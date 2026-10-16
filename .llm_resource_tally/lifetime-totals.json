@@ -1,0 +1,49 @@
+{
+  "schema": "llm-resource-tally/v4",
+  "accounting_scope": {
+    "scope_schema": 1,
+    "coverage_status": "unknown_unless_established_externally",
+    "allocation_policy": "next_commit_or_reconciled_pending",
+    "cross_repo_deduplication": "best_effort_local_user_machine",
+    "cross_repo_claim_identity": "backend_plus_transcript_source_digest_local_only",
+    "durable_observation_identity_backends": [
+      "pi"
+    ],
+    "global_observation_identity": false,
+    "durable_message_ids": false,
+    "durable_transcript_source_identity": false,
+    "session_identity": "backend_session_id",
+    "stored_state_integrity": "malformed_policy_or_ledger_fails_closed",
+    "per_model_turn_counts": false,
+    "history_rewrite_recovery": "requires_retained_transcripts",
+    "non_committing_work": "requires_reconcile",
+    "compaction_usage": "measured_signals_only_when_runtime_omits_usage"
+  },
+  "through": null,
+  "ledger_rows": 0,
+  "commits_accounted": 0,
+  "turns": 0,
+  "tokens": {
+    "input": 0,
+    "cache_write": 0,
+    "cache_read": 0,
+    "output": 0,
+    "billable_input": 0
+  },
+  "by_model": {},
+  "by_activity": {},
+  "by_agent": {},
+  "server_tool_calls": {
+    "web_search": 0,
+    "web_fetch": 0
+  },
+  "time": {
+    "wall_clock_s": 0.0
+  },
+  "compaction_signals": {
+    "events": 0,
+    "peak_context_tokens": 0,
+    "summary_chars": 0
+  },
+  "modeled_post_hoc": "inference_seconds, energy_kwh, carbon_gco2e, usd — derived from the measurements above by `estimate`; not stored here."
+}
