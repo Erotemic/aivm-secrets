@@ -401,7 +401,10 @@ def test_serve_refuses_anything_inside_a_guest_writable_root(world):
     # ...or its interpreter and libraries: a virtualenv inside the workspace.
     error, _ = refused(world, '--untrusted-root', sys.prefix)
     assert error['code'] == 'shared_source'
-    assert 'broker python environment' in error['detail']
+    # A wheel lives inside sys.prefix, so its code may be refused before the
+    # interpreter. An editable source tree reaches the interpreter check.
+    assert any(label in error['detail'] for label in (
+        'broker python environment', 'broker code'))
     assert world.service.requests == []
 
 

@@ -5,18 +5,38 @@ explicitly authorized operations. **Unaudited: not approved for production
 credentials or unattended privileged use.** It is not a TPM or hardware identity
 service and it is not a formally verified implementation.
 
-This source currently lives alongside AIVM, but builds an **independent** Python
-wheel. The ordinary AIVM wheel does not contain this package or its executable.
-An independent repository is planned; see the source checkout's
-`docs/planning/aivm-secrets-repository-boundary.md` for the transition rules.
+This is the standalone project extracted from AIVM. It installs its own
+`aivm-secrets` executable and does not require or bundle the AIVM VM manager.
+The package version remains **0.2.0**; extraction does not change the wire
+protocol or migrate existing authority, certificate, or OAuth vault state.
 
-For development from a trusted host checkout (not a guest-writable directory):
+From a trusted host checkout that guests cannot modify:
 
 ```bash
-python -m pip install ./aivm_secrets
-python -m aivm_secrets --help
+umask 077
+python3 -m venv .venv
+.venv/bin/python -m pip install '.[tests]'
+.venv/bin/python -m aivm_secrets --help
+.venv/bin/python -m pytest -q
+.venv/bin/python -m build
 ```
 
-The broker uses a separate process and a restricted, versioned operation
-interface. Review the operation policy and test with synthetic credentials
-before using it with a real service.
+Tests use synthetic credentials and local test services. Tests for the future
+independent Rust backend skip unless its runner is explicitly configured;
+those skips are not evidence of Python/Rust parity.
+
+Start with the [operator guide](docs/source/secrets.rst),
+[architecture and threat model](docs/planning/aivm-secrets-design.md),
+[policy examples](docs/examples/), and
+[assumption ledger](docs/planning/aivm-secrets-assumptions.json).
+AIVM-specific commands in the operator guide require the separate AIVM checkout
+and its existing experimental opt-in adapters.
+
+The [extraction record](docs/extraction.md) explains the preserved authorship,
+source commit, commit map, independent checks, and remaining integration work.
+Original author and co-author attribution is retained in Git history:
+
+```bash
+git shortlog -sne aivm-extraction-base
+git log --follow -- aivm_secrets/host/broker.py
+```

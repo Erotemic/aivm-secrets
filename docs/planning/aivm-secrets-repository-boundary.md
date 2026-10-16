@@ -1,11 +1,20 @@
 # AIVM / aivm-secrets repository boundary and extraction plan
 
-Status: **maintainer direction, 2026-10-14**. `aivm-secrets` remains an
+Original policy: **maintainer direction, 2026-10-14**. `aivm-secrets` remains an
 **experimental, unaudited Python implementation**. This document is the
 current integration/repository policy. It takes precedence over older
 statements that co-distribution or a process boundary alone makes the system
-ready for general AIVM users. The immediate decision is **not** to extract the
-repository on this branch: development may continue here temporarily.
+ready for general AIVM users. The original decision deferred repository extraction while development
+continued here. The **2026-10-16 update below** authorizes the initial port.
+
+## Extraction update, 2026-10-16
+
+The maintainer explicitly authorized the initial standalone repository port.
+See the [extraction record](../extraction.md) for preserved history, standalone
+packaging/tests and remaining cutover work. This direction supersedes the
+original instruction above to defer extraction. AIVM's existing copy and optional
+adapters remain in its repository for now; independent publication and security
+endorsement remain separate decisions. The constraints below still apply.
 
 ## Decision
 

@@ -1,0 +1,11 @@
+aivm_secrets/
+LICENSE
+.gitignore
+tests/__init__.py
+tests/secrets_helpers.py
+tests/secrets_vectors/
+regex:^tests/test_secrets.*\.py$
+tests/e2e/test_secrets.py
+regex:^docs/planning/aivm-secrets-.*
+regex:^docs/examples/aivm-secrets-.*
+docs/source/secrets.rst

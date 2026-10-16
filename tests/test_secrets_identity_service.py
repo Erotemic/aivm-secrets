@@ -603,20 +603,12 @@ def test_a_closed_lease_stops_listening_at_once_and_drains_only_briefly(
         assert caught.value.code == 'invalid_policy'
 
 
-def test_a_closed_lease_ends_the_bridge_inside_aivms_stop_timeout() -> None:
-    """``aivm ssh`` closes the bridge's lease, waits this long, then kills it."""
-    from aivm.secrets_transport import BROKER_STOP_TIMEOUT
-
-    # The lease is noticed within a poll, and then drained for at most this.
-    noticed = 2 * bridge_service.POLL_SECONDS
-    assert noticed + bridge_service.STOP_DRAIN_SECONDS < BROKER_STOP_TIMEOUT
-
-
 def test_a_bridge_child_whose_lease_closes_mid_call_exits_and_cleans_up(
     live: Live, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """As AIVM ends a bound session while an agent's call is at the provider."""
-    from aivm.secrets_transport import BROKER_STOP_TIMEOUT
+    # Standalone process contract: exit within ten seconds of lease EOF.
+    stop_timeout = 10.0
 
     release = threading.Event()
     live.provider.routes[('GET', '/v1/issues/24')] = held_until(release)
@@ -647,10 +639,10 @@ def test_a_bridge_child_whose_lease_closes_mid_call_exits_and_cleans_up(
         wait_for(lambda: live.provider.seen('GET'))
         closed = time.monotonic()
         child.stdin.close()
-        code = child.wait(timeout=BROKER_STOP_TIMEOUT)
+        code = child.wait(timeout=stop_timeout)
         took = time.monotonic() - closed
         assert code == 0
-        assert took < BROKER_STOP_TIMEOUT
+        assert took < stop_timeout
         # It removed its own socket rather than being killed beside it.
         assert not listen.exists()
         caller.join(timeout=10)

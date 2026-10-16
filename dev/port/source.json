@@ -1,0 +1,54 @@
+{
+  "source_commit": "27bc4d2afa8ded6e45ab47517dba7294724260dc",
+  "source_branch": "dev/0.6.2",
+  "history_paths": [
+    "aivm_secrets/",
+    "LICENSE",
+    ".gitignore",
+    "tests/__init__.py",
+    "tests/secrets_helpers.py",
+    "tests/secrets_vectors/",
+    "regex:^tests/test_secrets.*\\.py$",
+    "tests/e2e/test_secrets.py",
+    "regex:^docs/planning/aivm-secrets-.*",
+    "regex:^docs/examples/aivm-secrets-.*",
+    "docs/source/secrets.rst"
+  ],
+  "source_repository": "https://github.com/Erotemic/aivm",
+  "extracted_history_head": "f697d44f36fae6e8d6f21567f5a067dd30639066",
+  "preserved_commits": 46,
+  "filter_repo_version": "2.47.0",
+  "attribution_verified": [
+    "author identity and timestamp",
+    "committer identity and timestamp",
+    "complete commit message including co-author trailers"
+  ],
+  "external_assurance_paths": [
+    "aivm/rc/guest/guestctl.py",
+    "aivm/secrets_identity_transport.py",
+    "aivm/secrets_identity_vm.py",
+    "aivm/secrets_transport.py",
+    "tests/e2e/test_secrets.py",
+    "tests/test_secrets_guest_identity_csr.py",
+    "tests/test_secrets_transport.py",
+    "tests/test_secrets_vm_binding.py",
+    "tests/test_secrets_vm_enrollment_transport.py",
+    "tests/test_vm_create.py"
+  ],
+  "aivm_tests_retained_in_source": [
+    "tests/test_secrets_guest_identity_csr.py",
+    "tests/test_secrets_guest_identity_key_rotation.py",
+    "tests/test_secrets_repository_boundary.py",
+    "tests/test_secrets_transport.py",
+    "tests/test_secrets_vm_binding.py",
+    "tests/test_secrets_vm_enrollment_transport.py",
+    "tests/test_secrets_vm_identity_key_rotation.py",
+    "tests/test_secrets_vm_identity_renewal.py",
+    "tests/e2e/test_secrets.py"
+  ],
+  "mixed_tests_retained_in_source": [
+    "tests/test_secrets_purity.py::test_aivm_reaches_the_broker_only_as_a_process",
+    "tests/test_secrets_purity.py::test_aivm_never_names_the_key_destruction_verb",
+    "tests/test_secrets_identity_service.py::test_a_closed_lease_ends_the_bridge_inside_aivms_stop_timeout"
+  ]
+}

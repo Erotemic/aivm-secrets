@@ -1,1 +1,1 @@
-"""Test package for aivm; shared fakes live in tests.helpers."""
+"""Offline tests for the standalone experimental aivm-secrets distribution."""

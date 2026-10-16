@@ -299,27 +299,6 @@ def test_import_purity_from_cold_interpreter():
     assert done.stdout.strip() == '[]'
 
 
-def test_aivm_reaches_the_broker_only_as_a_process():
-    """AIVM may import the fixed error table and nothing else from the broker."""
-    seen = {}
-    for path in sorted((ROOT / 'aivm').rglob('*.py')):
-        names = [
-            name
-            for level, name in imports(path)
-            if level == 0 and name.startswith('aivm_secrets')
-        ]
-        if names:
-            seen[str(path.relative_to(ROOT))] = sorted(set(names))
-    assert seen == {
-        'aivm/cli/vm_connect.py': ['aivm_secrets.errors'],
-        # Reports an identity SecretsError as an operator error line.
-        'aivm/cli/vm_identity.py': ['aivm_secrets.errors'],
-        'aivm/secrets_transport.py': ['aivm_secrets.errors'],
-        'aivm/secrets_identity_transport.py': ['aivm_secrets.errors'],
-        'aivm/secrets_identity_vm.py': ['aivm_secrets.errors'],
-    }
-
-
 def test_host_modules_do_not_reach_around_the_kernel():
     """Host code may use kernel types, but only the broker drives transitions."""
     drivers = set()
@@ -332,6 +311,25 @@ def test_host_modules_do_not_reach_around_the_kernel():
         ):
             drivers.add(path.name)
     assert drivers == {'broker.py'}
+
+
+def assert_reference(reference: str) -> None:
+    """Local evidence must exist; AIVM evidence is pinned and inventoried.
+
+    External references identify the source of integration evidence. This
+    standalone suite does not claim to run or revalidate those tests.
+    """
+    import json
+
+    provenance = json.loads((ROOT / 'dev/port/source.json').read_text())
+    prefix = (provenance['source_repository'] + '/blob/' +
+              provenance['source_commit'] + '/')
+    if reference.startswith(prefix):
+        path = reference.removeprefix(prefix)
+        assert path in provenance['external_assurance_paths'], reference
+    else:
+        assert not reference.startswith('https://'), reference
+        assert (ROOT / reference).is_file(), reference
 
 
 def test_the_assumption_ledger_is_wellformed_and_points_at_real_files():
@@ -349,10 +347,10 @@ def test_the_assumption_ledger_is_wellformed_and_points_at_real_files():
     fields = {'id', 'boundary', 'assumption', 'owner', 'if_false', 'checked_by'}
     for entry in entries:
         assert set(entry) == fields, entry['id']
-        assert (ROOT / entry['owner']).is_file(), entry['owner']
+        assert_reference(entry['owner'])
         assert entry['checked_by'], entry['id']
         for path in entry['checked_by']:
-            assert (ROOT / path).is_file(), (entry['id'], path)
+            assert_reference(path)
     # Every boundary of the assurance plan's ledger is represented.
     assert {
         'Specification', 'Cryptography', 'Channel identity', 'Host isolation',
@@ -396,22 +394,3 @@ def test_garrett_policies_are_linked_and_their_obligations_recorded() -> None:
             assert obligation in ledger, f'{obligation} has no ledger entry'
             cited = ledger[obligation]['assumption']
             assert f'docs/planning/{name}' in cited, (obligation, name)
-
-
-def test_aivm_never_names_the_key_destruction_verb() -> None:
-    """Private keys are destroyed only by an operator running prune-keys.
-
-    The issuer API policy reserves that verb for a direct operator
-    invocation, so no AIVM code may spell it, not even behind a prompt.
-    """
-    found = []
-    for path in sorted((ROOT / 'aivm').rglob('*.py')):
-        tree = ast.parse(path.read_text(encoding='utf-8'))
-        for node in ast.walk(tree):
-            if (
-                isinstance(node, ast.Constant)
-                and isinstance(node.value, str)
-                and 'prune-keys' in node.value
-            ):
-                found.append(f'{path.relative_to(ROOT)}:{node.lineno}')
-    assert found == []

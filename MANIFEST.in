@@ -1,0 +1,5 @@
+include LICENSE README.md AGENTS.md
+graft docs
+graft tests
+recursive-include dev/port *.json *.txt *.py
+global-exclude __pycache__ *.py[cod]

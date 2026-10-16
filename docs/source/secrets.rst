@@ -1,6 +1,15 @@
 Secret-use sessions
 ===================
 
+Standalone extraction note (2026-10-16)
+--------------------------------------
+
+This guide was carried from AIVM with its history. Standalone installation now
+runs from this repository root; use the root README for development and test
+commands. Sections invoking ``aivm`` require the separate AIVM checkout and its
+existing experimental adapters. Historical VM/provider validation claims are
+not new validation of this port. See ``docs/extraction.md`` for the cutover plan.
+
 ``aivm-secrets`` lets a guest *use* a service credential without ever *holding*
 it. The credential stays on the host. The guest receives a short-lived,
 encrypted capability and may ask a host-side broker to perform a fixed list of
@@ -74,7 +83,8 @@ trusted host checkout **the guest cannot modify**. Ordinary ``pip install aivm``
 installs neither this package nor its cryptographic dependencies. Until the
 separate repository/distribution is published, use the sibling project::
 
-    python -m pip install ./aivm_secrets
+    umask 077
+    python -m pip install .
     install -d -m 700 "$HOME/.config/aivm/secrets"
     install -m 600 docs/examples/aivm-secrets-gitlab-merge-request.json \
         "$HOME/.config/aivm/secrets/gitlab.json"
@@ -673,7 +683,10 @@ Validation
 
 ::
 
-    python -m pytest -o addopts='' -q tests/test_secrets_*.py
+    python -m pytest -q
+
+The real-VM suite remains in the separate AIVM source checkout::
+
     AIVM_E2E=1 python -m pytest -o addopts='' -s tests/e2e/test_secrets.py
 
 The first runs offline, against in-process fakes and a real TLS server on
