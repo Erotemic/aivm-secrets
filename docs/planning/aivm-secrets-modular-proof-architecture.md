@@ -7,6 +7,10 @@ remains the target design for unfinished M3, M5 and M6. No Rust crate,
 extracted Lean theorem, or end-to-end proof is delivered. Existing protocol
 bytes and CLI behavior remain the compatibility contract.
 
+The [2026-10-16 Rust/Lean reconnaissance](aivm-secrets-rust-lean-recon.md)
+records the current source inventory, candidate toolchain pins and the first
+implementation-linked primitive proof to attempt.
+
 Related plans: [overall design](aivm-secrets-design.md),
 [dual implementations](aivm-secrets-parallel-implementations.md),
 [formal assurance](aivm-secrets-formal-assurance.md),
