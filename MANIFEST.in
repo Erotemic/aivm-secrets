@@ -1,5 +1,14 @@
 include LICENSE README.md AGENTS.md
+include .github/workflows/freshness.yml
 graft docs
 graft tests
 recursive-include dev/port *.json *.txt *.py
+recursive-include dev/verification *.py
+include rust/Cargo.toml rust/Cargo.lock rust/rust-toolchain.toml
+recursive-include rust/crates *.rs *.toml
+include proofs/lean-toolchain proofs/lakefile.lean proofs/lake-manifest.json
+include proofs/manifest.json proofs/Freshness.lean proofs/Check.lean
+recursive-include proofs/generated *.lean
+prune rust/target
+prune proofs/.lake
 global-exclude __pycache__ *.py[cod]

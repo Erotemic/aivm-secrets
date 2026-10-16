@@ -40,3 +40,8 @@ Original author and co-author attribution is retained in Git history:
 git shortlog -sne aivm-extraction-base
 git log --follow -- aivm_secrets/host/broker.py
 ```
+
+The first [verified Rust freshness primitive](docs/verified-freshness.md) has
+implementation-linked Lean proofs and scoped Python parity tests. It is an
+independent development unit; the Python broker remains experimental and
+unaudited, and full Rust broker/primitive-runner parity is still pending.

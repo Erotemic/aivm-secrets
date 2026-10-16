@@ -42,6 +42,13 @@ def test_standalone_wheel_and_sdist(tmp_path: Path) -> None:
         assert 'tests/test_secrets_broker.py' in names
         assert 'docs/planning/aivm-secrets-assumptions.json' in names
         assert 'dev/port/aivm-commit-map.txt' in names
+        assert 'rust/crates/aivm-secrets-primitives/src/lib.rs' in names
+        assert 'proofs/generated/AivmSecretsPrimitives.lean' in names
+        assert 'proofs/manifest.json' in names
+        assert 'dev/verification/freshness.py' in names
+        assert '.github/workflows/freshness.yml' in names
+        assert not any('/.lake/' in name or '/.tools/' in name or '/rust/target/' in name
+                       for name in names)
         assert not any(name.startswith(('aivm/', '.llm_resource_tally/'))
                        for name in names)
 

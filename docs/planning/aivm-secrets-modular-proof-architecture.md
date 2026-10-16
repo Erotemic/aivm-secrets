@@ -3,13 +3,14 @@
 Status: **M1 and selected M2/M4 Python modules implemented (2026-10-12).**
 The `primitives` package and self-contained *pure* Garrett protocol now exist;
 see [implementation record](aivm-secrets-garrett-modular-refactor.md). This
-remains the target design for unfinished M3, M5 and M6. No Rust crate,
-extracted Lean theorem, or end-to-end proof is delivered. Existing protocol
+remains the target design for unfinished M3, the rest of M5, and M6. Selected
+M5 epoch/time leaves now have [Rust-derived Lean proofs and scoped Python
+parity](../verified-freshness.md). End-to-end mediation remains unproved. Existing protocol
 bytes and CLI behavior remain the compatibility contract.
 
 The [2026-10-16 Rust/Lean reconnaissance](aivm-secrets-rust-lean-recon.md)
-records the current source inventory, candidate toolchain pins and the first
-implementation-linked primitive proof to attempt.
+records the pre-implementation source inventory and candidate proof path;
+the implementation record above supersedes its pending-toolchain status.
 
 Related plans: [overall design](aivm-secrets-design.md),
 [dual implementations](aivm-secrets-parallel-implementations.md),

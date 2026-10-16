@@ -4,7 +4,9 @@ Status: **implemented in Python, specified here for extraction.** This is the
 contract the planned safe-Rust kernel must meet. It describes what the code in
 `aivm_secrets/kernel/` does today, precisely enough to be ported function by
 function and checked against the frozen vectors in `tests/secrets_vectors/`.
-Nothing in this document is a proof, and no Lean artifact exists yet; see
+This document is a specification. Selected epoch/time leaves now have
+[Rust-derived Lean proofs](../verified-freshness.md); the full kernel remains
+unproved. See
 [the assurance plan](aivm-secrets-formal-assurance.md) for what is to be
 proved and [the design](aivm-secrets-design.md) for the threat model.
 
@@ -438,7 +440,8 @@ and [the P4a protocol](aivm-secrets-garrett-identity.md).
 The existing kernel specification remains the normative description of the
 **current Python state machine**. An incremental refactor is proposed in
 [the modular proof architecture](aivm-secrets-modular-proof-architecture.md);
-its new `aivm_secrets.primitives` package is **not implemented yet**.
+the Python `aivm_secrets.primitives` package is implemented, with selected
+epoch/time Rust/Lean leaves now checked. Budget/scope extraction remains open.
 
 Porting should move one behavior at a time behind a compatibility facade,
 not change `aivs1`, policy digests, error codes, or effect bytes. Candidate

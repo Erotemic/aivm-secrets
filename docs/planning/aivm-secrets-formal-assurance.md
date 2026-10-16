@@ -1,10 +1,12 @@
 # AIVM Secrets: formal assurance and refinement plan
 
-Status: obligations to implement, not completed proofs (updated 2026-10-12).
-The delivered system is Python with executable contracts and adversarial
-tests. There are no Lean proof artifacts, extracted Rust functions or
-verified-binary claims in this release. This document is the acceptance
-contract for that next stage. What exists today toward it: a pure,
+Status: **selected Rust freshness primitives proved (2026-10-16)**; the
+broker-wide obligations below remain open. The broker is Python with
+executable contracts and adversarial tests. The independent
+[Rust freshness unit](../verified-freshness.md) now has extracted Lean proofs
+and scoped Python parity, with exact coverage and assumptions in its manifest.
+This document remains the acceptance contract for broader assurance. Other
+existing evidence includes a pure,
 extraction-shaped kernel, [its specification](aivm-secrets-kernel-spec.md), a
 frozen conformance corpus, a mutation gate, and
 [a machine-readable assumption ledger](aivm-secrets-assumptions.json).
@@ -302,8 +304,9 @@ required witnesses, and `tests/test_secrets_mutation.py` applies each of those
 deletions.
 
 Run the same independent vectors through Python, compiled Rust and extracted
-Lean definitions once they exist; no Rust implementation or Lean derivation is
-currently present. The corpus is `tests/secrets_vectors/`, including
+Lean definitions as each unit is implemented. Epoch/time freshness has a
+scoped Rust runner and Lean derivation; the identity/broker runners below
+remain pending. The corpus is `tests/secrets_vectors/`, including
 `identity-v1.jsonl` for certificate binding. The Python JSONL runner is
 `aivm_secrets.identity.runner`; the Rust runner must accept the identical
 record protocol. CI must fail if it claims Rust parity but the Rust runner
@@ -379,8 +382,9 @@ from the unproved Python orchestration and network runtime.
 
 ## 8. Primitive theorem reuse and protocol composition (2026-10-12 plan)
 
-The planned `aivm_secrets.primitives` package is an internal source-level
-separation; no primitive module has yet been extracted or proved in Lean.
+The `aivm_secrets.primitives` package is an internal source-level separation.
+Selected epoch/time functions and their freshness composition now have
+implementation-linked Rust/Lean proofs; other primitive obligations remain.
 Its proposed proof targets are `PRIM-BOUNDS-01`, `PRIM-CANON-01`,
 `PRIM-TIME-01`, `PRIM-EPOCH-01`, `PRIM-BUDGET-01`, `PRIM-BIND-01` and
 `PRIM-SCOPE-01`, specified in

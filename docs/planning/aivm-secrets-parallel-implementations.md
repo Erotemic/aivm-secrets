@@ -1,5 +1,10 @@
 # AIVM Secrets: two independent implementations, one security contract
 
+**2026-10-16 implementation update:** the independent
+[Rust freshness unit](../verified-freshness.md) now has implementation-linked
+Lean proofs and scoped Python parity. The complete primitive runner, identity
+protocol runners, broker backend and composed effect proofs remain pending.
+
 **Decision (2026-10-12):** Keep a maintained **Python reference implementation**
 *and* develop a separate **safe-Rust implementation** of `aivm-secrets` with
 implementation-linked Lean proofs via Charon/Aeneas. Neither replaces the other.
@@ -237,7 +242,8 @@ contracts between the host launcher and the service.
 
 AIVM's host-side VM subject hash is tested against the independently maintained
 Python identity vectors. The tests compare this contract but are not Rust
-parity tests: no Rust executable exists yet.
+parity tests: no Rust managed-VM identity executable exists yet. The scoped
+freshness runner does not implement this identity contract.
 
 ## Python P4b local OAuth contract (2026-10-12)
 

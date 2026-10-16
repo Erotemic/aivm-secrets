@@ -1,5 +1,9 @@
 # Rust primitives and Lean verification: reconnaissance
 
+Subsequent implementation: see the [verified freshness unit](../verified-freshness.md)
+for the Rust source, checked Lean obligations, parity gate and actual tool pins.
+The inventory below records the state before that implementation.
+
 Date: **2026-10-16**. Inspected standalone source at
 `7de33b7` (Python package 0.2.0). This is an implementation proposal grounded
 in source and upstream inspection. No Rust implementation, extraction run,
