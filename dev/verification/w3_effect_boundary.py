@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 
 
@@ -18,18 +19,28 @@ HERE = Path(__file__).resolve()
 DEFAULT_ROOT = HERE.parents[2]
 INVENTORY_PATH = 'docs/planning/aivm-secrets-w3-reachability.json'
 RUST = 'rust/crates/aivm-secrets-garrett/src/'
-# Pin every in-repository Rust source and workspace/package build manifest, not
-# just the five files with the obvious network/write calls. This detects new
-# in-repository modules and changes to transitive Rust dependencies under review.
-# It cannot inspect external crate implementation code or prove dynamic reachability.
+# Pin repository-owned Rust sources and workspace/package build manifests,
+# including new untracked Rust modules. Cargo output is NOT source under review.
+# A normal `cargo build` creates rust/target/**, potentially including generated
+# *.rs files. Traversing that tree would make the inventory change after every
+# build, and can be extremely expensive. This still does not provide sound
+# interprocedural call-graph or external-dependency coverage.
 def rust_sources(root: Path) -> set[str]:
-    return {
-        p.relative_to(root).as_posix()
-        for p in (root / 'rust').rglob('*')
-        if p.is_file() and (p.suffix == '.rs' or p.name in {
-            'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml',
-        })
-    }
+    rust_root = root / 'rust'
+    result: set[str] = set()
+    for directory, subdirectories, filenames in os.walk(rust_root):
+        # Ignore local Cargo build outputs at any package/workspace depth,
+        # but continue checking all repository-owned sources (tracked or not).
+        subdirectories[:] = [name for name in subdirectories if name != 'target']
+        for name in filenames:
+            if not (name.endswith('.rs') or name in {
+                'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml',
+            }):
+                continue
+            path = Path(directory) / name
+            if path.is_file():
+                result.add(path.relative_to(root).as_posix())
+    return result
 
 
 EXPECTED_SOURCES = rust_sources(DEFAULT_ROOT)
@@ -147,7 +158,13 @@ def check(root: Path) -> dict:
     require(inventory.get('schema_version') == 1, 'unknown W3 inventory version')
     require(inventory.get('scope') == 'native-manifest-https-v1', 'invalid W3 scope')
     fingerprints = inventory.get('source_sha256', {})
-    require(set(fingerprints) == rust_sources(root), 'incomplete reviewed Rust source/build manifest inventory')
+    actual_sources = rust_sources(root)
+    unreviewed = sorted(actual_sources - set(fingerprints))
+    absent = sorted(set(fingerprints) - actual_sources)
+    require(not (unreviewed or absent),
+            'incomplete reviewed Rust source/build manifest inventory; '
+            f'new/unreviewed ({len(unreviewed)}): {unreviewed[:10]}; '
+            f'listed-but-absent ({len(absent)}): {absent[:10]}')
     contents = {}
     for source, expected in sorted(fingerprints.items()):
         path = root / source

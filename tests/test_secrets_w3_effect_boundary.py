@@ -115,3 +115,24 @@ def test_w3_rejects_added_rust_module(tmp_path):
     added.write_text('pub fn bypass() {}\n')
     with pytest.raises(ContractError, match='incomplete reviewed Rust source'):
         check(repo)
+
+
+def test_w3_ignores_cargo_generated_rust_sources(tmp_path):
+    repo = fake_checkout(tmp_path)
+    # Cargo and build scripts legitimately create Rust files under target/.
+    # They cannot be treated as repository-owned source inventory changes.
+    for path in [
+        repo / 'rust/target/debug/build/example/out/bindings.rs',
+        repo / 'rust/crates/aivm-secrets-garrett/target/debug/generated.rs',
+    ]:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('pub fn generated() {}\n')
+    assert check(repo)['sources'] == len(EXPECTED_SOURCES)
+
+
+def test_w3_reports_new_unreviewed_rust_source(tmp_path):
+    repo = fake_checkout(tmp_path)
+    path = repo / (RUST + 'unexpected_sink.rs')
+    path.write_text('pub fn unexpected_sink() {}\n')
+    with pytest.raises(ContractError, match=r'new/unreviewed .*unexpected_sink\.rs'):
+        check(repo)

@@ -10,7 +10,10 @@ pinned-toolchain build and maintainer security review. W4 and W6 remain open.
 The primary scope is **`manifest-https-v1` only**. The machine-readable
 `docs/planning/aivm-secrets-w3-reachability.json` maps 11 effect classes to
 W0 sinks, entry paths, constructor sites and concrete interpreters. It pins
-all 61 Rust source and workspace build files in this snapshot, including
+all 61 repository-owned Rust source and workspace build files in this snapshot,
+excluding Cargo-generated `rust/target/` and nested package `target/` trees. A
+normal Rust build must not invalidate the source review inventory. It still
+requires re-review of new untracked repository-owned Rust modules, including
 adjacent profiles and operator-only code, not just files containing `write_all`.
 `python dev/verification/w3_effect_boundary.py check` demands an explicit
 review/update when any pinned Rust file changes and tests several risky
@@ -65,8 +68,9 @@ projection before guest release, and a single credentialed HTTP adapter in
 the native manifest module. Six deliberately introduced source bypasses were
 rejected even after regenerating affected SHA-256 hashes: direct unchecked
 exchange, deleted freshness check, raw disclosure, token diagnostics, direct
-guest write, and raw error diagnostic. Three additional checks detect changed Rust source, newly added
-Rust modules, and omitted sink classes. These are **regression guards** against
+guest write, and raw error diagnostic. Additional checks detect changed Rust source, newly added
+repository-owned Rust modules, and omitted sink classes. Cargo-generated Rust
+sources are excluded by regression tests. These are **regression guards** against
 known edits, not proof of absence of other ways to bypass the boundary.
 
 ## Unproved or deferred obligations
