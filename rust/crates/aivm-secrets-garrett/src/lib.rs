@@ -10,6 +10,7 @@ pub use custody::ProviderSession;
 pub mod files;
 pub mod json;
 pub mod lifecycle;
+pub mod manifest;
 pub mod model;
 pub mod oauth;
 pub mod oauth_vault;
@@ -20,10 +21,14 @@ pub mod tpm;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
     InvalidCapability,
+    InvalidPolicy,
+    ResourceMismatch,
     InvalidRequest,
     Denied,
     Unreachable,
     UpstreamResponse,
+    UpstreamRejected,
+    UpstreamError,
     InternalError,
     UnsafeFile,
     OutcomeUnknown,
@@ -38,10 +43,14 @@ impl Error {
     pub fn code(self) -> &'static str {
         match self {
             Self::InvalidCapability => "invalid_capability",
+            Self::InvalidPolicy => "invalid_policy",
+            Self::ResourceMismatch => "resource_mismatch",
             Self::InvalidRequest => "invalid_request",
             Self::Denied => "denied",
             Self::Unreachable => "unreachable",
             Self::UpstreamResponse => "upstream_response",
+            Self::UpstreamRejected => "upstream_rejected",
+            Self::UpstreamError => "upstream_error",
             Self::InternalError => "internal_error",
             Self::UnsafeFile => "unsafe_file",
             Self::OutcomeUnknown => "outcome_unknown",

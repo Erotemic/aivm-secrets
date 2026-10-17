@@ -842,3 +842,63 @@ active: the general provider interpreter, native client-material creation,
 concrete acquisition/audit/storage/concurrent histories and deployment trust
 premises remain open. Python's runtime/reference and AIVM integration ownership
 were not changed by this checkpoint.
+
+## 2026-10-17 03:53:53 -0400
+
+The previous turn made progress in 3874fc1: normal PKCE login, direct encrypted
+installation, 139 checked obligations, 59 rejected Rust attacks and 2,008 full
+suite passes. The clean worktree confirms that checkpoint. I am now addressing
+the larger remaining provider surface rather than treating the fixed account
+profile as a complete port. The Python reference's schema-2 HTTPSpec includes
+parameter allowlists, defaults/folding, request bodies, fact checks/captures,
+paging, GraphQL and effect classifications. Native use needs that declarative
+request/effect path plus an explicit disclosure contract; returning arbitrary
+provider JSON would undo the existing credential-confinement design. I plan to
+keep policy parsing and HTTPS adapters separate from extracted authorization,
+route and release decisions and compare actual provider requests with Python.
+I am confident the existing identity/envelope/OAuth lease pipeline is reusable.
+The main risks are silently dropping manifest restrictions, path or header
+injection, checked-fact substitution, writes sent after an uncertain failure,
+and accidentally broadening public results. Unsupported semantics must be
+reported rather than ignored, and every staged subset remains an incomplete
+part of the full interpreter goal. No AIVM integration or Python reference
+runtime changes are authorized by this work.
+
+The native manifest path is now implemented through the authority-backed mTLS
+broker, reusing opaque inner envelopes and participating authority/OAuth leases.
+The operator explicitly selects unbounded requests, a file or explicit OAuth
+source override, allow/deny writes and a typed disclosure document. The effective
+digest binds those choices and the supplied documents; it intentionally does not
+claim Python normalized-policy digest equality. Parameter search supplies a
+witness, but the extracted core checks its bound and the actual selected value.
+That separation makes me more confident about safety even before search/parser
+refinement. Lean has checked 15 new obligations, including membership, operation
+and write authority, stale-grant denial and conditional selected-byte release.
+
+Real HTTPS tests cover compilation parity, bodies, GraphQL, checked facts,
+pagination, actual credential headers, another enrolled key presenting a stolen
+surrogate, renunciation, OAuth revocation draining and secret reflection. A
+slow-preflight test exposed missing freshness resampling before the second
+network effect; that is fixed, and sampling also follows each acknowledged
+audit. Review found that repeated projections could amplify a small response;
+a shared construction budget now bounds selected copies before allocation.
+These findings reinforce that proving local guards is useful but insufficient
+for the whole adapter. I am deliberately retaining the parser, JSON projection,
+HTTP, fsync/clock and concrete service-history obligations in the assumption
+ledger. Literal reflection denial cannot establish absence of encodings or
+semantic leaks. Nonempty CLI tables, native command sources, approvals and
+delegation remain explicit missing surfaces; normal AIVM and Python reference
+runtime code remain untouched. The final gates and release-archive comparison
+are still in progress at this point in the entry.
+
+The recorded gate passed 236 selected tests, 154 named axiom audits, strict lint
+in both feature modes and six Rust unit checks. Full pytest with normal service
+binaries passed 2,073 tests with the one expected general primitive-runner skip
+in 305.91 seconds. Sixty-five new manifest tests account for the increase. The
+remaining validation is the 70-mutant proof run and final packaging/archive
+comparison. For the next formal step, I would prioritize moving actual effect
+selection and typed disclosure into the extracted controller: accumulating
+local guard theorems must not substitute for the confidentiality result the
+user wants. Native client key/CSR commands and client/policy administration are
+also unfinished, but the unrefined release/building adapters are the central
+assurance gap in this new backend.

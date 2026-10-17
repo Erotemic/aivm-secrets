@@ -147,7 +147,7 @@ fn legacy_bridge(config: &Value) -> Outcome<(tls::Bridge, Value)> {
             now,
             lifetime,
         )?;
-        announcement = serde_json::json!({"version":1,"ready":true,"profile":"account-status-v1","capability":std::str::from_utf8(&issued.token).map_err(|_|Error::InternalError)?,"expires_at":issued.claims.expires_at});
+        announcement = serde_json::json!({"version":1,"ready":true,"profile":provider.profile(),"capability":std::str::from_utf8(&issued.token).map_err(|_|Error::InternalError)?,"expires_at":issued.claims.expires_at});
         tls::Bridge::new_provider(
             tls,
             verifier,

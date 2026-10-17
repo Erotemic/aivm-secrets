@@ -61,7 +61,7 @@
     "rust/crates/freshness-conformance/Cargo.toml": "13a263f66bdb0e24d8bd2eff079f4b04755b70ae4b4706f3019b5527b2194df1",
     "rust/crates/freshness-conformance/src/main.rs": "e0b5c477a18d4301025942d4f7e3ae7f22af1db4d8444dc4be7ae9840ff37f76",
     "proofs/lean-toolchain": "ca5f1f601d34c49079e38d7e7041eb0f2a9c227fbc1df0f404820069a052330c",
-    "proofs/lakefile.lean": "51326899b27ac53208fc9f645f93b12af2791d5ac1afb4fb11ec403c46365058",
+    "proofs/lakefile.lean": "44b730d0eed6cf336b7c9f3d7eadb1ae4eea5a9001e74b3a22fd6c4587cf19f4",
     "proofs/lake-manifest.json": "c7d460c9a3a2b982550c022e66d0bb41901f18a84c14aa6d02ff77f8b7933a4e",
     "proofs/generated/AivmSecretsPrimitives.lean": "b1834c11e6c31f82d1124bd4a55bd7af1d245cd130ff9fd234883d1360f47dfa",
     "proofs/Freshness.lean": "1839b70609de168419aa6c4d4e6afa40a57b9fa6c7a7755dcd4b98e8994d1e22",

@@ -176,7 +176,7 @@ class AuthorityProviderCase(ProviderCase):
             assert line, self.process.stderr.read()
             announcement = codec.loads(line)
             assert (
-                announcement["ready"] and announcement["profile"] == "account-status-v1"
+                announcement["ready"] and announcement["profile"] == provider["profile"]
             )
             assert TOKEN.encode() not in line
             self.token = announcement["capability"]

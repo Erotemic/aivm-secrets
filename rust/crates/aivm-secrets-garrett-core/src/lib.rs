@@ -9,6 +9,7 @@
 pub mod authority;
 pub mod credential_use;
 pub mod enrollment;
+pub mod manifest;
 pub mod oauth_login;
 pub mod oauth_state;
 pub mod protocol;

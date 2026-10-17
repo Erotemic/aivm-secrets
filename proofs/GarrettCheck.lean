@@ -1,3 +1,4 @@
+import GarrettManifest
 import GarrettLogin
 import GarrettOAuth
 import GarrettTrust
@@ -155,3 +156,19 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.oauth_login.Proofs.uncertain_never_reexchanges
 #print axioms aivm_secrets_garrett_core.oauth_login.Proofs.successful_callback_witness
 #print axioms aivm_secrets_garrett_core.oauth_login.Proofs.successful_exchange_witness
+
+#print axioms aivm_secrets_garrett_core.manifest.Proofs.index_exact
+#print axioms aivm_secrets_garrett_core.manifest.Proofs.parameter_contract
+#print axioms aivm_secrets_garrett_core.manifest.Proofs.integer_choice_is_in_allowlist
+#print axioms aivm_secrets_garrett_core.manifest.Proofs.text_choice_is_in_allowlist
+#print axioms aivm_secrets_garrett_core.manifest.Proofs.range_never_exceeds_authority
+#print axioms aivm_secrets_garrett_core.manifest.Proofs.body_never_exceeds_authority
+#print axioms aivm_secrets_garrett_core.manifest.Proofs.integer_out_of_bounds_denied
+#print axioms aivm_secrets_garrett_core.manifest.Proofs.type_confusion_denied
+#print axioms aivm_secrets_garrett_core.manifest.Proofs.authorize_contract
+#print axioms aivm_secrets_garrett_core.manifest.Proofs.writes_need_host_permission
+#print axioms aivm_secrets_garrett_core.manifest.Proofs.request_cannot_select_other_operation
+#print axioms aivm_secrets_garrett_core.manifest.Proofs.stale_grant_cannot_dispatch
+#print axioms aivm_secrets_garrett_core.manifest.Proofs.release_exact
+#print axioms aivm_secrets_garrett_core.manifest.Proofs.discarded_response_noninterference
+#print axioms aivm_secrets_garrett_core.manifest.Proofs.range_positive_witness

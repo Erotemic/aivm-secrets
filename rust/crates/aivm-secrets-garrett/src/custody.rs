@@ -459,7 +459,7 @@ impl OAuthSource {
 }
 /// Explicit account-status-v1 custody profile. This is a development provider
 /// session, not a replacement for the general Python policy interpreter.
-pub struct ProviderSession {
+struct AccountSession {
     envelope: InnerEnvelope,
     grant: core::UseGrant,
     executor: Executor,
@@ -467,12 +467,29 @@ pub struct ProviderSession {
     inner: String,
     oauth: Option<OAuthSource>,
 }
-impl ProviderSession {
+impl AccountSession {
     pub fn start(
         config: &Value,
         identity_binding: &Value,
         now: i64,
         lifetime: i64,
+    ) -> Outcome<Self> {
+        Self::start_with_policy(
+            config,
+            config,
+            identity_binding,
+            now,
+            lifetime,
+            "account-status-v1",
+        )
+    }
+    fn start_with_policy(
+        config: &Value,
+        effective: &Value,
+        identity_binding: &Value,
+        now: i64,
+        lifetime: i64,
+        profile: &str,
     ) -> Outcome<Self> {
         let m = json::keys(
             config,
@@ -589,7 +606,7 @@ impl ProviderSession {
             )?);
             (credential(&raw)?, None, lifetime)
         };
-        let policy = hex(digest::digest(&digest::SHA256, &json::canonical(config)).as_ref());
+        let policy = hex(digest::digest(&digest::SHA256, &json::canonical(effective)).as_ref());
         let c = json!({"binding":identity_binding,"policy_digest":policy,"grant_id":hex(&random::<16>()?),"issued_at":now,"expires_at":now+lifetime});
         let mut envelope = InnerEnvelope::new(&random::<32>()?)?;
         // OAuth's validated opaque-token grammar permits short synthetic or
@@ -614,7 +631,11 @@ impl ProviderSession {
             address,
             audit: Audit::new(Path::new(text(config, "audit_file")?), &c)?,
         };
-        executor.audit.record("session_open")?;
+        if profile == "account-status-v1" {
+            executor.audit.record("session_open")?;
+        } else {
+            executor.audit.write_record(&json!({"schema":1,"event":"session_open","profile":profile,"grant":executor.audit.grant,"policy":executor.audit.policy}))?;
+        }
         Ok(Self {
             envelope,
             grant,
@@ -854,5 +875,71 @@ mod tests {
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n2\r\n{}\r\n0\r\nAuthorization: private\r\n\r\n",
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\nContent-Encoding: gzip\r\n\r\n{}",
         ] { assert!(response(raw.as_bytes()).is_err()); }
+    }
+}
+
+mod manifest_session;
+enum Backend {
+    Account(Box<AccountSession>),
+    Manifest(Box<manifest_session::Session>),
+}
+pub struct ProviderSession(Backend);
+impl ProviderSession {
+    pub fn start(config: &Value, binding: &Value, now: i64, lifetime: i64) -> Outcome<Self> {
+        if config["profile"] == "manifest-https-v1" {
+            Ok(Self(Backend::Manifest(Box::new(
+                manifest_session::Session::start(config, binding, now, lifetime)?,
+            ))))
+        } else {
+            Ok(Self(Backend::Account(Box::new(AccountSession::start(
+                config, binding, now, lifetime,
+            )?))))
+        }
+    }
+    pub fn profile(&self) -> &'static str {
+        match &self.0 {
+            Backend::Account(_) => "account-status-v1",
+            Backend::Manifest(_) => "manifest-https-v1",
+        }
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn issue(
+        &self,
+        issuer: &Issuer,
+        registry: &Registry,
+        name: &str,
+        audience: &str,
+        subject: &str,
+        now: i64,
+        lifetime: i64,
+    ) -> Outcome<IssuedSurrogate> {
+        match &self.0 {
+            Backend::Account(s) => {
+                s.issue(issuer, registry, name, audience, subject, now, lifetime)
+            }
+            Backend::Manifest(s) => {
+                s.issue(issuer, registry, name, audience, subject, now, lifetime)
+            }
+        }
+    }
+    pub(crate) fn request(
+        &mut self,
+        verifier: &Verifier,
+        token: &str,
+        peer: &crate::tls::VerifiedPeer,
+        expected: Expectation,
+        value: &Value,
+        now: i64,
+    ) -> Outcome<Value> {
+        match &mut self.0 {
+            Backend::Account(s) => s.request(verifier, token, peer, expected, value, now),
+            Backend::Manifest(s) => s.request(verifier, token, peer, expected, value, now),
+        }
+    }
+    pub(crate) fn control(&mut self, inner: &[u8], verb: &str, now: i64) -> Outcome<Value> {
+        match &mut self.0 {
+            Backend::Account(s) => s.control(inner, verb, now),
+            Backend::Manifest(s) => s.control(inner, verb, now),
+        }
     }
 }

@@ -11,4 +11,4 @@ lean_lib Generated where
   roots := #[`AivmSecretsPrimitives, `AivmSecretsGarrettCore]
 
 @[default_target] lean_lib Proofs where
-  roots := #[`Freshness, `Check, `Garrett, `GarrettSecrecy, `GarrettProtocol, `GarrettHistory, `GarrettEnrollment, `GarrettAuthority, `GarrettTrust, `GarrettOAuth, `GarrettLogin, `GarrettCheck]
+  roots := #[`Freshness, `Check, `Garrett, `GarrettSecrecy, `GarrettProtocol, `GarrettHistory, `GarrettEnrollment, `GarrettAuthority, `GarrettTrust, `GarrettOAuth, `GarrettLogin, `GarrettManifest, `GarrettCheck]

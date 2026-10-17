@@ -78,5 +78,9 @@ Extracted Lean contracts check durable quarantine before refresh and persistence
 before returning a successor. Native host-only PKCE login now binds its loopback
 callback before emitting the browser URL, exchanges one accepted code and installs
 the grant directly into the encrypted vault. Its callback/lifecycle guards have
-extracted proofs. General policy interpretation and concrete whole-service
-refinement remain open.
+extracted proofs. A new native `manifest-https-v1` backend executes host-selected
+operations with typed parameters, checked facts, bodies, pagination and fixed
+GraphQL reads. It requires an explicit typed response disclosure contract and
+uses extracted parameter and operation/write guards. Client aliases, command
+resolvers, approvals/delegation and concrete whole-service refinement remain
+open; the adapter and interpreter are not formally verified.

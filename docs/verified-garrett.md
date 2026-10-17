@@ -623,11 +623,140 @@ path and an independent Python URL/ciphertext oracle. The mutation gate now
 requires 59 changed Rust controllers to fail unchanged proofs, including eleven
 new callback/lifecycle attacks. Hosted CI remains unexecuted.
 
+## Native declarative provider execution
+
+`manifest-https-v1` extends the native custody path to a host-selected schema-2
+HTTPS policy. The provider receives the real credential while the authenticated
+agent sends only an operation name and bounded scalar arguments. Implemented
+semantics include integer sets/ranges and string allowlists, path/query templates,
+body fields, aggregate UTF-8 body limits, defaults and ASCII folding, declared
+read/write classification, checked facts and validated captures, fact returns,
+pagination metadata and a fixed single named GraphQL query. A POST read is
+allowed only for that static GraphQL form. The provider contract still determines
+whether a declared read is actually non-mutating.
+
+Select the new profile in the native bridge/authority configuration's `provider`
+object, using host-owned files and the same mTLS/authority setup described above:
+
+```json
+{
+  "profile": "manifest-https-v1",
+  "host": "api.example.org",
+  "address": "192.0.2.25",
+  "port": 443,
+  "authentication": "bearer",
+  "server_ca": "/private/provider-ca.pem",
+  "credential_file": "/private/provider-token",
+  "audit_file": "/private/provider-audit.jsonl",
+  "policy_file": "/private/tracker-policy.json",
+  "disclosure_file": "/private/tracker-disclosure.json",
+  "writes": "allow",
+  "request_limit": "unbounded"
+}
+```
+
+`writes` must explicitly be `allow` or `deny`; a GET declared as a write uses the
+same gate as PATCH. There is no new quota: `request_limit: "unbounded"` explicitly
+overrides the legacy policy's numeric `max_requests`. This is a versioned native
+profile choice, not a silent reinterpretation of an existing session. The
+policy's credential source must exactly name the selected file. For an OAuth
+source, omit `credential_file`, supply the existing `oauth` object and explicitly
+select `source_override: "oauth"`. There is no source fallback. Host, authentication
+and any declared address/port/CA pins must agree. The effective policy digest
+binds the native configuration, supplied policy document and disclosure document.
+It is not the Python interpreter's normalized policy digest; omitted defaults
+and explicitly supplied defaults may produce distinct native session digests.
+Policy, disclosure and file credentials are session snapshots. Editing those
+files does not revoke an existing session: renounce or stop/restart the service
+when applying a policy/file-source change. Restart replaces the ephemeral inner
+key and invalidates the old session's tokens. OAuth mutations instead participate
+in the active credential lease described above.
+
+For example, a reviewed operation can contain:
+
+```json
+{
+  "name": "ticket.edit",
+  "effect": "write",
+  "method": "PATCH",
+  "path": "/v1/tickets/{ticket}",
+  "parameters": {"ticket": [7, 8]},
+  "body_fields": {"text": 2000}
+}
+```
+
+A disclosure document must name every operation exactly once and specify its
+public fields. For this operation, a minimal entry is:
+
+```json
+{
+  "ticket.edit": {
+    "id": {"at": ["id"], "type": "integer"}
+  }
+}
+```
+
+Pointers traverse object keys. Types are `integer`, `boolean`, `text`, `null`,
+`object` with a `fields` map, or `array` with `items` and bounded `max_items`.
+Every object level drops undeclared fields. Selected copies are charged against
+a reply-size bound before construction, including repeated projections. There is
+no unrestricted JSON projection. Arrays apply their item schema recursively. Selected decoded text
+and keys, serialized results and final route coordinates are checked against
+literal credential reflection. A malicious provider reflecting the credential
+in a captured path is rejected before that final route is logged or sent.
+These checks do not establish that an allowed field cannot reveal a secret
+through an encoding, fragment, timing channel or semantic information. The
+operator/provider disclosure contract is still essential.
+
+The native path holds its authority and optional OAuth credential lease through
+both preflight and final execution. It rechecks identity and grant freshness
+after preflight and after each acknowledged dispatch audit. Acknowledged audit intent precedes each effect, and bodies and
+provider diagnostics are not logged. Calls use the configured IP and verified
+TLS hostname, with no proxy environment, key log, redirect following or automatic
+retry. Framing is bounded and rejects ambiguous/compressed responses. JSON
+responses require the declared JSON media type; text responses require plain
+text, with the usual empty 204 exception. Empty JSON is rejected. After any
+attempted write, transport, provider, projection or completion-audit failure is
+`outcome_unknown`; the action may already have happened. A connection/TLS failure
+before sending remains `unreachable`. Read HTTP errors use fixed rejection/error
+codes without provider text. HTTP status metadata is not preserved in the native
+error envelope.
+
+`GarrettManifest.lean` proves contracts over the Aeneas translation of the actual
+Rust parameter and admission guards: exact allowlist membership at the checked
+index, range/body authority, type mismatch and out-of-bounds denial, current grant
+and exact operation/write permission. A broken or malicious search index cannot
+make an unlisted value pass. Its release theorem states that changing discarded
+response bytes cannot change already-selected output bytes. It does not prove
+the JSON projection adapter, route/check/GraphQL parsers, actual network/audit
+ordering or the whole service. `manifest-conformance` compares independently
+compiled effects against Python; integration tests inspect real HTTPS methods,
+targets, bodies and credential headers and exercise denial, expiry, revocation,
+projection and uncertain-write paths. This is finite behavioral evidence, not an
+all-input equivalence proof.
+
+The native-manifest checkpoint passes **2,073 full-suite tests**, with one
+expected pending general primitive-runner skip (305.91 seconds), using normal
+native service binaries. The recorded gate passes **236 selected Garrett tests**,
+all **154 named axiom checks**, strict Rust lint in both modes and six Rust
+unit checks. **65 new manifest tests** cover independent Python effect compilation
+and actual native provider I/O, filtering, expiry and revocation. The mutation
+gate requires **70 changed Rust controllers** to fail unchanged proofs, including
+eleven new parameter, operation/write and release attacks. Hosted CI remains
+unexecuted, and all credentials/providers/TPM activity in this validation are
+synthetic or isolated emulation.
+
+Native CLI alias tables, command resolver execution, one-shot write approvals,
+and delegated/attenuated grant lineages remain unfinished. Nonempty CLI tables
+are explicitly rejected. Command source descriptions are validated by the pure
+compiler but are not executed by a native session. Use a reviewed file source
+or explicit OAuth override. Existing Python policies are not migrated or changed.
+
 ## Remaining assurance work
 
 The [acceptance plan](planning/aivm-secrets-garrett-verification.md) remains
 the broader goal. Remaining work includes concrete adapter refinement,
-complete credential/policy administration and general provider interpretation in Rust,
+complete credential/policy administration, native client aliases/resolvers/approvals/delegation,
 TPM provenance deployment, broader
 provider release/egress proofs, audit/log confinement, and a composed finite
 service-history theorem. The extracted request composition does not establish

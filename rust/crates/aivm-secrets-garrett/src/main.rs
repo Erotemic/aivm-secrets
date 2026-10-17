@@ -9,6 +9,7 @@ fn main() -> io::Result<()> {
         || (args.is_empty() && env!("CARGO_BIN_NAME") == "registry-conformance");
     let identity_mode = args.as_slice() == ["--identity"]
         || (args.is_empty() && env!("CARGO_BIN_NAME") == "identity-conformance");
+    let manifest_mode = args.is_empty() && env!("CARGO_BIN_NAME") == "manifest-conformance";
     let oauth_mode = args.is_empty() && env!("CARGO_BIN_NAME") == "oauth-conformance";
     let authority_mode = args.is_empty() && env!("CARGO_BIN_NAME") == "authority-conformance";
     let rotation_mode = args.is_empty() && env!("CARGO_BIN_NAME") == "key-rotation-conformance";
@@ -19,7 +20,7 @@ fn main() -> io::Result<()> {
             "unknown conformance mode",
         ));
     }
-    let limit = if crypto_mode || registry_mode {
+    let limit = if crypto_mode || registry_mode || manifest_mode {
         262144
     } else if identity_mode || authority_mode {
         8192
@@ -72,6 +73,8 @@ fn main() -> io::Result<()> {
                     {
                         Err(Error::InvalidCapability)
                     }
+                } else if manifest_mode {
+                    aivm_secrets_garrett::manifest::evaluate(&v)
                 } else if oauth_mode {
                     aivm_secrets_garrett::oauth::evaluate(&v)
                 } else if authority_mode {

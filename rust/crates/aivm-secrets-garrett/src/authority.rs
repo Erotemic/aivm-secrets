@@ -787,7 +787,7 @@ pub fn bridge_from_config(config: &Value, now: i64) -> Outcome<(tls::Bridge, Val
             now,
             lifetime,
         )?;
-        let ready = json!({"version":1,"ready":true,"profile":"account-status-v1","capability":std::str::from_utf8(&issued.token).map_err(|_|Error::InternalError)?,"expires_at":issued.claims.expires_at});
+        let ready = json!({"version":1,"ready":true,"profile":provider.profile(),"capability":std::str::from_utf8(&issued.token).map_err(|_|Error::InternalError)?,"expires_at":issued.claims.expires_at});
         (
             tls::Bridge::new_provider(
                 boot.tls,

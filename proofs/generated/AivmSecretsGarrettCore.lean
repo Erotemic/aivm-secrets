@@ -521,14 +521,14 @@ def enrollment.enroll_client
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::Denial]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 17:0-19:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 18:0-20:1
     Visibility: public -/
 @[discriminant isize]
 inductive Denial where
 | InvalidCapability : Denial
 
 /-- [aivm_secrets_garrett_core::Claims]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 21:0-30:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 22:0-31:1
     Visibility: public -/
 structure Claims where
   issuer : alloc.vec.Vec Std.U8
@@ -541,7 +541,7 @@ structure Claims where
   certificate : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::Expectation]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 32:0-37:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 33:0-38:1
     Visibility: public -/
 structure Expectation where
   issuer : alloc.vec.Vec Std.U8
@@ -550,7 +550,7 @@ structure Expectation where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::IssueWindow]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 39:0-43:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 40:0-44:1
     Visibility: public -/
 structure IssueWindow where
   issued_at : Std.I64
@@ -558,7 +558,7 @@ structure IssueWindow where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::issue_window]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 46:0-73:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 47:0-74:1
     Visibility: public -/
 def issue_window
   (active : Bool) (epoch : Std.I64) (not_after : Std.I64) (now : Std.I64)
@@ -602,7 +602,7 @@ def issue_window
   else ok (core.result.Result.Err Denial.InvalidCapability)
 
 /-- [aivm_secrets_garrett_core::present]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 77:0-104:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 78:0-105:1
     Visibility: public -/
 def present
   (claims : Claims) (expected : Expectation) (peer : alloc.vec.Vec Std.U8)
@@ -666,21 +666,21 @@ def present
                           else ok (core.result.Result.Ok ())
 
 /-- [aivm_secrets_garrett_core::AuthenticatedEnvelope]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 108:0-111:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 109:0-112:1
     Visibility: public -/
 structure AuthenticatedEnvelope where
   claims : Claims
   encrypted : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::OpenedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 113:0-116:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 114:0-117:1
     Visibility: public -/
 structure OpenedSurrogate (S : Type _) where
   claims : Claims
   secret : S
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeVerifier]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 119:0-123:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 120:0-124:1
     Visibility: public -/
 structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
   verify : Self → alloc.vec.Vec Std.U8 → Result (core.result.Result
@@ -689,7 +689,7 @@ structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
     Self_Secret Denial)
 
 /-- [aivm_secrets_garrett_core::open_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 128:0-150:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 129:0-151:1
     Visibility: public -/
 def open_surrogate
   {V : Type _} {Clause0_Secret : Type _} (EnvelopeVerifierInst :
@@ -713,7 +713,7 @@ def open_surrogate
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssueInputs]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 152:0-161:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 153:0-162:1
     Visibility: public -/
 structure IssueInputs where
   issuer : alloc.vec.Vec Std.U8
@@ -726,7 +726,7 @@ structure IssueInputs where
   not_after : Std.I64
 
 /-- [aivm_secrets_garrett_core::prepare_issue]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 164:0-179:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 165:0-180:1
     Visibility: public -/
 def prepare_issue
   (input : IssueInputs) (now : Std.I64) (lifetime : Std.I64) :
@@ -749,21 +749,21 @@ def prepare_issue
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssuedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 181:0-184:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 182:0-185:1
     Visibility: public -/
 structure IssuedSurrogate where
   claims : Claims
   token : alloc.vec.Vec Std.U8
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeIssuer]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 186:0-189:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 187:0-190:1
     Visibility: public -/
 structure EnvelopeIssuer (Self : Type _) (Self_Secret : Type _) where
   «seal» : Self → Claims → Self_Secret → Result (core.result.Result
     (alloc.vec.Vec Std.U8) Denial)
 
 /-- [aivm_secrets_garrett_core::issue_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 191:0-207:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 192:0-208:1
     Visibility: public -/
 def issue_surrogate
   {I : Type _} {Clause0_Secret : Type _} (EnvelopeIssuerInst : EnvelopeIssuer I
@@ -780,6 +780,134 @@ def issue_surrogate
       ok (core.result.Result.Ok { claims, token })
     | core.result.Result.Err error => ok (core.result.Result.Err error)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
+
+/-- [aivm_secrets_garrett_core::manifest::Scalar]
+    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 5:0-8:1
+    Visibility: public -/
+@[discriminant isize]
+inductive manifest.Scalar where
+| Integer : Std.I64 → manifest.Scalar
+| Text : alloc.vec.Vec Std.U8 → manifest.Scalar
+
+/-- [aivm_secrets_garrett_core::manifest::Rule]
+    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 9:0-14:1
+    Visibility: public -/
+@[discriminant isize]
+inductive manifest.Rule where
+| Range : Std.I64 → Std.I64 → manifest.Rule
+| Integers : alloc.vec.Vec Std.I64 → manifest.Rule
+| Texts : alloc.vec.Vec (alloc.vec.Vec Std.U8) → manifest.Rule
+| Body : Std.Usize → manifest.Rule
+
+/-- [aivm_secrets_garrett_core::manifest::parameter]:
+    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 15:0-40:1
+    Visibility: public -/
+def manifest.parameter
+  (rule : manifest.Rule) (value : manifest.Scalar) (witness : Std.Usize) :
+  Result (core.result.Result Unit credential_use.UseDenial)
+  := do
+  match rule with
+  | manifest.Rule.Range lo hi =>
+    match value with
+    | manifest.Scalar.Integer value1 =>
+      if lo < 0#i64
+      then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+      else
+        if hi < lo
+        then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        else
+          if value1 < lo
+          then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+          else
+            if value1 > hi
+            then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+            else ok (core.result.Result.Ok ())
+    | manifest.Scalar.Text _ =>
+      ok (core.result.Result.Err credential_use.UseDenial.Denied)
+  | manifest.Rule.Integers allowed =>
+    match value with
+    | manifest.Scalar.Integer value1 =>
+      let i := alloc.vec.Vec.len allowed
+      if witness >= i
+      then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+      else
+        let i1 ←
+          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.I64)
+            allowed witness
+        if i1 != value1
+        then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        else ok (core.result.Result.Ok ())
+    | manifest.Scalar.Text _ =>
+      ok (core.result.Result.Err credential_use.UseDenial.Denied)
+  | manifest.Rule.Texts allowed =>
+    match value with
+    | manifest.Scalar.Integer _ =>
+      ok (core.result.Result.Err credential_use.UseDenial.Denied)
+    | manifest.Scalar.Text value1 =>
+      let i := alloc.vec.Vec.len allowed
+      if witness >= i
+      then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+      else
+        let v ←
+          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+            (alloc.vec.Vec Std.U8)) allowed witness
+        let b ←
+          alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8 v value1
+        if b
+        then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        else ok (core.result.Result.Ok ())
+  | manifest.Rule.Body maximum =>
+    match value with
+    | manifest.Scalar.Integer _ =>
+      ok (core.result.Result.Err credential_use.UseDenial.Denied)
+    | manifest.Scalar.Text value1 =>
+      if maximum < 1#usize
+      then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+      else
+        let i := alloc.vec.Vec.len value1
+        if i > maximum
+        then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        else ok (core.result.Result.Ok ())
+
+/-- [aivm_secrets_garrett_core::manifest::authorize]:
+    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 42:0-60:1
+    Visibility: public -/
+def manifest.authorize
+  (claims : credential_use.UseClaims) (grant : credential_use.UseGrant)
+  (requested : alloc.vec.Vec Std.U8) (selected : alloc.vec.Vec Std.U8)
+  (write : Bool) (writes_allowed : Bool) (now : Std.I64) (elapsed : Std.I64) :
+  Result (core.result.Result Unit credential_use.UseDenial)
+  := do
+  let r ← credential_use.require_use_current claims grant now elapsed
+  match r with
+  | core.result.Result.Ok _ =>
+    let b ←
+      alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8 requested
+        selected
+    if b
+    then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+    else
+      if write
+      then
+        if writes_allowed
+        then ok (core.result.Result.Ok ())
+        else ok (core.result.Result.Err credential_use.UseDenial.Denied)
+      else ok (core.result.Result.Ok ())
+  | core.result.Result.Err _ => ok r
+
+/-- [aivm_secrets_garrett_core::manifest::ProviderReply]
+    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 61:0-64:1
+    Visibility: public -/
+structure manifest.ProviderReply where
+  selected : alloc.vec.Vec Std.U8
+  discarded : alloc.vec.Vec Std.U8
+
+/-- [aivm_secrets_garrett_core::manifest::release]:
+    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 65:0-67:1
+    Visibility: public -/
+def manifest.release
+  (reply : manifest.ProviderReply) : Result (alloc.vec.Vec Std.U8) := do
+  ok reply.selected
 
 /-- [aivm_secrets_garrett_core::oauth_login::Stage]
     Source: 'crates/aivm-secrets-garrett-core/src/oauth_login.rs', lines 3:0-10:1
