@@ -1040,3 +1040,27 @@ byte. The 80-controller mutation run is still active; it has rejected the first
 16 mutations. I am committing the source/proof checkpoint before any further
 work so that its remaining audit runs against immutable inputs. It remains on
 the feature branch until that final mutation gate passes.
+
+The isolated reflection review reproduced a direct leak in account-status-v1:
+a valid 16-digit credential placed in the provider's integer id was returned in
+the successful client frame. The host's typed-public-field assumption does not
+excuse this preventable literal reflection. A minimal adapter fix now checks the
+complete success frame while the credential is still held; its new regression
+also exercises the Python reference broker and confirms the same upstream_response
+denial. I copied only that adapter/test fix back into this candidate. All actual
+Rust controllers, extracted functions, Lean proofs and mutation-gate source are
+byte-identical to 3b0ec8f, so the ongoing 80-controller proof challenge remains
+applicable. The record/full-suite/package gates are being refreshed for the
+runtime fix. The separate borrowed-slice search prototype is not included here.
+
+The numeric-reflection follow-up passes the refreshed 253 selected tests and
+191 axiom audits, strict lint in both feature modes and six Rust unit checks.
+The normal-service full suite passes 2,090 tests with the sole expected primitive
+runner skip in 310.32 seconds. Build/twine checks pass, and all 191 checked
+source/proof/document archive inputs match. Documentation now makes both-success
+premises explicit for the older cross-credential use theorem: reflection denial
+can depend on which credential is substituted. The 80-mutation run is continuing
+against unchanged controllers/proofs, with 67 re-extracted mutations rejected so
+far. The new search-helper implementation and seven checked prototype lemmas are
+saved separately on garrett-reflection-core; its stale manifests/registration
+must be completed before integration.

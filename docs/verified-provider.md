@@ -63,7 +63,12 @@ A valid provider response has a nonnegative `i64` field `id` and Boolean field
 `active`. The released result contains exactly those fields. All other JSON
 content is discarded, including reflected credentials, refresh tokens,
 diagnostics and nested data. Invalid response structure produces a closed
-error code without reflecting bytes.
+error code without reflecting bytes. Before the selected values leave credential
+custody, the native adapter also checks the complete canonical success frame
+for literal credential reflection, including reflection through a numeric `id`.
+A synthetic numeric-credential regression matches the Python broker's
+`upstream_response` denial. This tripwire does not detect encodings or semantic
+leaks and is not part of the typed projection proof.
 
 This stronger release contract is **selected explicitly** by the profile.
 The general Python broker's existing raw-result/reflection semantics remain
@@ -83,8 +88,10 @@ and its proofs in [`Garrett.lean`](../proofs/Garrett.lean) cover:
   credential, under its explicit execution contract.
 - Successful release is exactly the approved typed projection.
 - Two-run release noninterference for arbitrary discarded response bytes.
-- Credential-use noninterference when credentials/private response content
-  change while the provider's declared public `id` and `active` agree.
+- Credential-use noninterference when both explicit executor calls succeed and
+  credentials/private response content change while the provider's declared
+  public `id` and `active` agree. This does not require equal denial behavior
+  after changing the credential.
 - A successful authorized execution, rather than an always-deny controller.
 
 The last condition matters: a malicious provider can encode a credential in

@@ -7,6 +7,7 @@ semantics and the selected public fields, without claiming whole-broker parity.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import base64
@@ -362,9 +363,15 @@ def test_inflight_request_may_finish_but_revoked_identity_cannot_dispatch_again(
                     assert pending.result(timeout=5)["ok"]
                 assert not case.invoke()["ok"]
                 assert len(provider.requests) == 1
-                records = [codec.loads(line) for line in (p / "audit.jsonl").read_bytes().splitlines()]
+                records = [
+                    codec.loads(line)
+                    for line in (p / "audit.jsonl").read_bytes().splitlines()
+                ]
                 assert [r["event"] for r in records] == [
-                    "session_open", "issued", "dispatch", "completed"
+                    "session_open",
+                    "issued",
+                    "dispatch",
+                    "completed",
                 ]
                 assert records[1]["identity"] == records[2]["identity"]
 
@@ -690,3 +697,43 @@ def test_audit_file_excludes_other_sessions_and_rejects_partial_records():
                     and not denied.stdout
                 )
                 assert not provider.requests
+
+
+def test_numeric_credential_cannot_be_reflected_through_public_id(
+    tmp_path, monkeypatch
+):
+    secret = "1234567890123456"
+    monkeypatch.setattr(sys.modules[__name__], "TOKEN", secret)
+    with TLSService(provider_directory(tmp_path)) as provider:
+        provider.routes[("GET", "/v1/account")] = dict(id=int(secret), active=True)
+        with ProviderCase(tmp_path, provider) as case:
+            reply = case.invoke()
+            assert not reply["ok"], reply
+            assert reply["error"]["code"] == "upstream_response"
+            assert secret not in json.dumps(reply)
+            from aivm_secrets.kernel.service import parse_policy
+
+            policy = provider.policy(
+                tmp_path / "credential",
+                operations=[
+                    dict(
+                        name="profile.read",
+                        effect="read",
+                        method="GET",
+                        path="/v1/account",
+                    )
+                ],
+            )
+            reference = Harness(
+                tmp_path / "reference",
+                policy=policy,
+                token=secret,
+                executor=HTTPSExecutor(parse_policy(policy).egress),
+            )
+            try:
+                expected = reference.invoke("profile.read")
+                assert expected["error"]["code"] == reply["error"]["code"]
+                assert secret not in json.dumps(expected)
+            finally:
+                reference.broker.close()
+        assert secret.encode() not in (tmp_path / "audit.jsonl").read_bytes()
