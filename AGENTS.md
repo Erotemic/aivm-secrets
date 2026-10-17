@@ -10,7 +10,9 @@ and [sink inventory](docs/planning/aivm-secrets-w0-boundaries.json); check
 references with `python dev/verification/w0_contract.py check`. The W0
 inventory is hand-assembled and **not** exhaustive I/O reachability evidence.
 Older P/M/G milestone documents are detailed design/history, not alternative
-task assignments. Focus on a useful
+task assignments. W1 has a standalone broker/guest/TLS workflow in
+`docs/standalone-github-workflow.md` and
+`tests/test_secrets_w1_github_workflow.py`. Focus on a useful
 standalone broker workflow and conditional, implementation-linked credential
 confinement; do not advertise formal VM isolation or whole-service secrecy.
 

@@ -71,3 +71,38 @@ first failing test was `test_standalone_wheel_and_sdist`, because the current
 environment has no Python `build` module. `python -m build` fails for the same
 missing module. No Rust/Lean rebuild attempted because W0 changes neither
 Rust implementation nor Lean proof source.
+
+## 2026-10-17 11:54:00 -0400
+
+W1 implementation on top of the `28e466d` source and W0/planning overlays.
+Added `tests/secrets_github_scenario.py` as stable synthetic provider data and
+policy intent for W2, plus `tests/test_secrets_w1_github_workflow.py` as an
+independent multi-process workflow. The test starts the real Python broker,
+uses separate installed CLI processes for requests, and records real locally
+TLS-protected HTTPS traffic. The policy is the expanded GitHub manifest with
+host-selected synthetic credential, pinned loopback address and test CA.
+
+Positive steps cover exact checked PR metadata, `gh` JSON projection, raw
+diff and commit-bound checks; assertions include the provider's observed
+bearer credential, method, Accept/version headers and precise preflight/final
+paths. Denied steps cover a different PR, an operation admitted in policy but
+forbidden by the host write gate, unknown API operation, injected URL argument
+and the absence of real `gh` fallback. The provider's deliberate literal
+token reflection is rejected; a wrong head-repository fact prevents final
+execution after an allowed preflight. Host revocation and grant expiry reject
+additional requests; audit records are chain-verified and exclude literal
+credential/capability, and runtime socket/capability files are removed.
+
+This is local functional integration evidence for the Python broker only.
+It does not prove credential isolation from a same-UID client, validate a
+real GitHub token/API, prove general declassification or confer Rust parity.
+Python's `pr.view` protocol returns the whole checked response, whereas W0's
+intended native Rust declassification boundary is stricter; W2 must compare
+intended semantics and explicitly document differences. Left production code,
+wire versions, and existing W0 proof files unchanged.
+
+Validation: three W1 tests passed twice (final run 26.65 seconds), 506 nearby
+Python guest/policy/broker/W0/purity regression tests passed, W0 structural
+checker passed. A broad CLI-heavy regression invocation exceeded its timeout
+after 19 tests, so it is not counted as passing. No live GitHub, Rust, Lean or
+VM test was attempted. Maintainer review of test coverage remains open.
