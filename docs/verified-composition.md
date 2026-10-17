@@ -96,3 +96,7 @@ unaudited; this checkpoint does not complete that campaign. The subsequent
 [issuance and history layer](verified-history.md) adds recorded issuance,
 ideal signature origin and conditional source-controller histories; concrete
 service-history refinement remains open.
+
+## W4 candidate scope (2026-10-17)
+
+The new [W4 source-linked trace model](verified-w4-core-trace.md) composes extracted Rust manifest authorization, parameter checking, and recursive response projection into a **modeled** two-phase sink invariant. It does not extract the native manifest session or concrete I/O adapters; kernel compilation is still pending. The original controller composition and the global service-level refinement obligations described above remain open.

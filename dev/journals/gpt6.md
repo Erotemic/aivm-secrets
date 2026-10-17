@@ -170,3 +170,23 @@ container, so neither the new Rust unit tests nor the four native TLS
 subprocess workflows could be run here. This is an implementation-level
 root-cause inference from the Rust parser, not yet a verified full runtime
 repair. W0/W3 structural checks and Python regression tests can be run here.
+
+## 2026-10-17 16:29:00 -0400 — W4 conditional core-trace candidate
+
+- Built `proofs/GarrettConfinement.lean` as a finite effect semantics tied to Aeneas-extracted `manifest::authorize`, `manifest::parameter` and `disclosure::project`. The native W3 I/O interpreter is not extracted, so the model and its pending Lean theorems are intentionally **not** labeled whole-service assurance.
+- Explicitly modeled audit acknowledgement, preflight/provider failure, completion audit refusal, and revocation at a fresh final-phase authorization sample. Imported `protocol::perform` contract proofs are separately referenced rather than equated with native manifest dispatch.
+- Added source/proof digest inventory, a static guard and a separate `prove` mode to demand Lean kernel compilation and axiom audit; mutation tests exercise guard integrity. Does not modify the recorded Garrett proof manifest or production Rust.
+- Toolchain limitation in the working environment: no `cargo`, `lake`, or `lean`, and no access to download the pinned binaries. The candidate's Lean scripts are **not verified to compile**. This risk must be resolved before W4 is marked complete. W5/W6 remain independent obligations; practical value depends on corresponding real native I/O traces.
+
+## 2026-10-17 17:31:00 -0400 — W3/W4 acceptance runner repair
+
+A user run of W4 showed W3's complete-Rust-source scanner traversing Cargo's
+`target/` output after native Rust builds, so generated `.rs` files triggered a
+false source-inventory drift. Prune `target/` subtrees while keeping fail-closed
+review for repository-owned and untracked Rust source; added positive and
+negative regression tests. W4's `prove` reached Lake but failed before parsing
+any proof because the pinned Aeneas Lean backend had not been installed. Add
+actionable preflight diagnostics and explicit `garrett.py bootstrap` instructions.
+Do not auto-download dependencies from a proof command. The container lacks
+network access and a Lean toolchain: the W4 proof remains uncompiled and unverified.
+No source-level security assurance claim was expanded.

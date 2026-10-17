@@ -17,7 +17,7 @@ task assignments. W1 has a standalone broker/guest/TLS workflow in
 **skipped native tests are not W2 completion**. W3's reviewed-effect inventory
 and source guard are in `docs/verified-w3-effect-boundary.md` and
 `dev/verification/w3_effect_boundary.py`; they do not prove transitive I/O
-reachability. Run both W0/W3 checkers after Rust boundary changes. Focus on a useful
+reachability. Run both W0/W3 checkers after Rust boundary changes. W4 has a source-linked candidate at `proofs/GarrettConfinement.lean` with a separate `python dev/verification/w4_trace.py prove` Lean kernel gate; see `docs/verified-w4-core-trace.md`. Until that passes and W6 establishes the native I/O correspondence, do not call W4 or whole-service mediation proven. Focus on a useful
 standalone broker workflow and conditional, implementation-linked credential
 confinement; do not advertise formal VM isolation or whole-service secrecy.
 
