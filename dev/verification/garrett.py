@@ -74,6 +74,19 @@ THEOREMS += [
     "aivm_secrets_garrett_core.protocol.Proofs.perform_projection_noninterference",
 ]
 
+THEOREMS += [
+    "aivm_secrets_garrett_core.protocol.Proofs.recorded_issuance_contract",
+    "aivm_secrets_garrett_core.protocol.Proofs.recorded_issuance_failure",
+    "aivm_secrets_garrett_core.protocol.Proofs.recorded_issuance_success",
+    "Garrett.ControllerHistory.all_histories_correspond",
+    "Garrett.ControllerHistory.dispatch_continuation",
+    "Garrett.History.signature_origin_monotone",
+    "Garrett.History.deduction_preserves_signature_origin",
+    "Garrett.History.trace_is_public",
+    "Garrett.History.every_observation_has_signature_origin",
+    "Garrett.History.protected_signature_was_issued",
+]
+
 TESTS = [
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
@@ -118,6 +131,7 @@ def inputs() -> list[str]:
         "proofs/GarrettSecrecy.lean",
         "proofs/GarrettCheck.lean",
         "proofs/GarrettProtocol.lean",
+        "proofs/GarrettHistory.lean",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
         "dev/verification/freshness.py",
@@ -297,7 +311,7 @@ def assurance_coordinates() -> dict:
         "theorems": THEOREMS,
         "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
         "implementation_linked": "Aeneas-generated issuance, complete request preparation/observation/use/release controllers, exact byte/epoch/time decisions and typed public-result projection",
-        "symbolic_model": "Dolev-Yao encrypted-message deduction and public protocol traces",
+        "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
             "Signature verification authenticates the exact envelope; sealing/unsealing implement their stated cryptographic contracts.",
@@ -310,6 +324,7 @@ def assurance_coordinates() -> dict:
             "TPM tools and silicon/emulator command semantics are trusted; the restricted AK pin must be independently provisioned and oracle access controlled.",
             "The native observer acknowledges only a complete, flushed record under the exclusive-writer and trusted host/filesystem assumptions; acknowledgement is not a client field.",
             "Presentation uses trusted entry/enrollment/clock snapshots; cross-process dispatch linearization and whole-service concurrent traces remain open.",
+            "Controller histories assume signature verification has prior recorded issuer origin; the ideal signature-origin theorem does not establish a computational byte-level or concrete I/O refinement.",
         ],
         "exclusions": [
             "Proof of Python or all-input cross-language equivalence",
@@ -411,6 +426,18 @@ def mutate() -> None:
     mutations += [
         (
             protocol_source,
+            "unrecorded issuance released",
+            "observer.issued(&issued.claims)",
+            "Ok::<(), Denial>(())",
+        ),
+        (
+            protocol_source,
+            "substituted issuance record",
+            "observer.issued(&issued.claims)",
+            "observer.issued(&Claims { issuer: Vec::new(), audience: Vec::new(), subject: Vec::new(), token_id: Vec::new(), certificate: Vec::new(), epoch: 0, issued_at: 0, expires_at: 1 })",
+        ),
+        (
+            protocol_source,
             "composed authorization bypass",
             "authorize_use(\n        &inner.claims,\n        grant,\n        operation,\n        presentation.now,\n        presentation.elapsed,\n    )",
             "Ok::<(), UseDenial>(())",
@@ -485,7 +512,7 @@ def mutate() -> None:
                 env=env,
             )
             rejected = False
-            for module in ["Garrett", "GarrettProtocol"]:
+            for module in ["Garrett", "GarrettProtocol", "GarrettHistory"]:
                 proof = temporary / (module + ".lean")
                 shutil.copy2(PROOFS / proof.name, proof)
                 result = base.run(

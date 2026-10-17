@@ -83,14 +83,16 @@ observational equivalence, hide metadata/length/timing, or refine the entire
 Rust I/O system into the symbolic trace. Concrete cryptographic primitives,
 TLS/X.509, parser, filesystem, compiler and translation are trusted boundaries.
 
-The manifest now declares **45 named obligations**, including supporting lemmas,
+The manifest now declares **55 named obligations**, including supporting lemmas,
 the [credential-use/release contracts](verified-provider.md) and the
 [composed request controller](verified-composition.md). The composition checks
 authenticated opening, current inner authorization, exact audit acknowledgement
-and selected provider execution in the native Rust request path.
+and selected provider execution in the native Rust request path. The
+[history layer](verified-history.md) adds recorded issuance, ideal protected
+signature origin and conditional source-controller histories.
 Every transitive axiom dependency is checked afresh. Only Lean's `propext`,
 `Classical.choice`, and `Quot.sound` are permitted; no admitted proof or
-project-specific security axiom is allowed. Fourteen deliberate changes to actual
+project-specific security axiom is allowed. Sixteen deliberate changes to actual
 Rust must break the unchanged extracted proofs: missing certificate binding,
 missing epoch binding, inclusive expiry, inactive issuance, bypassing binding
 before decryption, returning a token without sealing, removing inner binding,
@@ -98,6 +100,8 @@ bypassing use authorization, substituting a provider route and exposing private
 response length in a public field. The composed-controller mutations also bypass
 authorization or audit acknowledgement, substitute the recorded identity and
 change the dispatched route.
+The issuance mutations omit acknowledgement or record a different identity
+before releasing the token.
 
 ## TPM custody and enrollment evidence
 

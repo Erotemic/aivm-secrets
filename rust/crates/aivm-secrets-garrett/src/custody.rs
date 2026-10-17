@@ -554,7 +554,8 @@ impl ProviderSession {
         {
             return Err(Error::InvalidCapability);
         }
-        issuer.issue_for_enrollment(
+        issuer.issue_observed(
+            &self.executor.audit,
             registry,
             issuer_name,
             audience,
@@ -663,6 +664,17 @@ pub(crate) fn fixture_envelope(v: &Value) -> Outcome<Value> {
     }
 }
 
+impl protocol::IssuanceObserver for Audit {
+    fn issued(
+        &self,
+        claims: &aivm_secrets_garrett_core::Claims,
+    ) -> Result<(), aivm_secrets_garrett_core::Denial> {
+        let identity = crate::model::claims_json(claims)
+            .map_err(|_| aivm_secrets_garrett_core::Denial::InvalidCapability)?;
+        self.write_record(&json!({"schema":1,"event":"issued","grant":self.grant,"policy":self.policy,"identity":identity}))
+            .map_err(|_| aivm_secrets_garrett_core::Denial::InvalidCapability)
+    }
+}
 impl protocol::CredentialOpener for InnerEnvelope {
     type Capability = InnerCapability;
     type Credential = Credential;

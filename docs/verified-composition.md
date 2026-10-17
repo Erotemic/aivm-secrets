@@ -79,8 +79,8 @@ private files; mode checks do not substitute for isolation from the agent.
 ## Reproduce and remaining work
 
 Run `dev/verification/garrett.py check` and `mutate` as documented in
-[verified Garrett](verified-garrett.md). The gate checks 45 named obligations.
-Fourteen changes to actual Rust are re-extracted and must fail the unchanged
+[verified Garrett](verified-garrett.md). The gate checks 55 named obligations.
+Sixteen changes to actual Rust are re-extracted and must fail the unchanged
 proofs. The composition mutations bypass authorization or audit acknowledgement,
 substitute the recorded identity, or change the dispatched route.
 
@@ -92,4 +92,7 @@ parser/crypto/HTTP/filesystem refinement, durable CA/OAuth authority and physica
 TPM provenance remain in the
 [acceptance plan](planning/aivm-secrets-garrett-verification.md). General policy
 and provider support also remain open. The implementation is experimental and
-unaudited; this checkpoint does not complete that campaign.
+unaudited; this checkpoint does not complete that campaign. The subsequent
+[issuance and history layer](verified-history.md) adds recorded issuance,
+ideal signature origin and conditional source-controller histories; concrete
+service-history refinement remains open.

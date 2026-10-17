@@ -497,15 +497,41 @@ def issue_surrogate
     | core.result.Result.Err error => ok (core.result.Result.Err error)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
+/-- Trait declaration: [aivm_secrets_garrett_core::protocol::IssuanceObserver]
+    Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 14:0-16:1
+    Visibility: public -/
+structure protocol.IssuanceObserver (Self : Type _) where
+  issued : Self → Claims → Result (core.result.Result Unit Denial)
+
+/-- [aivm_secrets_garrett_core::protocol::issue_recorded]:
+    Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 18:0-35:1
+    Visibility: public -/
+def protocol.issue_recorded
+  {I : Type _} {A : Type _} {Clause0_Secret : Type _} (EnvelopeIssuerInst :
+  EnvelopeIssuer I Clause0_Secret) (IssuanceObserverInst :
+  protocol.IssuanceObserver A) (issuer : I) (observer : A)
+  (input : IssueInputs) (now : Std.I64) (lifetime : Std.I64)
+  (secret : Clause0_Secret) :
+  Result (core.result.Result IssuedSurrogate Denial)
+  := do
+  let r ← issue_surrogate EnvelopeIssuerInst issuer input now lifetime secret
+  match r with
+  | core.result.Result.Ok issued =>
+    let r1 ← IssuanceObserverInst.issued observer issued.claims
+    match r1 with
+    | core.result.Result.Ok _ => ok r
+    | core.result.Result.Err error => ok (core.result.Result.Err error)
+  | core.result.Result.Err _ => ok r
+
 /-- [aivm_secrets_garrett_core::protocol::OpenedCredential]
-    Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 11:0-14:1
+    Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 37:0-40:1
     Visibility: public -/
 structure protocol.OpenedCredential (S : Type _) where
   claims : credential_use.UseClaims
   credential : S
 
 /-- Trait declaration: [aivm_secrets_garrett_core::protocol::CredentialOpener]
-    Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 15:0-22:1
+    Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 41:0-48:1
     Visibility: public -/
 structure protocol.CredentialOpener (Self : Type _) (Self_Capability : Type _)
   (Self_Credential : Type _) where
@@ -513,7 +539,7 @@ structure protocol.CredentialOpener (Self : Type _) (Self_Capability : Type _)
     (protocol.OpenedCredential Self_Credential) credential_use.UseDenial)
 
 /-- Trait declaration: [aivm_secrets_garrett_core::protocol::DispatchObserver]
-    Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 25:0-33:1
+    Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 51:0-59:1
     Visibility: public -/
 structure protocol.DispatchObserver (Self : Type _) where
   record : Self → Claims → credential_use.UseClaims →
@@ -521,7 +547,7 @@ structure protocol.DispatchObserver (Self : Type _) where
     (core.result.Result Unit credential_use.UseDenial)
 
 /-- [aivm_secrets_garrett_core::protocol::Presentation]
-    Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 34:0-39:1
+    Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 60:0-65:1
     Visibility: public -/
 structure protocol.Presentation where
   expected : Expectation
@@ -530,14 +556,14 @@ structure protocol.Presentation where
   elapsed : Std.I64
 
 /-- [aivm_secrets_garrett_core::protocol::Prepared]
-    Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 43:0-47:1 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 69:0-73:1 -/
 structure protocol.Prepared (S : Type _) where
   identity : Claims
   claims : credential_use.UseClaims
   credential : S
 
 /-- [aivm_secrets_garrett_core::protocol::prepare]:
-    Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 49:0-90:1 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 75:0-116:1 -/
 def protocol.prepare
   {V : Type _} {O : Type _} {Clause0_Secret : Type _} {Clause1_Credential :
   Type _} (EnvelopeVerifierInst : EnvelopeVerifier V Clause0_Secret)
@@ -573,7 +599,7 @@ def protocol.prepare
     ok (core.result.Result.Err credential_use.UseDenial.InvalidCapability)
 
 /-- [aivm_secrets_garrett_core::protocol::perform]:
-    Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 93:0-118:1
+    Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 119:0-144:1
     Visibility: public -/
 def protocol.perform
   {V : Type _} {O : Type _} {A : Type _} {E : Type _} {Clause0_Secret : Type _}

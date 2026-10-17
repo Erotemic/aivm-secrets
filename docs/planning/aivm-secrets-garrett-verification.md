@@ -12,6 +12,10 @@ outer/inner opening, authorization, exact audit acknowledgement and execution
 under named adapter contracts. Finite issuance/use histories, concurrent
 revocation boundaries, concrete adapter refinement and general policy support
 remain open; this does not close the full-service acceptance items below.
+The [issuance/history layer](../verified-history.md) adds acknowledged native
+issuance, ideal signature origin over adaptive attacker traces and conditional
+source-controller history correspondence. Refinement from actual service I/O
+and storage histories to those models remains open.
 
 The first substantial verification target is the Garrett protocol implemented
 by this project:

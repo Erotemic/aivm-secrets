@@ -6,7 +6,33 @@ use crate::credential_use::{
     authorize_use, finish_use, CredentialExecutor, PublicReply, Route, UseClaims, UseDenial,
     UseGrant,
 };
+use crate::{issue_surrogate, Denial, EnvelopeIssuer, IssueInputs, IssuedSurrogate};
 use crate::{open_surrogate, Claims, EnvelopeVerifier, Expectation};
+
+/// Acknowledges the public identity of the exact token being released. It has
+/// no access to either envelope's plaintext or the provider credential.
+pub trait IssuanceObserver {
+    fn issued(&self, claims: &Claims) -> Result<(), Denial>;
+}
+
+pub fn issue_recorded<I: EnvelopeIssuer, A: IssuanceObserver>(
+    issuer: &I,
+    observer: &A,
+    input: IssueInputs,
+    now: i64,
+    lifetime: i64,
+    secret: &I::Secret,
+) -> Result<IssuedSurrogate, Denial> {
+    let issued = match issue_surrogate(issuer, input, now, lifetime, secret) {
+        Ok(issued) => issued,
+        Err(error) => return Err(error),
+    };
+    match observer.issued(&issued.claims) {
+        Ok(()) => (),
+        Err(error) => return Err(error),
+    }
+    Ok(issued)
+}
 
 pub struct OpenedCredential<S> {
     pub claims: UseClaims,

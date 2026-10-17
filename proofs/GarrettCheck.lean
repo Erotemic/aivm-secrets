@@ -1,4 +1,4 @@
-import GarrettProtocol
+import GarrettHistory
 import Garrett
 import GarrettSecrecy
 
@@ -50,3 +50,14 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.protocol.Proofs.prepare_successful
 #print axioms aivm_secrets_garrett_core.protocol.Proofs.perform_successful
 #print axioms aivm_secrets_garrett_core.protocol.Proofs.perform_projection_noninterference
+
+#print axioms aivm_secrets_garrett_core.protocol.Proofs.recorded_issuance_contract
+#print axioms aivm_secrets_garrett_core.protocol.Proofs.recorded_issuance_failure
+#print axioms aivm_secrets_garrett_core.protocol.Proofs.recorded_issuance_success
+#print axioms Garrett.ControllerHistory.all_histories_correspond
+#print axioms Garrett.ControllerHistory.dispatch_continuation
+#print axioms Garrett.History.signature_origin_monotone
+#print axioms Garrett.History.deduction_preserves_signature_origin
+#print axioms Garrett.History.trace_is_public
+#print axioms Garrett.History.every_observation_has_signature_origin
+#print axioms Garrett.History.protected_signature_was_issued

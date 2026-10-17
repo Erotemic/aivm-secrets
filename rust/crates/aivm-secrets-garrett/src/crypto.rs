@@ -113,6 +113,35 @@ impl Issuer {
         now: i64,
         lifetime: i64,
     ) -> Outcome<core::IssuedSurrogate> {
+        let (input, secret) =
+            Self::enrollment_material(registry, issuer, audience, subject, inner)?;
+        core::issue_surrogate(self, input, now, lifetime, &secret)
+            .map_err(|_| Error::InvalidCapability)
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn issue_observed<A: core::protocol::IssuanceObserver>(
+        &self,
+        observer: &A,
+        registry: &model::Registry,
+        issuer: &str,
+        audience: &str,
+        subject: &str,
+        inner: &[u8],
+        now: i64,
+        lifetime: i64,
+    ) -> Outcome<core::IssuedSurrogate> {
+        let (input, secret) =
+            Self::enrollment_material(registry, issuer, audience, subject, inner)?;
+        core::protocol::issue_recorded(self, observer, input, now, lifetime, &secret)
+            .map_err(|_| Error::InvalidCapability)
+    }
+    fn enrollment_material(
+        registry: &model::Registry,
+        issuer: &str,
+        audience: &str,
+        subject: &str,
+        inner: &[u8],
+    ) -> Outcome<(core::IssueInputs, InnerCapability)> {
         let mut id = [0; 16];
         SystemRandom::new()
             .fill(&mut id)
@@ -120,8 +149,7 @@ impl Issuer {
         let token_id: String = id.iter().map(|b| format!("{b:02x}")).collect();
         let input = registry.issue_inputs(issuer, audience, subject, &token_id)?;
         let secret = InnerCapability(Zeroizing::new(inner.to_vec()));
-        core::issue_surrogate(self, input, now, lifetime, &secret)
-            .map_err(|_| Error::InvalidCapability)
+        Ok((input, secret))
     }
     fn seal(&self, claims: &Claims, inner: &[u8], nonce: [u8; 12]) -> Outcome<String> {
         let public = model::claims_json(claims)?;

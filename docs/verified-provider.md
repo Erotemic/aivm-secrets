@@ -42,7 +42,10 @@ headers. Its framing decisions follow the security boundary described by
 [RFC 9112](https://www.rfc-editor.org/rfc/rfc9112.html#section-6.3); this adapter
 is not a proof of the HTTP standard or a general-purpose HTTP client.
 
-The audit file records fixed events plus the grant/policy identifiers.
+The audit file records fixed events plus the grant/policy identifiers. Native
+issuance records the exact signed public identity before releasing the token;
+the [history layer](verified-history.md) describes its checked controller and
+conditional correspondence with subsequent dispatches.
 Dispatch intent includes the authenticated public identity, inner binding,
 operation and exact route. It is synced before provider I/O; completion is
 synced before releasing the result. The sink holds an exclusive session lock,
@@ -143,13 +146,14 @@ TPM-client/Rust-custody/provider path. No live accounts are contacted.
 
 ## Local validation
 
-The full suite passed with **1,899 tests and one expected pending full-primitive
-runner skip** in 289.00 seconds. The selected Garrett gate passed 62 tests;
-the normal client/bridge builds passed all 22 integration tests. Lean checked
-45 named obligations with the permitted axiom inventory. All fourteen changes to
+The full suite passed with **1,901 tests and one expected pending full-primitive
+runner skip** in 288.32 seconds. The selected Garrett gate passed 64 tests;
+the normal client/bridge builds passed all 24 integration tests. Lean checked
+55 named obligations with the permitted axiom inventory. All sixteen changes to
 actual Rust were re-extracted and rejected by the unchanged proofs, including
 wrong-route substitution, a private-response-length disclosure and bypassed
-composed authorization/audit linkage. The provider
+composed authorization/audit linkage, and omitted or substituted issuance
+acknowledgement. The provider
 cases also inspect service/client stdout, stderr, readiness fields and audit
 records for credential leakage. Strict lint passes with and without the
 conformance feature. These are local checks; hosted CI and physical TPM

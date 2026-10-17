@@ -10,11 +10,13 @@ from __future__ import annotations
 import os
 import sys
 import base64
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import select
 import subprocess
 import tempfile
 import time
+import threading
 
 from aivm_secrets.host.envelope import EnvelopeCodec
 from aivm_secrets.host.egress import HTTPSExecutor
@@ -266,6 +268,7 @@ def test_rust_owns_custody_and_matches_reference_provider_substitution(monkeypat
                 events = [codec.loads(line)["event"] for line in audit.splitlines()]
                 assert events == [
                     "session_open",
+                    "issued",
                     "dispatch",
                     "completed",
                     "dispatch",
@@ -274,6 +277,12 @@ def test_rust_owns_custody_and_matches_reference_provider_substitution(monkeypat
                 identity = codec.loads(
                     base64.urlsafe_b64decode(case.token.split(".")[1] + "==")
                 )
+                records = [codec.loads(line) for line in audit.splitlines()]
+                issuance = records[1]
+                assert issuance["event"] == "issued"
+                assert issuance["identity"] == {
+                    k: v for k, v in identity.items() if k != "enc"
+                }
                 for record in [
                     codec.loads(line)
                     for line in audit.splitlines()
@@ -282,6 +291,9 @@ def test_rust_owns_custody_and_matches_reference_provider_substitution(monkeypat
                     assert record["identity"] == {
                         k: v for k, v in identity.items() if k != "enc"
                     }
+                    assert record["identity"] == issuance["identity"]
+                    assert record["grant"] == issuance["grant"]
+                    assert record["policy"] == issuance["policy"]
                     assert record["route"] == dict(
                         host=provider.host,
                         port=provider.port,
@@ -321,6 +333,40 @@ def test_stolen_surrogate_wrong_operation_and_revocation_do_not_reach_provider()
                 replacement.replace(case.registry_path)
                 assert not case.invoke()["ok"]
                 assert len(provider.requests) == 1
+
+
+def test_inflight_request_may_finish_but_revoked_identity_cannot_dispatch_again():
+    with tempfile.TemporaryDirectory(prefix="agp-flight-") as directory:
+        p = Path(directory)
+        with TLSService(provider_directory(p)) as provider:
+            entered, release = threading.Event(), threading.Event()
+
+            def blocked(_request):
+                entered.set()
+                assert release.wait(5), "test did not release the provider response"
+                return 200, {}, codec.dumps(dict(id=42, active=True))
+
+            provider.routes[("GET", "/v1/account")] = blocked
+            with ProviderCase(p, provider) as case:
+                with ThreadPoolExecutor(max_workers=1) as pool:
+                    pending = pool.submit(case.invoke)
+                    try:
+                        assert entered.wait(5), "request did not reach provider"
+                        case.registry["subjects"]["vm-test"]["active"] = False
+                        replacement = p / "revoked.json"
+                        replacement.write_bytes(codec.dumps(case.registry))
+                        replacement.chmod(0o600)
+                        replacement.replace(case.registry_path)
+                    finally:
+                        release.set()
+                    assert pending.result(timeout=5)["ok"]
+                assert not case.invoke()["ok"]
+                assert len(provider.requests) == 1
+                records = [codec.loads(line) for line in (p / "audit.jsonl").read_bytes().splitlines()]
+                assert [r["event"] for r in records] == [
+                    "session_open", "issued", "dispatch", "completed"
+                ]
+                assert records[1]["identity"] == records[2]["identity"]
 
 
 def test_release_discards_reflected_credentials_and_provider_private_fields():
@@ -574,6 +620,43 @@ def test_audit_failure_prevents_dispatch_and_stays_failed_closed():
                 # write/sync failure cannot silently reactivate the audit sink.
                 audit.write_bytes(original)
                 assert not case.invoke()["ok"]
+                assert not provider.requests
+
+
+def test_issuance_audit_failure_never_releases_surrogate():
+    with tempfile.TemporaryDirectory(prefix="agp-issue-") as directory:
+        p = Path(directory)
+        with TLSService(provider_directory(p)) as provider:
+            with ProviderCase(p, provider) as case:
+                first_line = (p / "audit.jsonl").read_bytes().splitlines()[0]
+                alternate = codec.loads((p / "bridge.json").read_bytes())
+                alternate["listen"] = str(p / "unreleased.sock")
+                audit = p / "unreleased-audit.jsonl"
+                alternate["provider"]["audit_file"] = str(audit)
+                config = p / "unreleased.json"
+                config.write_bytes(codec.dumps(alternate))
+                config.chmod(0o600)
+                # Session-open fits. Recording the signed public claims cannot
+                # finish, exercising the acknowledgement after actual sealing.
+                denied = subprocess.run(
+                    [
+                        sys.executable,
+                        str(Path(__file__).with_name("limited_exec.py")),
+                        str(len(first_line) + 65),
+                        case.bridge,
+                        "--config",
+                        str(config),
+                    ],
+                    capture_output=True,
+                    timeout=5,
+                )
+                assert denied.returncode == 1
+                assert denied.stdout == b""
+                assert denied.stderr == b"invalid_capability\n"
+                first, partial = audit.read_bytes().split(b"\n", 1)
+                assert codec.loads(first)["event"] == "session_open"
+                assert partial and not partial.endswith(b"\n")
+                assert TOKEN.encode() not in first + partial
                 assert not provider.requests
 
 
