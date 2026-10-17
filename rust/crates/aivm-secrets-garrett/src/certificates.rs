@@ -30,7 +30,7 @@ fn p256(spki: &[u8]) -> Outcome<()> {
     }
     Ok(())
 }
-fn decode_pem(bytes: &[u8], label: &str, limit: usize) -> Outcome<Zeroizing<Vec<u8>>> {
+pub(crate) fn decode_pem(bytes: &[u8], label: &str, limit: usize) -> Outcome<Zeroizing<Vec<u8>>> {
     if bytes.is_empty() || bytes.len() > limit || !bytes.is_ascii() {
         return Err(Error::InvalidCapability);
     }
@@ -52,7 +52,7 @@ fn decode_pem(bytes: &[u8], label: &str, limit: usize) -> Outcome<Zeroizing<Vec<
             .map_err(|_| Error::InvalidCapability)?,
     ))
 }
-fn pem(der: &[u8], label: &str) -> String {
+pub(crate) fn pem(der: &[u8], label: &str) -> String {
     let encoded = STANDARD.encode(der);
     let mut result = format!("-----BEGIN {label}-----\n");
     for line in encoded.as_bytes().chunks(64) {
@@ -127,6 +127,50 @@ impl ClientRequest {
         &self.spki
     }
 }
+pub(crate) fn checked_ca_der(certificate: &[u8]) -> Outcome<Vec<u8>> {
+    let der = decode_pem(certificate, "CERTIFICATE", 65536)?;
+    let (rest, cert) = X509Certificate::from_der(&der).map_err(|_| Error::InvalidCapability)?;
+    let constraints = cert
+        .basic_constraints()
+        .map_err(|_| Error::InvalidCapability)?
+        .ok_or(Error::InvalidCapability)?;
+    let usage = cert
+        .key_usage()
+        .map_err(|_| Error::InvalidCapability)?
+        .ok_or(Error::InvalidCapability)?;
+    cert.extensions_map()
+        .map_err(|_| Error::InvalidCapability)?;
+    if !rest.is_empty()
+        || cert.version().0 != 2
+        || cert.subject() != cert.issuer()
+        || !constraints.critical
+        || !constraints.value.ca
+        || constraints.value.path_len_constraint != Some(0)
+        || !usage.critical
+        || !usage.value.key_cert_sign()
+        || cert.signature_algorithm.algorithm.to_id_string() != "1.2.840.10045.4.3.2"
+        || cert.signature_algorithm.parameters.is_some()
+        || cert.signature_algorithm != cert.tbs_certificate.signature
+        || cert.signature_value.unused_bits != 0
+        || cert.validity().not_after.timestamp() <= cert.validity().not_before.timestamp()
+        || cert.extensions().iter().any(|e| {
+            !matches!(
+                e.parsed_extension(),
+                ParsedExtension::BasicConstraints(_)
+                    | ParsedExtension::KeyUsage(_)
+                    | ParsedExtension::SubjectKeyIdentifier(_)
+                    | ParsedExtension::AuthorityKeyIdentifier(_)
+            )
+        })
+    {
+        return Err(Error::InvalidCapability);
+    }
+    p256(cert.public_key().raw)?;
+    cert.verify_signature(None)
+        .map_err(|_| Error::InvalidCapability)?;
+    Ok(der.to_vec())
+}
+
 pub struct CertificateAuthority {
     issuer: Issuer<'static, KeyPair>,
     certificate: Vec<u8>,
@@ -135,7 +179,7 @@ pub struct CertificateAuthority {
 }
 impl CertificateAuthority {
     pub fn from_pem(certificate: &[u8], private_key: &[u8]) -> Outcome<Self> {
-        let der = decode_pem(certificate, "CERTIFICATE", 65536)?;
+        let der = checked_ca_der(certificate)?;
         let key_der = decode_pem(private_key, "PRIVATE KEY", 8192)?;
         let key = KeyPair::from_pkcs8_der_and_sign_algo(
             &PrivatePkcs8KeyDer::from(key_der.to_vec()),
@@ -143,44 +187,9 @@ impl CertificateAuthority {
         )
         .map_err(|_| Error::InvalidCapability)?;
         let (rest, cert) = X509Certificate::from_der(&der).map_err(|_| Error::InvalidCapability)?;
-        let constraints = cert
-            .basic_constraints()
-            .map_err(|_| Error::InvalidCapability)?
-            .ok_or(Error::InvalidCapability)?;
-        let usage = cert
-            .key_usage()
-            .map_err(|_| Error::InvalidCapability)?
-            .ok_or(Error::InvalidCapability)?;
-        cert.extensions_map()
-            .map_err(|_| Error::InvalidCapability)?;
-        if !rest.is_empty()
-            || cert.version().0 != 2
-            || cert.subject() != cert.issuer()
-            || !constraints.critical
-            || !constraints.value.ca
-            || constraints.value.path_len_constraint != Some(0)
-            || !usage.critical
-            || !usage.value.key_cert_sign()
-            || cert.signature_algorithm.algorithm.to_id_string() != "1.2.840.10045.4.3.2"
-            || cert.signature_algorithm.parameters.is_some()
-            || cert.signature_algorithm != cert.tbs_certificate.signature
-            || cert.signature_value.unused_bits != 0
-            || cert.public_key().raw != key.subject_public_key_info()
-            || cert.extensions().iter().any(|e| {
-                !matches!(
-                    e.parsed_extension(),
-                    ParsedExtension::BasicConstraints(_)
-                        | ParsedExtension::KeyUsage(_)
-                        | ParsedExtension::SubjectKeyIdentifier(_)
-                        | ParsedExtension::AuthorityKeyIdentifier(_)
-                )
-            })
-        {
+        if !rest.is_empty() || cert.public_key().raw != key.subject_public_key_info() {
             return Err(Error::InvalidCapability);
         }
-        p256(cert.public_key().raw)?;
-        cert.verify_signature(None)
-            .map_err(|_| Error::InvalidCapability)?;
         let not_before = cert.validity().not_before.timestamp();
         let not_after = cert.validity().not_after.timestamp();
         if not_after <= not_before {
@@ -282,8 +291,31 @@ impl CertificateAuthority {
             _ => Error::InvalidCapability,
         })
     }
-    #[cfg(feature = "conformance")]
-    pub(crate) fn fixture_private_key_pem(&self) -> Zeroizing<String> {
+    pub(crate) fn server_material(&self, now: i64) -> Outcome<(String, Zeroizing<String>)> {
+        if !(0..=253399708799).contains(&now) {
+            return Err(Error::InvalidCapability);
+        }
+        if now - 60 < self.not_before || now + 2592000 >= self.not_after {
+            return Err(Error::Expired);
+        }
+        let key =
+            KeyPair::generate_for(&PKCS_ECDSA_P256_SHA256).map_err(|_| Error::InternalError)?;
+        let mut params = parameters("localhost", now - 60, now + 2592000)?;
+        params.is_ca = IsCa::ExplicitNoCa;
+        params.key_usages = vec![KeyUsagePurpose::DigitalSignature];
+        params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ServerAuth];
+        params.subject_alt_names.push(rcgen::SanType::DnsName(
+            "localhost"
+                .try_into()
+                .map_err(|_| Error::InvalidCapability)?,
+        ));
+        let cert = params
+            .signed_by(&key, &self.issuer)
+            .map_err(|_| Error::InternalError)?;
+        let key_pem = Zeroizing::new(key.serialize_pem());
+        Ok((cert.pem(), key_pem))
+    }
+    pub(crate) fn secret_pem(&self) -> Zeroizing<String> {
         Zeroizing::new(self.issuer.key().serialize_pem())
     }
 }
@@ -312,6 +344,61 @@ pub fn client_certificate_pem(issued: &core::IssuedClient) -> String {
     pem(&issued.certificate, "CERTIFICATE")
 }
 
+pub(crate) struct ClientInfo {
+    pub der: Vec<u8>,
+    pub fingerprint: String,
+    pub not_after: i64,
+}
+pub(crate) fn inspect_client(certificate: &[u8], root: &[u8]) -> Outcome<ClientInfo> {
+    let der = decode_pem(certificate, "CERTIFICATE", 65536)?;
+    let ca_der = checked_ca_der(root)?;
+    let (_, ca) = X509Certificate::from_der(&ca_der).map_err(|_| Error::InvalidCapability)?;
+    let (rest, cert) = X509Certificate::from_der(&der).map_err(|_| Error::InvalidCapability)?;
+    let bc = cert
+        .basic_constraints()
+        .map_err(|_| Error::InvalidCapability)?
+        .ok_or(Error::InvalidCapability)?;
+    let ku = cert
+        .key_usage()
+        .map_err(|_| Error::InvalidCapability)?
+        .ok_or(Error::InvalidCapability)?;
+    let eku = cert
+        .extended_key_usage()
+        .map_err(|_| Error::InvalidCapability)?
+        .ok_or(Error::InvalidCapability)?;
+    cert.extensions_map()
+        .map_err(|_| Error::InvalidCapability)?;
+    if !rest.is_empty()
+        || cert.issuer() != ca.subject()
+        || bc.value.ca
+        || !ku.value.digital_signature()
+        || ku.value.key_cert_sign()
+        || !eku.value.client_auth
+        || eku.value.server_auth
+        || eku.value.any
+        || !eku.value.other.is_empty()
+        || cert.signature_algorithm.algorithm.to_id_string() != "1.2.840.10045.4.3.2"
+        || cert.signature_algorithm.parameters.is_some()
+        || cert.signature_algorithm != cert.tbs_certificate.signature
+        || cert.signature_value.unused_bits != 0
+    {
+        return Err(Error::InvalidCapability);
+    }
+    p256(cert.public_key().raw)?;
+    cert.verify_signature(Some(ca.public_key()))
+        .map_err(|_| Error::InvalidCapability)?;
+    let fingerprint = digest::digest(&digest::SHA256, cert.public_key().raw)
+        .as_ref()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    Ok(ClientInfo {
+        der: der.to_vec(),
+        fingerprint,
+        not_after: cert.validity().not_after.timestamp(),
+    })
+}
+
 /// Synthetic fixtures only: private-key serialization is excluded from normal builds.
 #[cfg(feature = "conformance")]
 pub(crate) fn fixture(v: &serde_json::Value) -> Outcome<serde_json::Value> {
@@ -321,9 +408,7 @@ pub(crate) fn fixture(v: &serde_json::Value) -> Outcome<serde_json::Value> {
     if action == "ca-create" {
         json::keys(v, &["action", "now"], &[])?;
         let ca = CertificateAuthority::generate(json::integer(&v["now"], 0, 253370764799)?)?;
-        return Ok(
-            json!({"ok":true,"ca_pem":ca.certificate_pem(),"key_pem":&*ca.fixture_private_key_pem()}),
-        );
+        return Ok(json!({"ok":true,"ca_pem":ca.certificate_pem(),"key_pem":&*ca.secret_pem()}));
     }
     if action == "csr-inspect" {
         json::keys(v, &["action", "csr_pem"], &[])?;
@@ -337,26 +422,8 @@ pub(crate) fn fixture(v: &serde_json::Value) -> Outcome<serde_json::Value> {
             text("ca_pem")?.as_bytes(),
             text("ca_key_pem")?.as_bytes(),
         )?;
-        let now = json::integer(&v["now"], 0, 253399708799)?;
-        if now - 60 < ca.not_before || now + 2592000 >= ca.not_after {
-            return Err(Error::Expired);
-        }
-        let key =
-            KeyPair::generate_for(&PKCS_ECDSA_P256_SHA256).map_err(|_| Error::InternalError)?;
-        let mut params = parameters("localhost", now - 60, now + 2592000)?;
-        params.is_ca = IsCa::ExplicitNoCa;
-        params.key_usages = vec![KeyUsagePurpose::DigitalSignature];
-        params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ServerAuth];
-        params.subject_alt_names.push(rcgen::SanType::DnsName(
-            "localhost"
-                .try_into()
-                .map_err(|_| Error::InvalidCapability)?,
-        ));
-        let cert = params
-            .signed_by(&key, &ca.issuer)
-            .map_err(|_| Error::InternalError)?;
-        let key_pem = Zeroizing::new(key.serialize_pem());
-        return Ok(json!({"ok":true,"certificate_pem":cert.pem(),"key_pem":&*key_pem}));
+        let (certificate, key) = ca.server_material(json::integer(&v["now"], 0, 253399708799)?)?;
+        return Ok(json!({"ok":true,"certificate_pem":certificate,"key_pem":&*key}));
     }
     let additional = match action {
         "client-software" => "approve_fingerprint",

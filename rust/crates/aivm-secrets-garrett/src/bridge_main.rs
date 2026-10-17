@@ -58,11 +58,9 @@ impl Drop for ListenerPath {
         }
     }
 }
-fn serve(path: &Path, maximum: Option<usize>) -> Outcome<()> {
-    let bytes = zeroize::Zeroizing::new(files::read_private(path, 65536)?);
-    let config = json::parse(&bytes, 65536)?;
+fn legacy_bridge(config: &Value) -> Outcome<(tls::Bridge, Value)> {
     let m = json::keys(
-        &config,
+        config,
         &[
             "schema",
             "issuer",
@@ -177,8 +175,23 @@ fn serve(path: &Path, maximum: Option<usize>) -> Outcome<()> {
             PathBuf::from(field(m, "broker_socket")?),
         )?
     };
-    let bridge = Arc::new(bridge.with_registry_file(PathBuf::from(field(m, "registry_path")?))?);
-    let listen = PathBuf::from(field(m, "listen")?);
+    let bridge = bridge.with_registry_file(PathBuf::from(field(m, "registry_path")?))?;
+    Ok((bridge, announcement))
+}
+fn serve(path: &Path, maximum: Option<usize>) -> Outcome<()> {
+    let bytes = zeroize::Zeroizing::new(files::read_private(path, 65536)?);
+    let config = json::parse(&bytes, 65536)?;
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| Error::InternalError)?
+        .as_secs() as i64;
+    let (bridge, announcement) = if config.get("authority_root").is_some() {
+        aivm_secrets_garrett::authority::bridge_from_config(&config, now)?
+    } else {
+        legacy_bridge(&config)?
+    };
+    let bridge = Arc::new(bridge);
+    let listen = PathBuf::from(config["listen"].as_str().ok_or(Error::InvalidCapability)?);
     files::private_directory(listen.parent().ok_or(Error::UnsafeFile)?)?;
     let listener = UnixListener::bind(&listen).map_err(|_| Error::UnsafeFile)?;
     let info = fs::symlink_metadata(&listen).map_err(|_| Error::UnsafeFile)?;

@@ -81,7 +81,75 @@ pub struct Issuer {
     sealer: aead::LessSafeKey,
     kid: String,
 }
+const ED25519_PKCS8: &[u8] = &[
+    0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20,
+];
+const ED25519_SPKI: &[u8] = &[
+    0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00,
+];
+pub(crate) fn issuer_material() -> Outcome<(Zeroizing<String>, String, Zeroizing<Vec<u8>>)> {
+    let mut seed = Zeroizing::new([0u8; 32]);
+    let mut aes = Zeroizing::new(vec![0u8; 32]);
+    SystemRandom::new()
+        .fill(&mut *seed)
+        .map_err(|_| Error::InternalError)?;
+    SystemRandom::new()
+        .fill(&mut aes)
+        .map_err(|_| Error::InternalError)?;
+    let pair =
+        signature::Ed25519KeyPair::from_seed_unchecked(&*seed).map_err(|_| Error::InternalError)?;
+    // RFC 8410 PKCS#8 v1 / SPKI, matching the Python authority's immutable files.
+    let mut private = Zeroizing::new(ED25519_PKCS8.to_vec());
+    private.extend_from_slice(&*seed);
+    let mut public = ED25519_SPKI.to_vec();
+    public.extend_from_slice(pair.public_key().as_ref());
+    Ok((
+        Zeroizing::new(crate::certificates::pem(&private, "PRIVATE KEY")),
+        crate::certificates::pem(&public, "PUBLIC KEY"),
+        aes,
+    ))
+}
+pub(crate) fn issuer_public(pem: &[u8]) -> Outcome<Vec<u8>> {
+    let der = crate::certificates::decode_pem(pem, "PUBLIC KEY", 4096)?;
+    if der.len() != 44 || !der.starts_with(ED25519_SPKI) {
+        return Err(Error::InvalidCapability);
+    }
+    Ok(der[12..].to_vec())
+}
+/// An unverified header only selects from the trusted enabled keyring. The
+/// selected verifier still authenticates the complete token before unsealing.
+pub(crate) fn token_key_id(token: &str) -> Outcome<String> {
+    if token.len() > MAX_TOKEN {
+        return Err(Error::InvalidCapability);
+    }
+    let parts: Vec<_> = token.split('.').collect();
+    if parts.len() != 3 {
+        return Err(Error::InvalidCapability);
+    }
+    let header = json::parse(&decode(parts[0], 1024)?, 1024)?;
+    let map = json::keys(&header, &["alg", "typ", "kid"], &[])?;
+    if map["alg"] != "EdDSA" || map["typ"] != "aivm-bound+jwt" {
+        return Err(Error::InvalidCapability);
+    }
+    kid(map["kid"].as_str().ok_or(Error::InvalidCapability)?)
+}
 impl Issuer {
+    pub(crate) fn from_pem(
+        private: &[u8],
+        public: &[u8],
+        aes: &[u8],
+        key_id: &str,
+    ) -> Outcome<Self> {
+        let der = crate::certificates::decode_pem(private, "PRIVATE KEY", 4096)?;
+        if der.len() != 48 || !der.starts_with(ED25519_PKCS8) {
+            return Err(Error::InvalidCapability);
+        }
+        let issuer = Self::new(&der[16..], aes, key_id)?;
+        if issuer.public_key() != issuer_public(public)? {
+            return Err(Error::InvalidCapability);
+        }
+        Ok(issuer)
+    }
     pub fn new(seed: &[u8], encryption_key: &[u8], key_id: &str) -> Outcome<Self> {
         Ok(Self {
             signer: signature::Ed25519KeyPair::from_seed_unchecked(seed)

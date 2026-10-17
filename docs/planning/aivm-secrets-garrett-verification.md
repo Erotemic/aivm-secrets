@@ -285,6 +285,7 @@ request quota is not part of this milestone's value proposition.
 | Acquisition and refresh | OAuth contract/vault/provider modules and synthetic OAuth tests | Complete custody/error trace and generation/revocation composition |
 | Substitution and result release | Original broker/egress tests plus Rust account-status-v1 custody, route tests and extracted typed-release noninterference | Review/extend the public disclosure contract, general provider mediation and whole-service confinement/refinement |
 | Instance key custody | Rust TPM signer, fresh creation-evidence verifier under a trusted AK pin, actual isolated swtpm/TLS tests | Authenticate hardware AK provenance, EK activation, approved deployment/PCR/rollback policy and physical TPM validation |
+| Native authority | Python-compatible durable Rust init/enroll/renew/revoke, immutable assurance receipts, held-directory storage, extracted admission/publication contracts and live native bridge leases | Native issuer/server/root rotation, recovery commands, complete storage/locking and concurrent-service history refinement |
 
 The Python executor currently returns successful provider JSON or text to the
 broker, which places it in the result and checks literal credential reflection.
@@ -303,6 +304,16 @@ boundaries. A stale authenticated snapshot is not current authority. Ordinary
 restart, rollback, VM clone, CA change and issuer retirement require separate
 trace cases; rollback resistance needs a trustworthy freshness anchor or an
 explicit assumption excluding rollback.
+
+The native authority bridge now holds a shared authority lease through dispatch;
+participating administrative writers acquire its exclusive lease. Tests show
+revocation drains already admitted provider requests and prevents later uses,
+and waiting on a lease does not extend a token lifetime. Its current-peer and
+ordered-publication controllers are extracted and checked, but the concrete
+file-lock/filesystem implementation and concurrent service histories are not
+yet refined in Lean. The independent-file bridge retains snapshot semantics.
+TPM assurance receipts bind fresh verified evidence to installed certificates;
+they are trusted host metadata, not proof of physical hardware or a workload.
 
 ## 8. Milestones and acceptance gates
 

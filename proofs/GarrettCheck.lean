@@ -1,3 +1,4 @@
+import GarrettAuthority
 import GarrettHistory
 import GarrettEnrollment
 import Garrett
@@ -73,3 +74,20 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.enrollment.Proofs.tpm_plan_uses_attested_key
 #print axioms aivm_secrets_garrett_core.enrollment.Proofs.enroll_client_successful
 #print axioms aivm_secrets_garrett_core.enrollment.Proofs.authorize_tpm_success
+
+#print axioms aivm_secrets_garrett_core.authority.Proofs.require_peer_contract
+#print axioms aivm_secrets_garrett_core.authority.Proofs.inactive_peer_denied
+#print axioms aivm_secrets_garrett_core.authority.Proofs.wrong_peer_denied
+#print axioms aivm_secrets_garrett_core.authority.Proofs.software_cannot_satisfy_tpm
+#print axioms aivm_secrets_garrett_core.authority.Proofs.unrecorded_cannot_satisfy_tpm
+#print axioms aivm_secrets_garrett_core.authority.Proofs.revoke_contract
+#print axioms aivm_secrets_garrett_core.authority.Proofs.revoked_peer_never_admitted
+#print axioms aivm_secrets_garrett_core.authority.Proofs.revoke_prevents_admission
+#print axioms aivm_secrets_garrett_core.authority.Proofs.expired_peer_denied
+#print axioms aivm_secrets_garrett_core.authority.Proofs.attested_peer_positive_witness
+#print axioms aivm_secrets_garrett_core.authority.Proofs.commit_change_contract
+#print axioms aivm_secrets_garrett_core.authority.Proofs.intent_failure_never_publishes
+#print axioms aivm_secrets_garrett_core.authority.Proofs.staging_failure_never_publishes
+#print axioms aivm_secrets_garrett_core.authority.Proofs.publication_failure_is_uncertain
+#print axioms aivm_secrets_garrett_core.authority.Proofs.completion_failure_is_uncertain
+#print axioms aivm_secrets_garrett_core.authority.Proofs.commit_change_positive_witness

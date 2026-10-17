@@ -156,10 +156,18 @@ impl Registry {
         if now < 0 {
             return Err(Error::InvalidCapability);
         }
-        let mut matching = self
-            .subjects
-            .iter()
-            .filter(|(_, r)| r.active && r.certificate == peer && now < r.not_after);
+        let mut matching = self.subjects.iter().filter(|(_, r)| {
+            core::authority::require_peer(
+                r.active,
+                &r.certificate.as_bytes().to_vec(),
+                &peer.as_bytes().to_vec(),
+                r.not_after,
+                now,
+                &core::authority::Assurance::Unrecorded,
+                &core::authority::Requirement::Enrolled,
+            )
+            .is_ok()
+        });
         let (subject, row) = matching.next().ok_or(Error::InvalidCapability)?;
         if matching.next().is_some() {
             return Err(Error::InvalidCapability);

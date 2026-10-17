@@ -460,3 +460,81 @@ rotation/recovery, concrete adapter/history refinement and hardware provenance
 are not finished. The TPM label is a returned plan fact, not a certificate
 extension or proof of a VM/process; subsequent host enrollment policy must
 retain the selected assurance. The broader goal remains active.
+
+## 2026-10-17 01:13:30 -0400
+
+The last checkpoint completed real certificate/key binding with preserved
+challenge deadlines and checked source controllers. The next implementation
+gap is durable authority ownership. I am porting normal Rust authority
+operations in the existing Python v2 format, using held private directory
+handles, immutable material and atomic publication rather than a parallel
+store. This should produce a usable native authority path and a bridge that
+observes current enrollment/trust/key retirement. I want crash behavior to be
+explicit: staged files may survive, but old private keys must never be silently
+reused/overwritten, and state must not point at unflushed material. The hard
+parts are lock/inode discipline, partial writes, CA cutover ordering and keeping
+trust snapshots tied to the actual loaded TLS/issuer material. I am confident
+we can reuse the certificate adapters and pure registry transitions; concrete
+filesystem and cross-process history refinement remain trusted boundaries,
+not facts obtained merely by adding a process interface. No live authority or
+credential data will be migrated or used during this work.
+
+The normal native authority and authority-root bridge now run. Rust writes the
+existing Python v2 store with protected CA/server/issuer keys and installs
+client leaves plus immutable assurance receipts before publishing registry
+state. Python reads and signs using native-created stores; native operations
+also open Python-created stores. The Rust administrator refuses silent TPM to
+software replacement; the bridge can require recorded TPM assurance before
+credential custody. Older Python writers remain trusted but do not enforce
+that new downgrade policy, so the documentation tells operators to use the
+Rust path for it.
+
+I am encouraged by the normal-path tests: a fresh challenge from the actual
+administrator is certified in an isolated software TPM, enrolled, then used
+through the native mTLS client and broker to an HTTPS provider. Replaying that
+creation statement into another enrollment fails. Live revocation drains an
+already admitted provider use before returning, then rejects later requests.
+Issuer retirement and CA changes made by the Python administrator are observed
+by the running native authority bridge. These are concrete tests, not a proof
+of the Linux locks/filesystem or a physical TPM.
+
+Failure testing checks partial intent writes, refused material staging,
+completion failure after publication, unsafe symlinks/hardlinks/FIFOs and two
+concurrent initializers. I corrected a stale-clock gap found during review:
+token expiry is checked again after waiting for the authority or provider
+mutex, and a real locked-authority test covers this. The extracted core now
+has current-peer/assurance/revocation and ordered-publication contracts. Its
+sixteen additional obligations preserve the distinction between unpublished
+failure and unknown outcome after publication. Full gates and mutation tests
+are next. Native durable issuer/server/root rotation, recovery commands,
+complete policy/OAuth custody and concrete concurrent-history refinement are
+still open; this checkpoint must not be presented as the whole protocol done.
+
+The full regression run passed 1,930 tests with the one expected unfinished
+general primitive-runner skip in 285.16 seconds. The selected Garrett record
+passed 93 tests and all 81 named axiom checks; 18 authority checks passed using
+normal executables without conformance features. The final sdist/wheel and
+twine checks pass, and the source archive matches 161 declared proof/source/
+document inputs. The ordinary wheel has no Rust, Lean or AIVM payload. The
+30-mutant Rust proof gate is still running; its source/proof baseline has not
+changed during validation. Resource publication reports nothing pending.
+
+Next native lifecycle work should reuse the held store and ordered controller,
+but not pretend CA rollover is one registry rename. Stage CA/server material,
+durably revoke every prior enrollment, then publish the new trust selector;
+retain an expected-root CAS and failure coordinates so retries cannot revoke
+identities enrolled under a later root. Issuer/server pointer changes need
+immutable names and explicit old-key retirement. Generalizing staging must
+preserve zeroizing private-key buffers and keep audit resources to paths and
+digests. Recovery remains a reviewed administrative operation, never silent
+adoption/deletion. This is the next concrete gap, followed by issue-to-file,
+OAuth custody and stronger concrete storage/concurrent-history refinement.
+
+All 30 actual Rust security mutations completed with proof errors against the
+unchanged Lean baseline, including all eight new authority mutations: peer
+binding, expiry, assurance escalation, revocation, skipped intent/staging/
+publication and false unchanged-outcome reporting. This closes the local gate
+for this checkpoint. No additional source changes followed the successful
+full regression run. I am committing the native authority layer; the overall
+Garrett port/formalization goal remains active with the lifecycle, OAuth,
+provider-generalization and concrete refinement work listed above.

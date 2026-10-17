@@ -49,8 +49,9 @@ These are independent Rust decisions and cryptographic/transport adapters.
 In the original bridge profile, the Python broker still performs inner-capability
 authorization, credential
 custody, audit, and provider effects. The Rust transition runners are not a
-replacement for its durable authority service, OAuth vault, CA or provider
-HTTP adapters. The explicit [account-status-v1 profile](verified-provider.md)
+replacement for its complete authority service, OAuth vault or provider
+HTTP adapters. The native authority subset described below adds actual
+durable initialization, enrollment, renewal and revocation. The explicit [account-status-v1 profile](verified-provider.md)
 adds Rust-owned credential use, a pinned provider path and a proved typed
 release projection for `profile.read`. Neither Python packaging nor ordinary
 AIVM requires Rust,
@@ -83,7 +84,7 @@ observational equivalence, hide metadata/length/timing, or refine the entire
 Rust I/O system into the symbolic trace. Concrete cryptographic primitives,
 TLS/X.509, parser, filesystem, compiler and translation are trusted boundaries.
 
-The manifest now declares **65 named obligations**, including supporting lemmas,
+The manifest now declares **81 named obligations**, including supporting lemmas,
 the [credential-use/release contracts](verified-provider.md) and the
 [composed request controller](verified-composition.md). The composition checks
 authenticated opening, current inner authorization, exact audit acknowledgement
@@ -92,9 +93,12 @@ and selected provider execution in the native Rust request path. The
 signature origin and conditional source-controller histories.
 The [certificate enrollment layer](verified-enrollment.md) checks exact CSR/key
 approval binding before real Rust client-certificate signing.
+[`GarrettAuthority.lean`](../proofs/GarrettAuthority.lean) adds current-peer,
+TPM-assurance, revocation and ordered durable-publication contracts for the
+actual Rust authority controller.
 Every transitive axiom dependency is checked afresh. Only Lean's `propext`,
 `Classical.choice`, and `Quot.sound` are permitted; no admitted proof or
-project-specific security axiom is allowed. Twenty-two deliberate changes to actual
+project-specific security axiom is allowed. Thirty deliberate changes to actual
 Rust must break the unchanged extracted proofs: missing certificate binding,
 missing epoch binding, inclusive expiry, inactive issuance, bypassing binding
 before decryption, returning a token without sealing, removing inner binding,
@@ -106,6 +110,9 @@ The issuance mutations omit acknowledgement or record a different identity
 before releasing the token.
 Enrollment mutations bypass approvals, substitute the client key, exceed CA
 validity or escalate software approval to a TPM label.
+Authority mutations remove peer/expiry checks, escalate software assurance,
+leave a revoked client active, bypass intent/material/publication steps, or
+misreport a failure after publication as an unchanged store.
 
 ## TPM custody and enrollment evidence
 
@@ -227,11 +234,121 @@ The `--test-crypto` JSONL interface exists only when built with the development
 plaintext for interoperability testing. Never expose it as a service or feed
 it live credentials. Normal bridge/client builds have no such endpoint.
 
+## Native authority and live admission
+
+`garrett-authority` is a normal Rust executable, built without the conformance
+feature. Its version-1 process interface accepts a private host request file:
+
+```bash
+garrett-authority init --root /private/authority --request /private/init.json
+garrett-authority enroll --root /private/authority --request /private/enroll.json
+garrett-authority status --root /private/authority
+```
+
+`init.json` contains `issuer` and `audience`. An enrollment request contains
+`subject`, an absolute private `csr_file`, and `approve_fingerprint` (the
+operator-confirmed SHA-256 SPKI fingerprint). Requests can select `now` for
+trusted host testing; ordinary operation uses the host clock. Replies are
+`{"version":1,"ok":true,"result":...}` or a fixed error code. No private
+key is a reply, diagnostic or command argument. The executable writes CA,
+server and issuer keys only into the protected authority store.
+
+Implemented actions are `init`, `status`, `enroll`, `renew`, `enroll-tpm`,
+`renew-tpm`, `public-client`, `revoke`, `revoke-if-current`, `forget` and
+`prune`. Renewal requires `expected_epoch` and `expected_thumbprint`;
+`require_new_key` selects rekeying. Enrollment replacement requires explicit
+`replace`; its optional compare-and-swap needs both expected values.
+Stale conditional revocation returns `revoked:false`, as in the reference.
+The Python v2 authority/registry/key formats are retained with no migration.
+Python can read/sign using Rust-created keys and enrollments, and Rust can
+open Python-created authorities. Ed25519 private/public material follows
+[RFC 8410](https://www.rfc-editor.org/rfc/rfc8410.html).
+
+For TPM enrollment, replace `approve_fingerprint` with independently provisioned
+private `ak_public_area_file` and `ak_qualified_name_file` paths. The executable
+emits a fresh 120-second challenge (`challenge_hex`), then reads exactly one
+bounded version-1 evidence frame with `public_area_hex`, `attestation_hex`,
+and `signature_hex` from stdin. It verifies creation evidence and CSR key
+equality before signing. The challenge deadline is rechecked after acquiring
+the authority lock. Client JSON cannot supply an AK trust decision or
+`tpm_backed` assertion.
+
+New enrollments write a private immutable assurance receipt next to the public
+certificate. It binds subject, certificate thumbprint, SPKI fingerprint,
+assurance mode and issuance time; TPM receipts also name the trusted AK pin
+digest and certified key Name. Missing receipts mean unrecorded assurance.
+The Rust administrator refuses software replacement of a recorded TPM client
+unless the host explicitly selects `allow_assurance_downgrade`. Older Python
+administrators do not enforce this new policy; use the Rust administrator when
+requiring it. Host administrators remain trusted and can modify their store.
+
+The authority holds no-symlink directory descriptors, checks private ownership
+and regular single-link files, and uses the common `.enrollment.lock` inode.
+Initialization builds a private staging directory, writes its manifest last,
+then publishes with `RENAME_NOREPLACE`; it never resets/adopts an existing
+target. Enrollment persists an audit intent, immutable leaf and receipt before
+atomically publishing the registry, then records completion. A failure during
+or after publication returns `outcome_unknown`; it never promises unchanged
+authority. Staged files and intent coordinates survive failures for inspection.
+These are adapter contracts: [rename](https://man7.org/linux/man-pages/man2/rename.2.html)
+and [file/directory fsync](https://man7.org/linux/man-pages/man2/fsync.2.html)
+semantics and the host filesystem are trusted. Recovery commands and rollback
+protection are not implemented. The hash chain cannot detect tail truncation
+without an externally anchored head.
+
+The bridge can instead select this held authority as its complete trust source:
+
+```json
+{
+  "schema": 1,
+  "authority_root": "/private/authority",
+  "client_assurance": "attested-tpm",
+  "subject": "vm-test",
+  "listen": "/private/identity.sock",
+  "broker_socket": "/private/broker/broker.sock"
+}
+```
+
+Use `any-enrolled` to deliberately permit software/unrecorded enrollment.
+For native custody, replace `broker_socket` with the `provider`, `binding` and
+`lifetime` fields in the [provider profile](verified-provider.md). Trust/key/TLS
+paths come from the held authority and cannot be mixed with independent legacy
+fields. TPM-required issuance fails before custody/session creation for a
+software or missing receipt. Each request reloads the enabled issuer keyring
+and enrollment, and fences CA changes. Enabled old signing keys still work;
+retired keys do not. A root change makes the old bridge refuse dispatch and
+requires an explicit restart with the new trust material.
+
+Native admission holds a shared authority lease through provider use or broker
+forwarding. Participating administrators take the exclusive lease, so a
+successful revocation waits for already admitted operations to finish and
+prevents later admission. This is tested with a blocked real provider request;
+it does not cancel already sent effects. The independent-file bridge described
+above retains its older snapshot behavior. Lock starvation, host compromise,
+nonparticipating writers and complete concurrent I/O/history refinement are
+outside the Lean result.
+
+Sixteen new named obligations check the actual admission/revocation and
+commit controllers, including positive witnesses. Successful commit requires
+intent, staging, publication and completion in order under explicit adapter
+contracts. Failures before publication bypass publication; publication or
+completion failures report uncertainty. The proofs do not assert that Linux,
+the storage adapter, TLS or the audit file is itself formally verified.
+
+The native authority checkpoint passes **1,930 full-suite tests**, with the
+one expected pending general primitive-runner skip (285.16 seconds), and
+**93 selected Garrett tests**. All **81 named obligations** pass the transitive
+axiom audit. The **18 new authority tests** also pass with normal executables
+built without conformance features, including real software-TPM enrollment,
+TLS signing/provider use, replay refusal, live trust changes, revocation drain,
+expiry after waiting on a lease and partial-write outcomes. These remain
+software-TPM results; hosted CI and physical TPM validation have not run.
+
 ## Remaining assurance work
 
 The [acceptance plan](planning/aivm-secrets-garrett-verification.md) remains
 the broader goal. Remaining work includes concrete adapter refinement,
-durable authority/CA/trust cutover in Rust, TPM provenance deployment, broader
+native durable issuer/server/root rotation and recovery in Rust, TPM provenance deployment, broader
 provider release/egress proofs, audit/log confinement, and a composed finite
 service-history theorem. The extracted request composition does not establish
 that whole-service result.

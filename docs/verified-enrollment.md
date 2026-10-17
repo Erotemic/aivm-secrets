@@ -45,6 +45,9 @@ The assurance label belongs to the returned plan, not an X.509 extension. A
 hardware-only identity policy must select the TPM path and retain that policy
 when installing the certificate. A TLS certificate alone does not establish
 TPM custody.
+The [native authority path](verified-garrett.md#native-authority-and-live-admission)
+now installs that certificate and its private assurance receipt in one ordered
+registry transaction, and can require recorded TPM assurance at broker use.
 
 There is no fallback from failed TPM evidence or key matching to software
 approval. No JSON `tpm_backed` field creates evidence. The signing trait's real
@@ -107,21 +110,23 @@ provider action using that certificate and the TPM signer. A different CSR
 with the same evidence, a stale challenge and an otherwise valid verified
 object aged past its deadline all fail.
 
-The gate inventories 65 named obligations and 22 Rust security mutations.
+The gate now inventories 81 named obligations and 30 Rust security mutations,
+including the subsequent native authority layer.
 Use the [reproduction commands](verified-garrett.md). The explicit conformance
-feature can serialize synthetic CA/server fixture keys; normal builds cannot.
+feature exposes synthetic CA/server fixture keys in test replies; normal
+builds write private key material only to the protected authority store.
 Never use that test interface for live keys or expose it as an authority service.
 
-This module does not install registry rows, persist newly generated roots,
-perform coordinated CA/server/issuer rotation or recover partial authority
-transactions. Those normal host administration paths remain to be ported.
+The separate native authority module now installs registry rows and persists
+new roots through ordered transactions. Coordinated native CA/server/issuer
+rotation and recovery commands remain to be ported.
 It does not migrate existing Python state. AK provenance, EK activation,
 physical hardware, signing-oracle isolation and workload identity remain the
 [independent enrollment obligations](verified-garrett.md#tpm-custody-and-enrollment-evidence).
 The broader [acceptance plan](planning/aivm-secrets-garrett-verification.md)
 remains active; the project is experimental and unaudited.
 
-Local validation passed with 1,912 tests and one expected pending full-primitive
+The earlier certificate-only checkpoint passed with 1,912 tests and one expected pending full-primitive
 runner skip (290.75 seconds), 75 selected Garrett tests, and 35 selected
 certificate/TLS/provider checks using normal client/bridge builds. The 65 named
 obligations pass the permitted axiom audit. Hosted CI and physical TPM

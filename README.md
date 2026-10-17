@@ -67,4 +67,8 @@ ideal signature-origin proofs and conditional correspondence between source
 controller issuance and dispatch histories.
 The [Rust certificate enrollment layer](docs/verified-enrollment.md) binds a
 possession-checked CSR to explicit software approval or verified TPM evidence
-before client signing. Durable authority administration remains open.
+before client signing. The [native authority path](docs/verified-garrett.md#native-authority-and-live-admission)
+now initializes a Python-compatible private store, enrolls and renews clients,
+records TPM assurance, and coordinates revocation with native provider use.
+Durable issuer/server/root rotation, recovery administration and concrete
+whole-service refinement remain open.

@@ -15,6 +15,7 @@ use std::{
 pub struct Authority {
     point: Vec<u8>,
     qualified_name: Vec<u8>,
+    pin_digest: Vec<u8>,
 }
 pub struct PendingEnrollment {
     authority: Arc<Authority>,
@@ -32,6 +33,7 @@ pub struct VerifiedIdentity {
     name: Vec<u8>,
     area: Vec<u8>,
     expires: Instant,
+    pin_digest: Vec<u8>,
 }
 impl VerifiedIdentity {
     pub fn subject_public_key_info(&self) -> &[u8] {
@@ -42,6 +44,9 @@ impl VerifiedIdentity {
     }
     pub fn public_area(&self) -> &[u8] {
         &self.area
+    }
+    pub fn attestation_pin_sha256(&self) -> &[u8] {
+        &self.pin_digest
     }
     pub(crate) fn require_fresh(&self) -> Outcome<()> {
         if Instant::now() >= self.expires {
@@ -69,9 +74,13 @@ impl Authority {
         let mut signing_profile = public_area.to_vec();
         signing_profile[5] = 4; // restricted AK differs by TPMA_OBJECT.restricted
         let (point, _) = tpm::public_key(&signing_profile)?;
+        let mut pin = b"aivm-secrets/trusted-ak/v1\0".to_vec();
+        pin.extend_from_slice(public_area);
+        pin.extend_from_slice(qualified_name);
         Ok(Arc::new(Self {
             point,
             qualified_name: qualified_name.to_vec(),
+            pin_digest: digest::digest(&digest::SHA256, &pin).as_ref().to_vec(),
         }))
     }
     pub fn begin(self: &Arc<Self>) -> Outcome<PendingEnrollment> {
@@ -166,6 +175,7 @@ impl PendingEnrollment {
             name,
             area: evidence.public_area.to_vec(),
             expires: self.expires,
+            pin_digest: self.authority.pin_digest.clone(),
         })
     }
 }

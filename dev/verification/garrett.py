@@ -6,21 +6,28 @@ No provider credentials, host authority state or hardware keys are read.
 """
 
 from __future__ import annotations
+
 import argparse
-from concurrent.futures import ThreadPoolExecutor
 import json
 import os
-from pathlib import Path
 import re
 import shutil
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
 import freshness as base
 
 ROOT = base.ROOT
 PROOFS = base.PROOFS
 MANIFEST = PROOFS / "garrett-manifest.json"
-PROFILES = ["nested-bridge-v1", "account-status-v1", "p256-client-enrollment-v1"]
+PROFILES = [
+    "nested-bridge-v1",
+    "account-status-v1",
+    "p256-client-enrollment-v1",
+    "native-authority-v2",
+]
 THEOREMS = [
     "aivm_secrets_garrett_core.Proofs.bytes_ne_spec",
     "aivm_secrets_garrett_core.Proofs.issue_contract",
@@ -100,11 +107,31 @@ THEOREMS += [
     "aivm_secrets_garrett_core.enrollment.Proofs.authorize_tpm_success",
 ]
 
+THEOREMS += [
+    "aivm_secrets_garrett_core.authority.Proofs.require_peer_contract",
+    "aivm_secrets_garrett_core.authority.Proofs.inactive_peer_denied",
+    "aivm_secrets_garrett_core.authority.Proofs.wrong_peer_denied",
+    "aivm_secrets_garrett_core.authority.Proofs.software_cannot_satisfy_tpm",
+    "aivm_secrets_garrett_core.authority.Proofs.unrecorded_cannot_satisfy_tpm",
+    "aivm_secrets_garrett_core.authority.Proofs.revoke_contract",
+    "aivm_secrets_garrett_core.authority.Proofs.revoked_peer_never_admitted",
+    "aivm_secrets_garrett_core.authority.Proofs.revoke_prevents_admission",
+    "aivm_secrets_garrett_core.authority.Proofs.expired_peer_denied",
+    "aivm_secrets_garrett_core.authority.Proofs.attested_peer_positive_witness",
+    "aivm_secrets_garrett_core.authority.Proofs.commit_change_contract",
+    "aivm_secrets_garrett_core.authority.Proofs.intent_failure_never_publishes",
+    "aivm_secrets_garrett_core.authority.Proofs.staging_failure_never_publishes",
+    "aivm_secrets_garrett_core.authority.Proofs.publication_failure_is_uncertain",
+    "aivm_secrets_garrett_core.authority.Proofs.completion_failure_is_uncertain",
+    "aivm_secrets_garrett_core.authority.Proofs.commit_change_positive_witness",
+]
+
 TESTS = [
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
     "tests/test_rust_garrett_provider.py",
     "tests/test_rust_garrett_certificates.py",
+    "tests/test_rust_garrett_authority.py",
     "tests/test_secrets_garrett_modularity.py",
     "tests/test_secrets_identity_parity.py",
     "tests/test_secrets_identity_registry_parity.py",
@@ -122,6 +149,7 @@ RUNNERS = {
     "AIVM_SECRETS_RUST_IDENTITY_RUNNER": "identity-conformance",
     "AIVM_SECRETS_RUST_REGISTRY_RUNNER": "registry-conformance",
     "AIVM_SECRETS_RUST_AUTHORITY_RUNNER": "authority-conformance",
+    "AIVM_SECRETS_RUST_AUTHORITY_ADMIN": "garrett-authority",
     "AIVM_SECRETS_RUST_KEY_ROTATION_RUNNER": "key-rotation-conformance",
     "AIVM_SECRETS_RUST_VM_RUNNER": "vm-conformance",
     "AIVM_SECRETS_RUST_OAUTH_RUNNER": "oauth-conformance",
@@ -147,6 +175,7 @@ def inputs() -> list[str]:
         "proofs/GarrettProtocol.lean",
         "proofs/GarrettHistory.lean",
         "proofs/GarrettEnrollment.lean",
+        "proofs/GarrettAuthority.lean",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
         "dev/verification/freshness.py",
@@ -325,7 +354,7 @@ def assurance_coordinates() -> dict:
         "aeneas_release": base.RELEASE,
         "theorems": THEOREMS,
         "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
-        "implementation_linked": "Aeneas-generated issuance, complete request preparation/observation/use/release and key-approval/client-enrollment controllers, exact byte/epoch/time decisions and typed public-result projection",
+        "implementation_linked": "Aeneas-generated issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation and ordered authority-publication controllers; exact byte/epoch/time decisions and typed public-result projection",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
@@ -339,6 +368,8 @@ def assurance_coordinates() -> dict:
             "TPM tools and silicon/emulator command semantics are trusted; the restricted AK pin must be independently provisioned and oracle access controlled.",
             "The native observer acknowledges only a complete, flushed record under the exclusive-writer and trusted host/filesystem assumptions; acknowledgement is not a client field.",
             "Presentation uses trusted entry/enrollment/clock snapshots; cross-process dispatch linearization and whole-service concurrent traces remain open.",
+            "Native authority admission holds a shared flock through dispatch; participating administrators take its exclusive lease. Held directory/file checks, atomic rename and fsync implement assumed storage contracts, not a proved filesystem or anti-rollback boundary. Legacy independent-file bridges retain entry-snapshot semantics.",
+            "TPM assurance receipts are trusted principal-owned host metadata bound to subject, certificate and SPKI. Missing receipts never imply TPM assurance; older Python administrators do not enforce the new assurance-downgrade policy.",
             "Controller histories assume signature verification has prior recorded issuer origin; the ideal signature-origin theorem does not establish a computational byte-level or concrete I/O refinement.",
             "CSR possession, CA constraints/key matching and X.509 signing use the stated rcgen/x509-parser/time adapter contracts; their ASN.1/crypto implementations are not formally refined. TPM approval consumes verified fresh evidence under a trusted AK pin.",
         ],
@@ -347,7 +378,7 @@ def assurance_coordinates() -> dict:
             "Formal refinement of JSON, TLS, X.509, crypto, TPM evidence, HTTP and filesystem adapter implementations",
             "Physical TPM provenance, EK activation, PCR/firmware policy and anti-rollback deployment",
             "Provider non-disclosure, host compromise, snapshot rollback and side channels",
-            "General Rust policy interpretation, durable CA/authority administration and complete OAuth vault/HTTP service",
+            "General Rust policy interpretation, native durable issuer/server/root rotation and recovery administration, complete OAuth vault/HTTP service",
         ],
     }
 
@@ -480,29 +511,91 @@ def mutate() -> None:
     enrollment_source = source.with_name("enrollment.rs")
     mutations += [
         (
-            enrollment_source, "TPM CSR key substitution accepted",
-            "candidate.spki != *spki", "false",
+            enrollment_source,
+            "TPM CSR key substitution accepted",
+            "candidate.spki != *spki",
+            "false",
         ),
         (
-            enrollment_source, "software approval bypass",
-            "candidate.fingerprint != *fingerprint", "false",
+            enrollment_source,
+            "software approval bypass",
+            "candidate.fingerprint != *fingerprint",
+            "false",
         ),
         (
-            enrollment_source, "software assurance escalated",
-            "Ok(Assurance::OperatorApproved)", "Ok(Assurance::AttestedTpm)",
+            enrollment_source,
+            "software assurance escalated",
+            "Ok(Assurance::OperatorApproved)",
+            "Ok(Assurance::AttestedTpm)",
         ),
         (
-            enrollment_source, "approved client key replaced",
-            "spki: input.candidate.spki,", "spki: Vec::new(),",
+            enrollment_source,
+            "approved client key replaced",
+            "spki: input.candidate.spki,",
+            "spki: Vec::new(),",
         ),
         (
-            enrollment_source, "client expiry beyond CA",
-            "not_after >= input.ca_not_after", "false",
+            enrollment_source,
+            "client expiry beyond CA",
+            "not_after >= input.ca_not_after",
+            "false",
         ),
         (
-            enrollment_source, "client approval bypassed before signing",
+            enrollment_source,
+            "client approval bypassed before signing",
             "authorize_client(input, approval)",
             "Ok::<ClientPlan, EnrollmentDenial>(ClientPlan { subject: input.subject, spki: input.candidate.spki, not_before: input.now, not_after: input.now, assurance: Assurance::AttestedTpm })",
+        ),
+    ]
+    authority_source = source.with_name("authority.rs")
+    mutations += [
+        (
+            authority_source,
+            "current peer binding removed",
+            "*certificate != *peer",
+            "false",
+        ),
+        (
+            authority_source,
+            "expired authority admission accepted",
+            "now >= not_after",
+            "now > not_after",
+        ),
+        (
+            authority_source,
+            "software escalated at authority admission",
+            "Requirement::AttestedTpm => match assurance {",
+            "Requirement::AttestedTpm => match &Assurance::Tpm {",
+        ),
+        (
+            authority_source,
+            "revocation leaves client active",
+            "active: false,",
+            "active: true,",
+        ),
+        (
+            authority_source,
+            "authority intent bypassed",
+            "store.intent()",
+            "Ok::<(), StorageFailure>(())",
+        ),
+        (
+            authority_source,
+            "authority material staging bypassed",
+            "store.stage()",
+            "Ok::<(), StorageFailure>(())",
+        ),
+        (
+            authority_source,
+            "authority publication bypassed",
+            "store.publish()",
+            "Ok::<(), StorageFailure>(())",
+        ),
+        (
+            authority_source,
+            "published change reported unchanged",
+            "if let Err(_) = store.complete() {\n        return Err(CommitDenial::OutcomeUnknown);",
+            "if let Err(_) = store.complete() {\n        return Err(CommitDenial::Unpublished);",
         ),
     ]
     lean_path = base.run(
@@ -513,6 +606,7 @@ def mutate() -> None:
     lean_path = os.pathsep.join(
         str((PROOFS / part).resolve()) for part in lean_path.split(os.pathsep)
     )
+
     def check_mutation(mutation) -> None:
         source, label, old, new = mutation
         if source.read_text().count(old) != 1:
@@ -556,7 +650,13 @@ def mutate() -> None:
                 env=env,
             )
             rejected = False
-            for module in ["Garrett", "GarrettProtocol", "GarrettHistory", "GarrettEnrollment"]:
+            for module in [
+                "Garrett",
+                "GarrettProtocol",
+                "GarrettHistory",
+                "GarrettEnrollment",
+                "GarrettAuthority",
+            ]:
                 proof = temporary / (module + ".lean")
                 shutil.copy2(PROOFS / proof.name, proof)
                 result = base.run(
@@ -593,8 +693,10 @@ def mutate() -> None:
                         "interrupted",
                     ]
                 )
-                if infrastructure or resources or not re.search(
-                    rf"{module}\.lean:\d+:\d+: error:", result.stdout
+                if (
+                    infrastructure
+                    or resources
+                    or not re.search(rf"{module}\.lean:\d+:\d+: error:", result.stdout)
                 ):
                     raise SystemExit(
                         f"mutant failed for an unexpected reason: {label}\n{result.stdout}\n{result.stderr}"

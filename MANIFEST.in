@@ -12,6 +12,7 @@ include proofs/manifest.json proofs/Freshness.lean proofs/Check.lean
 include proofs/garrett-manifest.json proofs/Garrett.lean proofs/GarrettSecrecy.lean proofs/GarrettCheck.lean proofs/GarrettProtocol.lean
 include proofs/GarrettHistory.lean
 include proofs/GarrettEnrollment.lean
+include proofs/GarrettAuthority.lean
 recursive-include proofs/generated *.lean
 prune rust/target
 prune proofs/.lake

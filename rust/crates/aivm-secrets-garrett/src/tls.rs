@@ -147,6 +147,7 @@ pub struct Bridge {
     verifier: Verifier,
     registry: RwLock<Registry>,
     registry_file: Option<PathBuf>,
+    authority: Option<Arc<crate::authority::AuthorityView>>,
     issuer: String,
     audience: String,
     subject: Option<String>,
@@ -211,6 +212,7 @@ impl Bridge {
             verifier,
             registry: RwLock::new(registry),
             registry_file: None,
+            authority: None,
             issuer,
             audience,
             subject,
@@ -221,6 +223,9 @@ impl Bridge {
     /// service does. A request already past lookup may finish after revocation;
     /// filesystem-backed enrollment is not a distributed dispatch transaction.
     pub fn with_registry_file(mut self, path: PathBuf) -> Outcome<Self> {
+        if self.authority.is_some() {
+            return Err(Error::InvalidRequest);
+        }
         self.read_registry(&path)?;
         self.registry_file = Some(path);
         Ok(self)
@@ -233,7 +238,7 @@ impl Bridge {
         )
     }
     pub fn revoke(&self, subject: &str) -> Outcome<()> {
-        if self.registry_file.is_some() {
+        if self.registry_file.is_some() || self.authority.is_some() {
             return Err(Error::InvalidRequest);
         }
         let mut registry = self.registry.write().map_err(|_| Error::InternalError)?;
@@ -246,6 +251,16 @@ impl Bridge {
             row.epoch += 1;
         }
         Ok(())
+    }
+    pub(crate) fn with_authority_view(
+        mut self,
+        view: Arc<crate::authority::AuthorityView>,
+    ) -> Outcome<Self> {
+        if self.registry_file.is_some() {
+            return Err(Error::InvalidRequest);
+        }
+        self.authority = Some(view);
+        Ok(self)
     }
     pub fn serve_unix(&self, socket: UnixStream, now: impl Fn() -> i64) -> Outcome<()> {
         socket
@@ -285,7 +300,7 @@ impl Bridge {
         let mut stream = StreamOwned::new(connection, socket);
         let answer = frame(&mut stream, MAX_FRAME)
             .and_then(|raw| json::parse(&raw, MAX_FRAME).map_err(|_| Error::InvalidRequest))
-            .and_then(|v| self.answer(v, &peer, now()));
+            .and_then(|v| self.answer(v, &peer, &now));
         let reply = answer.unwrap_or_else(failure);
         stream
             .write_all(&json::canonical(&reply))
@@ -296,7 +311,12 @@ impl Bridge {
         let _ = stream.flush();
         Ok(())
     }
-    fn answer(&self, value: Value, peer: &VerifiedPeer, now: i64) -> Outcome<Value> {
+    fn answer(
+        &self,
+        value: Value,
+        peer: &VerifiedPeer,
+        clock: &impl Fn() -> i64,
+    ) -> Outcome<Value> {
         let object = value.as_object().ok_or(Error::InvalidRequest)?;
         let verbs: Vec<_> = ["request", "describe", "renounce", "delegate"]
             .into_iter()
@@ -316,8 +336,22 @@ impl Bridge {
         // Hold the identity lease through forwarding. A completed revocation
         // means no older identity dispatch is still in this critical section.
         let lease = self.registry.read().map_err(|_| Error::InternalError)?;
+        // The native authority's shared file lease lives through the entire
+        // dispatch. A completed exclusive revocation has drained older uses.
+        let admission = self
+            .authority
+            .as_ref()
+            .map(|a| a.admit(token, peer.thumbprint(), clock))
+            .transpose()?;
+        let now = clock();
+        let verifier = admission
+            .as_ref()
+            .map(|a| &a.verifier)
+            .unwrap_or(&self.verifier);
         let snapshot;
-        let registry = if let Some(path) = &self.registry_file {
+        let registry = if let Some(a) = &admission {
+            &a.registry
+        } else if let Some(path) = &self.registry_file {
             snapshot = self.read_registry(path)?;
             &snapshot
         } else {
@@ -334,13 +368,16 @@ impl Bridge {
         }
         if let Backend::Provider(provider) = &self.backend {
             let mut provider = provider.lock().map_err(|_| Error::InternalError)?;
+            // A previous provider operation can block this mutex. Verify the
+            // outer lifetime with a fresh clock before another credential use.
+            let now = clock();
             if verb == "request" {
-                return provider.request(&self.verifier, token, peer, expected, &m[verb], now);
+                return provider.request(verifier, token, peer, expected, &m[verb], now);
             }
-            let opened = self.verifier.open(token, peer, &expected, now)?;
+            let opened = verifier.open(token, peer, &expected, now)?;
             return provider.control(opened.inner.bytes(), verb, now);
         }
-        let opened = self.verifier.open(token, peer, &expected, now)?;
+        let opened = verifier.open(token, peer, &expected, now)?;
         let inner =
             std::str::from_utf8(opened.inner.bytes()).map_err(|_| Error::InvalidCapability)?;
         let forwarded = json!({"version":1,"capability":inner,verb:m[verb]});

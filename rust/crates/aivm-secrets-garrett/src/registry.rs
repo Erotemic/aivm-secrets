@@ -15,13 +15,14 @@ fn row_mut<'a>(state: &'a mut Value, subject: &str) -> Outcome<&'a mut Map<Strin
         .and_then(Value::as_object_mut)
         .ok_or(Error::InvalidCapability)
 }
-fn deactivate(row: &mut Map<String, Value>) {
-    row.insert("active".into(), json!(false));
+fn deactivate(row: &mut Map<String, Value>) -> Outcome<()> {
     let epoch = row["epoch"].as_i64().expect("validated epoch");
-    row.insert(
-        "epoch".into(),
-        json!(epoch.saturating_add(1).min(MAX_EPOCH)),
-    );
+    let active = row["active"].as_bool().ok_or(Error::InvalidCapability)?;
+    let revoked = aivm_secrets_garrett_core::authority::revoke(active, epoch)
+        .map_err(|_| Error::InvalidCapability)?;
+    row.insert("active".into(), json!(revoked.active));
+    row.insert("epoch".into(), json!(revoked.epoch));
+    Ok(())
 }
 fn enroll(
     state: &Value,
@@ -195,7 +196,7 @@ pub fn evaluate(value: &Value) -> Outcome<Value> {
                 prior.is_some_and(|r| r.active && r.epoch == epoch && r.certificate == expected);
             let mut result = state.clone();
             if revoked {
-                deactivate(row_mut(&mut result, &subject)?);
+                deactivate(row_mut(&mut result, &subject)?)?;
             }
             return Ok(json!({"ok":true,"state":result,"revoked":revoked}));
         }
@@ -203,7 +204,7 @@ pub fn evaluate(value: &Value) -> Outcome<Value> {
             let row = prior.ok_or(Error::Denied)?;
             let mut result = state.clone();
             if row.active {
-                deactivate(row_mut(&mut result, &subject)?);
+                deactivate(row_mut(&mut result, &subject)?)?;
             }
             result
         }
@@ -211,7 +212,7 @@ pub fn evaluate(value: &Value) -> Outcome<Value> {
             let mut result = state.clone();
             for (name, row) in &registry.subjects {
                 if row.active {
-                    deactivate(row_mut(&mut result, name)?);
+                    deactivate(row_mut(&mut result, name)?)?;
                 }
             }
             result

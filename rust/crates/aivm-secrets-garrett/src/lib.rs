@@ -1,6 +1,7 @@
 //! Independent Garrett protocol implementation. Experimental and unaudited.
 #![forbid(unsafe_code)]
 pub mod attestation;
+pub mod authority;
 pub mod certificates;
 pub mod client;
 pub mod crypto;
