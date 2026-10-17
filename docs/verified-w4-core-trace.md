@@ -1,17 +1,16 @@
 # W4 — extracted-controller trace-confinement candidate
 
-**Status (2026-10-17): W4 remains a candidate, not a verified theorem set.**
-The first maintainer Lean run successfully built the existing Garrett proof
-suite but failed in `GarrettConfinement.lean`: `unit` was rejected as a local
-constructor-like name, and `prefix` was parsed as a Lean keyword. The latter
-caused downstream unsolved goals and `sorryAx` dependencies. The follow-up
-repair renames those local bindings and refreshes the W4 proof fingerprint.
-The repaired Lean file has **not** yet passed the pinned kernel gate in the
-overlay environment; the W4 exit gate and whole-service SINK-01/TRACE-01
-claim remain **open**.
+**Status (2026-10-17): the maintainer reports that the repaired W4
+`GarrettConfinement.lean` compiles with pinned Lean.** The overlay authoring
+environment cannot independently reproduce that kernel run. The proof-scope
+manifest still identifies W4 as a candidate until the exact axiom-audited
+acceptance output is recorded. The compilation milestone can unblock W5;
+**whole-service SINK-01/TRACE-01 remains open** because W6 must establish
+correspondence to native Rust I/O. Additional abstract W4 lemmas do not close
+that correspondence gap.
 
-This file documents exactly what the added model would establish after Lean
-accepts it and what must still be connected to real native service I/O.
+This file specifies the modeled result and the remaining boundaries between
+that result and real native service I/O.
 
 ## Reviewed source and scope
 

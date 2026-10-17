@@ -97,6 +97,8 @@ unaudited; this checkpoint does not complete that campaign. The subsequent
 ideal signature origin and conditional source-controller histories; concrete
 service-history refinement remains open.
 
-## W4 candidate scope (2026-10-17)
+## W4/W5 scoped proof development (2026-10-17)
 
-The new [W4 source-linked trace model](verified-w4-core-trace.md) composes extracted Rust manifest authorization, parameter checking, and recursive response projection into a **modeled** two-phase sink invariant. It does not extract the native manifest session or concrete I/O adapters; kernel compilation is still pending. The original controller composition and the global service-level refinement obligations described above remain open.
+The [W4 source-linked trace model](verified-w4-core-trace.md) composes extracted Rust manifest authorization, parameter checking, and recursive response projection into a **modeled** two-phase sink invariant. The maintainer reports that the repaired W4 Lean file now compiles. W4 does not extract the native manifest session or concrete I/O adapters, and its source-correspondence obligations remain open.
+
+The [W5 modeled information-flow proof candidate](verified-w5-information-flow.md) extends the W4 trace with guest-facing observations and an adaptive two-run relation. It is awaiting its own Lean kernel check. Public authorization decisions, credential-dependent reflection rejection, adapter outcomes, and wire metadata are explicit release premises, not assumed to be secret-independent. Both W4 and W5 require W6 to justify service-level I/O and state correspondence.
