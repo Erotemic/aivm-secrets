@@ -1078,6 +1078,20 @@ histories and hardware provenance remain clear boundaries. The next step is to
 fast-forward main and reproduce its gate from that checkout; the separate search
 prototype remains intentionally unmerged.
 
+Main was fast-forwarded to the completed milestone and its official check was
+reproduced from the standalone root checkout: regeneration, all 191 axiom
+obligations, strict lint, six Rust unit tests and 253 selected tests pass (45.45
+seconds for the selected tests). Normal non-conformance service binaries were
+then rebuilt; the seven targeted numeric/nested-disclosure regressions pass in
+1.55 seconds. The root wheel and sdist pass twine, and all 191 checked archive
+inputs match. Source inputs remain unchanged by this journal-only checkpoint.
+Resource accounting is published. The original AIVM checkout retains only its
+preexisting untracked .pi directory. The separate reflection branch is clean at
+2e6ab8b, includes this functional main milestone, and retains its explicitly
+unfinished gate registration. The broad Garrett objective remains active:
+concrete JSON/I/O/history refinement and the remaining native surfaces are not
+completed by the filter theorem.
+
 ## 2026-10-17 06:15:50 -0400
 
 Started an isolated reflection follow-up from the committed disclosure checkpoint
