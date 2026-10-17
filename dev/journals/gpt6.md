@@ -219,3 +219,20 @@ The previous maintainer log showed 19 W4 theorem axiom reports without
 `sorryAx`, but Lean exited with a parser error. This correction is still
 subject to the pinned Lean kernel gate on the maintainer's machine; Python
 structural checks alone do not prove W4. Exact model variant unavailable.
+
+## 2026-10-17 18:06:37 -0400 - W5 modeled adaptive noninterference
+
+- Decision: W4 source-linked two-phase trace compiled on the maintainer's pinned Lean toolchain, but the native manifest adapter refinement remains assigned to W6. Do not expand W4's claim to concrete I/O.
+- Added `proofs/GarrettNoninterference.lean`, importing W4 and the extracted Rust recursive-disclosure noninterference proof. The modeled guest observes denied/released messages plus explicit wire metadata; internal audit/provider events are not guest-visible in the model.
+- The two-run and adaptive finite-history theorems require matching admission decisions, adapter results, credential-dependent reflection outcome, metadata and recursive schema projection agreement. No premise directly assumes equality of selected guest payloads; the extracted projection lemma proves that equality.
+- A direct ignored-leading-field mutation lemma and Boolean positive projection witness constrain the model beyond denial-only behavior. An explicit reflection distinguishing theorem shows that a credential-dependent reject/allow status can leak one bit.
+- Added deterministic static contract/axiom-audit checks and optional native Rust synthetic-provider mutations for ignored fields, approved field changes and credential reflection. No production Rust sources were modified.
+- Authoring environment: Python structural tests pass; Lean, Aeneas, and Rust runtime binaries are unavailable, so all new kernel/native run claims remain **unverified**. Run W5 `prove` on the maintainer machine and fix any actual elaboration errors before marking accepted.
+- Risks: current W5 audit cannot establish transitive socket/HTTP reachability, concrete wire lengths/status/closure, the correctness of reflection classification, or state-transition bisimulation. Those are W6 obligations; reflective-denial equality is an explicit release condition, not a secrecy proof.
+
+## 2026-10-17: W5 proof iteration diagnostics
+
+- Separated fast Lean compilation from provenance checks: `w5_noninterference.py prove` builds only W4's imported proof roots, compiles W4 and W5, and prints diagnostics only on failure. The unrelated GarrettCheck default target and per-theorem axiom dumps no longer run.
+- Removed W5 `#print axioms` declarations and their output parser/tests; retain explicit source-level prohibition of `sorry`/`admit`/`axiom` in the optional structural `check`.
+- Repaired the reported W5 binder/typeclass errors using a local classical `Decidable` instance for `Gate.accepted`, fully qualified the extracted result constructors, and simplified the two witness proofs.
+- Note: the repaired Lean file has not been compiled with the pinned toolchain in this environment.
