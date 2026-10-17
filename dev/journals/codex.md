@@ -1145,3 +1145,12 @@ feature modes. The official 85-mutation run is now active against this frozen
 controller/proof snapshot. I will run the full suite with normal service binaries
 and build the archives before merging. Native client bootstrap will proceed in
 another worktree, preserving the snapshot under audit.
+
+The official reflection mutation audit finished successfully: all 85 actual
+Rust mutations were re-extracted and rejected by unchanged proofs, including
+all five search attacks. The normal-service full suite passed 2,091 tests with
+one expected pending primitive-runner skip in 333.99 seconds; packaging and
+twine passed, and all 194 archive inputs match byte for byte. This checkpoint
+is ready to consolidate. The later client-bootstrap work adds its own proofs
+and challenges on top; no timing/encoding secrecy claim follows from literal
+byte-search correctness.
