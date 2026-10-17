@@ -86,6 +86,10 @@ typed response disclosure contract and uses extracted parameter and
 operation/write guards. Client aliases, command resolvers, approvals/delegation,
 JSON/I/O adapter refinement and whole-service verification remain open.
 
-The native client also supports [software key/CSR bootstrap and recovery](docs/verified-client-material.md)
+The native client also supports [key/CSR bootstrap and recovery](docs/verified-client-material.md)
 with explicit software mode, protected no-replace publication and an extracted
-controller for ordered acknowledgement and uncertain outcomes.
+controller for ordered acknowledgement and uncertain outcomes. A provisioned TPM
+key can sign a CSR without exporting key material or requiring an existing client
+certificate. Tests carry that CSR through fresh attestation enrollment and a
+TPM-signed provider call under isolated emulation; hardware provenance remains
+a deployment assumption.

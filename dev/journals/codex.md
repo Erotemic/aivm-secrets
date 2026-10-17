@@ -1211,3 +1211,15 @@ comparison also confirms identical mutation logic. The ongoing 90-controller
 challenge therefore remains applicable. I am freezing the adapter changes for
 normal-service full-suite and package verification. No physical TPM or live
 provider account is involved.
+
+The normal-service full suite passes 2,116 tests with the one expected pending
+primitive-runner skip in 305.94 seconds. No Python reference runtime changes
+were necessary. I remain confident in the functional native CSR-to-action path
+and fail-closed behavior under these fixtures; this does not close deployment
+provenance, concrete filesystem refinement or composed concurrent histories.
+Packaging verification follows against the frozen implementation and proofs.
+
+Wheel and source archive build and pass twine; all 201 inventoried source,
+proof and documentation inputs match the source archive byte for byte. The
+remaining controller mutation audits are running on their original frozen
+worktrees. I will consolidate only after those runs finish successfully.
