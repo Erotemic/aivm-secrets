@@ -146,3 +146,27 @@ noisy during subsequent work. `PreparedDispatch` and `GuestFrame` centralize
 selected boundaries, but do not encode independent authorization witnesses or
 prove every path to physical I/O. No assumption of VM isolation was discharged.
 The actual model is GPT-6; the exact weights/config variant is unavailable.
+
+## 2026-10-17 13:41:15 -0400
+
+Follow-up on user-reported native W2 failures after compiling Rust: all four
+process-level tests terminated at `ManifestCase.__enter__` because the bridge
+reported `invalid_policy` before announcing readiness. The Python-only fixture
+check had passed, but Rust's `manifest/disclosure.rs` applies the lowercase
+policy identifier grammar to *public release field names*. The W2 fixture
+requests `headRefOid` for native `gh pr view --json`, which that grammar
+rejects even though the selected path is explicit and legitimate.
+
+Scoped the fix to output field-name parsing in the Rust disclosure adapter:
+accept a bounded ASCII lower-initial alphanumeric/underscore identifier with
+internal uppercase letters. Kept input operation/argument/check names and
+policy authorization unchanged. Added native unit tests for camelCase
+selection, malformed output names, discarded private provider fields and
+credential reflection. Updated the W3 source fingerprint and documented the
+native-parser-only test requirement.
+
+Uncertainty: the Rust compiler and Garrett binaries are absent in this
+container, so neither the new Rust unit tests nor the four native TLS
+subprocess workflows could be run here. This is an implementation-level
+root-cause inference from the Rust parser, not yet a verified full runtime
+repair. W0/W3 structural checks and Python regression tests can be run here.

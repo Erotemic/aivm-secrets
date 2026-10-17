@@ -7,6 +7,22 @@ use aivm_secrets_garrett_core::disclosure as filter;
 pub struct Disclosure {
     rules: BTreeMap<String, Vec<filter::Field>>,
 }
+
+// A disclosure key names a host-selected field in the *public reply*, not
+// an input parameter or operation. JSON clients (including `gh --json`)
+// require camelCase keys such as `headRefOid`. Keep the identifier alphabet
+// bounded without loosening the policy grammar for guest-controlled names.
+fn public_field_name(value: &str) -> Outcome<()> {
+    let bytes = value.as_bytes();
+    if bytes.is_empty()
+        || bytes.len() > 32
+        || !bytes[0].is_ascii_lowercase()
+        || !bytes.iter().all(|b| b.is_ascii_alphanumeric() || *b == b'_')
+    {
+        return bad();
+    }
+    Ok(())
+}
 struct Projection;
 impl Projection {
     fn parse(v: &Value, depth: usize) -> Outcome<filter::Projection> {
@@ -60,7 +76,7 @@ impl Projection {
         }
         m.iter()
             .map(|(n, v)| {
-                name(n, false)?;
+                public_field_name(n)?;
                 Ok(filter::Field {
                     name: n.as_bytes().to_vec(),
                     projection: Self::parse(v, depth)?,
@@ -175,4 +191,58 @@ pub(crate) fn ensure_safe(v: &Value, secret: &[u8]) -> Outcome<()> {
         return Err(Error::UpstreamResponse);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn camel_case_public_projection_preserves_exact_host_selected_names() {
+        let operations = vec!["pr.view".to_owned()];
+        let selected = json!({"pr.view": {
+            "number": {"at": ["number"], "type": "integer"},
+            "headRefOid": {"at": ["head", "sha"], "type": "text"}
+        }});
+        let disclosure = Disclosure::parse(&selected, &operations).unwrap();
+        let response = json!({
+            "number": 13861,
+            "head": {"sha": "aabbcc"},
+            "credential": "discarded-private-provider-field"
+        });
+        assert_eq!(
+            disclosure.project("pr.view", &response, b"broker-secret").unwrap(),
+            json!({"number": 13861, "headRefOid": "aabbcc"})
+        );
+    }
+
+    #[test]
+    fn public_projection_field_names_remain_strictly_bounded() {
+        let operations = vec!["pr.view".to_owned()];
+        for invalid in [
+            "HeadRefOid", "head-ref-oid", "head.ref.oid", "head ref oid",
+            "head/ref/oid", "_private", "", "abcdefghijklmnopqrstuvwxyzabcdefg",
+        ] {
+            let mut fields = Map::new();
+            fields.insert(invalid.to_owned(), json!({
+                "at": ["head", "sha"], "type": "text"
+            }));
+            let config = json!({"pr.view": fields});
+            assert!(Disclosure::parse(&config, &operations).is_err(), "{invalid:?}");
+        }
+    }
+
+    #[test]
+    fn reflected_credential_in_camel_case_field_is_still_rejected() {
+        let operations = vec!["pr.view".to_owned()];
+        let selected = json!({"pr.view": {
+            "headRefOid": {"at": ["head", "sha"], "type": "text"}
+        }});
+        let disclosure = Disclosure::parse(&selected, &operations).unwrap();
+        let response = json!({"head": {"sha": "broker-secret"}});
+        assert!(matches!(
+            disclosure.project("pr.view", &response, b"broker-secret"),
+            Err(Error::UpstreamResponse)
+        ));
+    }
 }

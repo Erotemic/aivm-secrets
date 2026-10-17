@@ -49,6 +49,12 @@ precedes releasing selected metadata even with no final dispatch.
   replies/errors. This centralizes observable serialization; the wrapper can
   still carry a value returned by a faulty backend, so disclosure correctness
   is **not** established by its Rust type alone.
+- `manifest/disclosure.rs` accepts bounded, explicitly declared camelCase
+  **public output keys**, needed for GitHub `headRefOid`; it does not relax
+  operation/argument identifiers or permit additional provider fields. The
+  W3 source fingerprint is updated for this parser review. The disclosure
+  projection and reflection-rejection logic remains the same, with Rust unit
+  coverage for selection, malformed keys and reflected credentials.
 - `client_alias.rs` is guest-owned presentation only, pinned in the source
   inventory. It cannot grant an operation; the host manifest must authorize
   every translated command independently.

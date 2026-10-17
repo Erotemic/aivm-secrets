@@ -82,6 +82,14 @@ integration cases skip, since test environments may not have Rust built.
 For a meaningful W2 acceptance run, set all three and require **zero skips**.
 The independent Python policy-shape test can run before compiling Rust.
 
+The native disclosure parser permits explicitly selected camelCase **output**
+keys such as `headRefOid` (still a bounded ASCII identifier); operation and
+request-argument names retain their lowercase grammar. The policy-shape test
+uses the Python parser, so it cannot validate Rust disclosure parsing.
+`cargo +nightly-2026-09-17 test --manifest-path rust/Cargo.toml --lib camel_case_public_projection` exercises that native grammar and projection
+without starting the bridge. A bridge startup failure reporting
+`invalid_policy` may originate in either the manifest or disclosure file.
+
 ## Remaining differences from Python W1
 
 - No generic schema-2 `cli` manifest alias interpreter; just three explicitly
