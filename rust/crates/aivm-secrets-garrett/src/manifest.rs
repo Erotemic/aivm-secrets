@@ -213,7 +213,10 @@ fn references(parts: &[Part]) -> BTreeSet<String> {
 fn scalar_string(value: &Value) -> Outcome<String> {
     match value {
         Value::String(s) => Ok(s.clone()),
-        Value::Number(n) if n.as_i64().is_some() => Ok(n.to_string()),
+        Value::Number(n) => n
+            .as_i64()
+            .map(|value| value.to_string())
+            .ok_or(Error::InvalidRequest),
         _ => Err(Error::InvalidRequest),
     }
 }
@@ -301,14 +304,18 @@ fn raw_arguments(value: &Value) -> Outcome<BTreeMap<String, Value>> {
     let mut args = BTreeMap::new();
     for (n, v) in raw {
         name(n, false).map_err(|_| Error::InvalidRequest)?;
-        match v {
+        // Normalize the value, not its JSON number spelling: -0 grants only
+        // integer zero and must never choose a distinct /-0 provider route.
+        let normalized = match v {
             Value::Number(_) => {
-                json::integer(v, 0, MAX_INT).map_err(|_| Error::InvalidRequest)?;
+                json!(json::integer(v, 0, MAX_INT).map_err(|_| Error::InvalidRequest)?)
             }
-            Value::String(s) if !s.is_empty() && s.len() <= MAX_TEXT && !s.contains('\0') => (),
+            Value::String(s) if !s.is_empty() && s.len() <= MAX_TEXT && !s.contains('\0') => {
+                v.clone()
+            }
             _ => return Err(Error::InvalidRequest),
         };
-        args.insert(n.clone(), v.clone());
+        args.insert(n.clone(), normalized);
     }
     Ok(args)
 }
@@ -416,11 +423,18 @@ impl Check {
                 .and_then(|n| args.get(n))
                 .or(r.literal.as_ref())
                 .ok_or(Error::ResourceMismatch)?;
-            let matches = if r.fold && found.is_string() && expected.is_string() {
-                found.as_str().map(str::to_ascii_lowercase)
-                    == expected.as_str().map(str::to_ascii_lowercase)
-            } else {
-                found == expected
+            let matches = match (found, expected) {
+                (Value::Number(a), Value::Number(b)) => {
+                    a.as_i64().is_some_and(|value| b.as_i64() == Some(value))
+                }
+                (Value::String(a), Value::String(b)) => {
+                    if r.fold {
+                        a.eq_ignore_ascii_case(b)
+                    } else {
+                        a == b
+                    }
+                }
+                _ => false,
             };
             if !matches {
                 return Err(Error::ResourceMismatch);
@@ -718,7 +732,11 @@ impl Operation {
             if !parameters.get(n).is_some_and(|p| p.accepts(v)) {
                 return bad();
             }
-            defaults.insert(n.clone(), v.clone());
+            let normalized = match v {
+                Value::Number(number) => json!(number.as_i64().ok_or(Error::InvalidPolicy)?),
+                _ => v.clone(),
+            };
+            defaults.insert(n.clone(), normalized);
         }
         let mut fold = Vec::new();
         if let Some(raw) = m.get("fold") {

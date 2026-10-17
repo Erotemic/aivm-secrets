@@ -738,3 +738,103 @@ def test_projection_expansion_is_bounded_before_returning_a_large_response(
                 "outcome_unknown" if write else "upstream_response"
             )
             assert len(server.requests) == 1
+
+
+@pytest.mark.parametrize("placement", ["argument", "default", "query"])
+def test_negative_zero_has_the_same_route_as_reference_integer_zero(
+    tmp_path, placement
+):
+    p = policy(tmp_path)
+    p["operations"][0]["parameters"] = {"ticket": [0]}
+    request = dict(operation="ticket.view", arguments={"ticket": 0})
+    spelling = b'"ticket":0'
+    if placement == "default":
+        p["operations"][0]["defaults"] = {"ticket": 0}
+        request["arguments"] = {}
+    elif placement == "query":
+        p["operations"][3]["parameters"]["page"] = {"min": 0, "max": 3}
+        request = dict(operation="ticket.list", arguments={"page": 0})
+        spelling = b'"page":0'
+    row = codec.dumps(dict(version=1, policy=p, request=request))
+    assert row.count(spelling) == 1
+    row = row.replace(spelling, spelling[:-1] + b"-0") + b"\n"
+    done = subprocess.run(
+        [executable("AIVM_SECRETS_RUST_MANIFEST_RUNNER")],
+        input=row,
+        capture_output=True,
+        check=True,
+        timeout=20,
+    )
+    assert not done.stderr
+    assert codec.loads(done.stdout) == reference_compile(p, request)
+
+
+def test_custom_tls_client_cannot_use_negative_zero_to_select_another_route(tmp_path):
+    import socket
+    import ssl
+
+    with TLSService(provider_directory(tmp_path), host="api.example.org") as server:
+        p = policy(tmp_path, server)
+        p["operations"][0]["parameters"] = {"ticket": [0]}
+        server.routes[("GET", "/v1/tickets/0")] = dict(id=0)
+        server.routes[("GET", "/v1/tickets/-0")] = dict(id=99)
+        with ManifestCase(tmp_path, server, p) as session:
+            context = ssl.create_default_context(cafile=str(session.certs["ca"]))
+            context.minimum_version = ssl.TLSVersion.TLSv1_3
+            context.load_cert_chain(*map(str, session.certs["client1"][:2]))
+            request = dict(
+                version=1,
+                capability=session.token,
+                request=dict(operation="ticket.view", arguments={"ticket": 0}),
+            )
+            frame = codec.dumps(request).replace(b'"ticket":0', b'"ticket":-0') + b"\n"
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as raw:
+                raw.connect(str(tmp_path / "identity.sock"))
+                with context.wrap_socket(
+                    raw, server_hostname="localhost"
+                ) as connection:
+                    connection.settimeout(5)
+                    connection.sendall(frame)
+                    response = b""
+                    while not response.endswith(b"\n"):
+                        part = connection.recv(65536)
+                        assert part
+                        response += part
+            reply = codec.loads(response)
+            assert reply["result"] == {"id": 0}
+            assert [r["target"] for r in server.requests] == ["/v1/tickets/0"]
+
+
+@pytest.mark.parametrize(
+    "origin,spelling",
+    [
+        ("fact", b"-0"),
+        ("policy", b"-0"),
+        ("fact", b"0.0"),
+        ("fact", b"false"),
+        ("fact", b'"0"'),
+        ("fact", b"0"),
+    ],
+)
+def test_numeric_preflight_facts_compare_values_without_coercing_types(
+    tmp_path, origin, spelling
+):
+    p = checked(policy(tmp_path))
+    p["checks"]["ticket"]["require"] = [{"at": ["owner"], "equals": 0}]
+    request = dict(operation="ticket.check", arguments={"ticket": 7})
+    facts = dict(owner=0, revision="a" * 40, id=7)
+    row = codec.dumps(dict(version=1, policy=p, request=request, facts=facts))
+    key = b'"equals":0' if origin == "policy" else b'"owner":0'
+    assert row.count(key) == 1
+    row = row.replace(key, key[:-1] + spelling)
+    parsed = codec.loads(row)
+    expected = reference_compile(parsed["policy"], parsed["request"], parsed["facts"])
+    done = subprocess.run(
+        [executable("AIVM_SECRETS_RUST_MANIFEST_RUNNER")],
+        input=row + b"\n",
+        capture_output=True,
+        check=True,
+        timeout=20,
+    )
+    assert not done.stderr
+    assert codec.loads(done.stdout) == expected
