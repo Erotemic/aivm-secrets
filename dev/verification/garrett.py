@@ -28,6 +28,7 @@ PROFILES = [
     "p256-client-enrollment-v1",
     "native-authority-v2",
     "native-oauth-vault-v2",
+    "native-pkce-login-v1",
 ]
 THEOREMS = [
     "aivm_secrets_garrett_core.Proofs.bytes_ne_spec",
@@ -173,6 +174,27 @@ THEOREMS += [
     "aivm_secrets_garrett_core.oauth_state.Proofs.refresh_positive_witness",
 ]
 
+THEOREMS += [
+    "aivm_secrets_garrett_core.oauth_login.Proofs.bytes_ne_exact",
+    "aivm_secrets_garrett_core.oauth_login.Proofs.current_contract",
+    "aivm_secrets_garrett_core.oauth_login.Proofs.claim_contract",
+    "aivm_secrets_garrett_core.oauth_login.Proofs.accepted_requires_exact_state",
+    "aivm_secrets_garrett_core.oauth_login.Proofs.accepted_requires_issuer_policy",
+    "aivm_secrets_garrett_core.oauth_login.Proofs.accepted_requires_current_window",
+    "aivm_secrets_garrett_core.oauth_login.Proofs.consumed_callback_cannot_be_claimed_again",
+    "aivm_secrets_garrett_core.oauth_login.Proofs.begin_contract",
+    "aivm_secrets_garrett_core.oauth_login.Proofs.exchange_cannot_be_started_twice",
+    "aivm_secrets_garrett_core.oauth_login.Proofs.denial_never_exchanges",
+    "aivm_secrets_garrett_core.oauth_login.Proofs.unclaimed_never_exchanges",
+    "aivm_secrets_garrett_core.oauth_login.Proofs.expired_callback_never_exchanges",
+    "aivm_secrets_garrett_core.oauth_login.Proofs.finish_contract",
+    "aivm_secrets_garrett_core.oauth_login.Proofs.failed_install_is_uncertain",
+    "aivm_secrets_garrett_core.oauth_login.Proofs.complete_never_reexchanges",
+    "aivm_secrets_garrett_core.oauth_login.Proofs.uncertain_never_reexchanges",
+    "aivm_secrets_garrett_core.oauth_login.Proofs.successful_callback_witness",
+    "aivm_secrets_garrett_core.oauth_login.Proofs.successful_exchange_witness",
+]
+
 TESTS = [
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
@@ -182,6 +204,7 @@ TESTS = [
     "tests/test_rust_garrett_lifecycle.py",
     "tests/test_rust_garrett_issuance.py",
     "tests/test_rust_garrett_oauth_vault.py",
+    "tests/test_rust_garrett_login.py",
     "tests/test_secrets_garrett_modularity.py",
     "tests/test_secrets_identity_parity.py",
     "tests/test_secrets_identity_registry_parity.py",
@@ -229,6 +252,7 @@ def inputs() -> list[str]:
         "proofs/GarrettAuthority.lean",
         "proofs/GarrettTrust.lean",
         "proofs/GarrettOAuth.lean",
+        "proofs/GarrettLogin.lean",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
         "dev/verification/freshness.py",
@@ -407,7 +431,7 @@ def assurance_coordinates() -> dict:
         "aeneas_release": base.RELEASE,
         "theorems": THEOREMS,
         "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
-        "implementation_linked": "Aeneas-generated issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease controllers; exact byte/epoch/time decisions and typed public-result projection",
+        "implementation_linked": "Aeneas-generated issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions and typed public-result projection",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
@@ -426,6 +450,7 @@ def assurance_coordinates() -> dict:
             "Trust recovery requires a reviewed public-plan digest, exact authority/keyring/enrollment prefix and complete immutable material. Hashing/serialization, key-file validation, durable retirement and activation are trusted storage adapters; no snapshot-rollback resistance or whole-filesystem refinement is claimed.",
             "Native file issuance acknowledges public claims before atomic no-replace output publication under a held authority lease. Private output storage and explicit delivery are trusted host operations; publication/completion errors may leave a usable file and require reconciliation.",
             "OAuth quarantine and successor persistence are conditional storage-adapter contracts. Native vault locking drains participating refresh/revoke against dispatch and HMAC checks token equality; root snapshot rollback, hostile same-UID replacement and nonparticipating writers are outside that boundary.",
+            "Native PKCE login trusts entropy, SHA-256 S256 derivation, HTTP/query decoding and loopback listener/clock adapters. Callback binding and one-shot lifecycle guards are extracted; ready URLs go only to a trusted host operator/browser, and their state/challenge must not be offered as an agent API. Concrete acquisition I/O histories and secret-sink refinement remain open.",
             "Controller histories assume signature verification has prior recorded issuer origin; the ideal signature-origin theorem does not establish a computational byte-level or concrete I/O refinement.",
             "CSR possession, CA constraints/key matching and X.509 signing use the stated rcgen/x509-parser/time adapter contracts; their ASN.1/crypto implementations are not formally refined. TPM approval consumes verified fresh evidence under a trusted AK pin.",
         ],
@@ -434,7 +459,7 @@ def assurance_coordinates() -> dict:
             "Formal refinement of JSON, TLS, X.509, crypto, TPM evidence, HTTP and filesystem adapter implementations",
             "Physical TPM provenance, EK activation, PCR/firmware policy and anti-rollback deployment",
             "Provider non-disclosure, host compromise, snapshot rollback and side channels",
-            "General Rust policy interpretation, complete credential/policy administration, native browser/authorization-code acquisition and concrete storage/concurrent-history refinement",
+            "General Rust policy interpretation, complete credential/policy administration, general provider policy execution and concrete storage/concurrent-history refinement",
         ],
     }
 
@@ -763,6 +788,75 @@ def mutate() -> None:
             "now > current.expires_at",
         ),
     ]
+    login_source = source.with_name("oauth_login.rs")
+    mutations += [
+        (
+            login_source,
+            "login callback state bypass",
+            "if callback.state != pending.state {",
+            "if false {",
+        ),
+        (
+            login_source,
+            "login missing required issuer accepted",
+            "if !callback.has_issuer || callback.issuer != *expected {",
+            "if callback.issuer != *expected {",
+        ),
+        (
+            login_source,
+            "login issuer substitution accepted",
+            "if !callback.has_issuer || callback.issuer != *expected {",
+            "if !callback.has_issuer {",
+        ),
+        (
+            login_source,
+            "login unexpected issuer accepted",
+            "if callback.has_issuer {",
+            "if false {",
+        ),
+        (
+            login_source,
+            "login inclusive callback expiry",
+            "now >= pending.expires_at",
+            "now > pending.expires_at",
+        ),
+        (
+            login_source,
+            "login consumed callback accepted again",
+            "Stage::Pending => (),",
+            "Stage::Pending | Stage::Accepted => (),",
+        ),
+        (
+            login_source,
+            "login unclaimed code exchanged",
+            "Stage::Accepted => (),",
+            "Stage::Accepted | Stage::Pending => (),",
+        ),
+        (
+            login_source,
+            "login code exchanged twice",
+            "Stage::Accepted => (),",
+            "Stage::Accepted | Stage::Exchanging => (),",
+        ),
+        (
+            login_source,
+            "login denial treated as code",
+            "if callback.denied {\n        Ok(Stage::Denied)",
+            "if callback.denied {\n        Ok(Stage::Accepted)",
+        ),
+        (
+            login_source,
+            "login failed install treated as complete",
+            "Ok(Stage::Uncertain)",
+            "Ok(Stage::Complete)",
+        ),
+        (
+            login_source,
+            "login completion before exchange",
+            "Stage::Exchanging => (),",
+            "Stage::Exchanging | Stage::Accepted => (),",
+        ),
+    ]
     lean_path = base.run(
         [base.executable("lake"), "env", "printenv", "LEAN_PATH"],
         cwd=PROOFS,
@@ -815,7 +909,7 @@ def mutate() -> None:
                 env=env,
             )
             rejected = False
-            for module in [
+            modules = [
                 "Garrett",
                 "GarrettProtocol",
                 "GarrettHistory",
@@ -823,7 +917,18 @@ def mutate() -> None:
                 "GarrettAuthority",
                 "GarrettTrust",
                 "GarrettOAuth",
-            ]:
+                "GarrettLogin",
+            ]
+            # The new leaf proofs depend only on Garrett. Check the directly
+            # affected leaf first, without rebuilding unrelated proof modules.
+            preferred = {
+                "oauth_state.rs": "GarrettOAuth",
+                "oauth_login.rs": "GarrettLogin",
+            }.get(source.name)
+            if preferred:
+                modules.remove(preferred)
+                modules.insert(1, preferred)
+            for module in modules:
                 proof = temporary / (module + ".lean")
                 shutil.copy2(PROOFS / proof.name, proof)
                 result = base.run(

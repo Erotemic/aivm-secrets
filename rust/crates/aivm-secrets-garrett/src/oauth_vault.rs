@@ -14,6 +14,7 @@ use ring::{
 use serde_json::{json, Value};
 use std::{fs::File, io::Write, path::Path, sync::Mutex};
 use zeroize::Zeroizing;
+pub mod login;
 pub mod provider;
 pub mod transport;
 use provider::Provider;
@@ -407,11 +408,15 @@ impl OAuthVault {
     ) -> Outcome<Value> {
         let raw = Zeroizing::new(files::read_private(path, 16384)?);
         let grant = Grant::from_value(&json::parse(&raw, 16384)?)?;
-        if grant.scopes.iter().any(|s| !provider.scopes.contains(s)) {
-            return Err(Error::CredentialSource);
-        }
-        let _lease = self.root.lock_named(".vault.lock", true)?;
-        let (epoch, previous) = if self
+        self.enroll_grant(provider, subject, &grant, replace, now)
+    }
+    fn enrollment_successor(
+        &self,
+        provider: &Provider,
+        subject: &str,
+        replace: bool,
+    ) -> Outcome<(i64, String)> {
+        if self
             .root
             .exists(&format!("{}.json", account(provider, subject)?))?
         {
@@ -422,17 +427,36 @@ impl OAuthVault {
             if old.epoch >= i32::MAX as i64 {
                 return Err(Error::Exhausted);
             }
-            (
+            Ok((
                 old.epoch + 1,
                 if old.profile != provider.digest {
                     old.profile[..16].to_owned()
                 } else {
                     old.previous
                 },
-            )
+            ))
         } else {
-            (0, String::new())
-        };
+            Ok((0, String::new()))
+        }
+    }
+    fn can_enroll(&self, provider: &Provider, subject: &str, replace: bool) -> Outcome<()> {
+        let _lease = self.root.lock_named(".vault.lock", true)?;
+        self.enrollment_successor(provider, subject, replace)?;
+        Ok(())
+    }
+    fn enroll_grant(
+        &self,
+        provider: &Provider,
+        subject: &str,
+        grant: &Grant,
+        replace: bool,
+        now: i64,
+    ) -> Outcome<Value> {
+        if grant.scopes.iter().any(|s| !provider.scopes.contains(s)) {
+            return Err(Error::CredentialSource);
+        }
+        let _lease = self.root.lock_named(".vault.lock", true)?;
+        let (epoch, previous) = self.enrollment_successor(provider, subject, replace)?;
         let row = Row {
             profile: provider.digest.clone(),
             active: true,
@@ -443,7 +467,7 @@ impl OAuthVault {
         };
         let audit = Audit::new(&self.root, provider, subject)?;
         audit.record("oauth_enroll_intent", now, "")?;
-        self.write(provider, subject, &row, Some(&grant), &row.state)?;
+        self.write(provider, subject, &row, Some(grant), &row.state)?;
         audit
             .record("oauth_recorded", now, "")
             .map_err(|_| Error::OutcomeUnknown)?;

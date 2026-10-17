@@ -75,5 +75,8 @@ acknowledged token issuance to protected host files are implemented too.
 The native OAuth vault now preserves Python schema-2 ciphertext, refreshes through
 a pinned HTTPS origin and holds revocable credential leases through provider use.
 Extracted Lean contracts check durable quarantine before refresh and persistence
-before returning a successor. Native browser/authorization-code acquisition,
-general policy interpretation and concrete whole-service refinement remain open.
+before returning a successor. Native host-only PKCE login now binds its loopback
+callback before emitting the browser URL, exchanges one accepted code and installs
+the grant directly into the encrypted vault. Its callback/lifecycle guards have
+extracted proofs. General policy interpretation and concrete whole-service
+refinement remain open.

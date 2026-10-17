@@ -98,71 +98,22 @@ pub fn evaluate(v: &Value) -> Outcome<Value> {
                 &["version", "action", "pending", "parameters", "now"],
                 &["expected_issuer"],
             )?;
-            let p = json::keys(
-                &m["pending"],
-                &[
-                    "state",
-                    "verifier",
-                    "redirect_uri",
-                    "issued_at",
-                    "expires_at",
-                ],
-                &[],
-            )?;
             let issuer = m
                 .get("expected_issuer")
                 .map(text)
                 .transpose()?
                 .unwrap_or("");
-            let issued = json::integer(&p["issued_at"], 0, i64::MAX)?;
-            let expires = json::integer(&p["expires_at"], 0, i64::MAX)?;
-            pkce(&p["state"])?;
-            pkce(&p["verifier"])?;
-            opaque(&p["redirect_uri"], 256)?;
-            if issued > i64::MAX - 600 || !(1..=600).contains(&(expires - issued)) {
-                return Err(Error::CredentialSource);
+            let stage = callback(
+                &m["pending"],
+                &m["parameters"],
+                json::integer(&m["now"], 0, i64::MAX)?,
+                issuer,
+                &aivm_secrets_garrett_core::oauth_login::Stage::Pending,
+            )?;
+            match stage {
+                aivm_secrets_garrett_core::oauth_login::Stage::Accepted => Ok(json!({"ok":true})),
+                _ => Err(Error::AuthorizationDenied),
             }
-            let params = m["parameters"].as_object().ok_or(Error::CredentialSource)?;
-            let now = json::integer(&m["now"], 0, i64::MAX)?;
-            if now < issued || now >= expires {
-                return Err(Error::Expired);
-            }
-            let denied =
-                if params.len() == 2 && params.contains_key("code") && params.contains_key("state")
-                    || params.len() == 3
-                        && params.contains_key("code")
-                        && params.contains_key("state")
-                        && params.contains_key("iss")
-                {
-                    false
-                } else {
-                    json::keys(
-                        &m["parameters"],
-                        &["error", "state"],
-                        &["error_description", "error_uri", "iss"],
-                    )?;
-                    true
-                };
-            if params["state"] != p["state"]
-                || (!issuer.is_empty() && params.get("iss") != Some(&json!(issuer)))
-                || (issuer.is_empty() && params.contains_key("iss"))
-            {
-                return Err(Error::CredentialSource);
-            }
-            if !denied {
-                opaque(&params["code"], 4096)?;
-                return Ok(json!({"ok":true}));
-            }
-            opaque(&params["error"], 128)?;
-            for name in ["error_description", "error_uri"] {
-                if let Some(v) = params.get(name) {
-                    let s = text(v)?;
-                    if s.is_empty() || s.len() > 2048 || s.contains('\0') {
-                        return Err(Error::CredentialSource);
-                    }
-                }
-            }
-            Err(Error::AuthorizationDenied)
         }
         Some("token") => {
             let m = json::keys(
@@ -296,4 +247,88 @@ pub fn evaluate(v: &Value) -> Outcome<Value> {
         }
         _ => Err(Error::CredentialSource),
     }
+}
+
+fn login_error(error: aivm_secrets_garrett_core::oauth_login::LoginDenial) -> Error {
+    match error {
+        aivm_secrets_garrett_core::oauth_login::LoginDenial::Expired => Error::Expired,
+        _ => Error::CredentialSource,
+    }
+}
+pub(crate) fn callback(
+    pending: &Value,
+    parameters: &Value,
+    now: i64,
+    issuer: &str,
+    stage: &aivm_secrets_garrett_core::oauth_login::Stage,
+) -> Outcome<aivm_secrets_garrett_core::oauth_login::Stage> {
+    use aivm_secrets_garrett_core::oauth_login as login;
+    let p = json::keys(
+        pending,
+        &[
+            "state",
+            "verifier",
+            "redirect_uri",
+            "issued_at",
+            "expires_at",
+        ],
+        &[],
+    )?;
+    pkce(&p["state"])?;
+    pkce(&p["verifier"])?;
+    opaque(&p["redirect_uri"], 256)?;
+    let bound = login::Pending {
+        state: text(&p["state"])?.as_bytes().to_vec(),
+        issuer: if issuer.is_empty() {
+            login::IssuerRule::Absent
+        } else {
+            login::IssuerRule::Exact(issuer.as_bytes().to_vec())
+        },
+        issued_at: json::integer(&p["issued_at"], 0, i64::MAX)?,
+        expires_at: json::integer(&p["expires_at"], 0, i64::MAX)?,
+    };
+    login::current(&bound, now).map_err(login_error)?;
+    let params = parameters.as_object().ok_or(Error::CredentialSource)?;
+    let denied = if params.len() == 2 && params.contains_key("code") && params.contains_key("state")
+        || params.len() == 3
+            && params.contains_key("code")
+            && params.contains_key("state")
+            && params.contains_key("iss")
+    {
+        false
+    } else {
+        json::keys(
+            parameters,
+            &["error", "state"],
+            &["error_description", "error_uri", "iss"],
+        )?;
+        true
+    };
+    let received = login::Callback {
+        state: text(&params["state"])?.as_bytes().to_vec(),
+        issuer: params
+            .get("iss")
+            .map(text)
+            .transpose()?
+            .unwrap_or("")
+            .as_bytes()
+            .to_vec(),
+        has_issuer: params.contains_key("iss"),
+        denied,
+    };
+    let claimed = login::claim(stage, &bound, &received, now).map_err(login_error)?;
+    if !denied {
+        opaque(&params["code"], 4096)?;
+    } else {
+        opaque(&params["error"], 128)?;
+        for name in ["error_description", "error_uri"] {
+            if let Some(v) = params.get(name) {
+                let s = text(v)?;
+                if s.is_empty() || s.len() > 2048 || s.contains('\0') {
+                    return Err(Error::CredentialSource);
+                }
+            }
+        }
+    }
+    Ok(claimed)
 }

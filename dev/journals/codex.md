@@ -741,3 +741,104 @@ browser acquisition, the general policy interpreter, whole-service I/O/history
 refinement or physical TPM provenance. Those remain the next goal work. The
 standalone repository boundary and the Python reference implementation remain
 intact, and the overall Garrett implementation/formalization goal stays active.
+
+## 2026-10-17 03:16:37 -0400
+
+The previous goal turn made concrete progress in e9197f3: native encrypted
+OAuth custody, refresh quarantine and dispatch leases, 121 checked obligations,
+48 rejected source mutations and 1,975 full-suite passes. The worktree is clean
+and those artifacts are present. The next missing runtime is browser/code
+acquisition. I am building the ordinary Rust login service around host-held
+PKCE state, a bound loopback receiver, exact callback validation and a single
+code exchange that installs directly into the vault. I want the consumption
+boundary to survive caller errors: no duplicate callback may cause a second
+exchange, and a grant that was issued but cannot be stored must be reported as
+uncertain. I am confident the existing HTTPS and encrypted storage adapters can
+be reused. The risks are callback request framing, state/issuer/expiry binding,
+slow local clients, concurrent enrollment during the browser wait and accidental
+secret-bearing output. These require real I/O tests and explicit adapter
+contracts; formalizing just a JSON acceptance predicate would leave the actual
+missing service unbuilt. Python remains the independent reference and the AIVM
+boundary remains unchanged.
+
+The native login now completes the missing service path through actual TCP
+loopback, pinned HTTPS code exchange and direct opaque-Grant installation.
+The existing import transaction was refactored for reuse rather than routing
+through a plaintext grant file. Thirty-three new integration cases cover
+callback noise versus a consuming denial, host/path/framing substitutions,
+absolute deadlines, a queued valid callback behind a slow client, single
+redemption while the token endpoint blocks, failed exchange/installation, a
+concurrent enrollment winner, explicit reauthorization and subsequent native
+broker use. The URL is independently compared with Python's exact PKCE URL;
+Python decrypts the resulting record. Together with vault and OAuth parity
+cases, 62 focused tests passed.
+
+Eighteen new Lean obligations check exact state/issuer/window binding and
+consuming stage transitions with positive witnesses. The first proof attempt
+left four Boolean/equality branches; explicit WP simplification closed them.
+Positive witness arithmetic needed the checked window contract rather than
+leaving a generated addition monad unevaluated. Two unnecessary-simpa warnings
+were fixed before enabling warning-as-error mutation checks, so warnings cannot
+masquerade as security rejections. Eleven actual core mutations are registered.
+The mutation gate tries the affected OAuth leaf immediately after its Garrett
+dependency to avoid recompiling unrelated proof modules; every candidate still
+requires a genuine unchanged-proof error, with infrastructure/resources refused.
+
+I am intentionally keeping acquisition I/O/audit histories explicit. Enrollment
+auditing begins at installation, and a killed code exchange can leave an upstream
+grant without a local record. The private flow cannot be resumed or redeemed
+automatically, but this is not a whole-service crash or provider-revocation
+proof. The URL is a trusted host/browser disclosure, never a new agent API.
+That distinction and the PKCE/provider/parser assumptions are now in the ledger.
+
+The recorded baseline is terminal: 171 selected tests, 139 named axiom checks,
+six Rust units and strict clippy in both feature modes. The full suite and
+59-mutation challenge are running on unchanged core/proof inputs. Counts from
+collection show 33 new login integration cases, not 35; the earlier estimate
+was corrected in this session's entry. The focused total of 62 includes three
+existing pure OAuth parity tests plus the 26 vault cases.
+
+While waiting, I inspected the remaining native surface. The general Python
+HTTPSpec carries typed parameters, body fields, read-only checks/captures,
+normalization/defaults, paging, GraphQL and CLI tables. The fixed account-status
+profile cannot be treated as a completed port of that interpreter. The next
+large implementation should model its approved request/effect AST and a reviewed
+response disclosure contract, then connect those to native dispatch. There is
+also a concrete smaller identity gap: Python's `identity request` creates a
+private client key and CSR, while the normal Rust client only loads configured
+material and the authority verifies supplied CSRs. Native key/CSR creation and
+inspection need protected no-replace output and independent interoperability
+tests; TPM provisioning is still explicit external tooling. I added that gap
+to the acceptance table so completion is not inferred from the signing adapter.
+
+The normal-service full regression is terminal: 2,008 passed and the one known
+unimplemented general primitive-runner skip, 300.52 seconds. All 33 new login
+cases ran after the explicit no-default-feature service build; the fixture
+runner remained separate. The recorded 171-test/139-obligation baseline is
+unchanged. Sixteen Rust source attacks have failed genuine proofs so far.
+There are no reported test failures, and the physical/provider deployment and
+whole-service claims remain open. I am now checking the packaged source bytes
+so the new native service and extraction artifacts are actually reproducible
+from the standalone archive rather than existing only in this checkout.
+
+The final source distribution builds and passes twine. All 180 checked
+manifest/source/proof/document inputs match the archive byte for byte, and
+current manifest checking confirms the same recorded baseline. Nineteen
+source mutants have been rejected so far. No new implementation changes are
+planned during this challenge; the remaining work in this checkpoint is its
+terminal result, resource publication and a model-attributed local commit.
+
+The 59-mutation challenge is terminal and successful. All eleven new login
+attacks failed unchanged GarrettLogin proofs, including missing state/issuer
+binding, consumed or expired callbacks, unclaimed/repeated exchange, denial
+as success and false completion after failed storage or before exchange.
+No infrastructure/resource failure or timeout counted as a rejection. The
+source and proof inputs were unchanged during the run; the final full suite
+and archive checks cover that same implementation. Resource publication is
+being performed before the model-attributed local commit. I am confident in
+the callback/lifecycle guards and exercised native acquisition path under
+the stated adapter/host/provider assumptions. The entire protocol goal stays
+active: the general provider interpreter, native client-material creation,
+concrete acquisition/audit/storage/concurrent histories and deployment trust
+premises remain open. Python's runtime/reference and AIVM integration ownership
+were not changed by this checkpoint.

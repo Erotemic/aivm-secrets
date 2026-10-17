@@ -194,7 +194,7 @@ impl TokenEndpoint {
         result.map_err(|_| core::classify(sent, status, invalid_grant))
     }
 }
-fn decode(value: &[u8]) -> Outcome<String> {
+pub(super) fn decode(value: &[u8]) -> Outcome<String> {
     let mut out = Vec::new();
     let mut i = 0;
     while i < value.len() {

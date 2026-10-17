@@ -282,10 +282,11 @@ request quota is not part of this milestone's value proposition.
 | Pure issue/present model | Python contracts/vectors plus extracted Rust issuance/opening and use/release proofs | Complete correspondence with the concrete service and authentic inputs |
 | Token envelopes | Python/Rust exact outer fixture and bidirectional inner/outer crypto interoperability | Concrete encoding/crypto adapter refinement and nonce analysis |
 | Authenticated connection | Actual Rust/Python TLS tests, opaque peer evidence and Rust provider path | Formal transport refinement and complete connection/request association |
-| Acquisition and refresh | Python-compatible native encrypted vault, pinned HTTPS refresh, durable-before-send extracted controller, opaque leases through native dispatch, process-death/write-failure/concurrency tests | Native browser/callback/code-exchange acquisition; concrete storage/error/concurrent-service trace refinement |
+| Acquisition and refresh | Native host-only PKCE URL/loopback/code exchange and direct encrypted-vault installation, extracted callback/lifecycle/refresh guards, pinned HTTPS, opaque dispatch leases and synthetic I/O attack tests | Concrete acquisition/audit/storage/error/concurrent-service trace refinement; broader provider registration/production validation |
 | Substitution and result release | Original broker/egress tests plus Rust account-status-v1 custody, route tests and extracted typed-release noninterference | Review/extend the public disclosure contract, general provider mediation and whole-service confinement/refinement |
 | Instance key custody | Rust TPM signer, fresh creation-evidence verifier under a trusted AK pin, actual isolated swtpm/TLS tests | Authenticate hardware AK provenance, EK activation, approved deployment/PCR/rollback policy and physical TPM validation |
-| Native authority | Python-compatible durable Rust administration, assurance receipts, issuer/server/CA rotation, explicit prefix-checked recovery, protected file issuance, held-directory storage, extracted admission/trust-publication contracts and live native bridge leases | Complete storage/locking and concurrent-service history refinement; general policy and browser OAuth acquisition |
+| Native authority | Python-compatible durable Rust administration, assurance receipts, issuer/server/CA rotation, explicit prefix-checked recovery, protected file issuance, held-directory storage, extracted admission/trust-publication contracts and live native bridge leases | Complete storage/locking and concurrent-service history refinement; general policy and acquisition/service-history refinement |
+| Client identity creation | Native CSR possession/approval checks and software/TPM signing; Python `identity request` and external TPM tooling create client material | Normal Rust client key/CSR creation and inspect commands, with protected no-replace output; provisioning/deployment provenance remains separate |
 
 The Python executor currently returns successful provider JSON or text to the
 broker, which places it in the result and checks literal credential reflection.
@@ -317,14 +318,13 @@ they are trusted host metadata, not proof of physical hardware or a workload.
 
 ### Next implementation sequence after native refresh custody
 
-1. Finish normal Rust authorization-code acquisition. Keep PKCE verifier and
-   pending state on the trusted host, bind a loopback listener before opening
-   the browser, check the exact callback path/state/issuer/expiry and consume
-   one pending authorization once. Exchange only with the approved token
-   origin and install through the existing vault transaction. The ordinary
-   service must exercise these rules; a JSON transition runner alone does
-   not close acquisition. Add browser/callback substitution, duplicate-code,
-   timeout and lost-response tests with synthetic endpoints.
+1. Native authorization-code acquisition is now implemented through ordinary
+   `garrett-oauth login`, with host-held PKCE, a bound loopback listener, exact
+   callback state/issuer/time checks, one-shot exchange and direct vault install.
+   The callback and lifecycle decisions are extracted; real callback/TLS and
+   independent Python URL/store tests exercise the adapters. Complete the
+   acquisition audit/concurrent I/O history refinement and broader registration
+   validation before claiming the entire acquisition service is verified.
 2. Extend the Rust provider interpreter deliberately. Keep credential sources
    opaque, make request builders consume host-approved routes and typed
    arguments, and choose each operation's public-result disclosure contract.

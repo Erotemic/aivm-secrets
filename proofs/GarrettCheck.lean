@@ -1,3 +1,4 @@
+import GarrettLogin
 import GarrettOAuth
 import GarrettTrust
 import GarrettAuthority
@@ -135,3 +136,22 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.oauth_state.Proofs.uncertain_exchange_never_settles
 #print axioms aivm_secrets_garrett_core.oauth_state.Proofs.failed_commit_never_returns_token
 #print axioms aivm_secrets_garrett_core.oauth_state.Proofs.refresh_positive_witness
+
+#print axioms aivm_secrets_garrett_core.oauth_login.Proofs.bytes_ne_exact
+#print axioms aivm_secrets_garrett_core.oauth_login.Proofs.current_contract
+#print axioms aivm_secrets_garrett_core.oauth_login.Proofs.claim_contract
+#print axioms aivm_secrets_garrett_core.oauth_login.Proofs.accepted_requires_exact_state
+#print axioms aivm_secrets_garrett_core.oauth_login.Proofs.accepted_requires_issuer_policy
+#print axioms aivm_secrets_garrett_core.oauth_login.Proofs.accepted_requires_current_window
+#print axioms aivm_secrets_garrett_core.oauth_login.Proofs.consumed_callback_cannot_be_claimed_again
+#print axioms aivm_secrets_garrett_core.oauth_login.Proofs.begin_contract
+#print axioms aivm_secrets_garrett_core.oauth_login.Proofs.exchange_cannot_be_started_twice
+#print axioms aivm_secrets_garrett_core.oauth_login.Proofs.denial_never_exchanges
+#print axioms aivm_secrets_garrett_core.oauth_login.Proofs.unclaimed_never_exchanges
+#print axioms aivm_secrets_garrett_core.oauth_login.Proofs.expired_callback_never_exchanges
+#print axioms aivm_secrets_garrett_core.oauth_login.Proofs.finish_contract
+#print axioms aivm_secrets_garrett_core.oauth_login.Proofs.failed_install_is_uncertain
+#print axioms aivm_secrets_garrett_core.oauth_login.Proofs.complete_never_reexchanges
+#print axioms aivm_secrets_garrett_core.oauth_login.Proofs.uncertain_never_reexchanges
+#print axioms aivm_secrets_garrett_core.oauth_login.Proofs.successful_callback_witness
+#print axioms aivm_secrets_garrett_core.oauth_login.Proofs.successful_exchange_witness

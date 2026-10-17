@@ -84,7 +84,7 @@ observational equivalence, hide metadata/length/timing, or refine the entire
 Rust I/O system into the symbolic trace. Concrete cryptographic primitives,
 TLS/X.509, parser, filesystem, compiler and translation are trusted boundaries.
 
-The manifest now declares **121 named obligations**, including supporting lemmas,
+The manifest now declares **139 named obligations**, including supporting lemmas,
 the [credential-use/release contracts](verified-provider.md) and the
 [composed request controller](verified-composition.md). The composition checks
 authenticated opening, current inner authorization, exact audit acknowledgement
@@ -102,9 +102,12 @@ file issuer uses the existing extracted acknowledged-issuance controller.
 [`GarrettOAuth.lean`](../proofs/GarrettOAuth.lean) adds exact refresh eligibility,
 not-sent/uncertain/rejected settlement, epoch/generation/expiry lease fencing,
 and the ordered quarantine/exchange/commit controller contract.
+[`GarrettLogin.lean`](../proofs/GarrettLogin.lean) adds exact callback state,
+issuer and time binding, one-shot claim/exchange transitions, terminal-state
+replay rejection and successful-acquisition witnesses.
 Every transitive axiom dependency is checked afresh. Only Lean's `propext`,
 `Classical.choice`, and `Quot.sound` are permitted; no admitted proof or
-project-specific security axiom is allowed. Forty-eight deliberate changes to actual
+project-specific security axiom is allowed. Fifty-nine deliberate changes to actual
 Rust must break the unchanged extracted proofs: missing certificate binding,
 missing epoch binding, inclusive expiry, inactive issuance, bypassing binding
 before decryption, returning a token without sealing, removing inner binding,
@@ -124,7 +127,9 @@ enrollments, skip staging or retirement, activate before retirement, or report
 an uncertain trust change as unchanged.
 OAuth mutations remove quarantine or successor persistence, exchange before
 quarantine, permit silent retry or rejected-grant reuse, clear prior doubt after
-a failed deliberate retry, or admit stale/expired credential leases.
+a failed deliberate retry, or admit stale/expired credential leases. Login mutations bypass callback state/issuer
+binding, accept expired or consumed callbacks, exchange without admission or
+more than once, treat a denial as a code, or complete before exchange/storage.
 
 ## TPM custody and enrollment evidence
 
@@ -534,17 +539,95 @@ stale tokens and subsecond expiry after a blocked admission.
 The Lean result is conditional on the stated storage, audit, transport and
 cryptographic adapter contracts. It proves the ordering in the extracted Rust
 controller; it does not prove AES-GCM, HMAC, rustls, kernel locks, fsync, parsing
-or arbitrary concurrent service executions. The native browser, loopback
-callback and authorization-code exchange service is still pending; existing
-pure callback/PKCE/token decisions retain their Python parity tests. Host
-compromise, snapshot rollback, nonparticipating writers and provider disclosure
-remain outside this result. No live OAuth account or physical TPM was used.
+or arbitrary concurrent service executions. The native login path below adds
+actual loopback callback and code exchange with extracted lifecycle guards.
+Host compromise, snapshot rollback, nonparticipating writers and provider
+disclosure remain outside this result. No live OAuth account or physical TPM
+was used.
+
+## Native authorization-code acquisition
+
+The normal `garrett-oauth login` command now obtains a grant without a plaintext
+grant input file. Its private host request contains `provider_file`, `subject`,
+optional explicit `replace`, `timeout` (1..600 seconds, default 180), and the
+same optional pinned `transport` object used for refresh:
+
+```json
+{
+  "provider_file": "/private/provider.json",
+  "subject": "vm-test",
+  "timeout": 180
+}
+```
+
+```bash
+rust/target/release/garrett-oauth login --root /private/oauth-vault --request /private/login.json
+```
+
+After a read-only enrollment preflight and transport preparation, the command
+creates fresh state and PKCE verifier entropy, binds only `127.0.0.1` at the
+profile's callback port, then emits a version-1 `authorization_required` JSON
+event with `authorization_url` and `expires_at`. Open that URL in a trusted
+host browser, as with the reference CLI. This is a host-only interactive event,
+not an agent operation: the state and challenge are intentionally shared with
+the operator/browser and must not be offered through a guest or remote agent
+API. The private verifier is represented only by its S256 challenge in that URL.
+No shell/browser command or browser executable supplied by a callback is run.
+
+The receiver requires the exact local Host and `/oauth/callback` target,
+bounded ordinary HTTP, unique query fields, matching state, the profile's exact
+optional issuer rule and the half-open pending lifetime. Wrong or malformed
+callbacks keep the login waiting. A matching denial consumes the pending flow
+and terminates with fixed `authorization_denied`; provider descriptions/URIs
+are never echoed or fetched. Idle and trickling clients are cut by an absolute
+five-second request deadline bounded by the whole login deadline. The flow's
+state is consumed before acknowledging a valid callback; a failed browser
+acknowledgement does not reopen it. The listener closes before token exchange,
+so queued or replayed callbacks cannot cause another redemption.
+
+The actual Rust controller rechecks the clock before beginning exchange and
+enters a state that cannot begin again. It posts only the approved client ID,
+accepted code, fixed redirect URI, private verifier and optional host-held
+client secret to the pinned token origin. It never redirects, exports the code
+or verifier in CLI replies/audit, or retries the code automatically. The native
+authorization URL is checked byte for byte against the independent Python
+constructor using the verifier observed only at the synthetic HTTPS endpoint.
+The callback, denial, uncertain, complete and consumed transitions come from
+the Aeneas-extracted core; HTTP/query decoding, entropy, SHA-256 and I/O order
+remain explicit adapter obligations.
+
+A validated initial grant installs through the same encrypted-vault transaction
+as import. Enrollment is checked again under the vault lock, so another login
+that wins during the browser wait is not overwritten without explicit
+`replace`. Reauthorization advances the credential epoch and resets the new
+grant generation. Only metadata is returned after successful installation.
+The new grant is immediately usable by the native authority/provider path,
+which releases only its declared `id`/`active` result.
+
+`exchange_not_sent`, `exchange_rejected` and `exchange_in_doubt` distinguish
+transport outcomes with fixed text. A valid grant that cannot be installed
+reports `grant_orphaned_upstream` with the storage/enrollment error code. A
+failed publication acknowledgement may already have installed it; inspect the
+vault before further action. A killed login may leave a grant upstream with
+no local record: state, verifier and code are process-local and there is no
+automatic resumption. Enrollment audit starts at installation; a concrete
+acquisition audit/history refinement remains open. No live browser account,
+external OAuth provider, managed VM or physical TPM was used in these tests.
+
+The native login checkpoint passes **2,008 full-suite tests**, with the one
+expected pending general primitive-runner skip (300.52 seconds), using normal
+native service binaries. The recorded gate passes **171 selected Garrett tests**,
+all **139 named axiom checks**, strict Rust lint in both modes and six Rust
+unit checks. **33 new login tests** exercise the real callback/code-exchange
+path and an independent Python URL/ciphertext oracle. The mutation gate now
+requires 59 changed Rust controllers to fail unchanged proofs, including eleven
+new callback/lifecycle attacks. Hosted CI remains unexecuted.
 
 ## Remaining assurance work
 
 The [acceptance plan](planning/aivm-secrets-garrett-verification.md) remains
 the broader goal. Remaining work includes concrete adapter refinement,
-complete credential/policy administration and browser OAuth acquisition in Rust,
+complete credential/policy administration and general provider interpretation in Rust,
 TPM provenance deployment, broader
 provider release/egress proofs, audit/log confinement, and a composed finite
 service-history theorem. The extracted request composition does not establish

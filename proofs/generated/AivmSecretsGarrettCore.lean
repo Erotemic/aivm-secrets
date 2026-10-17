@@ -521,14 +521,14 @@ def enrollment.enroll_client
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::Denial]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 16:0-18:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 17:0-19:1
     Visibility: public -/
 @[discriminant isize]
 inductive Denial where
 | InvalidCapability : Denial
 
 /-- [aivm_secrets_garrett_core::Claims]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 20:0-29:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 21:0-30:1
     Visibility: public -/
 structure Claims where
   issuer : alloc.vec.Vec Std.U8
@@ -541,7 +541,7 @@ structure Claims where
   certificate : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::Expectation]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 31:0-36:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 32:0-37:1
     Visibility: public -/
 structure Expectation where
   issuer : alloc.vec.Vec Std.U8
@@ -550,7 +550,7 @@ structure Expectation where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::IssueWindow]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 38:0-42:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 39:0-43:1
     Visibility: public -/
 structure IssueWindow where
   issued_at : Std.I64
@@ -558,7 +558,7 @@ structure IssueWindow where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::issue_window]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 45:0-72:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 46:0-73:1
     Visibility: public -/
 def issue_window
   (active : Bool) (epoch : Std.I64) (not_after : Std.I64) (now : Std.I64)
@@ -602,7 +602,7 @@ def issue_window
   else ok (core.result.Result.Err Denial.InvalidCapability)
 
 /-- [aivm_secrets_garrett_core::present]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 76:0-103:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 77:0-104:1
     Visibility: public -/
 def present
   (claims : Claims) (expected : Expectation) (peer : alloc.vec.Vec Std.U8)
@@ -666,21 +666,21 @@ def present
                           else ok (core.result.Result.Ok ())
 
 /-- [aivm_secrets_garrett_core::AuthenticatedEnvelope]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 107:0-110:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 108:0-111:1
     Visibility: public -/
 structure AuthenticatedEnvelope where
   claims : Claims
   encrypted : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::OpenedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 112:0-115:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 113:0-116:1
     Visibility: public -/
 structure OpenedSurrogate (S : Type _) where
   claims : Claims
   secret : S
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeVerifier]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 118:0-122:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 119:0-123:1
     Visibility: public -/
 structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
   verify : Self → alloc.vec.Vec Std.U8 → Result (core.result.Result
@@ -689,7 +689,7 @@ structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
     Self_Secret Denial)
 
 /-- [aivm_secrets_garrett_core::open_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 127:0-149:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 128:0-150:1
     Visibility: public -/
 def open_surrogate
   {V : Type _} {Clause0_Secret : Type _} (EnvelopeVerifierInst :
@@ -713,7 +713,7 @@ def open_surrogate
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssueInputs]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 151:0-160:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 152:0-161:1
     Visibility: public -/
 structure IssueInputs where
   issuer : alloc.vec.Vec Std.U8
@@ -726,7 +726,7 @@ structure IssueInputs where
   not_after : Std.I64
 
 /-- [aivm_secrets_garrett_core::prepare_issue]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 163:0-178:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 164:0-179:1
     Visibility: public -/
 def prepare_issue
   (input : IssueInputs) (now : Std.I64) (lifetime : Std.I64) :
@@ -749,21 +749,21 @@ def prepare_issue
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssuedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 180:0-183:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 181:0-184:1
     Visibility: public -/
 structure IssuedSurrogate where
   claims : Claims
   token : alloc.vec.Vec Std.U8
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeIssuer]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 185:0-188:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 186:0-189:1
     Visibility: public -/
 structure EnvelopeIssuer (Self : Type _) (Self_Secret : Type _) where
   «seal» : Self → Claims → Self_Secret → Result (core.result.Result
     (alloc.vec.Vec Std.U8) Denial)
 
 /-- [aivm_secrets_garrett_core::issue_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 190:0-206:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 191:0-207:1
     Visibility: public -/
 def issue_surrogate
   {I : Type _} {Clause0_Secret : Type _} (EnvelopeIssuerInst : EnvelopeIssuer I
@@ -780,6 +780,180 @@ def issue_surrogate
       ok (core.result.Result.Ok { claims, token })
     | core.result.Result.Err error => ok (core.result.Result.Err error)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
+
+/-- [aivm_secrets_garrett_core::oauth_login::Stage]
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_login.rs', lines 3:0-10:1
+    Visibility: public -/
+@[discriminant isize]
+inductive oauth_login.Stage where
+| Pending : oauth_login.Stage
+| Accepted : oauth_login.Stage
+| Denied : oauth_login.Stage
+| Exchanging : oauth_login.Stage
+| Complete : oauth_login.Stage
+| Uncertain : oauth_login.Stage
+
+/-- [aivm_secrets_garrett_core::oauth_login::LoginDenial]
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_login.rs', lines 11:0-15:1
+    Visibility: public -/
+@[discriminant isize]
+inductive oauth_login.LoginDenial where
+| Invalid : oauth_login.LoginDenial
+| Expired : oauth_login.LoginDenial
+| Consumed : oauth_login.LoginDenial
+
+/-- [aivm_secrets_garrett_core::oauth_login::IssuerRule]
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_login.rs', lines 16:0-19:1
+    Visibility: public -/
+@[discriminant isize]
+inductive oauth_login.IssuerRule where
+| Absent : oauth_login.IssuerRule
+| Exact : alloc.vec.Vec Std.U8 → oauth_login.IssuerRule
+
+/-- [aivm_secrets_garrett_core::oauth_login::Pending]
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_login.rs', lines 20:0-25:1
+    Visibility: public -/
+structure oauth_login.Pending where
+  state : alloc.vec.Vec Std.U8
+  issuer : oauth_login.IssuerRule
+  issued_at : Std.I64
+  expires_at : Std.I64
+
+/-- [aivm_secrets_garrett_core::oauth_login::Callback]
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_login.rs', lines 26:0-31:1
+    Visibility: public -/
+structure oauth_login.Callback where
+  state : alloc.vec.Vec Std.U8
+  issuer : alloc.vec.Vec Std.U8
+  has_issuer : Bool
+  denied : Bool
+
+/-- [aivm_secrets_garrett_core::oauth_login::current]:
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_login.rs', lines 32:0-43:1
+    Visibility: public -/
+def oauth_login.current
+  (pending : oauth_login.Pending) (now : Std.I64) :
+  Result (core.result.Result Unit oauth_login.LoginDenial)
+  := do
+  if pending.issued_at < 0#i64
+  then ok (core.result.Result.Err oauth_login.LoginDenial.Invalid)
+  else
+    if pending.issued_at > 9223372036854775207#i64
+    then ok (core.result.Result.Err oauth_login.LoginDenial.Invalid)
+    else
+      if pending.expires_at <= pending.issued_at
+      then ok (core.result.Result.Err oauth_login.LoginDenial.Invalid)
+      else
+        let i ← pending.issued_at + 600#i64
+        if pending.expires_at > i
+        then ok (core.result.Result.Err oauth_login.LoginDenial.Invalid)
+        else
+          if now < pending.issued_at
+          then ok (core.result.Result.Err oauth_login.LoginDenial.Expired)
+          else
+            if now >= pending.expires_at
+            then ok (core.result.Result.Err oauth_login.LoginDenial.Expired)
+            else ok (core.result.Result.Ok ())
+
+/-- [aivm_secrets_garrett_core::oauth_login::claim]:
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_login.rs', lines 44:0-78:1
+    Visibility: public -/
+def oauth_login.claim
+  (stage : oauth_login.Stage) (pending : oauth_login.Pending)
+  (callback : oauth_login.Callback) (now : Std.I64) :
+  Result (core.result.Result oauth_login.Stage oauth_login.LoginDenial)
+  := do
+  match stage with
+  | oauth_login.Stage.Pending =>
+    let r ← oauth_login.current pending now
+    match r with
+    | core.result.Result.Ok _ =>
+      let b ←
+        alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8
+          callback.state pending.state
+      if b
+      then ok (core.result.Result.Err oauth_login.LoginDenial.Invalid)
+      else
+        match pending.issuer with
+        | oauth_login.IssuerRule.Absent =>
+          if callback.has_issuer
+          then ok (core.result.Result.Err oauth_login.LoginDenial.Invalid)
+          else
+            if callback.denied
+            then ok (core.result.Result.Ok oauth_login.Stage.Denied)
+            else ok (core.result.Result.Ok oauth_login.Stage.Accepted)
+        | oauth_login.IssuerRule.Exact expected =>
+          if callback.has_issuer
+          then
+            let b1 ←
+              alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8
+                callback.issuer expected
+            if b1
+            then ok (core.result.Result.Err oauth_login.LoginDenial.Invalid)
+            else
+              if callback.denied
+              then ok (core.result.Result.Ok oauth_login.Stage.Denied)
+              else ok (core.result.Result.Ok oauth_login.Stage.Accepted)
+          else ok (core.result.Result.Err oauth_login.LoginDenial.Invalid)
+    | core.result.Result.Err error => ok (core.result.Result.Err error)
+  | oauth_login.Stage.Accepted =>
+    ok (core.result.Result.Err oauth_login.LoginDenial.Consumed)
+  | oauth_login.Stage.Denied =>
+    ok (core.result.Result.Err oauth_login.LoginDenial.Consumed)
+  | oauth_login.Stage.Exchanging =>
+    ok (core.result.Result.Err oauth_login.LoginDenial.Consumed)
+  | oauth_login.Stage.Complete =>
+    ok (core.result.Result.Err oauth_login.LoginDenial.Consumed)
+  | oauth_login.Stage.Uncertain =>
+    ok (core.result.Result.Err oauth_login.LoginDenial.Consumed)
+
+/-- [aivm_secrets_garrett_core::oauth_login::begin]:
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_login.rs', lines 79:0-89:1
+    Visibility: public -/
+def oauth_login.begin
+  (stage : oauth_login.Stage) (pending : oauth_login.Pending) (now : Std.I64) :
+  Result (core.result.Result oauth_login.Stage oauth_login.LoginDenial)
+  := do
+  match stage with
+  | oauth_login.Stage.Pending =>
+    ok (core.result.Result.Err oauth_login.LoginDenial.Consumed)
+  | oauth_login.Stage.Accepted =>
+    let r ← oauth_login.current pending now
+    match r with
+    | core.result.Result.Ok _ =>
+      ok (core.result.Result.Ok oauth_login.Stage.Exchanging)
+    | core.result.Result.Err error => ok (core.result.Result.Err error)
+  | oauth_login.Stage.Denied =>
+    ok (core.result.Result.Err oauth_login.LoginDenial.Consumed)
+  | oauth_login.Stage.Exchanging =>
+    ok (core.result.Result.Err oauth_login.LoginDenial.Consumed)
+  | oauth_login.Stage.Complete =>
+    ok (core.result.Result.Err oauth_login.LoginDenial.Consumed)
+  | oauth_login.Stage.Uncertain =>
+    ok (core.result.Result.Err oauth_login.LoginDenial.Consumed)
+
+/-- [aivm_secrets_garrett_core::oauth_login::finish]:
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_login.rs', lines 90:0-100:1
+    Visibility: public -/
+def oauth_login.finish
+  (stage : oauth_login.Stage) (installed : Bool) :
+  Result (core.result.Result oauth_login.Stage oauth_login.LoginDenial)
+  := do
+  match stage with
+  | oauth_login.Stage.Pending =>
+    ok (core.result.Result.Err oauth_login.LoginDenial.Consumed)
+  | oauth_login.Stage.Accepted =>
+    ok (core.result.Result.Err oauth_login.LoginDenial.Consumed)
+  | oauth_login.Stage.Denied =>
+    ok (core.result.Result.Err oauth_login.LoginDenial.Consumed)
+  | oauth_login.Stage.Exchanging =>
+    if installed
+    then ok (core.result.Result.Ok oauth_login.Stage.Complete)
+    else ok (core.result.Result.Ok oauth_login.Stage.Uncertain)
+  | oauth_login.Stage.Complete =>
+    ok (core.result.Result.Err oauth_login.LoginDenial.Consumed)
+  | oauth_login.Stage.Uncertain =>
+    ok (core.result.Result.Err oauth_login.LoginDenial.Consumed)
 
 /-- [aivm_secrets_garrett_core::oauth_state::RefreshState]
     Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 2:0-6:1
