@@ -3,6 +3,11 @@
 `aivm-secrets` is an experimental, unaudited, independently packaged credential
 broker and identity project. Read `docs/extraction.md` and
 `docs/planning/aivm-secrets-repository-boundary.md` before changing boundaries.
+For new work, use `docs/planning/aivm-secrets-active-work.md` as the **current
+task priority and acceptance queue**. Older P/M/G milestone documents are
+detailed design/history, not alternative task assignments. Focus on a useful
+standalone broker workflow and conditional, implementation-linked credential
+confinement; do not advertise formal VM isolation or whole-service secrecy.
 
 - Keep runtime dependencies in root `pyproject.toml`. Do not import or depend
   on AIVM internals, libvirt, or a VM manager to install, import, or test this
@@ -15,8 +20,10 @@ broker and identity project. Read `docs/extraction.md` and
   versions as an incidental part of extraction. Changes to security boundaries
   need focused adversarial tests and maintainer security review.
 - Local broker use does not require TPM, another VM, OAuth, or a CA. Keep
-  optional identity research separate. Do not claim security audit, formal
-  verification, production approval, or parity with an unimplemented backend.
+  optional identity research separate. Do not claim a project-wide security
+  audit, whole-service formal verification, production approval, or unproved
+  backend parity; name the exact scope and assumptions of checked Rust/Lean
+  theorems.
 - Keep command logging reproducible and redact secrets. Preserve all existing
   authorship and co-author trailers; `dev/port/` records source provenance.
 - Prefer clear, focused changes and intent-level comments. Use `textwrap` for

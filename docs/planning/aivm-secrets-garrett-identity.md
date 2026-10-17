@@ -10,12 +10,16 @@ for the current executable contract and remaining P4c limitations.
 No real `gh` or other service credentials are needed for the tests. Consult
 [the parallel-implementations decision](aivm-secrets-parallel-implementations.md).
 
-**Verification priority, 2026-10-16:** start with [correct implementation of
+**Historical verification priority, 2026-10-16:** start with [correct implementation of
 the Garrett protocol](aivm-secrets-garrett-verification.md): successful
 credential use without disclosure, and rejection of stolen surrogates without
 the enrolled client's signing authority. The new contract covers the nested
 token profile, attacker model, output disclosures, implementation refinement
-and explicit TPM/vTPM conditions. These protocol obligations remain open.
+and explicit TPM/vTPM conditions. These protocol obligations remain open at
+whole-service scope. As of 2026-10-17, the
+[active work queue](aivm-secrets-active-work.md) prioritizes conditional
+broker I/O confinement and a standalone useful operation; further TPM/CA
+research is not a prerequisite for these local verification tasks.
 
 ## Policies
 

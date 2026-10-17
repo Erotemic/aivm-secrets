@@ -1,6 +1,11 @@
 # Garrett protocol correctness and credential confidentiality
 
 Status: **acceptance contract with an incremental implementation, 2026-10-17**.
+The [active work queue](aivm-secrets-active-work.md) supersedes the ordering
+of the historical G0-G5 campaign for new agent assignments. The immediate
+system goal is whole-trace conditional credential confinement plus a real
+standalone workload; enrollment/TPM and additional isolated protocol proofs
+are retained but not blanket prerequisites.
 See the [Rust implementation and exact proof scope](../verified-garrett.md)
 for checked controllers, symbolic secrecy, real TLS/TPM tests and remaining
 obligations. The full composed service result below remains open.
@@ -326,7 +331,15 @@ yet refined in Lean. The independent-file bridge retains snapshot semantics.
 TPM assurance receipts bind fresh verified evidence to installed certificates;
 they are trusted host metadata, not proof of physical hardware or a workload.
 
-### Next implementation sequence after native refresh custody
+### Historical native implementation sequence (re-ranked 2026-10-17)
+
+The following captures implemented work and still-open sub-obligations.
+For what to implement next, follow W0-W8 in the
+[active work queue](aivm-secrets-active-work.md): output/assumption inventory,
+standalone workload, one native useful workflow, a closed Rust effect boundary,
+trace confinement and relational information-flow proofs, then concrete I/O
+refinement. TPM/AK provenance is a downstream deployment premise, not a
+requirement for a local broker to prove its conditional controller properties.
 
 1. Native authorization-code acquisition is now implemented through ordinary
    `garrett-oauth login`, with host-held PKCE, a bound loopback listener, exact
@@ -361,7 +374,11 @@ they are trusted host metadata, not proof of physical hardware or a workload.
    security review must assess the disclosure contract and trusted base before
    any broader assurance claim.
 
-## 8. Milestones and acceptance gates
+## 8. Historical G0-G5 milestones and acceptance gates
+
+G0-G5 describe the Garrett identity/protocol subcampaign. They are not the
+current cross-team priority order; follow
+[W0-W8](aivm-secrets-active-work.md#active-task-queue) for new assignments.
 
 | Stage | Concrete deliverable | Exit gate |
 | --- | --- | --- |

@@ -1,5 +1,12 @@
 # AIVM Secrets: provider-neutral integrations and CLI compatibility
 
+**Planning precedence (2026-10-17):** the P0-P5 roadmap below documents the
+original delivery sequence, not the current agent work queue. Use
+[active work](aivm-secrets-active-work.md) for priorities and gates; retain
+this document for service-neutral policy and adapter contracts. Native Rust
+manifest execution and typed disclosure now exist but are not a fully verified
+or parity-complete service (see [the disclosure record](../verified-disclosure.md)).
+
 Status: **implemented experimental Python schema 2 with planned verified Rust
 kernel** (updated 2026-10-10). This refines [the main architecture](aivm-secrets-design.md) and
 [the assurance plan](aivm-secrets-formal-assurance.md); the implemented state
@@ -433,11 +440,11 @@ implementations must reproduce.
   streaming, request bodies beyond flat string fields or fixed typed GraphQL
   query variables, client
   certificates, OAuth refresh or SigV4.
-* `aivm-secrets` is currently an independently organized Python package
-  **temporarily bundled** into the `aivm` wheel on the experimental branch.
-  The intended destination is a separate repository and distribution,
-  preserving the versioned policy/process/wire contracts. Do not create
-  new non-optional AIVM dependencies during this interim period; see the
+* `aivm-secrets` was extracted to an independent repository and distribution
+  on 2026-10-16; AIVM retains the older opt-in copy and adapters until a
+  coordinated cutover. Preserve versioned policy/process/wire contracts and
+  do not introduce non-optional AIVM dependencies; see
+  [the extraction record](../extraction.md) and
   [repository boundary decision](aivm-secrets-repository-boundary.md).
 
 ### Executable provenance caveat

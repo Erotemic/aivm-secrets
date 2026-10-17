@@ -1,9 +1,13 @@
 # AIVM Secrets: two independent implementations, one security contract
 
-**2026-10-16 implementation update:** the independent
-[Rust freshness unit](../verified-freshness.md) now has implementation-linked
-Lean proofs and scoped Python parity. The complete primitive runner, identity
-protocol runners, broker backend and composed effect proofs remain pending.
+**2026-10-17 implementation update:** the independent Rust service now
+has selected implementation-linked freshness, Garrett controller, history and
+typed disclosure Lean proofs (see
+[the composition record](../verified-composition.md) and
+[the release record](../verified-disclosure.md)); full service trace/I/O
+verification and broad Python/Rust CLI parity are still open. Choose active
+work from [the current queue](aivm-secrets-active-work.md), not from earlier
+status wording in this document.
 
 **Decision (2026-10-12):** Keep a maintained **Python reference implementation**
 *and* develop a separate **safe-Rust implementation** of `aivm-secrets` with
@@ -18,10 +22,12 @@ executable source of truth. A future compiled Rust binary is the executable
 source for **its own extracted Lean proofs**; Python remains independently
 maintained and is not thereby formally verified.
 
-The [repository boundary plan](aivm-secrets-repository-boundary.md) permits
-continued experimental work in this feature branch without making AIVM
-dependent on secrets. Both implementations, protocol corpora and assurance
-work are intended to move to a standalone `aivm-secrets` repository later.
+The [repository boundary plan](aivm-secrets-repository-boundary.md) preserves
+AIVM as an independent VM manager. The
+[2026-10-16 extraction](../extraction.md) established this standalone
+repository; AIVM still holds an older experimental copy and opt-in adapters
+pending coordinated cutover. Both implementations and their assurance evidence
+are developed here.
 
 ## Why two implementations
 

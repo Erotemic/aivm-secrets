@@ -1,12 +1,15 @@
 # AIVM Secrets: credential-use capabilities with a verifiable core
 
-Status: architecture, implemented in Python through the local-host scope of
-P0-P3 and an opt-in local Python P4a/P4b credential-identity flow (updated 2026-10-12). **No part
-of this implementation is formally verified.** There is not yet a Rust backend
-or a Lean proof. The Python reference now includes host-browser OAuth/PKCE acquisition,
-an AES-GCM-protected host vault, refresh and revocation fencing, issuer
-key rotation, and an opt-in OAuth-backed bound-VM launcher. There is still
-no live-libvirt/provider validation, hardware key custody, or Lean proof.
+Status (2026-10-17): **architecture and historical P0-P5 milestones**.
+The Python reference includes local-host broker workflows and opt-in identity,
+OAuth/PKCE acquisition, vault/refresh and administrative lifecycle support;
+these are experimental and are not formally verified. A separate native Rust
+Garrett service, manifest HTTPS operations and selected implementation-linked
+Lean proofs now exist (see [the proof-scope records](../verified-composition.md)
+and [native disclosure](../verified-disclosure.md)). Whole-service
+information-flow verification, broad client parity, independent real-provider
+smoke tests and deployment/hardware isolation evidence remain open. For active
+priorities, use the [2026-10-17 task queue](aivm-secrets-active-work.md).
 The [modular proof architecture](aivm-secrets-modular-proof-architecture.md)
 records the planned primitive package, Garrett protocol decomposition,
 and conditional proof-composition rules.
@@ -29,14 +32,15 @@ governs optional AIVM integration and the planned independent repository.
 ## 1. Decision and scope
 
 Build `aivm-secrets` as an independent secret-*use* service, not a mechanism for
-copying provider tokens into VMs. **Temporary branch state:** `aivm_secrets`
-ships beside `aivm` in the current Python distribution with its own executable,
-but this is not the intended release boundary. Keep imports one-way: the secrets
-package does not import AIVM. Existing AIVM opt-in adapters may resolve an
-access identity, establish a channel, and control session lifetime; no new
-mandatory AIVM dependency or normal-workflow activation is permitted.
-The eventual separate repository/distribution must preserve the versioned
-capability/process protocol. See the [boundary decision](aivm-secrets-repository-boundary.md).
+copying provider tokens into VMs. **Independent repository state (2026-10-16 extraction):** `aivm-secrets`
+now builds and tests as its own distribution; AIVM retains its existing
+experimental opt-in adapters and an older co-located copy pending coordinated
+cutover. Keep imports one-way: the secrets package does not import AIVM.
+AIVM may supply host-authenticated identity facts and control session lifetime;
+no mandatory AIVM dependency or normal-workflow activation is permitted.
+Preserve the versioned capability/process protocol across cutover. See
+[the extraction record](../extraction.md) and
+[the boundary decision](aivm-secrets-repository-boundary.md).
 
 Keep **two independent implementations**: this Python reference and a
 small safe-Rust kernel/backend, translated with Charon/Aeneas and verified in
@@ -530,20 +534,17 @@ specification, but not evidence that the deployed Rust or Python realizes it.
 The detailed theorem inventory, refinement obligations and release gates are in
 [the assurance plan](aivm-secrets-formal-assurance.md).
 
-## 11. Delivery milestones and acceptance gates
+## 11. Historical P0-P5 milestones and acceptance gates
 
-Status as of 2026-10-12: P0 is delivered. The Python-expressible parts of P1
-(frozen vectors, effect grammar, abstract state machine), P2 (kernel
-transitions with trace-level, generated and mutation tests) and P3 (separate
-credential-owning process, real VM lifecycle tests, total deadlines, fault
-injection, whole-path safety) are delivered **as tested Python, not as
-verified Rust**. From P4, in-memory revocation and one-shot approvals are
-delivered. A separate Python **P4a experimental identity library** now
-implements signed, encrypted certificate-bound JWTs and a one-connection mTLS
-bridge tested with dummy credentials. An explicit managed-VM launcher and
-enrollment adapter are present, but have not been exercised on a live libvirt
-VM. P4b OAuth acquisition, vTPM identity custody and P4c durable authority are not
-implemented. The Rust work may advance in parallel, not as a prerequisite.
+These stages record the **original** prototype/port/deployment milestones,
+not current work assignment. Python P0-P3 and parts of P4 were delivered as
+tested reference behavior; Python and Rust OAuth, native Rust manifest
+operations, issuer/authority mechanics and selected Rust-derived Lean proofs
+have progressed since the original 2026-10-12 status. They do **not** establish
+complete Rust/Python parity or a whole-service confidentiality theorem. See
+[active work](aivm-secrets-active-work.md) for current W0-W8 gates, and the
+[Garrett verification plan](aivm-secrets-garrett-verification.md) for the exact
+remaining native proof/integration boundary.
 
 ### P0 - Python vertical slice (original overlay and service-neutral follow-up)
 

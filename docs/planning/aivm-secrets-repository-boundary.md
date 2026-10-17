@@ -7,6 +7,15 @@ statements that co-distribution or a process boundary alone makes the system
 ready for general AIVM users. The original decision deferred repository extraction while development
 continued here. The **2026-10-16 update below** authorizes the initial port.
 
+**Current status (2026-10-17):** this is now the independently built
+`aivm-secrets` source repository. The 2026-10-14 branch audit and original
+instructions about a *future* extraction below are historical. The enduring
+policy is optional, versioned, process-only AIVM integration; see
+[the extraction record](../extraction.md) and the
+[active implementation/security work queue](aivm-secrets-active-work.md).
+Rust native execution and selected implementation-linked Lean proofs now exist;
+these do not establish production security or end-to-end confinement.
+
 ## Extraction update, 2026-10-16
 
 The maintainer explicitly authorized the initial standalone repository port.

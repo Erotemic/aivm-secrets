@@ -1,6 +1,8 @@
 # AIVM Secrets: primitive contracts and compositional proof architecture
 
-Status: **M1 and selected M2/M4 Python modules implemented (2026-10-12).**
+Status: **historical M0-M6 dependency plan; current work queue is
+[aivm-secrets-active-work.md](aivm-secrets-active-work.md).**
+M1 and selected M2/M4 Python modules were implemented by 2026-10-12.
 The `primitives` package and self-contained *pure* Garrett protocol now exist;
 see [implementation record](aivm-secrets-garrett-modular-refactor.md). This
 remains the target design for unfinished M3, the rest of M5, and M6. Selected
@@ -295,12 +297,16 @@ it is runnable; the operator's chosen threat model must remain explicit.
 
 ## 7. Migration campaign, in dependency order
 
-**Priority update, 2026-10-16:** the first substantial composed proof target is
+**Priority history:** the 2026-10-16 first composed target was
 [Garrett protocol correctness](aivm-secrets-garrett-verification.md), including
 credential confidentiality, successful authorized use and stolen-surrogate
-rejection. Its G0-G5 stages set the next work order. The M0-M6 inventory below
-retains the extraction history and dependencies; M3 budget/scope work does not
-block that protocol campaign.
+rejection. On 2026-10-17, this was refined to the
+[active W0-W8 queue](aivm-secrets-active-work.md): demonstrate a useful
+standalone workflow, close the Rust reachable-output/effect boundary, and
+prove conditional whole-trace confinement and declassification-aware
+noninterference. G0-G5 and M0-M6 remain dependency and history inventories,
+not independent agents' marching orders. M3 budget/scope work does not block
+the initial confinement campaign.
 
 | Increment | Scope | Exit gate |
 | --- | --- | --- |

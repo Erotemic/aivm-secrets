@@ -1,15 +1,17 @@
 # AIVM Secrets: formal assurance and refinement plan
 
-Status: **selected Rust freshness primitives proved (2026-10-16)**; the
-broker-wide obligations below remain open. The broker is Python with
-executable contracts and adversarial tests. The independent
-[Rust freshness unit](../verified-freshness.md) now has extracted Lean proofs
-and scoped Python parity, with exact coverage and assumptions in its manifest.
-This document remains the acceptance contract for broader assurance. Other
-existing evidence includes a pure,
-extraction-shaped kernel, [its specification](aivm-secrets-kernel-spec.md), a
-frozen conformance corpus, a mutation gate, and
-[a machine-readable assumption ledger](aivm-secrets-assumptions.json).
+Status (2026-10-17): **selected Rust/Lean controller, freshness, issuance,
+protocol and recursive disclosure obligations are checked; whole-service trace
+confinement and I/O correspondence remain open.** See the
+[active work queue](aivm-secrets-active-work.md) for what agents should do
+next, and the [composed controller](../verified-composition.md),
+[typed disclosure](../verified-disclosure.md) and
+[Garrett record](../verified-garrett.md) for precise delivered scope. The
+independent Python broker remains tested but is not formally verified. This
+document defines the assurance obligations, including a pure,
+extraction-shaped kernel, [its specification](aivm-secrets-kernel-spec.md),
+a frozen corpus, mutation gates and the
+[machine-readable assumption ledger](aivm-secrets-assumptions.json).
 
 See [the modular proof architecture](aivm-secrets-modular-proof-architecture.md)
 for planned leaf proofs and their composition obligations.
@@ -20,14 +22,17 @@ notation is a specification sketch, not executable Lean.
 
 ## 1. What should be proved
 
-The first composed target is [Garrett protocol correctness and credential
-confidentiality](aivm-secrets-garrett-verification.md), following maintainer
-direction on 2026-10-16. It requires successful authorized use, rejection of
-independent use of a stolen surrogate, and credential confinement across
-issuance, presentation and substitution. Budget/delegation proofs remain
-valid inventory items but do not set this campaign's priority. The protocol
-claim explicitly includes crypto/TLS/TPM provenance and provider disclosure
-conditions; proving a pure claim comparison alone does not discharge it.
+The primary new composed target is **conditional credential confinement
+across every modeled guest-request reachable broker output path**, as ranked
+in the [active work queue](aivm-secrets-active-work.md). It builds on
+[Garrett protocol correctness and credential confidentiality](aivm-secrets-garrett-verification.md),
+including successful authorized use, stolen-surrogate resistance under its
+separate signing-oracle assumptions, and confinement across issuance,
+presentation and substitution. Primitive budget/delegation and TPM work remain
+tracked but should not displace whole-trace mediation or standalone workflow
+validation. The complete claim requires named OS compartment, TLS/crypto,
+trusted-provider and concrete I/O-adapter premises; a pure comparison alone
+does not discharge them.
 
 The composed theorem must cover **all emitted credentialed effects**. Every
 emitted effect must correspond to a currently valid, correctly bound
@@ -85,7 +90,12 @@ parser and authentication refinement proved or explicitly assumed separately.
 | ATTEN-01 | A child policy permits no operation outside its parent's semantic permission set | Exhaustive `spec_subset` against set inclusion, brute-force scope oracle, delegated grants with shared budget, expiry clamp and bounded depth; no proof |
 | APPROVAL-01 | A one-shot approval authorizes at most one effect with exactly the approved canonical bytes | Implemented: digest binds policy, grant and request; consumed with admission; unreachable from the guest socket. In-memory only |
 | CODEC-01 | Accepted bytes have one canonical meaning, and encoded effect bytes preserve that meaning | Regex-free validators checked against regex oracles, strictness negatives, canonical-encoding vectors; no byte-to-Rust-to-Lean refinement |
-| CONF-01 | Public errors/audit/protocol outputs contain no raw credential under the specified declassification model | Fixed error table, reflection tripwire, a search of a live guest's disk and process environments; no noninterference proof |
+| CONF-01 | Public errors/audit/protocol outputs contain no raw credential under the specified declassification model | Literal reflection tests and extracted typed-selection noninterference; not whole-service noninterference |
+| SINK-01 | Credential-bearing outputs reach only approved provider authentication sinks after bound admission and route selection | Partial `credential_use.rs`/`protocol.rs` proofs; concrete provider I/O, other handlers and exception paths not composed |
+| TRACE-01 | Every guest-reachable I/O effect has a prior, appropriately authorized transition, including failures and negative paths | Partial controller/audit ordering proofs; all output paths and actual traces not shown to refine the model |
+| NI-TRACE-01 | Equal approved declassifications imply equal **modeled guest-visible trace observations** for secret-varying, adaptive two-run executions | Recursive disclosure/protocol success lemmas exist; error/reflection oracle, output metadata and service traces remain open |
+| IO-REFINE-01 | Actual request builders, serializers, TLS/HTTP, audit and output adapters implement modeled effects without bypasses | Adversarial integration tests and explicit adapter assumptions; no whole-service source-to-I/O refinement |
+| LIVE-01 | A complete authorized useful operation succeeds without disclosing the credential while unauthorized attempts fail | Existing standalone socket/TLS/invoke tests; integrated provider-workflow and opt-in real GitHub gates remain open |
 | AUDIT-01 | Required intent durability acknowledgment precedes each dispatch; audit failure prevents later admissions | Ordering test, fault injection at each record, hash-chain verification; filesystem and external atomicity trusted |
 | RESTART-01 | A stale capability cannot regain authority after an epoch change or ordinary restart | Fresh per-process key; a killed session's capability refused by the next session on a real VM; snapshot rollback not covered |
 
@@ -186,6 +196,17 @@ child holds no budget of its own, and the state invariant
 `sum(children.used) <= parent.used` is checked after every generated step.
 
 ### CONF-01: specify information release honestly
+
+**Updated priority, 2026-10-17:** SINK-01, TRACE-01, NI-TRACE-01 and
+IO-REFINE-01 together form the active confinement target. Define guest
+observations and declassification **before** proving a two-run relation;
+keep intentional provider authentication as an authorized release. For an
+adaptive attacker, compare executions under equal allowed public histories
+and approved disclosures, not merely two successful calls with matching
+returned structs. All reachable request outcomes, secret-dependent denials,
+selected metadata, audit/error routes and actual adapter output paths must
+be covered or explicitly excluded. Scope exclusions (including timing and
+computational ciphertext secrecy) are part of the theorem statement.
 
 Separate three claims. A syntactic API property says raw provider credentials
 are not protocol return values, log fields or client-owned filesystem writes.
