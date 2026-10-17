@@ -1,12 +1,12 @@
 //! Private inner-envelope and provider custody. No plaintext credential API.
 use crate::{
-    crypto::{self, Issuer},
+    crypto::{self, InnerCapability, Issuer, Verifier},
     files, json,
     model::Registry,
     tls::Deadline,
     Error, Outcome,
 };
-use aivm_secrets_garrett_core::{credential_use as core, IssuedSurrogate};
+use aivm_secrets_garrett_core::{credential_use as core, protocol, Expectation, IssuedSurrogate};
 use ring::{
     aead, digest,
     rand::{SecureRandom, SystemRandom},
@@ -155,15 +155,19 @@ impl InnerEnvelope {
     }
 }
 
+struct AuditState {
+    file: File,
+    failed: bool,
+}
 struct Audit {
-    file: Mutex<File>,
+    state: Mutex<AuditState>,
     grant: String,
     policy: String,
 }
 impl Audit {
     fn new(path: &Path, claims: &Value) -> Outcome<Self> {
-        use rustix::fs::{open, openat, Mode, OFlags};
-        use std::os::unix::fs::MetadataExt;
+        use rustix::fs::{flock, open, openat, FlockOperation, Mode, OFlags};
+        use std::os::unix::fs::{FileExt, MetadataExt};
         let parent = path.parent().ok_or(Error::UnsafeFile)?;
         files::private_directory(parent)?;
         let directory = File::from(
@@ -177,7 +181,7 @@ impl Audit {
         let fd = openat(
             &directory,
             path.file_name().ok_or(Error::UnsafeFile)?,
-            OFlags::WRONLY
+            OFlags::RDWR
                 | OFlags::CREATE
                 | OFlags::APPEND
                 | OFlags::NOFOLLOW
@@ -191,23 +195,48 @@ impl Audit {
         if !m.is_file() || m.uid() != rustix::process::geteuid().as_raw() || m.mode() & 0o077 != 0 {
             return Err(Error::UnsafeFile);
         }
+        // A whole-session lock prevents interleaved records from another Rust
+        // session. An interrupted write must be repaired explicitly by the host.
+        flock(&file, FlockOperation::NonBlockingLockExclusive).map_err(|_| Error::UnsafeFile)?;
+        let length = file.metadata().map_err(|_| Error::UnsafeFile)?.len();
+        if length > 0 {
+            let mut tail = [0u8];
+            file.read_exact_at(&mut tail, length - 1)
+                .map_err(|_| Error::UnsafeFile)?;
+            if tail != *b"\n" {
+                return Err(Error::UnsafeFile);
+            }
+        }
         // Persist a newly created log's directory entry before its first
         // durable dispatch record can authorize any external provider I/O.
         directory.sync_all().map_err(|_| Error::InternalError)?;
         Ok(Self {
-            file: Mutex::new(file),
+            state: Mutex::new(AuditState {
+                file,
+                failed: false,
+            }),
             grant: text(claims, "grant_id")?.into(),
             policy: text(claims, "policy_digest")?.into(),
         })
     }
     fn record(&self, event: &str) -> Outcome<()> {
-        let mut file = self.file.lock().map_err(|_| Error::InternalError)?;
-        file.write_all(&json::canonical(
-            &json!({"schema":1,"event":event,"operation":"profile.read","grant":self.grant,"policy":self.policy}),
-        ))
-        .and_then(|_| file.write_all(b"\n"))
-        .and_then(|_| file.sync_all())
-        .map_err(|_| Error::InternalError)
+        self.write_record(&json!({"schema":1,"event":event,"operation":"profile.read","grant":self.grant,"policy":self.policy}))
+    }
+    fn write_record(&self, value: &Value) -> Outcome<()> {
+        let mut state = self.state.lock().map_err(|_| Error::InternalError)?;
+        if state.failed {
+            return Err(Error::InternalError);
+        }
+        let result = state
+            .file
+            .write_all(&json::canonical(value))
+            .and_then(|_| state.file.write_all(b"\n"))
+            .and_then(|_| state.file.sync_all());
+        if result.is_err() {
+            state.failed = true;
+            return Err(Error::InternalError);
+        }
+        Ok(())
     }
 }
 // This private adapter alone turns the opaque credential into provider wire
@@ -222,7 +251,6 @@ impl Executor {
         let host = std::str::from_utf8(&route.host).map_err(|_| Error::InternalError)?;
         let path = std::str::from_utf8(&route.path).map_err(|_| Error::InternalError)?;
         let port = u16::try_from(route.port).map_err(|_| Error::InternalError)?;
-        self.audit.record("dispatch")?;
         let mut socket = TcpStream::connect_timeout(
             &SocketAddr::new(self.address, port),
             Duration::from_secs(5),
@@ -536,67 +564,39 @@ impl ProviderSession {
             lifetime.min(self.grant.claims.expires_at - now),
         )
     }
-    pub(crate) fn answer(
+    /// Actual TLS evidence, not client-provided identity, enters the same
+    /// extracted controller that opens both envelopes and dispatches the effect.
+    pub(crate) fn request(
         &mut self,
-        inner: &[u8],
-        verb: &str,
+        verifier: &Verifier,
+        token: &str,
+        peer: &crate::tls::VerifiedPeer,
+        expected: Expectation,
         value: &Value,
         now: i64,
     ) -> Outcome<Value> {
-        let (opened, secret) = self.envelope.open(inner)?;
-        let elapsed = i64::try_from(self.started.elapsed().as_secs())
-            .map_err(|_| Error::InvalidCapability)?;
-        let operation = if verb == "request" {
-            let m = json::keys(value, &["operation"], &["arguments"])
-                .map_err(|_| Error::InvalidRequest)?;
-            if m.get("arguments")
-                .is_some_and(|v| v.as_object().is_none_or(|m| !m.is_empty()))
-            {
-                return Err(Error::Denied);
-            }
-            let operation = text(value, "operation").map_err(|_| Error::InvalidRequest)?;
-            if operation.is_empty()
-                || operation.len() > 64
-                || !operation.as_bytes()[0].is_ascii_lowercase()
-                || !operation
-                    .bytes()
-                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"_.-".contains(&b))
-            {
-                return Err(Error::InvalidRequest);
-            }
-            operation.as_bytes().to_vec()
-        } else {
-            self.grant.operation.clone()
+        let operation = parse_operation(value)?;
+        let presentation = protocol::Presentation {
+            expected,
+            peer: peer.thumbprint().as_bytes().to_vec(),
+            now,
+            elapsed: self.elapsed()?,
         };
-        let result = match verb {
-            "request" => core::use_credential(
-                &self.executor,
-                &secret,
-                &opened,
-                &self.grant,
-                &operation,
-                now,
-                elapsed,
-            ),
-            "describe" | "renounce" => {
-                core::authorize_use(&opened, &self.grant, &operation, now, elapsed)
-                    .map_err(use_error)?;
-                if verb == "renounce" {
-                    self.executor.audit.record("revoked")?;
-                    self.grant.active = false;
-                    return Ok(json!({"version":1,"ok":true,"renounced":true}));
-                }
-                return Ok(
-                    json!({"version":1,"ok":true,"description":{"profile":"account-status-v1","operations":["profile.read"],"release":["id","active"]}}),
-                );
-            }
-            _ => return Err(Error::Denied),
-        };
+        let result = protocol::perform(
+            verifier,
+            &self.envelope,
+            &self.executor.audit,
+            &self.executor,
+            &token.as_bytes().to_vec(),
+            &self.grant,
+            &operation,
+            &presentation,
+        );
         match result {
-            Ok(public) => {
+            Ok(released) => {
                 self.executor.audit.record("completed")?;
                 Ok(
-                    json!({"version":1,"ok":true,"result":{"id":public.account_id,"active":public.active}}),
+                    json!({"version":1,"ok":true,"result":{"id":released.account_id,"active":released.active}}),
                 )
             }
             Err(error) => {
@@ -604,6 +604,31 @@ impl ProviderSession {
                 Err(use_error(error))
             }
         }
+    }
+    fn elapsed(&self) -> Outcome<i64> {
+        i64::try_from(self.started.elapsed().as_secs()).map_err(|_| Error::InvalidCapability)
+    }
+    pub(crate) fn control(&mut self, inner: &[u8], verb: &str, now: i64) -> Outcome<Value> {
+        if !matches!(verb, "describe" | "renounce") {
+            return Err(Error::Denied);
+        }
+        let (opened, _secret) = self.envelope.open(inner)?;
+        core::authorize_use(
+            &opened,
+            &self.grant,
+            &self.grant.operation,
+            now,
+            self.elapsed()?,
+        )
+        .map_err(use_error)?;
+        if verb == "renounce" {
+            self.executor.audit.record("revoked")?;
+            self.grant.active = false;
+            return Ok(json!({"version":1,"ok":true,"renounced":true}));
+        }
+        Ok(
+            json!({"version":1,"ok":true,"description":{"profile":"account-status-v1","operations":["profile.read"],"release":["id","active"]}}),
+        )
     }
 }
 fn use_error(error: core::UseDenial) -> Error {
@@ -636,6 +661,60 @@ pub(crate) fn fixture_envelope(v: &Value) -> Outcome<Value> {
             json!({"ok":true,"claims":{"binding":binding,"policy_digest":std::str::from_utf8(&c.policy).map_err(|_|Error::InvalidCapability)?,"grant_id":std::str::from_utf8(&c.grant).map_err(|_|Error::InvalidCapability)?,"issued_at":c.issued_at,"expires_at":c.expires_at},"credential":std::str::from_utf8(&secret.0).map_err(|_|Error::InvalidCapability)?}),
         )
     }
+}
+
+impl protocol::CredentialOpener for InnerEnvelope {
+    type Capability = InnerCapability;
+    type Credential = Credential;
+    fn open(
+        &self,
+        capability: &InnerCapability,
+    ) -> Result<protocol::OpenedCredential<Credential>, core::UseDenial> {
+        let (claims, credential) = self
+            .open(capability.bytes())
+            .map_err(|_| core::UseDenial::InvalidCapability)?;
+        Ok(protocol::OpenedCredential { claims, credential })
+    }
+}
+impl protocol::DispatchObserver for Audit {
+    fn record(
+        &self,
+        identity: &aivm_secrets_garrett_core::Claims,
+        claims: &core::UseClaims,
+        route: &core::Route,
+        operation: &Vec<u8>,
+    ) -> Result<(), core::UseDenial> {
+        let prepare = || -> Outcome<Value> {
+            Ok(
+                json!({"schema":1,"event":"dispatch","operation":std::str::from_utf8(operation).map_err(|_|Error::InternalError)?,"grant":self.grant,"policy":self.policy,
+                    "identity":crate::model::claims_json(identity)?,
+                    "inner":{"binding":json::parse(&claims.binding,4096)?,"issued_at":claims.issued_at,"expires_at":claims.expires_at},
+                    "route":{"host":std::str::from_utf8(&route.host).map_err(|_|Error::InternalError)?,"port":route.port,"method":"GET","path":std::str::from_utf8(&route.path).map_err(|_|Error::InternalError)?,"authentication":match route.authentication {core::Authentication::Bearer=>"bearer",core::Authentication::ApiKey=>"x-api-key"}}
+                }),
+            )
+        };
+        self.write_record(&prepare().map_err(|_| core::UseDenial::Upstream)?)
+            .map_err(|_| core::UseDenial::Upstream)
+    }
+}
+fn parse_operation(value: &Value) -> Outcome<Vec<u8>> {
+    let m = json::keys(value, &["operation"], &["arguments"]).map_err(|_| Error::InvalidRequest)?;
+    if m.get("arguments")
+        .is_some_and(|v| v.as_object().is_none_or(|m| !m.is_empty()))
+    {
+        return Err(Error::Denied);
+    }
+    let operation = text(value, "operation").map_err(|_| Error::InvalidRequest)?;
+    if operation.is_empty()
+        || operation.len() > 64
+        || !operation.as_bytes()[0].is_ascii_lowercase()
+        || !operation
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"_.-".contains(&b))
+    {
+        return Err(Error::InvalidRequest);
+    }
+    Ok(operation.as_bytes().to_vec())
 }
 #[cfg(test)]
 mod tests {

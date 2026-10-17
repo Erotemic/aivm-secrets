@@ -1,3 +1,4 @@
+import GarrettProtocol
 import Garrett
 import GarrettSecrecy
 
@@ -36,3 +37,16 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.credential_use.Proofs.unauthorized_operation_never_executes
 #print axioms aivm_secrets_garrett_core.credential_use.Proofs.credential_use_successful
 #print axioms aivm_secrets_garrett_core.credential_use.Proofs.credential_use_noninterference
+
+#print axioms aivm_secrets_garrett_core.protocol.Proofs.prepared_contract
+#print axioms aivm_secrets_garrett_core.protocol.Proofs.finish_contract
+#print axioms aivm_secrets_garrett_core.protocol.Proofs.perform_contract
+#print axioms aivm_secrets_garrett_core.protocol.Proofs.perform_outer_failure
+#print axioms aivm_secrets_garrett_core.protocol.Proofs.perform_stolen_surrogate
+#print axioms aivm_secrets_garrett_core.protocol.Proofs.perform_inner_failure
+#print axioms aivm_secrets_garrett_core.protocol.Proofs.perform_unauthorized_operation
+#print axioms aivm_secrets_garrett_core.protocol.Proofs.perform_after_prepared
+#print axioms aivm_secrets_garrett_core.protocol.Proofs.perform_observer_failure
+#print axioms aivm_secrets_garrett_core.protocol.Proofs.prepare_successful
+#print axioms aivm_secrets_garrett_core.protocol.Proofs.perform_successful
+#print axioms aivm_secrets_garrett_core.protocol.Proofs.perform_projection_noninterference

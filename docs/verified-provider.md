@@ -43,8 +43,11 @@ headers. Its framing decisions follow the security boundary described by
 is not a proof of the HTTP standard or a general-purpose HTTP client.
 
 The audit file records fixed events plus the grant/policy identifiers.
-Dispatch intent is flushed before provider I/O; completion is flushed before
-releasing the result. Audit failures fail closed. No credential, inner token,
+Dispatch intent includes the authenticated public identity, inner binding,
+operation and exact route. It is synced before provider I/O; completion is
+synced before releasing the result. The sink holds an exclusive session lock,
+rejects incomplete existing tails and stays failed after a write/sync failure.
+Audit failures fail closed. No credential, inner token,
 provider body, HTTP header or arbitrary exception text enters those records.
 The custody/executor module exposes no credential formatting/serialization or
 general callback that could obtain plaintext credentials. Trusted libraries
@@ -65,7 +68,9 @@ unchanged. Parity tests compare the common inner envelope, provider request,
 credential substitution and selected public fields. They do not claim that
 the projected result equals the Python broker's complete raw result.
 
-The extracted Rust controller in
+The [composed request controller](verified-composition.md) joins outer opening,
+inner opening, authorization, audit acknowledgement, execution and release.
+The underlying credential-use controller in
 [`credential_use.rs`](../rust/crates/aivm-secrets-garrett-core/src/credential_use.rs)
 and its proofs in [`Garrett.lean`](../proofs/Garrett.lean) cover:
 
@@ -138,12 +143,13 @@ TPM-client/Rust-custody/provider path. No live accounts are contacted.
 
 ## Local validation
 
-The full suite passed with **1,897 tests and one expected pending full-primitive
-runner skip** in 291.21 seconds. The selected Garrett gate passed 60 tests;
-the normal client/bridge builds passed all 20 integration tests. Lean checked
-33 named obligations with the permitted axiom inventory. All ten changes to
+The full suite passed with **1,899 tests and one expected pending full-primitive
+runner skip** in 289.00 seconds. The selected Garrett gate passed 62 tests;
+the normal client/bridge builds passed all 22 integration tests. Lean checked
+45 named obligations with the permitted axiom inventory. All fourteen changes to
 actual Rust were re-extracted and rejected by the unchanged proofs, including
-wrong-route substitution and a private-response-length disclosure. The provider
+wrong-route substitution, a private-response-length disclosure and bypassed
+composed authorization/audit linkage. The provider
 cases also inspect service/client stdout, stderr, readiness fields and audit
 records for credential leakage. Strict lint passes with and without the
 conformance feature. These are local checks; hosted CI and physical TPM

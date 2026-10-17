@@ -8,6 +8,8 @@ semantics and the selected public fields, without claiming whole-broker parity.
 from __future__ import annotations
 
 import os
+import sys
+import base64
 from pathlib import Path
 import select
 import subprocess
@@ -25,12 +27,18 @@ from tests.test_rust_garrett import certificates, executable, run
 
 class ProviderCase:
     def __init__(
-        self, directory, provider, certificate_factory=certificates, **changes
+        self,
+        directory,
+        provider,
+        certificate_factory=certificates,
+        file_size_limit=None,
+        **changes,
     ):
         self.directory = Path(directory)
         self.provider = provider
         self.changes = changes
         self.certificate_factory = certificate_factory
+        self.file_size_limit = file_size_limit
 
     def __enter__(self):
         p = self.directory
@@ -99,8 +107,16 @@ class ProviderCase:
         for item in p.iterdir():
             if item.is_file():
                 item.chmod(0o600)
+        command = [self.bridge, "--config", str(p / "bridge.json")]
+        if self.file_size_limit is not None:
+            command = [
+                sys.executable,
+                str(Path(__file__).with_name("limited_exec.py")),
+                str(self.file_size_limit),
+                *command,
+            ]
         self.process = subprocess.Popen(
-            [self.bridge, "--config", str(p / "bridge.json")],
+            command,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -255,6 +271,30 @@ def test_rust_owns_custody_and_matches_reference_provider_substitution(monkeypat
                     "dispatch",
                     "completed",
                 ]
+                identity = codec.loads(
+                    base64.urlsafe_b64decode(case.token.split(".")[1] + "==")
+                )
+                for record in [
+                    codec.loads(line)
+                    for line in audit.splitlines()
+                    if codec.loads(line)["event"] == "dispatch"
+                ]:
+                    assert record["identity"] == {
+                        k: v for k, v in identity.items() if k != "enc"
+                    }
+                    assert record["route"] == dict(
+                        host=provider.host,
+                        port=provider.port,
+                        path="/v1/account",
+                        method="GET",
+                        authentication="bearer",
+                    )
+                    assert record["inner"]["binding"] == dict(
+                        owner_uid=os.getuid(),
+                        access_identity="principal-test",
+                        vm="vm-test",
+                        channel="b" * 32,
+                    )
                 assert not keylog.exists()
 
 
@@ -514,5 +554,56 @@ def test_secret_fifo_cannot_block_startup():
                     done.returncode == 1
                     and not done.stdout
                     and done.stderr == b"unsafe_file\n"
+                )
+                assert not provider.requests
+
+
+def test_audit_failure_prevents_dispatch_and_stays_failed_closed():
+    with tempfile.TemporaryDirectory(prefix="agp-audit-") as directory:
+        p = Path(directory)
+        with TLSService(provider_directory(p)) as provider:
+            provider.routes[("GET", "/v1/account")] = dict(id=42, active=True)
+            with ProviderCase(p, provider, file_size_limit=8192) as case:
+                audit = p / "audit.jsonl"
+                original = audit.read_bytes()
+                with audit.open("ab") as stream:
+                    stream.write(b" " * 8192)
+                assert not case.invoke()["ok"]
+                assert not provider.requests
+                # Even if the host removes the triggering condition, a partial
+                # write/sync failure cannot silently reactivate the audit sink.
+                audit.write_bytes(original)
+                assert not case.invoke()["ok"]
+                assert not provider.requests
+
+
+def test_audit_file_excludes_other_sessions_and_rejects_partial_records():
+    with tempfile.TemporaryDirectory(prefix="agp-lock-") as directory:
+        p = Path(directory)
+        with TLSService(provider_directory(p)) as provider:
+            with ProviderCase(p, provider) as case:
+                alternate = codec.loads((p / "bridge.json").read_bytes())
+                alternate["listen"] = str(p / "other.sock")
+                other = p / "other-bridge.json"
+                other.write_bytes(codec.dumps(alternate))
+                other.chmod(0o600)
+                command = [case.bridge, "--config", str(other)]
+                denied = subprocess.run(command, capture_output=True, timeout=5)
+                assert (
+                    denied.returncode == 1
+                    and denied.stderr == b"unsafe_file\n"
+                    and not denied.stdout
+                )
+                assert not provider.requests
+                case.process.terminate()
+                stdout, stderr = case.process.communicate(timeout=5)
+                assert TOKEN.encode() not in stdout + stderr
+                with (p / "audit.jsonl").open("ab") as stream:
+                    stream.write(b'{"partial":')
+                denied = subprocess.run(command, capture_output=True, timeout=5)
+                assert (
+                    denied.returncode == 1
+                    and denied.stderr == b"unsafe_file\n"
+                    and not denied.stdout
                 )
                 assert not provider.requests

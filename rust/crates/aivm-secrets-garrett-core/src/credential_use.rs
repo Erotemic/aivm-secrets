@@ -116,7 +116,16 @@ pub fn use_credential<E: CredentialExecutor>(
         Ok(()) => (),
         Err(error) => return Err(error),
     }
-    let response = match executor.execute(&grant.route, credential) {
+    finish_use(executor, credential, &grant.route)
+}
+
+/// Shared emission/release tail. Its callers establish authority first.
+pub(crate) fn finish_use<E: CredentialExecutor>(
+    executor: &E,
+    credential: &E::Credential,
+    route: &Route,
+) -> Result<PublicReply, UseDenial> {
+    let response = match executor.execute(route, credential) {
         Ok(response) => response,
         Err(error) => return Err(error),
     };

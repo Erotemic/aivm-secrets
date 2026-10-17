@@ -236,3 +236,81 @@ changed. Accounting publication reports nothing outstanding. This checkpoint
 completes the first Rust-owned provider slice, not the entire goal: general
 policy/provider support, durable authority/CA/OAuth state, authenticated-use
 trace correspondence and full service refinement remain future work.
+
+## 2026-10-16 23:46:01 -0400
+
+The previous turn was concrete progress: Rust-owned provider custody and checked
+conditional release, with full tests and mutations. The next gap is composition.
+The production handler currently opens the outer token and calls the custody
+handler through unextracted glue. I am joining that path into one extractable
+controller, with a durable dispatch observation carrying authenticated public
+identity, inner-grant and route metadata. This should establish meaningful
+correspondence across boundaries instead of just independent field checks.
+I am confident the existing generic crypto/executor contracts are reusable;
+borrowed adapter composition, failure-before-effect and audit linkage are the
+main proof risks. Whole-service concurrency and durable authority freshness
+remain separate obligations; I will not present an entry snapshot as dispatch
+linearization or a conditional adapter contract as a hardware proof.
+
+The actual native request path now calls one extracted prepare/observe/execute/
+release controller. Rust-private prepared values carry the authenticated outer
+identity together with the opened inner grant and opaque credential. The
+producer contract establishes their provenance before execution, including
+when the provider fails; the composed result theorem additionally carries the
+exact durable-observation and selected-route/credential evidence. Twelve new
+obligations build, bringing the named inventory to 45. Independent failure and
+success laws cover stolen tokens, bad inner opening/operation, rejected audit
+acknowledgement, provider outcomes and conditional reply noninterference.
+
+Runtime dispatch records now identify the signed public claims, inner binding,
+policy/grant and fixed provider route, with no credential or unwrapped token.
+The fault-injected file-size-limit test discovered that retrying after an audit
+write error could append after a partial record. The sink now stays failed
+closed, takes an exclusive session file lock, checks the existing complete-line
+tail after acquiring that lock, and rejects partial logs on restart. Real
+provider tests verify the authenticated record fields, blocked execution after
+EFBIG (even after the host removes the size condition), competing sessions and
+partial records. Twelve provider integration tests pass. Shared Lake roots
+changed deliberately; I am reproducing the existing freshness gate before the
+new 45-obligation manifest and the expanded 14-mutation gate.
+
+The full suite passes with 1,899 tests and one expected missing full-primitive
+runner skip (289.00 seconds). The selected gate passes 62 tests; all 45 named
+obligations and their transitive axiom inventories pass. The old freshness
+manifest was reproduced after the shared Lake change, then the complete Garrett
+source/assumption metadata was recorded. Four new source mutations now target
+the actual protocol preparation/observation/dispatch composition; the checker
+compiles the mutated base proofs before checking the new protocol module, with
+an error limit that stops after genuine proof errors rather than cascading.
+No timeout or stale-source comparison counts as rejecting a security mutant.
+
+The normal (non-conformance) client/bridge builds also pass all 22 integration
+tests. Wheel/sdist builds and twine checks pass; the archive matches all 153
+declared proof/source/document inputs and the wheel contains no Rust, Lean or
+AIVM payload. During final review I noticed that the mutation harness only
+required a located Lean error, which could also accept a resource failure.
+It now rejects timeout/heartbeat/recursion/memory failures and retains the
+actual proof diagnostics. Independent mutants run in bounded concurrent,
+isolated workspaces after a successful baseline. The complete recorded gate
+passed again after that tooling change. The exhaustive mutation run is the
+remaining check before committing this checkpoint.
+
+My confidence is in the concrete composition and deliberately narrow result:
+the same controller used by the native service carries authenticated identity
+and credential provenance into exact authorization, observation and execution.
+The strongest unresolved step is still a finite service-history correspondence
+theorem, with concurrent state and actual adapter observations. Treating an
+arbitrary provenance predicate as if the byte-level service already satisfies
+it would hide that gap. The new composition guide spells out those hypotheses,
+the entry-snapshot revocation boundary, reply-only noninterference, provider
+trust and host isolation. General Rust policy/provider support and durable
+CA/authority/OAuth administration remain implementation work, and no hardware
+provenance claim is made from emulator tests.
+
+The final exhaustive run rejected all fourteen re-extracted Rust mutants with
+ordinary proof errors and exited successfully. Both exact-record identity
+substitution and composed wrong-route dispatch fail in GarrettProtocol, as do
+removed authorization and omitted audit acknowledgement. No resource failure
+was accepted as a rejection. Final source manifests and the 153 archive inputs
+match, twine passes, and accounting publication has no outstanding rows. This
+checkpoint is ready to commit; the broader goal remains active.

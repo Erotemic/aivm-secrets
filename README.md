@@ -58,5 +58,7 @@ is not formally verified.
 An explicit [Rust-owned provider profile](docs/verified-provider.md) now carries
 `profile.read` from the authenticated client through credential custody and
 pinned HTTPS to a typed public result, without a Python broker in that path.
-Its extracted controller and disclosure contract are separate from the general
-Python policy interpreter.
+The [composed request controller](docs/verified-composition.md) now joins
+authentication, inner opening, authorization, acknowledged audit intent and
+provider execution in the extracted Rust path. Its conditional proofs and
+disclosure contract are separate from the general Python policy interpreter.

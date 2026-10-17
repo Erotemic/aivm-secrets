@@ -7,6 +7,11 @@ obligations. The full composed service result below remains open.
 The initial [Rust-owned provider profile](../verified-provider.md) adds
 credential custody, real HTTPS substitution and a conditional two-run release
 proof for `profile.read`; it does not close the general service obligations.
+The [composed request controller](../verified-composition.md) now joins actual
+outer/inner opening, authorization, exact audit acknowledgement and execution
+under named adapter contracts. Finite issuance/use histories, concurrent
+revocation boundaries, concrete adapter refinement and general policy support
+remain open; this does not close the full-service acceptance items below.
 
 The first substantial verification target is the Garrett protocol implemented
 by this project:

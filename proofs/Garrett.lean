@@ -401,7 +401,7 @@ theorem credential_use_contract {E S : Type} (ops : CredentialExecutor E S) (exe
           ∃ response, Executed g.route secret response ∧
             released.account_id = response.account_id ∧ released.active = response.active
       | .Err _ => True ⦄ := by
-  unfold use_credential
+  unfold use_credential finish_use
   apply WP.spec_bind (authorize_use_contract c g op now elapsed)
   intro checked authorized
   cases checked with
@@ -426,14 +426,14 @@ theorem inactive_grant_never_executes {E S : Type} (ops : CredentialExecutor E S
     (inactive : g.active = false) :
     use_credential ops executor secret c g op now elapsed =
       Result.ok (core.result.Result.Err UseDenial.InvalidCapability) := by
-  simp [use_credential, authorize_use_exact, Current, inactive]
+  simp [use_credential, finish_use, authorize_use_exact, Current, inactive]
 
 theorem unauthorized_operation_never_executes {E S : Type} (ops : CredentialExecutor E S) (executor : E)
     (secret : S) (c : UseClaims) (g : UseGrant) (op : alloc.vec.Vec U8) (now elapsed : I64)
     (current : Current c g now.val elapsed.val) (wrong : op ≠ g.operation) :
     use_credential ops executor secret c g op now elapsed =
       Result.ok (core.result.Result.Err UseDenial.Denied) := by
-  simp [use_credential, authorize_use_exact, current, wrong]
+  simp [use_credential, finish_use, authorize_use_exact, current, wrong]
 
 theorem credential_use_successful {E S : Type} (ops : CredentialExecutor E S) (executor : E)
     (secret : S) (c : UseClaims) (g : UseGrant) (now elapsed : I64) (response : ProviderReply)
@@ -441,7 +441,7 @@ theorem credential_use_successful {E S : Type} (ops : CredentialExecutor E S) (e
     (executed : ops.execute executor g.route secret = Result.ok (core.result.Result.Ok response)) :
     use_credential ops executor secret c g g.operation now elapsed =
       Result.ok (core.result.Result.Ok (PublicReply.mk response.account_id response.active)) := by
-  simp [use_credential, authorize_use_exact, current, executed, release_reply]
+  simp [use_credential, finish_use, authorize_use_exact, current, executed, release_reply]
 
 /-- Changing the credential and arbitrary private response content leaves the
     released result identical when the provider's declared public result agrees.
@@ -454,7 +454,7 @@ theorem credential_use_noninterference {E S : Type} (ops : CredentialExecutor E 
     (same_id : a.account_id = b.account_id) (same_active : a.active = b.active) :
     use_credential ops executor secret_a c g op now elapsed =
     use_credential ops executor secret_b c g op now elapsed := by
-  simp only [use_credential, authorize_use_exact]
+  simp only [use_credential, finish_use, authorize_use_exact]
   split_ifs <;> simp [execute_a, execute_b, release_reply, same_id, same_active]
 
 end aivm_secrets_garrett_core.credential_use.Proofs

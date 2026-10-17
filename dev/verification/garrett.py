@@ -7,6 +7,7 @@ No provider credentials, host authority state or hardware keys are read.
 
 from __future__ import annotations
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
@@ -58,6 +59,21 @@ THEOREMS += [
     "aivm_secrets_garrett_core.credential_use.Proofs.credential_use_noninterference",
 ]
 
+THEOREMS += [
+    "aivm_secrets_garrett_core.protocol.Proofs.prepared_contract",
+    "aivm_secrets_garrett_core.protocol.Proofs.finish_contract",
+    "aivm_secrets_garrett_core.protocol.Proofs.perform_contract",
+    "aivm_secrets_garrett_core.protocol.Proofs.perform_outer_failure",
+    "aivm_secrets_garrett_core.protocol.Proofs.perform_stolen_surrogate",
+    "aivm_secrets_garrett_core.protocol.Proofs.perform_inner_failure",
+    "aivm_secrets_garrett_core.protocol.Proofs.perform_unauthorized_operation",
+    "aivm_secrets_garrett_core.protocol.Proofs.perform_after_prepared",
+    "aivm_secrets_garrett_core.protocol.Proofs.perform_observer_failure",
+    "aivm_secrets_garrett_core.protocol.Proofs.prepare_successful",
+    "aivm_secrets_garrett_core.protocol.Proofs.perform_successful",
+    "aivm_secrets_garrett_core.protocol.Proofs.perform_projection_noninterference",
+]
+
 TESTS = [
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
@@ -101,6 +117,8 @@ def inputs() -> list[str]:
         "proofs/Garrett.lean",
         "proofs/GarrettSecrecy.lean",
         "proofs/GarrettCheck.lean",
+        "proofs/GarrettProtocol.lean",
+        "tests/limited_exec.py",
         "dev/verification/garrett.py",
         "dev/verification/freshness.py",
         "tests/secrets_helpers.py",
@@ -278,7 +296,7 @@ def assurance_coordinates() -> dict:
         "aeneas_release": base.RELEASE,
         "theorems": THEOREMS,
         "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
-        "implementation_linked": "Aeneas-generated issuance/opening and credential-use controllers, exact byte/epoch/time decisions and typed public-result projection",
+        "implementation_linked": "Aeneas-generated issuance, complete request preparation/observation/use/release controllers, exact byte/epoch/time decisions and typed public-result projection",
         "symbolic_model": "Dolev-Yao encrypted-message deduction and public protocol traces",
         "assumptions": [
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
@@ -290,6 +308,8 @@ def assurance_coordinates() -> dict:
             "The legacy bridge uses the existing trusted local broker; account-status-v1 uses the Rust custody/executor and its declared id/active disclosure contract.",
             "Reply noninterference holds when parsed provider public fields agree; providers, errors, timing and metadata may disclose information outside that contract.",
             "TPM tools and silicon/emulator command semantics are trusted; the restricted AK pin must be independently provisioned and oracle access controlled.",
+            "The native observer acknowledges only a complete, flushed record under the exclusive-writer and trusted host/filesystem assumptions; acknowledgement is not a client field.",
+            "Presentation uses trusted entry/enrollment/clock snapshots; cross-process dispatch linearization and whole-service concurrent traces remain open.",
         ],
         "exclusions": [
             "Proof of Python or all-input cross-language equivalence",
@@ -377,7 +397,7 @@ def mutate() -> None:
         (
             use_source,
             "substituted provider route",
-            "executor.execute(&grant.route, credential)",
+            "executor.execute(route, credential)",
             "executor.execute(&Route { host: Vec::new(), port: 443, path: Vec::new(), authentication: Authentication::Bearer }, credential)",
         ),
         (
@@ -385,6 +405,33 @@ def mutate() -> None:
             "private response length released",
             "account_id: reply.account_id,",
             "account_id: reply.discarded.len() as i64,",
+        ),
+    ]
+    protocol_source = source.with_name("protocol.rs")
+    mutations += [
+        (
+            protocol_source,
+            "composed authorization bypass",
+            "authorize_use(\n        &inner.claims,\n        grant,\n        operation,\n        presentation.now,\n        presentation.elapsed,\n    )",
+            "Ok::<(), UseDenial>(())",
+        ),
+        (
+            protocol_source,
+            "unrecorded composed dispatch",
+            "observer.record(&ready.identity, &ready.claims, &grant.route, operation)",
+            "Ok::<(), UseDenial>(())",
+        ),
+        (
+            protocol_source,
+            "substituted recorded identity",
+            "observer.record(&ready.identity, &ready.claims, &grant.route, operation)",
+            "observer.record(&Claims { certificate: Vec::new(), ..ready.identity }, &ready.claims, &grant.route, operation)",
+        ),
+        (
+            protocol_source,
+            "composed route substitution",
+            "finish_use(executor, &ready.credential, &grant.route)",
+            "finish_use(executor, &ready.credential, &Route { host: Vec::new(), port: 443, path: Vec::new(), authentication: crate::credential_use::Authentication::Bearer })",
         ),
     ]
     lean_path = base.run(
@@ -395,7 +442,8 @@ def mutate() -> None:
     lean_path = os.pathsep.join(
         str((PROOFS / part).resolve()) for part in lean_path.split(os.pathsep)
     )
-    for source, label, old, new in mutations:
+    def check_mutation(mutation) -> None:
+        source, label, old, new = mutation
         if source.read_text().count(old) != 1:
             raise SystemExit(f"mutation no longer matches once: {label}")
         with tempfile.TemporaryDirectory(
@@ -436,27 +484,64 @@ def mutate() -> None:
                 cwd=temporary,
                 env=env,
             )
-            shutil.copy2(PROOFS / "Garrett.lean", temporary / "Garrett.lean")
-            result = base.run(
-                [*lean, temporary / "Garrett.lean"],
-                cwd=temporary,
-                env=env,
-                capture=True,
-                check=False,
-            )
-            if result.returncode == 0:
-                raise SystemExit(f"mutant survived the proofs: {label}")
-            infrastructure = any(
-                x in result.stdout
-                for x in ["unknown module prefix", "does not exist", "cannot find file"]
-            )
-            if infrastructure or not re.search(
-                r"Garrett\.lean:\d+:\d+: error:", result.stdout
-            ):
-                raise SystemExit(
-                    f"mutant failed for an unexpected reason: {label}\n{result.stdout}\n{result.stderr}"
+            rejected = False
+            for module in ["Garrett", "GarrettProtocol"]:
+                proof = temporary / (module + ".lean")
+                shutil.copy2(PROOFS / proof.name, proof)
+                result = base.run(
+                    [
+                        *lean,
+                        "-DmaxErrors=1",
+                        "-o",
+                        temporary / (module + ".olean"),
+                        proof,
+                    ],
+                    cwd=temporary,
+                    env=env,
+                    capture=True,
+                    check=False,
                 )
-            print(f"Lean rejected re-extracted Rust mutation: {label}", flush=True)
+                if result.returncode == 0:
+                    continue
+                infrastructure = any(
+                    x in result.stdout
+                    for x in [
+                        "unknown module prefix",
+                        "does not exist",
+                        "cannot find file",
+                    ]
+                )
+                resources = any(
+                    x in (result.stdout + result.stderr).lower()
+                    for x in [
+                        "timeout",
+                        "heartbeats",
+                        "maximum recursion depth",
+                        "out of memory",
+                        "stack overflow",
+                        "interrupted",
+                    ]
+                )
+                if infrastructure or resources or not re.search(
+                    rf"{module}\.lean:\d+:\d+: error:", result.stdout
+                ):
+                    raise SystemExit(
+                        f"mutant failed for an unexpected reason: {label}\n{result.stdout}\n{result.stderr}"
+                    )
+                print(result.stdout, end="")
+                print(
+                    f"Lean rejected re-extracted Rust mutation: {label} ({module})",
+                    flush=True,
+                )
+                rejected = True
+                break
+            if not rejected:
+                raise SystemExit(f"mutant survived the proofs: {label}")
+
+    # Each mutant has its own Rust workspace and Lean search/output directory.
+    # Shared proof/model caches are read-only after the successful baseline.
+    with ThreadPoolExecutor(max_workers=min(4, os.cpu_count() or 1)) as pool:
+        list(pool.map(check_mutation, mutations))
 
 
 def main() -> None:

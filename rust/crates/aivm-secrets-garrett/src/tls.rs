@@ -332,15 +332,15 @@ impl Bridge {
         {
             return Err(Error::InvalidCapability);
         }
-        let opened = self.verifier.open(token, peer, &expected, now)?;
         if let Backend::Provider(provider) = &self.backend {
-            return provider.lock().map_err(|_| Error::InternalError)?.answer(
-                opened.inner.bytes(),
-                verb,
-                &m[verb],
-                now,
-            );
+            let mut provider = provider.lock().map_err(|_| Error::InternalError)?;
+            if verb == "request" {
+                return provider.request(&self.verifier, token, peer, expected, &m[verb], now);
+            }
+            let opened = self.verifier.open(token, peer, &expected, now)?;
+            return provider.control(opened.inner.bytes(), verb, now);
         }
+        let opened = self.verifier.open(token, peer, &expected, now)?;
         let inner =
             std::str::from_utf8(opened.inner.bytes()).map_err(|_| Error::InvalidCapability)?;
         let forwarded = json!({"version":1,"capability":inner,verb:m[verb]});

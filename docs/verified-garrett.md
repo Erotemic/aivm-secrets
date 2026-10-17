@@ -83,16 +83,21 @@ observational equivalence, hide metadata/length/timing, or refine the entire
 Rust I/O system into the symbolic trace. Concrete cryptographic primitives,
 TLS/X.509, parser, filesystem, compiler and translation are trusted boundaries.
 
-The manifest now declares **33 named obligations**, including supporting lemmas
-and the [credential-use/release contracts](verified-provider.md).
+The manifest now declares **45 named obligations**, including supporting lemmas,
+the [credential-use/release contracts](verified-provider.md) and the
+[composed request controller](verified-composition.md). The composition checks
+authenticated opening, current inner authorization, exact audit acknowledgement
+and selected provider execution in the native Rust request path.
 Every transitive axiom dependency is checked afresh. Only Lean's `propext`,
 `Classical.choice`, and `Quot.sound` are permitted; no admitted proof or
-project-specific security axiom is allowed. Ten deliberate changes to actual
+project-specific security axiom is allowed. Fourteen deliberate changes to actual
 Rust must break the unchanged extracted proofs: missing certificate binding,
 missing epoch binding, inclusive expiry, inactive issuance, bypassing binding
 before decryption, returning a token without sealing, removing inner binding,
 bypassing use authorization, substituting a provider route and exposing private
-response length in a public field.
+response length in a public field. The composed-controller mutations also bypass
+authorization or audit acknowledgement, substitute the recorded identity and
+change the dispatched route.
 
 ## TPM custody and enrollment evidence
 
@@ -218,7 +223,9 @@ it live credentials. Normal bridge/client builds have no such endpoint.
 
 The [acceptance plan](planning/aivm-secrets-garrett-verification.md) remains
 the broader goal. Remaining work includes concrete adapter refinement,
-durable authority/CA/trust cutover in Rust, TPM provenance deployment, provider
-release/egress proofs, audit/log confinement, and a composed service theorem.
+durable authority/CA/trust cutover in Rust, TPM provenance deployment, broader
+provider release/egress proofs, audit/log confinement, and a composed finite
+service-history theorem. The extracted request composition does not establish
+that whole-service result.
 The full Rust primitive-runner gate also remains pending. Passing enumerated
 parity cases is not a proof of Python/Rust equivalence on all inputs.
