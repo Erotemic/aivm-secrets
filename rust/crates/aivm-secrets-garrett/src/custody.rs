@@ -301,6 +301,12 @@ impl Executor {
             .get("active")
             .and_then(Value::as_bool)
             .ok_or(Error::UpstreamResponse)?;
+        // A typed integer can still be a literal credential. Check the complete
+        // success frame before the selected values can leave credential custody.
+        crate::manifest::disclosure::ensure_safe(
+            &json!({"version":1,"ok":true,"result":{"id":id,"active":active}}),
+            &secret.0,
+        )?;
         Ok(core::ProviderReply {
             account_id: id,
             active,

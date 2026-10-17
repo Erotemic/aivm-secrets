@@ -67,6 +67,17 @@ pub(crate) fn verify_attestation_fixture(
     Ok(verified)
 }
 pub fn evaluate(v: &Value) -> Outcome<Value> {
+    if v.get("action").and_then(Value::as_str) == Some("reflection") {
+        let m = json::keys(v, &["action", "value_hex", "secret_hex", "start"], &[])?;
+        let value = bytes(&m["value_hex"])?;
+        let secret = bytes(&m["secret_hex"])?;
+        let start = json::integer(&m["start"], 0, i64::MAX)? as usize;
+        return Ok(json!({
+            "ok": true,
+            "contains": aivm_secrets_garrett_core::reflection::contains(&value, &secret),
+            "matches_at": aivm_secrets_garrett_core::reflection::matches_at(&value, &secret, start),
+        }));
+    }
     if matches!(
         v.get("action").and_then(Value::as_str),
         Some("ca-create" | "csr-inspect" | "client-software" | "client-tpm" | "server-generate")

@@ -1040,3 +1040,38 @@ byte. The 80-controller mutation run is still active; it has rejected the first
 16 mutations. I am committing the source/proof checkpoint before any further
 work so that its remaining audit runs against immutable inputs. It remains on
 the feature branch until that final mutation gate passes.
+
+## 2026-10-17 06:15:50 -0400
+
+Started an isolated reflection follow-up from the committed disclosure checkpoint
+while its 80-mutation gate runs unchanged. The typed filter is now proved, but
+literal credential reflection still uses an unrefined slice/windows predicate.
+I want that exact byte-search decision in the extracted core without cloning
+credentials into ordinary temporary buffers. This is a narrower confidentiality
+property than semantic non-disclosure, and must remain described that way.
+
+Review also found that account-status-v1 has no final literal reflection check:
+a valid numeric credential can fit the permitted integer id field. I will first
+reproduce that with a synthetic enrolled TLS session. The earlier public-field
+assumption does not justify silently overlooking this preventable direct leak.
+Any fix and new proofs will remain separate from the frozen disclosure audit.
+
+The byte-search prototype now uses borrowed slice equality. Its first explicit
+byte loop measured 4.95 seconds on a 2 MiB near-match with a 4096-byte needle,
+versus 106 ms for the existing windows/equality implementation. That regression
+would be unacceptable on the response path. The revised extracted search measured
+133 ms against 101 ms for the same standard implementation, without credential
+copies. Its complete search contract, exact offset matcher, interval induction,
+no-literal consequence and nonempty self-match witness now check: seven lemmas,
+with only the established allowed axioms. This is not a constant-time claim.
+
+A test-only JSONL action exercises the actual core functions; 5,010 seeded binary
+and boundary cases match Python's byte operations. With the required native
+runner environment set, all 97 scoped reflection/provider/manifest tests pass.
+The earlier quick invocation omitted three manifest runner variables and skipped
+those 81 cases; the complete subsequent invocation has no skips. The numeric
+reflection adapter fix and Python-reference regression were copied back to the
+main candidate, where 2,090 full-suite tests pass with the one expected primitive
+runner skip. The separate complete predicate prototype still needs gate/module
+registration, source/archive manifests, source mutations and full-suite/package
+validation before merging. Its assurance manifests are intentionally stale.

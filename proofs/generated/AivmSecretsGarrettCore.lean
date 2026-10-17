@@ -2075,6 +2075,70 @@ def protocol.perform
     | core.result.Result.Err error => ok (core.result.Result.Err error)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
+/-- [aivm_secrets_garrett_core::reflection::matches_at]:
+    Source: 'crates/aivm-secrets-garrett-core/src/reflection.rs', lines 5:0-10:1
+    Visibility: public -/
+def reflection.matches_at
+  (value : Slice Std.U8) (secret : Slice Std.U8) (start : Std.Usize) :
+  Result Bool
+  := do
+  let i := Slice.len value
+  if start > i
+  then ok false
+  else
+    let i1 := Slice.len secret
+    let i2 := Slice.len value
+    let i3 ← i2 - start
+    if i1 > i3
+    then ok false
+    else
+      let i4 := Slice.len secret
+      let i5 ← start + i4
+      let s ←
+        core.slice.index.Slice.index
+          (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) value
+          { start, «end» := i5 }
+      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s secret
+
+/-- [aivm_secrets_garrett_core::reflection::contains]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/reflection.rs', lines 20:4-27:1
+    Visibility: public -/
+@[rust_loop]
+def reflection.contains_loop
+  (value : Slice Std.U8) (secret : Slice Std.U8) (last : Std.Usize)
+  (start : Std.Usize) :
+  Result Bool
+  := do
+  if start <= last
+  then
+    let b ← reflection.matches_at value secret start
+    if b
+    then ok true
+    else
+      let start1 ← start + 1#usize
+      reflection.contains_loop value secret last start1
+  else ok false
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::reflection::contains]:
+    Source: 'crates/aivm-secrets-garrett-core/src/reflection.rs', lines 14:0-27:1
+    Visibility: public -/
+def reflection.contains
+  (value : Slice Std.U8) (secret : Slice Std.U8) : Result Bool := do
+  let i := Slice.len secret
+  if i = 0#usize
+  then ok false
+  else
+    let i1 := Slice.len secret
+    let i2 := Slice.len value
+    if i1 > i2
+    then ok false
+    else
+      let i3 := Slice.len value
+      let i4 := Slice.len secret
+      let last ← i3 - i4
+      reflection.contains_loop value secret last 0#usize
+
 /-- [aivm_secrets_garrett_core::trust::TrustDenial]
     Source: 'crates/aivm-secrets-garrett-core/src/trust.rs', lines 5:0-9:1
     Visibility: public -/

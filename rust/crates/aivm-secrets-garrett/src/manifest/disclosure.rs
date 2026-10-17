@@ -141,7 +141,7 @@ impl Disclosure {
     }
 }
 fn contains(value: &[u8], secret: &[u8]) -> bool {
-    !secret.is_empty() && value.windows(secret.len()).any(|part| part == secret)
+    aivm_secrets_garrett_core::reflection::contains(value, secret)
 }
 fn reject_reflection(v: &Value, secret: &[u8]) -> Outcome<()> {
     let bad = match v {
