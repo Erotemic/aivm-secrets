@@ -1064,3 +1064,16 @@ against unchanged controllers/proofs, with 67 re-extracted mutations rejected so
 far. The new search-helper implementation and seven checked prototype lemmas are
 saved separately on garrett-reflection-core; its stale manifests/registration
 must be completed before integration.
+
+The official mutation command has now completed successfully: all 80 distinct
+re-extracted, compiled Rust mutations fail the unchanged proofs, including all
+ten new disclosure attacks. The final array/object/depth/schema changes were
+rejected by GarrettDisclosure. No hash, infrastructure or resource failure was
+accepted as a mutation kill. The runtime reflection follow-up leaves those
+controllers, generated source and proof/gate files byte-identical to 3b0ec8f.
+The full 2,090-test, 191-obligation, 253-selected-test and archive checks described
+above are the final candidate results. I am confident this is a useful source-
+linked confidentiality milestone, while JSON conversion/rendering, service
+histories and hardware provenance remain clear boundaries. The next step is to
+fast-forward main and reproduce its gate from that checkout; the separate search
+prototype remains intentionally unmerged.
