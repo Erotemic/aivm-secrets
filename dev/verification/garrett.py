@@ -1,0 +1,416 @@
+#!/usr/bin/env python3
+"""Reproduce the Rust Garrett port, extracted contracts, symbolic secrecy and parity.
+
+Run bootstrap once, then check and mutate with the project's test Python.
+No provider credentials, host authority state or hardware keys are read.
+"""
+
+from __future__ import annotations
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import sys
+import tempfile
+import freshness as base
+
+ROOT = base.ROOT
+PROOFS = base.PROOFS
+MANIFEST = PROOFS / "garrett-manifest.json"
+THEOREMS = [
+    "aivm_secrets_garrett_core.Proofs.bytes_ne_spec",
+    "aivm_secrets_garrett_core.Proofs.issue_contract",
+    "aivm_secrets_garrett_core.Proofs.present_contract",
+    "aivm_secrets_garrett_core.Proofs.returned_of_spec",
+    "aivm_secrets_garrett_core.Proofs.present_exact",
+    "aivm_secrets_garrett_core.Proofs.present_accepted_iff",
+    "aivm_secrets_garrett_core.Proofs.stolen_surrogate_wrong_peer",
+    "aivm_secrets_garrett_core.Proofs.stolen_surrogate_cannot_be_used",
+    "aivm_secrets_garrett_core.Proofs.issuance_cannot_outlive_enrollment",
+    "aivm_secrets_garrett_core.Proofs.authorized_use_positive_witness",
+    "aivm_secrets_garrett_core.Proofs.open_surrogate_contract",
+    "aivm_secrets_garrett_core.Proofs.open_rejects_unbound_before_unsealing",
+    "aivm_secrets_garrett_core.Proofs.open_stolen_surrogate_rejected",
+    "aivm_secrets_garrett_core.Proofs.open_successful_use",
+    "aivm_secrets_garrett_core.Proofs.prepare_issue_contract",
+    "aivm_secrets_garrett_core.Proofs.issue_surrogate_contract",
+    "aivm_secrets_garrett_core.Proofs.inactive_enrollment_never_sealed",
+    "Garrett.Protocol.derivation_preserves_confinement",
+    "Garrett.Protocol.provider_credential_not_derivable",
+    "Garrett.Protocol.private_key_not_derivable",
+    "Garrett.Protocol.surrogate_can_be_public",
+    "Garrett.Protocol.every_trace_observation_safe",
+    "Garrett.Protocol.all_traces_preserve_credential_secrecy",
+]
+TESTS = [
+    "tests/test_rust_garrett.py",
+    "tests/test_rust_garrett_tpm.py",
+    "tests/test_secrets_garrett_modularity.py",
+    "tests/test_secrets_identity_parity.py",
+    "tests/test_secrets_identity_registry_parity.py",
+    "tests/test_secrets_identity_renewal_parity.py",
+    "tests/test_secrets_identity_revoke_cas_parity.py",
+    "tests/test_secrets_authority_parity.py",
+    "tests/test_secrets_identity_key_rotation_parity.py",
+    "tests/test_secrets_vm_parity.py",
+    "tests/test_secrets_garrett_oauth_parity.py",
+]
+RUNNERS = {
+    "AIVM_SECRETS_RUST_GARRETT_RUNNER": "garrett-conformance",
+    "AIVM_SECRETS_RUST_GARRETT_BRIDGE": "garrett-bridge",
+    "AIVM_SECRETS_RUST_GARRETT_CLIENT": "garrett-client",
+    "AIVM_SECRETS_RUST_IDENTITY_RUNNER": "identity-conformance",
+    "AIVM_SECRETS_RUST_REGISTRY_RUNNER": "registry-conformance",
+    "AIVM_SECRETS_RUST_AUTHORITY_RUNNER": "authority-conformance",
+    "AIVM_SECRETS_RUST_KEY_ROTATION_RUNNER": "key-rotation-conformance",
+    "AIVM_SECRETS_RUST_VM_RUNNER": "vm-conformance",
+    "AIVM_SECRETS_RUST_OAUTH_RUNNER": "oauth-conformance",
+}
+
+
+def inputs() -> list[str]:
+    files = {
+        ".github/workflows/garrett.yml",
+        "MANIFEST.in",
+        "pyproject.toml",
+        "rust/Cargo.toml",
+        "rust/Cargo.lock",
+        "rust/rust-toolchain.toml",
+        "proofs/lakefile.lean",
+        "proofs/lean-toolchain",
+        "proofs/lake-manifest.json",
+        "proofs/manifest.json",
+        "proofs/generated/AivmSecretsGarrettCore.lean",
+        "proofs/Garrett.lean",
+        "proofs/GarrettSecrecy.lean",
+        "proofs/GarrettCheck.lean",
+        "dev/verification/garrett.py",
+        "dev/verification/freshness.py",
+        "tests/secrets_helpers.py",
+        "tests/test_secrets_identity_mtls.py",
+        *TESTS,
+    }
+    for name in ["aivm-secrets-garrett", "aivm-secrets-garrett-core"]:
+        directory = ROOT / "rust/crates" / name
+        files.add(str((directory / "Cargo.toml").relative_to(ROOT)))
+        files.update(str(p.relative_to(ROOT)) for p in directory.rglob("*.rs"))
+    files.update(
+        str(p.relative_to(ROOT)) for p in (ROOT / "aivm_secrets").rglob("*.py")
+    )
+    for pattern in ["*.jsonl", "*.json"]:
+        files.update(
+            str(p.relative_to(ROOT))
+            for p in (ROOT / "tests/secrets_vectors").glob(pattern)
+        )
+    return sorted(files)
+
+
+def extract(destination: Path, rust_root: Path | None = None) -> Path:
+    rust_root = ROOT / "rust" if rust_root is None else rust_root
+    base.run(
+        [
+            base.TOOLS / "charon",
+            "cargo",
+            "--preset=aeneas",
+            "--sysroot",
+            "default",
+            "--",
+            "--lib",
+            "--locked",
+        ],
+        cwd=rust_root / "crates/aivm-secrets-garrett-core",
+    )
+    destination.mkdir(parents=True, exist_ok=True)
+    base.run(
+        [
+            base.TOOLS / "aeneas",
+            "-backend",
+            "lean",
+            "-no-progress-bar",
+            "-abort-on-error",
+            "-warnings-as-errors",
+            "-dest",
+            destination,
+            rust_root / "aivm_secrets_garrett_core.llbc",
+        ]
+    )
+    generated = destination / "AivmSecretsGarrettCore.lean"
+    if not generated.is_file():
+        raise SystemExit("missing extracted Garrett module")
+    return generated
+
+
+def regeneration() -> None:
+    with tempfile.TemporaryDirectory(
+        prefix="garrett-extract-", dir=ROOT / ".tools"
+    ) as scratch:
+        generated = extract(Path(scratch))
+        if (
+            generated.read_bytes()
+            != (PROOFS / "generated" / generated.name).read_bytes()
+        ):
+            raise SystemExit("Garrett extraction is stale; regenerate and review it")
+
+
+def audit(output: str) -> None:
+    found = {}
+    for name, axioms in re.findall(
+        r"'([^']+)' depends on axioms:\s*\[([^\]]*)\]", output
+    ):
+        found[name] = {item.strip() for item in axioms.split(",") if item.strip()}
+    for name in re.findall(r"'([^']+)' does not depend on any axioms", output):
+        found[name] = set()
+    if set(found) != set(THEOREMS):
+        raise SystemExit(
+            f"theorem audit inventory differs: {set(found) ^ set(THEOREMS)}"
+        )
+    for name, axioms in found.items():
+        if axioms - base.ALLOWED_AXIOMS:
+            raise SystemExit(
+                f"{name}: undeclared axioms {axioms - base.ALLOWED_AXIOMS}"
+            )
+    print(
+        f"Audited {len(found)} named Garrett obligations; no admitted or project-specific security axiom.",
+        flush=True,
+    )
+
+
+def prove() -> None:
+    base.run([base.executable("lake"), "build"], cwd=PROOFS)
+    result = base.run(
+        [
+            base.executable("lake"),
+            "env",
+            "lean",
+            "-DwarningAsError=true",
+            "GarrettCheck.lean",
+        ],
+        cwd=PROOFS,
+        capture=True,
+    )
+    print(result.stdout, end="")
+    audit(result.stdout)
+
+
+def parity() -> None:
+    base.run(
+        [base.executable("cargo"), "+" + base.RUST, "fmt", "--all", "--", "--check"],
+        cwd=ROOT / "rust",
+    )
+    for mode in ["--no-default-features", "--all-features"]:
+        base.run(
+            [
+                base.executable("cargo"),
+                "+" + base.RUST,
+                "clippy",
+                "--locked",
+                "-p",
+                "aivm-secrets-garrett",
+                "--all-targets",
+                mode,
+                "--",
+                "-D",
+                "warnings",
+            ],
+            cwd=ROOT / "rust",
+        )
+    base.run(
+        [
+            base.executable("cargo"),
+            "+" + base.RUST,
+            "build",
+            "--locked",
+            "--release",
+            "-p",
+            "aivm-secrets-garrett",
+            "--all-features",
+        ],
+        cwd=ROOT / "rust",
+    )
+    env = dict(
+        os.environ,
+        **{
+            name: str(ROOT / "rust/target/release" / program)
+            for name, program in RUNNERS.items()
+        },
+    )
+    env["AIVM_SECRETS_REQUIRE_TPM_TESTS"] = "1"
+    base.run([sys.executable, "-m", "pytest", "-q", *TESTS], env=env)
+
+
+def check_manifest() -> None:
+    # Shared tool/model/compiler identities are pinned by the independently
+    # checked freshness manifest; no duplicate drifting provisioner is needed.
+    base.check_hashes(json.loads(base.MANIFEST.read_text()))
+    manifest = json.loads(MANIFEST.read_text())
+    if (
+        manifest["theorems"] != THEOREMS
+        or set(manifest["allowed_axioms"]) != base.ALLOWED_AXIOMS
+    ):
+        raise SystemExit("Garrett theorem or axiom policy differs")
+    if (
+        manifest["rust"] != base.RUST
+        or manifest["lean"] != base.LEAN
+        or manifest["aeneas_release"] != base.RELEASE
+    ):
+        raise SystemExit("Garrett toolchain pins differ")
+    if set(manifest["sha256"]) != set(inputs()):
+        raise SystemExit("Garrett manifest source coverage differs")
+    for name, expected in manifest["sha256"].items():
+        if base.sha256(ROOT / name) != expected:
+            raise SystemExit(f"Garrett manifest is stale: {name}")
+
+
+def record() -> None:
+    base.check_hashes(json.loads(base.MANIFEST.read_text()))
+    regeneration()
+    prove()
+    parity()
+    manifest = {
+        "schema": 1,
+        "protocol": "nested Garrett surrogate profile v1",
+        "rust": base.RUST,
+        "lean": base.LEAN,
+        "aeneas_release": base.RELEASE,
+        "theorems": THEOREMS,
+        "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
+        "implementation_linked": "Aeneas-generated issuance and opening controllers plus exact byte/epoch/time decisions",
+        "symbolic_model": "Dolev-Yao encrypted-message deduction and public protocol traces",
+        "assumptions": [
+            "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
+            "Signature verification authenticates the exact envelope; sealing/unsealing implement their stated cryptographic contracts.",
+            "ring AES-GCM/Ed25519/SHA-256, rustls/webpki, OS entropy and nonce discipline are trusted, not cryptographically re-proved.",
+            "TLS peer evidence comes only from the completed certificate-verified connection; registry/trust inputs come from the trusted host.",
+            "Independent-use prevention assumes no access to the enrolled signing/client oracle; non-exportability alone is insufficient.",
+            "Symbolic secrecy assumes protected keys and the specified provider disclosure contract; lengths and public claims are observable.",
+            "The existing local broker is the trusted authorization/custody/provider-effect boundary of this nested profile.",
+        ],
+        "exclusions": [
+            "Proof of Python or all-input cross-language equivalence",
+            "Formal refinement of JSON, TLS, X.509, crypto and filesystem adapter implementations",
+            "Physical TPM provenance, EK activation, PCR/firmware policy and anti-rollback deployment",
+            "Provider non-disclosure, host compromise, snapshot rollback and side channels",
+            "A complete Rust provider broker or OAuth credential vault/HTTP service",
+        ],
+        "sha256": {name: base.sha256(ROOT / name) for name in inputs()},
+    }
+    MANIFEST.write_text(json.dumps(manifest, indent=2) + "\n")
+    print("Recorded checked Garrett source, assumptions and proof coordinates.")
+
+
+def mutate() -> None:
+    source = ROOT / "rust/crates/aivm-secrets-garrett-core/src/lib.rs"
+    changes = [
+        ("missing peer binding", "|| claims.certificate != *peer", "|| false"),
+        ("missing current epoch", "|| claims.epoch != expected.epoch", "|| false"),
+        ("inclusive expiry", "now >= claims.expires_at", "now > claims.expires_at"),
+        ("inactive enrollment", "!active || epoch < 0", "false || epoch < 0"),
+        (
+            "bypassed binding before unseal",
+            "present(&envelope.claims, expected, peer, now)",
+            "Ok::<(), Denial>(())",
+        ),
+        (
+            "unissued token",
+            "issuer.seal(&claims, secret)",
+            "Ok::<Vec<u8>, Denial>(Vec::new())",
+        ),
+    ]
+    lean_path = base.run(
+        [base.executable("lake"), "env", "printenv", "LEAN_PATH"],
+        cwd=PROOFS,
+        capture=True,
+    ).stdout.strip()
+    lean_path = os.pathsep.join(
+        str((PROOFS / part).resolve()) for part in lean_path.split(os.pathsep)
+    )
+    for label, old, new in changes:
+        if source.read_text().count(old) != 1:
+            raise SystemExit(f"mutation no longer matches once: {label}")
+        with tempfile.TemporaryDirectory(
+            prefix="garrett-mutant-", dir=ROOT / ".tools"
+        ) as scratch:
+            temporary = Path(scratch)
+            rust = temporary / "rust"
+            shutil.copytree(
+                source.parents[1], rust / "crates/aivm-secrets-garrett-core"
+            )
+            shutil.copy2(
+                ROOT / "rust/rust-toolchain.toml", rust / "rust-toolchain.toml"
+            )
+            (rust / "Cargo.toml").write_text(
+                '[workspace]\nmembers=["crates/aivm-secrets-garrett-core"]\nresolver="2"\n[workspace.package]\nversion="0.1.0"\nedition="2021"\nlicense="Apache-2.0"\n'
+            )
+            (rust / "Cargo.lock").write_text(
+                'version = 4\n[[package]]\nname="aivm-secrets-garrett-core"\nversion="0.1.0"\n'
+            )
+            target = rust / "crates/aivm-secrets-garrett-core/src/lib.rs"
+            target.write_text(source.read_text().replace(old, new))
+            extract(temporary, rust)
+            env = dict(os.environ, LEAN_PATH=str(temporary) + os.pathsep + lean_path)
+            lean = [
+                base.executable("elan"),
+                "run",
+                base.LEAN,
+                "lean",
+                "-DwarningAsError=true",
+            ]
+            base.run(
+                [
+                    *lean,
+                    "-o",
+                    temporary / "AivmSecretsGarrettCore.olean",
+                    temporary / "AivmSecretsGarrettCore.lean",
+                ],
+                cwd=temporary,
+                env=env,
+            )
+            shutil.copy2(PROOFS / "Garrett.lean", temporary / "Garrett.lean")
+            result = base.run(
+                [*lean, temporary / "Garrett.lean"],
+                cwd=temporary,
+                env=env,
+                capture=True,
+                check=False,
+            )
+            if result.returncode == 0:
+                raise SystemExit(f"mutant survived the proofs: {label}")
+            infrastructure = any(
+                x in result.stdout
+                for x in ["unknown module prefix", "does not exist", "cannot find file"]
+            )
+            if infrastructure or not re.search(
+                r"Garrett\.lean:\d+:\d+: error:", result.stdout
+            ):
+                raise SystemExit(
+                    f"mutant failed for an unexpected reason: {label}\n{result.stdout}\n{result.stderr}"
+                )
+            print(f"Lean rejected re-extracted Rust mutation: {label}", flush=True)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "action", choices=["bootstrap", "extract", "record", "check", "mutate"]
+    )
+    args = parser.parse_args()
+    if args.action == "bootstrap":
+        base.bootstrap()
+    elif args.action == "extract":
+        extract(PROOFS / "generated")
+    elif args.action == "record":
+        record()
+    else:
+        check_manifest()
+        regeneration()
+        prove()
+        if args.action == "mutate":
+            mutate()
+        else:
+            parity()
+
+
+if __name__ == "__main__":
+    main()

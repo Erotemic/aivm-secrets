@@ -1,0 +1,38 @@
+name: Rust Garrett protocol proof and interoperability
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  garrett:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.12'
+      - name: Install isolated TPM test tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends swtpm tpm2-tools
+      - name: Install test dependencies
+        run: |
+          umask 077
+          python -m pip install '.[tests]'
+      - name: Install Lean manager
+        run: |
+          mkdir -p .tools/elan
+          curl --fail --location https://github.com/leanprover/elan/releases/download/v4.2.4/elan-x86_64-unknown-linux-gnu.tar.gz --output .tools/elan.tar.gz
+          tar -xzf .tools/elan.tar.gz -C .tools/elan
+          .tools/elan/elan-init -y --no-modify-path --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Provision pinned verification tools
+        run: python dev/verification/garrett.py bootstrap
+      - name: Regenerate, prove, lint and replay independent protocol contracts
+        run: python dev/verification/garrett.py check
+      - name: Require security mutations to break the extracted proofs
+        run: python dev/verification/garrett.py mutate

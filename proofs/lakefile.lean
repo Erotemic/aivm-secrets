@@ -8,7 +8,7 @@ package «aivm-secrets-proofs»
 
 lean_lib Generated where
   srcDir := "generated"
-  roots := #[`AivmSecretsPrimitives]
+  roots := #[`AivmSecretsPrimitives, `AivmSecretsGarrettCore]
 
 @[default_target] lean_lib Proofs where
-  roots := #[`Freshness, `Check]
+  roots := #[`Freshness, `Check, `Garrett, `GarrettSecrecy, `GarrettCheck]

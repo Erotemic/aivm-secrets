@@ -1,5 +1,6 @@
 include LICENSE README.md AGENTS.md
 include .github/workflows/freshness.yml
+include .github/workflows/garrett.yml
 graft docs
 graft tests
 recursive-include dev/port *.json *.txt *.py
@@ -8,6 +9,7 @@ include rust/Cargo.toml rust/Cargo.lock rust/rust-toolchain.toml
 recursive-include rust/crates *.rs *.toml
 include proofs/lean-toolchain proofs/lakefile.lean proofs/lake-manifest.json
 include proofs/manifest.json proofs/Freshness.lean proofs/Check.lean
+include proofs/garrett-manifest.json proofs/Garrett.lean proofs/GarrettSecrecy.lean proofs/GarrettCheck.lean
 recursive-include proofs/generated *.lean
 prune rust/target
 prune proofs/.lake

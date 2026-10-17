@@ -21,8 +21,8 @@ python3 -m venv .venv
 .venv/bin/python -m build
 ```
 
-Tests use synthetic credentials and local test services. Tests for the future
-independent Rust backend skip unless its runner is explicitly configured;
+Tests use synthetic credentials and local test services. Independent Rust
+backend tests skip unless their runners are explicitly configured;
 those skips are not evidence of Python/Rust parity.
 
 Start with the [operator guide](docs/source/secrets.rst),
@@ -46,8 +46,11 @@ implementation-linked Lean proofs and scoped Python parity tests. It is an
 independent development unit; the Python broker remains experimental and
 unaudited, and full Rust broker/primitive-runner parity is still pending.
 
-The next [verification campaign](docs/planning/aivm-secrets-garrett-verification.md)
-targets Garrett protocol correctness: authorized actions without credential
-disclosure, and rejection of stolen surrogates without the enrolled client's
-signing authority. Its design records the crypto, TLS, provider and TPM/vTPM
-conditions; these protocol guarantees remain open.
+The [Rust Garrett implementation](docs/verified-garrett.md) now has signed and
+encrypted surrogates, real TLS client/bridge executables, optional TPM signing
+and creation-evidence verification, and independent Python parity tests. Lean
+checks extracted issuance/opening controllers and a separate symbolic secrecy
+model under explicit crypto, TLS, provider and key-custody conditions. The
+[broader assurance campaign](docs/planning/aivm-secrets-garrett-verification.md)
+still has open service, hardware and provider obligations; the whole broker
+is not formally verified.

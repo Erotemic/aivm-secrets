@@ -96,3 +96,70 @@ proof-input hashes are unchanged. A final sequential wheel/sdist build
 succeeded and the source archive contains the exact new plan. The
 initial parallel build overlapped the suite's own packaging test, so
 that final build was deliberately run after the suite completed.
+
+## 2026-10-16 22:21:33 -0400
+
+Implementing the maintainer-requested Rust Garrett protocol and its formalization.
+The active goal now covers the entire protocol, so the useful slice must include
+actual signed/encrypted surrogates and authenticated transport rather than stop
+at field comparisons. I will keep the Python reference independent and retain
+existing wire formats, with explicit contracts for cryptography, TLS and TPM
+custody. I am confident in the existing extraction toolchain; collection/string
+extraction and connecting concrete wrappers to trace proofs are the main risks.
+I will work through the pure controller, interoperability and protocol secrecy
+model together, and keep hardware evidence distinct from assumed key custody.
+
+The implementation now includes byte-exact nested surrogate cryptography,
+real TLS client/server adapters, and independent registry, trust-generation,
+rotation, VM-subject and OAuth transition runners. The extracted production
+issuance/opening controller carries actual byte bindings and abstract crypto
+operations; Lean checks 17 controller obligations plus six symbolic secrecy
+obligations. All six deliberate Rust security mutations failed the unchanged
+proofs. This is a much more useful result than arithmetic safety, but I do not
+consider it a complete service theorem: the symbolic trace is separate from
+concrete I/O and the existing Python broker still owns provider custody/effects.
+
+I added a TPM2-tools signer, checked the fixed key profile and public-key pin,
+and verified real software-TPM creation evidence under a separately trusted
+restricted AK. A consuming, expiring challenge guards enrollment replay. Tests
+exercise actual TLS signing without exporting the identity private key, bad
+authorization and malformed/stale evidence. The local machine has no physical
+TPM; swtpm is deliberately not hardware-custody evidence. EK activation and
+host enrollment policy remain obligations, and key non-exportability alone
+cannot prevent a victim-client signing oracle. Installing the authorized TPM
+tooling also ran Ubuntu's normal package service hooks; no VM or provider
+configuration was changed.
+
+A review caught that the first bridge draft loaded enrollment only once. It
+now re-reads private, atomically replaced state before every dispatch, with
+regression tests for live revocation and corrupt/missing state. This follows
+the reference snapshot semantics: already admitted work can finish after a
+file update. In-memory revocation and forwarding share a lock, but I am not
+claiming a cross-process revocation transaction. Trust keys/CA stay pinned to
+the foreground process, requiring a coordinated restart on trust rotation.
+
+The independent selected gate passed 50 tests, including real crypto, TLS and
+TPM interoperability. Source/extraction freshness, all 23 named proof axiom
+inventories and strict Rust lint passed. Shared Cargo/Lake inputs were changed
+intentionally; the original freshness manifest was reproduced before recording
+new hashes. Full regressions and source/wheel packaging are running next.
+My main remaining uncertainty is the boundary from these checked controllers
+to concrete provider-result disclosure and durable host administration. Keeping
+those gaps visible is preferable to diluting the desired confidentiality claim.
+
+Final regression result: 1,887 passed and one expected pending full-primitive
+runner skip in 280.05 seconds. All Garrett gates ran. Both development and
+normal client/bridge builds passed the ten real integration tests; strict
+Clippy passed in both feature modes after removing conformance-only unused
+declarations from normal builds. The latest source manifest passed its exact
+inventory/hash check. The independent reference Python implementation and
+original AIVM checkout remain unchanged. The next major implementation gap is
+Rust-owned inner authorization/provider custody with a composed release proof,
+followed by durable enrollment/trust and deployment-specific TPM assurance.
+
+Wheel and sdist build/metadata checks passed. A final sequential rebuild after
+the documentation update produced an archive containing all 144 exact checked
+proof/input/document files. The wheel contains no AIVM, Rust or proof runtime
+payload. Resource accounting publication reported nothing outstanding. This is
+a reviewable implementation checkpoint; the entire protocol assurance goal
+remains active, with the broader service obligations listed in the new guide.

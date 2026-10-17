@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/aivm-secrets-primitives", "crates/freshness-conformance"]
+members = ["crates/aivm-secrets-primitives", "crates/freshness-conformance", "crates/aivm-secrets-garrett-core", "crates/aivm-secrets-garrett"]
 resolver = "2"
 
 [workspace.package]

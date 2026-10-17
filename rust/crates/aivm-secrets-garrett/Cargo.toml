@@ -1,0 +1,31 @@
+[package]
+name = "aivm-secrets-garrett"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+conformance = []
+
+[dependencies]
+aivm-secrets-garrett-core = { path = "../aivm-secrets-garrett-core" }
+base64 = "0.22"
+ring = "0.17"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+rustls-pemfile = "2"
+rustix = { version = "1", features = ["fs", "process"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value", "arbitrary_precision"] }
+zeroize = "1"
+
+[[bin]]
+name = "garrett-conformance"
+path = "src/main.rs"
+
+[[bin]]
+name = "garrett-bridge"
+path = "src/bridge_main.rs"
+
+[[bin]]
+name = "garrett-client"
+path = "src/client_main.rs"

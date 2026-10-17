@@ -1,11 +1,17 @@
 # Garrett protocol correctness and credential confidentiality
 
-Status: **design and acceptance contract, 2026-10-16**. The first substantial
-verification target is the Garrett protocol implemented by this project:
+Status: **acceptance contract with an initial implementation, 2026-10-16**.
+See the [Rust implementation and exact proof scope](../verified-garrett.md)
+for checked controllers, symbolic secrecy, real TLS/TPM tests and remaining
+obligations. The full composed service result below remains open.
+
+The first substantial verification target is the Garrett protocol implemented
+by this project:
 authorized credential use without giving the agent the credential, and rejection
 of an outsider holding a stolen surrogate token. These protocol properties are
-open. The existing [freshness proofs](../verified-freshness.md) establish the
-extraction pipeline and reusable lemmas, not this result.
+open at full-service scope. The existing
+[freshness proofs](../verified-freshness.md) establish the extraction pipeline
+and reusable lemmas, not this result.
 
 This priority supersedes a budget-first proof campaign. Existing request limits
 and authorization rules remain unchanged; their independent proofs are not

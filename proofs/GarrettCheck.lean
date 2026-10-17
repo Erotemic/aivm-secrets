@@ -1,0 +1,27 @@
+import Garrett
+import GarrettSecrecy
+
+-- The checker audits every named theorem and its transitive dependencies.
+#print axioms aivm_secrets_garrett_core.Proofs.bytes_ne_spec
+#print axioms aivm_secrets_garrett_core.Proofs.issue_contract
+#print axioms aivm_secrets_garrett_core.Proofs.present_contract
+#print axioms aivm_secrets_garrett_core.Proofs.returned_of_spec
+#print axioms aivm_secrets_garrett_core.Proofs.present_exact
+#print axioms aivm_secrets_garrett_core.Proofs.present_accepted_iff
+#print axioms aivm_secrets_garrett_core.Proofs.stolen_surrogate_wrong_peer
+#print axioms aivm_secrets_garrett_core.Proofs.stolen_surrogate_cannot_be_used
+#print axioms aivm_secrets_garrett_core.Proofs.issuance_cannot_outlive_enrollment
+#print axioms aivm_secrets_garrett_core.Proofs.authorized_use_positive_witness
+#print axioms aivm_secrets_garrett_core.Proofs.open_surrogate_contract
+#print axioms aivm_secrets_garrett_core.Proofs.open_rejects_unbound_before_unsealing
+#print axioms aivm_secrets_garrett_core.Proofs.open_stolen_surrogate_rejected
+#print axioms aivm_secrets_garrett_core.Proofs.open_successful_use
+#print axioms aivm_secrets_garrett_core.Proofs.prepare_issue_contract
+#print axioms aivm_secrets_garrett_core.Proofs.issue_surrogate_contract
+#print axioms aivm_secrets_garrett_core.Proofs.inactive_enrollment_never_sealed
+#print axioms Garrett.Protocol.derivation_preserves_confinement
+#print axioms Garrett.Protocol.provider_credential_not_derivable
+#print axioms Garrett.Protocol.private_key_not_derivable
+#print axioms Garrett.Protocol.surrogate_can_be_public
+#print axioms Garrett.Protocol.every_trace_observation_safe
+#print axioms Garrett.Protocol.all_traces_preserve_credential_secrecy
