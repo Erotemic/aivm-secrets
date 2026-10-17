@@ -1014,3 +1014,29 @@ Assurance manifests remain stale until the full gate; this checkpoint is still
 on the isolated branch. The JSON adapter, reflection scan, pagination metadata,
 network and durable storage remain outside the new source proof. I am confident
 in the pure filter theorem and will test the proof's sensitivity before merging.
+
+The deeper result now uses a recursive schema-agreement relation: hidden fields
+can change even within selected containers and array elements. Three additional
+lemmas establish specification agreement and exact extracted-result equality.
+All 37 disclosure obligations compile cleanly, and the integrated record gate
+passes 191 transitive axiom audits, 252 selected tests and six Rust unit checks.
+Freshness coordinates were refreshed after registering the new Lake root. The
+new documentation separates typed-tree guarantees from JSON/I/O assumptions and
+makes whole-service timing/size/failure side channels explicit.
+
+The branch now contains main's validated numeric fix through an ordinary merge;
+its conflict resolution preserved both earlier journal continuations and all ten
+raw-number tests. New full-suite and 80-mutation runs are active against the
+frozen proof/source snapshot. I changed the new mutation predicates to preserve
+extractable control-flow shape, so a missing generated declaration cannot be
+mistaken for a security-proof rejection. Validation results remain pending for
+those runs and packaging; do not infer whole-service verification from the new
+noninterference theorem.
+
+The full suite passes 2,089 tests with the sole expected general primitive-runner
+skip in 311.93 seconds, using normal native service binaries. Build and twine
+checks pass, and all 190 source/proof/document archive inputs match byte for
+byte. The 80-controller mutation run is still active; it has rejected the first
+16 mutations. I am committing the source/proof checkpoint before any further
+work so that its remaining audit runs against immutable inputs. It remains on
+the feature branch until that final mutation gate passes.

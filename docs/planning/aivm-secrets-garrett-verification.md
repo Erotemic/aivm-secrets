@@ -287,7 +287,7 @@ request quota is not part of this milestone's value proposition.
 | Token envelopes | Python/Rust exact outer fixture and bidirectional inner/outer crypto interoperability | Concrete encoding/crypto adapter refinement and nonce analysis |
 | Authenticated connection | Actual Rust/Python TLS tests, opaque peer evidence and Rust provider path | Formal transport refinement and complete connection/request association |
 | Acquisition and refresh | Native host-only PKCE URL/loopback/code exchange and direct encrypted-vault installation, extracted callback/lifecycle/refresh guards, pinned HTTPS, opaque dispatch leases and synthetic I/O attack tests | Concrete acquisition/audit/storage/error/concurrent-service trace refinement; broader provider registration/production validation |
-| Substitution and result release | Rust fixed-account and native manifest custody, real HTTPS effects, explicit recursive typed disclosure, extracted parameter/admission guards and conditional selected-byte noninterference | Refine concrete route/check/template/GraphQL and JSON release adapters; complete aliases/resolvers/approvals/delegation and whole-service confinement |
+| Substitution and result release | Rust fixed-account and native manifest custody, real HTTPS effects, explicit recursive typed disclosure, extracted parameter/admission guards, complete typed-filter refinement and recursive two-run noninterference | Refine concrete route/check/template/GraphQL and JSON conversion/rendering adapters; complete aliases/resolvers/approvals/delegation and whole-service confinement |
 | Instance key custody | Rust TPM signer, fresh creation-evidence verifier under a trusted AK pin, actual isolated swtpm/TLS tests | Authenticate hardware AK provenance, EK activation, approved deployment/PCR/rollback policy and physical TPM validation |
 | Native authority | Python-compatible durable Rust administration, assurance receipts, issuer/server/CA rotation, explicit prefix-checked recovery, protected file issuance, held-directory storage, extracted admission/trust-publication contracts and live native bridge leases | Complete storage/locking and concurrent-service history refinement; general policy and acquisition/service-history refinement |
 | Client identity creation | Native CSR possession/approval checks and software/TPM signing; Python `identity request` and external TPM tooling create client material | Normal Rust client key/CSR creation and inspect commands, with protected no-replace output; provisioning/deployment provenance remains separate |
@@ -299,10 +299,11 @@ boundary. This remains an explicit gap for GARR-CONF-01 in the general Python
 profile. The Rust account-status-v1 profile instead selects a typed public
 projection explicitly. Native manifest execution extends that boundary to
 recursive operator-declared typed projection with a construction budget and
-literal reflection checks. Its extracted membership/admission and selected-byte
-release contracts are checked, while the JSON and effect-building adapters remain
-unrefined. Session file snapshots require renunciation or restart for policy or
-file-credential changes; OAuth instead participates in active leases.
+literal reflection checks. Its extracted membership/admission guards and complete
+typed filter have checked contracts. The [recursive disclosure proof](../verified-disclosure.md)
+adds schema-directed two-run noninterference, including nested objects and arrays.
+JSON conversion/rendering and effect-building adapters remain unrefined. Session
+file snapshots require renunciation or restart for policy or file-credential changes; OAuth instead participates in active leases.
 The original Python pure issue/present model alone does not include TLS,
 signatures, encryption, provider substitution or secrets.
 
@@ -337,9 +338,10 @@ they are trusted host metadata, not proof of physical hardware or a workload.
 2. Continue the native manifest provider interpreter. The `manifest-https-v1`
    path now executes typed operations, checked facts/captures, pagination and
    fixed GraphQL reads with an explicit typed disclosure contract. Its extracted
-   parameter and admission guards have proofs; concrete builders, JSON release
-   and network/audit ordering are tested adapters. Complete CLI aliases, command
-   sources, approvals/delegation and route/release refinement. Keep credential sources
+   parameter/admission guards and recursive typed selection have proofs. Concrete
+   builders, JSON conversion/rendering and network/audit ordering remain tested
+   adapters. Complete CLI aliases, command sources, approvals/delegation and
+   concrete route/serialization refinement. Keep credential sources
    opaque, make request builders consume host-approved routes and typed
    arguments, and choose each operation's public-result disclosure contract.
    Prove destination/action confinement and release properties before adding

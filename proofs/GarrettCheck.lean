@@ -208,3 +208,6 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.disclosure.Proofs.root_fields_noninterference
 #print axioms aivm_secrets_garrett_core.disclosure.Proofs.ignored_input_field_noninterference
 #print axioms aivm_secrets_garrett_core.disclosure.Proofs.boolean_projection_positive_witness
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.itemsWith_relational
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.refProject_agreement
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.recursive_projection_noninterference

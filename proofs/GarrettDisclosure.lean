@@ -1053,6 +1053,99 @@ theorem boolean_projection_positive_witness :
   have eq := result_matches_unique 1 _ out _ matched_result witness
   simpa [eq] using returned
 
+/-- Agreement follows the schema recursively. Provider fields outside its paths
+are unconstrained, including inside selected objects and array elements. -/
+def ProjectionAgreement : Nat → Json → Json → Projection → Prop
+  | 0, _, _, _ => True
+  | depth + 1, a, b, schema =>
+      match boundedLookup a schema.at, boundedLookup b schema.at with
+      | .Err _, .Err _ => True
+      | .Ok left, .Ok right =>
+          match schema.kind, left, right with
+          | .Object fields, .Object _, .Object _ =>
+              ∀ field ∈ fields.val, ProjectionAgreement depth left right field.projection
+          | .Array item _, .Array xs, .Array ys =>
+              List.Forall₂ (fun x y => ProjectionAgreement depth x y item) xs.val ys.val
+          | _, _, _ => left = right
+      | _, _ => False
+
+theorem itemsWith_relational (select : Json → Nat → Option (PublicTree × Nat))
+    (xs ys : List Json) (budget : Nat)
+    (same : List.Forall₂ (fun x y => ∀ b, select x b = select y b) xs ys) :
+    itemsWith select xs budget = itemsWith select ys budget := by
+  induction same generalizing budget with
+  | nil => rfl
+  | cons head tail ih =>
+    simp only [itemsWith]
+    cases cut : takeBudget budget 1 with
+    | none => rfl
+    | some remaining =>
+      simp only [Option.bind_eq_bind, Option.bind_some, head remaining]
+      cases selected : select _ remaining with
+      | none => rfl
+      | some pair =>
+        rcases pair with ⟨value, next⟩
+        simp only [Option.bind_some]
+        rw [ih next]
+
+theorem refProject_agreement (depth : Nat) (a b : Json) (schema : Projection) (budget : Nat)
+    (agree : ProjectionAgreement depth a b schema) :
+    refProject depth a schema budget = refProject depth b schema budget := by
+  induction depth generalizing a b schema budget with
+  | zero => rfl
+  | succ depth ih =>
+    simp only [ProjectionAgreement] at agree
+    simp only [refProject]
+    cases lhs : boundedLookup a schema.at with
+    | Err error =>
+      cases rhs : boundedLookup b schema.at with
+      | Err other => rfl
+      | Ok right => simp [lhs, rhs] at agree
+    | Ok left =>
+      cases rhs : boundedLookup b schema.at with
+      | Err other => simp [lhs, rhs] at agree
+      | Ok right =>
+        simp only [lhs, rhs] at agree ⊢
+        cases kind : schema.kind <;> cases left <;> cases right
+        all_goals simp only [kind] at agree ⊢
+        all_goals try { contradiction }
+        all_goals try { solve | cases agree; rfl }
+        case Object.Object.Object fields left right =>
+          have selected := fieldsWith_congruence
+            (fun p n => refProject depth (.Object left) p n)
+            (fun p n => refProject depth (.Object right) p n) fields.val
+          by_cases invalid : fields.length = 0 ∨ 32 < fields.length
+          · simp only [invalid, ↓reduceIte]
+          · simp only [invalid, ↓reduceIte]
+            cases cut : takeBudget budget 2 with
+            | none => rfl
+            | some remaining =>
+              simp only [Option.bind_eq_bind, Option.bind_some]
+              rw [selected remaining (by intro field member n; exact ih _ _ _ _ (agree field member))]
+        case Array.Array.Array item maximum xs ys =>
+          have lengths : xs.length = ys.length := agree.length_eq
+          simp only [lengths]
+          by_cases invalid : maximum.val < 1 ∨ 1000 < maximum.val ∨ maximum.val < ys.length
+          · simp only [invalid, ↓reduceIte]
+          · simp only [invalid, ↓reduceIte]
+            cases cut : takeBudget budget 2 with
+            | none => rfl
+            | some remaining =>
+              simp only [Option.bind_eq_bind, Option.bind_some]
+              rw [itemsWith_relational (fun v n => refProject depth v item n) xs.val ys.val remaining
+                (agree.imp (by intro x y property n; exact ih _ _ _ _ property))]
+
+/-- Full recursive two-run noninterference of the extracted filter. This includes
+successful owned output, remaining budget and denial, not just selected bytes. -/
+theorem recursive_projection_noninterference (a b : Json) (schema : Projection) (fuel budget : Usize)
+    (agree : ProjectionAgreement fuel.val a b schema) :
+    project a schema fuel budget = project b schema fuel budget := by
+  obtain ⟨left, left_return, left_matches⟩ := returned_of_spec (project_contract a schema fuel budget)
+  obtain ⟨right, right_return, right_matches⟩ := returned_of_spec (project_contract b schema fuel budget)
+  have spec_same := refProject_agreement fuel.val a b schema budget.val agree
+  rw [← spec_same] at right_matches
+  rw [left_return, right_return, result_matches_unique fuel.val _ left right left_matches right_matches]
+
 end aivm_secrets_garrett_core.disclosure.Proofs
 
 end

@@ -251,6 +251,12 @@ THEOREMS += [
     "aivm_secrets_garrett_core.disclosure.Proofs.boolean_projection_positive_witness",
 ]
 
+THEOREMS += [
+    "aivm_secrets_garrett_core.disclosure.Proofs.itemsWith_relational",
+    "aivm_secrets_garrett_core.disclosure.Proofs.refProject_agreement",
+    "aivm_secrets_garrett_core.disclosure.Proofs.recursive_projection_noninterference",
+]
+
 TESTS = [
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
@@ -492,7 +498,7 @@ def assurance_coordinates() -> dict:
         "aeneas_release": base.RELEASE,
         "theorems": THEOREMS,
         "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
-        "implementation_linked": "Aeneas-generated issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection",
+        "implementation_linked": "Aeneas-generated issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering and schema-directed two-run noninterference",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
@@ -512,7 +518,7 @@ def assurance_coordinates() -> dict:
             "Native file issuance acknowledges public claims before atomic no-replace output publication under a held authority lease. Private output storage and explicit delivery are trusted host operations; publication/completion errors may leave a usable file and require reconciliation.",
             "OAuth quarantine and successor persistence are conditional storage-adapter contracts. Native vault locking drains participating refresh/revoke against dispatch and HMAC checks token equality; root snapshot rollback, hostile same-UID replacement and nonparticipating writers are outside that boundary.",
             "Native PKCE login trusts entropy, SHA-256 S256 derivation, HTTP/query decoding and loopback listener/clock adapters. Callback binding and one-shot lifecycle guards are extracted; ready URLs go only to a trusted host operator/browser, and their state/challenge must not be offered as an agent API. Concrete acquisition I/O histories and secret-sink refinement remain open.",
-            "The manifest HTTPS backend trusts the policy/check/template/GraphQL parsers, JSON disclosure projection and reflection checks and concrete HTTP/audit ordering. Extracted guards prove actual selected-index membership, current grant and operation/write decisions and separation of already-selected bytes; they do not refine those adapters or prove arbitrary provider non-disclosure. Native configuration explicitly selects unbounded requests and a file source or explicit OAuth override.",
+            "The manifest HTTPS backend trusts the policy/check/template/GraphQL parsers, JSON-to-typed-tree conversion and selected-tree rendering, reflection checks and concrete HTTP/audit ordering. The extracted recursive filter matches an independent selection specification and has exact two-run noninterference under recursive schema agreement; unselected typed-tree fields are unconstrained. These contracts do not refine the remaining adapters or establish arbitrary provider non-disclosure or whole-service trace equivalence. Native configuration explicitly selects unbounded requests and a file source or explicit OAuth override.",
             "Controller histories assume signature verification has prior recorded issuer origin; the ideal signature-origin theorem does not establish a computational byte-level or concrete I/O refinement.",
             "CSR possession, CA constraints/key matching and X.509 signing use the stated rcgen/x509-parser/time adapter contracts; their ASN.1/crypto implementations are not formally refined. TPM approval consumes verified fresh evidence under a trusted AK pin.",
         ],
@@ -984,19 +990,19 @@ def mutate() -> None:
             disclosure_source,
             "disclosure lookup accepts wrong key",
             "if entry.0 != *name {",
-            "if false {",
+            "if entry.0 == *name {",
         ),
         (
             disclosure_source,
-            "disclosure ignores selected path",
+            "disclosure exits selected path early",
             "if index >= at.len() {",
-            "if true {",
+            "if index <= at.len() {",
         ),
         (
             disclosure_source,
             "disclosure accepts embedded zero",
             "if value[index] == 0 {",
-            "if false {",
+            "if value[index] != 0 {",
         ),
         (
             disclosure_source,

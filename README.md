@@ -80,7 +80,8 @@ callback before emitting the browser URL, exchanges one accepted code and instal
 the grant directly into the encrypted vault. Its callback/lifecycle guards have
 extracted proofs. A new native `manifest-https-v1` backend executes host-selected
 operations with typed parameters, checked facts, bodies, pagination and fixed
-GraphQL reads. It requires an explicit typed response disclosure contract and
-uses extracted parameter and operation/write guards. Client aliases, command
-resolvers, approvals/delegation and concrete whole-service refinement remain
-open; the adapter and interpreter are not formally verified.
+GraphQL reads. Its [extracted recursive filter](docs/verified-disclosure.md) has
+conditional Lean selection and noninterference proofs. It requires an explicit
+typed response disclosure contract and uses extracted parameter and
+operation/write guards. Client aliases, command resolvers, approvals/delegation,
+JSON/I/O adapter refinement and whole-service verification remain open.

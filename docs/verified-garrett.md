@@ -84,7 +84,7 @@ observational equivalence, hide metadata/length/timing, or refine the entire
 Rust I/O system into the symbolic trace. Concrete cryptographic primitives,
 TLS/X.509, parser, filesystem, compiler and translation are trusted boundaries.
 
-The manifest now declares **139 named obligations**, including supporting lemmas,
+The manifest now declares **191 named obligations**, including supporting lemmas,
 the [credential-use/release contracts](verified-provider.md) and the
 [composed request controller](verified-composition.md). The composition checks
 authenticated opening, current inner authorization, exact audit acknowledgement
@@ -107,7 +107,7 @@ issuer and time binding, one-shot claim/exchange transitions, terminal-state
 replay rejection and successful-acquisition witnesses.
 Every transitive axiom dependency is checked afresh. Only Lean's `propext`,
 `Classical.choice`, and `Quot.sound` are permitted; no admitted proof or
-project-specific security axiom is allowed. Fifty-nine deliberate changes to actual
+project-specific security axiom is allowed. Eighty deliberate changes to actual
 Rust must break the unchanged extracted proofs: missing certificate binding,
 missing epoch binding, inclusive expiry, inactive issuance, bypassing binding
 before decryption, returning a token without sealing, removing inner binding,
@@ -129,7 +129,9 @@ OAuth mutations remove quarantine or successor persistence, exchange before
 quarantine, permit silent retry or rejected-grant reuse, clear prior doubt after
 a failed deliberate retry, or admit stale/expired credential leases. Login mutations bypass callback state/issuer
 binding, accept expired or consumed callbacks, exchange without admission or
-more than once, treat a denial as a code, or complete before exchange/storage.
+more than once, treat a denial as a code, or complete before exchange/storage. Disclosure mutations
+change selected paths, keys, values or output names, skip array elements, or
+bypass text, depth and schema rejection.
 
 ## TPM custody and enrollment evidence
 
@@ -727,41 +729,27 @@ Rust parameter and admission guards: exact allowlist membership at the checked
 index, range/body authority, type mismatch and out-of-bounds denial, current grant
 and exact operation/write permission. A broken or malicious search index cannot
 make an unlisted value pass. Its release theorem states that changing discarded
-response bytes cannot change already-selected output bytes. It does not prove
-the JSON projection adapter, route/check/GraphQL parsers, actual network/audit
-ordering or the whole service. `manifest-conformance` compares independently
+response bytes cannot change already-selected output bytes. The
+[recursive disclosure proof](verified-disclosure.md) now checks actual typed
+selection and construction against an independent recursive specification.
+JSON decoding/rendering, route/check/GraphQL parsers, actual network/audit
+ordering and the whole service remain outside those proofs. `manifest-conformance` compares independently
 compiled effects against Python; integration tests inspect real HTTPS methods,
 targets, bodies and credential headers and exercise denial, expiry, revocation,
 projection and uncertain-write paths. This is finite behavioral evidence, not an
 all-input equivalence proof.
 
-The native-manifest checkpoint passes **2,073 full-suite tests**, with one
-expected pending general primitive-runner skip (305.91 seconds), using normal
-native service binaries. The recorded gate passes **236 selected Garrett tests**,
-all **154 named axiom checks**, strict Rust lint in both modes and six Rust
-unit checks. **65 new manifest tests** cover independent Python effect compilation
-and actual native provider I/O, filtering, expiry and revocation. The mutation
-gate requires **70 changed Rust controllers** to fail unchanged proofs, including
-eleven new parameter, operation/write and release attacks. Hosted CI remains
+The recursive-disclosure checkpoint passes **2,089 full-suite tests**, with one
+expected pending general primitive-runner skip (311.93 seconds), using normal
+native service binaries. The recorded gate passes **252 selected Garrett tests**,
+all **191 named axiom checks**, strict Rust lint in both modes and six Rust
+unit checks. **81 manifest tests** cover independent Python effect compilation
+and actual native provider I/O, filtering, expiry and revocation, including
+nested ignored-field changes and strict whole-result rejection after a bad child.
+The mutation gate requires **80 changed Rust controllers** to fail unchanged
+proofs, including ten new attacks against recursive disclosure. Hosted CI remains
 unexecuted, and all credentials/providers/TPM activity in this validation are
 synthetic or isolated emulation.
-
-A follow-up raw-number review found and fixed a route mismatch: arbitrary-
-precision JSON preserved the spelling `-0`, membership guards interpreted it as
-integer zero, and interpolation formerly produced `/-0`. Arguments and defaults
-now normalize to the validated integer and routing renders that value. Numeric
-facts compare integer values while preserving the distinction from floats,
-booleans and strings. A custom TLS client regression reaches the broker without
-the ordinary client's canonical encoder; only `/0` may be selected when integer
-zero is approved, even when the synthetic provider exposes a different `/-0`.
-
-The updated checkpoint passes **2,083 full-suite tests** with the same one
-expected skip (315.33 seconds), **246 selected tests**, strict lint and six Rust
-unit checks. **75 manifest tests** now include ten raw-number routing, default,
-query and typed-fact cases. The extracted controller and proof sources remain
-unchanged from the successful 70-mutation run; updated runtime/test hashes are
-recorded. The subsequent recursive-disclosure refinement is isolated in a
-worktree and is not part of this checkpoint's assurance claim.
 
 Native CLI alias tables, command resolver execution, one-shot write approvals,
 and delegated/attenuated grant lineages remain unfinished. Nonempty CLI tables
