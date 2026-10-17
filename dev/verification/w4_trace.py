@@ -69,6 +69,10 @@ def check(root: Path = ROOT) -> dict:
         require(digest(root / name) == expected, f'core/extraction changed: {name}')
     require(digest(root / PROOF) == info.get('proof_sha256'), 'W4 proof changed without review')
     proof = (root / PROOF).read_text()
+    # Lean documentation comments must precede declarations, not tactic/command directives.
+    # Catch this syntax error even in environments without the Lean toolchain.
+    require(re.search(r'/--(?:(?!-/)[\s\S])*-/\s*#(?:check|print|eval)\b', proof) is None,
+            'Lean doc comment cannot attach to a #check/#print/#eval command')
     for forbidden in (r'\bsorry\b', r'\badmit\b', r'(?m)^\s*axiom\b', r'(?m)^\s*constant\b'):
         require(re.search(forbidden, proof) is None, f'W4 proof has an unsupported escape: {forbidden}')
     for marker in REQUIRED_MARKERS:

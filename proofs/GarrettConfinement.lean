@@ -59,8 +59,8 @@ theorem accepted_implies_admission (g : Gate) (accepted : g.accepted) :
     exact accepted
   cases out with
   | Err error => simp at eq
-  | Ok unit =>
-    cases unit
+  | Ok resultUnit =>
+    cases resultUnit
     exact property.mp rfl
 
 /-- Revocation at the *new* dispatch check blocks the effect even if a
@@ -259,8 +259,8 @@ theorem accepted_fact_is_allowed (fact : CheckedFact) (accepted : fact.accepted)
     exact accepted
   cases out with
   | Err error => simp at eq
-  | Ok unit =>
-    cases unit
+  | Ok resultUnit =>
+    cases resultUnit
     exact property.mp rfl
 
 /-- The modeled two-phase request uses a fresh gate for each credentialed
@@ -269,11 +269,11 @@ theorem accepted_fact_is_allowed (fact : CheckedFact) (accepted : fact.accepted)
 noncomputable def afterPreflight (pre : Gate) (auditOK providerOK : Bool)
     (continuation : List Event) : List Event := by
   classical
-  let prefix := dispatch .preflight pre auditOK
-  exact if Event.providerSend .preflight pre auditOK ∈ prefix then
-    if providerOK then prefix ++ continuation
-    else prefix ++ [.guestDenied]
-  else prefix
+  let phaseEvents := dispatch .preflight pre auditOK
+  exact if Event.providerSend .preflight pre auditOK ∈ phaseEvents then
+    if providerOK then phaseEvents ++ continuation
+    else phaseEvents ++ [.guestDenied]
+  else phaseEvents
 
 theorem denied_at_entry_stops (pre : Gate)
     (auditOK providerOK : Bool) (continuation : List Event)
@@ -306,14 +306,14 @@ noncomputable def afterFinal
     (schema : aivm_secrets_garrett_core.disclosure.Projection)
     (fuel budget : Usize) : List Event := by
   classical
-  let prefix := dispatch .final final auditOK
-  exact if Event.providerSend .final final auditOK ∈ prefix then
+  let phaseEvents := dispatch .final final auditOK
+  exact if Event.providerSend .final final auditOK ∈ phaseEvents then
     if providerOK then
       if completedAuditOK then
-        prefix ++ ([.auditAttempt .completed] ++ disclose raw schema fuel budget)
-      else prefix ++ ([.auditAttempt .completed] ++ [.guestDenied])
-    else prefix ++ [.guestDenied]
-  else prefix
+        phaseEvents ++ ([.auditAttempt .completed] ++ disclose raw schema fuel budget)
+      else phaseEvents ++ ([.auditAttempt .completed] ++ [.guestDenied])
+    else phaseEvents ++ [.guestDenied]
+  else phaseEvents
 
 theorem final_provider_failure_stops_release (final : Gate)
     (accepted : final.accepted)
@@ -400,7 +400,7 @@ theorem request_trace_sound
     | true => exact sound_append _ _ (dispatch_sound .preflight pre preAudit) (after_final_sound final finalAudit finalProviderOK completedAuditOK raw schema fuel budget)
   · simpa only [sent, ↓reduceIte] using dispatch_sound .preflight pre preAudit
 
-/-- Native source-controller evidence is deliberately separate from the
+/- Native source-controller evidence is deliberately separate from the
     abstract trace interpreter. The extracted `protocol::perform` requires
     successful preparation, durable observer acknowledgement and execution
     before it can return a public reply; this existing lemma is reused rather

@@ -190,3 +190,32 @@ actionable preflight diagnostics and explicit `garrett.py bootstrap` instruction
 Do not auto-download dependencies from a proof command. The container lacks
 network access and a Lean toolchain: the W4 proof remains uncompiled and unverified.
 No source-level security assurance claim was expanded.
+
+## 2026-10-17 - W4 Lean parser and linter repair
+
+The maintainer bootstrapped the pinned Aeneas backend and reached actual W4
+Lean elaboration. Existing Garrett proof dependencies built successfully.
+The W4 module failed with Lean's constructor-name linter for a local `unit`
+variable and parser errors from using reserved `prefix` as a `let` binder.
+Downstream proof goals contained implicit `sorryAx`; these are not accepted
+by the W4 axiom allowlist. Renamed the local bindings to `resultUnit` and
+`phaseEvents`, refreshed the recorded proof digest, and added a regression
+test ensuring the axiom audit rejects elaborator-inserted `sorryAx`.
+No theorem statements, source-linked guards, or model semantics changed.
+W4 remains pending a new pinned Lean kernel run; Python structural tests
+do not establish proof validity.
+
+## 2026-10-17 17:53:52 -0400 - W4 orphaned Lean doc-comment repair
+
+The maintainer's post-bootstrap W4 run narrowed the only reported error to
+`GarrettConfinement.lean:407`: a Lean documentation comment (`/--`) directly
+preceded a `#check` command. `#check` cannot receive documentation comments;
+use an ordinary block comment (`/-`) for source-controller evidence notes.
+No theorems or effect-model semantics changed. Updated the reviewed proof digest
+and added a structural regression test that rejects documentation comments
+attached to `#check`, `#print` or `#eval`.
+
+The previous maintainer log showed 19 W4 theorem axiom reports without
+`sorryAx`, but Lean exited with a parser error. This correction is still
+subject to the pinned Lean kernel gate on the maintainer's machine; Python
+structural checks alone do not prove W4. Exact model variant unavailable.
