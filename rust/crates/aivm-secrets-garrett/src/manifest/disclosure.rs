@@ -1,37 +1,29 @@
-//! Host-side typed projection, separate from untrusted client formatting. Object
-//! schemas discard unknown fields; arrays project each element through a schema.
+//! Typed response selection runs in the extracted core. The JSON adapter only
+//! converts input nodes and renders the owned selected tree; it has no raw
+//! provider-document fallback.
 use super::*;
+use aivm_secrets_garrett_core::disclosure as filter;
+
 pub struct Disclosure {
-    rules: BTreeMap<String, BTreeMap<String, Projection>>,
+    rules: BTreeMap<String, Vec<filter::Field>>,
 }
-struct Projection {
-    at: Vec<String>,
-    kind: Kind,
-}
-enum Kind {
-    Integer,
-    Boolean,
-    Text,
-    Null,
-    Object(BTreeMap<String, Projection>),
-    Array(Box<Projection>, usize),
-}
+struct Projection;
 impl Projection {
-    fn parse(v: &Value, depth: usize) -> Outcome<Self> {
+    fn parse(v: &Value, depth: usize) -> Outcome<filter::Projection> {
         if depth > 8 {
             return bad();
         }
         let m = keys(v, &["at", "type"], &["fields", "items", "max_items"])?;
         let kind = match m["type"].as_str() {
-            Some("integer") => Kind::Integer,
-            Some("boolean") => Kind::Boolean,
-            Some("text") => Kind::Text,
-            Some("null") => Kind::Null,
+            Some("integer") => filter::Kind::Integer,
+            Some("boolean") => filter::Kind::Boolean,
+            Some("text") => filter::Kind::Text,
+            Some("null") => filter::Kind::Null,
             Some("object") => {
                 if m.len() != 3 {
                     return bad();
                 }
-                Kind::Object(Self::fields(
+                filter::Kind::Object(Self::fields(
                     m.get("fields").ok_or(Error::InvalidPolicy)?,
                     depth + 1,
                 )?)
@@ -40,7 +32,7 @@ impl Projection {
                 if m.len() != 4 {
                     return bad();
                 }
-                Kind::Array(
+                filter::Kind::Array(
                     Box::new(Self::parse(
                         m.get("items").ok_or(Error::InvalidPolicy)?,
                         depth + 1,
@@ -50,15 +42,18 @@ impl Projection {
             }
             _ => return bad(),
         };
-        if !matches!(kind, Kind::Object(_) | Kind::Array(..)) && m.len() != 2 {
+        if !matches!(kind, filter::Kind::Object(_) | filter::Kind::Array(..)) && m.len() != 2 {
             return bad();
         }
-        Ok(Self {
-            at: pointer(&m["at"])?,
+        Ok(filter::Projection {
+            at: pointer(&m["at"])?
+                .into_iter()
+                .map(String::into_bytes)
+                .collect(),
             kind,
         })
     }
-    fn fields(v: &Value, depth: usize) -> Outcome<BTreeMap<String, Self>> {
+    fn fields(v: &Value, depth: usize) -> Outcome<Vec<filter::Field>> {
         let m = v.as_object().ok_or(Error::InvalidPolicy)?;
         if m.is_empty() || m.len() > 32 {
             return bad();
@@ -66,59 +61,53 @@ impl Projection {
         m.iter()
             .map(|(n, v)| {
                 name(n, false)?;
-                Ok((n.clone(), Self::parse(v, depth)?))
+                Ok(filter::Field {
+                    name: n.as_bytes().to_vec(),
+                    projection: Self::parse(v, depth)?,
+                })
             })
             .collect()
     }
-    fn apply(&self, response: &Value, budget: &mut usize) -> Outcome<Value> {
-        let value = lookup(response, &self.at, Error::UpstreamResponse)?;
-        match &self.kind {
-            Kind::Integer if value.as_i64().is_some() => leaf(value, budget),
-            Kind::Boolean if value.is_boolean() => leaf(value, budget),
-            Kind::Text
-                if value
-                    .as_str()
-                    .is_some_and(|s| s.len() <= MAX_TEXT && !s.contains('\0')) =>
-            {
-                leaf(value, budget)
-            }
-            Kind::Null if value.is_null() => leaf(value, budget),
-            Kind::Object(fields) if value.is_object() => Self::apply_fields(fields, value, budget),
-            Kind::Array(item, maximum) => {
-                let values = value.as_array().ok_or(Error::UpstreamResponse)?;
-                if values.len() > *maximum {
+}
+fn document(v: &Value) -> filter::Json {
+    match v {
+        Value::Null => filter::Json::Null,
+        Value::Bool(b) => filter::Json::Boolean(*b),
+        Value::Number(n) => n
+            .as_i64()
+            .map(filter::Json::Integer)
+            .unwrap_or(filter::Json::Opaque),
+        Value::String(s) => filter::Json::Text(s.as_bytes().to_vec()),
+        Value::Array(values) => filter::Json::Array(values.iter().map(document).collect()),
+        Value::Object(values) => filter::Json::Object(
+            values
+                .iter()
+                .map(|(n, v)| (n.as_bytes().to_vec(), document(v)))
+                .collect(),
+        ),
+    }
+}
+fn render(v: filter::Json) -> Outcome<Value> {
+    Ok(match v {
+        filter::Json::Null => Value::Null,
+        filter::Json::Boolean(b) => json!(b),
+        filter::Json::Integer(n) => json!(n),
+        filter::Json::Text(s) => json!(String::from_utf8(s).map_err(|_| Error::UpstreamResponse)?),
+        filter::Json::Array(values) => {
+            Value::Array(values.into_iter().map(render).collect::<Outcome<_>>()?)
+        }
+        filter::Json::Object(values) => {
+            let mut out = Map::new();
+            for (name, value) in values {
+                let name = String::from_utf8(name).map_err(|_| Error::UpstreamResponse)?;
+                if out.insert(name, render(value)?).is_some() {
                     return Err(Error::UpstreamResponse);
                 }
-                charge(budget, 2 + values.len())?;
-                Ok(Value::Array(
-                    values
-                        .iter()
-                        .map(|v| item.apply(v, budget))
-                        .collect::<Outcome<Vec<_>>>()?,
-                ))
             }
-            _ => Err(Error::UpstreamResponse),
+            Value::Object(out)
         }
-    }
-    fn apply_fields(
-        fields: &BTreeMap<String, Self>,
-        response: &Value,
-        budget: &mut usize,
-    ) -> Outcome<Value> {
-        // A small provider document can expand through repeated projections.
-        // Charge each selected copy before constructing it, reserving space
-        // for the final reply envelope and pagination metadata.
-        charge(
-            budget,
-            2 + fields.keys().map(|n| n.len() + 4).sum::<usize>(),
-        )?;
-        Ok(Value::Object(
-            fields
-                .iter()
-                .map(|(n, p)| Ok((n.clone(), p.apply(response, budget)?)))
-                .collect::<Outcome<Map<_, _>>>()?,
-        ))
-    }
+        filter::Json::Opaque => return Err(Error::UpstreamResponse),
+    })
 }
 impl Disclosure {
     pub fn parse(value: &Value, operations: &[String]) -> Outcome<Self> {
@@ -134,11 +123,15 @@ impl Disclosure {
         })
     }
     pub fn project(&self, operation: &str, response: &Value, credential: &[u8]) -> Outcome<Value> {
-        let value = Projection::apply_fields(
+        let tree = document(response);
+        let selected = filter::project_fields(
+            &tree,
             self.rules.get(operation).ok_or(Error::Denied)?,
-            response,
-            &mut (2 * 1024 * 1024 - 4096),
-        )?;
+            9,
+            2 * 1024 * 1024 - 4096,
+        )
+        .map_err(|_| Error::UpstreamResponse)?;
+        let value = render(selected.value)?;
         ensure_safe(&value, credential)?;
         let released = core::release(core::ProviderReply {
             selected: json::canonical(&value),
@@ -146,14 +139,6 @@ impl Disclosure {
         });
         json::parse(&released, 2 * 1024 * 1024).map_err(|_| Error::UpstreamResponse)
     }
-}
-fn charge(budget: &mut usize, size: usize) -> Outcome<()> {
-    *budget = budget.checked_sub(size).ok_or(Error::UpstreamResponse)?;
-    Ok(())
-}
-fn leaf(value: &Value, budget: &mut usize) -> Outcome<Value> {
-    charge(budget, json::canonical(value).len())?;
-    Ok(value.clone())
 }
 fn contains(value: &[u8], secret: &[u8]) -> bool {
     !secret.is_empty() && value.windows(secret.len()).any(|part| part == secret)

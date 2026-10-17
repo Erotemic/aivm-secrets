@@ -206,3 +206,5 @@ pub fn issue_surrogate<I: EnvelopeIssuer>(
     };
     Ok(IssuedSurrogate { claims, token })
 }
+
+pub mod disclosure;

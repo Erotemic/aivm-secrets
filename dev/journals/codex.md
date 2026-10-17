@@ -902,3 +902,54 @@ local guard theorems must not substitute for the confidentiality result the
 user wants. Native client key/CSR commands and client/policy administration are
 also unfinished, but the unrefined release/building adapters are the central
 assurance gap in this new backend.
+
+After committing the tested manifest checkpoint as 5b5ec7a, I opened an isolated
+worktree so its still-running mutation audit keeps an immutable source snapshot.
+The next stage moves recursive response selection into the extractable core.
+The recursive JSON/schema types and full filter now translate without new
+axioms. Aeneas could not join a loop that reassigned a nested shared borrow, so
+path descent uses bounded recursion; projection loops keep owned explicit
+result/budget state and have no early returns. Array iteration remains iterative
+rather than relying on Rust tail-call optimization or a large call stack. This
+is a prototype until its actual runtime adapter and structural selection / public
+view equivalence contracts are checked. No claim about the new filter should be
+inferred from the already-verified manifest guard checkpoint.
+
+The 5b5ec7a checkpoint's official mutation command finished successfully: all 70
+re-extracted Rust mutations failed unchanged proofs, including the 11 new
+manifest attacks. Its normal-service full suite, archive/twine checks and all
+187 source/proof/document archive comparisons had already passed. The active
+worktree's new filter also passes the same 65 native manifest tests. Its first
+exact field-search proof is checking; recursive lookup and complete projection
+refinement remain in progress and are not part of that committed assurance.
+
+The isolated prototype now has clean Lean checks for exact field search, ignored
+field values, bounded nested lookup, text safety, budget subtraction and byte
+cloning, plus a pure independent projection specification. Its depth-indexed
+public tree is proved injective on outputs that fit the depth bound, so later
+privacy claims cannot hide unmodeled deeper output. The array_step_contract also
+checks, conditional on the lower-fuel projection contract; this is a modular
+induction building block, not the full filter theorem. The remaining composition
+is array_from_loop/wrapper, field_step/fields_from_loop/wrapper, then projection
+induction on fuel and observable equality from the lossless public view. Do not
+claim the complete recursive filter or whole service is formally verified yet.
+
+A separate main-checkout patch canonicalizes numeric arguments/defaults/routes
+and compares numeric facts by integer value after raw -0 inputs exposed a real
+adapter bug. It adds ten tests. The same source/test changes have been copied
+into this worktree; its binaries still need rebuilding for those additions.
+The worktree also selects directly affected enrollment/authority/trust proof
+leaves before unrelated modules in the mutation gate, retaining full fallback
+coverage. The committed 70-mutant checkpoint was kept frozen during that change.
+
+Checkpoint for continuation: main is now f91c3ba after the numeric-normalization
+follow-up, with 2,083 full-suite passes/one expected skip, 246 selected passes,
+build/twine success and all 187 archive inputs matching. This isolated branch
+contains the same numeric source/test patch copied before that commit. Its
+rebuilt binaries pass all 75 manifest tests in 10.91 seconds. All current 14
+GarrettDisclosure lemmas compile with warnings as errors. The full projection
+contract/induction and its artifact inventory are intentionally unfinished; do
+not merge or describe this branch as a complete filter refinement until those
+checks, full gates and manifest/archive refresh are done. main remains the
+validated result. A future merge must preserve both journal continuations and
+regenerate assurance manifests instead of choosing stale hashes from either side.

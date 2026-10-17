@@ -377,6 +377,596 @@ def credential_use.use_credential
       grant.route
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
+/-- [aivm_secrets_garrett_core::disclosure::Json]
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 6:0-14:1
+    Visibility: public -/
+@[discriminant isize]
+inductive disclosure.Json where
+| Null : disclosure.Json
+| Boolean : Bool → disclosure.Json
+| Integer : Std.I64 → disclosure.Json
+| Text : alloc.vec.Vec Std.U8 → disclosure.Json
+| Array : alloc.vec.Vec disclosure.Json → disclosure.Json
+| Object :
+  alloc.vec.Vec ((alloc.vec.Vec Std.U8) × disclosure.Json) →
+  disclosure.Json
+| Opaque : disclosure.Json
+
+mutual
+
+/-- [aivm_secrets_garrett_core::disclosure::Field]
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 15:0-18:1
+    Visibility: public -/
+inductive disclosure.Field where
+| mk : alloc.vec.Vec Std.U8 → disclosure.Projection → disclosure.Field
+
+/-- [aivm_secrets_garrett_core::disclosure::Projection]
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 19:0-22:1
+    Visibility: public -/
+inductive disclosure.Projection where
+| mk :
+  alloc.vec.Vec (alloc.vec.Vec Std.U8) →
+  disclosure.Kind →
+  disclosure.Projection
+
+/-- [aivm_secrets_garrett_core::disclosure::Kind]
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 23:0-30:1
+    Visibility: public -/
+@[discriminant isize]
+inductive disclosure.Kind where
+| Integer : disclosure.Kind
+| Boolean : disclosure.Kind
+| Text : disclosure.Kind
+| Null : disclosure.Kind
+| Object : alloc.vec.Vec disclosure.Field → disclosure.Kind
+| Array : disclosure.Projection → Std.Usize → disclosure.Kind
+
+end
+
+def disclosure.Field.name (x : disclosure.Field) :=
+  match x with | disclosure.Field.mk x1 _ => x1
+
+def disclosure.Field.projection (x : disclosure.Field) :=
+  match x with | disclosure.Field.mk _ x1 => x1
+
+@[simp]
+theorem disclosure.Field.name._simpLemma_ («name» : alloc.vec.Vec Std.U8)
+  (projection : disclosure.Projection) :
+  (disclosure.Field.mk «name» projection).name = «name» := by rfl
+
+@[simp]
+theorem disclosure.Field.projection._simpLemma_ («name» : alloc.vec.Vec
+  Std.U8) (projection : disclosure.Projection) :
+  (disclosure.Field.mk «name» projection).projection = projection := by rfl
+
+def disclosure.Projection.at (x : disclosure.Projection) :=
+  match x with | disclosure.Projection.mk x1 _ => x1
+
+def disclosure.Projection.kind (x : disclosure.Projection) :=
+  match x with | disclosure.Projection.mk _ x1 => x1
+
+@[simp]
+theorem disclosure.Projection.at._simpLemma_ («at» : alloc.vec.Vec
+  (alloc.vec.Vec Std.U8)) (kind : disclosure.Kind) :
+  (disclosure.Projection.mk «at» kind).at = «at» := by rfl
+
+@[simp]
+theorem disclosure.Projection.kind._simpLemma_ («at» : alloc.vec.Vec
+  (alloc.vec.Vec Std.U8)) (kind : disclosure.Kind) :
+  (disclosure.Projection.mk «at» kind).kind = kind := by rfl
+
+/-- [aivm_secrets_garrett_core::disclosure::field]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 35:4-44:1
+    Visibility: public -/
+@[rust_loop]
+def disclosure.field_loop
+  (fields : alloc.vec.Vec ((alloc.vec.Vec Std.U8) × disclosure.Json))
+  («name» : alloc.vec.Vec Std.U8) (index : Std.Usize) :
+  Result (core.result.Result disclosure.Json credential_use.UseDenial)
+  := do
+  let i := alloc.vec.Vec.len fields
+  if index < i
+  then
+    let (v, j) ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        ((alloc.vec.Vec Std.U8) × disclosure.Json)) fields index
+    let b ←
+      alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8 v «name»
+    if b
+    then
+      let index1 ← index + 1#usize
+      disclosure.field_loop fields «name» index1
+    else ok (core.result.Result.Ok j)
+  else ok (core.result.Result.Err credential_use.UseDenial.Denied)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::disclosure::field]:
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 33:0-44:1
+    Visibility: public -/
+@[reducible]
+def disclosure.field
+  (fields : alloc.vec.Vec ((alloc.vec.Vec Std.U8) × disclosure.Json))
+  («name» : alloc.vec.Vec Std.U8) :
+  Result (core.result.Result disclosure.Json credential_use.UseDenial)
+  := do
+  disclosure.field_loop fields «name» 0#usize
+
+/-- [aivm_secrets_garrett_core::disclosure::lookup_from]:
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 45:0-60:1
+    Visibility: public -/
+def disclosure.lookup_from
+  (value : disclosure.Json) («at» : alloc.vec.Vec (alloc.vec.Vec Std.U8))
+  (index : Std.Usize) :
+  Result (core.result.Result disclosure.Json credential_use.UseDenial)
+  := do
+  let i := alloc.vec.Vec.len «at»
+  if index >= i
+  then ok (core.result.Result.Ok value)
+  else
+    match value with
+    | disclosure.Json.Null =>
+      ok (core.result.Result.Err credential_use.UseDenial.Denied)
+    | disclosure.Json.Boolean _ =>
+      ok (core.result.Result.Err credential_use.UseDenial.Denied)
+    | disclosure.Json.Integer _ =>
+      ok (core.result.Result.Err credential_use.UseDenial.Denied)
+    | disclosure.Json.Text _ =>
+      ok (core.result.Result.Err credential_use.UseDenial.Denied)
+    | disclosure.Json.Array _ =>
+      ok (core.result.Result.Err credential_use.UseDenial.Denied)
+    | disclosure.Json.Object fields =>
+      let v ←
+        alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+          (alloc.vec.Vec Std.U8)) «at» index
+      let r ← disclosure.field fields v
+      match r with
+      | core.result.Result.Ok child =>
+        let i1 ← index + 1#usize
+        disclosure.lookup_from child «at» i1
+      | core.result.Result.Err _ => ok r
+    | disclosure.Json.Opaque =>
+      ok (core.result.Result.Err credential_use.UseDenial.Denied)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::disclosure::lookup]:
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 61:0-66:1
+    Visibility: public -/
+def disclosure.lookup
+  (value : disclosure.Json) («at» : alloc.vec.Vec (alloc.vec.Vec Std.U8)) :
+  Result (core.result.Result disclosure.Json credential_use.UseDenial)
+  := do
+  let i := alloc.vec.Vec.len «at»
+  if i > 8#usize
+  then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+  else disclosure.lookup_from value «at» 0#usize
+
+/-- [aivm_secrets_garrett_core::disclosure::Selection]
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 68:0-71:1
+    Visibility: public -/
+structure disclosure.Selection where
+  value : disclosure.Json
+  remaining : Std.Usize
+
+/-- [aivm_secrets_garrett_core::disclosure::charge]:
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 72:0-77:1
+    Visibility: public -/
+def disclosure.charge
+  (budget : Std.Usize) (size : Std.Usize) :
+  Result (core.result.Result Std.Usize credential_use.UseDenial)
+  := do
+  if size > budget
+  then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+  else let i ← budget - size
+       ok (core.result.Result.Ok i)
+
+/-- [aivm_secrets_garrett_core::disclosure::text_safe]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 83:4-90:1
+    Visibility: public -/
+@[rust_loop]
+def disclosure.text_safe_loop
+  (value : alloc.vec.Vec Std.U8) (index : Std.Usize) : Result Bool := do
+  let i := alloc.vec.Vec.len value
+  if index < i
+  then
+    let i1 ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U8) value
+        index
+    if i1 = 0#u8
+    then ok false
+    else let index1 ← index + 1#usize
+         disclosure.text_safe_loop value index1
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::disclosure::text_safe]:
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 78:0-90:1
+    Visibility: public -/
+def disclosure.text_safe (value : alloc.vec.Vec Std.U8) : Result Bool := do
+  let i := alloc.vec.Vec.len value
+  if i > 16384#usize
+  then ok false
+  else disclosure.text_safe_loop value 0#usize
+
+mutual
+
+/-- [aivm_secrets_garrett_core::disclosure::project]:
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 92:0-138:1
+    Visibility: public -/
+def disclosure.project
+  (value : disclosure.Json) (schema : disclosure.Projection) (fuel : Std.Usize)
+  (budget : Std.Usize) :
+  Result (core.result.Result disclosure.Selection credential_use.UseDenial)
+  := do
+  if fuel = 0#usize
+  then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+  else
+    let r ← disclosure.lookup value schema.at
+    let cf ← core.result.Result.Insts.CoreOpsTry.branch r
+    match cf with
+    | core.ops.control_flow.ControlFlow.Continue val =>
+      match schema.kind with
+      | disclosure.Kind.Integer =>
+        match val with
+        | disclosure.Json.Null =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Boolean _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Integer _ =>
+          let r1 ← disclosure.charge budget 21#usize
+          let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
+          match cf1 with
+          | core.ops.control_flow.ControlFlow.Continue val1 =>
+            ok (core.result.Result.Ok { value := val, remaining := val1 })
+          | core.ops.control_flow.ControlFlow.Break residual =>
+            core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+              disclosure.Selection (core.convert.FromSame
+              credential_use.UseDenial) residual
+        | disclosure.Json.Text _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Array _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Object _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Opaque =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+      | disclosure.Kind.Boolean =>
+        match val with
+        | disclosure.Json.Null =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Boolean _ =>
+          let r1 ← disclosure.charge budget 5#usize
+          let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
+          match cf1 with
+          | core.ops.control_flow.ControlFlow.Continue val1 =>
+            ok (core.result.Result.Ok { value := val, remaining := val1 })
+          | core.ops.control_flow.ControlFlow.Break residual =>
+            core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+              disclosure.Selection (core.convert.FromSame
+              credential_use.UseDenial) residual
+        | disclosure.Json.Integer _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Text _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Array _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Object _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Opaque =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+      | disclosure.Kind.Text =>
+        match val with
+        | disclosure.Json.Null =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Boolean _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Integer _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Text v =>
+          let b ← disclosure.text_safe v
+          if b
+          then
+            let v1 ← alloc.vec.CloneVec.clone core.clone.CloneU8 v
+            let i := alloc.vec.Vec.len v
+            let i1 ← 6#usize * i
+            let i2 ← i1 + 2#usize
+            let r1 ← disclosure.charge budget i2
+            let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
+            match cf1 with
+            | core.ops.control_flow.ControlFlow.Continue val1 =>
+              ok (core.result.Result.Ok
+                { value := (disclosure.Json.Text v1), remaining := val1 })
+            | core.ops.control_flow.ControlFlow.Break residual =>
+              core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+                disclosure.Selection (core.convert.FromSame
+                credential_use.UseDenial) residual
+          else ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Array _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Object _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Opaque =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+      | disclosure.Kind.Null =>
+        match val with
+        | disclosure.Json.Null =>
+          let r1 ← disclosure.charge budget 4#usize
+          let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
+          match cf1 with
+          | core.ops.control_flow.ControlFlow.Continue val1 =>
+            ok (core.result.Result.Ok
+              { value := disclosure.Json.Null, remaining := val1 })
+          | core.ops.control_flow.ControlFlow.Break residual =>
+            core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+              disclosure.Selection (core.convert.FromSame
+              credential_use.UseDenial) residual
+        | disclosure.Json.Boolean _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Integer _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Text _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Array _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Object _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Opaque =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+      | disclosure.Kind.Object fields =>
+        match val with
+        | disclosure.Json.Null =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Boolean _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Integer _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Text _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Array _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Object _ =>
+          let i ← fuel - 1#usize
+          disclosure.project_fields val fields i budget
+        | disclosure.Json.Opaque =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+      | disclosure.Kind.Array item maximum =>
+        match val with
+        | disclosure.Json.Null =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Boolean _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Integer _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Text _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Array values =>
+          if maximum < 1#usize
+          then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+          else
+            if maximum > 1000#usize
+            then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+            else
+              let i := alloc.vec.Vec.len values
+              if i > maximum
+              then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+              else
+                let i1 ← fuel - 1#usize
+                let r1 ← disclosure.charge budget 2#usize
+                let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
+                match cf1 with
+                | core.ops.control_flow.ControlFlow.Continue val1 =>
+                  disclosure.array_from values item i1 val1 0#usize
+                    (alloc.vec.Vec.new disclosure.Json)
+                | core.ops.control_flow.ControlFlow.Break residual =>
+                  core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+                    disclosure.Selection (core.convert.FromSame
+                    credential_use.UseDenial) residual
+        | disclosure.Json.Object _ =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+        | disclosure.Json.Opaque =>
+          ok (core.result.Result.Err credential_use.UseDenial.Denied)
+    | core.ops.control_flow.ControlFlow.Break residual =>
+      core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+        disclosure.Selection (core.convert.FromSame credential_use.UseDenial)
+        residual
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::disclosure::array_step]:
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 139:0-149:1
+    Visibility: public -/
+def disclosure.array_step
+  (value : disclosure.Json) (schema : disclosure.Projection) (fuel : Std.Usize)
+  (budget : Std.Usize) (out : alloc.vec.Vec disclosure.Json) :
+  Result (core.result.Result ((alloc.vec.Vec disclosure.Json) × Std.Usize)
+    credential_use.UseDenial)
+  := do
+  let r ← disclosure.charge budget 1#usize
+  let cf ← core.result.Result.Insts.CoreOpsTry.branch r
+  match cf with
+  | core.ops.control_flow.ControlFlow.Continue val =>
+    let r1 ← disclosure.project value schema fuel val
+    let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
+    match cf1 with
+    | core.ops.control_flow.ControlFlow.Continue val1 =>
+      let out1 ← alloc.vec.Vec.push out val1.value
+      ok (core.result.Result.Ok (out1, val1.remaining))
+    | core.ops.control_flow.ControlFlow.Break residual =>
+      core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+        ((alloc.vec.Vec disclosure.Json) × Std.Usize) (core.convert.FromSame
+        credential_use.UseDenial) residual
+  | core.ops.control_flow.ControlFlow.Break residual =>
+    core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+      ((alloc.vec.Vec disclosure.Json) × Std.Usize) (core.convert.FromSame
+      credential_use.UseDenial) residual
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::disclosure::array_from]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 159:4-165:5
+    Visibility: public -/
+@[rust_loop]
+def disclosure.array_from_loop
+  (values : alloc.vec.Vec disclosure.Json) (schema : disclosure.Projection)
+  (fuel : Std.Usize) (index : Std.Usize)
+  (state : core.result.Result ((alloc.vec.Vec disclosure.Json) × Std.Usize)
+  credential_use.UseDenial) :
+  Result (core.result.Result ((alloc.vec.Vec disclosure.Json) × Std.Usize)
+    credential_use.UseDenial)
+  := do
+  let i := alloc.vec.Vec.len values
+  if index < i
+  then
+    let state1 ←
+      match state with
+      | core.result.Result.Ok p =>
+        do
+        let (out, remaining) := p
+        let j ←
+          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+            disclosure.Json) values index
+        disclosure.array_step j schema fuel remaining out
+      | core.result.Result.Err _ => ok state
+    let index1 ← index + 1#usize
+    disclosure.array_from_loop values schema fuel index1 state1
+  else ok state
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::disclosure::array_from]:
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 150:0-173:1
+    Visibility: public -/
+def disclosure.array_from
+  (values : alloc.vec.Vec disclosure.Json) (schema : disclosure.Projection)
+  (fuel : Std.Usize) (budget : Std.Usize) (index : Std.Usize)
+  (out : alloc.vec.Vec disclosure.Json) :
+  Result (core.result.Result disclosure.Selection credential_use.UseDenial)
+  := do
+  let state ←
+    disclosure.array_from_loop values schema fuel index (core.result.Result.Ok
+      (out, budget))
+  match state with
+  | core.result.Result.Ok p =>
+    let (out1, remaining) := p
+    ok (core.result.Result.Ok
+      { value := (disclosure.Json.Array out1), remaining })
+  | core.result.Result.Err error => ok (core.result.Result.Err error)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::disclosure::field_step]:
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 174:0-192:1
+    Visibility: public -/
+def disclosure.field_step
+  (value : disclosure.Json) (field : disclosure.Field) (fuel : Std.Usize)
+  (budget : Std.Usize)
+  (out : alloc.vec.Vec ((alloc.vec.Vec Std.U8) × disclosure.Json)) :
+  Result (core.result.Result ((alloc.vec.Vec ((alloc.vec.Vec Std.U8) ×
+    disclosure.Json)) × Std.Usize) credential_use.UseDenial)
+  := do
+  let i := alloc.vec.Vec.len field.name
+  if i > 64#usize
+  then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+  else
+    let i1 := alloc.vec.Vec.len field.name
+    let i2 ← 6#usize * i1
+    let i3 ← i2 + 4#usize
+    let r ← disclosure.charge budget i3
+    let cf ← core.result.Result.Insts.CoreOpsTry.branch r
+    match cf with
+    | core.ops.control_flow.ControlFlow.Continue val =>
+      let r1 ← disclosure.project value field.projection fuel val
+      let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
+      match cf1 with
+      | core.ops.control_flow.ControlFlow.Continue val1 =>
+        let v ← alloc.vec.CloneVec.clone core.clone.CloneU8 field.name
+        let out1 ← alloc.vec.Vec.push out (v, val1.value)
+        ok (core.result.Result.Ok (out1, val1.remaining))
+      | core.ops.control_flow.ControlFlow.Break residual =>
+        core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+          ((alloc.vec.Vec ((alloc.vec.Vec Std.U8) × disclosure.Json)) ×
+          Std.Usize) (core.convert.FromSame credential_use.UseDenial) residual
+    | core.ops.control_flow.ControlFlow.Break residual =>
+      core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+        ((alloc.vec.Vec ((alloc.vec.Vec Std.U8) × disclosure.Json)) ×
+        Std.Usize) (core.convert.FromSame credential_use.UseDenial) residual
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::disclosure::fields_from]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 202:4-208:5
+    Visibility: public -/
+@[rust_loop]
+def disclosure.fields_from_loop
+  (value : disclosure.Json) (fields : alloc.vec.Vec disclosure.Field)
+  (fuel : Std.Usize) (index : Std.Usize)
+  (state : core.result.Result ((alloc.vec.Vec ((alloc.vec.Vec Std.U8) ×
+  disclosure.Json)) × Std.Usize) credential_use.UseDenial) :
+  Result (core.result.Result ((alloc.vec.Vec ((alloc.vec.Vec Std.U8) ×
+    disclosure.Json)) × Std.Usize) credential_use.UseDenial)
+  := do
+  let i := alloc.vec.Vec.len fields
+  if index < i
+  then
+    let state1 ←
+      match state with
+      | core.result.Result.Ok p =>
+        do
+        let (out, remaining) := p
+        let f ←
+          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+            disclosure.Field) fields index
+        disclosure.field_step value f fuel remaining out
+      | core.result.Result.Err _ => ok state
+    let index1 ← index + 1#usize
+    disclosure.fields_from_loop value fields fuel index1 state1
+  else ok state
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::disclosure::fields_from]:
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 193:0-216:1
+    Visibility: public -/
+def disclosure.fields_from
+  (value : disclosure.Json) (fields : alloc.vec.Vec disclosure.Field)
+  (fuel : Std.Usize) (budget : Std.Usize) (index : Std.Usize)
+  (out : alloc.vec.Vec ((alloc.vec.Vec Std.U8) × disclosure.Json)) :
+  Result (core.result.Result disclosure.Selection credential_use.UseDenial)
+  := do
+  let state ←
+    disclosure.fields_from_loop value fields fuel index (core.result.Result.Ok
+      (out, budget))
+  match state with
+  | core.result.Result.Ok p =>
+    let (out1, remaining) := p
+    ok (core.result.Result.Ok
+      { value := (disclosure.Json.Object out1), remaining })
+  | core.result.Result.Err error => ok (core.result.Result.Err error)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::disclosure::project_fields]:
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 219:0-229:1
+    Visibility: public -/
+def disclosure.project_fields
+  (value : disclosure.Json) (fields : alloc.vec.Vec disclosure.Field)
+  (fuel : Std.Usize) (budget : Std.Usize) :
+  Result (core.result.Result disclosure.Selection credential_use.UseDenial)
+  := do
+  let i := alloc.vec.Vec.len fields
+  if i = 0#usize
+  then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+  else
+    let i1 := alloc.vec.Vec.len fields
+    if i1 > 32#usize
+    then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+    else
+      let r ← disclosure.charge budget 2#usize
+      let cf ← core.result.Result.Insts.CoreOpsTry.branch r
+      match cf with
+      | core.ops.control_flow.ControlFlow.Continue val =>
+        disclosure.fields_from value fields fuel val 0#usize (alloc.vec.Vec.new
+          ((alloc.vec.Vec Std.U8) × disclosure.Json))
+      | core.ops.control_flow.ControlFlow.Break residual =>
+        core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+          disclosure.Selection (core.convert.FromSame credential_use.UseDenial)
+          residual
+partial_fixpoint
+
+end
+
 /-- [aivm_secrets_garrett_core::enrollment::EnrollmentDenial]
     Source: 'crates/aivm-secrets-garrett-core/src/enrollment.rs', lines 5:0-10:1
     Visibility: public -/

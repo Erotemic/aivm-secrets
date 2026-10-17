@@ -319,6 +319,7 @@ def extract(destination: Path, rust_root: Path | None = None) -> Path:
             "-backend",
             "lean",
             "-no-progress-bar",
+            "-loops-to-rec",
             "-abort-on-error",
             "-warnings-as-errors",
             "-dest",
@@ -1002,9 +1003,12 @@ def mutate() -> None:
                 "GarrettLogin",
                 "GarrettManifest",
             ]
-            # The new leaf proofs depend only on Garrett. Check the directly
-            # affected leaf first, without rebuilding unrelated proof modules.
+            # These leaf proofs depend only on Garrett. Check the directly
+            # affected leaf first; retain all other modules as fallback coverage.
             preferred = {
+                "enrollment.rs": "GarrettEnrollment",
+                "authority.rs": "GarrettAuthority",
+                "trust.rs": "GarrettTrust",
                 "oauth_state.rs": "GarrettOAuth",
                 "oauth_login.rs": "GarrettLogin",
             }.get(source.name)
