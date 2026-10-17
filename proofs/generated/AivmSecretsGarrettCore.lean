@@ -161,6 +161,41 @@ def authority.commit_change
   | core.result.Result.Err _ =>
     ok (core.result.Result.Err authority.CommitDenial.Unpublished)
 
+/-- [aivm_secrets_garrett_core::client_material::PublishFailure]
+    Source: 'crates/aivm-secrets-garrett-core/src/client_material.rs', lines 4:0-7:1
+    Visibility: public -/
+@[discriminant isize]
+inductive client_material.PublishFailure where
+| Unpublished : client_material.PublishFailure
+| OutcomeUnknown : client_material.PublishFailure
+
+/-- Trait declaration: [aivm_secrets_garrett_core::client_material::RequestStore]
+    Source: 'crates/aivm-secrets-garrett-core/src/client_material.rs', lines 8:0-11:1
+    Visibility: public -/
+structure client_material.RequestStore (Self : Type _) where
+  write_key : Self → Result (core.result.Result Unit
+    client_material.PublishFailure)
+  write_csr : Self → Result (core.result.Result Unit
+    client_material.PublishFailure)
+
+/-- [aivm_secrets_garrett_core::client_material::publish_request]:
+    Source: 'crates/aivm-secrets-garrett-core/src/client_material.rs', lines 12:0-21:1
+    Visibility: public -/
+def client_material.publish_request
+  {S : Type _} (RequestStoreInst : client_material.RequestStore S) (store : S)
+  :
+  Result (core.result.Result Unit client_material.PublishFailure)
+  := do
+  let r ← RequestStoreInst.write_key store
+  match r with
+  | core.result.Result.Ok _ =>
+    let r1 ← RequestStoreInst.write_csr store
+    match r1 with
+    | core.result.Result.Ok _ => ok (core.result.Result.Ok ())
+    | core.result.Result.Err _ =>
+      ok (core.result.Result.Err client_material.PublishFailure.OutcomeUnknown)
+  | core.result.Result.Err _ => ok r
+
 /-- [aivm_secrets_garrett_core::credential_use::UseDenial]
     Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 5:0-9:1
     Visibility: public -/

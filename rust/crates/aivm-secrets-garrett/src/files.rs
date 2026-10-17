@@ -135,6 +135,11 @@ impl PrivateDirectory {
         }
         Ok(())
     }
+    pub(crate) fn same_inode(&self, other: &Self) -> Outcome<bool> {
+        let a = self.0.metadata().map_err(|_| Error::UnsafeFile)?;
+        let b = other.0.metadata().map_err(|_| Error::UnsafeFile)?;
+        Ok(a.dev() == b.dev() && a.ino() == b.ino())
+    }
     pub(crate) fn child(&self, name: &str) -> Outcome<Self> {
         Self::name(name)?;
         let file = fs::File::from(

@@ -1,4 +1,5 @@
-import Garrett
+import AivmSecretsGarrettCore
+import GarrettFoundation
 
 open Aeneas Aeneas.Std
 open aivm_secrets_garrett_core.Proofs

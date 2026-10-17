@@ -1,3 +1,4 @@
+import GarrettClientMaterial
 import GarrettReflection
 import GarrettDisclosure
 import GarrettManifest
@@ -220,3 +221,11 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.reflection.Proofs.reflected_credential_is_detected
 #print axioms aivm_secrets_garrett_core.reflection.Proofs.false_search_excludes_literal
 #print axioms aivm_secrets_garrett_core.reflection.Proofs.nonempty_self_is_detected
+
+#print axioms aivm_secrets_garrett_core.client_material.Proofs.publish_request_contract
+#print axioms aivm_secrets_garrett_core.client_material.Proofs.failed_key_never_reaches_csr
+#print axioms aivm_secrets_garrett_core.client_material.Proofs.failed_key_is_csr_independent
+#print axioms aivm_secrets_garrett_core.client_material.Proofs.csr_failure_retains_uncertainty
+#print axioms aivm_secrets_garrett_core.client_material.Proofs.key_uncertainty_is_not_erased
+#print axioms aivm_secrets_garrett_core.client_material.Proofs.success_requires_both_acknowledgements
+#print axioms aivm_secrets_garrett_core.client_material.Proofs.successful_request_witness

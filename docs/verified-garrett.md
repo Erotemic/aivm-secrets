@@ -84,7 +84,7 @@ observational equivalence, hide metadata/length/timing, or refine the entire
 Rust I/O system into the symbolic trace. Concrete cryptographic primitives,
 TLS/X.509, parser, filesystem, compiler and translation are trusted boundaries.
 
-The manifest now declares **198 named obligations**, including supporting lemmas,
+The manifest now declares **205 named obligations**, including supporting lemmas,
 the [credential-use/release contracts](verified-provider.md) and the
 [composed request controller](verified-composition.md). The composition checks
 authenticated opening, current inner authorization, exact audit acknowledgement
@@ -107,7 +107,7 @@ issuer and time binding, one-shot claim/exchange transitions, terminal-state
 replay rejection and successful-acquisition witnesses.
 Every transitive axiom dependency is checked afresh. Only Lean's `propext`,
 `Classical.choice`, and `Quot.sound` are permitted; no admitted proof or
-project-specific security axiom is allowed. Eighty-five deliberate changes to actual
+project-specific security axiom is allowed. Ninety deliberate changes to actual
 Rust must break the unchanged extracted proofs: missing certificate binding,
 missing epoch binding, inclusive expiry, inactive issuance, bypassing binding
 before decryption, returning a token without sealing, removing inner binding,
@@ -770,3 +770,8 @@ service-history theorem. The extracted request composition does not establish
 that whole-service result.
 The full Rust primitive-runner gate also remains pending. Passing enumerated
 parity cases is not a proof of Python/Rust equivalence on all inputs.
+
+The [native client material workflow](verified-client-material.md) now provides
+explicit software key/CSR generation, CSR inspection and recovery from a retained
+key. Its extracted publication controller checks ordered acknowledgement and
+uncertain outcomes. These software commands provide no TPM or VM attestation.

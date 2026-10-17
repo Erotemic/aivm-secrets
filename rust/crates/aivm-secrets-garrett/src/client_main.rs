@@ -1,5 +1,5 @@
 //! One foreground call using an explicitly configured client identity.
-use aivm_secrets_garrett::{client, files, json, tpm, Error, Outcome};
+use aivm_secrets_garrett::{client, client_material, files, json, tpm, Error, Outcome};
 use std::{
     io::{Read, Write},
     path::Path,
@@ -79,14 +79,43 @@ fn call(path: &Path) -> Outcome<serde_json::Value> {
         &frame,
     )
 }
+fn local_action(action: &str, args: &[String]) -> Outcome<serde_json::Value> {
+    let mut options = std::collections::BTreeMap::new();
+    if !args.len().is_multiple_of(2) {
+        return Err(Error::InvalidRequest);
+    }
+    for pair in args.as_chunks::<2>().0 {
+        if options.insert(pair[0].as_str(), pair[1].as_str()).is_some() {
+            return Err(Error::InvalidRequest);
+        }
+    }
+    let csr = options.get("--csr").ok_or(Error::InvalidRequest)?;
+    if action == "inspect-csr" && options.len() == 1 {
+        return client_material::inspect_csr(Path::new(csr));
+    }
+    if options.len() != 3 || options.get("--key-mode") != Some(&"software") {
+        return Err(Error::InvalidRequest);
+    }
+    let key = options.get("--key").ok_or(Error::InvalidRequest)?;
+    match action {
+        "request" => client_material::request(Path::new(key), Path::new(csr)),
+        "csr-from-key" => client_material::csr_from_key(Path::new(key), Path::new(csr)),
+        _ => Err(Error::InvalidRequest),
+    }
+}
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.as_slice() == ["--help"] {
-        println!("garrett-client --config ABSOLUTE_PRIVATE_JSON\nRead one version-1 broker frame from stdin; return the public reply.\nSelect key_mode software or tpm2 explicitly; no automatic fallback. TPM provenance must be enrolled separately.");
+        println!("garrett-client --config ABSOLUTE_PRIVATE_JSON\nRead one version-1 broker frame from stdin; return the public reply.\nSelect key_mode software or tpm2 explicitly; no automatic fallback. TPM provenance must be enrolled separately.\n\ngarrett-client request --key-mode software --key ABSOLUTE_NEW_KEY --csr ABSOLUTE_NEW_CSR\ngarrett-client csr-from-key --key-mode software --key ABSOLUTE_EXISTING_KEY --csr ABSOLUTE_NEW_CSR\ngarrett-client inspect-csr --csr ABSOLUTE_CSR\nSoftware request generation creates an exportable key and provides no VM attestation. Existing files are never replaced. If publication is uncertain, retain the key and inspect/recover its CSR.");
         return;
     }
     let result = if args.len() == 2 && args[0] == "--config" {
         call(Path::new(&args[1]))
+    } else if let Some(action) = args
+        .first()
+        .filter(|s| matches!(s.as_str(), "request" | "csr-from-key" | "inspect-csr"))
+    {
+        local_action(action, &args[1..])
     } else {
         Err(Error::InvalidRequest)
     };

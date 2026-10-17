@@ -267,6 +267,16 @@ THEOREMS += [
     "aivm_secrets_garrett_core.reflection.Proofs.nonempty_self_is_detected",
 ]
 
+THEOREMS += [
+    "aivm_secrets_garrett_core.client_material.Proofs.publish_request_contract",
+    "aivm_secrets_garrett_core.client_material.Proofs.failed_key_never_reaches_csr",
+    "aivm_secrets_garrett_core.client_material.Proofs.failed_key_is_csr_independent",
+    "aivm_secrets_garrett_core.client_material.Proofs.csr_failure_retains_uncertainty",
+    "aivm_secrets_garrett_core.client_material.Proofs.key_uncertainty_is_not_erased",
+    "aivm_secrets_garrett_core.client_material.Proofs.success_requires_both_acknowledgements",
+    "aivm_secrets_garrett_core.client_material.Proofs.successful_request_witness",
+]
+
 TESTS = [
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
@@ -279,6 +289,7 @@ TESTS = [
     "tests/test_rust_garrett_login.py",
     "tests/test_rust_garrett_manifest.py",
     "tests/test_rust_garrett_reflection.py",
+    "tests/test_rust_garrett_client_material.py",
     "tests/test_secrets_garrett_modularity.py",
     "tests/test_secrets_identity_parity.py",
     "tests/test_secrets_identity_registry_parity.py",
@@ -319,6 +330,7 @@ def inputs() -> list[str]:
         "proofs/manifest.json",
         "proofs/generated/AivmSecretsGarrettCore.lean",
         "proofs/Garrett.lean",
+        "proofs/GarrettFoundation.lean",
         "proofs/GarrettSecrecy.lean",
         "proofs/GarrettCheck.lean",
         "proofs/GarrettProtocol.lean",
@@ -331,6 +343,7 @@ def inputs() -> list[str]:
         "proofs/GarrettManifest.lean",
         "proofs/GarrettDisclosure.lean",
         "proofs/GarrettReflection.lean",
+        "proofs/GarrettClientMaterial.lean",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
         "dev/verification/freshness.py",
@@ -510,7 +523,7 @@ def assurance_coordinates() -> dict:
         "aeneas_release": base.RELEASE,
         "theorems": THEOREMS,
         "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
-        "implementation_linked": "Aeneas-generated issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search",
+        "implementation_linked": "Aeneas-generated issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
@@ -531,6 +544,7 @@ def assurance_coordinates() -> dict:
             "OAuth quarantine and successor persistence are conditional storage-adapter contracts. Native vault locking drains participating refresh/revoke against dispatch and HMAC checks token equality; root snapshot rollback, hostile same-UID replacement and nonparticipating writers are outside that boundary.",
             "Native PKCE login trusts entropy, SHA-256 S256 derivation, HTTP/query decoding and loopback listener/clock adapters. Callback binding and one-shot lifecycle guards are extracted; ready URLs go only to a trusted host operator/browser, and their state/challenge must not be offered as an agent API. Concrete acquisition I/O histories and secret-sink refinement remain open.",
             "The manifest HTTPS backend trusts the policy/check/template/GraphQL parsers, JSON-to-typed-tree conversion and selected-tree rendering, reflection traversal/call sites and concrete HTTP/audit ordering. Exact borrowed-byte literal search is extracted and proved. The extracted recursive filter matches an independent selection specification and has exact two-run noninterference under recursive schema agreement; unselected typed-tree fields are unconstrained. These contracts do not refine the remaining adapters or establish arbitrary provider non-disclosure or whole-service trace equivalence. Native configuration explicitly selects unbounded requests and a file source or explicit OAuth override.",
+            "Native software client bootstrap trusts entropy, P-256/CSR/SPKI adapters and held-directory no-replace file publication/durability. The extracted controller proves key acknowledgement before CSR publication and conservative uncertainty; it does not prove the filesystem, private-key memory erasure, signing or CLI I/O. Existing material is never automatically replaced or adopted, and software requests assert no TPM or VM provenance.",
             "Controller histories assume signature verification has prior recorded issuer origin; the ideal signature-origin theorem does not establish a computational byte-level or concrete I/O refinement.",
             "CSR possession, CA constraints/key matching and X.509 signing use the stated rcgen/x509-parser/time adapter contracts; their ASN.1/crypto implementations are not formally refined. TPM approval consumes verified fresh evidence under a trusted AK pin.",
         ],
@@ -539,7 +553,7 @@ def assurance_coordinates() -> dict:
             "Formal refinement of JSON, TLS, X.509, crypto, TPM evidence, HTTP and filesystem adapter implementations",
             "Physical TPM provenance, EK activation, PCR/firmware policy and anti-rollback deployment",
             "Provider non-disclosure, host compromise, snapshot rollback and side channels",
-            "Complete Rust policy/credential administration, client aliases, command resolvers, approvals/delegation and concrete storage/concurrent-history refinement",
+            "Complete Rust policy/credential administration, client aliases, command resolvers, approvals/delegation, TPM material provisioning and concrete storage/concurrent-history refinement",
         ],
     }
 
@@ -1092,6 +1106,39 @@ def mutate() -> None:
             "start += 2;",
         ),
     ]
+    material_source = source.with_name("client_material.rs")
+    mutations += [
+        (
+            material_source,
+            "client key publication bypassed",
+            "match store.write_key() {",
+            "match Ok::<(), PublishFailure>(()) {",
+        ),
+        (
+            material_source,
+            "client key uncertainty erased",
+            "Err(error) => return Err(error),",
+            "Err(_) => return Err(PublishFailure::Unpublished),",
+        ),
+        (
+            material_source,
+            "client CSR failure reported unchanged",
+            "Err(_) => Err(PublishFailure::OutcomeUnknown),",
+            "Err(_) => Err(PublishFailure::Unpublished),",
+        ),
+        (
+            material_source,
+            "client CSR failure reported successful",
+            "Err(_) => Err(PublishFailure::OutcomeUnknown),",
+            "Err(_) => Ok(()),",
+        ),
+        (
+            material_source,
+            "client CSR published before private key",
+            "match store.write_key() {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }\n    match store.write_csr() {",
+            "match store.write_csr() {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }\n    match store.write_key() {",
+        ),
+    ]
     lean_path = base.run(
         [base.executable("lake"), "env", "printenv", "LEAN_PATH"],
         cwd=PROOFS,
@@ -1156,9 +1203,11 @@ def mutate() -> None:
                 "GarrettManifest",
                 "GarrettDisclosure",
                 "GarrettReflection",
+                "GarrettClientMaterial",
             ]
-            # These leaf proofs depend only on Garrett. Check the directly
-            # affected leaf first; retain all other modules as fallback coverage.
+            # These leaves import the extracted crate plus generic standard-
+            # model facts. Check the affected leaf first; keep full fallback
+            # coverage and dependency order for all other protocol modules.
             preferred = {
                 "enrollment.rs": "GarrettEnrollment",
                 "authority.rs": "GarrettAuthority",
@@ -1166,10 +1215,11 @@ def mutate() -> None:
                 "oauth_state.rs": "GarrettOAuth",
                 "oauth_login.rs": "GarrettLogin",
                 "reflection.rs": "GarrettReflection",
+                "client_material.rs": "GarrettClientMaterial",
             }.get(source.name)
             if preferred:
                 modules.remove(preferred)
-                modules.insert(1, preferred)
+                modules.insert(0, preferred)
             if source.name == "manifest.rs":
                 modules.remove("GarrettLogin")
                 modules.remove("GarrettManifest")

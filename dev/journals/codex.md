@@ -1145,3 +1145,36 @@ feature modes. The official 85-mutation run is now active against this frozen
 controller/proof snapshot. I will run the full suite with normal service binaries
 and build the archives before merging. Native client bootstrap will proceed in
 another worktree, preserving the snapshot under audit.
+
+## 2026-10-17 06:52:42 -0400
+
+Starting native client bootstrap separately from the frozen reflection audit.
+The implementation will preserve the P-256 CSR/fingerprint contract and require
+explicit software mode. The main risk is partial two-file publication: key and
+CSR paths cannot be atomically renamed together. I will publish the private key
+first through held private directories, refuse replacement, classify any later
+failure as uncertain, and provide CSR regeneration from the retained key. A small
+extracted controller will make the ordered acknowledgements and uncertainty
+rules reviewable. Cryptographic generation/signing and filesystem durability
+remain explicit adapters; a software request must never acquire a TPM label.
+
+All 19 bootstrap tests pass, including a full native authority/TLS/provider path,
+Python-generated key recovery, actual file-size failures, concurrent publication,
+and unsafe/wrong-algorithm recovery rejection. All seven publication lemmas check
+with warnings as errors. The generic byte-equality/total-return facts now live
+in GarrettFoundation and retain their exact names and proof bodies; that module
+imports only Aeneas, not the extracted crate. Affected leaf proofs import the
+actual extracted crate plus that immutable standard-model foundation. The gate
+can check those leaves before unrelated protocol proofs while retaining full
+fallback/dependency coverage. Manifest proofs retain their explicit Garrett
+import for current-grant contracts. The complete default proof build passed
+before refreshing the shared toolchain/freshness coordinates. The expanded
+Garrett record gate is running now; nothing is merged into main from this branch.
+
+The complete record gate passes: all 205 named obligations have only allowed
+standard axioms, all 273 selected tests pass in 45.20 seconds, strict Rust lint
+passes in both feature modes, and six Rust unit checks pass. The 90-mutation
+run is now active, including five publication attacks and the existing search,
+disclosure and protocol challenges. The default build validates every proof
+module after the Foundation import refactor. I am freezing source/proof inputs
+for this audit before normal-service full-suite and package checks.
