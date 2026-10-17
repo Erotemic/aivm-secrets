@@ -1,9 +1,14 @@
 # W4 — extracted-controller trace-confinement candidate
 
-**Status (2026-10-17): Candidate Lean source is authored; only source and
-structural checks ran in the overlay environment. The pinned Lean toolchain
-was unavailable, so the new theorems have **not** been kernel-checked. The W4
-exit gate and full SINK-01/TRACE-01 claim remain **open**.**
+**Status (2026-10-17): W4 remains a candidate, not a verified theorem set.**
+The first maintainer Lean run successfully built the existing Garrett proof
+suite but failed in `GarrettConfinement.lean`: `unit` was rejected as a local
+constructor-like name, and `prefix` was parsed as a Lean keyword. The latter
+caused downstream unsolved goals and `sorryAx` dependencies. The follow-up
+repair renames those local bindings and refreshes the W4 proof fingerprint.
+The repaired Lean file has **not** yet passed the pinned kernel gate in the
+overlay environment; the W4 exit gate and whole-service SINK-01/TRACE-01
+claim remain **open**.
 
 This file documents exactly what the added model would establish after Lean
 accepts it and what must still be connected to real native service I/O.
