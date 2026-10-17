@@ -1,5 +1,10 @@
 //! Foreground Rust mTLS bridge; host configuration is a private local file.
-use aivm_secrets_garrett::{crypto::Verifier, files, json, model::Registry, tls, Error, Outcome};
+use aivm_secrets_garrett::{
+    crypto::{Issuer, Verifier},
+    files, json,
+    model::Registry,
+    tls, Error, Outcome,
+};
 use serde_json::Value;
 use std::{
     fs,
@@ -14,7 +19,9 @@ use std::{
 };
 
 fn field<'a>(m: &'a serde_json::Map<String, Value>, key: &str) -> Outcome<&'a str> {
-    m[key].as_str().ok_or(Error::InvalidCapability)
+    m.get(key)
+        .and_then(Value::as_str)
+        .ok_or(Error::InvalidCapability)
 }
 fn unhex(s: &str) -> Outcome<Vec<u8>> {
     if s.len() != 64
@@ -61,16 +68,22 @@ fn serve(path: &Path, maximum: Option<usize>) -> Outcome<()> {
             "issuer",
             "audience",
             "listen",
-            "broker_socket",
             "registry_path",
             "server_certificate",
             "server_key",
             "client_ca",
-            "public_key_hex",
             "encryption_key_file",
             "kid",
         ],
-        &["subject"],
+        &[
+            "subject",
+            "broker_socket",
+            "public_key_hex",
+            "provider",
+            "signing_key_file",
+            "binding",
+            "lifetime",
+        ],
     )?;
     json::integer(&m["schema"], 1, 1)?;
     let issuer = field(m, "issuer")?;
@@ -87,7 +100,7 @@ fn serve(path: &Path, maximum: Option<usize>) -> Outcome<()> {
         Path::new(field(m, "encryption_key_file")?),
         32,
     )?);
-    let verifier = Verifier::new(&unhex(field(m, "public_key_hex")?)?, &key, field(m, "kid")?)?;
+
     let private = zeroize::Zeroizing::new(files::read_private(
         Path::new(field(m, "server_key")?),
         1048576,
@@ -105,7 +118,55 @@ fn serve(path: &Path, maximum: Option<usize>) -> Outcome<()> {
                 .ok_or(Error::InvalidCapability)
         })
         .transpose()?;
-    let bridge = Arc::new(
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| Error::InternalError)?
+        .as_secs() as i64;
+    let mut announcement = serde_json::json!({"version":1,"ready":true});
+    let bridge = if let Some(provider_config) = m.get("provider") {
+        if m.contains_key("broker_socket") || m.contains_key("public_key_hex") {
+            return Err(Error::InvalidCapability);
+        }
+        let seed = zeroize::Zeroizing::new(files::read_private(
+            Path::new(field(m, "signing_key_file")?),
+            32,
+        )?);
+        let signer = Issuer::new(&seed, &key, field(m, "kid")?)?;
+        let verifier = Verifier::new(signer.public_key(), &key, field(m, "kid")?)?;
+        let lifetime = json::integer(m.get("lifetime").ok_or(Error::InvalidCapability)?, 1, 3600)?;
+        let provider = aivm_secrets_garrett::ProviderSession::start(
+            provider_config,
+            m.get("binding").ok_or(Error::InvalidCapability)?,
+            now,
+            lifetime,
+        )?;
+        let issued = provider.issue(
+            &signer,
+            &registry,
+            issuer,
+            audience,
+            field(m, "subject")?,
+            now,
+            lifetime,
+        )?;
+        announcement = serde_json::json!({"version":1,"ready":true,"profile":"account-status-v1","capability":std::str::from_utf8(&issued.token).map_err(|_|Error::InternalError)?,"expires_at":issued.claims.expires_at});
+        tls::Bridge::new_provider(
+            tls,
+            verifier,
+            registry,
+            issuer.to_owned(),
+            audience.to_owned(),
+            subject,
+            provider,
+        )?
+    } else {
+        if ["signing_key_file", "binding", "lifetime"]
+            .iter()
+            .any(|k| m.contains_key(*k))
+        {
+            return Err(Error::InvalidCapability);
+        }
+        let verifier = Verifier::new(&unhex(field(m, "public_key_hex")?)?, &key, field(m, "kid")?)?;
         tls::Bridge::new(
             tls,
             verifier,
@@ -115,8 +176,8 @@ fn serve(path: &Path, maximum: Option<usize>) -> Outcome<()> {
             subject,
             PathBuf::from(field(m, "broker_socket")?),
         )?
-        .with_registry_file(PathBuf::from(field(m, "registry_path")?))?,
-    );
+    };
+    let bridge = Arc::new(bridge.with_registry_file(PathBuf::from(field(m, "registry_path")?))?);
     let listen = PathBuf::from(field(m, "listen")?);
     files::private_directory(listen.parent().ok_or(Error::UnsafeFile)?)?;
     let listener = UnixListener::bind(&listen).map_err(|_| Error::UnsafeFile)?;
@@ -148,7 +209,10 @@ fn serve(path: &Path, maximum: Option<usize>) -> Outcome<()> {
             });
         }));
     }
-    println!("{{\"version\":1,\"ready\":true}}");
+    io::stdout()
+        .write_all(&json::canonical(&announcement))
+        .and_then(|_| io::stdout().write_all(b"\n"))
+        .map_err(|_| Error::InternalError)?;
     io::stdout().flush().map_err(|_| Error::InternalError)?;
     for (count, accepted) in listener.incoming().enumerate() {
         let socket = accepted.map_err(|_| Error::InternalError)?;
@@ -166,7 +230,7 @@ fn serve(path: &Path, maximum: Option<usize>) -> Outcome<()> {
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.as_slice() == ["--help"] {
-        println!("garrett-bridge --config ABSOLUTE_PRIVATE_JSON [--max-connections N]\nExperimental Rust certificate-bound bridge to a host broker.sock.\nRuns in the foreground; requires TLS 1.3 client authentication.");
+        println!("garrett-bridge --config ABSOLUTE_PRIVATE_JSON [--max-connections N]\nExperimental Rust certificate-bound bridge or explicit account-status-v1 provider session.\nRuns in the foreground; requires TLS 1.3 client authentication.");
         return;
     }
     let result = (|| {

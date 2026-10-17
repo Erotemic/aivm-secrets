@@ -19,6 +19,7 @@ import freshness as base
 ROOT = base.ROOT
 PROOFS = base.PROOFS
 MANIFEST = PROOFS / "garrett-manifest.json"
+PROFILES = ["nested-bridge-v1", "account-status-v1"]
 THEOREMS = [
     "aivm_secrets_garrett_core.Proofs.bytes_ne_spec",
     "aivm_secrets_garrett_core.Proofs.issue_contract",
@@ -44,9 +45,23 @@ THEOREMS = [
     "Garrett.Protocol.every_trace_observation_safe",
     "Garrett.Protocol.all_traces_preserve_credential_secrecy",
 ]
+THEOREMS += [
+    "aivm_secrets_garrett_core.credential_use.Proofs.require_use_current_contract",
+    "aivm_secrets_garrett_core.credential_use.Proofs.authorize_use_contract",
+    "aivm_secrets_garrett_core.credential_use.Proofs.release_reply_exact",
+    "aivm_secrets_garrett_core.credential_use.Proofs.release_noninterference",
+    "aivm_secrets_garrett_core.credential_use.Proofs.authorize_use_exact",
+    "aivm_secrets_garrett_core.credential_use.Proofs.credential_use_contract",
+    "aivm_secrets_garrett_core.credential_use.Proofs.inactive_grant_never_executes",
+    "aivm_secrets_garrett_core.credential_use.Proofs.unauthorized_operation_never_executes",
+    "aivm_secrets_garrett_core.credential_use.Proofs.credential_use_successful",
+    "aivm_secrets_garrett_core.credential_use.Proofs.credential_use_noninterference",
+]
+
 TESTS = [
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
+    "tests/test_rust_garrett_provider.py",
     "tests/test_secrets_garrett_modularity.py",
     "tests/test_secrets_identity_parity.py",
     "tests/test_secrets_identity_registry_parity.py",
@@ -229,6 +244,19 @@ def parity() -> None:
         ],
         cwd=ROOT / "rust",
     )
+    base.run(
+        [
+            base.executable("cargo"),
+            "+" + base.RUST,
+            "test",
+            "--locked",
+            "-p",
+            "aivm-secrets-garrett",
+            "--lib",
+            "--all-features",
+        ],
+        cwd=ROOT / "rust",
+    )
     env = dict(
         os.environ,
         **{
@@ -240,11 +268,50 @@ def parity() -> None:
     base.run([sys.executable, "-m", "pytest", "-q", *TESTS], env=env)
 
 
+def assurance_coordinates() -> dict:
+    return {
+        "schema": 1,
+        "protocol": "nested Garrett surrogate profile v1",
+        "profiles": PROFILES,
+        "rust": base.RUST,
+        "lean": base.LEAN,
+        "aeneas_release": base.RELEASE,
+        "theorems": THEOREMS,
+        "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
+        "implementation_linked": "Aeneas-generated issuance/opening and credential-use controllers, exact byte/epoch/time decisions and typed public-result projection",
+        "symbolic_model": "Dolev-Yao encrypted-message deduction and public protocol traces",
+        "assumptions": [
+            "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
+            "Signature verification authenticates the exact envelope; sealing/unsealing implement their stated cryptographic contracts.",
+            "ring AES-GCM/Ed25519/SHA-256, rustls/webpki, OS entropy and nonce discipline are trusted, not cryptographically re-proved.",
+            "TLS peer evidence comes only from the completed certificate-verified connection; registry/trust inputs come from the trusted host.",
+            "Independent-use prevention assumes no access to the enrolled signing/client oracle; non-exportability alone is insufficient.",
+            "Symbolic secrecy assumes protected keys and the specified provider disclosure contract; lengths and public claims are observable.",
+            "The legacy bridge uses the existing trusted local broker; account-status-v1 uses the Rust custody/executor and its declared id/active disclosure contract.",
+            "Reply noninterference holds when parsed provider public fields agree; providers, errors, timing and metadata may disclose information outside that contract.",
+            "TPM tools and silicon/emulator command semantics are trusted; the restricted AK pin must be independently provisioned and oracle access controlled.",
+        ],
+        "exclusions": [
+            "Proof of Python or all-input cross-language equivalence",
+            "Formal refinement of JSON, TLS, X.509, crypto, TPM evidence, HTTP and filesystem adapter implementations",
+            "Physical TPM provenance, EK activation, PCR/firmware policy and anti-rollback deployment",
+            "Provider non-disclosure, host compromise, snapshot rollback and side channels",
+            "General Rust policy interpretation, durable CA/authority administration and complete OAuth vault/HTTP service",
+        ],
+    }
+
+
 def check_manifest() -> None:
     # Shared tool/model/compiler identities are pinned by the independently
     # checked freshness manifest; no duplicate drifting provisioner is needed.
     base.check_hashes(json.loads(base.MANIFEST.read_text()))
     manifest = json.loads(MANIFEST.read_text())
+    expected = assurance_coordinates()
+    if set(manifest) != set(expected) | {"sha256"}:
+        raise SystemExit("Garrett manifest metadata inventory differs")
+    for key, value in expected.items():
+        if manifest.get(key) != value:
+            raise SystemExit(f"Garrett assurance coordinate differs: {key}")
     if (
         manifest["theorems"] != THEOREMS
         or set(manifest["allowed_axioms"]) != base.ALLOWED_AXIOMS
@@ -268,34 +335,8 @@ def record() -> None:
     regeneration()
     prove()
     parity()
-    manifest = {
-        "schema": 1,
-        "protocol": "nested Garrett surrogate profile v1",
-        "rust": base.RUST,
-        "lean": base.LEAN,
-        "aeneas_release": base.RELEASE,
-        "theorems": THEOREMS,
-        "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
-        "implementation_linked": "Aeneas-generated issuance and opening controllers plus exact byte/epoch/time decisions",
-        "symbolic_model": "Dolev-Yao encrypted-message deduction and public protocol traces",
-        "assumptions": [
-            "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
-            "Signature verification authenticates the exact envelope; sealing/unsealing implement their stated cryptographic contracts.",
-            "ring AES-GCM/Ed25519/SHA-256, rustls/webpki, OS entropy and nonce discipline are trusted, not cryptographically re-proved.",
-            "TLS peer evidence comes only from the completed certificate-verified connection; registry/trust inputs come from the trusted host.",
-            "Independent-use prevention assumes no access to the enrolled signing/client oracle; non-exportability alone is insufficient.",
-            "Symbolic secrecy assumes protected keys and the specified provider disclosure contract; lengths and public claims are observable.",
-            "The existing local broker is the trusted authorization/custody/provider-effect boundary of this nested profile.",
-        ],
-        "exclusions": [
-            "Proof of Python or all-input cross-language equivalence",
-            "Formal refinement of JSON, TLS, X.509, crypto and filesystem adapter implementations",
-            "Physical TPM provenance, EK activation, PCR/firmware policy and anti-rollback deployment",
-            "Provider non-disclosure, host compromise, snapshot rollback and side channels",
-            "A complete Rust provider broker or OAuth credential vault/HTTP service",
-        ],
-        "sha256": {name: base.sha256(ROOT / name) for name in inputs()},
-    }
+    manifest = assurance_coordinates()
+    manifest["sha256"] = {name: base.sha256(ROOT / name) for name in inputs()}
     MANIFEST.write_text(json.dumps(manifest, indent=2) + "\n")
     print("Recorded checked Garrett source, assumptions and proof coordinates.")
 
@@ -318,6 +359,34 @@ def mutate() -> None:
             "Ok::<Vec<u8>, Denial>(Vec::new())",
         ),
     ]
+    mutations = [(source, *change) for change in changes]
+    use_source = source.with_name("credential_use.rs")
+    mutations += [
+        (
+            use_source,
+            "missing inner binding",
+            "|| claims.binding != current.binding",
+            "|| false",
+        ),
+        (
+            use_source,
+            "bypassed credential authorization",
+            "authorize_use(claims, grant, operation, now, elapsed)",
+            "Ok::<(), UseDenial>(())",
+        ),
+        (
+            use_source,
+            "substituted provider route",
+            "executor.execute(&grant.route, credential)",
+            "executor.execute(&Route { host: Vec::new(), port: 443, path: Vec::new(), authentication: Authentication::Bearer }, credential)",
+        ),
+        (
+            use_source,
+            "private response length released",
+            "account_id: reply.account_id,",
+            "account_id: reply.discarded.len() as i64,",
+        ),
+    ]
     lean_path = base.run(
         [base.executable("lake"), "env", "printenv", "LEAN_PATH"],
         cwd=PROOFS,
@@ -326,7 +395,7 @@ def mutate() -> None:
     lean_path = os.pathsep.join(
         str((PROOFS / part).resolve()) for part in lean_path.split(os.pathsep)
     )
-    for label, old, new in changes:
+    for source, label, old, new in mutations:
         if source.read_text().count(old) != 1:
             raise SystemExit(f"mutation no longer matches once: {label}")
         with tempfile.TemporaryDirectory(
@@ -346,7 +415,7 @@ def mutate() -> None:
             (rust / "Cargo.lock").write_text(
                 'version = 4\n[[package]]\nname="aivm-secrets-garrett-core"\nversion="0.1.0"\n'
             )
-            target = rust / "crates/aivm-secrets-garrett-core/src/lib.rs"
+            target = rust / "crates/aivm-secrets-garrett-core/src" / source.name
             target.write_text(source.read_text().replace(old, new))
             extract(temporary, rust)
             env = dict(os.environ, LEAN_PATH=str(temporary) + os.pathsep + lean_path)

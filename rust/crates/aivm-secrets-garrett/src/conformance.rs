@@ -29,6 +29,12 @@ fn text(v: &Value) -> Outcome<&str> {
     v.as_str().ok_or(Error::InvalidCapability)
 }
 pub fn evaluate(v: &Value) -> Outcome<Value> {
+    if matches!(
+        v.get("action").and_then(Value::as_str),
+        Some("inner-issue" | "inner-open")
+    ) {
+        return crate::custody::fixture_envelope(v);
+    }
     if v.get("action").and_then(Value::as_str) == Some("attestation") {
         let m = json::keys(
             v,

@@ -54,3 +54,9 @@ model under explicit crypto, TLS, provider and key-custody conditions. The
 [broader assurance campaign](docs/planning/aivm-secrets-garrett-verification.md)
 still has open service, hardware and provider obligations; the whole broker
 is not formally verified.
+
+An explicit [Rust-owned provider profile](docs/verified-provider.md) now carries
+`profile.read` from the authenticated client through credential custody and
+pinned HTTPS to a typed public result, without a Python broker in that path.
+Its extracted controller and disclosure contract are separate from the general
+Python policy interpreter.

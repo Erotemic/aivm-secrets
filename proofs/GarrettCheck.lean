@@ -25,3 +25,14 @@ import GarrettSecrecy
 #print axioms Garrett.Protocol.surrogate_can_be_public
 #print axioms Garrett.Protocol.every_trace_observation_safe
 #print axioms Garrett.Protocol.all_traces_preserve_credential_secrecy
+
+#print axioms aivm_secrets_garrett_core.credential_use.Proofs.require_use_current_contract
+#print axioms aivm_secrets_garrett_core.credential_use.Proofs.authorize_use_contract
+#print axioms aivm_secrets_garrett_core.credential_use.Proofs.release_reply_exact
+#print axioms aivm_secrets_garrett_core.credential_use.Proofs.release_noninterference
+#print axioms aivm_secrets_garrett_core.credential_use.Proofs.authorize_use_exact
+#print axioms aivm_secrets_garrett_core.credential_use.Proofs.credential_use_contract
+#print axioms aivm_secrets_garrett_core.credential_use.Proofs.inactive_grant_never_executes
+#print axioms aivm_secrets_garrett_core.credential_use.Proofs.unauthorized_operation_never_executes
+#print axioms aivm_secrets_garrett_core.credential_use.Proofs.credential_use_successful
+#print axioms aivm_secrets_garrett_core.credential_use.Proofs.credential_use_noninterference

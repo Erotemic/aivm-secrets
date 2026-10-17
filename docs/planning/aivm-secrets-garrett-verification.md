@@ -4,6 +4,9 @@ Status: **acceptance contract with an initial implementation, 2026-10-16**.
 See the [Rust implementation and exact proof scope](../verified-garrett.md)
 for checked controllers, symbolic secrecy, real TLS/TPM tests and remaining
 obligations. The full composed service result below remains open.
+The initial [Rust-owned provider profile](../verified-provider.md) adds
+credential custody, real HTTPS substitution and a conditional two-run release
+proof for `profile.read`; it does not close the general service obligations.
 
 The first substantial verification target is the Garrett protocol implemented
 by this project:
@@ -263,18 +266,21 @@ request quota is not part of this milestone's value proposition.
 
 | Existing boundary | Evidence to reuse | Work before claiming protocol correctness |
 | --- | --- | --- |
-| Pure issue/present model | `identity/garrett/protocol.py`, `claims.py`, `registry.py`; frozen Garrett and identity vectors | Independent Rust transitions, extracted proofs and linkage to authentic inputs |
-| Token envelopes | `identity/token.py`, `host/envelope.py`; deterministic crypto fixture and tamper tests | Rust codec/crypto wrappers, exact-byte interoperability and boundary refinement |
-| Authenticated connection | `identity/mtls.py`, `identity/service.py`; actual local TLS tests | Rust adapter evidence provenance, no bypass route, connection/request association |
+| Pure issue/present model | Python contracts/vectors plus extracted Rust issuance/opening and use/release proofs | Complete correspondence with the concrete service and authentic inputs |
+| Token envelopes | Python/Rust exact outer fixture and bidirectional inner/outer crypto interoperability | Concrete encoding/crypto adapter refinement and nonce analysis |
+| Authenticated connection | Actual Rust/Python TLS tests, opaque peer evidence and Rust provider path | Formal transport refinement and complete connection/request association |
 | Acquisition and refresh | OAuth contract/vault/provider modules and synthetic OAuth tests | Complete custody/error trace and generation/revocation composition |
-| Substitution and result release | `host/broker.py`, `host/egress.py`; authorization, route and reflection tests | Rust credential-owning path, reviewed response contract, confinement/refinement proofs |
-| Instance key custody | Existing software-key enrollment; vTPM design only | Selected custody profile, verified enrollment evidence and real TPM/vTPM validation |
+| Substitution and result release | Original broker/egress tests plus Rust account-status-v1 custody, route tests and extracted typed-release noninterference | Review/extend the public disclosure contract, general provider mediation and whole-service confinement/refinement |
+| Instance key custody | Rust TPM signer, fresh creation-evidence verifier under a trusted AK pin, actual isolated swtpm/TLS tests | Authenticate hardware AK provenance, EK activation, approved deployment/PCR/rollback policy and physical TPM validation |
 
 The Python executor currently returns successful provider JSON or text to the
 broker, which places it in the result and checks literal credential reflection.
 Guest presentation rules such as `json_fields` are not a server confidentiality
-boundary. This is an explicit gap for GARR-CONF-01. The pure Garrett model alone
-does not include TLS, signatures, encryption, provider substitution or secrets.
+boundary. This remains an explicit gap for GARR-CONF-01 in the general Python
+profile. The Rust account-status-v1 profile instead selects a typed public
+projection explicitly; its conditional release theorem is described separately.
+The original Python pure issue/present model alone does not include TLS,
+signatures, encryption, provider substitution or secrets.
 
 Revocation currently consults trusted registry/key state at request entry, while
 broker grant liveness is rechecked at emission and credential-generation guards

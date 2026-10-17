@@ -20,15 +20,219 @@ set_option maxRecDepth 2048
 
 namespace aivm_secrets_garrett_core
 
+/-- [aivm_secrets_garrett_core::credential_use::UseDenial]
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 5:0-9:1
+    Visibility: public -/
+@[discriminant isize]
+inductive credential_use.UseDenial where
+| InvalidCapability : credential_use.UseDenial
+| Denied : credential_use.UseDenial
+| Upstream : credential_use.UseDenial
+
+/-- [aivm_secrets_garrett_core::credential_use::Authentication]
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 10:0-13:1
+    Visibility: public -/
+@[discriminant isize]
+inductive credential_use.Authentication where
+| Bearer : credential_use.Authentication
+| ApiKey : credential_use.Authentication
+
+/-- [aivm_secrets_garrett_core::credential_use::Route]
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 14:0-19:1
+    Visibility: public -/
+structure credential_use.Route where
+  host : alloc.vec.Vec Std.U8
+  port : Std.I64
+  path : alloc.vec.Vec Std.U8
+  authentication : credential_use.Authentication
+
+/-- [aivm_secrets_garrett_core::credential_use::UseClaims]
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 20:0-26:1
+    Visibility: public -/
+structure credential_use.UseClaims where
+  binding : alloc.vec.Vec Std.U8
+  policy : alloc.vec.Vec Std.U8
+  grant : alloc.vec.Vec Std.U8
+  issued_at : Std.I64
+  expires_at : Std.I64
+
+/-- [aivm_secrets_garrett_core::credential_use::UseGrant]
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 27:0-32:1
+    Visibility: public -/
+structure credential_use.UseGrant where
+  claims : credential_use.UseClaims
+  operation : alloc.vec.Vec Std.U8
+  route : credential_use.Route
+  active : Bool
+
+/-- [aivm_secrets_garrett_core::credential_use::require_use_current]:
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 34:0-62:1
+    Visibility: public -/
+def credential_use.require_use_current
+  (claims : credential_use.UseClaims) (grant : credential_use.UseGrant)
+  (now : Std.I64) (elapsed : Std.I64) :
+  Result (core.result.Result Unit credential_use.UseDenial)
+  := do
+  if grant.active
+  then
+    let b ←
+      alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8 claims.binding
+        grant.claims.binding
+    if b
+    then ok (core.result.Result.Err credential_use.UseDenial.InvalidCapability)
+    else
+      let b1 ←
+        alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8 claims.policy
+          grant.claims.policy
+      if b1
+      then
+        ok (core.result.Result.Err credential_use.UseDenial.InvalidCapability)
+      else
+        let b2 ←
+          alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8
+            claims.grant grant.claims.grant
+        if b2
+        then
+          ok (core.result.Result.Err
+            credential_use.UseDenial.InvalidCapability)
+        else
+          if claims.issued_at != grant.claims.issued_at
+          then
+            ok (core.result.Result.Err
+              credential_use.UseDenial.InvalidCapability)
+          else
+            if claims.expires_at != grant.claims.expires_at
+            then
+              ok (core.result.Result.Err
+                credential_use.UseDenial.InvalidCapability)
+            else
+              if claims.issued_at < 0#i64
+              then
+                ok (core.result.Result.Err
+                  credential_use.UseDenial.InvalidCapability)
+              else
+                if claims.issued_at > 9223372036854772207#i64
+                then
+                  ok (core.result.Result.Err
+                    credential_use.UseDenial.InvalidCapability)
+                else
+                  if claims.expires_at <= claims.issued_at
+                  then
+                    ok (core.result.Result.Err
+                      credential_use.UseDenial.InvalidCapability)
+                  else
+                    let i ← claims.issued_at + 3600#i64
+                    if claims.expires_at > i
+                    then
+                      ok (core.result.Result.Err
+                        credential_use.UseDenial.InvalidCapability)
+                    else
+                      if now < claims.issued_at
+                      then
+                        ok (core.result.Result.Err
+                          credential_use.UseDenial.InvalidCapability)
+                      else
+                        if now >= claims.expires_at
+                        then
+                          ok (core.result.Result.Err
+                            credential_use.UseDenial.InvalidCapability)
+                        else
+                          if elapsed < 0#i64
+                          then
+                            ok (core.result.Result.Err
+                              credential_use.UseDenial.InvalidCapability)
+                          else
+                            let i1 ← claims.expires_at - claims.issued_at
+                            if elapsed >= i1
+                            then
+                              ok (core.result.Result.Err
+                                credential_use.UseDenial.InvalidCapability)
+                            else ok (core.result.Result.Ok ())
+  else ok (core.result.Result.Err credential_use.UseDenial.InvalidCapability)
+
+/-- [aivm_secrets_garrett_core::credential_use::authorize_use]:
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 64:0-79:1
+    Visibility: public -/
+def credential_use.authorize_use
+  (claims : credential_use.UseClaims) (grant : credential_use.UseGrant)
+  (operation : alloc.vec.Vec Std.U8) (now : Std.I64) (elapsed : Std.I64) :
+  Result (core.result.Result Unit credential_use.UseDenial)
+  := do
+  let r ← credential_use.require_use_current claims grant now elapsed
+  match r with
+  | core.result.Result.Ok _ =>
+    let b ←
+      alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8 operation
+        grant.operation
+    if b
+    then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+    else ok (core.result.Result.Ok ())
+  | core.result.Result.Err _ => ok r
+
+/-- [aivm_secrets_garrett_core::credential_use::ProviderReply]
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 83:0-87:1
+    Visibility: public -/
+structure credential_use.ProviderReply where
+  account_id : Std.I64
+  active : Bool
+  discarded : alloc.vec.Vec Std.U8
+
+/-- [aivm_secrets_garrett_core::credential_use::PublicReply]
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 88:0-91:1
+    Visibility: public -/
+structure credential_use.PublicReply where
+  account_id : Std.I64
+  active : Bool
+
+/-- [aivm_secrets_garrett_core::credential_use::release_reply]:
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 92:0-97:1
+    Visibility: public -/
+def credential_use.release_reply
+  (reply : credential_use.ProviderReply) :
+  Result credential_use.PublicReply
+  := do
+  ok { account_id := reply.account_id, active := reply.active }
+
+/-- Trait declaration: [aivm_secrets_garrett_core::credential_use::CredentialExecutor]
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 98:0-105:1
+    Visibility: public -/
+structure credential_use.CredentialExecutor (Self : Type _) (Self_Credential :
+  Type _) where
+  execute : Self → credential_use.Route → Self_Credential → Result
+    (core.result.Result credential_use.ProviderReply credential_use.UseDenial)
+
+/-- [aivm_secrets_garrett_core::credential_use::use_credential]:
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 106:0-124:1
+    Visibility: public -/
+def credential_use.use_credential
+  {E : Type _} {Clause0_Credential : Type _} (CredentialExecutorInst :
+  credential_use.CredentialExecutor E Clause0_Credential) (executor : E)
+  (credential : Clause0_Credential) (claims : credential_use.UseClaims)
+  (grant : credential_use.UseGrant) (operation : alloc.vec.Vec Std.U8)
+  (now : Std.I64) (elapsed : Std.I64) :
+  Result (core.result.Result credential_use.PublicReply
+    credential_use.UseDenial)
+  := do
+  let r ← credential_use.authorize_use claims grant operation now elapsed
+  match r with
+  | core.result.Result.Ok _ =>
+    let r1 ← CredentialExecutorInst.execute executor grant.route credential
+    match r1 with
+    | core.result.Result.Ok response =>
+      let pr ← credential_use.release_reply response
+      ok (core.result.Result.Ok pr)
+    | core.result.Result.Err error => ok (core.result.Result.Err error)
+  | core.result.Result.Err error => ok (core.result.Result.Err error)
+
 /-- [aivm_secrets_garrett_core::Denial]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 9:0-11:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 11:0-13:1
     Visibility: public -/
 @[discriminant isize]
 inductive Denial where
 | InvalidCapability : Denial
 
 /-- [aivm_secrets_garrett_core::Claims]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 13:0-22:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 15:0-24:1
     Visibility: public -/
 structure Claims where
   issuer : alloc.vec.Vec Std.U8
@@ -41,7 +245,7 @@ structure Claims where
   certificate : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::Expectation]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 24:0-29:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 26:0-31:1
     Visibility: public -/
 structure Expectation where
   issuer : alloc.vec.Vec Std.U8
@@ -50,7 +254,7 @@ structure Expectation where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::IssueWindow]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 31:0-35:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 33:0-37:1
     Visibility: public -/
 structure IssueWindow where
   issued_at : Std.I64
@@ -58,7 +262,7 @@ structure IssueWindow where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::issue_window]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 38:0-65:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 40:0-67:1
     Visibility: public -/
 def issue_window
   (active : Bool) (epoch : Std.I64) (not_after : Std.I64) (now : Std.I64)
@@ -102,7 +306,7 @@ def issue_window
   else ok (core.result.Result.Err Denial.InvalidCapability)
 
 /-- [aivm_secrets_garrett_core::present]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 69:0-96:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 71:0-98:1
     Visibility: public -/
 def present
   (claims : Claims) (expected : Expectation) (peer : alloc.vec.Vec Std.U8)
@@ -166,21 +370,21 @@ def present
                           else ok (core.result.Result.Ok ())
 
 /-- [aivm_secrets_garrett_core::AuthenticatedEnvelope]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 100:0-103:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 102:0-105:1
     Visibility: public -/
 structure AuthenticatedEnvelope where
   claims : Claims
   encrypted : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::OpenedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 105:0-108:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 107:0-110:1
     Visibility: public -/
 structure OpenedSurrogate (S : Type _) where
   claims : Claims
   secret : S
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeVerifier]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 111:0-115:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 113:0-117:1
     Visibility: public -/
 structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
   verify : Self → alloc.vec.Vec Std.U8 → Result (core.result.Result
@@ -189,7 +393,7 @@ structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
     Self_Secret Denial)
 
 /-- [aivm_secrets_garrett_core::open_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 120:0-142:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 122:0-144:1
     Visibility: public -/
 def open_surrogate
   {V : Type _} {Clause0_Secret : Type _} (EnvelopeVerifierInst :
@@ -213,7 +417,7 @@ def open_surrogate
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssueInputs]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 144:0-153:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 146:0-155:1
     Visibility: public -/
 structure IssueInputs where
   issuer : alloc.vec.Vec Std.U8
@@ -226,7 +430,7 @@ structure IssueInputs where
   not_after : Std.I64
 
 /-- [aivm_secrets_garrett_core::prepare_issue]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 156:0-171:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 158:0-173:1
     Visibility: public -/
 def prepare_issue
   (input : IssueInputs) (now : Std.I64) (lifetime : Std.I64) :
@@ -249,21 +453,21 @@ def prepare_issue
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssuedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 173:0-176:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 175:0-178:1
     Visibility: public -/
 structure IssuedSurrogate where
   claims : Claims
   token : alloc.vec.Vec Std.U8
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeIssuer]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 178:0-181:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 180:0-183:1
     Visibility: public -/
 structure EnvelopeIssuer (Self : Type _) (Self_Secret : Type _) where
   «seal» : Self → Claims → Self_Secret → Result (core.result.Result
     (alloc.vec.Vec Std.U8) Denial)
 
 /-- [aivm_secrets_garrett_core::issue_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 183:0-199:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 185:0-201:1
     Visibility: public -/
 def issue_surrogate
   {I : Type _} {Clause0_Secret : Type _} (EnvelopeIssuerInst : EnvelopeIssuer I

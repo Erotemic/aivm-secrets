@@ -3,6 +3,8 @@
 pub mod attestation;
 pub mod client;
 pub mod crypto;
+mod custody;
+pub use custody::ProviderSession;
 pub mod files;
 pub mod json;
 pub mod lifecycle;

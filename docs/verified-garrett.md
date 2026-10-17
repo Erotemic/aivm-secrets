@@ -46,10 +46,14 @@ The independent adapters are
   private local broker socket, and restricted diagnostic error codes.
 
 These are independent Rust decisions and cryptographic/transport adapters.
-The Python broker still performs inner-capability authorization, credential
+In the original bridge profile, the Python broker still performs inner-capability
+authorization, credential
 custody, audit, and provider effects. The Rust transition runners are not a
 replacement for its durable authority service, OAuth vault, CA or provider
-HTTP adapters. Neither Python packaging nor ordinary AIVM requires Rust,
+HTTP adapters. The explicit [account-status-v1 profile](verified-provider.md)
+adds Rust-owned credential use, a pinned provider path and a proved typed
+release projection for `profile.read`. Neither Python packaging nor ordinary
+AIVM requires Rust,
 Lean, TPM, a broker process, or this optional identity path.
 
 ## What Lean checks
@@ -79,13 +83,16 @@ observational equivalence, hide metadata/length/timing, or refine the entire
 Rust I/O system into the symbolic trace. Concrete cryptographic primitives,
 TLS/X.509, parser, filesystem, compiler and translation are trusted boundaries.
 
-The manifest declares **23 named obligations**, including supporting lemmas.
+The manifest now declares **33 named obligations**, including supporting lemmas
+and the [credential-use/release contracts](verified-provider.md).
 Every transitive axiom dependency is checked afresh. Only Lean's `propext`,
 `Classical.choice`, and `Quot.sound` are permitted; no admitted proof or
-project-specific security axiom is allowed. Six deliberate changes to actual
+project-specific security axiom is allowed. Ten deliberate changes to actual
 Rust must break the unchanged extracted proofs: missing certificate binding,
 missing epoch binding, inclusive expiry, inactive issuance, bypassing binding
-before decryption, and returning a token without sealing.
+before decryption, returning a token without sealing, removing inner binding,
+bypassing use authorization, substituting a provider route and exposing private
+response length in a public field.
 
 ## TPM custody and enrollment evidence
 
@@ -149,9 +156,10 @@ If a shared Cargo/Lake input changes, also reproduce and record the existing
 freshness gate first. `record` requires extraction, proofs, lint and parity
 to succeed before recording hashes; editing a manifest alone is insufficient.
 
-## Local validation
+## Initial identity-path validation
 
-The complete Python suite passed with **1,887 tests and one skip** in
+The initial identity-path checkpoint's Python suite passed with **1,887 tests
+and one skip** in
 280.05 seconds, with all implemented Rust runners selected. The remaining
 skip is the unimplemented full primitive runner, not a Garrett gate. The
 selected Garrett gate passed 50 tests. All ten integration tests also passed

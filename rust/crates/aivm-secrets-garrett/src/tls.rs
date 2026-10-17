@@ -29,10 +29,13 @@ pub(crate) struct Deadline {
 }
 impl Deadline {
     pub(crate) fn start(abort: impl FnOnce() + Send + 'static) -> Self {
+        Self::start_for(DEADLINE, abort)
+    }
+    pub(crate) fn start_for(duration: Duration, abort: impl FnOnce() + Send + 'static) -> Self {
         let (cancel, wait) = std::sync::mpsc::channel();
         let worker = std::thread::spawn(move || {
             if matches!(
-                wait.recv_timeout(DEADLINE),
+                wait.recv_timeout(duration),
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout)
             ) {
                 abort();
@@ -133,6 +136,10 @@ fn failure(error: Error) -> Value {
     json!({"version":1,"ok":false,"error":{"code":error.code(),"message":message}})
 }
 
+enum Backend {
+    Socket(PathBuf),
+    Provider(Box<std::sync::Mutex<crate::ProviderSession>>),
+}
 /// Registry updates and use share this lock: revocation cannot race dispatch.
 /// The issuer and registry are host inputs; no request can replace either.
 pub struct Bridge {
@@ -143,7 +150,7 @@ pub struct Bridge {
     issuer: String,
     audience: String,
     subject: Option<String>,
-    broker: PathBuf,
+    backend: Backend,
 }
 impl Bridge {
     pub fn new(
@@ -156,6 +163,44 @@ impl Bridge {
         broker: PathBuf,
     ) -> Outcome<Self> {
         files::broker_socket(&broker)?;
+        Self::with_backend(
+            config,
+            verifier,
+            registry,
+            issuer,
+            audience,
+            subject,
+            Backend::Socket(broker),
+        )
+    }
+    pub fn new_provider(
+        config: AuthenticatedServerConfig,
+        verifier: Verifier,
+        registry: Registry,
+        issuer: String,
+        audience: String,
+        subject: Option<String>,
+        provider: crate::ProviderSession,
+    ) -> Outcome<Self> {
+        Self::with_backend(
+            config,
+            verifier,
+            registry,
+            issuer,
+            audience,
+            subject,
+            Backend::Provider(Box::new(std::sync::Mutex::new(provider))),
+        )
+    }
+    fn with_backend(
+        config: AuthenticatedServerConfig,
+        verifier: Verifier,
+        registry: Registry,
+        issuer: String,
+        audience: String,
+        subject: Option<String>,
+        backend: Backend,
+    ) -> Outcome<Self> {
         json::word(&json!(issuer), 128)?;
         json::word(&json!(audience), 128)?;
         if let Some(name) = &subject {
@@ -169,7 +214,7 @@ impl Bridge {
             issuer,
             audience,
             subject,
-            broker,
+            backend,
         })
     }
     /// Re-read atomically replaced host state for every dispatch, as the Python
@@ -288,14 +333,25 @@ impl Bridge {
             return Err(Error::InvalidCapability);
         }
         let opened = self.verifier.open(token, peer, &expected, now)?;
+        if let Backend::Provider(provider) = &self.backend {
+            return provider.lock().map_err(|_| Error::InternalError)?.answer(
+                opened.inner.bytes(),
+                verb,
+                &m[verb],
+                now,
+            );
+        }
         let inner =
             std::str::from_utf8(opened.inner.bytes()).map_err(|_| Error::InvalidCapability)?;
         let forwarded = json!({"version":1,"capability":inner,verb:m[verb]});
         self.forward(&forwarded)
     }
     fn forward(&self, request: &Value) -> Outcome<Value> {
-        files::broker_socket(&self.broker)?;
-        let mut socket = UnixStream::connect(&self.broker).map_err(|_| Error::InternalError)?;
+        let Backend::Socket(broker) = &self.backend else {
+            return Err(Error::InternalError);
+        };
+        files::broker_socket(broker)?;
+        let mut socket = UnixStream::connect(broker).map_err(|_| Error::InternalError)?;
         socket
             .set_read_timeout(Some(DEADLINE))
             .map_err(|_| Error::InternalError)?;

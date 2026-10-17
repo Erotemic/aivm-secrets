@@ -31,7 +31,7 @@ pub fn read_private(path: &Path, limit: usize) -> Outcome<Vec<u8>> {
     private_directory(path.parent().ok_or(Error::UnsafeFile)?)?;
     let fd = open(
         path,
-        OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+        OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC | OFlags::NONBLOCK,
         Mode::empty(),
     )
     .map_err(|_| Error::UnsafeFile)?;

@@ -283,3 +283,178 @@ theorem inactive_enrollment_never_sealed {I S : Type} (ops : EnvelopeIssuer I S)
   | Err denial => cases denial; simp [issue_surrogate, returned]
 
 end aivm_secrets_garrett_core.Proofs
+
+namespace aivm_secrets_garrett_core.credential_use.Proofs
+open aivm_secrets_garrett_core.Proofs
+
+def Current (c : UseClaims) (g : UseGrant) (now elapsed : Int) : Prop :=
+  g.active = true ∧ c.binding = g.claims.binding ∧ c.policy = g.claims.policy ∧
+  c.grant = g.claims.grant ∧ c.issued_at = g.claims.issued_at ∧
+  c.expires_at = g.claims.expires_at ∧ 0 ≤ c.issued_at.val ∧
+  c.issued_at.val ≤ 9223372036854772207 ∧ c.issued_at.val < c.expires_at.val ∧
+  c.expires_at.val ≤ c.issued_at.val + 3600 ∧ c.issued_at.val ≤ now ∧
+  now < c.expires_at.val ∧ 0 ≤ elapsed ∧ elapsed < c.expires_at.val - c.issued_at.val
+
+instance (c : UseClaims) (g : UseGrant) (now elapsed : Int) :
+    Decidable (Current c g now elapsed) := by unfold Current; infer_instance
+
+def UseSpec (c : UseClaims) (g : UseGrant) (op : alloc.vec.Vec U8) (now elapsed : Int)
+    (out : core.result.Result Unit UseDenial) : Prop :=
+  match out with
+  | .Ok _ => Current c g now elapsed ∧ op = g.operation
+  | .Err .InvalidCapability => ¬ Current c g now elapsed
+  | .Err .Denied => Current c g now elapsed ∧ op ≠ g.operation
+  | .Err .Upstream => False
+
+theorem require_use_current_contract (c : UseClaims) (g : UseGrant) (now elapsed : I64) :
+    require_use_current c g now elapsed ⦃ out =>
+      match out with
+      | .Ok _ => Current c g now.val elapsed.val
+      | .Err .InvalidCapability => ¬ Current c g now.val elapsed.val
+      | .Err _ => False ⦄ := by
+  unfold require_use_current
+  by_cases active : g.active = true
+  · simp only [active, ↓reduceIte]
+    apply WP.spec_bind (bytes_ne_spec c.binding g.claims.binding)
+    intro different0 neq0
+    by_cases h0 : different0 = true
+    · simp_all [WP.spec_ok, Current]
+    · simp only [h0]
+      apply WP.spec_bind (bytes_ne_spec c.policy g.claims.policy)
+      intro different1 neq1
+      by_cases h1 : different1 = true
+      · simp_all [WP.spec_ok, Current]
+      · simp only [h1]
+        apply WP.spec_bind (bytes_ne_spec c.grant g.claims.grant)
+        intro different2 neq2
+        by_cases h2 : different2 = true
+        · simp_all [WP.spec_ok, Current]
+        · simp only [h2]
+          repeat' first
+          | (solve | simp_all [WP.spec_ok, Current]; all_goals scalar_tac)
+          | split
+          | step
+  · simp_all [WP.spec_ok, Current]
+
+theorem authorize_use_contract (c : UseClaims) (g : UseGrant) (op : alloc.vec.Vec U8) (now elapsed : I64) :
+    authorize_use c g op now elapsed ⦃ out => UseSpec c g op now.val elapsed.val out ⦄ := by
+  unfold authorize_use
+  apply WP.spec_bind (require_use_current_contract c g now elapsed)
+  intro checked property
+  cases checked with
+  | Err error => cases error <;> simp_all [UseSpec]
+  | Ok value =>
+    dsimp only at property
+    dsimp only
+    apply WP.spec_bind (bytes_ne_spec op g.operation)
+    intro different neq
+    by_cases h : different = true <;> simp_all [WP.spec_ok, UseSpec]
+
+theorem release_reply_exact (response : ProviderReply) :
+    release_reply response = Result.ok (PublicReply.mk response.account_id response.active) := by
+  rfl
+
+/-- Two-run noninterference of the actual release function: arbitrary discarded
+    provider bytes do not change any field of the public result. -/
+theorem release_noninterference (a b : ProviderReply)
+    (same_id : a.account_id = b.account_id) (same_active : a.active = b.active) :
+    release_reply a = release_reply b := by
+  simp [release_reply, same_id, same_active]
+
+end aivm_secrets_garrett_core.credential_use.Proofs
+
+
+namespace aivm_secrets_garrett_core.credential_use.Proofs
+open aivm_secrets_garrett_core.Proofs
+
+theorem authorize_use_exact (c : UseClaims) (g : UseGrant) (op : alloc.vec.Vec U8) (now elapsed : I64) :
+    authorize_use c g op now elapsed = Result.ok
+      (if Current c g now.val elapsed.val then
+        if op = g.operation then core.result.Result.Ok () else core.result.Result.Err UseDenial.Denied
+       else core.result.Result.Err UseDenial.InvalidCapability) := by
+  obtain ⟨out, returned, property⟩ := returned_of_spec (authorize_use_contract c g op now elapsed)
+  cases out with
+  | Ok value =>
+      cases value
+      dsimp only [UseSpec] at property
+      simpa [property.1, property.2] using returned
+  | Err error =>
+      cases error with
+      | InvalidCapability =>
+          dsimp only [UseSpec] at property
+          simpa [property] using returned
+      | Denied =>
+          dsimp only [UseSpec] at property
+          simpa [property.1, property.2] using returned
+      | Upstream => exact False.elim property
+
+/-- Composition over the actual executor call. The only credential-bearing
+    operation receives the selected route and precisely the opened credential. -/
+theorem credential_use_contract {E S : Type} (ops : CredentialExecutor E S) (executor : E)
+    (secret : S) (c : UseClaims) (g : UseGrant) (op : alloc.vec.Vec U8) (now elapsed : I64)
+    (Executed : Route → S → ProviderReply → Prop)
+    (execute_contract : ops.execute executor g.route secret ⦃ out =>
+      match out with | .Ok response => Executed g.route secret response | .Err _ => True ⦄) :
+    use_credential ops executor secret c g op now elapsed ⦃ out =>
+      match out with
+      | .Ok released => Current c g now.val elapsed.val ∧ op = g.operation ∧
+          ∃ response, Executed g.route secret response ∧
+            released.account_id = response.account_id ∧ released.active = response.active
+      | .Err _ => True ⦄ := by
+  unfold use_credential
+  apply WP.spec_bind (authorize_use_contract c g op now elapsed)
+  intro checked authorized
+  cases checked with
+  | Err error => simp
+  | Ok value =>
+    dsimp only [UseSpec] at authorized
+    dsimp only
+    apply WP.spec_bind execute_contract
+    intro result executed
+    cases result with
+    | Err error => simp
+    | Ok response =>
+      apply WP.spec_bind (show release_reply response ⦃ released =>
+        released.account_id = response.account_id ∧ released.active = response.active ⦄ from by
+          simp [release_reply])
+      intro released projection
+      simpa only [WP.spec_ok] using
+        And.intro authorized.1 (And.intro authorized.2 ⟨response, executed, projection⟩)
+
+theorem inactive_grant_never_executes {E S : Type} (ops : CredentialExecutor E S) (executor : E)
+    (secret : S) (c : UseClaims) (g : UseGrant) (op : alloc.vec.Vec U8) (now elapsed : I64)
+    (inactive : g.active = false) :
+    use_credential ops executor secret c g op now elapsed =
+      Result.ok (core.result.Result.Err UseDenial.InvalidCapability) := by
+  simp [use_credential, authorize_use_exact, Current, inactive]
+
+theorem unauthorized_operation_never_executes {E S : Type} (ops : CredentialExecutor E S) (executor : E)
+    (secret : S) (c : UseClaims) (g : UseGrant) (op : alloc.vec.Vec U8) (now elapsed : I64)
+    (current : Current c g now.val elapsed.val) (wrong : op ≠ g.operation) :
+    use_credential ops executor secret c g op now elapsed =
+      Result.ok (core.result.Result.Err UseDenial.Denied) := by
+  simp [use_credential, authorize_use_exact, current, wrong]
+
+theorem credential_use_successful {E S : Type} (ops : CredentialExecutor E S) (executor : E)
+    (secret : S) (c : UseClaims) (g : UseGrant) (now elapsed : I64) (response : ProviderReply)
+    (current : Current c g now.val elapsed.val)
+    (executed : ops.execute executor g.route secret = Result.ok (core.result.Result.Ok response)) :
+    use_credential ops executor secret c g g.operation now elapsed =
+      Result.ok (core.result.Result.Ok (PublicReply.mk response.account_id response.active)) := by
+  simp [use_credential, authorize_use_exact, current, executed, release_reply]
+
+/-- Changing the credential and arbitrary private response content leaves the
+    released result identical when the provider's declared public result agrees.
+    This is not a claim about malicious providers encoding secrets in public data. -/
+theorem credential_use_noninterference {E S : Type} (ops : CredentialExecutor E S) (executor : E)
+    (secret_a secret_b : S) (c : UseClaims) (g : UseGrant) (op : alloc.vec.Vec U8) (now elapsed : I64)
+    (a b : ProviderReply)
+    (execute_a : ops.execute executor g.route secret_a = Result.ok (core.result.Result.Ok a))
+    (execute_b : ops.execute executor g.route secret_b = Result.ok (core.result.Result.Ok b))
+    (same_id : a.account_id = b.account_id) (same_active : a.active = b.active) :
+    use_credential ops executor secret_a c g op now elapsed =
+    use_credential ops executor secret_b c g op now elapsed := by
+  simp only [use_credential, authorize_use_exact]
+  split_ifs <;> simp [execute_a, execute_b, release_reply, same_id, same_active]
+
+end aivm_secrets_garrett_core.credential_use.Proofs

@@ -163,3 +163,76 @@ proof/input/document files. The wheel contains no AIVM, Rust or proof runtime
 payload. Resource accounting publication reported nothing outstanding. This is
 a reviewable implementation checkpoint; the entire protocol assurance goal
 remains active, with the broader service obligations listed in the new guide.
+
+## 2026-10-16 23:11:30 -0400
+
+Continuing the active Garrett goal after the verified identity-path checkpoint.
+The previous turn made concrete implementation and validation progress. The
+largest remaining gap is that provider custody still crosses into Python. I am
+building the plan's first Rust-owned provider operation, with an explicit typed
+public-result projection, and extracting its authorization/use/release control.
+I am deliberately keeping Python's existing raw-result semantics unchanged;
+the stronger release policy must be selected explicitly rather than silently
+presented as whole-service parity. I am confident that exact envelope interop
+can be retained. The harder risks are the concrete parser/HTTP boundary,
+provider-controlled public fields, audit-before-dispatch, and avoiding a proof
+that merely assumes all outputs safe. Formal noninterference will state the
+public projection it holds fixed and quantify over the discarded fields.
+
+The native account-status-v1 profile now owns the full Rust path: inner AEAD
+custody, outer binding, actual TLS, inner grant/operation checks, durable dispatch
+intent, pinned HTTPS credential insertion and a typed id/active release. Eight
+provider tests passed, including the full software-TPM signer/client/Rust broker/
+provider path, restart invalidation with unchanged outer keys, legacy Python
+inner-envelope interoperability, and raw/private response suppression. The
+reference HTTP request and authentication field match the independent Python
+executor; its raw result is intentionally not claimed equivalent to the new
+explicit projection.
+
+Lean now builds all ten additional use/release obligations, including exact
+current-grant authorization, no effect on denial, selected-route/credential
+composition, success and two-run release noninterference. I had to split current
+grant validation from the operation decision to keep the extraction proof
+legible, and use an explicit WP bind for release rather than expand the monad.
+That is a useful implementation decomposition, not a second proof-only model.
+The public response contract remains the key condition: changing discarded
+bytes or credentials leaves released output unchanged only when the provider's
+approved public fields agree. A malicious provider can still encode secrets in
+those fields, errors or timing. Concrete HTTP/parser/crypto refinement and
+whole-service trace composition remain open. The next validation step is to
+require wrong-route, bypassed-authorization and private-output mutations to
+break the new proofs, then run the full regression/packaging gates.
+
+The first complete provider regression run passed 1,895 tests with the one
+expected full-primitive-runner skip (286.81 seconds). Review then found an
+actual durability issue: a newly created audit file's parent entry was not
+explicitly synced. Log creation now opens through a held private directory
+fd, refuses symlinks/nonregular files without blocking, syncs the directory,
+and flushes each record before provider I/O/public release. Private file reads
+also open nonblocking so a FIFO cannot stall startup before its type check.
+The ten targeted provider tests pass after those fixes, including unsafe audit
+symlink/FIFO/directory paths and credential-file FIFOs. Full regressions and
+manifest reproduction are being repeated for that concrete shared-file change.
+The first four re-extracted security mutations have been rejected so far.
+
+Final suite after the file/audit fix: 1,897 passed and the one known pending
+full-primitive-runner skip, in 291.21 seconds. The selected gate passes 60 tests
+and a Rust unit test for ambiguous/bounded HTTP framing; 20 integration tests
+also pass with normal client/bridge builds. All ten re-extracted mutations were
+rejected, including actual wrong-route substitution and private response length
+in the released id. I tightened the test harness to inspect broker diagnostics
+and the exact public readiness fields as well as client results and audit data.
+The reproduced source manifest now checks its complete supported-profile and
+assumption metadata, so editing a manifest cannot silently change that scope.
+The core result is conditional release noninterference, not a claim that a
+malicious provider cannot encode secrets in its designated public fields.
+
+The final sequential wheel/sdist build and twine checks passed. All 148 declared
+proof/input/document files match the source archive byte for byte, and the wheel
+still contains no Rust, Lean or AIVM runtime payload. Source hashes, supported
+profiles, assumptions and theorem coordinates match after the diagnostic-sink
+checks were added. No reference Python or original AIVM implementation was
+changed. Accounting publication reports nothing outstanding. This checkpoint
+completes the first Rust-owned provider slice, not the entire goal: general
+policy/provider support, durable authority/CA/OAuth state, authenticated-use
+trace correspondence and full service refinement remain future work.
