@@ -1244,3 +1244,38 @@ Wheel and source archive build and pass twine; all 201 inventoried source,
 proof and documentation inputs match the source archive byte for byte. The
 remaining controller mutation audits are running on their original frozen
 worktrees. I will consolidate only after those runs finish successfully.
+
+
+## 2026-10-17 07:36:46 -0400
+
+Consolidated the completed reflection, software-bootstrap and TPM-request work
+on standalone main. I preserved both branches' journal evidence and kept the
+latest TPM validation report when resolving documentation conflicts. Only README,
+the journal and the report differ from the native TPM source snapshot tested
+by the full suite; all controllers, generated Lean and proofs remain identical
+to the successfully completed 90-mutation snapshot.
+
+The original checkout independently reproduces the official check: extraction
+matches byte for byte, all 205 named obligations pass their transitive axiom
+audit, strict lint passes in both feature modes, six Rust unit tests pass, and
+279 selected tests pass in 53.33 seconds. Its wheel and source archive pass
+build/twine and all 201 inventoried inputs match. After rebuilding the service
+binaries without conformance features, 42 client/TPM/provider regressions pass
+in 5.24 seconds. The complete normal-service suite had already passed 2,116
+tests with one expected pending general primitive-runner skip on the identical
+source snapshot. Rechecking extraction attribution confirms all 46 original
+commits' author/committer identities, dates and complete messages. AIVM itself
+still has only its pre-existing untracked .pi directory.
+
+The native bootstrap is now a practical part of the protocol path: software
+material has explicit exportability and conservative publication recovery;
+TPM requests reuse checked signing without exporting a key or selecting a
+software fallback. I am confident in those scoped source proofs and synthetic
+end-to-end tests. I remain concerned about overstating their composition:
+concrete JSON/crypto/filesystem/network/audit adapters and concurrent histories
+are not fully refined, and software TPM evidence cannot establish physical
+custody, trusted AK provenance or signing-oracle isolation. Native aliases,
+command resolvers, approvals/delegation and general primitive-runner parity
+also remain open. The broader goal remains active; connecting actual dispatch
+leases and administrative writers to a finite service-history theorem is the
+next assurance priority, alongside the remaining native administration surface.
