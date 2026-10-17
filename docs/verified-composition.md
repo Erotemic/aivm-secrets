@@ -79,8 +79,8 @@ private files; mode checks do not substitute for isolation from the agent.
 ## Reproduce and remaining work
 
 Run `dev/verification/garrett.py check` and `mutate` as documented in
-[verified Garrett](verified-garrett.md). The gate checks 55 named obligations.
-Sixteen changes to actual Rust are re-extracted and must fail the unchanged
+[verified Garrett](verified-garrett.md). The gate checks 65 named obligations.
+Twenty-two changes to actual Rust are re-extracted and must fail the unchanged
 proofs. The composition mutations bypass authorization or audit acknowledgement,
 substitute the recorded identity, or change the dispatched route.
 

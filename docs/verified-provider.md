@@ -144,7 +144,7 @@ HTTP framing tests, Lean obligations and Rust security mutations. Tests use
 synthetic credentials and actual local TLS services, including the full
 TPM-client/Rust-custody/provider path. No live accounts are contacted.
 
-## Local validation
+## History checkpoint validation
 
 The full suite passed with **1,901 tests and one expected pending full-primitive
 runner skip** in 288.32 seconds. The selected Garrett gate passed 64 tests;

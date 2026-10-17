@@ -65,3 +65,6 @@ disclosure contract are separate from the general Python policy interpreter.
 The [history layer](docs/verified-history.md) adds acknowledged issuance,
 ideal signature-origin proofs and conditional correspondence between source
 controller issuance and dispatch histories.
+The [Rust certificate enrollment layer](docs/verified-enrollment.md) binds a
+possession-checked CSR to explicit software approval or verified TPM evidence
+before client signing. Durable authority administration remains open.

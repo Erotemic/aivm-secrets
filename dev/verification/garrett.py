@@ -20,7 +20,7 @@ import freshness as base
 ROOT = base.ROOT
 PROOFS = base.PROOFS
 MANIFEST = PROOFS / "garrett-manifest.json"
-PROFILES = ["nested-bridge-v1", "account-status-v1"]
+PROFILES = ["nested-bridge-v1", "account-status-v1", "p256-client-enrollment-v1"]
 THEOREMS = [
     "aivm_secrets_garrett_core.Proofs.bytes_ne_spec",
     "aivm_secrets_garrett_core.Proofs.issue_contract",
@@ -87,10 +87,24 @@ THEOREMS += [
     "Garrett.History.protected_signature_was_issued",
 ]
 
+THEOREMS += [
+    "aivm_secrets_garrett_core.enrollment.Proofs.approve_key_exact",
+    "aivm_secrets_garrett_core.enrollment.Proofs.approve_key_contract",
+    "aivm_secrets_garrett_core.enrollment.Proofs.authorize_client_contract",
+    "aivm_secrets_garrett_core.enrollment.Proofs.enroll_client_contract",
+    "aivm_secrets_garrett_core.enrollment.Proofs.tpm_substitution_never_signed",
+    "aivm_secrets_garrett_core.enrollment.Proofs.unapproved_software_key_never_signed",
+    "aivm_secrets_garrett_core.enrollment.Proofs.software_is_not_tpm",
+    "aivm_secrets_garrett_core.enrollment.Proofs.tpm_plan_uses_attested_key",
+    "aivm_secrets_garrett_core.enrollment.Proofs.enroll_client_successful",
+    "aivm_secrets_garrett_core.enrollment.Proofs.authorize_tpm_success",
+]
+
 TESTS = [
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
     "tests/test_rust_garrett_provider.py",
+    "tests/test_rust_garrett_certificates.py",
     "tests/test_secrets_garrett_modularity.py",
     "tests/test_secrets_identity_parity.py",
     "tests/test_secrets_identity_registry_parity.py",
@@ -132,6 +146,7 @@ def inputs() -> list[str]:
         "proofs/GarrettCheck.lean",
         "proofs/GarrettProtocol.lean",
         "proofs/GarrettHistory.lean",
+        "proofs/GarrettEnrollment.lean",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
         "dev/verification/freshness.py",
@@ -310,7 +325,7 @@ def assurance_coordinates() -> dict:
         "aeneas_release": base.RELEASE,
         "theorems": THEOREMS,
         "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
-        "implementation_linked": "Aeneas-generated issuance, complete request preparation/observation/use/release controllers, exact byte/epoch/time decisions and typed public-result projection",
+        "implementation_linked": "Aeneas-generated issuance, complete request preparation/observation/use/release and key-approval/client-enrollment controllers, exact byte/epoch/time decisions and typed public-result projection",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
@@ -325,6 +340,7 @@ def assurance_coordinates() -> dict:
             "The native observer acknowledges only a complete, flushed record under the exclusive-writer and trusted host/filesystem assumptions; acknowledgement is not a client field.",
             "Presentation uses trusted entry/enrollment/clock snapshots; cross-process dispatch linearization and whole-service concurrent traces remain open.",
             "Controller histories assume signature verification has prior recorded issuer origin; the ideal signature-origin theorem does not establish a computational byte-level or concrete I/O refinement.",
+            "CSR possession, CA constraints/key matching and X.509 signing use the stated rcgen/x509-parser/time adapter contracts; their ASN.1/crypto implementations are not formally refined. TPM approval consumes verified fresh evidence under a trusted AK pin.",
         ],
         "exclusions": [
             "Proof of Python or all-input cross-language equivalence",
@@ -461,6 +477,34 @@ def mutate() -> None:
             "finish_use(executor, &ready.credential, &Route { host: Vec::new(), port: 443, path: Vec::new(), authentication: crate::credential_use::Authentication::Bearer })",
         ),
     ]
+    enrollment_source = source.with_name("enrollment.rs")
+    mutations += [
+        (
+            enrollment_source, "TPM CSR key substitution accepted",
+            "candidate.spki != *spki", "false",
+        ),
+        (
+            enrollment_source, "software approval bypass",
+            "candidate.fingerprint != *fingerprint", "false",
+        ),
+        (
+            enrollment_source, "software assurance escalated",
+            "Ok(Assurance::OperatorApproved)", "Ok(Assurance::AttestedTpm)",
+        ),
+        (
+            enrollment_source, "approved client key replaced",
+            "spki: input.candidate.spki,", "spki: Vec::new(),",
+        ),
+        (
+            enrollment_source, "client expiry beyond CA",
+            "not_after >= input.ca_not_after", "false",
+        ),
+        (
+            enrollment_source, "client approval bypassed before signing",
+            "authorize_client(input, approval)",
+            "Ok::<ClientPlan, EnrollmentDenial>(ClientPlan { subject: input.subject, spki: input.candidate.spki, not_before: input.now, not_after: input.now, assurance: Assurance::AttestedTpm })",
+        ),
+    ]
     lean_path = base.run(
         [base.executable("lake"), "env", "printenv", "LEAN_PATH"],
         cwd=PROOFS,
@@ -512,7 +556,7 @@ def mutate() -> None:
                 env=env,
             )
             rejected = False
-            for module in ["Garrett", "GarrettProtocol", "GarrettHistory"]:
+            for module in ["Garrett", "GarrettProtocol", "GarrettHistory", "GarrettEnrollment"]:
                 proof = temporary / (module + ".lean")
                 shutil.copy2(PROOFS / proof.name, proof)
                 result = base.run(

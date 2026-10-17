@@ -370,3 +370,93 @@ proof that all concrete service I/O/authority histories obey those contracts.
 That is substantive future work alongside durable CA/OAuth state, broader
 policy/provider mediation and TPM provenance. This checkpoint advances the
 active goal without changing that completion scope.
+
+## 2026-10-17 00:42:08 -0400
+
+The preceding checkpoint established recorded issuance and conditional finite
+histories with full tests. I am moving to the missing Rust X.509 enrollment
+boundary: an attested TPM public key must be the same key whose CSR proves
+possession and whose client certificate the CA signs. The existing attestation
+verifier returns opaque SPKI evidence, but no Rust CA consumes it. I plan an
+extractable approval/signing controller plus narrow real CSR/CA adapters,
+explicit software versus TPM approval, malicious-CSR tests and an actual
+TPM-backed certificate/TLS/provider path. The signer must ignore untrusted CSR
+names/extensions and validate CA constraints/key matching itself; rcgen's
+signing API explicitly does not validate those for us. I am confident this
+closes a useful key-substitution gap. Durable authority transactions and
+physical AK provenance remain separate work, and a verified key must not be
+misrepresented as an attested process or VM. New Rust dependencies are optional
+to Python/AIVM and pinned in the workspace lock; their crypto/ASN.1 semantics
+remain trusted adapters rather than newly asserted Lean axioms.
+
+The Rust CA adapter now generates/loads a strict self-signed P-256 root,
+checks CA constraints, duplicate/unsupported extensions, root self-signature
+and certificate/private-key matching, and verifies signed P-256/SHA256 CSRs.
+Only a private signer adapter implements the core signing trait: callers cannot
+hand a fabricated approved plan directly to a public CA signing method. Fresh
+client parameters ignore CSR subject/attributes and refuse requested extensions;
+client certificates receive no CA or server-auth capability. Serials use fresh
+OS entropy. The normal API has no CA-private-key serializer; the pre-existing
+explicit conformance feature has synthetic-only key fixtures.
+
+Eleven new tests pass, including Python CSR fingerprint and parsed certificate
+behavior parity, CA/key mismatches and unsafe authority constraints, malformed
+requests, and a full actual software-TPM path. That path constructs PKCS#10
+info, signs it through tpm2_sign without exporting the identity key, checks
+fresh creation evidence, obtains a Rust-signed matching certificate, and uses
+it through the normal TLS/provider path. Another CSR with the same evidence
+is denied. This is key provenance under an externally trusted AK pin, not
+physical EK provenance or a process/VM attestation.
+
+Ten new source-linked obligations build: exact key approvals, plan/authority
+window preservation, exact attested SPKI, no signing for substituted/unapproved
+keys, no software-to-TPM assurance escalation, and successful enrollment. The
+shared freshness gate was re-recorded after the Cargo/Lake changes (seven tests
+and all original theorem axioms passed). Strict Rust lint passes in both feature
+modes. The expanded 65-obligation/22-mutation gate and full regression suite
+are being reproduced against stable sources. Durable authority transactions,
+registry installation, complete server/CA administration and hardware trust
+provisioning are still open; the new library is intended to feed those layers.
+
+The complete Garrett record passes 75 selected tests and all 65 named axiom
+checks. Full regressions pass 1,912 tests with the single expected pending
+full-primitive-runner skip (282.58 seconds). The normal client/bridge builds
+pass 35 selected certificate/TLS/provider checks, including the fresh-evidence
+CSR-to-Rust-certificate-to-TPM/provider action. This is the result I wanted to
+make concrete: evidence for one key cannot be substituted into a certificate
+for another, and software approval has a distinct assurance mode. I have kept
+new CA/library scope separate from durable administration; the generic leaf CN
+still needs an operator-selected registry association. The final mutation and
+packaging gates are running. No Python runtime or AIVM integration surface was
+changed, and the reference certificate comparison deliberately checks parsed
+semantics rather than random serial/signature byte equality.
+
+Final review found a real lifetime gap at the newly joined boundary: opaque
+VerifiedIdentity objects recorded successful verification but could be retained
+indefinitely before CA use. I now preserve the original monotonic pending
+challenge deadline in the verified object and recheck it at enrollment
+admission. A conformance-only aging hook lets the real TPM/CSR test verify that
+otherwise valid evidence is refused after that deadline, without waiting two
+minutes. This is an adapter freshness check, separate from the extracted key
+approval theorem; the guide says so explicitly. The core/proof/mutation sources
+are unchanged, and all 22 source mutations completed with actual Lean errors,
+including all six new enrollment attacks. I am reproducing the changed adapter
+lint/parity manifest and full regressions before the final archive/commit.
+
+Final post-fix validation passed: 1,912 full-suite tests and the one known
+pending full-primitive-runner skip in 290.75 seconds; 75 selected gate tests;
+35 certificate/TLS/provider checks with normal client/bridge binaries in
+4.71 seconds. All 65 named obligations pass the transitive axiom audit, and
+all 22 actual core Rust mutations were re-extracted and rejected by unchanged
+proofs. The adapter-only deadline fix left those core/proof sources unchanged.
+The reproduced manifest covers the latest adapter/test code. Wheel/sdist and
+twine checks pass, all 160 declared proof/source/document inputs match the
+source archive, and the ordinary wheel has no Rust, Lean or AIVM payload.
+
+I am ready to commit this layer. Its limitation is deliberate and visible:
+real CA/CSR key approval/signing and tested TPM key binding now exist, but
+normal durable authority initialization, registry installation, coordinated
+rotation/recovery, concrete adapter/history refinement and hardware provenance
+are not finished. The TPM label is a returned plan fact, not a certificate
+extension or proof of a VM/process; subsequent host enrollment policy must
+retain the selected assurance. The broader goal remains active.

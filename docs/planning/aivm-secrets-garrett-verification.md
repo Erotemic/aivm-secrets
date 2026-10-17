@@ -16,6 +16,10 @@ The [issuance/history layer](../verified-history.md) adds acknowledged native
 issuance, ideal signature origin over adaptive attacker traces and conditional
 source-controller history correspondence. Refinement from actual service I/O
 and storage histories to those models remains open.
+The [Rust certificate enrollment layer](../verified-enrollment.md) adds actual
+CA/CSR signing adapters and extracted key/authority approval proofs, including
+TPM-to-CSR SPKI binding. Durable authority administration, registry installation
+and physical AK trust provisioning remain open.
 
 The first substantial verification target is the Garrett protocol implemented
 by this project:

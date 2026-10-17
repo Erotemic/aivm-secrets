@@ -28,7 +28,51 @@ fn bytes(v: &Value) -> Outcome<Vec<u8>> {
 fn text(v: &Value) -> Outcome<&str> {
     v.as_str().ok_or(Error::InvalidCapability)
 }
+pub(crate) fn verify_attestation_fixture(
+    v: &Value,
+) -> Outcome<crate::attestation::VerifiedIdentity> {
+    let m = json::keys(
+        v,
+        &[
+            "action",
+            "ak_area_hex",
+            "ak_qualified_name_hex",
+            "challenge_hex",
+            "public_area_hex",
+            "attestation_hex",
+            "signature_hex",
+        ],
+        &[],
+    )?;
+    if m["action"] != "attestation" {
+        return Err(Error::InvalidCapability);
+    }
+    let authority = crate::attestation::Authority::from_trusted_pin(
+        &bytes(&m["ak_area_hex"])?,
+        &bytes(&m["ak_qualified_name_hex"])?,
+    )?;
+    let challenge = bytes(&m["challenge_hex"])?
+        .try_into()
+        .map_err(|_| Error::InvalidCapability)?;
+    let area = bytes(&m["public_area_hex"])?;
+    let attestation = bytes(&m["attestation_hex"])?;
+    let signature = bytes(&m["signature_hex"])?;
+    let verified = authority
+        .fixture_begin(challenge)
+        .verify(crate::attestation::Evidence {
+            public_area: &area,
+            attestation: &attestation,
+            signature: &signature,
+        })?;
+    Ok(verified)
+}
 pub fn evaluate(v: &Value) -> Outcome<Value> {
+    if matches!(
+        v.get("action").and_then(Value::as_str),
+        Some("ca-create" | "csr-inspect" | "client-software" | "client-tpm" | "server-generate")
+    ) {
+        return crate::certificates::fixture(v);
+    }
     if matches!(
         v.get("action").and_then(Value::as_str),
         Some("inner-issue" | "inner-open")
@@ -36,36 +80,7 @@ pub fn evaluate(v: &Value) -> Outcome<Value> {
         return crate::custody::fixture_envelope(v);
     }
     if v.get("action").and_then(Value::as_str) == Some("attestation") {
-        let m = json::keys(
-            v,
-            &[
-                "action",
-                "ak_area_hex",
-                "ak_qualified_name_hex",
-                "challenge_hex",
-                "public_area_hex",
-                "attestation_hex",
-                "signature_hex",
-            ],
-            &[],
-        )?;
-        let authority = crate::attestation::Authority::from_trusted_pin(
-            &bytes(&m["ak_area_hex"])?,
-            &bytes(&m["ak_qualified_name_hex"])?,
-        )?;
-        let challenge = bytes(&m["challenge_hex"])?
-            .try_into()
-            .map_err(|_| Error::InvalidCapability)?;
-        let area = bytes(&m["public_area_hex"])?;
-        let attestation = bytes(&m["attestation_hex"])?;
-        let signature = bytes(&m["signature_hex"])?;
-        let verified = authority
-            .fixture_begin(challenge)
-            .verify(crate::attestation::Evidence {
-                public_area: &area,
-                attestation: &attestation,
-                signature: &signature,
-            })?;
+        let verified = verify_attestation_fixture(v)?;
         let hex = |v: &[u8]| v.iter().map(|b| format!("{b:02x}")).collect::<String>();
         return Ok(
             json!({"ok":true,"spki_der_hex":hex(verified.subject_public_key_info()),"key_name_hex":hex(verified.key_name())}),

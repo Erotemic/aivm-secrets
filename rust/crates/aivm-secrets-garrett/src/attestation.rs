@@ -31,6 +31,7 @@ pub struct VerifiedIdentity {
     spki: Vec<u8>,
     name: Vec<u8>,
     area: Vec<u8>,
+    expires: Instant,
 }
 impl VerifiedIdentity {
     pub fn subject_public_key_info(&self) -> &[u8] {
@@ -41,6 +42,17 @@ impl VerifiedIdentity {
     }
     pub fn public_area(&self) -> &[u8] {
         &self.area
+    }
+    pub(crate) fn require_fresh(&self) -> Outcome<()> {
+        if Instant::now() >= self.expires {
+            return Err(Error::Expired);
+        }
+        Ok(())
+    }
+    #[cfg(feature = "conformance")]
+    pub(crate) fn fixture_expired(mut self) -> Self {
+        self.expires = Instant::now();
+        self
     }
 }
 impl Authority {
@@ -153,6 +165,7 @@ impl PendingEnrollment {
             spki,
             name,
             area: evidence.public_area.to_vec(),
+            expires: self.expires,
         })
     }
 }

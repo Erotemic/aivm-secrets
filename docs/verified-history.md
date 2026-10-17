@@ -83,7 +83,7 @@ checks another request is refused before a second effect. The theorem checks
 supplied admission snapshots; registry-update linearization, rollback and
 coordination with an independent administrator remain unproved.
 
-The gate inventories 55 named obligations and 16 re-extracted Rust mutations,
+The gate inventories 65 named obligations and 22 re-extracted Rust mutations,
 including omitted and substituted issuance acknowledgement. Reproduction is
 documented in [verified Garrett](verified-garrett.md). Full I/O refinement,
 durable authority/CA/OAuth administration, general policy/provider support and
@@ -91,6 +91,6 @@ physical TPM provenance remain in the
 [acceptance plan](planning/aivm-secrets-garrett-verification.md). The project
 remains experimental and unaudited.
 
-Local validation passed with 1,901 tests and one expected pending full-primitive
+The history checkpoint's local validation passed with 1,901 tests and one expected pending full-primitive
 runner skip (288.32 seconds), 64 selected Garrett tests and 24 normal-build
 integration tests. Hosted CI and physical TPM validation remain unexecuted.

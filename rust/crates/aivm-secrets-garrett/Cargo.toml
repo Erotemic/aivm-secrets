@@ -17,6 +17,9 @@ rustix = { version = "1", features = ["fs", "process"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value", "arbitrary_precision"] }
 zeroize = "1"
+rcgen = { version = "=0.14.10", default-features = false, features = ["ring", "pem", "x509-parser", "zeroize"] }
+x509-parser = { version = "0.18", features = ["verify"] }
+time = "0.3"
 
 [[bin]]
 name = "garrett-conformance"

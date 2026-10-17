@@ -7,6 +7,7 @@
 #![allow(clippy::question_mark)]
 
 pub mod credential_use;
+pub mod enrollment;
 pub mod protocol;
 
 pub enum Denial {

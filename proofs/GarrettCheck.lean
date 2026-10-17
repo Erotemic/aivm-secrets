@@ -1,4 +1,5 @@
 import GarrettHistory
+import GarrettEnrollment
 import Garrett
 import GarrettSecrecy
 
@@ -61,3 +62,14 @@ import GarrettSecrecy
 #print axioms Garrett.History.trace_is_public
 #print axioms Garrett.History.every_observation_has_signature_origin
 #print axioms Garrett.History.protected_signature_was_issued
+
+#print axioms aivm_secrets_garrett_core.enrollment.Proofs.approve_key_exact
+#print axioms aivm_secrets_garrett_core.enrollment.Proofs.approve_key_contract
+#print axioms aivm_secrets_garrett_core.enrollment.Proofs.authorize_client_contract
+#print axioms aivm_secrets_garrett_core.enrollment.Proofs.enroll_client_contract
+#print axioms aivm_secrets_garrett_core.enrollment.Proofs.tpm_substitution_never_signed
+#print axioms aivm_secrets_garrett_core.enrollment.Proofs.unapproved_software_key_never_signed
+#print axioms aivm_secrets_garrett_core.enrollment.Proofs.software_is_not_tpm
+#print axioms aivm_secrets_garrett_core.enrollment.Proofs.tpm_plan_uses_attested_key
+#print axioms aivm_secrets_garrett_core.enrollment.Proofs.enroll_client_successful
+#print axioms aivm_secrets_garrett_core.enrollment.Proofs.authorize_tpm_success
