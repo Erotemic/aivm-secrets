@@ -1126,3 +1126,22 @@ main candidate, where 2,090 full-suite tests pass with the one expected primitiv
 runner skip. The separate complete predicate prototype still needs gate/module
 registration, source/archive manifests, source mutations and full-suite/package
 validation before merging. Its assurance manifests are intentionally stale.
+
+## 2026-10-17 06:47:14 -0400
+
+The previous goal turn made concrete progress: main contains the complete typed
+filter refinement and the independently reproduced numeric-reflection fix. I am
+finishing registration and mutation challenges for the borrowed-byte search
+checker now. Its seven exact contracts already check, but an unregistered proof
+file is not the project's complete assurance result. The key tradeoff remains
+keeping byte-level reflection claims narrow: this search has no encoding,
+semantic or timing guarantee. I intend to carry it through the same source,
+parity and packaging gates, then move to the missing native client material
+workflow so the Rust protocol can be bootstrapped without Python tooling.
+
+Registration is complete and the record gate passes 198 named axiom audits,
+254 selected tests (46.65 seconds), six Rust unit tests and strict lint in both
+feature modes. The official 85-mutation run is now active against this frozen
+controller/proof snapshot. I will run the full suite with normal service binaries
+and build the archives before merging. Native client bootstrap will proceed in
+another worktree, preserving the snapshot under audit.

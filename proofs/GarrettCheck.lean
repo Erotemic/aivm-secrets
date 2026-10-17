@@ -1,3 +1,4 @@
+import GarrettReflection
 import GarrettDisclosure
 import GarrettManifest
 import GarrettLogin
@@ -211,3 +212,11 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.disclosure.Proofs.itemsWith_relational
 #print axioms aivm_secrets_garrett_core.disclosure.Proofs.refProject_agreement
 #print axioms aivm_secrets_garrett_core.disclosure.Proofs.recursive_projection_noninterference
+
+#print axioms aivm_secrets_garrett_core.reflection.Proofs.matches_at_contract
+#print axioms aivm_secrets_garrett_core.reflection.Proofs.contains_from_step
+#print axioms aivm_secrets_garrett_core.reflection.Proofs.contains_loop_contract
+#print axioms aivm_secrets_garrett_core.reflection.Proofs.contains_contract
+#print axioms aivm_secrets_garrett_core.reflection.Proofs.reflected_credential_is_detected
+#print axioms aivm_secrets_garrett_core.reflection.Proofs.false_search_excludes_literal
+#print axioms aivm_secrets_garrett_core.reflection.Proofs.nonempty_self_is_detected

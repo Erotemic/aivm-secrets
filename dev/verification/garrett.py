@@ -257,6 +257,16 @@ THEOREMS += [
     "aivm_secrets_garrett_core.disclosure.Proofs.recursive_projection_noninterference",
 ]
 
+THEOREMS += [
+    "aivm_secrets_garrett_core.reflection.Proofs.matches_at_contract",
+    "aivm_secrets_garrett_core.reflection.Proofs.contains_from_step",
+    "aivm_secrets_garrett_core.reflection.Proofs.contains_loop_contract",
+    "aivm_secrets_garrett_core.reflection.Proofs.contains_contract",
+    "aivm_secrets_garrett_core.reflection.Proofs.reflected_credential_is_detected",
+    "aivm_secrets_garrett_core.reflection.Proofs.false_search_excludes_literal",
+    "aivm_secrets_garrett_core.reflection.Proofs.nonempty_self_is_detected",
+]
+
 TESTS = [
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
@@ -268,6 +278,7 @@ TESTS = [
     "tests/test_rust_garrett_oauth_vault.py",
     "tests/test_rust_garrett_login.py",
     "tests/test_rust_garrett_manifest.py",
+    "tests/test_rust_garrett_reflection.py",
     "tests/test_secrets_garrett_modularity.py",
     "tests/test_secrets_identity_parity.py",
     "tests/test_secrets_identity_registry_parity.py",
@@ -319,6 +330,7 @@ def inputs() -> list[str]:
         "proofs/GarrettLogin.lean",
         "proofs/GarrettManifest.lean",
         "proofs/GarrettDisclosure.lean",
+        "proofs/GarrettReflection.lean",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
         "dev/verification/freshness.py",
@@ -498,7 +510,7 @@ def assurance_coordinates() -> dict:
         "aeneas_release": base.RELEASE,
         "theorems": THEOREMS,
         "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
-        "implementation_linked": "Aeneas-generated issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering and schema-directed two-run noninterference",
+        "implementation_linked": "Aeneas-generated issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
@@ -518,7 +530,7 @@ def assurance_coordinates() -> dict:
             "Native file issuance acknowledges public claims before atomic no-replace output publication under a held authority lease. Private output storage and explicit delivery are trusted host operations; publication/completion errors may leave a usable file and require reconciliation.",
             "OAuth quarantine and successor persistence are conditional storage-adapter contracts. Native vault locking drains participating refresh/revoke against dispatch and HMAC checks token equality; root snapshot rollback, hostile same-UID replacement and nonparticipating writers are outside that boundary.",
             "Native PKCE login trusts entropy, SHA-256 S256 derivation, HTTP/query decoding and loopback listener/clock adapters. Callback binding and one-shot lifecycle guards are extracted; ready URLs go only to a trusted host operator/browser, and their state/challenge must not be offered as an agent API. Concrete acquisition I/O histories and secret-sink refinement remain open.",
-            "The manifest HTTPS backend trusts the policy/check/template/GraphQL parsers, JSON-to-typed-tree conversion and selected-tree rendering, reflection checks and concrete HTTP/audit ordering. The extracted recursive filter matches an independent selection specification and has exact two-run noninterference under recursive schema agreement; unselected typed-tree fields are unconstrained. These contracts do not refine the remaining adapters or establish arbitrary provider non-disclosure or whole-service trace equivalence. Native configuration explicitly selects unbounded requests and a file source or explicit OAuth override.",
+            "The manifest HTTPS backend trusts the policy/check/template/GraphQL parsers, JSON-to-typed-tree conversion and selected-tree rendering, reflection traversal/call sites and concrete HTTP/audit ordering. Exact borrowed-byte literal search is extracted and proved. The extracted recursive filter matches an independent selection specification and has exact two-run noninterference under recursive schema agreement; unselected typed-tree fields are unconstrained. These contracts do not refine the remaining adapters or establish arbitrary provider non-disclosure or whole-service trace equivalence. Native configuration explicitly selects unbounded requests and a file source or explicit OAuth override.",
             "Controller histories assume signature verification has prior recorded issuer origin; the ideal signature-origin theorem does not establish a computational byte-level or concrete I/O refinement.",
             "CSR possession, CA constraints/key matching and X.509 signing use the stated rcgen/x509-parser/time adapter contracts; their ASN.1/crypto implementations are not formally refined. TPM approval consumes verified fresh evidence under a trusted AK pin.",
         ],
@@ -1047,6 +1059,39 @@ def mutate() -> None:
             "if fields.len() > 32 {",
         ),
     ]
+    reflection_source = source.with_name("reflection.rs")
+    mutations += [
+        (
+            reflection_source,
+            "reflection comparison inverted",
+            "value[start..start + secret.len()] == *secret",
+            "value[start..start + secret.len()] != *secret",
+        ),
+        (
+            reflection_source,
+            "reflection last offset skipped",
+            "while start <= last {",
+            "while start < last {",
+        ),
+        (
+            reflection_source,
+            "reflection first offset skipped",
+            "let mut start = 0;",
+            "let mut start = 1;",
+        ),
+        (
+            reflection_source,
+            "reflection equal-length secret skipped",
+            "if secret.len() == 0 || secret.len() > value.len() {",
+            "if secret.len() == 0 || secret.len() >= value.len() {",
+        ),
+        (
+            reflection_source,
+            "reflection alternating offsets skipped",
+            "start += 1;",
+            "start += 2;",
+        ),
+    ]
     lean_path = base.run(
         [base.executable("lake"), "env", "printenv", "LEAN_PATH"],
         cwd=PROOFS,
@@ -1110,6 +1155,7 @@ def mutate() -> None:
                 "GarrettLogin",
                 "GarrettManifest",
                 "GarrettDisclosure",
+                "GarrettReflection",
             ]
             # These leaf proofs depend only on Garrett. Check the directly
             # affected leaf first; retain all other modules as fallback coverage.
@@ -1119,6 +1165,7 @@ def mutate() -> None:
                 "trust.rs": "GarrettTrust",
                 "oauth_state.rs": "GarrettOAuth",
                 "oauth_login.rs": "GarrettLogin",
+                "reflection.rs": "GarrettReflection",
             }.get(source.name)
             if preferred:
                 modules.remove(preferred)

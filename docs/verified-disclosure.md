@@ -59,6 +59,31 @@ axioms `propext`, `Classical.choice` and `Quot.sound` are allowed. Rust mutation
 challenge wrong keys/paths, text rejection, changed values/names, projection from
 the wrong object, skipped array elements and depth/schema guard bypasses.
 
+## Exact literal reflection search
+
+[reflection.rs](../rust/crates/aivm-secrets-garrett-core/src/reflection.rs)
+implements the borrowed-byte search used by the native reflection checks.
+[GarrettReflection.lean](../proofs/GarrettReflection.lean) proves that it reports
+exactly every nonempty literal occurrence, including the first and last possible
+offsets. A false search result excludes such an occurrence, and every nonempty
+value matches itself. Empty needles are deliberately false; credential
+acquisition separately rejects empty credentials.
+
+The native JSON adapter applies this predicate to selected decoded strings and
+keys and to the complete canonical public success frame. A numeric credential
+reflected through an allowed integer id is rejected too. The source proof covers
+the byte predicate; correct JSON walking, serialization, invocation and final I/O
+remain adapter obligations. The predicate detects no encoding, fragmentation,
+semantic or timing channel and has no constant-time claim.
+
+A test-only conformance action compares 5,010 seeded binary and boundary cases
+with Python byte operations. Five Rust mutations invert comparison, omit the
+first/last position, reject equal-length matches or skip alternating positions.
+The implementation borrows credentials and uses slice equality instead of
+copying them. A worst-case synthetic benchmark under the pinned Rust compiler
+measured about 135 ms against 112 ms for the previous standard search; this is
+local performance evidence, not a resource or timing-security theorem.
+
 ## Practical limits
 
 This source proof begins with the typed input tree. It relies on the host schema
