@@ -747,8 +747,8 @@ Rust unit checks. The client adds 19 software key/CSR interoperability,
 no-replace, recovery, actual write-failure and concurrency tests, plus six native
 TPM request tests including fresh attestation enrollment and provider dispatch.
 The existing 81 manifest tests and 5,010 byte-search cases remain selected.
-The mutation gate requires **90 changed Rust controllers** to fail unchanged
-proofs, including five attacks against client material publication. Its core,
+The completed mutation gate rejected **90 changed Rust controllers** with
+unchanged proofs, including five attacks against client material publication. Its core,
 generated model, proof sources and mutation logic are unchanged by the TPM
 adapter extension. Hosted CI remains unexecuted, and credentials/providers/TPM
 activity in this validation are synthetic or isolated emulation.
