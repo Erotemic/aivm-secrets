@@ -93,6 +93,10 @@ fn local_action(action: &str, args: &[String]) -> Outcome<serde_json::Value> {
     if action == "inspect-csr" && options.len() == 1 {
         return client_material::inspect_csr(Path::new(csr));
     }
+    if action == "request" && options.len() == 3 && options.get("--key-mode") == Some(&"tpm2") {
+        let config = options.get("--tpm-config").ok_or(Error::InvalidRequest)?;
+        return client_material::request_tpm(Path::new(config), Path::new(csr));
+    }
     if options.len() != 3 || options.get("--key-mode") != Some(&"software") {
         return Err(Error::InvalidRequest);
     }
@@ -106,7 +110,7 @@ fn local_action(action: &str, args: &[String]) -> Outcome<serde_json::Value> {
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.as_slice() == ["--help"] {
-        println!("garrett-client --config ABSOLUTE_PRIVATE_JSON\nRead one version-1 broker frame from stdin; return the public reply.\nSelect key_mode software or tpm2 explicitly; no automatic fallback. TPM provenance must be enrolled separately.\n\ngarrett-client request --key-mode software --key ABSOLUTE_NEW_KEY --csr ABSOLUTE_NEW_CSR\ngarrett-client csr-from-key --key-mode software --key ABSOLUTE_EXISTING_KEY --csr ABSOLUTE_NEW_CSR\ngarrett-client inspect-csr --csr ABSOLUTE_CSR\nSoftware request generation creates an exportable key and provides no VM attestation. Existing files are never replaced. If publication is uncertain, retain the key and inspect/recover its CSR.");
+        println!("garrett-client --config ABSOLUTE_PRIVATE_JSON\nRead one version-1 broker frame from stdin; return the public reply.\nSelect key_mode software or tpm2 explicitly; no automatic fallback. TPM provenance must be enrolled separately.\n\ngarrett-client request --key-mode software --key ABSOLUTE_NEW_KEY --csr ABSOLUTE_NEW_CSR\ngarrett-client request --key-mode tpm2 --tpm-config ABSOLUTE_PRIVATE_JSON --csr ABSOLUTE_NEW_CSR\ngarrett-client csr-from-key --key-mode software --key ABSOLUTE_EXISTING_KEY --csr ABSOLUTE_NEW_CSR\ngarrett-client inspect-csr --csr ABSOLUTE_CSR\nSoftware request generation creates an exportable key and provides no VM attestation. Existing files are never replaced. If publication is uncertain, retain the key and inspect/recover its CSR.");
         return;
     }
     let result = if args.len() == 2 && args[0] == "--config" {

@@ -260,11 +260,7 @@ impl TpmSigner {
     }
 }
 
-pub fn identity(
-    configuration: Configuration,
-    certificate: &[u8],
-    server_ca: &[u8],
-) -> Outcome<client::AuthenticatedClientConfig> {
+fn load_key(configuration: Configuration) -> Outcome<TpmKey> {
     configuration.validate()?;
     let area = files::read_private(&configuration.public_area_file, 1024)?;
     let (point, spki) = public_key(&area)?;
@@ -285,17 +281,50 @@ pub fn identity(
     if scratch.read("public", 1024)? != area {
         return Err(Error::InvalidCapability);
     }
+    Ok(TpmKey {
+        configuration: Arc::new(configuration),
+        point,
+        spki,
+    })
+}
+
+impl rcgen::PublicKeyData for TpmKey {
+    fn der_bytes(&self) -> &[u8] {
+        &self.point
+    }
+    fn algorithm(&self) -> &'static rcgen::SignatureAlgorithm {
+        &rcgen::PKCS_ECDSA_P256_SHA256
+    }
+    fn subject_public_key_info(&self) -> Vec<u8> {
+        self.spki.clone()
+    }
+}
+impl rcgen::SigningKey for TpmKey {
+    fn sign(&self, message: &[u8]) -> Result<Vec<u8>, rcgen::Error> {
+        TpmSigner {
+            configuration: self.configuration.clone(),
+            point: self.point.clone(),
+        }
+        .sign_checked(message)
+        .map_err(|_| rcgen::Error::RemoteKeyError)
+    }
+}
+/// Sign a possession request using a provisioned key. Local attributes and a
+/// signature do not replace the host's independent attestation approval.
+pub(crate) fn create_request(configuration: Configuration) -> Outcome<(String, String)> {
+    crate::client_material::request_for(&load_key(configuration)?)
+}
+
+pub fn identity(
+    configuration: Configuration,
+    certificate: &[u8],
+    server_ca: &[u8],
+) -> Outcome<client::AuthenticatedClientConfig> {
+    let key = load_key(configuration)?;
     let certificates = rustls_pemfile::certs(&mut &*certificate)
         .collect::<Result<Vec<_>, _>>()
         .map_err(|_| Error::InvalidCapability)?;
-    let key = CertifiedKey::new(
-        certificates,
-        Arc::new(TpmKey {
-            configuration: Arc::new(configuration),
-            point,
-            spki,
-        }),
-    );
+    let key = CertifiedKey::new(certificates, Arc::new(key));
     key.keys_match().map_err(|_| Error::InvalidCapability)?;
     client::signing_resolver(server_ca, Arc::new(SingleCertAndKey::from(key)))
 }

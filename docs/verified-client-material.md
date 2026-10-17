@@ -18,8 +18,34 @@ assurance description. It never prints private-key material. The CSR and key
 match Python's P-256/SPKI SHA-256 contract; the CSR has the fixed untrusted-request
 name and requests no certificate extensions. The authority continues to choose
 certificate subject, lifetime and assurance. Explicit software mode is required;
-a TPM selection cannot fall back to software generation. Existing TPM signing
-and attestation paths remain separate and require provisioned key material.
+a TPM selection cannot fall back to software generation. TPM mode uses an already-provisioned pinned key and requires the separate
+configuration described below. It creates no software private-key file.
+
+## Request from a provisioned TPM key
+
+```bash
+garrett-client request --key-mode tpm2 \
+  --tpm-config /private/tpm-request.json --csr /private/client.csr
+```
+
+The private version-1 JSON configuration contains exactly `schema: 1`, `tcti`,
+`persistent_handle`, `authorization_file`, `public_area_file` and `work_directory`.
+These use the same fixed-tool, pinned-public-area and private-authorization
+contracts as the TPM TLS signer. No client certificate is needed to create the
+CSR. Each signature is verified against the pinned public key before its request
+can be published. An existing CSR target, wrong authorization, changed public
+area or an extra software-key configuration field fails closed. TPM errors never
+select a software generator.
+
+The result contains only the CSR path, public fingerprint and an explicit notice
+that provenance must be independently enrolled. Local attributes and a valid
+signature alone do not create an attested identity. Trusted host `enroll-tpm`
+still consumes fresh creation evidence under an independently provisioned AK
+pin and binds that exact SPKI. The tests exercise that complete native sequence
+and a provider call with isolated software TPMs; they establish no physical
+silicon, EK provenance, PCR policy, signing-oracle isolation or anti-clone claim.
+The operator provisions TPM key material separately; this command does not
+create, replace or evict a persistent TPM key.
 
 ## Publication and recovery
 

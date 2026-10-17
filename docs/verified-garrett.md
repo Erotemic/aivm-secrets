@@ -775,3 +775,8 @@ The [native client material workflow](verified-client-material.md) now provides
 explicit software key/CSR generation, CSR inspection and recovery from a retained
 key. Its extracted publication controller checks ordered acknowledgement and
 uncertain outcomes. These software commands provide no TPM or VM attestation.
+
+Native client request generation also supports a provisioned TPM key without
+a pre-existing client certificate. Fresh native attestation enrollment and a
+TPM-signed TLS provider call are exercised together under isolated emulation.
+CSR possession or local attributes alone do not establish hardware provenance.

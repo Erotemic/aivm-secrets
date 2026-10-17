@@ -1178,3 +1178,36 @@ run is now active, including five publication attacks and the existing search,
 disclosure and protocol challenges. The default build validates every proof
 module after the Foundation import refactor. I am freezing source/proof inputs
 for this audit before normal-service full-suite and package checks.
+
+## 2026-10-17 07:10:14 -0400
+
+Starting TPM CSR bootstrap from the software-client checkpoint while the earlier
+controller audits run unchanged. The existing signer already verifies a pinned
+TPM public area and each returned signature, but constructing a TLS identity
+requires a certificate first. A CSR should be signable by the same provisioned
+key without exporting it or inventing a software fallback. I will reuse that
+signer behind rcgen's public SigningKey interface and preserve independent host
+attestation approval. This proves no new hardware provenance: emulator tests
+remain functional evidence and the existing AK trust premise remains necessary.
+
+The TPM path reuses one load/pin validation helper for TLS and CSR signing. rcgen
+receives only public key data and the checked TPM signing operation, never a
+private key. Six new tests join the existing signer/bootstrap checks: all 27
+scoped tests pass, including native CSR creation, fresh native attestation
+enrollment, an attested-only native broker and a TPM-signed provider action.
+Wrong authorization, altered key attributes/point and a software fallback field
+all fail without a CSR or key file. The first end-to-end test used the wrong
+public response field name; checking the authority's actual assurance receipt
+resolved that test defect. The source controllers, generated model, proofs and
+mutation logic remain identical to the software-bootstrap checkpoint; only
+native adapters, conformance tests and assurance metadata are extended. The
+expanded record gate is now running. This is emulator evidence, not a hardware
+provenance claim.
+
+The record gate passes all 205 named obligations and 279 selected tests in
+47.45 seconds, with strict lint in both feature modes and six Rust unit checks.
+The core, generated model and proof sources are byte-identical to 2b8cdea; an AST
+comparison also confirms identical mutation logic. The ongoing 90-controller
+challenge therefore remains applicable. I am freezing the adapter changes for
+normal-service full-suite and package verification. No physical TPM or live
+provider account is involved.

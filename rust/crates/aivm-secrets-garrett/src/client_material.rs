@@ -2,9 +2,7 @@
 //! implied by generating a key; host approval still binds the exact CSR key.
 use crate::{certificates::ClientRequest, files::PrivateDirectory, Error, Outcome};
 use aivm_secrets_garrett_core::client_material as core;
-use rcgen::{
-    CertificateParams, DistinguishedName, DnType, KeyPair, PublicKeyData, PKCS_ECDSA_P256_SHA256,
-};
+use rcgen::{CertificateParams, DistinguishedName, DnType, KeyPair, PKCS_ECDSA_P256_SHA256};
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use zeroize::Zeroizing;
@@ -60,17 +58,21 @@ struct Material {
     csr: String,
     fingerprint: String,
 }
-fn request_for(key: &KeyPair) -> Outcome<(String, String)> {
+pub(crate) fn request_for(key: &impl rcgen::SigningKey) -> Outcome<(String, String)> {
     let mut parameters =
         CertificateParams::new(Vec::<String>::new()).map_err(|_| Error::InternalError)?;
     parameters.distinguished_name = DistinguishedName::new();
     parameters
         .distinguished_name
         .push(DnType::CommonName, "aivm-untrusted-request");
-    let csr = parameters
-        .serialize_request(key)
-        .and_then(|v| v.pem())
-        .map_err(|_| Error::InternalError)?;
+    let request = parameters.serialize_request(key).map_err(|error| {
+        if matches!(error, rcgen::Error::RemoteKeyError) {
+            Error::InvalidCapability
+        } else {
+            Error::InternalError
+        }
+    })?;
+    let csr = request.pem().map_err(|_| Error::InternalError)?;
     let checked = ClientRequest::from_pem(csr.as_bytes())?;
     if checked.subject_public_key_info() != key.subject_public_key_info() {
         return Err(Error::InternalError);
@@ -152,4 +154,37 @@ pub fn csr_from_key(key: &Path, csr: &Path) -> Outcome<Value> {
 pub fn inspect_csr(path: &Path) -> Outcome<Value> {
     let data = crate::files::read_trusted_public(path, 8192)?;
     Ok(json!({"key_fingerprint":ClientRequest::from_pem(&data)?.fingerprint()}))
+}
+
+/// Publish a public request from a pre-existing TPM key, with no software-key
+/// path. Host attestation is still required to enroll hardware assurance.
+pub fn request_tpm(config: &Path, csr: &Path) -> Outcome<Value> {
+    let csr = Destination::at(csr, true)?;
+    let input = crate::json::parse(&crate::files::read_private(config, 65536)?, 65536)?;
+    let m = crate::json::keys(
+        &input,
+        &[
+            "schema",
+            "tcti",
+            "persistent_handle",
+            "authorization_file",
+            "public_area_file",
+            "work_directory",
+        ],
+        &[],
+    )?;
+    crate::json::integer(&m["schema"], 1, 1)?;
+    let text = |key: &str| m[key].as_str().ok_or(Error::InvalidCapability);
+    let configuration = crate::tpm::Configuration {
+        tcti: text("tcti")?.into(),
+        persistent_handle: crate::json::integer(&m["persistent_handle"], 0x81000000, 0x81ffffff)?
+            as u32,
+        authorization_file: Path::new(text("authorization_file")?).into(),
+        public_area_file: Path::new(text("public_area_file")?).into(),
+        work_directory: Path::new(text("work_directory")?).into(),
+    };
+    let (request, fingerprint) = crate::tpm::create_request(configuration)?;
+    csr.publish(request.as_bytes())?;
+    Ok(json!({"key_fingerprint":fingerprint,"csr":csr.path,
+        "security":"TPM2 signing key; provenance must be independently enrolled"}))
 }
