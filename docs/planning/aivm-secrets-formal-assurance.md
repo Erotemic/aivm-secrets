@@ -13,6 +13,13 @@ extraction-shaped kernel, [its specification](aivm-secrets-kernel-spec.md),
 a frozen corpus, mutation gates and the
 [machine-readable assumption ledger](aivm-secrets-assumptions.json).
 
+The [W0 confinement contract](aivm-secrets-conditional-confinement.md)
+and [boundary inventory](aivm-secrets-w0-boundaries.json) define the
+initial native-manifest trace scope, independent release rules, explicit
+adaptive observations and environmental/adapter premises. These are
+specification inputs, not a complete I/O reachability audit or a theorem.
+W3/W6 must review the transitive call graph and byte-level adapters.
+
 See [the modular proof architecture](aivm-secrets-modular-proof-architecture.md)
 for planned leaf proofs and their composition obligations.
 See [the architecture](aivm-secrets-design.md) and the

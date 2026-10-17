@@ -4,8 +4,13 @@
 broker and identity project. Read `docs/extraction.md` and
 `docs/planning/aivm-secrets-repository-boundary.md` before changing boundaries.
 For new work, use `docs/planning/aivm-secrets-active-work.md` as the **current
-task priority and acceptance queue**. Older P/M/G milestone documents are
-detailed design/history, not alternative task assignments. Focus on a useful
+task priority and acceptance queue**. W0 now has the
+[conditional-confinement scope](docs/planning/aivm-secrets-conditional-confinement.md)
+and [sink inventory](docs/planning/aivm-secrets-w0-boundaries.json); check
+references with `python dev/verification/w0_contract.py check`. The W0
+inventory is hand-assembled and **not** exhaustive I/O reachability evidence.
+Older P/M/G milestone documents are detailed design/history, not alternative
+task assignments. Focus on a useful
 standalone broker workflow and conditional, implementation-linked credential
 confinement; do not advertise formal VM isolation or whole-service secrecy.
 

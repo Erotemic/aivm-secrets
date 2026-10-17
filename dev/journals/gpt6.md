@@ -28,3 +28,46 @@ structure checks, and `git diff --check` is clean. Wheel/sdist build tests were
 not reproduced because this environment has no `build` module; the initial
 uninstalled-source run had three environment/setup failures, which are not
 recorded as product regressions.
+## 2026-10-17 11:32:40 -0400
+
+W0 contract baseline for the active conditional credential-confinement plan.
+Kept runtime code and existing Lean theorems unchanged. Inventoried native
+manifest-https-v1 separately from fixed account-status-v1, legacy Python
+forwarding, guest-owned CLI, and operator-only authority. Documented
+protected/public values, guest/host/provider/OAuth sinks, serialized error/
+length/close observations, excluded timing/side channels, finite adaptive
+request strategies, concurrency/linearization and a deliberately restricted
+declassification model. The spec does not classify arbitrary accepted result
+strings as safe or treat a fixed error enum as blanket declassification.
+
+Added versioned W0 JSON with traceable sources/assumption IDs and a structural
+validator plus negative tests; added eight narrowly described Rust/deployment
+assumptions to the ledger. Distinct host-selected origin/bytes construction
+remains a project proof/refinement obligation, **not** an assumption that
+credential confinement holds. Updated active plan, assurance plan and agent
+instructions to point to the W0 specification.
+
+Source audit correction: OAuthSource::active is a guest-time lease check, not
+a refresh. Native OAuth refresh may occur at host-controlled startup via
+session_snapshot; its token endpoint is a separate authorized sink.
+Native pagination exposes per_page, possibly_more and optional page, so the
+possibly_more bit is an explicit declassification decision. The initial model
+includes errors, frame lengths and closure in guest observations but not
+wall-clock timing or packet traffic analysis.
+
+Uncertainties: the sinks list was assembled by source inspection rather than
+an audited complete transitive call graph, and the schema/release decisions
+still require maintainer security approval. W3/W6 must check all concrete
+writers (including errors and panics); W4/W5 must prove linked trace and
+relational properties. The validator only checks structure and references.
+No proof of virtualization, complete service confinement, or Lean
+implementation correspondence is claimed by W0.
+
+Validation: `python dev/verification/w0_contract.py check` passed (5 profiles,
+10 sinks, 11 release rules, 10 observation classes); 141 W0/structural tests
+passed; `git diff --check` passed. A full `python -m pytest -q` run exceeded
+180 seconds at about 16% (slow pre-existing integration coverage) and its
+first failing test was `test_standalone_wheel_and_sdist`, because the current
+environment has no Python `build` module. `python -m build` fails for the same
+missing module. No Rust/Lean rebuild attempted because W0 changes neither
+Rust implementation nor Lean proof source.
