@@ -538,3 +538,116 @@ for this checkpoint. No additional source changes followed the successful
 full regression run. I am committing the native authority layer; the overall
 Garrett port/formalization goal remains active with the lifecycle, OAuth,
 provider-generalization and concrete refinement work listed above.
+
+## 2026-10-17 01:52:47 -0400
+
+The previous turn was concrete progress: f73186a committed the native authority
+layer, 81 checked obligations, 30 rejected Rust mutants and 1,930 full-suite
+passes. The next missing end-state behavior is native lifecycle administration
+and explicit recovery. I am implementing issuer rotation/retirement, server
+renewal and root rollover, preserving the Python v2 formats and common held
+store lease. Root rollover must retire the entire enrollment set durably before
+activating the next CA. A stale CAS or recovery cannot revoke identities
+installed under a newer root. I want reviewable, public-metadata transaction
+plans and preserved immutable private materials rather than silent retry,
+rollback or deletion. The main risk is partial publication across two files;
+the controller needs to distinguish unpublished failures from uncertain state,
+and recovery must check exact current coordinates before any write. I am
+confident about reusing the existing CA/issuer adapters and store primitives;
+concrete filesystem/lock refinement and hardware provenance remain assumptions.
+
+Native issuer rotation/retirement, server renewal and CA rollover now operate
+on the shared Python v2 store. Rollover stages complete immutable material,
+retires all enrollments, then switches the trust selector. A closed public
+transaction plan records before/after snapshots and public material hashes;
+no private-key/AES bytes or their hashes enter the plan or its audit digest.
+Recovery requires the plan SHA and an exact surviving prefix, refuses changed
+enrollments or later trust state, and validates existing keys/certificates
+instead of regenerating or overwriting them. Incomplete plans remain visible
+as invalid entries, without blocking inspection of other plans. Expired staged
+certificate plans cannot be activated. I remain cautious about these claims:
+we simulate interruption points around real adapters, not disk power loss;
+filesystem integrity, leases and durability remain explicit assumptions.
+
+The new trust source controller and 18 Lean obligations are now checked with
+warnings as errors. I initially said the proof compiled too early while an
+adapter lemma and tactic-lint issue remained; that was corrected before gate
+recording. The root fence checks complete selected-CA bytes, recovery classifies
+exact authority/keyring/registry prefixes, and publication requires retirement
+before activation under adapter contracts. Four Rust unit checks include
+cutpoint recovery, private-material refusal and a regression guard against
+extra JSON fields overriding held registry/issuer/state inputs. The Python
+lifecycle tests also exercise recovery through the actual native executable
+and independent Python readers, stale root CAS, live bridge fencing, immutable
+name collisions and an actual EFBIG while persisting a plan.
+
+I also implemented normal native issuance to a protected host file, so the
+nested local-broker profile no longer needs Python to mint its surrogate.
+It uses the existing extracted recorded-issuance controller and a private
+schema-2 audit sink, then atomic no-replace publication and completion. Replies
+contain public file coordinates, never the raw inner capability or surrogate.
+Python opens the Rust-issued token; a normal Rust mTLS client uses it, another
+enrolled peer fails, and a running bridge observes retirement and accepts a
+fresh token from the new issuer. A real staged-output write failure preserves
+its audit/temporary coordinates without exposing a partial destination.
+The complete 99-obligation/38-mutation gate and regression suite are next.
+General policy/OAuth custody, concrete full-service refinement and hardware
+provenance remain open; these lifecycle actions do not complete the full goal.
+
+The recorded gate passes 112 selected tests and the full transitive axiom audit
+for 99 named Garrett obligations. Strict lint passes with and without the
+conformance feature; five Rust unit checks pass. Final review tightened
+publication errors: after a rename is attempted, failure is conservatively
+unknown, including no-replace initialization/file publication, rather than an
+assertion that nothing happened. The Linux rename documentation explicitly
+warns about failure after NFS rename completion. Non-UTF-8 public coordinates
+are refused before side effects so JSON reply serialization cannot panic
+after publishing a file or registry update. The manifest was reproduced after
+these changes. Full regressions and all 38 actual Rust mutations are running
+against unchanged source.
+
+The next credential-lifecycle target is the existing Python OAuth vault's
+in-doubt refresh discipline. Native code currently has independent pure OAuth
+decisions but no complete encrypted vault/HTTP custody path. Porting it must
+make an in-doubt marker durable before sending a possibly one-time refresh
+secret, avoid silent re-presentation after a lost response or failed successor
+write, preserve current-provider/subject binding and generation revocation,
+and feed only opaque host-side credential leases to the provider path. This
+is useful assurance about secret custody and recoverable effects, rather than
+another arithmetic limit theorem. General provider disclosure contracts and
+concrete source-to-I/O/concurrent-history refinement are still substantial
+remaining work. Hardware AK provenance is a separate deployment assumption;
+no physical TPM was available in this checkpoint.
+
+The first full run passed 1,949 tests with the single expected pending general
+primitive-runner skip in 285.45 seconds. A final post-publication-path review
+found that the CLI's initialization status read could still return an ordinary
+read error after the new authority had been published. It now maps that
+post-publication read failure to outcome_unknown, matching the trust/file
+publication policy. This is an adapter-only correction; the core and Lean
+proof/mutation inputs are unchanged. I am reproducing the record and full
+regressions after it rather than treating earlier source validation as final.
+
+Post-fix validation passed: 1,949 full-suite tests and the one expected general
+primitive-runner skip in 285.88 seconds, this time with the normal authority,
+bridge and client executables and independent conformance runners. The final
+record passes 112 selected tests, all 99 permitted-axiom audits and strict lint
+in both modes; five Rust unit checks pass. The sdist/wheel and twine checks
+pass; 168 declared proof/source/document inputs match the archive byte for
+byte, and the ordinary wheel has no Rust, Lean, AIVM or tool payload. There
+were no subsequent source changes. The last four trust mutants are compiling.
+Resource publication reports no pending rows. The next goal turn can begin
+with the OAuth vault/refresh custody boundary described above after this
+checkpoint is committed; the full protocol/service refinement goal remains
+active.
+
+All 38 actual Rust security mutants completed with genuine proof errors
+against the unchanged baseline, including all eight new trust attacks.
+The final two uncertainty mutations fail the exact failure-result theorems;
+activation-before-retirement fails the ordered adapter-contract proof. No
+infrastructure/resource failures or surviving mutants were accepted. The
+initialization wrapper correction changed no core/proof/mutation inputs, and
+its final recorded source passed the complete normal-service regression run.
+I am committing this layer with the overall goal active. The next concrete
+implementation gap remains encrypted OAuth custody/refresh, followed by
+broader policy/provider release and concrete concurrent-service refinement.

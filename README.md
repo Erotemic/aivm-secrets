@@ -70,5 +70,6 @@ possession-checked CSR to explicit software approval or verified TPM evidence
 before client signing. The [native authority path](docs/verified-garrett.md#native-authority-and-live-admission)
 now initializes a Python-compatible private store, enrolls and renews clients,
 records TPM assurance, and coordinates revocation with native provider use.
-Durable issuer/server/root rotation, recovery administration and concrete
-whole-service refinement remain open.
+Native issuer/server/root rotation, explicit trust-transaction recovery and
+acknowledged token issuance to protected host files are implemented too.
+Complete policy/OAuth custody and concrete whole-service refinement remain open.

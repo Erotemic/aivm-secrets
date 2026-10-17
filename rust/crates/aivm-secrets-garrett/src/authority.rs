@@ -20,6 +20,9 @@ use std::{
 };
 use zeroize::Zeroizing;
 
+mod administration;
+mod issuance;
+
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
@@ -42,6 +45,9 @@ fn selection(root: &PrivateDirectory) -> Outcome<Value> {
 }
 fn keyring(root: &PrivateDirectory) -> Outcome<Value> {
     let value = json::parse(&root.read("issuer-keyring.json", 4096)?, 4096)?;
+    parse_keyring(value)
+}
+fn parse_keyring(value: Value) -> Outcome<Value> {
     let m = json::keys(&value, &["schema", "active", "enabled", "next_number"], &[])?;
     json::integer(&m["schema"], 1, 1)?;
     json::integer(&m["next_number"], 2, 100000)?;
@@ -127,6 +133,7 @@ enum Approval {
 }
 impl IdentityAuthority {
     pub fn open(path: &Path) -> Outcome<Self> {
+        path.to_str().ok_or(Error::UnsafeFile)?;
         let root = PrivateDirectory::open(path)?;
         let _lock = root.lock(false)?;
         let pinned = selection(&root)?;
@@ -138,6 +145,7 @@ impl IdentityAuthority {
         })
     }
     pub fn initialize(path: &Path, issuer: &str, audience: &str, now: i64) -> Outcome<Self> {
+        path.to_str().ok_or(Error::UnsafeFile)?;
         json::word(&json!(issuer), 128)?;
         json::word(&json!(audience), 128)?;
         let parent = PrivateDirectory::open(path.parent().ok_or(Error::UnsafeFile)?)?;
@@ -193,8 +201,12 @@ impl IdentityAuthority {
     }
     fn current(&self) -> Outcome<Value> {
         let selected = selection(&self.root)?;
-        if selected["ca"] != self.pinned["ca"]
-            || selected["issuer"] != self.pinned["issuer"]
+        aivm_secrets_garrett_core::trust::require_root(
+            &json::canonical(&selected["ca"]),
+            &json::canonical(&self.pinned["ca"]),
+        )
+        .map_err(|_| Error::Revoked)?;
+        if selected["issuer"] != self.pinned["issuer"]
             || selected["audience"] != self.pinned["audience"]
         {
             return Err(Error::Revoked);
@@ -211,6 +223,12 @@ impl IdentityAuthority {
         CertificateAuthority::from_pem(&ca_public(&self.root, selected)?, &key)
     }
     fn evaluate_registry(&self, state: &Value, action: &str, extra: Value) -> Outcome<Value> {
+        if ["version", "action", "issuer", "audience", "state"]
+            .iter()
+            .any(|key| extra.get(key).is_some())
+        {
+            return Err(Error::InvalidRequest);
+        }
         let mut input = json!({"version":1,"action":action,"issuer":self.pinned["issuer"],"audience":self.pinned["audience"],"state":state});
         let object = input.as_object_mut().ok_or(Error::InvalidCapability)?;
         object.extend(extra.as_object().ok_or(Error::InvalidCapability)?.clone());

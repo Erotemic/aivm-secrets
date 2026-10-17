@@ -1,3 +1,4 @@
+import GarrettTrust
 import GarrettAuthority
 import GarrettHistory
 import GarrettEnrollment
@@ -91,3 +92,22 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.authority.Proofs.publication_failure_is_uncertain
 #print axioms aivm_secrets_garrett_core.authority.Proofs.completion_failure_is_uncertain
 #print axioms aivm_secrets_garrett_core.authority.Proofs.commit_change_positive_witness
+
+#print axioms aivm_secrets_garrett_core.trust.Proofs.bytes_eq_spec
+#print axioms aivm_secrets_garrett_core.trust.Proofs.bytes_eq_exact
+#print axioms aivm_secrets_garrett_core.trust.Proofs.require_root_exact
+#print axioms aivm_secrets_garrett_core.trust.Proofs.changed_root_fences_old_authority
+#print axioms aivm_secrets_garrett_core.trust.Proofs.recovery_phase_contract
+#print axioms aivm_secrets_garrett_core.trust.Proofs.changed_enrollments_refuse_recovery
+#print axioms aivm_secrets_garrett_core.trust.Proofs.activation_without_retirement_refused
+#print axioms aivm_secrets_garrett_core.trust.Proofs.unchanged_recovery_positive
+#print axioms aivm_secrets_garrett_core.trust.Proofs.retired_recovery_positive
+#print axioms aivm_secrets_garrett_core.trust.Proofs.activated_recovery_positive
+#print axioms aivm_secrets_garrett_core.trust.Proofs.stale_root_never_changes_trust
+#print axioms aivm_secrets_garrett_core.trust.Proofs.commit_trust_contract
+#print axioms aivm_secrets_garrett_core.trust.Proofs.intent_failure_preserves_trust
+#print axioms aivm_secrets_garrett_core.trust.Proofs.stage_failure_never_retires
+#print axioms aivm_secrets_garrett_core.trust.Proofs.retirement_failure_never_activates
+#print axioms aivm_secrets_garrett_core.trust.Proofs.activation_failure_reports_uncertainty
+#print axioms aivm_secrets_garrett_core.trust.Proofs.completion_failure_reports_uncertainty
+#print axioms aivm_secrets_garrett_core.trust.Proofs.trust_change_positive

@@ -110,7 +110,7 @@ provider action using that certificate and the TPM signer. A different CSR
 with the same evidence, a stale challenge and an otherwise valid verified
 object aged past its deadline all fail.
 
-The gate now inventories 81 named obligations and 30 Rust security mutations,
+The gate now inventories 99 named obligations and 38 Rust security mutations,
 including the subsequent native authority layer.
 Use the [reproduction commands](verified-garrett.md). The explicit conformance
 feature exposes synthetic CA/server fixture keys in test replies; normal
@@ -118,8 +118,8 @@ builds write private key material only to the protected authority store.
 Never use that test interface for live keys or expose it as an authority service.
 
 The separate native authority module now installs registry rows and persists
-new roots through ordered transactions. Coordinated native CA/server/issuer
-rotation and recovery commands remain to be ported.
+new roots through ordered transactions. Native CA/server/issuer rotation and
+explicit trust-transaction recovery now use the subsequent checked trust layer.
 It does not migrate existing Python state. AK provenance, EK activation,
 physical hardware, signing-oracle isolation and workload identity remain the
 [independent enrollment obligations](verified-garrett.md#tpm-custody-and-enrollment-evidence).

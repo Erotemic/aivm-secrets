@@ -84,7 +84,7 @@ observational equivalence, hide metadata/length/timing, or refine the entire
 Rust I/O system into the symbolic trace. Concrete cryptographic primitives,
 TLS/X.509, parser, filesystem, compiler and translation are trusted boundaries.
 
-The manifest now declares **81 named obligations**, including supporting lemmas,
+The manifest now declares **99 named obligations**, including supporting lemmas,
 the [credential-use/release contracts](verified-provider.md) and the
 [composed request controller](verified-composition.md). The composition checks
 authenticated opening, current inner authorization, exact audit acknowledgement
@@ -96,9 +96,12 @@ approval binding before real Rust client-certificate signing.
 [`GarrettAuthority.lean`](../proofs/GarrettAuthority.lean) adds current-peer,
 TPM-assurance, revocation and ordered durable-publication contracts for the
 actual Rust authority controller.
+[`GarrettTrust.lean`](../proofs/GarrettTrust.lean) adds exact trust-root fencing,
+recovery-prefix and ordered retirement-before-activation contracts. The native
+file issuer uses the existing extracted acknowledged-issuance controller.
 Every transitive axiom dependency is checked afresh. Only Lean's `propext`,
 `Classical.choice`, and `Quot.sound` are permitted; no admitted proof or
-project-specific security axiom is allowed. Thirty deliberate changes to actual
+project-specific security axiom is allowed. Thirty-eight deliberate changes to actual
 Rust must break the unchanged extracted proofs: missing certificate binding,
 missing epoch binding, inclusive expiry, inactive issuance, bypassing binding
 before decryption, returning a token without sealing, removing inner binding,
@@ -113,6 +116,9 @@ validity or escalate software approval to a TPM label.
 Authority mutations remove peer/expiry checks, escalate software assurance,
 leave a revoked client active, bypass intent/material/publication steps, or
 misreport a failure after publication as an unchanged store.
+Trust mutations accept changed roots/enrollments, allow activation with old
+enrollments, skip staging or retirement, activate before retirement, or report
+an uncertain trust change as unchanged.
 
 ## TPM custody and enrollment evidence
 
@@ -255,7 +261,7 @@ server and issuer keys only into the protected authority store.
 
 Implemented actions are `init`, `status`, `enroll`, `renew`, `enroll-tpm`,
 `renew-tpm`, `public-client`, `revoke`, `revoke-if-current`, `forget` and
-`prune`. Renewal requires `expected_epoch` and `expected_thumbprint`;
+`prune`. Native lifecycle/file actions are described below. Renewal requires `expected_epoch` and `expected_thumbprint`;
 `require_new_key` selects rekeying. Enrollment replacement requires explicit
 `replace`; its optional compare-and-swap needs both expected values.
 Stale conditional revocation returns `revoked:false`, as in the reference.
@@ -292,8 +298,9 @@ or after publication returns `outcome_unknown`; it never promises unchanged
 authority. Staged files and intent coordinates survive failures for inspection.
 These are adapter contracts: [rename](https://man7.org/linux/man-pages/man2/rename.2.html)
 and [file/directory fsync](https://man7.org/linux/man-pages/man2/fsync.2.html)
-semantics and the host filesystem are trusted. Recovery commands and rollback
-protection are not implemented. The hash chain cannot detect tail truncation
+semantics and the host filesystem are trusted. Explicit trust-transaction
+recovery is described below; snapshot rollback protection is not implemented.
+The hash chain cannot detect tail truncation
 without an externally anchored head.
 
 The bridge can instead select this held authority as its complete trust source:
@@ -335,7 +342,7 @@ contracts. Failures before publication bypass publication; publication or
 completion failures report uncertainty. The proofs do not assert that Linux,
 the storage adapter, TLS or the audit file is itself formally verified.
 
-The native authority checkpoint passes **1,930 full-suite tests**, with the
+The earlier native authority checkpoint passed **1,930 full-suite tests**, with the
 one expected pending general primitive-runner skip (285.16 seconds), and
 **93 selected Garrett tests**. All **81 named obligations** pass the transitive
 axiom audit. The **18 new authority tests** also pass with normal executables
@@ -344,11 +351,101 @@ TLS signing/provider use, replay refusal, live trust changes, revocation drain,
 expiry after waiting on a lease and partial-write outcomes. These remain
 software-TPM results; hosted CI and physical TPM validation have not run.
 
+## Native trust rotation, recovery and file issuance
+
+The normal administrator also implements `rotate-issuer`, `retire-issuer`,
+`renew-server`, `rotate-ca`, `transactions`, `transaction-status`, `recover`
+and `issue`. Issuer rotation installs a fresh Ed25519/AES key set before
+switching the keyring; enabled older keys remain usable until explicit
+retirement. `retire-issuer` requires `kid` and refuses the active key. Failed
+immutable names are preserved and skipped by future allocations. No private
+key is silently adopted, overwritten or deleted. Server renewal stages a new
+server-only leaf under the current root and reports `restart_required:true`.
+
+`rotate-ca` requires the operator's `expected_ca_sha256`. A stale expectation
+fails before staging, audit or enrollment writes. The native source controller
+performs intent → complete material staging → durable retirement of all
+enrollments → trust activation → completion acknowledgement. Retirement itself
+changes authority: a failure from that point returns `outcome_unknown`.
+The registry and selector are separate durable publications. A crash can leave
+the old root with retired enrollments; recovery moves forward from that state.
+Running old-root brokers fence themselves on their next admission. The operator
+must redistribute the public root, re-enroll clients and restart TLS contexts.
+
+Each trust change persists a private `transactions/<id>/plan.json` before
+effects. It contains closed-schema public snapshots, approved immutable file
+names, public certificate/key digests, operation and timestamp. It contains no
+private-key/AES bytes or hashes of those secrets. Audit intent anchors that
+public plan's digest. Private staged keys must match their public certificates
+or signing keys; the AES file must have the exact supported length. Integrity
+of the private store and entropy source remain assumptions.
+
+Use `transactions` to locate preserved plans and `transaction-status` with
+`transaction` to inspect one. Listing reports partially written plans as
+`invalid-plan` without hiding other transactions. Recovery requires
+`transaction` and `expected_plan_sha256`, rather than selecting a plan or
+retrying a failed operation automatically. It checks complete material and
+the exact current authority/keyring/enrollment prefix under the exclusive
+lease. Only unchanged, retired or fully activated prefixes are admitted.
+New enrollments, later trust changes and activation with an old registry
+conflict; recovery cannot restore an old registry or revoke newly enrolled
+clients. Incomplete/corrupt private material is refused without repair.
+Expired staged certificate plans are refused. Replaying a fully activated plan
+with unchanged state performs no pointer rewrite and records reconciliation.
+These recovery actions cover the new trust transactions; earlier enrollment
+and issued-output failures retain their existing coordinates for inspection.
+
+The eighteen new obligations include exact byte-vector root fencing and
+recovery classification, refusal of changed enrollment snapshots, successful
+prefix witnesses, stale-CAS refusal before effects, and conditional ordered
+staging/retirement/activation/completion. Storage contracts are hypotheses,
+not project security axioms. Tests reconstruct interruption prefixes using
+real native staged material and inject failures around the real filesystem
+adapters; they do not simulate a disk power loss or prove Linux lock/fsync
+semantics. Concrete concurrent service/history refinement remains open.
+
+`issue` accepts private host-file paths instead of literal capabilities:
+
+```json
+{
+  "subject": "vm-test",
+  "inner_capability_file": "/private/inner.capability",
+  "output": "/private/issued.jwt",
+  "client_assurance": "attested-tpm",
+  "lifetime": 900
+}
+```
+
+Use `any-enrolled` only when permitting software/unrecorded enrollment.
+The current row, assurance and enabled issuer are checked under a shared
+authority lease. The extracted recorded-issuance controller binds the token
+to that enrollment and acknowledges its exact public identity before the
+native adapter publishes a complete protected file with no replacement.
+No raw capability/token is returned in the administrative reply or audit.
+Replies contain public subject/expiry/thumbprint and output coordinates.
+Delivery to the agent remains explicit. Existing destinations are refused;
+partial stages are retained, and publication/completion uncertainty is never
+treated as permission to overwrite/retry. This path is interoperable with the
+reference Python verifier and the normal Rust authority-backed TLS bridge.
+Once rename is attempted, errors conservatively report uncertainty. Linux's
+[rename documentation](https://man7.org/linux/man-pages/man2/rename.2.html#BUGS)
+describes failed acknowledgements after completed NFS renames; an error alone
+cannot establish that publication did not occur.
+
+The lifecycle/file checkpoint passes **1,949 full-suite tests** and the one
+expected pending general primitive-runner skip (285.88 seconds), using normal
+authority/client/bridge binaries. Its recorded gate passes **112 selected
+Garrett tests**, all **99 named axiom checks**, strict Rust lint in both build
+modes, and five Rust unit checks. Nineteen new Python tests cover lifecycle,
+recovery and issuance through the actual executables and independent reference
+readers. The hardware-path tests require software TPM execution and do not
+establish physical hardware provenance. Hosted CI remains unexecuted.
+
 ## Remaining assurance work
 
 The [acceptance plan](planning/aivm-secrets-garrett-verification.md) remains
 the broader goal. Remaining work includes concrete adapter refinement,
-native durable issuer/server/root rotation and recovery in Rust, TPM provenance deployment, broader
+complete credential/policy and OAuth custody in Rust, TPM provenance deployment, broader
 provider release/egress proofs, audit/log confinement, and a composed finite
 service-history theorem. The extracted request composition does not establish
 that whole-service result.

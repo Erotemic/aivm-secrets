@@ -126,12 +126,35 @@ THEOREMS += [
     "aivm_secrets_garrett_core.authority.Proofs.commit_change_positive_witness",
 ]
 
+THEOREMS += [
+    "aivm_secrets_garrett_core.trust.Proofs.bytes_eq_spec",
+    "aivm_secrets_garrett_core.trust.Proofs.bytes_eq_exact",
+    "aivm_secrets_garrett_core.trust.Proofs.require_root_exact",
+    "aivm_secrets_garrett_core.trust.Proofs.changed_root_fences_old_authority",
+    "aivm_secrets_garrett_core.trust.Proofs.recovery_phase_contract",
+    "aivm_secrets_garrett_core.trust.Proofs.changed_enrollments_refuse_recovery",
+    "aivm_secrets_garrett_core.trust.Proofs.activation_without_retirement_refused",
+    "aivm_secrets_garrett_core.trust.Proofs.unchanged_recovery_positive",
+    "aivm_secrets_garrett_core.trust.Proofs.retired_recovery_positive",
+    "aivm_secrets_garrett_core.trust.Proofs.activated_recovery_positive",
+    "aivm_secrets_garrett_core.trust.Proofs.stale_root_never_changes_trust",
+    "aivm_secrets_garrett_core.trust.Proofs.commit_trust_contract",
+    "aivm_secrets_garrett_core.trust.Proofs.intent_failure_preserves_trust",
+    "aivm_secrets_garrett_core.trust.Proofs.stage_failure_never_retires",
+    "aivm_secrets_garrett_core.trust.Proofs.retirement_failure_never_activates",
+    "aivm_secrets_garrett_core.trust.Proofs.activation_failure_reports_uncertainty",
+    "aivm_secrets_garrett_core.trust.Proofs.completion_failure_reports_uncertainty",
+    "aivm_secrets_garrett_core.trust.Proofs.trust_change_positive",
+]
+
 TESTS = [
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
     "tests/test_rust_garrett_provider.py",
     "tests/test_rust_garrett_certificates.py",
     "tests/test_rust_garrett_authority.py",
+    "tests/test_rust_garrett_lifecycle.py",
+    "tests/test_rust_garrett_issuance.py",
     "tests/test_secrets_garrett_modularity.py",
     "tests/test_secrets_identity_parity.py",
     "tests/test_secrets_identity_registry_parity.py",
@@ -176,6 +199,7 @@ def inputs() -> list[str]:
         "proofs/GarrettHistory.lean",
         "proofs/GarrettEnrollment.lean",
         "proofs/GarrettAuthority.lean",
+        "proofs/GarrettTrust.lean",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
         "dev/verification/freshness.py",
@@ -354,7 +378,7 @@ def assurance_coordinates() -> dict:
         "aeneas_release": base.RELEASE,
         "theorems": THEOREMS,
         "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
-        "implementation_linked": "Aeneas-generated issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation and ordered authority-publication controllers; exact byte/epoch/time decisions and typed public-result projection",
+        "implementation_linked": "Aeneas-generated issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix and ordered authority/trust-publication controllers; exact byte/epoch/time decisions and typed public-result projection",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
@@ -370,6 +394,8 @@ def assurance_coordinates() -> dict:
             "Presentation uses trusted entry/enrollment/clock snapshots; cross-process dispatch linearization and whole-service concurrent traces remain open.",
             "Native authority admission holds a shared flock through dispatch; participating administrators take its exclusive lease. Held directory/file checks, atomic rename and fsync implement assumed storage contracts, not a proved filesystem or anti-rollback boundary. Legacy independent-file bridges retain entry-snapshot semantics.",
             "TPM assurance receipts are trusted principal-owned host metadata bound to subject, certificate and SPKI. Missing receipts never imply TPM assurance; older Python administrators do not enforce the new assurance-downgrade policy.",
+            "Trust recovery requires a reviewed public-plan digest, exact authority/keyring/enrollment prefix and complete immutable material. Hashing/serialization, key-file validation, durable retirement and activation are trusted storage adapters; no snapshot-rollback resistance or whole-filesystem refinement is claimed.",
+            "Native file issuance acknowledges public claims before atomic no-replace output publication under a held authority lease. Private output storage and explicit delivery are trusted host operations; publication/completion errors may leave a usable file and require reconciliation.",
             "Controller histories assume signature verification has prior recorded issuer origin; the ideal signature-origin theorem does not establish a computational byte-level or concrete I/O refinement.",
             "CSR possession, CA constraints/key matching and X.509 signing use the stated rcgen/x509-parser/time adapter contracts; their ASN.1/crypto implementations are not formally refined. TPM approval consumes verified fresh evidence under a trusted AK pin.",
         ],
@@ -378,7 +404,7 @@ def assurance_coordinates() -> dict:
             "Formal refinement of JSON, TLS, X.509, crypto, TPM evidence, HTTP and filesystem adapter implementations",
             "Physical TPM provenance, EK activation, PCR/firmware policy and anti-rollback deployment",
             "Provider non-disclosure, host compromise, snapshot rollback and side channels",
-            "General Rust policy interpretation, native durable issuer/server/root rotation and recovery administration, complete OAuth vault/HTTP service",
+            "General Rust policy interpretation, complete credential/policy administration, OAuth vault/HTTP service and concrete storage/concurrent-history refinement",
         ],
     }
 
@@ -598,6 +624,52 @@ def mutate() -> None:
             "if let Err(_) = store.complete() {\n        return Err(CommitDenial::Unpublished);",
         ),
     ]
+    trust_source = source.with_name("trust.rs")
+    mutations += [
+        (trust_source, "changed trust root accepted", "*current != *expected", "false"),
+        (
+            trust_source,
+            "changed enrollments accepted for recovery",
+            "if *registry == *before_registry {",
+            "if true {",
+        ),
+        (
+            trust_source,
+            "activation without retired enrollments accepted",
+            "*anchor == *after_anchor && *registry == *after_registry",
+            "*anchor == *after_anchor",
+        ),
+        (
+            trust_source,
+            "trust material staging bypassed",
+            "store.stage()",
+            "Ok::<(), StorageFailure>(())",
+        ),
+        (
+            trust_source,
+            "enrollment retirement bypassed",
+            "store.retire()",
+            "Ok::<(), StorageFailure>(())",
+        ),
+        (
+            trust_source,
+            "activation moved before retirement",
+            "if let Err(_) = store.retire() {\n        return Err(TrustDenial::OutcomeUnknown);\n    }\n    if let Err(_) = store.activate() {",
+            "if let Err(_) = store.activate() {\n        return Err(TrustDenial::OutcomeUnknown);\n    }\n    if let Err(_) = store.retire() {",
+        ),
+        (
+            trust_source,
+            "retirement failure reported unchanged",
+            "if let Err(_) = store.retire() {\n        return Err(TrustDenial::OutcomeUnknown);",
+            "if let Err(_) = store.retire() {\n        return Err(TrustDenial::Unpublished);",
+        ),
+        (
+            trust_source,
+            "completed trust change reported unchanged",
+            "if let Err(_) = store.complete() {\n        return Err(TrustDenial::OutcomeUnknown);",
+            "if let Err(_) = store.complete() {\n        return Err(TrustDenial::Unpublished);",
+        ),
+    ]
     lean_path = base.run(
         [base.executable("lake"), "env", "printenv", "LEAN_PATH"],
         cwd=PROOFS,
@@ -656,6 +728,7 @@ def mutate() -> None:
                 "GarrettHistory",
                 "GarrettEnrollment",
                 "GarrettAuthority",
+                "GarrettTrust",
             ]:
                 proof = temporary / (module + ".lean")
                 shutil.copy2(PROOFS / proof.name, proof)

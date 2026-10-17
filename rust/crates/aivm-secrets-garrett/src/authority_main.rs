@@ -120,7 +120,8 @@ fn execute(action: &str, root: &Path, request: &Value) -> Outcome<Value> {
             text(request, "audience")?,
             now,
         )?
-        .status();
+        .status()
+        .map_err(|_| Error::OutcomeUnknown);
     }
     let authority = IdentityAuthority::open(root)?;
     match action {
@@ -131,6 +132,72 @@ fn execute(action: &str, root: &Path, request: &Value) -> Outcome<Value> {
         "public-client" => {
             json::keys(request, &["subject"], &["now"])?;
             authority.public_client(text(request, "subject")?, now)
+        }
+        "rotate-issuer" | "renew-server" => {
+            json::keys(request, &[], &["now"])?;
+            if action == "rotate-issuer" {
+                authority.rotate_issuer(now)
+            } else {
+                authority.renew_server(now)
+            }
+        }
+        "retire-issuer" => {
+            json::keys(request, &["kid"], &["now"])?;
+            authority.retire_issuer(text(request, "kid")?, now)
+        }
+        "rotate-ca" => {
+            json::keys(request, &["expected_ca_sha256"], &["now"])?;
+            authority.rotate_ca(text(request, "expected_ca_sha256")?, now)
+        }
+        "transactions" => {
+            json::keys(request, &[], &[])?;
+            authority.transactions()
+        }
+        "transaction-status" => {
+            json::keys(request, &["transaction"], &[])?;
+            authority.transaction_status(text(request, "transaction")?)
+        }
+        "recover" => {
+            json::keys(request, &["transaction", "expected_plan_sha256"], &["now"])?;
+            authority.recover_transaction(
+                text(request, "transaction")?,
+                text(request, "expected_plan_sha256")?,
+                now,
+            )
+        }
+        "issue" => {
+            json::keys(
+                request,
+                &[
+                    "subject",
+                    "inner_capability_file",
+                    "output",
+                    "client_assurance",
+                ],
+                &["now", "lifetime"],
+            )?;
+            let require_tpm = match text(request, "client_assurance")? {
+                "any-enrolled" => false,
+                "attested-tpm" => true,
+                _ => return Err(Error::InvalidRequest),
+            };
+            let inner = zeroize::Zeroizing::new(files::read_private(
+                Path::new(text(request, "inner_capability_file")?),
+                16384,
+            )?);
+            let lifetime = request
+                .get("lifetime")
+                .map(|v| json::integer(v, 1, 3600))
+                .transpose()?
+                .unwrap_or(900);
+            authority.issue_to_file(
+                text(request, "subject")?,
+                &inner,
+                Path::new(text(request, "output")?),
+                lifetime,
+                require_tpm,
+                now,
+            )
         }
         "enroll" | "renew" | "enroll-tpm" | "renew-tpm" => {
             let tpm = action.ends_with("-tpm");
@@ -207,7 +274,7 @@ fn execute(action: &str, root: &Path, request: &Value) -> Outcome<Value> {
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     if args.as_slice() == ["--help"] {
-        println!("garrett-authority ACTION --root ABSOLUTE_PRIVATE_ROOT [--request PRIVATE_JSON]\nActions: init, status, enroll, renew, enroll-tpm, renew-tpm, public-client, revoke, revoke-if-current, forget, prune.\nTPM enrollment emits a fresh challenge, then accepts one bounded evidence frame on stdin.\nExperimental and unaudited; host operations only, no private-key output.");
+        println!("garrett-authority ACTION --root ABSOLUTE_PRIVATE_ROOT [--request PRIVATE_JSON]\nActions: init, status, enroll, renew, enroll-tpm, renew-tpm, public-client, revoke, revoke-if-current, forget, prune, rotate-issuer, retire-issuer, renew-server, rotate-ca, transactions, transaction-status, recover, issue.\nTPM enrollment emits a fresh challenge, then accepts one bounded evidence frame on stdin.\nRecovery requires an explicit transaction ID and reviewed plan SHA-256.\nExperimental and unaudited; host operations only, no private-key output.");
         return;
     }
     let result = (|| -> Outcome<Value> {

@@ -224,6 +224,22 @@ impl PrivateDirectory {
         rustix::fs::renameat(&self.0, &temp, &self.0, name).map_err(|_| Error::OutcomeUnknown)?;
         self.sync().map_err(|_| Error::OutcomeUnknown)
     }
+    pub(crate) fn publish_new(&self, name: &str, bytes: &[u8]) -> Outcome<()> {
+        Self::name(name)?;
+        let staged = format!(".issued-{}", random_id()?);
+        self.write_new(&staged, bytes)?;
+        // A failed rename acknowledgement can follow completed publication.
+        // Keep the same conservative outcome as state-pointer replacement.
+        rustix::fs::renameat_with(
+            &self.0,
+            &staged,
+            &self.0,
+            name,
+            rustix::fs::RenameFlags::NOREPLACE,
+        )
+        .map_err(|_| Error::OutcomeUnknown)?;
+        self.sync().map_err(|_| Error::OutcomeUnknown)
+    }
     pub(crate) fn publish_directory(&self, staged: &str, target: &str) -> Outcome<()> {
         Self::name(staged)?;
         Self::name(target)?;
@@ -234,7 +250,7 @@ impl PrivateDirectory {
             target,
             rustix::fs::RenameFlags::NOREPLACE,
         )
-        .map_err(|_| Error::UnsafeFile)?;
+        .map_err(|_| Error::OutcomeUnknown)?;
         self.sync().map_err(|_| Error::OutcomeUnknown)
     }
     pub(crate) fn exists(&self, name: &str) -> Outcome<bool> {
@@ -244,6 +260,20 @@ impl PrivateDirectory {
             Err(rustix::io::Errno::NOENT) => Ok(false),
             Err(_) => Err(Error::UnsafeFile),
         }
+    }
+    pub(crate) fn names(&self) -> Outcome<Vec<String>> {
+        let directory = rustix::fs::Dir::read_from(&self.0).map_err(|_| Error::UnsafeFile)?;
+        let mut names = Vec::new();
+        for entry in directory {
+            let entry = entry.map_err(|_| Error::UnsafeFile)?;
+            let name = entry.file_name().to_str().map_err(|_| Error::UnsafeFile)?;
+            if !matches!(name, "." | "..") {
+                Self::name(name)?;
+                names.push(name.to_owned());
+            }
+        }
+        names.sort();
+        Ok(names)
     }
     pub(crate) fn lock(&self, exclusive: bool) -> Outcome<fs::File> {
         let file = self.file(".enrollment.lock", exclusive)?;

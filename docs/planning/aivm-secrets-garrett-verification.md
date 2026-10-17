@@ -285,7 +285,7 @@ request quota is not part of this milestone's value proposition.
 | Acquisition and refresh | OAuth contract/vault/provider modules and synthetic OAuth tests | Complete custody/error trace and generation/revocation composition |
 | Substitution and result release | Original broker/egress tests plus Rust account-status-v1 custody, route tests and extracted typed-release noninterference | Review/extend the public disclosure contract, general provider mediation and whole-service confinement/refinement |
 | Instance key custody | Rust TPM signer, fresh creation-evidence verifier under a trusted AK pin, actual isolated swtpm/TLS tests | Authenticate hardware AK provenance, EK activation, approved deployment/PCR/rollback policy and physical TPM validation |
-| Native authority | Python-compatible durable Rust init/enroll/renew/revoke, immutable assurance receipts, held-directory storage, extracted admission/publication contracts and live native bridge leases | Native issuer/server/root rotation, recovery commands, complete storage/locking and concurrent-service history refinement |
+| Native authority | Python-compatible durable Rust administration, assurance receipts, issuer/server/CA rotation, explicit prefix-checked recovery, protected file issuance, held-directory storage, extracted admission/trust-publication contracts and live native bridge leases | Complete storage/locking and concurrent-service history refinement; general policy/OAuth custody |
 
 The Python executor currently returns successful provider JSON or text to the
 broker, which places it in the result and checks literal credential reflection.

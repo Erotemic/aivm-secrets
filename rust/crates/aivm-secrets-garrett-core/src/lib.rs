@@ -10,6 +10,7 @@ pub mod authority;
 pub mod credential_use;
 pub mod enrollment;
 pub mod protocol;
+pub mod trust;
 
 pub enum Denial {
     InvalidCapability,

@@ -350,6 +350,12 @@ pub(crate) struct ClientInfo {
     pub not_after: i64,
 }
 pub(crate) fn inspect_client(certificate: &[u8], root: &[u8]) -> Outcome<ClientInfo> {
+    inspect_leaf(certificate, root, false)
+}
+pub(crate) fn inspect_server(certificate: &[u8], root: &[u8]) -> Outcome<ClientInfo> {
+    inspect_leaf(certificate, root, true)
+}
+fn inspect_leaf(certificate: &[u8], root: &[u8], server: bool) -> Outcome<ClientInfo> {
     let der = decode_pem(certificate, "CERTIFICATE", 65536)?;
     let ca_der = checked_ca_der(root)?;
     let (_, ca) = X509Certificate::from_der(&ca_der).map_err(|_| Error::InvalidCapability)?;
@@ -373,8 +379,8 @@ pub(crate) fn inspect_client(certificate: &[u8], root: &[u8]) -> Outcome<ClientI
         || bc.value.ca
         || !ku.value.digital_signature()
         || ku.value.key_cert_sign()
-        || !eku.value.client_auth
-        || eku.value.server_auth
+        || eku.value.client_auth == server
+        || eku.value.server_auth != server
         || eku.value.any
         || !eku.value.other.is_empty()
         || cert.signature_algorithm.algorithm.to_id_string() != "1.2.840.10045.4.3.2"
