@@ -48,3 +48,51 @@ I provisioned and exercised the coherent Aeneas d95aeac / Charon 08d7c9d / Rust 
 Validation passed: scoped parity replays 84 frozen epoch/time/envelope rows, 4,634 generated epoch/time/composition cases and raw JSON/stream checks; Rust fmt and Clippy are clean. The full Python suite passed with 1,868 passed and 10 unavailable-backend skips in 266.19 seconds. Wheel/sdist build and twine checks passed; the sdist contains every declared verification input and omits tool caches/compiled targets, while the wheel stays Python-only. I fixed source-archive traversal so including proofs does not walk the multi-GiB local Lake cache.
 
 Reflections and remaining limits: I am confident this is a real implementation-linked result with nonvacuous witnesses and meaningful negative gates. It is deliberately narrower than a verified broker: JSON decoding/mapping is parity-tested, authenticated input provenance and clock/store behavior are caller obligations, and compiler/translation/Lean/model assumptions remain explicit. The parser also matches Python's default 4,300-digit JSON integer policy; a differently configured reference interpreter needs a reviewed adapter contract. The bootstrap repeat exposed elan's error on installing an already-present toolchain, which I fixed with its idempotent run --install path. The pending full primitive/identity/broker runners remain honestly pending.
+
+
+## 2026-10-16 21:40:16 -0400
+
+The maintainer clarified the actual assurance objective: agents must be able
+to use provider credentials without learning them, and an outsider holding
+an exported surrogate must not gain independent use of the broker. The first
+substantial target is correctness of the Garrett protocol implementation.
+I had prioritized a tractable delegation/budget theorem, which would have
+answered the wrong product question. The next campaign now follows issuance,
+authenticated presentation, substitution and result release end to end.
+
+I am confident the existing nested token profile, pure issue/present model,
+crypto fixture and real local TLS tests provide a useful starting point.
+I recorded the current source-to-obligation map and G0-G5 acceptance gates in
+docs/planning/aivm-secrets-garrett-verification.md and linked that priority
+from the assurance, modular architecture and identity plans. This session
+changes the design and work order, not runtime authorization or wire formats.
+
+The important uncertainties are genuine boundaries: a TPM proves neither
+which process invokes a key nor absence of a live relay, vTPM state is under
+host control, current enrollment at entry is not automatically current at
+dispatch, and the intended provider necessarily receives its credential.
+Successful provider JSON/text currently reaches the reply behind a literal
+reflection check. That is not a general confidentiality boundary, and its
+secret-dependent comparison also needs treatment in an observation-equivalence
+proof. I separated malicious-agent confidentiality from outsider token-theft
+experiments so we do not promise that a compromised authorized client cannot
+act on another party's behalf.
+
+The tradeoff is to start with a small complete protocol/controller and one
+provider operation, with explicit crypto/TLS/TPM contracts, rather than fill
+out unrelated leaf proofs or claim a handwritten Lean model verifies the
+service. Symbolic secrecy, extracted Rust refinement, concrete adapter tests,
+hardware evidence and Python parity will be reported separately. All new
+protocol theorems remain open; the existing 21 freshness proof inputs are
+unchanged. Hardware deployment selection remains an optional open question.
+
+Validation: the full Python suite passed with 1,861 tests and 17 skips
+in 259.16 seconds. Seven of those skips were the available freshness
+runner left unconfigured; rerunning that scoped module with the real
+Rust executable passed all seven in 1.52 seconds. The remaining ten
+unavailable Rust backend checks remain pending. All 41 local links
+checked in the affected docs resolve, and all 21 declared existing
+proof-input hashes are unchanged. A final sequential wheel/sdist build
+succeeded and the source archive contains the exact new plan. The
+initial parallel build overlapped the suite's own packaging test, so
+that final build was deliberately run after the suite completed.

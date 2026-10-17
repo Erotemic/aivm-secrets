@@ -45,3 +45,9 @@ The first [verified Rust freshness primitive](docs/verified-freshness.md) has
 implementation-linked Lean proofs and scoped Python parity tests. It is an
 independent development unit; the Python broker remains experimental and
 unaudited, and full Rust broker/primitive-runner parity is still pending.
+
+The next [verification campaign](docs/planning/aivm-secrets-garrett-verification.md)
+targets Garrett protocol correctness: authorized actions without credential
+disclosure, and rejection of stolen surrogates without the enrolled client's
+signing authority. Its design records the crypto, TLS, provider and TPM/vTPM
+conditions; these protocol guarantees remain open.

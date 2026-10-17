@@ -295,6 +295,13 @@ it is runnable; the operator's chosen threat model must remain explicit.
 
 ## 7. Migration campaign, in dependency order
 
+**Priority update, 2026-10-16:** the first substantial composed proof target is
+[Garrett protocol correctness](aivm-secrets-garrett-verification.md), including
+credential confidentiality, successful authorized use and stolen-surrogate
+rejection. Its G0-G5 stages set the next work order. The M0-M6 inventory below
+retains the extraction history and dependencies; M3 budget/scope work does not
+block that protocol campaign.
+
 | Increment | Scope | Exit gate |
 | --- | --- | --- |
 | M0 - Plan (completed earlier) | Record internal primitives and Garrett protocol boundary, theorem graph and two-backend contract | Planning overlay accepted |

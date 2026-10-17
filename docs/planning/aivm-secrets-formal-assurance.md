@@ -20,9 +20,18 @@ notation is a specification sketch, not executable Lean.
 
 ## 1. What should be proved
 
-The central theorem should concern **all emitted credentialed effects**, not
-only a policy function's return value. Every emitted effect must correspond to
-a currently valid, correctly bound capability, a budget reservation and a
+The first composed target is [Garrett protocol correctness and credential
+confidentiality](aivm-secrets-garrett-verification.md), following maintainer
+direction on 2026-10-16. It requires successful authorized use, rejection of
+independent use of a stolen surrogate, and credential confinement across
+issuance, presentation and substitution. Budget/delegation proofs remain
+valid inventory items but do not set this campaign's priority. The protocol
+claim explicitly includes crypto/TLS/TPM provenance and provider disclosure
+conditions; proving a pure claim comparison alone does not discharge it.
+
+The composed theorem must cover **all emitted credentialed effects**. Every
+emitted effect must correspond to a currently valid, correctly bound
+capability, a budget reservation and a
 permitted operation on the checked resource. A rejected request must not create
 an alternate credentialed route. Provider authentication is an effect of the
 trusted interpreter, not a value exposed by the client protocol.
