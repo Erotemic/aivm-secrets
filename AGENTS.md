@@ -12,7 +12,12 @@ inventory is hand-assembled and **not** exhaustive I/O reachability evidence.
 Older P/M/G milestone documents are detailed design/history, not alternative
 task assignments. W1 has a standalone broker/guest/TLS workflow in
 `docs/standalone-github-workflow.md` and
-`tests/test_secrets_w1_github_workflow.py`. Focus on a useful
+`tests/test_secrets_w1_github_workflow.py`. W2 adds native Rust
+`tests/test_rust_w2_github_workflow.py` and `docs/standalone-rust-github-workflow.md`;
+**skipped native tests are not W2 completion**. W3's reviewed-effect inventory
+and source guard are in `docs/verified-w3-effect-boundary.md` and
+`dev/verification/w3_effect_boundary.py`; they do not prove transitive I/O
+reachability. Run both W0/W3 checkers after Rust boundary changes. Focus on a useful
 standalone broker workflow and conditional, implementation-linked credential
 confinement; do not advertise formal VM isolation or whole-service secrecy.
 

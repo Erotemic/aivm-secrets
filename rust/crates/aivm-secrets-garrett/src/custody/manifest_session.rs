@@ -4,6 +4,37 @@ use super::*;
 use crate::manifest::{disclosure::Disclosure, Effect, Policy};
 use aivm_secrets_garrett_core::{manifest as guards, open_surrogate};
 
+// W3 dispatch vocabulary: these two effects are the only credentialed HTTPS
+// phases exposed by the native manifest guest-request path. A PreparedDispatch
+// is constructed only after the policy compiler selects an Effect. It is not a
+// proof witness by itself; the enclosing request checks admission, fresh grant,
+// durable audit and selected route before the interpreter runs.
+#[derive(Clone, Copy)]
+enum DispatchPhase {
+    Preflight,
+    Final,
+}
+impl DispatchPhase {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Preflight => "preflight",
+            Self::Final => "final",
+        }
+    }
+}
+struct PreparedDispatch<'a> {
+    phase: DispatchPhase,
+    effect: &'a Effect,
+}
+impl<'a> PreparedDispatch<'a> {
+    fn preflight(effect: &'a Effect) -> Self {
+        Self { phase: DispatchPhase::Preflight, effect }
+    }
+    fn final_effect(effect: &'a Effect) -> Self {
+        Self { phase: DispatchPhase::Final, effect }
+    }
+}
+
 pub(crate) struct Session {
     base: AccountSession,
     policy: Policy,
@@ -180,25 +211,28 @@ impl Session {
             .map_err(use_error)?;
             Ok(())
         };
-        let observe = |effect: &Effect, phase: &str| -> Outcome<()> {
+        // Single admission-to-I/O boundary for preflight and final effects.
+        // Neither raw facts nor a guest-provided URL is a PreparedDispatch.
+        let dispatch = |prepared: PreparedDispatch<'_>| -> Outcome<Value> {
+            let effect = prepared.effect;
             // A hostile fact must never turn a captured secret into a public
             // route/audit coordinate. Request bodies stay off the audit sink.
             crate::manifest::disclosure::ensure_safe(&json!({"target":effect.target}), &secret.0)?;
-            self.base.executor.audit.write_record(&json!({"schema":1,"event":"dispatch","phase":phase,"grant":self.base.executor.audit.grant,"policy":self.base.executor.audit.policy,
+            self.base.executor.audit.write_record(&json!({"schema":1,"event":"dispatch","phase":prepared.phase.as_str(),"grant":self.base.executor.audit.grant,"policy":self.base.executor.audit.policy,
                 "identity":crate::model::claims_json(&outer.claims)?,"operation":op.name,"request_digest":request_hash,
                 "route":{"host":self.policy.host,"port":self.base.grant.route.port,"method":effect.method,"path":effect.target}}))?;
-            // Audit persistence can block too. Sample again at dispatch, after
-            // its acknowledgement and any preflight wait, before network I/O.
-            fresh()
-        };
-        let facts = if let Some(effect) = self.policy.preflight(op, &args)? {
-            observe(&effect, "preflight")?;
+            // Durable audit and a fresh grant both precede credentialed I/O.
+            // Waiting for either must not extend identity or grant lifetime.
+            fresh()?;
             self.base.executor.exchange_manifest(
                 &self.base.grant.route,
                 &secret,
-                &effect,
+                effect,
                 &self.policy.headers,
-            )?
+            )
+        };
+        let facts = if let Some(effect) = self.policy.preflight(op, &args)? {
+            dispatch(PreparedDispatch::preflight(&effect))?
         } else {
             Value::Null
         };
@@ -208,13 +242,7 @@ impl Session {
         fresh()?;
         let sent_write = effect.as_ref().is_some_and(|e| e.write);
         let raw = if let Some(effect) = effect {
-            observe(&effect, "final")?;
-            self.base.executor.exchange_manifest(
-                &self.base.grant.route,
-                &secret,
-                &effect,
-                &self.policy.headers,
-            )?
+            dispatch(PreparedDispatch::final_effect(&effect))?
         } else {
             facts
         };

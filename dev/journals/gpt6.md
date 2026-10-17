@@ -106,3 +106,43 @@ Python guest/policy/broker/W0/purity regression tests passed, W0 structural
 checker passed. A broad CLI-heavy regression invocation exceeded its timeout
 after 19 tests, so it is not counted as passing. No live GitHub, Rust, Lean or
 VM test was attempted. Maintainer review of test coverage remains open.
+
+## 2026-10-17 13:32:00 -0400
+
+W2/W3 implementation, using the source snapshot at `28e466d` with the
+planning/W0/W1 overlays applied. Implemented a deliberately closed guest-side
+Rust `garrett-client gh pr view/diff/checks` translator, with explicit `--repo`,
+selected `--json` fields, guest-owned private capability-file input, no `gh`
+subprocess/network fallback, and no write aliases. Added a native manifest
+fixture reusing W1's synthetic GitHub provider and PR data. The host policy
+compiler still independently checks every requested operation, arguments,
+checked facts, declared HTTPS route, and host write gate. Native disclosure
+selects a smaller set of fields than Python W1; CLI selection cannot expand it.
+
+W3 consolidated native manifest preflight/final credentialed HTTP sends into
+one phase-tagged dispatch closure that checks the destination against literal
+credential reflection, durably records an audit event, rechecks authorization,
+and then performs the provider exchange. Added one authenticated guest-frame
+serializer for success/error results. Inventoried provider, guest, audit,
+startup, legacy forwarding, OAuth and host-admin sinks with links back to W0.
+Added source-change digests and targeted bypass guards; six mutants were
+rejected after rebaselining their digests. A separate negative test
+rejects a newly added Rust source file. The source guard is neither a sound
+transitive I/O analysis nor an implementation-linked confinement theorem.
+
+Validation: W0 and W3 contract checkers passed; ten W3 tests passed; the W2
+native-policy fixture passed. Four W2 native runtime cases skipped because the
+Rust authority/bridge/client binaries and Rust compiler are unavailable here.
+W1 baseline was verified after local editable installation: three subprocess
+integration tests passed in 35.54 seconds. Consequently no new Rust code was
+compiled/executed in this environment, and W2 runtime acceptance and W3
+refactor runtime behavior remain *unverified*. The W4 whole-trace proof and W6
+I/O refinement remain open.
+
+Tradeoffs/risks: a three-command read-only surface makes the useful workflow
+measurable without prematurely committing to generic `gh` parity. The source
+fingerprints intentionally require re-review after any Rust change and may be
+noisy during subsequent work. `PreparedDispatch` and `GuestFrame` centralize
+selected boundaries, but do not encode independent authorization witnesses or
+prove every path to physical I/O. No assumption of VM isolation was discharged.
+The actual model is GPT-6; the exact weights/config variant is unavailable.

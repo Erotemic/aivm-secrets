@@ -153,6 +153,23 @@ pub struct Bridge {
     subject: Option<String>,
     backend: Backend,
 }
+// The sole authenticated guest-frame serializer in the bridge. Native provider
+// code supplies a selected reply or a bounded Error; this type serializes the
+// result but does not by itself prove the reply's disclosure policy.
+struct GuestFrame(Value);
+impl GuestFrame {
+    fn from_answer(answer: Outcome<Value>) -> Self {
+        Self(answer.unwrap_or_else(failure))
+    }
+    fn send(&self, writer: &mut impl Write) -> Outcome<()> {
+        writer
+            .write_all(&json::canonical(&self.0))
+            .and_then(|_| writer.write_all(b"\n"))
+            .and_then(|_| writer.flush())
+            .map_err(|_| Error::InternalError)
+    }
+}
+
 impl Bridge {
     pub fn new(
         config: AuthenticatedServerConfig,
@@ -301,12 +318,7 @@ impl Bridge {
         let answer = frame(&mut stream, MAX_FRAME)
             .and_then(|raw| json::parse(&raw, MAX_FRAME).map_err(|_| Error::InvalidRequest))
             .and_then(|v| self.answer(v, &peer, &now));
-        let reply = answer.unwrap_or_else(failure);
-        stream
-            .write_all(&json::canonical(&reply))
-            .map_err(|_| Error::InternalError)?;
-        stream.write_all(b"\n").map_err(|_| Error::InternalError)?;
-        stream.flush().map_err(|_| Error::InternalError)?;
+        GuestFrame::from_answer(answer).send(&mut stream)?;
         stream.conn.send_close_notify();
         let _ = stream.flush();
         Ok(())
