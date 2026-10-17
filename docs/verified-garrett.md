@@ -739,18 +739,16 @@ targets, bodies and credential headers and exercise denial, expiry, revocation,
 projection and uncertain-write paths. This is finite behavioral evidence, not an
 all-input equivalence proof.
 
-The recursive-disclosure checkpoint passes **2,090 full-suite tests**, with one
-expected pending general primitive-runner skip (310.32 seconds), using normal
-native service binaries. The recorded gate passes **253 selected Garrett tests**,
-all **191 named axiom checks**, strict Rust lint in both modes and six Rust
-unit checks. **81 manifest tests** cover independent Python effect compilation
-and actual native provider I/O, filtering, expiry and revocation, including
-nested ignored-field changes and strict whole-result rejection after a bad child.
-A separate provider regression confirms denial of a numeric credential reflected
-through the permitted account id, matching the Python broker.
-The mutation gate requires **80 changed Rust controllers** to fail unchanged
-proofs, including ten new attacks against recursive disclosure. Hosted CI remains
-unexecuted, and all credentials/providers/TPM activity in this validation are
+The native-client-bootstrap checkpoint passes **2,110 full-suite tests**, with
+one expected pending general primitive-runner skip (323.29 seconds), using normal
+native service binaries. The recorded gate passes **273 selected Garrett tests**,
+all **205 named axiom checks**, strict Rust lint in both modes and six Rust
+unit checks. The native client adds 19 key/CSR interoperability, no-replace,
+recovery, actual write-failure and concurrency tests. The existing 81 manifest
+tests and 5,010 byte-search cases remain selected.
+The mutation gate requires **90 changed Rust controllers** to fail unchanged
+proofs, including five attacks against client material publication. Hosted CI
+remains unexecuted, and credentials/providers/TPM activity in this validation are
 synthetic or isolated emulation.
 
 Native CLI alias tables, command resolver execution, one-shot write approvals,

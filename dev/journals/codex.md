@@ -1178,3 +1178,15 @@ run is now active, including five publication attacks and the existing search,
 disclosure and protocol challenges. The default build validates every proof
 module after the Foundation import refactor. I am freezing source/proof inputs
 for this audit before normal-service full-suite and package checks.
+
+The official 90-mutation audit finished successfully: every changed Rust
+controller was re-extracted and rejected by unchanged proofs. All five new
+publication attacks fail, including CSR-before-key, skipped key, erased key
+uncertainty and falsely unchanged/successful CSR failures. This also validates
+the Foundation import refactor against every prior controller challenge.
+Normal service binaries pass the complete suite: 2,110 tests and one expected
+pending primitive-runner skip in 323.29 seconds. Wheel/source builds and twine
+pass; all 200 inventoried archive inputs match byte for byte. The broader TPM
+adapter extension uses the same byte-identical core, generated model and proof
+sources, with its own added runtime evidence. These results do not refine
+filesystem durability, native adapters or whole-service histories.
