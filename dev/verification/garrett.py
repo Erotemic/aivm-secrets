@@ -214,6 +214,43 @@ THEOREMS += [
     "aivm_secrets_garrett_core.manifest.Proofs.range_positive_witness",
 ]
 
+THEOREMS += [
+    "aivm_secrets_garrett_core.disclosure.Proofs.field_loop_contract",
+    "aivm_secrets_garrett_core.disclosure.Proofs.field_contract",
+    "aivm_secrets_garrett_core.disclosure.Proofs.ignored_field_value_cannot_affect_lookup",
+    "aivm_secrets_garrett_core.disclosure.Proofs.lookup_from_contract",
+    "aivm_secrets_garrett_core.disclosure.Proofs.lookup_contract",
+    "aivm_secrets_garrett_core.disclosure.Proofs.charge_contract",
+    "aivm_secrets_garrett_core.disclosure.Proofs.nonzero_cons",
+    "aivm_secrets_garrett_core.disclosure.Proofs.text_safe_loop_contract",
+    "aivm_secrets_garrett_core.disclosure.Proofs.text_safe_contract",
+    "aivm_secrets_garrett_core.disclosure.Proofs.bytes_clone_exact",
+    "aivm_secrets_garrett_core.disclosure.Proofs.map_eq_of_fits",
+    "aivm_secrets_garrett_core.disclosure.Proofs.view_injective",
+    "aivm_secrets_garrett_core.disclosure.Proofs.runItems_cons",
+    "aivm_secrets_garrett_core.disclosure.Proofs.array_step_contract",
+    "aivm_secrets_garrett_core.disclosure.Proofs.runItems_nil",
+    "aivm_secrets_garrett_core.disclosure.Proofs.array_from_loop_contract",
+    "aivm_secrets_garrett_core.disclosure.Proofs.array_from_contract",
+    "aivm_secrets_garrett_core.disclosure.Proofs.runFields_cons",
+    "aivm_secrets_garrett_core.disclosure.Proofs.runFields_nil",
+    "aivm_secrets_garrett_core.disclosure.Proofs.field_step_contract",
+    "aivm_secrets_garrett_core.disclosure.Proofs.fields_from_loop_contract",
+    "aivm_secrets_garrett_core.disclosure.Proofs.fields_from_contract",
+    "aivm_secrets_garrett_core.disclosure.Proofs.project_fields_contract",
+    "aivm_secrets_garrett_core.disclosure.Proofs.findField_denial",
+    "aivm_secrets_garrett_core.disclosure.Proofs.lookupList_denial",
+    "aivm_secrets_garrett_core.disclosure.Proofs.boundedLookup_denial",
+    "aivm_secrets_garrett_core.disclosure.Proofs.project_contract",
+    "aivm_secrets_garrett_core.disclosure.Proofs.result_matches_unique",
+    "aivm_secrets_garrett_core.disclosure.Proofs.refProject_lookup_congruence",
+    "aivm_secrets_garrett_core.disclosure.Proofs.selected_path_noninterference",
+    "aivm_secrets_garrett_core.disclosure.Proofs.fieldsWith_congruence",
+    "aivm_secrets_garrett_core.disclosure.Proofs.root_fields_noninterference",
+    "aivm_secrets_garrett_core.disclosure.Proofs.ignored_input_field_noninterference",
+    "aivm_secrets_garrett_core.disclosure.Proofs.boolean_projection_positive_witness",
+]
+
 TESTS = [
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
@@ -275,6 +312,7 @@ def inputs() -> list[str]:
         "proofs/GarrettOAuth.lean",
         "proofs/GarrettLogin.lean",
         "proofs/GarrettManifest.lean",
+        "proofs/GarrettDisclosure.lean",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
         "dev/verification/freshness.py",
@@ -940,6 +978,69 @@ def mutate() -> None:
             "reply.discarded",
         ),
     ]
+    disclosure_source = source.with_name("disclosure.rs")
+    mutations += [
+        (
+            disclosure_source,
+            "disclosure lookup accepts wrong key",
+            "if entry.0 != *name {",
+            "if false {",
+        ),
+        (
+            disclosure_source,
+            "disclosure ignores selected path",
+            "if index >= at.len() {",
+            "if true {",
+        ),
+        (
+            disclosure_source,
+            "disclosure accepts embedded zero",
+            "if value[index] == 0 {",
+            "if false {",
+        ),
+        (
+            disclosure_source,
+            "disclosure corrupts integer leaf",
+            "value: Json::Integer(*v),",
+            "value: Json::Integer(0),",
+        ),
+        (
+            disclosure_source,
+            "disclosure replaces schema output name",
+            "out.push((field.name.clone(), selected.value));",
+            "out.push((Vec::new(), selected.value));",
+        ),
+        (
+            disclosure_source,
+            "disclosure projects from wrong object",
+            "project_fields(selected, fields, fuel - 1, budget)",
+            "project_fields(value, fields, fuel - 1, budget)",
+        ),
+        (
+            disclosure_source,
+            "disclosure skips first array item",
+            "array_from(values, item, fuel - 1, charge(budget, 2)?, 0, Vec::new())",
+            "array_from(values, item, fuel - 1, charge(budget, 2)?, 1, Vec::new())",
+        ),
+        (
+            disclosure_source,
+            "disclosure corrupts object child",
+            "out.push((field.name.clone(), selected.value));",
+            "out.push((field.name.clone(), Json::Null));",
+        ),
+        (
+            disclosure_source,
+            "disclosure bypasses depth termination",
+            "if fuel == 0 {",
+            "if false {",
+        ),
+        (
+            disclosure_source,
+            "disclosure permits empty field schema",
+            "if fields.len() == 0 || fields.len() > 32 {",
+            "if fields.len() > 32 {",
+        ),
+    ]
     lean_path = base.run(
         [base.executable("lake"), "env", "printenv", "LEAN_PATH"],
         cwd=PROOFS,
@@ -1002,6 +1103,7 @@ def mutate() -> None:
                 "GarrettOAuth",
                 "GarrettLogin",
                 "GarrettManifest",
+                "GarrettDisclosure",
             ]
             # These leaf proofs depend only on Garrett. Check the directly
             # affected leaf first; retain all other modules as fallback coverage.
@@ -1019,6 +1121,14 @@ def mutate() -> None:
                 modules.remove("GarrettLogin")
                 modules.remove("GarrettManifest")
                 modules[1:1] = ["GarrettLogin", "GarrettManifest"]
+            if source.name == "disclosure.rs":
+                for dependency in [
+                    "GarrettLogin",
+                    "GarrettManifest",
+                    "GarrettDisclosure",
+                ]:
+                    modules.remove(dependency)
+                modules[1:1] = ["GarrettLogin", "GarrettManifest", "GarrettDisclosure"]
             for module in modules:
                 proof = temporary / (module + ".lean")
                 shutil.copy2(PROOFS / proof.name, proof)

@@ -1,3 +1,4 @@
+import GarrettDisclosure
 import GarrettManifest
 import GarrettLogin
 import GarrettOAuth
@@ -172,3 +173,38 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.manifest.Proofs.release_exact
 #print axioms aivm_secrets_garrett_core.manifest.Proofs.discarded_response_noninterference
 #print axioms aivm_secrets_garrett_core.manifest.Proofs.range_positive_witness
+
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.field_loop_contract
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.field_contract
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.ignored_field_value_cannot_affect_lookup
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.lookup_from_contract
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.lookup_contract
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.charge_contract
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.nonzero_cons
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.text_safe_loop_contract
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.text_safe_contract
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.bytes_clone_exact
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.map_eq_of_fits
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.view_injective
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.runItems_cons
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.array_step_contract
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.runItems_nil
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.array_from_loop_contract
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.array_from_contract
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.runFields_cons
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.runFields_nil
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.field_step_contract
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.fields_from_loop_contract
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.fields_from_contract
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.project_fields_contract
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.findField_denial
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.lookupList_denial
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.boundedLookup_denial
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.project_contract
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.result_matches_unique
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.refProject_lookup_congruence
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.selected_path_noninterference
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.fieldsWith_congruence
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.root_fields_noninterference
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.ignored_input_field_noninterference
+#print axioms aivm_secrets_garrett_core.disclosure.Proofs.boolean_projection_positive_witness

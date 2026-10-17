@@ -953,3 +953,36 @@ not merge or describe this branch as a complete filter refinement until those
 checks, full gates and manifest/archive refresh are done. main remains the
 validated result. A future merge must preserve both journal continuations and
 regenerate assurance manifests instead of choosing stale hashes from either side.
+
+## 2026-10-17 05:52:00 -0400
+
+Continuing the disclosure refinement on the isolated branch. The validated main
+checkout remains the usable checkpoint. I am concentrating on the recursive
+composition now: exact lookup and individual projection steps are insufficient
+unless every array element and schema field is accounted for by the actual Rust
+loops. The main uncertainty is proof engineering around the extracted mutually
+recursive functions, rather than provider behavior, which already has synthetic
+parity coverage. I will keep the unfinished proof separate until its extraction,
+mutation, packaging and full-suite gates are refreshed. The tradeoff is a longer
+proof cycle in exchange for a claim about the implementation's complete filter
+instead of a guard that assumes filtering happened correctly.
+
+The complete projection contract now checks with warnings as errors. It relates
+all accepted and rejected Rust projections to an independent list specification;
+the loop invariants account for every child and retain failure once encountered.
+The lossless output view gives exact-result equality, not merely matching public
+prefixes. Derived noninterference covers equal selected paths and root field
+sets, with a concrete arbitrary ignored-field theorem and a successful Boolean
+witness. All 34 disclosure obligations are registered for the axiom audit; ten
+source mutations now challenge field lookup, path selection, text rejection,
+leaf/name integrity, nested source choice, array traversal and depth/schema guards.
+
+The rebuilt native adapter passes 81 manifest tests, including six new cases for
+nested private changes, schema-owned names and whole-result rejection after a
+bad child. Strict all-feature Clippy and targeted Python fatal-error lint pass.
+The broad Ruff rule set reports preexisting style conventions (dict calls and
+nested context managers), so I did not rewrite unrelated test scaffolding.
+Assurance manifests remain stale until the full gate; this checkpoint is still
+on the isolated branch. The JSON adapter, reflection scan, pagination metadata,
+network and durable storage remain outside the new source proof. I am confident
+in the pure filter theorem and will test the proof's sensitivity before merging.

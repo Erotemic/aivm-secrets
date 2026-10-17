@@ -1,5 +1,13 @@
 import GarrettManifest
 
+/-!
+Implementation refinement for the typed response filter extracted from Rust.
+The list specification fixes selected paths, output names, types and failure
+behavior independently of the Rust loops. Successful outputs fit the declared
+proof depth, making the public view lossless. JSON decoding/rendering, transport,
+reflection checks and provider semantics remain adapter assumptions.
+-/
+
 open Aeneas Aeneas.Std
 open aivm_secrets_garrett_core.Proofs
 open aivm_secrets_garrett_core.credential_use
@@ -433,6 +441,617 @@ theorem array_step_contract (fuel : Usize)
         · simp [appended, alloc.vec.Vec.length]
           scalar_tac
       · simp [StateView, stepItem, cut, child_view, appended, List.map_append]
+
+theorem runItems_nil (select : Json → Nat → Option (PublicTree × Nat))
+    (state : Option (List PublicTree × Nat)) : runItems select [] state = state := by
+  cases state with
+  | none => rfl
+  | some pair => cases pair; simp [runItems, itemsWith]
+
+theorem array_from_loop_contract (fuel : Usize)
+    (recursive : ∀ value schema budget,
+      project value schema fuel budget ⦃ out => ResultMatches fuel.val (refProject fuel.val value schema budget.val) out ⦄)
+    (values : alloc.vec.Vec Json) (schema : Projection) (index : Usize)
+    (state : core.result.Result ((alloc.vec.Vec Json) × Usize) UseDenial)
+    (initial : StateFits fuel.val (values.length - index.val) state) :
+    array_from_loop values schema fuel index state ⦃ result => StateFits fuel.val 0 result ∧
+      StateView fuel.val result = runItems (fun v b => refProject fuel.val v schema b)
+        (values.val.drop index.val) (StateView fuel.val state) ⦄ := by
+  suffices ∀ n (i : Usize) (s : core.result.Result ((alloc.vec.Vec Json) × Usize) UseDenial),
+      values.length - i.val = n → StateFits fuel.val n s →
+      array_from_loop values schema fuel i s ⦃ result => StateFits fuel.val 0 result ∧
+        StateView fuel.val result = runItems (fun v b => refProject fuel.val v schema b)
+          (values.val.drop i.val) (StateView fuel.val s) ⦄ from
+    this _ index state rfl initial
+  intro n
+  induction n using Nat.strong_induction_on with
+  | h n ih =>
+    intro i s measure fits
+    rw [array_from_loop.eq_def]
+    by_cases inside : i < values.len
+    · simp only [inside, ↓reduceIte]
+
+      have hb : i.val < values.length := by scalar_tac
+      have tail := List.drop_eq_getElem_cons hb
+      obtain ⟨next, returned, next_value⟩ := returned_of_spec (@Usize.add_spec i 1#usize (by scalar_tac))
+      cases s with
+      | Err error =>
+        cases error <;> simp only [StateFits] at fits
+        simp only [bind_ok, returned]
+        apply WP.spec_mono (ih (values.length - next.val) (by scalar_tac) next (.Err .Denied) rfl trivial)
+        intro result property
+        simpa [StateView, runItems] using property
+      | Ok pair =>
+        rcases pair with ⟨out, budget⟩
+        obtain ⟨fits_out, capacity⟩ := fits
+        rw [index_exact values i hb]
+        simp only [bind_ok]
+        apply WP.spec_bind (array_step_contract fuel recursive values.val[i.val] schema budget out
+          (values.length - next.val) fits_out (by scalar_tac))
+        intro stepped property
+        rw [returned]
+        simp only [bind_ok]
+        apply WP.spec_mono (ih (values.length - next.val) (by scalar_tac) next stepped rfl property.1)
+        intro result complete
+        refine ⟨complete.1, ?_⟩
+        rw [complete.2, property.2, tail, runItems_cons]
+        simp [next_value, StateView]
+    · simp only [inside, ↓reduceIte]
+
+      have hb : values.val.length ≤ i.val := by scalar_tac
+      simp only [WP.spec_ok]
+      refine ⟨?_, ?_⟩
+      · simpa [StateFits, ← measure, Nat.sub_eq_zero_of_le hb] using fits
+      · rw [List.drop_eq_nil_of_le hb, runItems_nil]
+
+theorem array_from_contract (fuel : Usize)
+    (recursive : ∀ value schema budget,
+      project value schema fuel budget ⦃ out => ResultMatches fuel.val (refProject fuel.val value schema budget.val) out ⦄)
+    (values : alloc.vec.Vec Json) (schema : Projection) (budget index : Usize) (out : alloc.vec.Vec Json)
+    (initial : StateFits fuel.val (values.length - index.val) (.Ok (out, budget))) :
+    array_from values schema fuel budget index out ⦃ result =>
+      ResultMatches (fuel.val + 1)
+        ((runItems (fun v b => refProject fuel.val v schema b) (values.val.drop index.val)
+          (some (out.val.map (view fuel.val), budget.val))).map (fun p => (PublicTree.array p.1, p.2))) result ⦄ := by
+  rw [array_from.eq_def]
+  apply WP.spec_bind (array_from_loop_contract fuel recursive values schema index (.Ok (out, budget)) initial)
+  intro state property
+  cases state with
+  | Err error => cases error <;> simp_all [StateFits, StateView, ResultMatches]
+  | Ok pair =>
+    rcases pair with ⟨selected, remaining⟩
+    apply (WP.spec_ok _).mpr
+    change Fits (fuel.val + 1) (Json.Array selected) ∧ _
+    constructor
+    · exact property.1.1
+    · have exact_run := property.2
+      simp only [StateView] at exact_run
+      rw [← exact_run]
+      rfl
+
+def FieldStateView (depth : Nat)
+    (state : core.result.Result ((alloc.vec.Vec ((alloc.vec.Vec U8) × Json)) × Usize) UseDenial) :
+    Option (List ((alloc.vec.Vec U8) × PublicTree) × Nat) :=
+  match state with
+  | .Ok (values, budget) => some (values.val.map (fun p => (p.1, view depth p.2)), budget.val)
+  | .Err _ => none
+
+def FieldStateFits (depth capacity : Nat)
+    (state : core.result.Result ((alloc.vec.Vec ((alloc.vec.Vec U8) × Json)) × Usize) UseDenial) : Prop :=
+  match state with
+  | .Ok (values, _) => (∀ pair ∈ values.val, Fits depth pair.2) ∧ values.length + capacity ≤ Usize.max
+  | .Err .Denied => True
+  | .Err _ => False
+
+def runFields (select : Projection → Nat → Option (PublicTree × Nat)) (todo : List Field)
+    (state : Option (List ((alloc.vec.Vec U8) × PublicTree) × Nat)) :
+    Option (List ((alloc.vec.Vec U8) × PublicTree) × Nat) := do
+  let (accumulated, budget) ← state
+  let (values, final) ← fieldsWith select todo budget
+  some (accumulated ++ values, final)
+
+def stepField (select : Projection → Nat → Option (PublicTree × Nat)) (item : Field)
+    (state : Option (List ((alloc.vec.Vec U8) × PublicTree) × Nat)) :
+    Option (List ((alloc.vec.Vec U8) × PublicTree) × Nat) := do
+  let (accumulated, budget) ← state
+  if 64 < item.name.length then none else
+    let remaining ← takeBudget budget (6 * item.name.length + 4)
+    let (value, final) ← select item.projection remaining
+    some (accumulated ++ [(item.name, value)], final)
+
+theorem runFields_cons (select : Projection → Nat → Option (PublicTree × Nat)) (item : Field) (rest : List Field)
+    (state : Option (List ((alloc.vec.Vec U8) × PublicTree) × Nat)) :
+    runFields select (item :: rest) state = runFields select rest (stepField select item state) := by
+  cases state with
+  | none => rfl
+  | some pair =>
+    rcases pair with ⟨accumulated, budget⟩
+    simp only [runFields, stepField, fieldsWith, Option.bind_eq_bind, Option.bind_some]
+    by_cases large : 64 < item.name.length
+    · simp [large]
+    · simp only [large, ↓reduceIte]
+      cases available : takeBudget budget (6 * item.name.length + 4) <;> simp
+      case some remaining =>
+        cases selected : select item.projection remaining <;> simp
+        case some pair =>
+          rcases pair with ⟨value, final⟩
+          cases tail : fieldsWith select rest final
+          · simp
+          · rename_i result
+            rcases result with ⟨values, left⟩
+            simp
+
+theorem runFields_nil (select : Projection → Nat → Option (PublicTree × Nat))
+    (state : Option (List ((alloc.vec.Vec U8) × PublicTree) × Nat)) : runFields select [] state = state := by
+  cases state with
+  | none => rfl
+  | some pair => cases pair; simp [runFields, fieldsWith]
+
+theorem field_step_contract (fuel : Usize)
+    (recursive : ∀ value schema budget,
+      project value schema fuel budget ⦃ out => ResultMatches fuel.val (refProject fuel.val value schema budget.val) out ⦄)
+    (value : Json) (item : Field) (budget : Usize) (out : alloc.vec.Vec ((alloc.vec.Vec U8) × Json)) (spare : Nat)
+    (fits_out : ∀ pair ∈ out.val, Fits fuel.val pair.2) (capacity : out.length + spare < Usize.max) :
+    field_step value item fuel budget out ⦃ result => FieldStateFits fuel.val spare result ∧
+      FieldStateView fuel.val result = stepField (fun p b => refProject fuel.val value p b) item
+        (some (out.val.map (fun p => (p.1, view fuel.val p.2)), budget.val)) ⦄ := by
+  rw [field_step.eq_def]
+  by_cases large : item.name.len > 64#usize
+  · have exceeds : 64 < item.name.length := by scalar_tac
+    simp [large, FieldStateFits, FieldStateView, stepField, exceeds, WP.spec_ok]
+  · have within : item.name.length ≤ 64 := by scalar_tac
+    simp only [large, ↓reduceIte]
+    obtain ⟨scaled, mul_return, mul_value⟩ := returned_of_spec
+      (@Usize.mul_spec 6#usize item.name.len (by scalar_tac))
+    rw [mul_return]
+    simp only [bind_ok]
+    obtain ⟨cost, add_return, add_value⟩ := returned_of_spec
+      (@Usize.add_spec scaled 4#usize (by scalar_tac))
+    rw [add_return]
+    simp only [bind_ok]
+    have cost_value : cost.val = 6 * item.name.length + 4 := by scalar_tac
+    apply WP.spec_bind (charge_contract budget cost)
+    intro charged charge_property
+    cases charged with
+    | Err error =>
+      cases error with
+      | InvalidCapability => exact False.elim charge_property
+      | Upstream => exact False.elim charge_property
+      | Denied =>
+        have insufficient : ¬ 6 * item.name.length + 4 ≤ budget.val := by
+          simp only [ChargeSpec] at charge_property
+          omega
+        simp [FieldStateFits, FieldStateView, stepField, takeBudget, insufficient]
+    | Ok available =>
+      have cut : takeBudget budget.val (6 * item.name.length + 4) = some available.val := by
+        simp_all [ChargeSpec, takeBudget]
+      simp
+      apply WP.spec_bind (recursive value item.projection available)
+      intro child property
+      cases child with
+      | Err error =>
+        cases error <;> simp_all [ResultMatches, FieldStateFits, FieldStateView, stepField]
+      | Ok selected =>
+        obtain ⟨child_fits, child_view⟩ := property
+        dsimp only
+        rw [bind_ok, bytes_clone_exact]
+        simp only [bind_ok]
+        apply WP.spec_bind (alloc.vec.Vec.push_spec out (item.name, selected.value) (by scalar_tac))
+        intro values appended
+        simp only [WP.spec_ok]
+        constructor
+        · constructor
+          · intro pair member
+            rw [appended] at member
+            rcases List.mem_append.mp member with old | new
+            · exact fits_out pair old
+            · have eq : pair = (item.name, selected.value) := by simpa using new
+              simpa [eq] using child_fits
+          · simp [appended, alloc.vec.Vec.length]
+            scalar_tac
+        · simp [FieldStateView, stepField, cut, child_view, appended, List.map_append, within]
+
+theorem fields_from_loop_contract (fuel : Usize)
+    (recursive : ∀ value schema budget,
+      project value schema fuel budget ⦃ out => ResultMatches fuel.val (refProject fuel.val value schema budget.val) out ⦄)
+    (value : Json) (fields : alloc.vec.Vec Field) (index : Usize)
+    (state : core.result.Result ((alloc.vec.Vec ((alloc.vec.Vec U8) × Json)) × Usize) UseDenial)
+    (initial : FieldStateFits fuel.val (fields.length - index.val) state) :
+    fields_from_loop value fields fuel index state ⦃ result => FieldStateFits fuel.val 0 result ∧
+      FieldStateView fuel.val result = runFields (fun p b => refProject fuel.val value p b)
+        (fields.val.drop index.val) (FieldStateView fuel.val state) ⦄ := by
+  suffices ∀ n (i : Usize) (s : core.result.Result ((alloc.vec.Vec ((alloc.vec.Vec U8) × Json)) × Usize) UseDenial),
+      fields.length - i.val = n → FieldStateFits fuel.val n s →
+      fields_from_loop value fields fuel i s ⦃ result => FieldStateFits fuel.val 0 result ∧
+        FieldStateView fuel.val result = runFields (fun p b => refProject fuel.val value p b)
+          (fields.val.drop i.val) (FieldStateView fuel.val s) ⦄ from
+    this _ index state rfl initial
+  intro n
+  induction n using Nat.strong_induction_on with
+  | h n ih =>
+    intro i s measure fits
+    rw [fields_from_loop.eq_def]
+    by_cases inside : i < fields.len
+    · simp only [inside, ↓reduceIte]
+
+      have hb : i.val < fields.length := by scalar_tac
+      have tail := List.drop_eq_getElem_cons hb
+      obtain ⟨next, returned, next_value⟩ := returned_of_spec (@Usize.add_spec i 1#usize (by scalar_tac))
+      cases s with
+      | Err error =>
+        cases error <;> simp only [FieldStateFits] at fits
+        simp only [bind_ok, returned]
+        apply WP.spec_mono (ih (fields.length - next.val) (by scalar_tac) next (.Err .Denied) rfl trivial)
+        intro result property
+        simpa [FieldStateView, runFields] using property
+      | Ok pair =>
+        rcases pair with ⟨out, budget⟩
+        obtain ⟨fits_out, capacity⟩ := fits
+        rw [index_exact fields i hb]
+        simp only [bind_ok]
+        apply WP.spec_bind (field_step_contract fuel recursive value fields.val[i.val] budget out
+          (fields.length - next.val) fits_out (by scalar_tac))
+        intro stepped property
+        rw [returned]
+        simp only [bind_ok]
+        apply WP.spec_mono (ih (fields.length - next.val) (by scalar_tac) next stepped rfl property.1)
+        intro result complete
+        refine ⟨complete.1, ?_⟩
+        rw [complete.2, property.2, tail, runFields_cons]
+        simp [next_value, FieldStateView]
+    · simp only [inside, ↓reduceIte]
+
+      have hb : fields.val.length ≤ i.val := by scalar_tac
+      simp only [WP.spec_ok]
+      refine ⟨?_, ?_⟩
+      · simpa [FieldStateFits, ← measure, Nat.sub_eq_zero_of_le hb] using fits
+      · rw [List.drop_eq_nil_of_le hb, runFields_nil]
+
+theorem fields_from_contract (fuel : Usize)
+    (recursive : ∀ value schema budget,
+      project value schema fuel budget ⦃ out => ResultMatches fuel.val (refProject fuel.val value schema budget.val) out ⦄)
+    (value : Json) (fields : alloc.vec.Vec Field) (budget index : Usize) (out : alloc.vec.Vec ((alloc.vec.Vec U8) × Json))
+    (initial : FieldStateFits fuel.val (fields.length - index.val) (.Ok (out, budget))) :
+    fields_from value fields fuel budget index out ⦃ result =>
+      ResultMatches (fuel.val + 1)
+        ((runFields (fun p b => refProject fuel.val value p b) (fields.val.drop index.val)
+          (some (out.val.map (fun p => (p.1, view fuel.val p.2)), budget.val))).map (fun p => (PublicTree.object p.1, p.2))) result ⦄ := by
+  rw [fields_from.eq_def]
+  apply WP.spec_bind (fields_from_loop_contract fuel recursive value fields index (.Ok (out, budget)) initial)
+  intro state property
+  cases state with
+  | Err error => cases error <;> simp_all [FieldStateFits, FieldStateView, ResultMatches]
+  | Ok pair =>
+    rcases pair with ⟨selected, remaining⟩
+    apply (WP.spec_ok _).mpr
+    change Fits (fuel.val + 1) (Json.Object selected) ∧ _
+    constructor
+    · exact property.1.1
+    · have exact_run := property.2
+      simp only [FieldStateView] at exact_run
+      rw [← exact_run]
+      rfl
+
+theorem project_fields_contract (fuel : Usize)
+    (recursive : ∀ value schema budget,
+      project value schema fuel budget ⦃ out => ResultMatches fuel.val (refProject fuel.val value schema budget.val) out ⦄)
+    (value : Json) (fields : alloc.vec.Vec Field) (budget : Usize) :
+    project_fields value fields fuel budget ⦃ result =>
+      ResultMatches (fuel.val + 1) (refFields fuel.val value fields budget.val) result ⦄ := by
+  rw [project_fields.eq_def]
+  by_cases empty : fields.len = 0#usize
+  · have zero : fields.length = 0 := by scalar_tac
+    simp only [empty, ↓reduceIte, WP.spec_ok]
+    simp [zero, refFields, ResultMatches]
+  · simp only [empty, ↓reduceIte]
+    by_cases large : fields.len > 32#usize
+    · have exceeds : 32 < fields.length := by scalar_tac
+      simp [large, exceeds, refFields, ResultMatches, WP.spec_ok]
+    · have within : ¬ (fields.length = 0 ∨ 32 < fields.length) := by scalar_tac
+      simp only [large, ↓reduceIte]
+      apply WP.spec_bind (charge_contract budget 2#usize)
+      intro charged property
+      cases charged with
+      | Err error =>
+        cases error <;> simp_all [ChargeSpec, ResultMatches, refFields, takeBudget]
+      | Ok available =>
+        have cut : takeBudget budget.val 2 = some available.val := by
+          simp_all [ChargeSpec, takeBudget]
+        simp
+        apply WP.spec_mono (fields_from_contract fuel recursive value fields available 0#usize
+          (alloc.vec.Vec.new _) (by simp [FieldStateFits]))
+        intro result contract
+        have spec_eq : refFields fuel.val value fields budget.val =
+            ((fieldsWith (fun p b => refProject fuel.val value p b) fields.val available.val).map
+              (fun p => (PublicTree.object p.1, p.2))) := by
+          simp only [refFields, within, ↓reduceIte, cut, Option.bind_eq_bind, Option.bind_some]
+          cases fieldsWith (fun p b => refProject fuel.val value p b) fields.val available.val <;> rfl
+        rw [spec_eq]
+        simpa [runFields] using contract
+
+theorem findField_denial (keyName : alloc.vec.Vec U8) (fields : List ((alloc.vec.Vec U8) × Json))
+    (error : UseDenial) (denied : findField keyName fields = .Err error) : error = .Denied := by
+  induction fields with
+  | nil => simpa [findField] using denied.symm
+  | cons pair rest ih =>
+    rcases pair with ⟨key, value⟩
+    by_cases same : key = keyName
+    · simp [findField, same] at denied
+    · exact ih (by simpa [findField, same] using denied)
+
+theorem lookupList_denial (path : List (alloc.vec.Vec U8)) (value : Json)
+    (error : UseDenial) (denied : lookupList path value = .Err error) : error = .Denied := by
+  induction path generalizing value with
+  | nil => simp [lookupList] at denied
+  | cons key rest ih =>
+    cases value <;> simp only [lookupList] at denied
+    all_goals try { simpa using denied.symm }
+    case Object fields =>
+      cases found : findField key fields.val with
+      | Err e =>
+        have eq : error = e := by simpa [found] using denied.symm
+        exact eq.trans (findField_denial key fields.val e found)
+      | Ok child => exact ih child (by simpa [found] using denied)
+
+theorem boundedLookup_denial (value : Json) (path : alloc.vec.Vec (alloc.vec.Vec U8))
+    (error : UseDenial) (denied : boundedLookup value path = .Err error) : error = .Denied := by
+  by_cases large : 8 < path.length
+  · simpa [boundedLookup, large] using denied.symm
+  · exact lookupList_denial path.val value error (by simpa [boundedLookup, large] using denied)
+
+theorem project_contract (value : Json) (schema : Projection) (fuel budget : Usize) :
+    project value schema fuel budget ⦃ result =>
+      ResultMatches fuel.val (refProject fuel.val value schema budget.val) result ⦄ := by
+  suffices ∀ n (f : Usize), f.val = n → ∀ value schema budget,
+      project value schema f budget ⦃ result =>
+        ResultMatches f.val (refProject f.val value schema budget.val) result ⦄ from
+    this fuel.val fuel rfl value schema budget
+  intro n
+  induction n with
+  | zero =>
+    intro f eq value schema budget
+    have zero : f = 0#usize := by scalar_tac
+    rw [project.eq_def]
+    simp [zero, ResultMatches, refProject, WP.spec_ok]
+  | succ n ih =>
+    intro f eq value schema budget
+    have positive : f ≠ 0#usize := by scalar_tac
+    obtain ⟨lower, lower_return, lower_value⟩ := returned_of_spec (@Usize.sub_spec f 1#usize (by scalar_tac))
+    have lower_nat : lower.val = n := by scalar_tac
+    have recursive : ∀ v p b, project v p lower b ⦃ out =>
+        ResultMatches lower.val (refProject lower.val v p b.val) out ⦄ := ih lower lower_nat
+    rw [project.eq_def]
+    simp only [positive, ↓reduceIte]
+    apply WP.spec_bind (lookup_contract value schema.at)
+    intro selected lookup_property
+    have matched : boundedLookup value schema.at = selected := lookup_property.symm
+    cases selected with
+    | Err error =>
+      have denied := boundedLookup_denial value schema.at error matched
+      subst error
+      simp [eq, refProject, matched, ResultMatches, WP.spec_ok]
+    | Ok child =>
+      simp only [core.result.Result.Insts.CoreOpsTry.branch, bind_ok]
+      cases kind : schema.kind <;> cases child
+      all_goals try { solve | simp [eq, refProject, matched, kind, ResultMatches, WP.spec_ok] }
+      case Integer.Integer integer =>
+        simp only [eq, refProject, matched, kind]
+        apply WP.spec_bind (charge_contract budget 21#usize)
+        intro charged property
+        cases charged with
+        | Err error => cases error <;> simp_all [ChargeSpec, ResultMatches, takeBudget]
+        | Ok remaining =>
+          simp_all [ChargeSpec, ResultMatches, Fits, view, takeBudget, WP.spec_ok]
+      case Boolean.Boolean boolean =>
+        simp only [eq, refProject, matched, kind]
+        apply WP.spec_bind (charge_contract budget 5#usize)
+        intro charged property
+        cases charged with
+        | Err error => cases error <;> simp_all [ChargeSpec, ResultMatches, takeBudget]
+        | Ok remaining =>
+          simp_all [ChargeSpec, ResultMatches, Fits, view, takeBudget, WP.spec_ok]
+      case Null.Null =>
+        simp only [eq, refProject, matched, kind]
+        apply WP.spec_bind (charge_contract budget 4#usize)
+        intro charged property
+        cases charged with
+        | Err error => cases error <;> simp_all [ChargeSpec, ResultMatches, takeBudget]
+        | Ok remaining =>
+          simp_all [ChargeSpec, ResultMatches, Fits, view, takeBudget, WP.spec_ok]
+      case Text.Text bytes =>
+        simp only [eq, refProject, matched, kind]
+        apply WP.spec_bind (text_safe_contract bytes)
+        intro safe safety
+        cases safe with
+        | false => simp_all [ResultMatches]
+        | true =>
+          have bound : bytes.length ≤ 16384 := safety.mp rfl |>.1
+          simp only [↓reduceIte]
+          rw [bytes_clone_exact]
+          simp only [bind_ok]
+          obtain ⟨scaled, mul_return, mul_value⟩ := returned_of_spec
+            (@Usize.mul_spec 6#usize bytes.len (by scalar_tac))
+          rw [mul_return]
+          simp only [bind_ok]
+          obtain ⟨cost, add_return, add_value⟩ := returned_of_spec
+            (@Usize.add_spec scaled 2#usize (by scalar_tac))
+          rw [add_return]
+          simp only [bind_ok]
+          have cost_value : cost.val = 6 * bytes.length + 2 := by scalar_tac
+          apply WP.spec_bind (charge_contract budget cost)
+          intro charged property
+          cases charged with
+          | Err error => cases error <;> simp_all [ChargeSpec, ResultMatches, takeBudget]
+          | Ok remaining =>
+            simp_all [ChargeSpec, ResultMatches, Fits, view, takeBudget, WP.spec_ok]
+      case Object.Object fields members =>
+        rw [lower_return]
+        simp only [bind_ok]
+        apply WP.spec_mono (project_fields_contract lower recursive (.Object members) fields budget)
+        intro result property
+        simpa [eq, refProject, matched, kind, refFields, lower_nat] using property
+      case Array.Array item maximum values =>
+        by_cases small : maximum < 1#usize
+        · have invalid : maximum.val < 1 := by scalar_tac
+          simp [small, eq, refProject, matched, kind, invalid, ResultMatches, WP.spec_ok]
+        · simp only [small, ↓reduceIte]
+          by_cases large : maximum > 1000#usize
+          · have invalid : 1000 < maximum.val := by scalar_tac
+            simp [large, eq, refProject, matched, kind, invalid, ResultMatches, WP.spec_ok]
+          · simp only [large, ↓reduceIte]
+            by_cases overflow : values.len > maximum
+            · have invalid : maximum.val < values.length := by scalar_tac
+              simp [overflow, eq, refProject, matched, kind, invalid, ResultMatches, WP.spec_ok]
+            · have valid : ¬ (maximum.val < 1 ∨ 1000 < maximum.val ∨ maximum.val < values.length) := by scalar_tac
+              simp only [overflow, ↓reduceIte]
+              rw [lower_return]
+              simp only [bind_ok]
+              apply WP.spec_bind (charge_contract budget 2#usize)
+              intro charged property
+              cases charged with
+              | Err error =>
+                simp only [eq, refProject, matched, kind, valid, ↓reduceIte]
+                cases error <;> simp_all [ChargeSpec, ResultMatches, takeBudget]
+              | Ok available =>
+                have cut : takeBudget budget.val 2 = some available.val := by
+                  simp_all [ChargeSpec, takeBudget]
+                simp
+                apply WP.spec_mono (array_from_contract lower recursive values item available 0#usize
+                  (alloc.vec.Vec.new _) (by simp [StateFits]))
+                intro result property
+                have spec_eq : refProject f.val value schema budget.val =
+                    ((itemsWith (fun v b => refProject lower.val v item b) values.val available.val).map
+                      (fun p => (PublicTree.array p.1, p.2))) := by
+                  simp only [eq, refProject, matched, kind, valid, ↓reduceIte, cut,
+                    Option.bind_eq_bind, Option.bind_some, lower_nat]
+                  cases itemsWith (fun v b => refProject n v item b) values.val available.val <;> rfl
+                rw [spec_eq]
+                simpa [eq, lower_nat, runItems] using property
+
+/-- The public view is lossless for successful outputs, including failure class
+and the remaining construction budget. -/
+theorem result_matches_unique (depth : Nat) (expected : Option (PublicTree × Nat))
+    (a b : core.result.Result Selection UseDenial)
+    (ha : ResultMatches depth expected a) (hb : ResultMatches depth expected b) : a = b := by
+  cases a with
+  | Err error =>
+    cases error <;> simp only [ResultMatches] at ha
+    cases b with
+    | Err error => cases error <;> simp_all [ResultMatches]
+    | Ok selected => simp [ResultMatches, ha] at hb
+  | Ok selected =>
+    cases b with
+    | Err error => cases error <;> simp_all [ResultMatches]
+    | Ok other =>
+      obtain ⟨fits_a, same_a⟩ := ha
+      obtain ⟨fits_b, same_b⟩ := hb
+      have pair_eq := Option.some.inj (same_a.symm.trans same_b)
+      have values_eq := view_injective depth selected.value other.value fits_a fits_b (congrArg Prod.fst pair_eq)
+      have budget_eq : selected.remaining = other.remaining := by
+        have numeric := congrArg Prod.snd pair_eq
+        scalar_tac
+      cases selected
+      cases other
+      simp_all
+
+theorem refProject_lookup_congruence (depth : Nat) (schema : Projection) (a b : Json) (budget : Nat)
+    (same : boundedLookup a schema.at = boundedLookup b schema.at) :
+    refProject depth a schema budget = refProject depth b schema budget := by
+  cases depth with
+  | zero => rfl
+  | succ depth => simp only [refProject, same]
+
+/-- Equal selected inputs produce exactly equal owned outputs, even when the
+provider documents differ outside the selected path. -/
+theorem selected_path_noninterference (schema : Projection) (a b : Json) (fuel budget : Usize)
+    (same : boundedLookup a schema.at = boundedLookup b schema.at) :
+    project a schema fuel budget = project b schema fuel budget := by
+  obtain ⟨left, left_return, left_matches⟩ := returned_of_spec (project_contract a schema fuel budget)
+  obtain ⟨right, right_return, right_matches⟩ := returned_of_spec (project_contract b schema fuel budget)
+  have spec_same := refProject_lookup_congruence fuel.val schema a b budget.val same
+  rw [← spec_same] at right_matches
+  rw [left_return, right_return, result_matches_unique fuel.val _ left right left_matches right_matches]
+
+theorem fieldsWith_congruence (selectA selectB : Projection → Nat → Option (PublicTree × Nat))
+    (fields : List Field) (budget : Nat)
+    (same : ∀ field ∈ fields, ∀ b, selectA field.projection b = selectB field.projection b) :
+    fieldsWith selectA fields budget = fieldsWith selectB fields budget := by
+  induction fields generalizing budget with
+  | nil => rfl
+  | cons item rest ih =>
+    simp only [fieldsWith]
+    by_cases large : 64 < item.name.length
+    · simp [large]
+    · simp only [large, ↓reduceIte]
+      cases cut : takeBudget budget (6 * item.name.length + 4) with
+      | none => rfl
+      | some remaining =>
+        simp only [Option.bind_eq_bind, Option.bind_some, same item (by simp) remaining]
+        cases selected : selectB item.projection remaining with
+        | none => rfl
+        | some pair =>
+          rcases pair with ⟨value, next⟩
+          simp only [Option.bind_some]
+          rw [ih next (by intro field member b; exact same field (by simp [member]) b)]
+
+/-- Root fields can change arbitrarily outside every schema-selected path.
+The comparison includes successful outputs and denial behavior. -/
+theorem root_fields_noninterference (a b : Json) (fields : alloc.vec.Vec Field) (fuel budget : Usize)
+    (same : ∀ field ∈ fields.val,
+      boundedLookup a field.projection.at = boundedLookup b field.projection.at) :
+    project_fields a fields fuel budget = project_fields b fields fuel budget := by
+  have recursive : ∀ value schema budget, project value schema fuel budget ⦃ out =>
+      ResultMatches fuel.val (refProject fuel.val value schema budget.val) out ⦄ :=
+    fun value schema budget => project_contract value schema fuel budget
+  have spec_same : refFields fuel.val a fields budget.val = refFields fuel.val b fields budget.val := by
+    unfold refFields
+    by_cases invalid : fields.length = 0 ∨ 32 < fields.length
+    · simp only [invalid, ↓reduceIte]
+    · simp only [invalid, ↓reduceIte]
+      cases cut : takeBudget budget.val 2 with
+      | none => rfl
+      | some remaining =>
+        simp only [Option.bind_eq_bind, Option.bind_some]
+        rw [fieldsWith_congruence (fun p bgt => refProject fuel.val a p bgt)
+          (fun p bgt => refProject fuel.val b p bgt) fields.val remaining
+          (by intro field member bgt; exact refProject_lookup_congruence _ _ _ _ _ (same field member))]
+  obtain ⟨left, left_return, left_matches⟩ := returned_of_spec
+    (project_fields_contract fuel recursive a fields budget)
+  obtain ⟨right, right_return, right_matches⟩ := returned_of_spec
+    (project_fields_contract fuel recursive b fields budget)
+  rw [← spec_same] at right_matches
+  rw [left_return, right_return,
+    result_matches_unique (fuel.val + 1) _ left right left_matches right_matches]
+
+/-- A provider's ignored leading field can contain arbitrary JSON. No bytes
+from that value can change the selected projection or its denial outcome. -/
+theorem ignored_input_field_noninterference (schema : Projection) (keyName hidden : alloc.vec.Vec U8)
+    (different : hidden ≠ keyName) (pathTail : List (alloc.vec.Vec U8))
+    (starts : schema.at.val = keyName :: pathTail) (a b : Json)
+    (rest : List ((alloc.vec.Vec U8) × Json)) (bound : rest.length + 1 ≤ Usize.max)
+    (fuel budget : Usize) :
+    project (.Object (alloc.vec.Vec.from ((hidden, a) :: rest) (by simpa using bound))) schema fuel budget =
+      project (.Object (alloc.vec.Vec.from ((hidden, b) :: rest) (by simpa using bound))) schema fuel budget := by
+  apply selected_path_noninterference
+  unfold boundedLookup
+  simp [starts, lookupList, findField, different]
+
+def booleanSchema : Projection := .mk (alloc.vec.Vec.new _) .Boolean
+
+theorem boolean_projection_positive_witness :
+    project (.Boolean true) booleanSchema 1#usize 5#usize =
+      Result.ok (.Ok {value := .Boolean true, remaining := 0#usize}) := by
+  obtain ⟨out, returned, matched_result⟩ := returned_of_spec
+    (project_contract (.Boolean true) booleanSchema 1#usize 5#usize)
+  have expected : refProject 1 (.Boolean true) booleanSchema 5 = some (.boolean true, 0) := by
+    simp [refProject, booleanSchema, boundedLookup, lookupList, takeBudget]
+  have witness : ResultMatches 1 (some (.boolean true, 0))
+      (.Ok {value := .Boolean true, remaining := 0#usize}) := by
+    simp [ResultMatches, Fits, view]
+  change ResultMatches 1 (refProject 1 (.Boolean true) booleanSchema 5) out at matched_result
+  rw [expected] at matched_result
+  have eq := result_matches_unique 1 _ out _ matched_result witness
+  simpa [eq] using returned
 
 end aivm_secrets_garrett_core.disclosure.Proofs
 

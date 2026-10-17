@@ -17,6 +17,7 @@ include proofs/GarrettTrust.lean
 include proofs/GarrettOAuth.lean
 include proofs/GarrettLogin.lean
 include proofs/GarrettManifest.lean
+include proofs/GarrettDisclosure.lean
 recursive-include proofs/generated *.lean
 prune rust/target
 prune proofs/.lake

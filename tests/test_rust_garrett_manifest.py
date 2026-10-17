@@ -838,3 +838,93 @@ def test_numeric_preflight_facts_compare_values_without_coercing_types(
     )
     assert not done.stderr
     assert codec.loads(done.stdout) == expected
+
+
+def nested_release():
+    """Public output names intentionally differ from provider keys."""
+    releases = disclosure()
+    releases["ticket.view"] = {
+        "public": {
+            "at": ["data", "rows"],
+            "type": "array",
+            "max_items": 2,
+            "items": {
+                "at": [],
+                "type": "object",
+                "fields": {
+                    "ticket_id": {"at": ["id"], "type": "integer"},
+                    "label": {"at": ["details", "caption"], "type": "text"},
+                    "active": {"at": ["enabled"], "type": "boolean"},
+                },
+            },
+        }
+    }
+    return releases
+
+
+def test_nested_projection_ignores_private_changes_and_owns_output_names(tmp_path):
+    with TLSService(provider_directory(tmp_path), host="api.example.org") as server:
+        with ManifestCase(tmp_path, server, releases=nested_release()) as session:
+            observed = []
+            for hidden in [TOKEN, {"token": TOKEN}, [TOKEN, None, 1.5]]:
+                server.routes[("GET", "/v1/tickets/7")] = {
+                    "private": hidden,
+                    "data": {
+                        "private": hidden,
+                        "rows": [
+                            {
+                                "id": 7,
+                                "details": {
+                                    "caption": "public title",
+                                    "secret": hidden,
+                                },
+                                "enabled": True,
+                                "ticket_id": hidden,
+                                "label": hidden,
+                            },
+                            {
+                                "id": 8,
+                                "details": {
+                                    "caption": "another title",
+                                    "secret": hidden,
+                                },
+                                "enabled": False,
+                                "active": hidden,
+                            },
+                        ],
+                    },
+                }
+                reply = session.invoke(operation="ticket.view", arguments={"ticket": 7})
+                observed.append(reply["result"])
+                assert TOKEN not in json.dumps(reply)
+            assert (
+                observed
+                == [
+                    {
+                        "public": [
+                            {"ticket_id": 7, "label": "public title", "active": True},
+                            {"ticket_id": 8, "label": "another title", "active": False},
+                        ]
+                    }
+                ]
+                * 3
+            )
+
+
+@pytest.mark.parametrize("bad_id", [True, "8", 8.0, None, {"id": 8}])
+def test_failed_nested_child_rejects_whole_projection(tmp_path, bad_id):
+    with TLSService(provider_directory(tmp_path), host="api.example.org") as server:
+        server.routes[("GET", "/v1/tickets/7")] = {
+            "data": {
+                "rows": [
+                    {"id": 7, "details": {"caption": "valid"}, "enabled": True},
+                    {"id": bad_id, "details": {"caption": TOKEN}, "enabled": True},
+                ]
+            }
+        }
+        with ManifestCase(tmp_path, server, releases=nested_release()) as session:
+            reply = session.invoke(operation="ticket.view", arguments={"ticket": 7})
+            assert reply["error"]["code"] == "upstream_response"
+            assert "result" not in reply
+            assert TOKEN not in json.dumps(reply)
+        assert TOKEN.encode() not in (tmp_path / "provider-audit.jsonl").read_bytes()
