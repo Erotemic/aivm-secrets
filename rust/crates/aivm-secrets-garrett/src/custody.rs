@@ -20,7 +20,7 @@ use std::{
     net::{IpAddr, SocketAddr, TcpStream},
     path::Path,
     sync::{Arc, Mutex},
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use zeroize::Zeroizing;
 
@@ -28,7 +28,10 @@ const INNER_AAD: &[u8] = b"aivm-secrets/local-session/service-neutral/v1";
 const MAX_BODY: usize = 2 * 1024 * 1024;
 struct Credential(Zeroizing<Vec<u8>>);
 fn credential(data: &[u8]) -> Outcome<Credential> {
-    if !(16..=4096).contains(&data.len()) || !data.iter().all(|b| (b'!'..=b'~').contains(b)) {
+    credential_at_least(data, 16)
+}
+fn credential_at_least(data: &[u8], minimum: usize) -> Outcome<Credential> {
+    if !(minimum..=4096).contains(&data.len()) || !data.iter().all(|b| (b'!'..=b'~').contains(b)) {
         return Err(Error::CredentialSource);
     }
     Ok(Credential(Zeroizing::new(data.to_vec())))
@@ -97,12 +100,16 @@ fn claims(value: &Value) -> Outcome<core::UseClaims> {
 }
 // Ephemeral inner keys make restart invalidate prior credential authority,
 // even when the trusted operator retains the outer issuer and TLS identity.
-struct InnerEnvelope(aead::LessSafeKey);
+struct InnerEnvelope(aead::LessSafeKey, usize);
 impl InnerEnvelope {
     fn new(key: &[u8]) -> Outcome<Self> {
-        Ok(Self(aead::LessSafeKey::new(
-            aead::UnboundKey::new(&aead::AES_256_GCM, key).map_err(|_| Error::InvalidCapability)?,
-        )))
+        Ok(Self(
+            aead::LessSafeKey::new(
+                aead::UnboundKey::new(&aead::AES_256_GCM, key)
+                    .map_err(|_| Error::InvalidCapability)?,
+            ),
+            16,
+        ))
     }
     fn seal(&self, claims: &Value, secret: &Credential) -> Outcome<String> {
         let nonce = random::<12>()?;
@@ -149,7 +156,7 @@ impl InnerEnvelope {
         let m = json::keys(&payload, &["claims", "credential"], &[])?;
         Ok((
             claims(&m["claims"])?,
-            credential(text(&payload, "credential")?.as_bytes())
+            credential_at_least(text(&payload, "credential")?.as_bytes(), self.1)
                 .map_err(|_| Error::InvalidCapability)?,
         ))
     }
@@ -424,6 +431,32 @@ fn response(mut reader: impl BufRead) -> Outcome<Vec<u8>> {
     Ok(body)
 }
 
+fn host_time() -> Outcome<i64> {
+    i64::try_from(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| Error::InvalidCapability)?
+            .as_secs(),
+    )
+    .map_err(|_| Error::InvalidCapability)
+}
+struct OAuthSource {
+    vault: crate::oauth_vault::OAuthVault,
+    provider: crate::oauth_vault::provider::Provider,
+    subject: String,
+    lease: crate::oauth_vault::Lease,
+}
+impl OAuthSource {
+    fn active(&self) -> Outcome<std::fs::File> {
+        // Sample after blocking: adding rounded elapsed seconds can admit a
+        // request on the wrong side of a wall-clock expiry boundary.
+        self.vault
+            .active_lease(&self.provider, &self.subject, &self.lease, || {
+                host_time().unwrap_or(i64::MAX)
+            })
+            .map_err(|_| Error::CredentialSource)
+    }
+}
 /// Explicit account-status-v1 custody profile. This is a development provider
 /// session, not a replacement for the general Python policy interpreter.
 pub struct ProviderSession {
@@ -432,6 +465,7 @@ pub struct ProviderSession {
     executor: Executor,
     started: Instant,
     inner: String,
+    oauth: Option<OAuthSource>,
 }
 impl ProviderSession {
     pub fn start(
@@ -449,11 +483,13 @@ impl ProviderSession {
                 "port",
                 "authentication",
                 "server_ca",
-                "credential_file",
                 "audit_file",
             ],
-            &[],
+            &["credential_file", "oauth"],
         )?;
+        if m.contains_key("credential_file") == m.contains_key("oauth") {
+            return Err(Error::InvalidCapability);
+        }
         if m["profile"] != "account-status-v1" {
             return Err(Error::InvalidCapability);
         }
@@ -503,14 +539,64 @@ impl ProviderSession {
                 .with_no_client_auth();
         tls.resumption = rustls::client::Resumption::disabled();
         tls.enable_early_data = false;
-        let raw = Zeroizing::new(files::read_private(
-            Path::new(text(config, "credential_file")?),
-            4096,
-        )?);
-        let secret = credential(&raw)?;
+        let (secret, oauth, lifetime) = if let Some(source) = m.get("oauth") {
+            let fields = json::keys(
+                source,
+                &["vault_root", "provider_file", "subject"],
+                &["transport", "force_refresh"],
+            )?;
+            if !matches!(authentication, core::Authentication::Bearer) {
+                return Err(Error::InvalidCapability);
+            }
+            let vault =
+                crate::oauth_vault::OAuthVault::open(Path::new(text(source, "vault_root")?))?;
+            let provider = crate::oauth_vault::provider::Provider::from_file(Path::new(text(
+                source,
+                "provider_file",
+            )?))?;
+            let subject = text(source, "subject")?.to_owned();
+            let force = fields
+                .get("force_refresh")
+                .map(|v| v.as_bool().ok_or(Error::InvalidCapability))
+                .transpose()?
+                .unwrap_or(false);
+            let lease = vault
+                .session_snapshot(
+                    &provider,
+                    &subject,
+                    host,
+                    now,
+                    force,
+                    fields.get("transport").unwrap_or(&json!({})),
+                )
+                .map_err(|_| Error::CredentialSource)?;
+            let lifetime = lifetime.min(lease.expires_at() - now);
+            let secret = Credential(Zeroizing::new(lease.credential().to_vec()));
+            (
+                secret,
+                Some(OAuthSource {
+                    vault,
+                    provider,
+                    subject,
+                    lease,
+                }),
+                lifetime,
+            )
+        } else {
+            let raw = Zeroizing::new(files::read_private(
+                Path::new(text(config, "credential_file")?),
+                4096,
+            )?);
+            (credential(&raw)?, None, lifetime)
+        };
         let policy = hex(digest::digest(&digest::SHA256, &json::canonical(config)).as_ref());
         let c = json!({"binding":identity_binding,"policy_digest":policy,"grant_id":hex(&random::<16>()?),"issued_at":now,"expires_at":now+lifetime});
-        let envelope = InnerEnvelope::new(&random::<32>()?)?;
+        let mut envelope = InnerEnvelope::new(&random::<32>()?)?;
+        // OAuth's validated opaque-token grammar permits short synthetic or
+        // provider-issued tokens; legacy file/fixture validation stays intact.
+        if oauth.is_some() {
+            envelope.1 = 1;
+        }
         let inner = envelope.seal(&c, &secret)?;
         let grant = core::UseGrant {
             claims: claims(&c)?,
@@ -535,6 +621,7 @@ impl ProviderSession {
             executor,
             started: Instant::now(),
             inner,
+            oauth,
         })
     }
     #[allow(clippy::too_many_arguments)] // Mirrors the enrollment issuer contract.
@@ -548,6 +635,12 @@ impl ProviderSession {
         now: i64,
         lifetime: i64,
     ) -> Outcome<IssuedSurrogate> {
+        let _vault_lease = self.oauth.as_ref().map(OAuthSource::active).transpose()?;
+        let now = if self.oauth.is_some() {
+            host_time()?
+        } else {
+            now
+        };
         if !self.grant.active
             || now < self.grant.claims.issued_at
             || now >= self.grant.claims.expires_at
@@ -576,6 +669,12 @@ impl ProviderSession {
         value: &Value,
         now: i64,
     ) -> Outcome<Value> {
+        let _vault_lease = self.oauth.as_ref().map(OAuthSource::active).transpose()?;
+        let now = if self.oauth.is_some() {
+            host_time()?
+        } else {
+            now
+        };
         let operation = parse_operation(value)?;
         let presentation = protocol::Presentation {
             expected,
@@ -610,6 +709,12 @@ impl ProviderSession {
         i64::try_from(self.started.elapsed().as_secs()).map_err(|_| Error::InvalidCapability)
     }
     pub(crate) fn control(&mut self, inner: &[u8], verb: &str, now: i64) -> Outcome<Value> {
+        let _vault_lease = self.oauth.as_ref().map(OAuthSource::active).transpose()?;
+        let now = if self.oauth.is_some() {
+            host_time()?
+        } else {
+            now
+        };
         if !matches!(verb, "describe" | "renounce") {
             return Err(Error::Denied);
         }

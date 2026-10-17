@@ -27,6 +27,7 @@ PROFILES = [
     "account-status-v1",
     "p256-client-enrollment-v1",
     "native-authority-v2",
+    "native-oauth-vault-v2",
 ]
 THEOREMS = [
     "aivm_secrets_garrett_core.Proofs.bytes_ne_spec",
@@ -147,6 +148,31 @@ THEOREMS += [
     "aivm_secrets_garrett_core.trust.Proofs.trust_change_positive",
 ]
 
+THEOREMS += [
+    "aivm_secrets_garrett_core.oauth_state.Proofs.unsent_classification",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.invalid_grant_requires_reauthorization",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.ambiguous_sent_is_uncertain",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.not_sent_preserves_prior",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.uncertain_never_restores_ready",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.rejection_requires_reauthorization",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.permit_refresh_contract",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.in_doubt_needs_explicit_retry",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.rejection_cannot_be_overridden",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.revoked_never_refreshes",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.lease_contract",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.changed_epoch_fences_lease",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.changed_generation_fences_lease",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.unsettled_grant_cannot_dispatch",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.expired_grant_cannot_dispatch",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.lease_positive_witness",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.refresh_order_contract",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.intent_failure_never_sends",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.quarantine_failure_never_sends",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.uncertain_exchange_never_settles",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.failed_commit_never_returns_token",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.refresh_positive_witness",
+]
+
 TESTS = [
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
@@ -155,6 +181,7 @@ TESTS = [
     "tests/test_rust_garrett_authority.py",
     "tests/test_rust_garrett_lifecycle.py",
     "tests/test_rust_garrett_issuance.py",
+    "tests/test_rust_garrett_oauth_vault.py",
     "tests/test_secrets_garrett_modularity.py",
     "tests/test_secrets_identity_parity.py",
     "tests/test_secrets_identity_registry_parity.py",
@@ -176,6 +203,7 @@ RUNNERS = {
     "AIVM_SECRETS_RUST_KEY_ROTATION_RUNNER": "key-rotation-conformance",
     "AIVM_SECRETS_RUST_VM_RUNNER": "vm-conformance",
     "AIVM_SECRETS_RUST_OAUTH_RUNNER": "oauth-conformance",
+    "AIVM_SECRETS_RUST_OAUTH_ADMIN": "garrett-oauth",
 }
 
 
@@ -200,6 +228,7 @@ def inputs() -> list[str]:
         "proofs/GarrettEnrollment.lean",
         "proofs/GarrettAuthority.lean",
         "proofs/GarrettTrust.lean",
+        "proofs/GarrettOAuth.lean",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
         "dev/verification/freshness.py",
@@ -378,7 +407,7 @@ def assurance_coordinates() -> dict:
         "aeneas_release": base.RELEASE,
         "theorems": THEOREMS,
         "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
-        "implementation_linked": "Aeneas-generated issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix and ordered authority/trust-publication controllers; exact byte/epoch/time decisions and typed public-result projection",
+        "implementation_linked": "Aeneas-generated issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease controllers; exact byte/epoch/time decisions and typed public-result projection",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
@@ -396,6 +425,7 @@ def assurance_coordinates() -> dict:
             "TPM assurance receipts are trusted principal-owned host metadata bound to subject, certificate and SPKI. Missing receipts never imply TPM assurance; older Python administrators do not enforce the new assurance-downgrade policy.",
             "Trust recovery requires a reviewed public-plan digest, exact authority/keyring/enrollment prefix and complete immutable material. Hashing/serialization, key-file validation, durable retirement and activation are trusted storage adapters; no snapshot-rollback resistance or whole-filesystem refinement is claimed.",
             "Native file issuance acknowledges public claims before atomic no-replace output publication under a held authority lease. Private output storage and explicit delivery are trusted host operations; publication/completion errors may leave a usable file and require reconciliation.",
+            "OAuth quarantine and successor persistence are conditional storage-adapter contracts. Native vault locking drains participating refresh/revoke against dispatch and HMAC checks token equality; root snapshot rollback, hostile same-UID replacement and nonparticipating writers are outside that boundary.",
             "Controller histories assume signature verification has prior recorded issuer origin; the ideal signature-origin theorem does not establish a computational byte-level or concrete I/O refinement.",
             "CSR possession, CA constraints/key matching and X.509 signing use the stated rcgen/x509-parser/time adapter contracts; their ASN.1/crypto implementations are not formally refined. TPM approval consumes verified fresh evidence under a trusted AK pin.",
         ],
@@ -404,7 +434,7 @@ def assurance_coordinates() -> dict:
             "Formal refinement of JSON, TLS, X.509, crypto, TPM evidence, HTTP and filesystem adapter implementations",
             "Physical TPM provenance, EK activation, PCR/firmware policy and anti-rollback deployment",
             "Provider non-disclosure, host compromise, snapshot rollback and side channels",
-            "General Rust policy interpretation, complete credential/policy administration, OAuth vault/HTTP service and concrete storage/concurrent-history refinement",
+            "General Rust policy interpretation, complete credential/policy administration, native browser/authorization-code acquisition and concrete storage/concurrent-history refinement",
         ],
     }
 
@@ -670,6 +700,69 @@ def mutate() -> None:
             "if let Err(_) = store.complete() {\n        return Err(TrustDenial::Unpublished);",
         ),
     ]
+    oauth_source = source.with_name("oauth_state.rs")
+    mutations += [
+        (
+            oauth_source,
+            "OAuth silent retry of in-doubt refresh",
+            "if !retry_in_doubt {",
+            "if false {",
+        ),
+        (
+            oauth_source,
+            "OAuth reauthorization bypass",
+            "RefreshState::Reauthorize => return Err(RefreshDenial::Unsettled),",
+            "RefreshState::Reauthorize => (),",
+        ),
+        (
+            oauth_source,
+            "OAuth uncertain result restores ready",
+            "ExchangeFailure::Uncertain => RefreshState::InDoubt,",
+            "ExchangeFailure::Uncertain => RefreshState::Ready,",
+        ),
+        (
+            oauth_source,
+            "OAuth definite-not-sent clears prior doubt",
+            "RefreshState::InDoubt => RefreshState::InDoubt,",
+            "RefreshState::InDoubt => RefreshState::Ready,",
+        ),
+        (
+            oauth_source,
+            "OAuth refresh quarantine omitted",
+            "ops.quarantine()",
+            "Ok::<(), StoreFailure>(())",
+        ),
+        (
+            oauth_source,
+            "OAuth successor persistence omitted",
+            "ops.commit(&successor)",
+            "Ok::<(), StoreFailure>(())",
+        ),
+        (
+            oauth_source,
+            "OAuth exchange before quarantine",
+            "if let Err(_) = ops.quarantine() {\n        return Err(RefreshDenial::Uncertain);\n    }\n    match ops.exchange() {",
+            "let exchanged = ops.exchange();\n    if let Err(_) = ops.quarantine() {\n        return Err(RefreshDenial::Uncertain);\n    }\n    match exchanged {",
+        ),
+        (
+            oauth_source,
+            "OAuth stale generation accepted",
+            "|| current.generation != leased.generation",
+            "|| false",
+        ),
+        (
+            oauth_source,
+            "OAuth stale epoch accepted",
+            "|| current.epoch != leased.epoch",
+            "|| false",
+        ),
+        (
+            oauth_source,
+            "OAuth expired lease accepted",
+            "now >= current.expires_at",
+            "now > current.expires_at",
+        ),
+    ]
     lean_path = base.run(
         [base.executable("lake"), "env", "printenv", "LEAN_PATH"],
         cwd=PROOFS,
@@ -729,6 +822,7 @@ def mutate() -> None:
                 "GarrettEnrollment",
                 "GarrettAuthority",
                 "GarrettTrust",
+                "GarrettOAuth",
             ]:
                 proof = temporary / (module + ".lean")
                 shutil.copy2(PROOFS / proof.name, proof)

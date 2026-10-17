@@ -282,10 +282,10 @@ request quota is not part of this milestone's value proposition.
 | Pure issue/present model | Python contracts/vectors plus extracted Rust issuance/opening and use/release proofs | Complete correspondence with the concrete service and authentic inputs |
 | Token envelopes | Python/Rust exact outer fixture and bidirectional inner/outer crypto interoperability | Concrete encoding/crypto adapter refinement and nonce analysis |
 | Authenticated connection | Actual Rust/Python TLS tests, opaque peer evidence and Rust provider path | Formal transport refinement and complete connection/request association |
-| Acquisition and refresh | OAuth contract/vault/provider modules and synthetic OAuth tests | Complete custody/error trace and generation/revocation composition |
+| Acquisition and refresh | Python-compatible native encrypted vault, pinned HTTPS refresh, durable-before-send extracted controller, opaque leases through native dispatch, process-death/write-failure/concurrency tests | Native browser/callback/code-exchange acquisition; concrete storage/error/concurrent-service trace refinement |
 | Substitution and result release | Original broker/egress tests plus Rust account-status-v1 custody, route tests and extracted typed-release noninterference | Review/extend the public disclosure contract, general provider mediation and whole-service confinement/refinement |
 | Instance key custody | Rust TPM signer, fresh creation-evidence verifier under a trusted AK pin, actual isolated swtpm/TLS tests | Authenticate hardware AK provenance, EK activation, approved deployment/PCR/rollback policy and physical TPM validation |
-| Native authority | Python-compatible durable Rust administration, assurance receipts, issuer/server/CA rotation, explicit prefix-checked recovery, protected file issuance, held-directory storage, extracted admission/trust-publication contracts and live native bridge leases | Complete storage/locking and concurrent-service history refinement; general policy/OAuth custody |
+| Native authority | Python-compatible durable Rust administration, assurance receipts, issuer/server/CA rotation, explicit prefix-checked recovery, protected file issuance, held-directory storage, extracted admission/trust-publication contracts and live native bridge leases | Complete storage/locking and concurrent-service history refinement; general policy and browser OAuth acquisition |
 
 The Python executor currently returns successful provider JSON or text to the
 broker, which places it in the result and checks literal credential reflection.
@@ -314,6 +314,36 @@ file-lock/filesystem implementation and concurrent service histories are not
 yet refined in Lean. The independent-file bridge retains snapshot semantics.
 TPM assurance receipts bind fresh verified evidence to installed certificates;
 they are trusted host metadata, not proof of physical hardware or a workload.
+
+### Next implementation sequence after native refresh custody
+
+1. Finish normal Rust authorization-code acquisition. Keep PKCE verifier and
+   pending state on the trusted host, bind a loopback listener before opening
+   the browser, check the exact callback path/state/issuer/expiry and consume
+   one pending authorization once. Exchange only with the approved token
+   origin and install through the existing vault transaction. The ordinary
+   service must exercise these rules; a JSON transition runner alone does
+   not close acquisition. Add browser/callback substitution, duplicate-code,
+   timeout and lost-response tests with synthetic endpoints.
+2. Extend the Rust provider interpreter deliberately. Keep credential sources
+   opaque, make request builders consume host-approved routes and typed
+   arguments, and choose each operation's public-result disclosure contract.
+   Prove destination/action confinement and release properties before adding
+   a provider operation. Preserve the successful-action witness alongside
+   attack rejections. This must not accidentally become an arbitrary HTTP
+   proxy or unrestricted provider-body return path.
+3. Connect the actual lease boundaries to a finite service-history theorem.
+   Model enrollment/root/issuer changes and OAuth refresh/revoke together,
+   including blocked dispatch, crashes and uncertain publication. State the
+   exact trusted adapter postconditions and show that each emitted request
+   has a current admitted identity and credential lease. Existing controller
+   and symbolic histories are reusable, but are not that whole-service proof.
+4. Validate a deployment's key-custody premise independently. Provision an AK
+   trust origin, exercise the chosen physical TPM/VM isolation arrangement,
+   and document who can reach its signing oracle or clone its state. Emulator
+   signing/creation tests do not establish those deployment facts. An external
+   security review must assess the disclosure contract and trusted base before
+   any broader assurance claim.
 
 ## 8. Milestones and acceptance gates
 

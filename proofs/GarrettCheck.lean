@@ -1,3 +1,4 @@
+import GarrettOAuth
 import GarrettTrust
 import GarrettAuthority
 import GarrettHistory
@@ -111,3 +112,26 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.trust.Proofs.activation_failure_reports_uncertainty
 #print axioms aivm_secrets_garrett_core.trust.Proofs.completion_failure_reports_uncertainty
 #print axioms aivm_secrets_garrett_core.trust.Proofs.trust_change_positive
+
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.unsent_classification
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.invalid_grant_requires_reauthorization
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.ambiguous_sent_is_uncertain
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.not_sent_preserves_prior
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.uncertain_never_restores_ready
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.rejection_requires_reauthorization
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.permit_refresh_contract
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.in_doubt_needs_explicit_retry
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.rejection_cannot_be_overridden
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.revoked_never_refreshes
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.lease_contract
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.changed_epoch_fences_lease
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.changed_generation_fences_lease
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.unsettled_grant_cannot_dispatch
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.expired_grant_cannot_dispatch
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.lease_positive_witness
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.refresh_order_contract
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.intent_failure_never_sends
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.quarantine_failure_never_sends
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.uncertain_exchange_never_settles
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.failed_commit_never_returns_token
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.refresh_positive_witness

@@ -521,14 +521,14 @@ def enrollment.enroll_client
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::Denial]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 15:0-17:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 16:0-18:1
     Visibility: public -/
 @[discriminant isize]
 inductive Denial where
 | InvalidCapability : Denial
 
 /-- [aivm_secrets_garrett_core::Claims]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 19:0-28:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 20:0-29:1
     Visibility: public -/
 structure Claims where
   issuer : alloc.vec.Vec Std.U8
@@ -541,7 +541,7 @@ structure Claims where
   certificate : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::Expectation]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 30:0-35:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 31:0-36:1
     Visibility: public -/
 structure Expectation where
   issuer : alloc.vec.Vec Std.U8
@@ -550,7 +550,7 @@ structure Expectation where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::IssueWindow]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 37:0-41:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 38:0-42:1
     Visibility: public -/
 structure IssueWindow where
   issued_at : Std.I64
@@ -558,7 +558,7 @@ structure IssueWindow where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::issue_window]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 44:0-71:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 45:0-72:1
     Visibility: public -/
 def issue_window
   (active : Bool) (epoch : Std.I64) (not_after : Std.I64) (now : Std.I64)
@@ -602,7 +602,7 @@ def issue_window
   else ok (core.result.Result.Err Denial.InvalidCapability)
 
 /-- [aivm_secrets_garrett_core::present]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 75:0-102:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 76:0-103:1
     Visibility: public -/
 def present
   (claims : Claims) (expected : Expectation) (peer : alloc.vec.Vec Std.U8)
@@ -666,21 +666,21 @@ def present
                           else ok (core.result.Result.Ok ())
 
 /-- [aivm_secrets_garrett_core::AuthenticatedEnvelope]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 106:0-109:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 107:0-110:1
     Visibility: public -/
 structure AuthenticatedEnvelope where
   claims : Claims
   encrypted : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::OpenedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 111:0-114:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 112:0-115:1
     Visibility: public -/
 structure OpenedSurrogate (S : Type _) where
   claims : Claims
   secret : S
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeVerifier]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 117:0-121:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 118:0-122:1
     Visibility: public -/
 structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
   verify : Self → alloc.vec.Vec Std.U8 → Result (core.result.Result
@@ -689,7 +689,7 @@ structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
     Self_Secret Denial)
 
 /-- [aivm_secrets_garrett_core::open_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 126:0-148:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 127:0-149:1
     Visibility: public -/
 def open_surrogate
   {V : Type _} {Clause0_Secret : Type _} (EnvelopeVerifierInst :
@@ -713,7 +713,7 @@ def open_surrogate
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssueInputs]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 150:0-159:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 151:0-160:1
     Visibility: public -/
 structure IssueInputs where
   issuer : alloc.vec.Vec Std.U8
@@ -726,7 +726,7 @@ structure IssueInputs where
   not_after : Std.I64
 
 /-- [aivm_secrets_garrett_core::prepare_issue]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 162:0-177:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 163:0-178:1
     Visibility: public -/
 def prepare_issue
   (input : IssueInputs) (now : Std.I64) (lifetime : Std.I64) :
@@ -749,21 +749,21 @@ def prepare_issue
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssuedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 179:0-182:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 180:0-183:1
     Visibility: public -/
 structure IssuedSurrogate where
   claims : Claims
   token : alloc.vec.Vec Std.U8
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeIssuer]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 184:0-187:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 185:0-188:1
     Visibility: public -/
 structure EnvelopeIssuer (Self : Type _) (Self_Secret : Type _) where
   «seal» : Self → Claims → Self_Secret → Result (core.result.Result
     (alloc.vec.Vec Std.U8) Denial)
 
 /-- [aivm_secrets_garrett_core::issue_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 189:0-205:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 190:0-206:1
     Visibility: public -/
 def issue_surrogate
   {I : Type _} {Clause0_Secret : Type _} (EnvelopeIssuerInst : EnvelopeIssuer I
@@ -779,6 +779,276 @@ def issue_surrogate
     | core.result.Result.Ok token =>
       ok (core.result.Result.Ok { claims, token })
     | core.result.Result.Err error => ok (core.result.Result.Err error)
+  | core.result.Result.Err error => ok (core.result.Result.Err error)
+
+/-- [aivm_secrets_garrett_core::oauth_state::RefreshState]
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 2:0-6:1
+    Visibility: public -/
+@[discriminant isize]
+inductive oauth_state.RefreshState where
+| Ready : oauth_state.RefreshState
+| InDoubt : oauth_state.RefreshState
+| Reauthorize : oauth_state.RefreshState
+
+/-- [aivm_secrets_garrett_core::oauth_state::ExchangeFailure]
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 7:0-11:1
+    Visibility: public -/
+@[discriminant isize]
+inductive oauth_state.ExchangeFailure where
+| NotSent : oauth_state.ExchangeFailure
+| Rejected : oauth_state.ExchangeFailure
+| Uncertain : oauth_state.ExchangeFailure
+
+/-- [aivm_secrets_garrett_core::oauth_state::RefreshDenial]
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 12:0-22:1
+    Visibility: public -/
+@[discriminant isize]
+inductive oauth_state.RefreshDenial where
+| Revoked : oauth_state.RefreshDenial
+| Unsettled : oauth_state.RefreshDenial
+| Expired : oauth_state.RefreshDenial
+| Exhausted : oauth_state.RefreshDenial
+| Invalid : oauth_state.RefreshDenial
+| Storage : oauth_state.RefreshDenial
+| Uncertain : oauth_state.RefreshDenial
+| NotSent : oauth_state.RefreshDenial
+| Rejected : oauth_state.RefreshDenial
+
+/-- [aivm_secrets_garrett_core::oauth_state::RefreshEvent]
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 23:0-28:1
+    Visibility: public -/
+@[discriminant isize]
+inductive oauth_state.RefreshEvent where
+| Recorded : oauth_state.RefreshEvent
+| InDoubt : oauth_state.RefreshEvent
+| NotSent : oauth_state.RefreshEvent
+| Rejected : oauth_state.RefreshEvent
+
+/-- [aivm_secrets_garrett_core::oauth_state::classify]:
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 29:0-37:1
+    Visibility: public -/
+def oauth_state.classify
+  (sent : Bool) (status : Std.I64) (invalid_grant : Bool) :
+  Result oauth_state.ExchangeFailure
+  := do
+  if sent
+  then
+    if status = 400#i64
+    then
+      if invalid_grant
+      then ok oauth_state.ExchangeFailure.Rejected
+      else ok oauth_state.ExchangeFailure.Uncertain
+    else ok oauth_state.ExchangeFailure.Uncertain
+  else ok oauth_state.ExchangeFailure.NotSent
+
+/-- [aivm_secrets_garrett_core::oauth_state::settled_failure]:
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 38:0-48:1
+    Visibility: public -/
+def oauth_state.settled_failure
+  (prior : oauth_state.RefreshState) (failure : oauth_state.ExchangeFailure) :
+  Result oauth_state.RefreshState
+  := do
+  match failure with
+  | oauth_state.ExchangeFailure.NotSent =>
+    match prior with
+    | oauth_state.RefreshState.Ready => ok oauth_state.RefreshState.Ready
+    | oauth_state.RefreshState.InDoubt => ok oauth_state.RefreshState.InDoubt
+    | oauth_state.RefreshState.Reauthorize =>
+      ok oauth_state.RefreshState.Reauthorize
+  | oauth_state.ExchangeFailure.Rejected =>
+    ok oauth_state.RefreshState.Reauthorize
+  | oauth_state.ExchangeFailure.Uncertain =>
+    ok oauth_state.RefreshState.InDoubt
+
+/-- [aivm_secrets_garrett_core::oauth_state::permit_refresh]:
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 49:0-78:1
+    Visibility: public -/
+def oauth_state.permit_refresh
+  (active : Bool) (state : oauth_state.RefreshState) (has_refresh : Bool)
+  (generation : Std.I64) (retry_in_doubt : Bool) :
+  Result (core.result.Result Unit oauth_state.RefreshDenial)
+  := do
+  if active
+  then
+    match state with
+    | oauth_state.RefreshState.Ready =>
+      if has_refresh
+      then
+        if generation < 0#i64
+        then ok (core.result.Result.Err oauth_state.RefreshDenial.Invalid)
+        else
+          if generation >= 2147483647#i64
+          then ok (core.result.Result.Err oauth_state.RefreshDenial.Exhausted)
+          else ok (core.result.Result.Ok ())
+      else ok (core.result.Result.Err oauth_state.RefreshDenial.Expired)
+    | oauth_state.RefreshState.InDoubt =>
+      if retry_in_doubt
+      then
+        if has_refresh
+        then
+          if generation < 0#i64
+          then ok (core.result.Result.Err oauth_state.RefreshDenial.Invalid)
+          else
+            if generation >= 2147483647#i64
+            then
+              ok (core.result.Result.Err oauth_state.RefreshDenial.Exhausted)
+            else ok (core.result.Result.Ok ())
+        else ok (core.result.Result.Err oauth_state.RefreshDenial.Expired)
+      else ok (core.result.Result.Err oauth_state.RefreshDenial.Unsettled)
+    | oauth_state.RefreshState.Reauthorize =>
+      ok (core.result.Result.Err oauth_state.RefreshDenial.Unsettled)
+  else ok (core.result.Result.Err oauth_state.RefreshDenial.Revoked)
+
+/-- [aivm_secrets_garrett_core::oauth_state::LeaseMeta]
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 79:0-83:1
+    Visibility: public -/
+structure oauth_state.LeaseMeta where
+  epoch : Std.I64
+  generation : Std.I64
+  expires_at : Std.I64
+
+/-- [aivm_secrets_garrett_core::oauth_state::require_lease]:
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 84:0-106:1
+    Visibility: public -/
+def oauth_state.require_lease
+  (active : Bool) (state : oauth_state.RefreshState)
+  (current : oauth_state.LeaseMeta) (leased : oauth_state.LeaseMeta)
+  (now : Std.I64) :
+  Result (core.result.Result Unit oauth_state.RefreshDenial)
+  := do
+  if active
+  then
+    if current.epoch != leased.epoch
+    then ok (core.result.Result.Err oauth_state.RefreshDenial.Revoked)
+    else
+      if current.generation != leased.generation
+      then ok (core.result.Result.Err oauth_state.RefreshDenial.Revoked)
+      else
+        if current.expires_at != leased.expires_at
+        then ok (core.result.Result.Err oauth_state.RefreshDenial.Revoked)
+        else
+          match state with
+          | oauth_state.RefreshState.Ready =>
+            if now < 0#i64
+            then ok (core.result.Result.Err oauth_state.RefreshDenial.Expired)
+            else
+              if now >= current.expires_at
+              then
+                ok (core.result.Result.Err oauth_state.RefreshDenial.Expired)
+              else ok (core.result.Result.Ok ())
+          | oauth_state.RefreshState.InDoubt =>
+            ok (core.result.Result.Err oauth_state.RefreshDenial.Unsettled)
+          | oauth_state.RefreshState.Reauthorize =>
+            ok (core.result.Result.Err oauth_state.RefreshDenial.Unsettled)
+  else ok (core.result.Result.Err oauth_state.RefreshDenial.Revoked)
+
+/-- [aivm_secrets_garrett_core::oauth_state::StoreFailure]
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 107:0-109:1
+    Visibility: public -/
+@[discriminant isize]
+inductive oauth_state.StoreFailure where
+| Failed : oauth_state.StoreFailure
+
+/-- Trait declaration: [aivm_secrets_garrett_core::oauth_state::RefreshOps]
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 110:0-118:1
+    Visibility: public -/
+structure oauth_state.RefreshOps (Self : Type _) (Self_Successor : Type _)
+  where
+  intent : Self → Result (core.result.Result Unit oauth_state.StoreFailure)
+  quarantine : Self → Result (core.result.Result Unit
+    oauth_state.StoreFailure)
+  exchange : Self → Result (core.result.Result Self_Successor
+    oauth_state.ExchangeFailure)
+  commit : Self → Self_Successor → Result (core.result.Result Unit
+    oauth_state.StoreFailure)
+  settle : Self → oauth_state.RefreshState → Result (core.result.Result
+    Unit oauth_state.StoreFailure)
+  observe : Self → oauth_state.RefreshEvent → Result (core.result.Result
+    Unit oauth_state.StoreFailure)
+
+/-- [aivm_secrets_garrett_core::oauth_state::refresh_once]:
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 120:0-169:1
+    Visibility: public -/
+def oauth_state.refresh_once
+  {O : Type _} {Clause0_Successor : Type _} (RefreshOpsInst :
+  oauth_state.RefreshOps O Clause0_Successor) (ops : O) (active : Bool)
+  (prior : oauth_state.RefreshState) (has_refresh : Bool)
+  (generation : Std.I64) (retry_in_doubt : Bool) :
+  Result (core.result.Result Clause0_Successor oauth_state.RefreshDenial)
+  := do
+  let r ←
+    oauth_state.permit_refresh active prior has_refresh generation
+      retry_in_doubt
+  match r with
+  | core.result.Result.Ok _ =>
+    let r1 ← RefreshOpsInst.intent ops
+    match r1 with
+    | core.result.Result.Ok _ =>
+      let r2 ← RefreshOpsInst.quarantine ops
+      match r2 with
+      | core.result.Result.Ok _ =>
+        let r3 ← RefreshOpsInst.exchange ops
+        match r3 with
+        | core.result.Result.Ok successor =>
+          let r4 ← RefreshOpsInst.commit ops successor
+          match r4 with
+          | core.result.Result.Ok _ =>
+            let r5 ←
+              RefreshOpsInst.observe ops oauth_state.RefreshEvent.Recorded
+            match r5 with
+            | core.result.Result.Ok _ => ok (core.result.Result.Ok successor)
+            | core.result.Result.Err _ =>
+              ok (core.result.Result.Err oauth_state.RefreshDenial.Uncertain)
+          | core.result.Result.Err _ =>
+            let _ ←
+              RefreshOpsInst.observe ops oauth_state.RefreshEvent.InDoubt
+            ok (core.result.Result.Err oauth_state.RefreshDenial.Uncertain)
+        | core.result.Result.Err ef =>
+          match ef with
+          | oauth_state.ExchangeFailure.NotSent =>
+            let state ←
+              oauth_state.settled_failure prior
+                oauth_state.ExchangeFailure.NotSent
+            let r4 ← RefreshOpsInst.settle ops state
+            match r4 with
+            | core.result.Result.Ok _ =>
+              let r5 ←
+                RefreshOpsInst.observe ops oauth_state.RefreshEvent.NotSent
+              match r5 with
+              | core.result.Result.Ok _ =>
+                ok (core.result.Result.Err oauth_state.RefreshDenial.NotSent)
+              | core.result.Result.Err _ =>
+                ok (core.result.Result.Err oauth_state.RefreshDenial.Uncertain)
+            | core.result.Result.Err _ =>
+              let _ ←
+                RefreshOpsInst.observe ops oauth_state.RefreshEvent.InDoubt
+              ok (core.result.Result.Err oauth_state.RefreshDenial.Uncertain)
+          | oauth_state.ExchangeFailure.Rejected =>
+            let state ←
+              oauth_state.settled_failure prior
+                oauth_state.ExchangeFailure.Rejected
+            let r4 ← RefreshOpsInst.settle ops state
+            match r4 with
+            | core.result.Result.Ok _ =>
+              let r5 ←
+                RefreshOpsInst.observe ops oauth_state.RefreshEvent.Rejected
+              match r5 with
+              | core.result.Result.Ok _ =>
+                ok (core.result.Result.Err oauth_state.RefreshDenial.Rejected)
+              | core.result.Result.Err _ =>
+                ok (core.result.Result.Err oauth_state.RefreshDenial.Uncertain)
+            | core.result.Result.Err _ =>
+              let _ ←
+                RefreshOpsInst.observe ops oauth_state.RefreshEvent.InDoubt
+              ok (core.result.Result.Err oauth_state.RefreshDenial.Uncertain)
+          | oauth_state.ExchangeFailure.Uncertain =>
+            let _ ←
+              RefreshOpsInst.observe ops oauth_state.RefreshEvent.InDoubt
+            ok (core.result.Result.Err oauth_state.RefreshDenial.Uncertain)
+      | core.result.Result.Err _ =>
+        ok (core.result.Result.Err oauth_state.RefreshDenial.Uncertain)
+    | core.result.Result.Err _ =>
+      ok (core.result.Result.Err oauth_state.RefreshDenial.Storage)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- Trait declaration: [aivm_secrets_garrett_core::protocol::IssuanceObserver]

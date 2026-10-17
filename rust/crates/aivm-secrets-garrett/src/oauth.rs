@@ -24,7 +24,7 @@ fn pkce(v: &Value) -> Outcome<&str> {
     }
     Ok(s)
 }
-fn scopes(v: &Value) -> Outcome<Vec<String>> {
+pub(crate) fn scopes(v: &Value) -> Outcome<Vec<String>> {
     let a = v.as_array().ok_or(Error::CredentialSource)?;
     if a.len() > 32 {
         return Err(Error::CredentialSource);
@@ -278,15 +278,19 @@ pub fn evaluate(v: &Value) -> Outcome<Value> {
             {
                 return Err(Error::CredentialSource);
             }
-            let outcome = if !sent {
-                if status != 0 || !error.is_empty() {
-                    return Err(Error::CredentialSource);
+            if !sent && (status != 0 || !error.is_empty()) {
+                return Err(Error::CredentialSource);
+            }
+            let outcome = match aivm_secrets_garrett_core::oauth_state::classify(
+                sent,
+                status,
+                error == "invalid_grant",
+            ) {
+                aivm_secrets_garrett_core::oauth_state::ExchangeFailure::NotSent => "not_sent",
+                aivm_secrets_garrett_core::oauth_state::ExchangeFailure::Rejected => {
+                    "rejected_grant"
                 }
-                "not_sent"
-            } else if status == 400 && error == "invalid_grant" {
-                "rejected_grant"
-            } else {
-                "in_doubt"
+                aivm_secrets_garrett_core::oauth_state::ExchangeFailure::Uncertain => "in_doubt",
             };
             Ok(json!({"ok":true,"outcome":outcome}))
         }

@@ -147,6 +147,7 @@ class AuthorityProviderCase(ProviderCase):
             audit_file=str(p / "provider-audit.jsonl"),
         )
         provider.update(self.provider_changes)
+        provider = {key: value for key, value in provider.items() if value is not None}
         config = dict(
             schema=1,
             authority_root=str(self.authority.root),

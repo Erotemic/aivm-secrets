@@ -12,6 +12,7 @@ pub mod json;
 pub mod lifecycle;
 pub mod model;
 pub mod oauth;
+pub mod oauth_vault;
 pub mod registry;
 pub mod tls;
 pub mod tpm;

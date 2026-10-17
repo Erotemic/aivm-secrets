@@ -72,6 +72,11 @@ pub fn broker_socket(path: &Path) -> Outcome<()> {
 pub(crate) struct PrivateDirectory(fs::File);
 impl PrivateDirectory {
     pub(crate) fn open(path: &Path) -> Outcome<Self> {
+        let directory = Self::trusted_directory(path)?;
+        Self::check_private(&directory)?;
+        Ok(Self(directory))
+    }
+    fn trusted_directory(path: &Path) -> Outcome<fs::File> {
         use std::path::Component;
         if !path.is_absolute() {
             return Err(Error::UnsafeFile);
@@ -102,8 +107,8 @@ impl PrivateDirectory {
                 _ => return Err(Error::UnsafeFile),
             }
         }
-        Self::check_private(&directory)?;
-        Ok(Self(directory))
+        Self::check_ancestor(&directory)?;
+        Ok(directory)
     }
     fn check_ancestor(file: &fs::File) -> Outcome<()> {
         let info = file.metadata().map_err(|_| Error::UnsafeFile)?;
@@ -276,7 +281,10 @@ impl PrivateDirectory {
         Ok(names)
     }
     pub(crate) fn lock(&self, exclusive: bool) -> Outcome<fs::File> {
-        let file = self.file(".enrollment.lock", exclusive)?;
+        self.lock_named(".enrollment.lock", exclusive)
+    }
+    pub(crate) fn lock_named(&self, name: &str, exclusive: bool) -> Outcome<fs::File> {
+        let file = self.file(name, exclusive)?;
         let operation = if exclusive {
             rustix::fs::FlockOperation::LockExclusive
         } else {
@@ -284,12 +292,8 @@ impl PrivateDirectory {
         };
         rustix::fs::flock(&file, operation).map_err(|_| Error::InternalError)?;
         let info = file.metadata().map_err(|_| Error::UnsafeFile)?;
-        let current = rustix::fs::statat(
-            &self.0,
-            ".enrollment.lock",
-            rustix::fs::AtFlags::SYMLINK_NOFOLLOW,
-        )
-        .map_err(|_| Error::UnsafeFile)?;
+        let current = rustix::fs::statat(&self.0, name, rustix::fs::AtFlags::SYMLINK_NOFOLLOW)
+            .map_err(|_| Error::UnsafeFile)?;
         if info.dev() != current.st_dev || info.ino() != current.st_ino || info.nlink() != 1 {
             return Err(Error::UnsafeFile);
         }
@@ -298,6 +302,41 @@ impl PrivateDirectory {
     pub(crate) fn sync(&self) -> Outcome<()> {
         self.0.sync_all().map_err(|_| Error::InternalError)
     }
+}
+
+/// CA bundles may be public, but their held path and inode must be controlled
+/// by root or the current principal. Environment-selected trust is never used.
+pub(crate) fn read_trusted_public(path: &Path, limit: usize) -> Outcome<Vec<u8>> {
+    let directory = PrivateDirectory::trusted_directory(path.parent().ok_or(Error::UnsafeFile)?)?;
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or(Error::UnsafeFile)?;
+    PrivateDirectory::name(name)?;
+    let file = fs::File::from(
+        rustix::fs::openat(
+            &directory,
+            name,
+            OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC | OFlags::NONBLOCK,
+            Mode::empty(),
+        )
+        .map_err(|_| Error::UnsafeFile)?,
+    );
+    let info = file.metadata().map_err(|_| Error::UnsafeFile)?;
+    if !info.is_file()
+        || (info.uid() != 0 && info.uid() != rustix::process::geteuid().as_raw())
+        || info.mode() & 0o022 != 0
+    {
+        return Err(Error::UnsafeFile);
+    }
+    let mut bytes = Vec::new();
+    file.take((limit + 1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|_| Error::UnsafeFile)?;
+    if bytes.len() > limit {
+        return Err(Error::UnsafeFile);
+    }
+    Ok(bytes)
 }
 
 /// Public unpredictable names; entropy never becomes a secret argument/log.

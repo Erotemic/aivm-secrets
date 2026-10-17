@@ -651,3 +651,93 @@ its final recorded source passed the complete normal-service regression run.
 I am committing this layer with the overall goal active. The next concrete
 implementation gap remains encrypted OAuth custody/refresh, followed by
 broader policy/provider release and concrete concurrent-service refinement.
+
+## 2026-10-17 02:32:58 -0400
+
+The previous turn was progress: 2260495 committed native trust lifecycle,
+prefix-checked recovery and protected-file issuance, with 99 obligations,
+38 rejected Rust mutations and 1,949 full-suite passes. The next missing
+Garrett path is OAuth custody and refresh. I am porting the Python schema-2
+AES-GCM vault, provider profile binding and refresh-in-doubt discipline to
+normal Rust operations, then connecting opaque leases to provider dispatch.
+The important condition is durable quarantine before a possibly one-time
+refresh secret is sent. A lost reply or failed successor persistence must
+never silently restore the old ready grant. Definite not-sent can restore
+only the exact prior state, including a prior in-doubt state after an explicit
+retry. A rejected grant requires reauthorization. I am confident that the
+existing pure response rules and held-file storage can be reused; the hard
+parts are correct transport send classification, profile/epoch/generation
+fences and holding a current lease through emission. Concrete crypto/TLS/FS
+refinement remains assumed, and all provider accounts/credentials used here
+will be synthetic.
+
+The new normal OAuth command now initializes, enrolls, inspects, revokes,
+refreshes and checks sessions without a token-bearing public reply. The native
+provider uses its opaque snapshot and holds the vault lock through egress.
+The reference Python vault decrypts Rust records and the opposite direction
+works too. Twenty-five new integration cases passed before the final gates,
+including a killed process while a real HTTPS refresh was blocked, denied
+successor persistence, concurrent automatic refresh, profile adoption,
+revocation draining, generation fencing and token replacement with unchanged
+metadata. A short OAuth token exposed the legacy inner-envelope minimum; I
+kept the old file/fixture grammar and selected OAuth's validated grammar only
+for its ephemeral session envelope. A test initially reused the authority CA
+filename for the provider CA; separating the fixtures fixed that test setup.
+
+Lean accepts 22 new obligations, including a callback-contract proof that
+requires durable quarantine before exchange and commit before returning a
+successor. I needed explicit not-sent/rejected proof branches because a generic
+tactic left an unconstrained settlement state; the checked proof now states
+the branch order directly. These are conditional adapter contracts, not a
+filesystem or TLS proof. I remain cautious about whole-service concurrency,
+host rollback and native browser acquisition. The current checkpoint ports
+OAuth custody/refresh, not the browser/loopback/code-exchange service. The
+next full-protocol work still needs that path and the general policy executor.
+
+The final recorded baseline is terminal and clean: 137 selected tests, 121
+named axiom audits, six Rust unit checks, fmt and strict clippy in both modes.
+Normal authority/bridge/client/OAuth binaries were then rebuilt without the
+conformance feature, preserving the separate fixture runner. The full suite
+passed 1,974 tests with the one expected pending general primitive-runner skip
+in 287.35 seconds; every new OAuth integration test ran. Python distribution
+build and twine checks passed after that suite finished. A byte comparison
+matched 176 manifest/source/proof/document inputs against the source archive.
+The assumption ledger's old "no proof artifacts" status was stale; I corrected
+it and added the native OAuth adapter/locking assumptions, including the
+consequence of a false assumption. The security mutation run is still active;
+its first 15 mutants have failed genuine unchanged proofs, with no resource or
+infrastructure failures accepted. Resource publication reported nothing pending.
+
+Final review found a real subsecond boundary in the new OAuth admission path:
+adding floor(elapsed seconds) to a previously rounded wall-clock sample can
+still be one second stale after a lock wait. I replaced it with a real host
+clock sample after the vault lock, and resampled before inner/outer admission
+for issuance, control and request. A focused concurrency regression enters
+during the last second, blocks for less than one second across expiry, and
+requires zero provider I/O. The pure core/proof inputs did not change, so the
+ongoing mutation run remains applicable; the runtime/test source manifest,
+full regression and archive must be refreshed before commit.
+
+The corrected runtime's recorded gate passed 138 selected tests, 121 axiom
+audits, both strict Rust lint modes and six unit checks. The normal-service
+full suite is now terminal: 1,975 passed, one known unfinished general runner
+skip, 279.26 seconds. All 26 OAuth cases ran, including the subsecond lock-wait
+regression. Forty-four actual Rust mutants have been rejected so far, including
+omitted quarantine and omitted successor persistence. I am rebuilding the
+source artifact after the runtime/manifest/evidence changes; the earlier
+archive comparison described the earlier runtime and must not be presented
+as validation of this final revision.
+
+The mutation run is terminal and successful: all 48 actual Rust source attacks
+failed unchanged Lean proofs, including exchange-before-quarantine and stale
+lease generation/epoch/expiry. No surviving mutant, infrastructure failure,
+resource failure or timeout counted as a rejection. The core and proof inputs
+were unchanged across the runtime clock correction, so this challenge covers
+the final core. The corrected source/proof manifest remains current. The final
+Python build and twine checks passed, and all 176 checked source/proof/document
+inputs match the rebuilt archive byte for byte. I am confident in this custody
+checkpoint under its explicit adapter assumptions; I am not claiming native
+browser acquisition, the general policy interpreter, whole-service I/O/history
+refinement or physical TPM provenance. Those remain the next goal work. The
+standalone repository boundary and the Python reference implementation remain
+intact, and the overall Garrett implementation/formalization goal stays active.

@@ -49,8 +49,8 @@ These are independent Rust decisions and cryptographic/transport adapters.
 In the original bridge profile, the Python broker still performs inner-capability
 authorization, credential
 custody, audit, and provider effects. The Rust transition runners are not a
-replacement for its complete authority service, OAuth vault or provider
-HTTP adapters. The native authority subset described below adds actual
+replacement for its general policy interpreter. The native OAuth subset below
+adds encrypted custody, HTTPS refresh and dispatch leases; the native authority subset adds actual
 durable initialization, enrollment, renewal and revocation. The explicit [account-status-v1 profile](verified-provider.md)
 adds Rust-owned credential use, a pinned provider path and a proved typed
 release projection for `profile.read`. Neither Python packaging nor ordinary
@@ -84,7 +84,7 @@ observational equivalence, hide metadata/length/timing, or refine the entire
 Rust I/O system into the symbolic trace. Concrete cryptographic primitives,
 TLS/X.509, parser, filesystem, compiler and translation are trusted boundaries.
 
-The manifest now declares **99 named obligations**, including supporting lemmas,
+The manifest now declares **121 named obligations**, including supporting lemmas,
 the [credential-use/release contracts](verified-provider.md) and the
 [composed request controller](verified-composition.md). The composition checks
 authenticated opening, current inner authorization, exact audit acknowledgement
@@ -99,9 +99,12 @@ actual Rust authority controller.
 [`GarrettTrust.lean`](../proofs/GarrettTrust.lean) adds exact trust-root fencing,
 recovery-prefix and ordered retirement-before-activation contracts. The native
 file issuer uses the existing extracted acknowledged-issuance controller.
+[`GarrettOAuth.lean`](../proofs/GarrettOAuth.lean) adds exact refresh eligibility,
+not-sent/uncertain/rejected settlement, epoch/generation/expiry lease fencing,
+and the ordered quarantine/exchange/commit controller contract.
 Every transitive axiom dependency is checked afresh. Only Lean's `propext`,
 `Classical.choice`, and `Quot.sound` are permitted; no admitted proof or
-project-specific security axiom is allowed. Thirty-eight deliberate changes to actual
+project-specific security axiom is allowed. Forty-eight deliberate changes to actual
 Rust must break the unchanged extracted proofs: missing certificate binding,
 missing epoch binding, inclusive expiry, inactive issuance, bypassing binding
 before decryption, returning a token without sealing, removing inner binding,
@@ -119,6 +122,9 @@ misreport a failure after publication as an unchanged store.
 Trust mutations accept changed roots/enrollments, allow activation with old
 enrollments, skip staging or retirement, activate before retirement, or report
 an uncertain trust change as unchanged.
+OAuth mutations remove quarantine or successor persistence, exchange before
+quarantine, permit silent retry or rejected-grant reuse, clear prior doubt after
+a failed deliberate retry, or admit stale/expired credential leases.
 
 ## TPM custody and enrollment evidence
 
@@ -441,11 +447,105 @@ recovery and issuance through the actual executables and independent reference
 readers. The hardware-path tests require software TPM execution and do not
 establish physical hardware provenance. Hosted CI remains unexecuted.
 
+## Native OAuth custody and refresh
+
+`garrett-oauth` is a normal host-only executable with `init`, `enroll`, `status`,
+`revoke`, `refresh` and `session-check` actions. Build it without fixture APIs:
+
+```bash
+cd rust
+cargo build --locked --release -p aivm-secrets-garrett --no-default-features --bin garrett-oauth
+cd ..
+rust/target/release/garrett-oauth init --root /private/oauth-vault
+rust/target/release/garrett-oauth enroll --root /private/oauth-vault --request /private/enroll.json
+rust/target/release/garrett-oauth refresh --root /private/oauth-vault --request /private/refresh.json
+```
+
+Requests are private host files. Enrollment takes `provider_file`, `subject`
+and `grant_file`, with optional explicit `replace`. The grant file uses the
+reference fields `access_token`, `refresh_token`, `expires_at`, `scopes` and
+`generation`. It remains a secret-bearing operator input; enrollment does not
+remove that file. Refresh takes `provider_file` and `subject`, with optional
+explicit `retry_in_doubt`. Responses and schema-2 chained audit files contain
+metadata and fixed errors, never grant tokens or token-endpoint bodies.
+Normally omit `now`; the host executable supplies its clock. Its explicit
+clock override is a trusted host input for reproducible tests.
+
+The native vault reads and writes the reference AES-256-GCM record/AAD format
+and canonical provider digest. Python can read native records and native code
+can read Python records. Provider changes prevent use, while inspection,
+revocation and explicit replacement can adopt the authenticated old record
+with an incremented epoch and previous-digest prefix. Root/key/lock/record
+operations use held directories and no-symlink file descriptors. Initialization
+publishes a complete private directory without replacing an existing root.
+
+The actual Rust refresh controller requires acknowledged intent and durable
+`in_doubt` storage before calling the private HTTPS adapter. The adapter checks
+the pinned origin's certificate before request bytes, disables resumption and
+early data, and has bounded connect/exchange/body handling. It supports TLS
+1.2/1.3 for OAuth providers; the identity channel and account-status provider
+remain TLS 1.3 only. It follows no redirects and reads neither proxy nor TLS
+key-log/trust overrides from the environment. Default trust comes from fixed
+Linux system CA locations. An explicit host `transport` object may select a
+`server_ca`, `address` and `port` for a private/synthetic endpoint; certificate
+name and HTTP origin still come from the approved provider profile.
+
+A validated rotated successor must be persisted before the controller returns
+it. Scope expansion, malformed replies, redirects, lost responses and uncertain
+writes never silently restore the old ready grant. A definite `not_sent`
+restores the **exact prior state**, so a failed deliberate retry remains in
+doubt. HTTP 400 `invalid_grant` requires reauthorization; even explicit retry
+cannot override that state. A failed rename acknowledgement can leave either
+the marker or the committed successor: the caller receives uncertainty, and
+neither outcome authorizes automatic reuse of the old refresh token. Process
+death after the request leaves a durable marker and an unmatched audit intent.
+
+The account-status-v1 broker configuration accepts exactly one of
+`credential_file` or an `oauth` object:
+
+```json
+{
+  "vault_root": "/private/oauth-vault",
+  "provider_file": "/private/provider.json",
+  "subject": "vm-test"
+}
+```
+
+The OAuth source requires bearer authentication and the exact approved resource
+host. It may refresh near expiration, then retains a private snapshot and HMAC
+witness of the token plus profile/account/epoch/generation/expiry. Each issuance,
+control operation and provider request checks a current vault record under a
+lease; provider requests retain that lease through egress. Admission samples
+wall time again after waiting on the vault lock, including waits that cross an
+expiry boundary in less than one second. Refresh and revocation
+wait for admitted calls to finish, and completed changes fence older sessions.
+Even token replacement with unchanged public metadata fails the HMAC check.
+An unavailable or invalid vault never selects a credential-file fallback.
+
+The native OAuth checkpoint passes **1,975 full-suite tests**, with the one
+expected pending general Rust primitive-runner skip (279.26 seconds), using
+normal authority/client/bridge/OAuth binaries. Its recorded gate passes
+**138 selected Garrett tests**, all **121 named axiom checks**, strict Rust
+lint in both build modes and six Rust unit checks. The **26 new OAuth cases**
+cover cross-language ciphertext, real local HTTPS, process death, failed
+successor persistence, concurrent refresh, profile adoption, draining revocation,
+stale tokens and subsecond expiry after a blocked admission.
+
+The Lean result is conditional on the stated storage, audit, transport and
+cryptographic adapter contracts. It proves the ordering in the extracted Rust
+controller; it does not prove AES-GCM, HMAC, rustls, kernel locks, fsync, parsing
+or arbitrary concurrent service executions. The native browser, loopback
+callback and authorization-code exchange service is still pending; existing
+pure callback/PKCE/token decisions retain their Python parity tests. Host
+compromise, snapshot rollback, nonparticipating writers and provider disclosure
+remain outside this result. No live OAuth account or physical TPM was used.
+
 ## Remaining assurance work
 
 The [acceptance plan](planning/aivm-secrets-garrett-verification.md) remains
 the broader goal. Remaining work includes concrete adapter refinement,
-complete credential/policy and OAuth custody in Rust, TPM provenance deployment, broader
+complete credential/policy administration and browser OAuth acquisition in Rust,
+TPM provenance deployment, broader
 provider release/egress proofs, audit/log confinement, and a composed finite
 service-history theorem. The extracted request composition does not establish
 that whole-service result.

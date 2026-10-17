@@ -72,4 +72,8 @@ now initializes a Python-compatible private store, enrolls and renews clients,
 records TPM assurance, and coordinates revocation with native provider use.
 Native issuer/server/root rotation, explicit trust-transaction recovery and
 acknowledged token issuance to protected host files are implemented too.
-Complete policy/OAuth custody and concrete whole-service refinement remain open.
+The native OAuth vault now preserves Python schema-2 ciphertext, refreshes through
+a pinned HTTPS origin and holds revocable credential leases through provider use.
+Extracted Lean contracts check durable quarantine before refresh and persistence
+before returning a successor. Native browser/authorization-code acquisition,
+general policy interpretation and concrete whole-service refinement remain open.
