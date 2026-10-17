@@ -746,6 +746,23 @@ eleven new parameter, operation/write and release attacks. Hosted CI remains
 unexecuted, and all credentials/providers/TPM activity in this validation are
 synthetic or isolated emulation.
 
+A follow-up raw-number review found and fixed a route mismatch: arbitrary-
+precision JSON preserved the spelling `-0`, membership guards interpreted it as
+integer zero, and interpolation formerly produced `/-0`. Arguments and defaults
+now normalize to the validated integer and routing renders that value. Numeric
+facts compare integer values while preserving the distinction from floats,
+booleans and strings. A custom TLS client regression reaches the broker without
+the ordinary client's canonical encoder; only `/0` may be selected when integer
+zero is approved, even when the synthetic provider exposes a different `/-0`.
+
+The updated checkpoint passes **2,083 full-suite tests** with the same one
+expected skip (315.33 seconds), **246 selected tests**, strict lint and six Rust
+unit checks. **75 manifest tests** now include ten raw-number routing, default,
+query and typed-fact cases. The extracted controller and proof sources remain
+unchanged from the successful 70-mutation run; updated runtime/test hashes are
+recorded. The subsequent recursive-disclosure refinement is isolated in a
+worktree and is not part of this checkpoint's assurance claim.
+
 Native CLI alias tables, command resolver execution, one-shot write approvals,
 and delegated/attenuated grant lineages remain unfinished. Nonempty CLI tables
 are explicitly rejected. Command source descriptions are validated by the pure

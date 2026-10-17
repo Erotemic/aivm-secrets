@@ -954,6 +954,34 @@ checks, full gates and manifest/archive refresh are done. main remains the
 validated result. A future merge must preserve both journal continuations and
 regenerate assurance manifests instead of choosing stale hashes from either side.
 
+All 70 mutations for 5b5ec7a finished successfully after the commit. While the
+isolated disclosure refinement was under way, adversarial number-spelling review
+found a real route mismatch: serde's arbitrary-precision Number preserved -0,
+allowlist checks interpreted it as integer zero, and path/query interpolation
+used the original spelling. Four regression tests fail before the fix. A custom
+Python TLS client actually reached /v1/tickets/-0 and received a different id
+while only integer zero was approved. This is exactly why local guard proofs
+cannot establish an unrefined route builder's correctness. I am normalizing
+validated arguments/defaults and rendering numeric segments from their integer
+value, preserving the independent Python semantics. The source core/proofs are
+unchanged; the runtime adapter, adversarial tests and artifact hashes need fresh
+validation. The larger response-projection work remains isolated and unclaimed.
+
+The normalization follow-up passes 246 selected tests and all 154 axiom audits,
+strict lint in both feature modes and six Rust unit checks. Full pytest using
+normal service binaries passes 2,083 tests with the same one expected primitive-
+runner skip in 315.33 seconds. There are now 75 manifest tests; the ten additions
+include raw-number routing/default/query and typed-fact checks. The original 70
+controller mutations remain applicable because their source, unchanged proofs
+and extraction/gate code are byte-identical to the audited 5b5ec7a snapshot.
+Packaging and the final source archive check follow before the local commit.
+
+Packaging succeeded, twine accepted the wheel and sdist, and all 187 checked
+source/proof/document inputs matched the source archive byte for byte. The
+normalization follow-up is ready as a separate local commit. Resource accounting
+is published again before this checkpoint; the deeper disclosure work remains
+in its own worktree with no claim that its full induction is complete.
+
 ## 2026-10-17 05:52:00 -0400
 
 Continuing the disclosure refinement on the isolated branch. The validated main
