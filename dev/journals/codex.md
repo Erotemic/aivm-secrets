@@ -1748,3 +1748,16 @@ has been established. The shared retry validator is small enough for an exact
 extracted Rust/Lean contract, avoiding a second handwritten policy in the client.
 Its proof does not establish SQL durability or CLI correctness. Broader gates,
 package provenance and adversarial proof mutations remain before acceptance.
+
+## 2026-10-18 13:15:35 -0400
+
+The first full system attempt stopped before workflows at an intentionally strict
+W4 extraction hash. I had refreshed the main Garrett/freshness manifests but
+missed the W4/W5 whole-generated-file provenance pins. Reviewing the generated
+diff confirms that it only inserts the retry validator definitions; the existing
+model source and relevant Rust controllers are unchanged. Both W4 and W5 now
+compile against this extraction, and W4's axiom audit passes. I am refreshing only
+those provenance hashes and rerunning the clean full gate. This is a useful
+reminder that a green leaf proof and main audit do not imply all recorded model
+links are current. Five targeted retry mutations are rejected; the earlier gate
+failure is retained rather than treated as runtime evidence.
