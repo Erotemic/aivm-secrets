@@ -394,6 +394,14 @@ def review_semantics(contents: dict[str, str]) -> None:
             'coordinator reply bypasses authenticated peer or committed ledger')
 
 
+    require(same_order(exchange, 'stream.conn.send_close_notify()',
+                       'if stream.flush().is_ok()', 'stream.sock.shutdown(Shutdown::Write)',
+                       'discard_after_reply(&mut stream.sock)')
+            and 'reader.take(32768)' in server
+            and 'tls::Deadline::start_for(TIMEOUT' in exchange,
+            'coordinator reply lost bounded, deadline-protected transport shutdown')
+
+
 def check(root: Path) -> dict:
     inventory = json.loads((root / INVENTORY_PATH).read_text())
     require(inventory.get('schema_version') == 1, 'unknown W3 inventory version')

@@ -176,6 +176,35 @@ def test_authority_rejects_ambiguous_http_framing(tmp_path, backend, malformed):
             conn.close()
 
 
+@pytest.mark.parametrize('malformed', ['duplicate-length', 'duplicate-type', 'empty-transfer-encoding'])
+def test_native_rejection_delivers_complete_reply_before_delayed_body(tmp_path, malformed):
+    import http.client
+    with NativeCoordinatorCase(tmp_path / 'coord') as coord:
+        body = b'{"action":"status","name":"shared-principal"}'
+        extra = {
+            'duplicate-length': b'Content-Length: 4096\r\n',
+            'duplicate-type': b'Content-Type: application/json\r\n',
+            'empty-transfer-encoding': b'Transfer-Encoding: \r\n',
+        }[malformed]
+        headers = (b'POST /v1/coordinate HTTP/1.1\r\nHost: localhost\r\n'
+                   b'Content-Type: application/json\r\nContent-Length: '
+                   + str(len(body)).encode() + b'\r\n' + extra + b'\r\n')
+        with socket.create_connection(('127.0.0.1', coord.port), timeout=4) as raw:
+            with coord.operator._context.wrap_socket(raw, server_hostname='localhost') as peer:
+                peer.settimeout(4)
+                peer.sendall(headers)
+                response = http.client.HTTPResponse(peer)
+                try:
+                    response.begin()
+                    # The server has rejected the headers. Deliver a separate
+                    # body record while its response is being consumed.
+                    peer.sendall(body)
+                    assert json.loads(response.read()) == {'ok': False, 'code': 'invalid_request'}
+                finally:
+                    response.close()
+        assert coord.operator.status() == {'ok': True, 'active': False, 'revision': None}
+
+
 @pytest.mark.parametrize('backend', ['python', 'rust'])
 @pytest.mark.parametrize('payload', [
     b'{"action":"status","action":"check","name":"shared-principal"}',

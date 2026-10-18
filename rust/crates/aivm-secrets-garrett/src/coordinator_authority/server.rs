@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
     io::{BufRead, BufReader, Read, Write},
-    net::{SocketAddr, TcpListener, TcpStream},
+    net::{Shutdown, SocketAddr, TcpListener, TcpStream},
     path::Path,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -165,8 +165,20 @@ fn exchange(
         .and_then(|_| stream.flush())
         .map_err(|_| Error::Unreachable)?;
     stream.conn.send_close_notify();
-    let _ = stream.flush();
+    if stream.flush().is_ok() {
+        // Rejection may leave a later TLS record containing the request body
+        // unread. Closing immediately can reset TCP and truncate our reply.
+        // Finish the response direction, then discard input without parsing or
+        // dispatching it. The existing wall-clock deadline still bounds this.
+        let _ = stream.sock.shutdown(Shutdown::Write);
+        discard_after_reply(&mut stream.sock);
+    }
     Ok(())
+}
+fn discard_after_reply(reader: &mut impl Read) {
+    // At most two maximum-size TLS records; an uncooperative peer cannot make
+    // shutdown an unbounded reader. Discard errors cannot undo a sent reply.
+    let _ = std::io::copy(&mut reader.take(32768), &mut std::io::sink());
 }
 fn line(reader: &mut impl BufRead, limit: usize) -> Result<Vec<u8>> {
     let mut line = Vec::new();
@@ -226,4 +238,17 @@ fn request(reader: &mut impl BufRead) -> Result<Value> {
         .read_exact(&mut body)
         .map_err(|_| Error::InvalidRequest)?;
     json::parse(&body, LIMIT).map_err(|_| AuthorityError::Public(Error::InvalidRequest))
+}
+
+#[cfg(test)]
+mod close_tests {
+    use super::*;
+    #[test]
+    fn shutdown_discard_stops_at_eof_or_fixed_transport_bound() {
+        for length in [0, 7, 32768, 65536] {
+            let mut reader = std::io::Cursor::new(vec![0; length]);
+            discard_after_reply(&mut reader);
+            assert_eq!(reader.position(), length.min(32768) as u64);
+        }
+    }
 }

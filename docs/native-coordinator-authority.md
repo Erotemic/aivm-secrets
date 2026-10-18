@@ -155,6 +155,16 @@ Handshakes now occur inside bounded Python worker slots. Native workers also
 have a fixed five-second socket deadline. Resource bounds and unsupported HTTP
 forms can still differ; full all-input wire/core parity is not claimed.
 
+Native response shutdown flushes TLS close-notify, half-closes the response
+direction, and discards at most 32 KiB of encrypted transport input under that
+same deadline. Rejected headers can leave a request-body record unread; abrupt
+TCP closure can truncate an already-started error reply. Discarded input is
+never parsed or dispatched. Tests cover delayed bodies for the three malformed
+header forms and the discard bound. A full-suite `IncompleteRead` motivated this
+hardening; isolated repetitions and these new cases also passed on the older
+binary, so deterministic reproduction of that intermittent truncation remains
+unestablished. Shutdown is a concrete transport adapter, not a new Lean theorem.
+
 ```bash
 python dev/verification/garrett.py record
 python dev/verification/garrett.py mutate --mutation-filter '^coordinator (authority|dispatch) '

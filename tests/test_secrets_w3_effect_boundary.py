@@ -49,6 +49,7 @@ def mutate(repo, filename, before, after):
 
 
 @pytest.mark.parametrize('file,old,new', [
+    (RUST + 'coordinator_authority/server.rs', 'discard_after_reply(&mut stream.sock);', 'let _ = &stream.sock;'),
     (RUST + 'custody/manifest_session.rs',
      'if !aivm_secrets_garrett_core::coordination::valid_retry_key(key.as_bytes())', 'if false'),
     (RUST + 'client_invoke.rs', 'if !valid_retry_key(key.as_bytes())', 'if false'),

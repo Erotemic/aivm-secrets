@@ -1761,3 +1761,21 @@ those provenance hashes and rerunning the clean full gate. This is a useful
 reminder that a green leaf proof and main audit do not imply all recorded model
 links are current. Five targeted retry mutations are rejected; the earlier gate
 failure is retained rather than treated as runtime evidence.
+
+## 2026-10-18 13:27:59 -0400
+
+The corrected full gate reported a native coordinator malformed-HTTP response
+truncation. I interrupted the already-failing suite to obtain the traceback:
+headers advertised 37 bytes, but response.read got EOF with none of that body.
+The request is rejected before its body is read; an abrupt TCP close with later
+input is a plausible mechanism. One hundred isolated repetitions and three new
+delayed-body cases pass on the old binary, so I cannot claim a deterministic
+regression reproduction. I am keeping that uncertainty visible.
+
+I hardened the concrete close path: flush close-notify, half-close response
+output, and bounded raw input discard under the existing wall-clock deadline.
+There is no second parser/dispatch and no authorization or ledger change. The
+new cases pass on the hardened native process; a unit test checks EOF and exact
+discard bounds, and a source mutant protects the call site. This is adapter
+hardening, not a new formal transport guarantee. I will rerun the main parity,
+ordinary workflows, packaging and clean full gate before accepting the increment.
