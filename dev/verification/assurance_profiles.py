@@ -46,6 +46,8 @@ More setup can leave the guarantees unchanged. The host-execution comparison is 
 <a href="../tests/test_assurance_profiles.py">Python/native Rust copy, scope and revocation tests</a>,
 <a href="planning/aivm-secrets-assurance-profiles.json">profile definitions</a>,
 <a href="assurance-profiles.md">scope and operating guidance</a>.
+<a href="verified-coordination.md">Optional global revocation and write reservations</a>
+add a separate shared-authority dependency; they do not improve client key custody.
 This comparison neither attests a running deployment nor claims whole-service formal verification.</p>
 </main>
 <script type="application/json" id="profile-data">''' + payload + '''</script>

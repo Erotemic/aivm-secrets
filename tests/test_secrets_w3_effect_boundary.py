@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_w3_current_reviewed_effect_boundary():
     assert check(ROOT) == {
-        'sources': len(EXPECTED_SOURCES), 'effects': 11, 'scope': 'native-manifest-https-v1',
+        'sources': len(EXPECTED_SOURCES), 'effects': 12, 'scope': 'native-manifest-https-v1',
     }
 
 
@@ -49,6 +49,18 @@ def mutate(repo, filename, before, after):
 
 
 @pytest.mark.parametrize('file,old,new', [
+    (RUST + 'custody.rs',
+     'self.check_coordination()?;\n        let now = host_time()?;',
+     'let now = host_time()?;\n        self.check_coordination()?;'),
+    (RUST + 'custody/manifest_session.rs',
+     'lease.require_current(now)?;', 'let _ = now;'),
+    (RUST + 'custody/manifest_session.rs',
+     'reserve: || reservation_call(false),', 'reserve: || Ok(()),'),
+    (RUST + 'custody/manifest_session.rs',
+     'finish: || reservation_call(true),', 'finish: || Ok(()),'),
+    (RUST + 'coordination.rs',
+     'value.get("ok") != Some(&json!(true))', 'false'),
+
     (
         RUST + 'oauth_vault.rs',
         'core::require_current_lease(row.active, &row.state, &meta, binding.epoch, clock())',
@@ -86,8 +98,8 @@ def mutate(repo, filename, before, after):
     ),
     (
         RUST + 'custody/manifest_session.rs',
-        '            fresh()?;\n            self.base.executor.exchange_manifest(',
-        '            self.base.executor.exchange_manifest(',
+        'check: &fresh,',
+        'check: || Ok(()),',
     ),
     (
         RUST + 'custody/manifest_session.rs',

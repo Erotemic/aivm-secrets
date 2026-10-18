@@ -64,7 +64,12 @@ impl Session {
                 "writes",
                 "request_limit",
             ],
-            &["credential_file", "oauth", "source_override"],
+            &[
+                "credential_file",
+                "oauth",
+                "source_override",
+                "coordination_file",
+            ],
         )?;
         if m["request_limit"] != "unbounded" {
             return Err(Error::InvalidPolicy);
@@ -164,6 +169,7 @@ impl Session {
             .as_ref()
             .map(OAuthSource::active)
             .transpose()?;
+        self.base.check_coordination()?;
         let now = host_time()?;
         let outer = open_surrogate(
             verifier,
@@ -178,7 +184,56 @@ impl Session {
                 .map_err(use_error)?;
         let claims = opened.claims;
         let secret = opened.credential;
-        let (op, args) = self.policy.operation(value)?;
+        // The retry name is transport metadata, never an authorization or
+        // route parameter. Preserve the canonical kernel request without it.
+        let mut request = value.clone();
+        let retry = request
+            .as_object_mut()
+            .ok_or(Error::InvalidRequest)?
+            .remove("idempotency_key");
+        let retry = retry
+            .as_ref()
+            .map(|v| {
+                let key = v.as_str().ok_or(Error::InvalidRequest)?;
+                if !(8..=128).contains(&key.len())
+                    || !key
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b))
+                {
+                    return Err(Error::InvalidRequest);
+                }
+                Ok(key)
+            })
+            .transpose()?;
+        let (op, args) = self.policy.operation(&request)?;
+        if retry.is_some() && (!op.write || self.base.coordinator.is_none())
+            || op.write
+                && (self.base.coordinator.is_some() || op.idempotency_header)
+                && retry.is_none()
+        {
+            return Err(Error::InvalidRequest);
+        }
+        if op.idempotency_header
+            && self
+                .policy
+                .headers
+                .keys()
+                .any(|h| h.eq_ignore_ascii_case("idempotency-key"))
+        {
+            return Err(Error::InvalidPolicy);
+        }
+        let reservation = retry.map(|key| {
+            let coordinator = self.base.coordinator.as_ref().ok_or(Error::InvalidRequest)?;
+            let provider_key = hex(digest::digest(&digest::SHA256,
+                &json::canonical(&json!({"schema":1,"principal":coordinator.principal(),"client_key":key}))).as_ref());
+            // The policy document hash is native evidence, not a claim that
+            // Python's normalized policy digest has been implemented here.
+            let policy_hash = hex(digest::digest(&digest::SHA256,
+                &json::canonical(self.policy.document())).as_ref());
+            let fingerprint = hex(digest::digest(&digest::SHA256,
+                &json::canonical(&json!({"policy":policy_hash,"request":{"operation":op.name,"arguments":args}}))).as_ref());
+            Ok((provider_key,fingerprint))
+        }).transpose()?;
         guards::authorize(
             &claims,
             &self.base.grant,
@@ -200,6 +255,7 @@ impl Session {
         )
         .as_ref());
         let fresh = || -> Outcome<()> {
+            self.base.check_coordination()?;
             let current = host_time()?;
             if let Some(lease) = &_vault {
                 lease.require_current(current)?;
@@ -236,14 +292,42 @@ impl Session {
                 "route":{"host":self.policy.host,"port":self.base.grant.route.port,"method":effect.method,"path":effect.target}}))?;
             // Durable audit and a fresh grant both precede credentialed I/O.
             // Waiting for either must not extend identity or grant lifetime.
-            fresh()?;
-            self.base.executor.exchange_manifest(
-                &self.base.grant.route,
-                &secret,
-                effect,
-                &self.policy.headers,
-                &fresh,
-            )
+            let keyed_write = matches!(prepared.phase, DispatchPhase::Final)
+                && effect.write
+                && self.base.coordinator.is_some();
+            let mut headers = self.policy.headers.clone();
+            if keyed_write && op.idempotency_header {
+                let (key, _) = reservation.as_ref().ok_or(Error::InvalidRequest)?;
+                headers.insert("Idempotency-Key".into(), key.clone());
+            }
+            let reservation_call = |finish: bool| -> Outcome<()> {
+                let (key, fingerprint) = reservation.as_ref().ok_or(Error::InvalidRequest)?;
+                let coordinator = self
+                    .base
+                    .coordinator
+                    .as_ref()
+                    .ok_or(Error::InvalidRequest)?;
+                if finish {
+                    coordinator.finish(key, fingerprint)
+                } else {
+                    coordinator.reserve(key, fingerprint)
+                }
+            };
+            let pending = crate::coordination::PendingDispatch {
+                check: &fresh,
+                reserve: || reservation_call(false),
+                emit: || {
+                    self.base.executor.exchange_manifest(
+                        &self.base.grant.route,
+                        &secret,
+                        effect,
+                        &headers,
+                        &fresh,
+                    )
+                },
+                finish: || reservation_call(true),
+            };
+            aivm_secrets_garrett_core::coordination::dispatch(&pending, keyed_write)
         };
         let facts = if let Some(effect) = self.policy.preflight(op, &args)? {
             dispatch(PreparedDispatch::preflight(&effect))?
@@ -291,7 +375,11 @@ impl Session {
             .as_ref()
             .map(OAuthSource::active)
             .transpose()?;
+        self.base.check_coordination()?;
         let now = host_time()?;
+        if let Some(lease) = &_vault {
+            lease.require_current(now)?;
+        }
         let outer = verifier.open(token, peer, &expected, now)?;
         let claims =
             protocol::CredentialOpener::open(&self.base.opener(_vault.as_ref()), &outer.inner)
@@ -368,7 +456,8 @@ fn manifest_request_bytes(
             effect.method, effect.target, effect.accept,
         ).into_bytes(),
     );
-    if headers.len() > 8 {
+    // Eight policy headers plus one explicitly derived write-retry header.
+    if headers.len() > 9 {
         return Err(Error::InvalidPolicy);
     }
     let mut seen_headers = std::collections::BTreeSet::new();

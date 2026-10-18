@@ -616,6 +616,7 @@ theorem field_step_contract (fuel : Usize)
     | Err error =>
       cases error with
       | InvalidCapability => exact False.elim charge_property
+      | Revoked => exact False.elim charge_property
       | Upstream => exact False.elim charge_property
       | Denied =>
         have insufficient : ¬ 6 * item.name.length + 4 ≤ budget.val := by

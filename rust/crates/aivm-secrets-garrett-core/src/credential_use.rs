@@ -5,6 +5,7 @@
 pub enum UseDenial {
     InvalidCapability,
     Denied,
+    Revoked,
     Upstream,
 }
 pub enum Authentication {

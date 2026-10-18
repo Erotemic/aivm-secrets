@@ -282,6 +282,7 @@ def UseSpec (c : UseClaims) (g : UseGrant) (op : alloc.vec.Vec U8) (now elapsed 
   | .Ok _ => Current c g now elapsed ∧ op = g.operation
   | .Err .InvalidCapability => ¬ Current c g now elapsed
   | .Err .Denied => Current c g now elapsed ∧ op ≠ g.operation
+  | .Err .Revoked => False
   | .Err .Upstream => False
 
 theorem require_use_current_contract (c : UseClaims) (g : UseGrant) (now elapsed : I64) :
@@ -364,6 +365,7 @@ theorem authorize_use_exact (c : UseClaims) (g : UseGrant) (op : alloc.vec.Vec U
       | Denied =>
           dsimp only [UseSpec] at property
           simpa [property.1, property.2] using returned
+      | Revoked => exact False.elim property
       | Upstream => exact False.elim property
 
 /-- Composition over the actual executor call. The only credential-bearing

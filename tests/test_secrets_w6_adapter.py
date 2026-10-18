@@ -19,6 +19,7 @@ def fixture_checkout(tmp_path):
              'docs/planning/aivm-secrets-w0-boundaries.json',
              'docs/planning/aivm-secrets-assumptions.json'}
     names.update(channel['path'] for channel in contract['channels'])
+    names.update(channel.get('evidence_path', TESTS) for channel in contract['channels'])
     for name in names:
         target = dst / name
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -28,7 +29,7 @@ def fixture_checkout(tmp_path):
 
 def test_w6_all_sinks_classified_and_open_premises_named():
     result = check(ROOT)
-    assert result['channels'] == 10
+    assert result['channels'] == 11
     assert result['remaining'] >= 5
     assert 'review guard only' in result['status']
 

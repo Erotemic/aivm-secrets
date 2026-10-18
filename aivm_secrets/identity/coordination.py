@@ -369,7 +369,10 @@ class CoordinationConfig:
             'schema', 'host', 'port', 'ca_file', 'certificate_file',
             'key_file', 'principal'}), code='invalid_policy')
         grammar.integer(data['schema'], 1, 1, code='invalid_policy')
-        host = grammar.hostname(data['host'], code='invalid_policy')
+        # Local coordinator deployments use an explicitly authenticated
+        # localhost certificate; keep file-loaded and direct clients usable.
+        host = ('localhost' if type(data['host']) is str and data['host'] == 'localhost' else
+                grammar.hostname(data['host'], code='invalid_policy'))
         port = grammar.integer(data['port'], 1, MAX_PORT, code='invalid_policy')
         principal = principal_name(data['principal'])
         return cls(host, port, *(

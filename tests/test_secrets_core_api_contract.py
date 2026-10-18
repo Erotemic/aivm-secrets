@@ -44,11 +44,11 @@ def test_every_python_module_is_classified_and_symbols_exist():
     assert len(symbols) >= 15
 
 
-def test_new_core_contracts_are_explicit_rust_parity_gaps():
+def test_new_core_contracts_remain_explicit_partial_rust_parity():
     data = json.loads(CONTRACT.read_text())
     by_id = {c['id']: c for c in data['core_contracts']}
-    assert by_id['CORE-07']['rust'] == 'missing'
-    assert by_id['CORE-08']['rust'] == 'missing'
-    assert by_id['CORE-09']['rust'] == 'missing'
+    assert by_id['CORE-07']['rust'] == 'partial'
+    assert by_id['CORE-08']['rust'] == 'partial'
+    assert by_id['CORE-09']['rust'] == 'partial'
     assert by_id['CORE-06']['rust'] == 'partial'
     assert 'outcome' in by_id['CORE-10']['acceptance']

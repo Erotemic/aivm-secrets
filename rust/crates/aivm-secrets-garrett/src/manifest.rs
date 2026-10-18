@@ -509,6 +509,7 @@ struct Page {
 pub struct Operation {
     pub(crate) name: String,
     pub(crate) write: bool,
+    pub(crate) idempotency_header: bool,
     method: String,
     path: Vec<Part>,
     query: BTreeMap<String, Part>,
@@ -542,6 +543,7 @@ impl Operation {
                 "fold",
                 "page",
                 "graphql",
+                "idempotency_header",
             ],
         )?;
         let n = text(&m["name"], 64)?;
@@ -549,6 +551,12 @@ impl Operation {
         let write = match m["effect"].as_str() {
             Some("read") => false,
             Some("write") => true,
+            _ => return bad(),
+        };
+        let idempotency_header = match m.get("idempotency_header").and_then(Value::as_str) {
+            Some("Idempotency-Key") if write => true,
+            Some("") => false,
+            None if !m.contains_key("idempotency_header") => false,
             _ => return bad(),
         };
         let requires = m
@@ -786,6 +794,7 @@ impl Operation {
         Ok(Self {
             name: n.into(),
             write,
+            idempotency_header,
             method,
             path,
             query,

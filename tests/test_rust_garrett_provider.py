@@ -154,6 +154,7 @@ class ProviderCase:
         arguments=None,
         verb="request",
         key_configuration=None,
+        request_fields=None,
         **extra,
     ):
         p = self.directory
@@ -177,6 +178,9 @@ class ProviderCase:
             if verb == "request"
             else True
         )
+        if request_fields is not None:
+            assert verb == 'request'
+            payload.update(request_fields)
         frame = dict(version=1, capability=self.token, **{verb: payload}, **extra)
         done = subprocess.run(
             [self.client, "--config", str(path)],

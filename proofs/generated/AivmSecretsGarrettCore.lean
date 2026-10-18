@@ -196,17 +196,76 @@ def client_material.publish_request
       ok (core.result.Result.Err client_material.PublishFailure.OutcomeUnknown)
   | core.result.Result.Err _ => ok r
 
+/-- Trait declaration: [aivm_secrets_garrett_core::coordination::Dispatch]
+    Source: 'crates/aivm-secrets-garrett-core/src/coordination.rs', lines 3:0-11:1
+    Visibility: public -/
+structure coordination.Dispatch (Self : Type _) (Self_Output : Type _)
+  (Self_Error : Type _) where
+  check : Self → Result (core.result.Result Unit Self_Error)
+  reserve : Self → Result (core.result.Result Unit Self_Error)
+  emit : Self → Result (core.result.Result Self_Output Self_Error)
+  finish : Self → Result (core.result.Result Unit Self_Error)
+  outcome_unknown : Self → Result Self_Error
+
+/-- [aivm_secrets_garrett_core::coordination::dispatch]:
+    Source: 'crates/aivm-secrets-garrett-core/src/coordination.rs', lines 13:0-35:1
+    Visibility: public -/
+def coordination.dispatch
+  {D : Type _} {Clause0_Output : Type _} {Clause0_Error : Type _} (DispatchInst
+  : coordination.Dispatch D Clause0_Output Clause0_Error) (ops : D)
+  (keyed_write : Bool) :
+  Result (core.result.Result Clause0_Output Clause0_Error)
+  := do
+  let r ← DispatchInst.check ops
+  match r with
+  | core.result.Result.Ok _ =>
+    if keyed_write
+    then
+      let r1 ← DispatchInst.reserve ops
+      match r1 with
+      | core.result.Result.Ok _ =>
+        let r2 ← DispatchInst.emit ops
+        match r2 with
+        | core.result.Result.Ok _ =>
+          if keyed_write
+          then
+            let r3 ← DispatchInst.finish ops
+            match r3 with
+            | core.result.Result.Ok _ => ok r2
+            | core.result.Result.Err _ =>
+              let t ← DispatchInst.outcome_unknown ops
+              ok (core.result.Result.Err t)
+          else ok r2
+        | core.result.Result.Err _ => ok r2
+      | core.result.Result.Err error => ok (core.result.Result.Err error)
+    else
+      let r1 ← DispatchInst.emit ops
+      match r1 with
+      | core.result.Result.Ok _ =>
+        if keyed_write
+        then
+          let r2 ← DispatchInst.finish ops
+          match r2 with
+          | core.result.Result.Ok _ => ok r1
+          | core.result.Result.Err _ =>
+            let t ← DispatchInst.outcome_unknown ops
+            ok (core.result.Result.Err t)
+        else ok r1
+      | core.result.Result.Err _ => ok r1
+  | core.result.Result.Err error => ok (core.result.Result.Err error)
+
 /-- [aivm_secrets_garrett_core::credential_use::UseDenial]
-    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 5:0-9:1
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 5:0-10:1
     Visibility: public -/
 @[discriminant isize]
 inductive credential_use.UseDenial where
 | InvalidCapability : credential_use.UseDenial
 | Denied : credential_use.UseDenial
+| Revoked : credential_use.UseDenial
 | Upstream : credential_use.UseDenial
 
 /-- [aivm_secrets_garrett_core::credential_use::Authentication]
-    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 10:0-13:1
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 11:0-14:1
     Visibility: public -/
 @[discriminant isize]
 inductive credential_use.Authentication where
@@ -214,7 +273,7 @@ inductive credential_use.Authentication where
 | ApiKey : credential_use.Authentication
 
 /-- [aivm_secrets_garrett_core::credential_use::Route]
-    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 14:0-19:1
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 15:0-20:1
     Visibility: public -/
 structure credential_use.Route where
   host : alloc.vec.Vec Std.U8
@@ -223,7 +282,7 @@ structure credential_use.Route where
   authentication : credential_use.Authentication
 
 /-- [aivm_secrets_garrett_core::credential_use::UseClaims]
-    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 20:0-26:1
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 21:0-27:1
     Visibility: public -/
 structure credential_use.UseClaims where
   binding : alloc.vec.Vec Std.U8
@@ -233,7 +292,7 @@ structure credential_use.UseClaims where
   expires_at : Std.I64
 
 /-- [aivm_secrets_garrett_core::credential_use::UseGrant]
-    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 27:0-32:1
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 28:0-33:1
     Visibility: public -/
 structure credential_use.UseGrant where
   claims : credential_use.UseClaims
@@ -242,7 +301,7 @@ structure credential_use.UseGrant where
   active : Bool
 
 /-- [aivm_secrets_garrett_core::credential_use::require_use_current]:
-    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 34:0-62:1
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 35:0-63:1
     Visibility: public -/
 def credential_use.require_use_current
   (claims : credential_use.UseClaims) (grant : credential_use.UseGrant)
@@ -327,7 +386,7 @@ def credential_use.require_use_current
   else ok (core.result.Result.Err credential_use.UseDenial.InvalidCapability)
 
 /-- [aivm_secrets_garrett_core::credential_use::authorize_use]:
-    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 64:0-79:1
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 65:0-80:1
     Visibility: public -/
 def credential_use.authorize_use
   (claims : credential_use.UseClaims) (grant : credential_use.UseGrant)
@@ -346,7 +405,7 @@ def credential_use.authorize_use
   | core.result.Result.Err _ => ok r
 
 /-- [aivm_secrets_garrett_core::credential_use::ProviderReply]
-    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 83:0-87:1
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 84:0-88:1
     Visibility: public -/
 structure credential_use.ProviderReply where
   account_id : Std.I64
@@ -354,14 +413,14 @@ structure credential_use.ProviderReply where
   discarded : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::credential_use::PublicReply]
-    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 88:0-91:1
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 89:0-92:1
     Visibility: public -/
 structure credential_use.PublicReply where
   account_id : Std.I64
   active : Bool
 
 /-- [aivm_secrets_garrett_core::credential_use::release_reply]:
-    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 92:0-97:1
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 93:0-98:1
     Visibility: public -/
 def credential_use.release_reply
   (reply : credential_use.ProviderReply) :
@@ -370,7 +429,7 @@ def credential_use.release_reply
   ok { account_id := reply.account_id, active := reply.active }
 
 /-- Trait declaration: [aivm_secrets_garrett_core::credential_use::CredentialExecutor]
-    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 98:0-105:1
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 99:0-106:1
     Visibility: public -/
 structure credential_use.CredentialExecutor (Self : Type _) (Self_Credential :
   Type _) where
@@ -378,7 +437,7 @@ structure credential_use.CredentialExecutor (Self : Type _) (Self_Credential :
     (core.result.Result credential_use.ProviderReply credential_use.UseDenial)
 
 /-- [aivm_secrets_garrett_core::credential_use::finish_use]:
-    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 123:0-133:1 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 124:0-134:1 -/
 def credential_use.finish_use
   {E : Type _} {Clause0_Credential : Type _} (CredentialExecutorInst :
   credential_use.CredentialExecutor E Clause0_Credential) (executor : E)
@@ -394,7 +453,7 @@ def credential_use.finish_use
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::credential_use::use_credential]:
-    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 106:0-120:1
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 107:0-121:1
     Visibility: public -/
 def credential_use.use_credential
   {E : Type _} {Clause0_Credential : Type _} (CredentialExecutorInst :
@@ -1168,14 +1227,14 @@ def enrollment.enroll_client
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::Denial]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 18:0-20:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 19:0-21:1
     Visibility: public -/
 @[discriminant isize]
 inductive Denial where
 | InvalidCapability : Denial
 
 /-- [aivm_secrets_garrett_core::Claims]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 22:0-31:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 23:0-32:1
     Visibility: public -/
 structure Claims where
   issuer : alloc.vec.Vec Std.U8
@@ -1188,7 +1247,7 @@ structure Claims where
   certificate : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::Expectation]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 33:0-38:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 34:0-39:1
     Visibility: public -/
 structure Expectation where
   issuer : alloc.vec.Vec Std.U8
@@ -1197,7 +1256,7 @@ structure Expectation where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::IssueWindow]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 40:0-44:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 41:0-45:1
     Visibility: public -/
 structure IssueWindow where
   issued_at : Std.I64
@@ -1205,7 +1264,7 @@ structure IssueWindow where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::issue_window]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 47:0-74:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 48:0-75:1
     Visibility: public -/
 def issue_window
   (active : Bool) (epoch : Std.I64) (not_after : Std.I64) (now : Std.I64)
@@ -1249,7 +1308,7 @@ def issue_window
   else ok (core.result.Result.Err Denial.InvalidCapability)
 
 /-- [aivm_secrets_garrett_core::present]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 78:0-105:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 79:0-106:1
     Visibility: public -/
 def present
   (claims : Claims) (expected : Expectation) (peer : alloc.vec.Vec Std.U8)
@@ -1313,21 +1372,21 @@ def present
                           else ok (core.result.Result.Ok ())
 
 /-- [aivm_secrets_garrett_core::AuthenticatedEnvelope]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 109:0-112:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 110:0-113:1
     Visibility: public -/
 structure AuthenticatedEnvelope where
   claims : Claims
   encrypted : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::OpenedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 114:0-117:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 115:0-118:1
     Visibility: public -/
 structure OpenedSurrogate (S : Type _) where
   claims : Claims
   secret : S
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeVerifier]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 120:0-124:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 121:0-125:1
     Visibility: public -/
 structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
   verify : Self → alloc.vec.Vec Std.U8 → Result (core.result.Result
@@ -1336,7 +1395,7 @@ structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
     Self_Secret Denial)
 
 /-- [aivm_secrets_garrett_core::open_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 129:0-151:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 130:0-152:1
     Visibility: public -/
 def open_surrogate
   {V : Type _} {Clause0_Secret : Type _} (EnvelopeVerifierInst :
@@ -1360,7 +1419,7 @@ def open_surrogate
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssueInputs]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 153:0-162:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 154:0-163:1
     Visibility: public -/
 structure IssueInputs where
   issuer : alloc.vec.Vec Std.U8
@@ -1373,7 +1432,7 @@ structure IssueInputs where
   not_after : Std.I64
 
 /-- [aivm_secrets_garrett_core::prepare_issue]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 165:0-180:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 166:0-181:1
     Visibility: public -/
 def prepare_issue
   (input : IssueInputs) (now : Std.I64) (lifetime : Std.I64) :
@@ -1396,21 +1455,21 @@ def prepare_issue
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssuedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 182:0-185:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 183:0-186:1
     Visibility: public -/
 structure IssuedSurrogate where
   claims : Claims
   token : alloc.vec.Vec Std.U8
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeIssuer]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 187:0-190:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 188:0-191:1
     Visibility: public -/
 structure EnvelopeIssuer (Self : Type _) (Self_Secret : Type _) where
   «seal» : Self → Claims → Self_Secret → Result (core.result.Result
     (alloc.vec.Vec Std.U8) Denial)
 
 /-- [aivm_secrets_garrett_core::issue_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 192:0-208:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 193:0-209:1
     Visibility: public -/
 def issue_surrogate
   {I : Type _} {Clause0_Secret : Type _} (EnvelopeIssuerInst : EnvelopeIssuer I

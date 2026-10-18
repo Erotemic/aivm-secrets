@@ -1,3 +1,4 @@
+import GarrettCoordination
 import GarrettEmission
 import GarrettClientMaterial
 import GarrettReflection
@@ -247,3 +248,11 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.oauth_state.Proofs.expired_current_session_cannot_dispatch
 #print axioms aivm_secrets_garrett_core.oauth_state.Proofs.current_session_generation_independent
 #print axioms aivm_secrets_garrett_core.oauth_state.Proofs.renewed_current_session_positive_witness
+
+#print axioms aivm_secrets_garrett_core.coordination.Proofs.rejected_before_provider
+#print axioms aivm_secrets_garrett_core.coordination.Proofs.reservation_refusal_prevents_provider
+#print axioms aivm_secrets_garrett_core.coordination.Proofs.provider_failure_propagated
+#print axioms aivm_secrets_garrett_core.coordination.Proofs.failed_completion_is_uncertain
+#print axioms aivm_secrets_garrett_core.coordination.Proofs.read_success_witness
+#print axioms aivm_secrets_garrett_core.coordination.Proofs.write_success_witness
+#print axioms aivm_secrets_garrett_core.coordination.Proofs.write_acknowledgement_contract

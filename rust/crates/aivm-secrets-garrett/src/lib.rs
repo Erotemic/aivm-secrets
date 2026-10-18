@@ -5,6 +5,7 @@ pub mod authority;
 pub mod certificates;
 pub mod client;
 pub mod client_material;
+mod coordination;
 pub mod crypto;
 mod custody;
 pub use custody::ProviderSession;

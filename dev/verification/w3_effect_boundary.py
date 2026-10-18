@@ -72,6 +72,7 @@ def review_semantics(contents: dict[str, str]) -> None:
     # after policy compilation, durable audit and current grant revalidation.
     m = contents[RUST + 'custody/manifest_session.rs']
     request = part(m, 'pub(super) fn request(', 'pub(super) fn control(')
+    control = part(m, 'pub(super) fn control(', '\nfn manifest_request_bytes(')
     dispatch = part(request, 'let dispatch = |prepared: PreparedDispatch', 'let facts = if let Some(effect)')
     release = part(request, 'let release = (|| -> Outcome<Value> {', 'if sent_write {')
     require('struct PreparedDispatch<' in m and 'enum DispatchPhase {' in m,
@@ -83,13 +84,26 @@ def review_semantics(contents: dict[str, str]) -> None:
             'preflight/final not constrained to the reviewed dispatch constructor')
     require(same_order(dispatch,
                        'ensure_safe(&json!({"target":effect.target})',
-                       'audit.write_record(', 'fresh()?;', 'executor.exchange_manifest('),
+                       'audit.write_record(', 'let pending = crate::coordination::PendingDispatch',
+                       'executor.exchange_manifest(', 'coordination::dispatch(&pending, keyed_write)'),
             'provider dispatch bypasses reflection, durable audit, or fresh authorization')
+    require('check: &fresh,' in dispatch and 'reserve: || reservation_call(false),' in dispatch
+            and 'finish: || reservation_call(true),' in dispatch
+            and 'matches!(prepared.phase, DispatchPhase::Final)' in dispatch
+            and '&& effect.write' in dispatch and '&& self.base.coordinator.is_some()' in dispatch,
+            'coordinated final write bypasses check/reserve/finish or phase classification')
+    require('self.base.check_coordination()?;' in request
+            and same_order(control, 'self.base.check_coordination()?;',
+                           'let now = host_time()?;', 'lease.require_current(now)?;',
+                           'verifier.open(token, peer, &expected, now)?;')
+            and '.as_object_mut()' in request and '.remove("idempotency_key")' in request
+            and 'self.base.coordinator.is_some() || op.idempotency_header' in request,
+            'coordinator control/request admission or keyed-write requirement bypassed')
     require(same_order(release, 'self.disclosure.project(', 'ensure_safe(&reply',
                        'audit.write_record(', 'Ok(reply)'),
             'guest release bypasses selected disclosure/reflection/audit')
     require('guards::authorize(' in request and 'open_surrogate(' in request
-            and 'self.policy.operation(value)' in request,
+            and 'self.policy.operation(&request)' in request,
             'native request missing authorizing guard / policy compiler')
     require('let effect = self.policy.final_effect(op, &args, &facts)?;' in request,
             'final effect is not compiled from checked facts')
@@ -160,6 +174,11 @@ def review_semantics(contents: dict[str, str]) -> None:
     require('write_all(&json::canonical(&announcement))' in b,
             'host-only startup stdout channel changed')
     c = contents[RUST + 'custody.rs']
+    account_control = part(c, 'pub(crate) fn control(', '\nfn use_error(')
+    require(same_order(account_control, 'self.check_coordination()?;',
+                       'let now = host_time()?;', 'lease.require_current(now)?;',
+                       'verifier.open(token, peer, &expected, now)?;'),
+            'account control samples authority before the coordinator wait')
     require('fn write_record(&self, value: &Value)' in c and '.sync_all()' in c,
             'audit persistence acknowledgement changed')
     require('aivm_secrets_garrett_core::emission::emit_current(PendingEmission { check, emit })' in c
@@ -183,6 +202,17 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'lease.require_current(current.now)?;' in c
             and 'lease.require_current(current)?;' in request,
             'OAuth session lost opaque sealing or late token-expiry admission')
+    coordinate = contents[RUST + 'coordination.rs']
+    require(coordinate.count('TcpStream::connect_timeout(') == 1
+            and coordinate.count('.write_all(&bytes)') == 1
+            and same_order(coordinate, 'with_client_auth_cert(', 'fn call(',
+                           '.complete_io(&mut socket)', '.write_all(&bytes)'),
+            'coordinator transport bypasses mTLS or adds an unreviewed send')
+    require('self.call("check", None)' in coordinate
+            and 'value.get("ok") != Some(&json!(true))' in coordinate
+            and 'value[flag] != json!(true)' in coordinate
+            and 'fn outcome_unknown(&self) -> Error' in coordinate,
+            'coordinator admission caches or accepts an untyped acknowledgement')
     d = contents[RUST + 'manifest/disclosure.rs']
     require('filter::project_fields(' in d and 'ensure_safe(&value, credential)?;' in d,
             'native disclosure no longer selects and reflection-checks public fields')
@@ -218,7 +248,7 @@ def check(root: Path) -> dict:
     require(isinstance(effects, list) and {e['id'] for e in effects} == {
         'provider-preflight', 'provider-final', 'guest-reply', 'guest-denial',
         'host-audit', 'host-announcement', 'legacy-forward', 'oauth-startup',
-        'host-private', 'host-control', 'guest-close',
+        'host-private', 'host-control', 'guest-close', 'authority-coordinate',
     }, 'missing effect class or newly unreviewed channel')
     sinks = json.loads((root / 'docs/planning/aivm-secrets-w0-boundaries.json').read_text())
     w0_ids = {row['id'] for row in sinks['sinks']}

@@ -36,9 +36,9 @@ work, not a requirement to reproduce Python's host package structure in Rust.
 | CORE-04 | Authorization, delegation, approval, budgets | Partial |
 | CORE-05 | Manifest request/effect and disclosure | Partial |
 | CORE-06 | OAuth refresh and same-session current-token lease | Native rollover implemented; finite differential coverage, broader parity gate open |
-| **CORE-07** | **Durable cross-host revocation** | **Missing** |
-| **CORE-08** | **Globally reserved write keys and no automatic replay** | **Missing** |
-| **CORE-09** | **Wire key, required-on-write, approved upstream key header** | **Missing** |
+| CORE-07 | Durable cross-host revocation | Native client tested; trusted server remains Python |
+| CORE-08 | Globally reserved write keys and no automatic replay | Native dispatch tested against the Python durable server |
+| CORE-09 | Wire key, required-on-write, approved upstream key header | Native manifest subset tested; broader wire/digest parity open |
 | CORE-10 | Audits, effect/write ambiguity, guest output | Partial |
 | CORE-11 | Trusted paths, TLS authorization and no proxy/redirect | Partial |
 
@@ -68,3 +68,10 @@ by Rust merely because the field is documented here.
 The Python implementation remains independently useful before parity; the
 missing Rust features are a specific future implementation queue, not
 something this Python overlay claims to have completed.
+
+The [native coordinator increment](verified-coordination.md) tests both live
+Python and Rust brokers against one mTLS/SQLite authority. The global retry-key
+derivation interoperates; native request fingerprints currently hash the
+validated native policy document, whereas Python hashes normalized policy
+serialization. Duplicate keys are refused regardless of digest, so this does
+not permit replay; it remains an explicit opaque-fingerprint parity gap.

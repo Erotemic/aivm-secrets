@@ -35,8 +35,10 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and {c['sink'] for c in channels} == {s['id'] for s in w0['sinks']},
            'W6 leaves a W0 I/O sink unclassified')
     assumptions = {a['id'] for a in ledger['assumptions']}
-    test_source = (root / TESTS).read_text()
     for channel in channels:
+        evidence_path = channel.get('evidence_path', TESTS)
+        ensure((root / evidence_path).is_file(), 'missing adapter evidence: ' + evidence_path)
+        test_source = (root / evidence_path).read_text()
         ensure((root / channel['path']).is_file(), 'missing adapter implementation: ' + channel['path'])
         ensure(all(a in assumptions for a in channel['trust']), 'unknown environment/adaptor premise')
         ensure(bool(channel['contract']) and bool(channel['model_event']), 'channel missing semantic contract')

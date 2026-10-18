@@ -361,6 +361,7 @@ impl<F: Fn() -> Outcome<()>> core::CredentialExecutor for CurrentExecutor<'_, F>
             .map_err(|error| match error {
                 Error::InvalidCapability => core::UseDenial::InvalidCapability,
                 Error::Denied => core::UseDenial::Denied,
+                Error::Revoked => core::UseDenial::Revoked,
                 _ => core::UseDenial::Upstream,
             })
     }
@@ -512,6 +513,7 @@ struct AccountSession {
     started: Instant,
     inner: String,
     oauth: Option<OAuthSource>,
+    coordinator: Option<crate::coordination::Coordinator>,
 }
 impl AccountSession {
     pub fn start(
@@ -548,7 +550,7 @@ impl AccountSession {
                 "server_ca",
                 "audit_file",
             ],
-            &["credential_file", "oauth"],
+            &["credential_file", "oauth", "coordination_file"],
         )?;
         if m.contains_key("credential_file") == m.contains_key("oauth") {
             return Err(Error::InvalidCapability);
@@ -682,6 +684,14 @@ impl AccountSession {
         } else {
             executor.audit.write_record(&json!({"schema":1,"event":"session_open","profile":profile,"grant":executor.audit.grant,"policy":executor.audit.policy}))?;
         }
+        let coordinator = m
+            .get("coordination_file")
+            .map(|v| {
+                crate::coordination::Coordinator::from_file(Path::new(
+                    v.as_str().ok_or(Error::InvalidPolicy)?,
+                ))
+            })
+            .transpose()?;
         Ok(Self {
             envelope,
             grant,
@@ -689,7 +699,11 @@ impl AccountSession {
             started: Instant::now(),
             inner,
             oauth,
+            coordinator,
         })
+    }
+    fn check_coordination(&self) -> Outcome<()> {
+        self.coordinator.as_ref().map_or(Ok(()), |c| c.check())
     }
     fn opener<'a>(
         &'a self,
@@ -747,7 +761,8 @@ impl AccountSession {
         now: i64,
     ) -> Outcome<Value> {
         let _vault_lease = self.oauth.as_ref().map(OAuthSource::active).transpose()?;
-        let now = if self.oauth.is_some() {
+        self.check_coordination()?;
+        let now = if self.oauth.is_some() || self.coordinator.is_some() {
             host_time()?
         } else {
             now
@@ -765,6 +780,7 @@ impl AccountSession {
             fresh: || {
                 // Both audit persistence and provider TLS setup can block.
                 // Re-open and re-authorize at the actual emission boundary.
+                self.check_coordination()?;
                 let current = protocol::Presentation {
                     expected: Expectation {
                         issuer: presentation.expected.issuer.clone(),
@@ -825,7 +841,11 @@ impl AccountSession {
         verb: &str,
     ) -> Outcome<Value> {
         let _vault_lease = self.oauth.as_ref().map(OAuthSource::active).transpose()?;
+        self.check_coordination()?;
         let now = host_time()?;
+        if let Some(lease) = &_vault_lease {
+            lease.require_current(now)?;
+        }
         let outer = verifier.open(token, peer, &expected, now)?;
         if !matches!(verb, "describe" | "renounce") {
             return Err(Error::Denied);
@@ -856,6 +876,7 @@ fn use_error(error: core::UseDenial) -> Error {
     match error {
         core::UseDenial::InvalidCapability => Error::InvalidCapability,
         core::UseDenial::Denied => Error::Denied,
+        core::UseDenial::Revoked => Error::Revoked,
         core::UseDenial::Upstream => Error::UpstreamResponse,
     }
 }
