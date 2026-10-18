@@ -1,8 +1,8 @@
 # Active work: useful broker workflows and conditional credential confinement
 
 Status: **work plan, not a completed assurance claim**, reconciled 2026-10-18
-against frozen runtime/proof implementation `df5542e` and its
-[native frame admission validation record](../../dev/validation/2026-10-18-line-framing.json). This is the authoritative **priority and task queue**
+against frozen runtime/proof implementation `dee53f9` and its
+[guest bundle validation record](../../dev/validation/2026-10-18-guest-bundles.json). This is the authoritative **priority and task queue**
 for new agents. Existing P0-P5, M0-M6, and G0-G5 stages remain useful design,
 implementation history, and prerequisite inventories; they are **not three
 competing current schedules**. Revisit this queue after each accepted milestone.
@@ -66,7 +66,7 @@ the existing grant through certificate/JWT renewal without restarting the broker
 The [optional native coordinator authority](../native-coordinator-authority.md) now
 implements the same mTLS/SQLite protocol and schema, with cross-backend vectors,
 broker workflows and scoped core/terminal-history proofs. SQL/TLS/native I/O
-correspondence, broader core differential coverage and atomic guest delivery
+correspondence, broader core differential coverage and cross-machine guest delivery
 remain open. The typed admission follow-up moves exhaustive action-to-role
 selection into the extracted core: operator authority does not imply active
 principal membership, nor does membership grant operator authority. Lean checks
@@ -104,7 +104,7 @@ The frozen encoder validation passes 2,489 portable tests with zero skips,
 264 required workflows in both build configurations, the 351-name Garrett
 audit and all 13 new encoder mutations. Compiler profiles retain eight bridge
 paths and six coordinator paths. These are scoped byte/admission and call-path
-results; broad core parity, transitive mediation, atomic guest delivery,
+results; broad core parity, transitive mediation, cross-machine guest delivery,
 independent review and live deployment remain open.
 
 The [newline framing follow-up](../verified-line-framing.md) closes nine
@@ -115,6 +115,19 @@ reads, clean EOF, coalesced suffixes and exact limits. The frozen gate passes
 2,524 portable tests, all 296 workflows in both configurations, the 360-name
 Garrett audit and six new framing mutations. Later-arriving bytes, JSON/TLS and
 native mediation remain explicit obligations.
+
+The [guest bundle increment](../guest-identity-bundles.md) replaces manual local
+certificate/JWT switching with one versioned private snapshot, expected-current
+digest and cooperating reader/writer locks. Python and Rust clients each load one
+pair per call. Eight installer/client/provider combinations renew the same running
+account/manifest broker, fence the old pair and accept the newly installed pair.
+The extracted native CAS/stage/publish controller has nine checked obligations;
+filesystem atomicity/durability, hashing, parsing and client loading remain adapter
+premises. Frozen validation passes 2,586 portable tests, 357 required workflows in
+both build configurations, the 369-name audit and five new bundle mutations.
+Host renewal and guest activation remain separate operations; remote delivery,
+private-key rotation, rollback protection and uninterrupted availability are not
+provided. This closes the local pair-activation step, not whole-service secrecy.
 
 The [parsed-policy identity increment](../verified-policy-normalization.md) closes
 the known raw-document fingerprint difference in coordinated manifest writes.
@@ -262,7 +275,7 @@ and [new functionality and trust boundaries](../garrett-python-core-extensions.m
 | ID | Python deliverable and status | Rust parity/operational gate |
 | --- | --- | --- |
 | **P-CORE-07** | Durable terminal cross-host principal revocation using one local SQLite coordinator, mTLS member/operator pins, check at every broker and bound-bridge request; tests use synthetic same-host distinct member certificates | Native account/manifest clients and optional native server tested against independent Python implementations; core terminal decision/history proofs compiled; SQL/native I/O refinement, real separate-host deployment, rollback witness and operational failover unvalidated |
-| **P-CORE-06** | Running OAuth broker leases the vault's current access token at each request, preserving capability and enrolled epoch; identity `renew-bound` issues fresh cert/JWT without broker/bridge restart | Rust same-session token rollover implemented and locally tested; same-key native renew/rebind tested without broker restart; broader differential gate incomplete and guest material delivery remains manual |
+| **P-CORE-06** | Running OAuth broker leases the vault's current access token at each request, preserving capability and enrolled epoch; identity `renew-bound` issues fresh cert/JWT without broker/bridge restart | Rust same-session token rollover implemented and locally tested; same-key native renew/rebind tested without broker restart; explicit local cert/JWT bundle activation tested with both clients; broader differential gate incomplete, remote delivery still manual and no host/guest transaction |
 | **P-CORE-08/09** | Durable per-principal idempotency reservations before any coordinated write; guest ASCII retry keys, optional explicit upstream `Idempotency-Key`, strict no-replay even after ambiguous result | Native keyed manifest dispatch and shared retry names tested; normalized policy fingerprints checked against Python and durable records; all-input parity and production provider header semantics unverified |
 | **P-PARITY** | All Python modules classified core vs non-core, 11 normative security contracts with Rust status and acceptance criteria | Implement independent Rust behavior and bidirectional negative/positive trace tests before marking any contract parity-complete |
 

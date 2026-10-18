@@ -1,0 +1,203 @@
+{
+  "schema": 1,
+  "source_commit": "dee53f9c272312e5ef70343ba5ed5292ab53297d",
+  "source_dirty": false,
+  "scope": "Standalone same-key guest certificate/JWT snapshot activation: local CAS, cooperating readers/writers, finite Python/native workflows and extracted publication controller",
+  "report_path": ".tools/system-i72yavg_/report.json",
+  "report_sha256": "ecdf801c0e13cdd7df97a04f5463e0026df81f6adf804d0c3de9885731bb9bbf",
+  "input_fingerprint_sha256": "a6b0caf8778aa216c85edd7e57d1446847e08dd7499551504badc80a6a56a081",
+  "full_suite": {
+    "passed": 2586,
+    "skipped": 0
+  },
+  "required_workflows": {
+    "conformance": 357,
+    "normal_release_without_conformance": 357,
+    "skipped": 0
+  },
+  "normal_workflow_report": {
+    "path": ".tools/bundle-normal-validation/report.json",
+    "sha256": "56417d75acce2c69bf0119a72759e124ba51b2019da3665aed317519c6c13d1a"
+  },
+  "selected_core_parity": {
+    "passed": 568,
+    "skipped": 0,
+    "log": {
+      "path": ".tools/guest-bundle-dee53f9-validation/bundle-garrett-packaging.log",
+      "sha256": "50e664824b0c12571287155ab162d83af4c99e605ed1116bcf91a15947eee165"
+    }
+  },
+  "initial_full_suite_failure": {
+    "source_commit": "7720e5eb0460e0c9d69c78ca1a1e8429c6da2ca4",
+    "passed": 2585,
+    "failed": 1,
+    "reason": "MANIFEST.in omitted GarrettBundle.lean",
+    "report": {
+      "path": ".tools/system-q1m0s051/report.json",
+      "sha256": "2d9f9af68efcb0bcc1bedf39302e09fdf2d02f8ad975395e5e935c5aaa6f1f70"
+    },
+    "log": {
+      "path": ".tools/system-q1m0s051/full-python-native.log",
+      "sha256": "9d15d869449c33151acd7d98866cee31bf01468072edf634f57377694ac4da5b"
+    },
+    "corrected_archive_test": {
+      "path": ".tools/bundle-archive-corrected.log",
+      "sha256": "6912a5fcb3f0b0283de1ae0ed50264c3beb4c5eeadecb38912cedbfd208ae522"
+    }
+  },
+  "native_library_tests": 27,
+  "freshness_selected_tests": 26,
+  "bundle_runtime": {
+    "pytest_cases": 61,
+    "live_renewal_combinations": 8,
+    "private_key_rotation": false,
+    "remote_delivery_automated": false,
+    "host_guest_failure_atomic_transaction": false
+  },
+  "proof_audit": {
+    "named_obligations": 369,
+    "new_obligations": 9,
+    "allowed_axioms": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+    ],
+    "checked_contracts": [
+      "exact optional digest comparison using the production Vec comparison",
+      "current-read errors and stale CAS do not reach staging/publication",
+      "staging failure does not reach publication",
+      "publication failure retains uncertainty",
+      "success requires a matching snapshot and both storage acknowledgements",
+      "successful-install witness"
+    ]
+  },
+  "bundle_mutations": {
+    "source_commit": "7720e5eb0460e0c9d69c78ca1a1e8429c6da2ca4",
+    "native_core_unchanged_in_packaging_revision": true,
+    "rejected": 5,
+    "registered_total": 164,
+    "mutation_filter": "^bundle ",
+    "process_exit_code": 0,
+    "full_historical_campaign": false,
+    "names": [
+      "bundle staging bypassed (GarrettBundle)",
+      "bundle publish failure reported successful (GarrettBundle)",
+      "bundle CAS bypassed (GarrettBundle)",
+      "bundle CAS inverted (GarrettBundle)",
+      "bundle publish uncertainty erased (GarrettBundle)"
+    ],
+    "log": {
+      "path": ".tools/guest-bundle-dee53f9-validation/bundle-mutations.log",
+      "sha256": "7719a7ad6de534709c1f4f5f2de85a6eeb2fd3b3771a9dec9f3e3671f1c3db38"
+    }
+  },
+  "reproduced_python_input_regressions": {
+    "baseline_bundle_sha256": "e046d66606f6cb1fcd1d6c8e2eeb301311874022e32f7466b0f3e689558eb42b",
+    "current_bundle_sha256": "a570755e31b8fb098cf83661a5807d9099dd41eab89f5438b9a8ed0786bd2c05",
+    "test_sha256": "dcf975e5c63ef2e4bb131c6f7f2ff6d53e12d83b2df6129553760c8e2899f152",
+    "native_client_sha256": "6debfc55e4c29e29b93f19d35bcf7e746484fdd1e5bf60a02fbd0a106ce84dc1",
+    "baseline": "2 failed, 1 passed; synthetic optional-dependency failure and PEM vertical-tab refusal",
+    "corrected": "3 passed; not broad core parity",
+    "record": {
+      "path": ".tools/bundle-baseline-material/coordinates.json",
+      "sha256": "86bf1cdcb69545542ddb28a4d002953ff605251ebfd096e8edcd91bb93efed86"
+    },
+    "note": "Checked working-tree Python source before the final two input fixes, not a released baseline or all-input parity claim"
+  },
+  "packaging": {
+    "artifact": {
+      "path": "dist/aivm_secrets-0.2.0-py3-none-any.whl",
+      "sha256": "b530002638ab4c4fb1e9e3f4e47dbfec71613d63be927598830cf035ea1f25d0"
+    },
+    "source_distribution": {
+      "path": "dist/aivm_secrets-0.2.0.tar.gz",
+      "sha256": "e29caffeb1b7c1f0e1969bf9ebc81dae57482ec72553f06efb1ce8c41ab39eb4"
+    },
+    "wheel_bundle_matches_source": true,
+    "log": {
+      "path": ".tools/guest-bundle-dee53f9-validation/bundle-package-sequential.log",
+      "sha256": "d5e35ce06edfb7577aeb3ac2189c858c17fcd835a817f976e7f133d3dd7e4017"
+    }
+  },
+  "w3": {
+    "reviewed_rust_build_sources": 84,
+    "effect_classes": 13,
+    "complete_mediation": false
+  },
+  "compiler_call_linkage": {
+    "rerun": false,
+    "previous_source_commit": "df5542e2c8f89d98f57a165b96694af22f1b3ab3",
+    "note": "This increment changes guest-owned client/publication code; no fresh provider call-ledger or native mediation claim"
+  },
+  "commands": [
+    ".venv/bin/python dev/verification/freshness.py record",
+    ".venv/bin/python dev/verification/garrett.py record",
+    ".venv/bin/python dev/verification/garrett.py mutate --mutation-filter \"^bundle \"",
+    ".venv/bin/python dev/verification/system.py --proofs --full-tests",
+    ".venv/bin/python -m build"
+  ],
+  "normal_release_commands": [
+    [
+      "cargo",
+      "build",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "rust/Cargo.toml",
+      "-p",
+      "aivm-secrets-garrett",
+      "--no-default-features",
+      "--features",
+      "coordinator-server",
+      "--bin",
+      "garrett-coordinator"
+    ],
+    [
+      "cargo",
+      "build",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "rust/Cargo.toml",
+      "-p",
+      "aivm-secrets-garrett",
+      "--no-default-features",
+      "--bins"
+    ],
+    [
+      "/home/local/KHQ/jon.crall/code/aivm-secrets/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "-ra",
+      "--junitxml",
+      "/home/local/KHQ/jon.crall/code/aivm-secrets/.tools/bundle-normal-validation/workflows.xml",
+      "tests/test_secrets_w1_github_workflow.py",
+      "tests/test_rust_w2_github_workflow.py",
+      "tests/test_rust_w5_noninterference.py",
+      "tests/test_rust_w6_adapter.py",
+      "tests/test_assurance_profiles.py",
+      "tests/test_rust_garrett_dispatch.py",
+      "tests/test_rust_oauth_current_session.py",
+      "tests/test_rust_coordination.py",
+      "tests/test_rust_coordinator_authority.py",
+      "tests/test_rust_bound_renewal.py",
+      "tests/test_secrets_primitives_parity.py",
+      "tests/test_specialized_calls.py",
+      "tests/test_rust_policy_normalization.py",
+      "tests/test_rust_http_auth.py",
+      "tests/test_rust_http_request.py",
+      "tests/test_rust_http_wire.py",
+      "tests/test_rust_line_framing.py",
+      "tests/test_identity_bundle.py",
+      "tests/test_rust_garrett_authority.py::test_tpm_requirement_rejects_software_before_credential_custody"
+    ]
+  ],
+  "limitations": [
+    "Local parsing checks consistency, not JWT signature, current enrollment or authorization. Broker checks remain mandatory.",
+    "Atomic rename/fsync/locks, JSON, X.509, SHA-256, client loading, compiler/translation and OS behavior remain adapter/environment premises.",
+    "All readers/writers must cooperate on the private lock. Same-owner/root replacement, snapshot rollback and memory erasure are outside the guarantee.",
+    "Host renewal and guest activation are separate, with a possible fail-closed availability gap. No private-key rotation, rollback recovery daemon or AIVM integration.",
+    "Broader Python/Rust parity, native I/O correspondence, complete mediation, independent security review, hardware TPM and live deployment/provider gates remain open."
+  ]
+}

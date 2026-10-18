@@ -74,11 +74,11 @@ usable. Broker-side authorization is identical for both interfaces.
 
 ## Failure and assurance scope
 
-Schema 1 contains exactly `schema`, `certificate` (one leaf PEM) and `capability`
+Schema 1 contains exactly `schema`, `certificate` (one certificate PEM) and `capability`
 (the opaque outer JWT). It contains no private key, CA configuration, host path
 or provider credential. Local parsing checks token profile/claim shapes and the
-certificate thumbprint binding; it **does not authenticate the token**, accept it
-as authorization or require it to be currently valid. Every broker call still
+certificate thumbprint binding; it **does not authenticate the token**, validate
+a CA chain or client EKU, or accept it as authorization or require it to be currently valid. Every broker call still
 verifies signature, lifetime, enrollment epoch, TLS peer and grant conditions.
 
 Installers hold an exclusive lock through reading/validating the current file,

@@ -1663,3 +1663,28 @@ contract. Full pinned-toolchain proofs, extraction records and portable/runtime
 gates are being refreshed before accepting this checkpoint. Those checks will
 not establish live VM/provider deployment or complete native mediation, and
 maintainer security review remains necessary.
+
+## 2026-10-18 12:12:24 -0400
+
+Accepted source checkpoint `dee53f9` for local guest bundle activation. The full
+portable gate passes 2,586 tests without skips; 357 required workflows pass in
+both conformance-enabled debug and ordinary release builds. The source-linked
+Garrett audit checks 369 names, including nine bundle obligations; all five new
+bundle mutations are rejected. Retained evidence is indexed in
+`dev/validation/2026-10-18-guest-bundles.json`. The wheel and source distribution
+build, and the wheel's bundle module matches this source.
+
+Review caught a staging-namespace collision risk, a Python/native PEM whitespace
+difference and an uncontrolled optional-crypto import failure. Reserved output
+names and focused regressions now cover them. I am satisfied that this closes
+the manual local pair-switching gap without inventing a host/guest transaction.
+The residual risks are the explicit storage/crypto/client adapters, cooperative
+locks, same-key limitation and the fail-closed gap after host renewal but before
+activation. I have not refreshed provider compiler-call profiles for this client
+increment and am not strengthening mediation, hardware or live-service claims.
+The first full run found a missing Lean module in MANIFEST.in; the archive
+gate and full acceptance run pass after its packaging-only correction. A
+concurrent packaging attempt also collided on its generated staging tree;
+sequential packaging rebuilt cleanly. The next choices remain broader core
+parity, remote delivery/recovery design,
+implementation-to-trace refinement and independent security review.
