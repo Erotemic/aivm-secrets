@@ -13,6 +13,8 @@ ROOT = Path(__file__).resolve().parents[2]
 CONTRACT = 'docs/planning/aivm-secrets-w6-adapters.json'
 SOURCE = 'rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs'
 TESTS = 'tests/test_rust_w6_adapter.py'
+CORE_ENCODER = 'rust/crates/aivm-secrets-garrett-core/src/http_wire.rs'
+COMMON_ENCODER = 'rust/crates/aivm-secrets-garrett/src/custody.rs'
 
 
 class ContractError(ValueError):
@@ -59,15 +61,22 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and provider_interpreter.count('TcpStream::connect_timeout(') == 1,
            'native manifest adapter has another provider send')
     encoder = source.split('fn manifest_request_bytes(', 1)[1].split('impl Executor {', 1)[0]
-    ensure('!http_auth::valid_credential(&secret.0)' in encoder
-           and encoder.count('http_auth::append_header(&mut request, &secret.0, &route.authentication)') == 1
-           and 'request.extend_from_slice(&secret.0)' not in encoder
-           and 'Error::CredentialSource' in encoder,
+    shared = (root / COMMON_ENCODER).read_text().split('fn provider_request_bytes(', 1)[1].split('fn account_request_bytes(', 1)[0]
+    core = (root / CORE_ENCODER).read_text().split('#[cfg(test)]', 1)[0]
+    ensure('!http_auth::valid_credential(secret)' in core
+           and shared.count('http_wire::append_request(') == 1
+           and '&secret.0,' in shared and 'Error::CredentialSource' in shared
+           and 'request.extend_from_slice(&secret.0)' not in shared,
            'HTTP header may contain unvalidated OAuth/credential bytes')
-    ensure(encoder.count("http_request::append_line(") == 1
-           and "effect.method.as_bytes()," in encoder and "effect.target.as_bytes()," in encoder
-           and '"authorization"' in encoder,
-           'origin-form request/header override restrictions removed')
+    ensure(encoder.count('provider_request_bytes(') == 1
+           and 'method: effect.method.as_bytes().to_vec()' in encoder
+           and 'target: effect.target.as_bytes().to_vec()' in encoder
+           and 'body.as_ref().map(|v| v.as_slice())' in encoder
+           and core.count('http_request::append_line(') == 1
+           and 'ascii_equal(name, b"authorization")' in core
+           and '!reserved_name(name)' in core and '!unique_before(headers, i, &headers[i].name)' in core
+           and 'append_decimal(output, bytes.len());' in core,
+           'origin-form request/header override or body-length restrictions removed')
     ensure('if status == 206 {' in source, 'partial response is no longer refused')
     ensure('self.disclosure.project(&op.name, &raw, &secret.0)?' in source
            and 'ensure_safe(&reply, &secret.0)?' in source,

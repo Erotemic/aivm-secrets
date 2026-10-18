@@ -1,5 +1,9 @@
 # Concrete provider authentication-header refinement
 
+The [complete request encoder follow-up](verified-http-wire.md) composes this
+leaf with the remaining native request bytes. The scope of this earlier leaf
+and its frozen evidence remains unchanged.
+
 Both native provider writers use the extracted Rust
 `http_auth::append_header` to build their authentication line. It borrows the
 credential bytes and appends directly into the caller's zeroizing request

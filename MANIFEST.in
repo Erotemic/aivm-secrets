@@ -25,6 +25,11 @@ include proofs/GarrettConfinement.lean proofs/GarrettNoninterference.lean proofs
 include proofs/GarrettFoundation.lean
 include proofs/GarrettHttpAuth.lean
 include proofs/GarrettHttpRequest.lean
+include proofs/GarrettHttpWireDecimal.lean
+include proofs/GarrettHttpWireHeaders.lean
+include proofs/GarrettHttpWireFormatting.lean
+include proofs/GarrettHttpWireValidation.lean
+include proofs/GarrettHttpWire.lean
 include proofs/GarrettCoordinatorAuthority.lean
 recursive-include proofs/generated *.lean
 prune rust/target

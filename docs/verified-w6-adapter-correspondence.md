@@ -12,8 +12,10 @@ open.** Frozen [policy-normalization validation](../dev/validation/2026-10-18-po
 records the runnable native suite. The [authentication-line follow-up](verified-http-auth.md)
 adds an extracted, kernel-checked byte leaf used by both provider writers.
 The [request-line refinement](verified-http-request.md) additionally checks exact
-method/target bytes and framing. Remaining Host/header/body encoders, parsers and
-call-site obligations stay open.
+method/target bytes and framing. The [complete encoder increment](verified-http-wire.md)
+moves Host, standard/custom headers, decimal lengths and body bytes into the same
+extracted core. Public-field conversion, JSON, parsers, TLS and native call-site
+correspondence remain open.
 
 This milestone follows W4's finite source-controller trace and W5's conditional
 information-flow relation. Both concern **modeled** events. W6 now checks

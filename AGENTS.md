@@ -45,6 +45,11 @@ The [request-line refinement](docs/verified-http-request.md) checks the actual
 method/target validator and exact appender used by both writers. It prevents
 framing injection within that segment; full request/destination/I/O refinement
 remains open. Use focused `GarrettHttpRequest.lean` compilation during iteration.
+The [complete request encoder](docs/verified-http-wire.md) extends these leaves
+through Host, standard/custom headers, decimal content length and body bytes.
+Use the five focused `GarrettHttpWire*.lean` modules during development. Its
+byte/admission contracts retain explicit buffer bounds; route conversion, JSON,
+TLS, parsers and complete native I/O correspondence remain separate obligations.
 The optional [native coordinator authority](docs/native-coordinator-authority.md)
 uses the existing mTLS/SQLite protocol and Python schema. Its extracted
 exhaustive typed action/role authorization and terminal decision/history proofs are separate from SQL,

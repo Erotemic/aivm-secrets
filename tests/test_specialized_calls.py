@@ -35,13 +35,20 @@ def projection():
                      'exchange_manifest'], [6,9]),
         function(6, ['std','io','Write','write_all'], kind='Opaque'),
         function(7, ['rustls_pki_types','pem','reader'], unresolved={'Trait':2}),
-        function(8, ['aivm_secrets_garrett','custody','account_request_bytes'], [10,12]),
+        function(8, ['aivm_secrets_garrett','custody','account_request_bytes'], [14]),
         function(9, ['aivm_secrets_garrett','custody','manifest_session',
-                     'manifest_request_bytes'], [10,12]),
+                     'manifest_request_bytes'], [14]),
         function(10, ['aivm_secrets_garrett_core','http_auth','append_header'], [11]),
         function(11, ['aivm_secrets_garrett_core','http_auth','valid_credential']),
         function(12, ['aivm_secrets_garrett_core','http_request','append_line'], [13]),
         function(13, ['aivm_secrets_garrett_core','http_request','valid_target']),
+        function(14, ['aivm_secrets_garrett','custody','provider_request_bytes'], [15]),
+        function(15, ['aivm_secrets_garrett_core','http_wire','append_request'], [10,12,16]),
+        function(16, ['aivm_secrets_garrett_core','http_wire','valid_headers'], [17]),
+        function(17, ['aivm_secrets_garrett_core','http_wire','valid_header'], [18]),
+        function(18, ['aivm_secrets_garrett_core','http_wire','valid_name'], [19]),
+        function(19, ['aivm_secrets_garrett_core','http_wire','reserved_name'], [20]),
+        function(20, ['aivm_secrets_garrett_core','http_wire','ascii_equal']),
     ]))
 
 
@@ -49,10 +56,12 @@ def test_compiled_paths_keep_external_and_dynamic_obligations_explicit():
     result = explain(projection())
     assert result['witnesses'] == {'account-controller-executor':[0,1,2,3],
         'coordinated-manifest-executor':[0,4,5],
-        'account-authentication-bytes':[0,1,2,3,8,10,11],
-        'manifest-authentication-bytes':[0,4,5,9,10,11],
-        'account-request-line':[0,1,2,3,8,12,13],
-        'manifest-request-line':[0,4,5,9,12,13]}
+        'account-authentication-bytes':[0,1,2,3,8,14,15,10,11],
+        'manifest-authentication-bytes':[0,4,5,9,14,15,10,11],
+        'account-request-line':[0,1,2,3,8,14,15,12,13],
+        'manifest-request-line':[0,4,5,9,14,15,12,13],
+        'account-complete-header-admission':[0,1,2,3,8,14,15,16,17,18,19,20],
+        'manifest-complete-header-admission':[0,4,5,9,14,15,16,17,18,19,20]}
     assert result['opaque_boundaries'] == [6]
     assert result['unresolved_calls'] == {7:{'Trait':2}}
     assert result['unresolved_in_root'] == {}
@@ -61,7 +70,7 @@ def test_compiled_paths_keep_external_and_dynamic_obligations_explicit():
         'begin']['line'] == 4
 
 
-@pytest.mark.parametrize('victim', [0,1,2,3,4,5,8,9,10,12])
+@pytest.mark.parametrize('victim', [0,1,2,3,4,5,8,9,10,12,14,15,16,17,18,19])
 def test_missing_callback_link_cannot_be_rebaselined_as_a_passing_witness(victim):
     data = projection()
     data['translated']['fun_decls'][victim]['body']['blocks']['direct'] = []
@@ -72,7 +81,7 @@ def test_missing_callback_link_cannot_be_rebaselined_as_a_passing_witness(victim
 def test_compiler_generated_helper_is_not_an_extra_method_root():
     data = projection()
     helper = deepcopy(data['translated']['fun_decls'][0])
-    helper['def_id'] = 14
+    helper['def_id'] = 21
     helper['item_meta']['name'].insert(-1, '<Builtin>')
     data['translated']['fun_decls'].append(helper)
     nodes = {f['def_id']:f for f in data['translated']['fun_decls']}

@@ -126,14 +126,37 @@ def review_semantics(contents: dict[str, str]) -> None:
             and m.index('let request = manifest_request_bytes(') < m.index('TcpStream::connect_timeout('),
             'provider socket opened before outbound wire validation')
     wire = part(m, 'fn manifest_request_bytes(', 'impl Executor {')
-    auth_append = 'http_auth::append_header(&mut request, &secret.0, &route.authentication)'
-    require('!http_auth::valid_credential(&secret.0)' in wire
-            and wire.count(auth_append) == 1 and 'Error::CredentialSource' in wire
-            and 'request.extend_from_slice(&secret.0)' not in wire
-            and wire.count("http_request::append_line(") == 1
-            and "effect.method.as_bytes()," in wire and "effect.target.as_bytes()," in wire
-            and '"authorization"' in wire and '"content-length"' in wire,
-            'provider wire encoder lost injection / reserved-header refusal')
+    require(wire.count('provider_request_bytes(') == 1
+            and 'method: effect.method.as_bytes().to_vec()' in wire
+            and 'target: effect.target.as_bytes().to_vec()' in wire
+            and 'host: route.host.clone()' in wire and '&route.authentication,' in wire
+            and 'body.as_ref().map(|v| v.as_slice())' in wire
+            and 'request.extend_from_slice(' not in wire and 'format!(' not in wire,
+            'manifest HTTP bypasses the shared complete request encoder')
+    c = contents[RUST + 'custody.rs']
+    shared_wire = part(c, 'fn provider_request_bytes(', 'fn account_request_bytes(')
+    require(shared_wire.count('http_wire::append_request(') == 1
+            and 'Zeroizing::new(Vec::new())' in shared_wire
+            and '&secret.0,' in shared_wire and 'authentication,' in shared_wire
+            and 'Error::CredentialSource' in shared_wire
+            and 'request.extend_from_slice(' not in shared_wire,
+            'provider HTTP bypasses the borrowed credential/full encoder boundary')
+    full_wire = contents['rust/crates/aivm-secrets-garrett-core/src/http_wire.rs']
+    full_wire = full_wire.split('#[cfg(test)]', 1)[0]
+    append = full_wire.split('pub fn append_request(', 1)[1]
+    require(same_order(append, '!valid_start(head)', '!http_auth::valid_credential(secret)',
+                       '!valid_body(body)', '!valid_headers(&head.headers)',
+                       'http_request::append_line(')
+            and append.count('http_auth::append_header(output, secret, authentication)') == 1
+            and append.count('append_decimal(output, bytes.len());') == 1
+            and append.count('output.extend_from_slice(bytes);') == 1
+            and 'output.extend_from_slice(secret)' not in full_wire
+            and '!reserved_name(name)' in full_wire
+            and '!unique_before(headers, i, &headers[i].name)' in full_wire
+            and all('b"' + name + '"' in full_wire for name in
+                    ['host','authorization','x-api-key','content-length','transfer-encoding',
+                     'proxy-','sec-','x-forwarded-']),
+            'complete HTTP encoder lost validation, header separation or body-length framing')
     require('if status == 206 {' in m, 'unreviewed partial response release')
     require(m.count('TcpStream::connect_timeout(') == 1 and m.count('.write_all(&request)') == 1,
             'native module added a credentialed socket or HTTP writer')
@@ -187,12 +210,14 @@ def review_semantics(contents: dict[str, str]) -> None:
     c = contents[RUST + 'custody.rs']
     account_wire = part(c, 'fn account_request_bytes(', 'impl Executor {')
     account_transport = part(c, '    fn exchange(', 'struct CurrentExecutor')
-    require(account_wire.count('http_request::append_line(&mut request, b"GET", path.as_bytes())') == 1
-            and account_wire.count(auth_append) == 1
+    require(account_wire.count('provider_request_bytes(&head, secret, &route.authentication, None)') == 1
+            and 'method: b"GET".to_vec()' in account_wire
+            and 'target: route.path.clone()' in account_wire
+            and 'host: route.host.clone()' in account_wire
             and 'request.extend_from_slice(&secret.0)' not in account_wire
             and same_order(account_transport, 'let request = account_request_bytes(route, secret)?;',
                            'TcpStream::connect_timeout(', 'emit_current(fresh, || {'),
-            'account HTTP bypasses the extracted auth encoder or validates after connection')
+            'account HTTP bypasses the complete encoder or validates after connection')
     account_control = part(c, 'pub(crate) fn control(', '\nfn use_error(')
     require(same_order(account_control, 'self.check_coordination()?;',
                        'let now = host_time()?;', 'lease.require_current(now)?;',

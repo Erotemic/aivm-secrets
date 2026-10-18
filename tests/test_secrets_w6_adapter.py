@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from dev.verification.w6_adapter import CONTRACT, SOURCE, TESTS, ContractError, check
+from dev.verification.w6_adapter import CONTRACT, SOURCE, TESTS, CORE_ENCODER, COMMON_ENCODER, ContractError, check
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def fixture_checkout(tmp_path):
     dst = tmp_path / 'checkout'
     contract = json.loads((ROOT / CONTRACT).read_text())
-    names = {CONTRACT, SOURCE, TESTS,
+    names = {CONTRACT, SOURCE, TESTS, CORE_ENCODER, COMMON_ENCODER,
              'docs/planning/aivm-secrets-w0-boundaries.json',
              'docs/planning/aivm-secrets-assumptions.json'}
     names.update(channel['path'] for channel in contract['channels'])
@@ -61,11 +61,11 @@ def test_w6_moving_wire_validation_after_connect_is_rejected(tmp_path):
 
 def test_w6_deleted_credential_header_validation_is_rejected(tmp_path):
     checkout = fixture_checkout(tmp_path)
-    path = checkout / SOURCE
+    path = checkout / CORE_ENCODER
     body = path.read_text()
-    assert '!http_auth::valid_credential(&secret.0)' in body
-    body = body.replace('!http_auth::valid_credential(&secret.0)',
-                        'http_auth::valid_credential(&secret.0)', 1)
+    assert '!http_auth::valid_credential(secret)' in body
+    body = body.replace('!http_auth::valid_credential(secret)',
+                        'http_auth::valid_credential(secret)', 1)
     path.write_text(body)
     with pytest.raises(ContractError, match='unvalidated OAuth'):
         check(checkout)
@@ -89,7 +89,7 @@ def test_w6_new_provider_send_or_public_raw_return_is_rejected(tmp_path):
 
 def test_w6_request_line_bypass_is_rejected(tmp_path):
     checkout = fixture_checkout(tmp_path)
-    path = checkout / SOURCE
+    path = checkout / CORE_ENCODER
     original = path.read_text()
     assert original.count('http_request::append_line(') == 1
     path.write_text(original.replace('http_request::append_line(', 'unchecked_line(', 1))

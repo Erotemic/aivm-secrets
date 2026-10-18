@@ -411,111 +411,32 @@ fn manifest_request_bytes(
     effect: &Effect,
     headers: &BTreeMap<String, String>,
 ) -> Outcome<Zeroizing<Vec<u8>>> {
-    let host = std::str::from_utf8(&route.host).map_err(|_| Error::InvalidPolicy)?;
-    if host.is_empty()
-        || host.len() > 253
-        || !host
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-')
-    {
-        return Err(Error::InvalidPolicy);
-    }
-    let port = u16::try_from(route.port).map_err(|_| Error::InvalidPolicy)?;
-    if port == 0
-        || effect.accept.is_empty()
-        || effect.accept.len() > 96
-        || !effect.accept.bytes().all(|b| (33..=126).contains(&b))
-    {
-        return Err(Error::InvalidPolicy);
-    }
-    let mut request = Zeroizing::new(Vec::new());
-    http_request::append_line(
-        &mut request,
-        effect.method.as_bytes(),
-        effect.target.as_bytes(),
-    )
-    .map_err(|_| Error::InvalidPolicy)?;
-    if !http_auth::valid_credential(&secret.0) {
-        return Err(Error::CredentialSource);
-    }
+    let head = http_wire::Head {
+        method: effect.method.as_bytes().to_vec(),
+        target: effect.target.as_bytes().to_vec(),
+        host: route.host.clone(),
+        port: u16::try_from(route.port).map_err(|_| Error::InvalidPolicy)?,
+        accept: effect.accept.as_bytes().to_vec(),
+        // BTreeMap preserves the existing deterministic wire order. The core
+        // independently checks case-insensitive uniqueness and reserved names.
+        headers: headers
+            .iter()
+            .map(|(name, value)| http_wire::Header {
+                name: name.as_bytes().to_vec(),
+                value: value.as_bytes().to_vec(),
+            })
+            .collect(),
+    };
     let body = effect
         .body
         .as_ref()
         .map(|value| Zeroizing::new(json::canonical(value)));
-    if body.as_ref().is_some_and(|value| value.len() > MAX_BODY) {
-        return Err(Error::InvalidPolicy);
-    }
-    request.extend_from_slice(format!(
-        "Host: {host}:{port}\r\nAccept: {}\r\nAccept-Encoding: identity\r\nUser-Agent: aivm-secrets/1\r\nConnection: close\r\n",
-        effect.accept,
-    ).as_bytes());
-    // Eight policy headers plus one explicitly derived write-retry header.
-    if headers.len() > 9 {
-        return Err(Error::InvalidPolicy);
-    }
-    let mut seen_headers = std::collections::BTreeSet::new();
-    for (name, value) in headers {
-        let lower = name.to_ascii_lowercase();
-        if name.is_empty()
-            || name.len() > 64
-            || !seen_headers.insert(lower.clone())
-            || !name
-                .bytes()
-                .enumerate()
-                .all(|(index, b)| b.is_ascii_alphanumeric() || index > 0 && b == b'-')
-            || value.is_empty()
-            || value.len() > 256
-            || !value.bytes().all(|b| (32..=126).contains(&b))
-            || value.starts_with(' ')
-            || value.ends_with(' ')
-            || [
-                "accept",
-                "accept-encoding",
-                "authorization",
-                "connection",
-                "content-encoding",
-                "content-length",
-                "content-type",
-                "cookie",
-                "expect",
-                "forwarded",
-                "host",
-                "keep-alive",
-                "proxy-authorization",
-                "proxy-connection",
-                "te",
-                "trailer",
-                "transfer-encoding",
-                "upgrade",
-                "user-agent",
-                "via",
-                "x-api-key",
-            ]
-            .contains(&lower.as_str())
-            || lower.starts_with("proxy-")
-            || lower.starts_with("sec-")
-            || lower.starts_with("x-forwarded-")
-        {
-            return Err(Error::InvalidPolicy);
-        }
-        request.extend_from_slice(format!("{name}: {value}\r\n").as_bytes());
-    }
-    http_auth::append_header(&mut request, &secret.0, &route.authentication)
-        .map_err(|_| Error::CredentialSource)?;
-    if let Some(body) = &body {
-        request.extend_from_slice(
-            format!(
-                "Content-Type: application/json\r\nContent-Length: {}\r\n",
-                body.len()
-            )
-            .as_bytes(),
-        );
-    }
-    request.extend_from_slice(b"\r\n");
-    if let Some(body) = &body {
-        request.extend_from_slice(body);
-    }
-    Ok(request)
+    provider_request_bytes(
+        &head,
+        secret,
+        &route.authentication,
+        body.as_ref().map(|v| v.as_slice()),
+    )
 }
 
 impl Executor {

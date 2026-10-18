@@ -52,6 +52,12 @@ every native output path is mediated by that helper.
 The [request-line refinement](verified-http-request.md) adds two more required
 builder-to-`http_request::append_line`/`valid_target` paths with the same limits.
 
+The [complete request encoder](verified-http-wire.md) routes those four byte-leaf
+paths through the common native wrapper and `http_wire::append_request`. Two
+additional paths reach custom-header admission and case-insensitive reserved-name
+checks, for eight required bridge paths total. The coordinator profile retains
+six paths. These witnesses do not establish validation dominance or mediation.
+
 The optional [native authority](native-coordinator-authority.md) has a separate
 `coordinator` target profile. Its root is the named compiled connection handler,
 `coordinator_authority::server::exchange`. Six paths link that handler through

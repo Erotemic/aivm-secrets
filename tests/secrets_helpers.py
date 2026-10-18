@@ -582,7 +582,7 @@ class TLSService:
     test can assert on exactly what reached "the provider".
     """
 
-    def __init__(self, directory: Path, host: str = TLS_HOST) -> None:
+    def __init__(self, directory: Path, host: str = TLS_HOST, *, wire_headers: bool = False) -> None:
         self.host = host
         self.files = make_certificates(directory, host)
         self.routes: dict[tuple[str, str], Any] = {}
@@ -602,6 +602,11 @@ class TLSService:
                     'headers': {k.lower(): v for k, v in self.headers.items()},
                     'body': body.decode('utf-8', 'replace'),
                 }
+                if wire_headers:
+                    # Keep every occurrence so wire tests cannot hide duplicate
+                    # framing/authentication fields through dict conversion.
+                    seen['header_pairs'] = list(self.headers.items())
+                    seen['request_version'] = self.request_version
                 with service._lock:
                     service.requests.append(seen)
                 route = service.routes.get((self.command, self.path))

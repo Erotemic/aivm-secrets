@@ -1,3 +1,4 @@
+import GarrettHttpWire
 import GarrettCoordinatorAuthority
 import GarrettHttpRequest
 import GarrettHttpAuth
@@ -337,3 +338,56 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.coordinator_authority.Proofs.member_without_operator_denied
 #print axioms aivm_secrets_garrett_core.coordinator_authority.Proofs.every_member_action_denied_after_revocation
 #print axioms aivm_secrets_garrett_core.coordinator_authority.Proofs.every_action_authorization_positive_witness
+
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.digit_value
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.digits_length_bound
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.decimal_value_append_digit
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.decimal_value_exact
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.append_decimal_exact
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.ascii_lower_contract
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.alphanumeric_contract
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.prefix_tail_step
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.ascii_prefix_loop_contract
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.ascii_prefix_contract
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.ascii_equal_contract
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.ascii_equal_exact
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.ascii_prefix_exact
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.lifted_array_slice
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.bool_result_choice
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.bool_choice_truth
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.reserved_name_contract
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.vec_deref_length
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.vec_deref_val
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.append_headers_loop_contract
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.append_headers_exact
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.byte_range_step
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.byte_range_loop_contract
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.host_from_step
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.valid_host_loop_sound
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.valid_host_sound
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.valid_accept_contract
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.max_body_contract
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.max_body_exact
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.valid_body_contract
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.slice_index_exact
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.name_from_step
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.valid_name_loop_sound
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.valid_name_sound
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.valid_value_sound
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.valid_header_sound
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.unique_before_loop_sound
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.unique_before_sound
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.valid_headers_loop_sound
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.valid_headers_sound
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.valid_start_sound
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.admitted_grammar
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.decimal_wire_contract
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.line_wire_contract
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.authentication_wire_contract
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.refused_start_preserves_buffer
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.refused_credential_preserves_buffer
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.refused_body_preserves_buffer
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.refused_headers_preserve_buffer
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.rejected_request_preserves_buffer
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.successful_request_requires_admission
+#print axioms aivm_secrets_garrett_core.http_wire.Proofs.accepted_request_exact

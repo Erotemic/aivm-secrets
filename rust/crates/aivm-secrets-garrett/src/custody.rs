@@ -7,7 +7,7 @@ use crate::{
     Error, Outcome,
 };
 use aivm_secrets_garrett_core::{
-    credential_use as core, http_auth, http_request, protocol, Expectation, IssuedSurrogate,
+    credential_use as core, http_auth, http_wire, protocol, Expectation, IssuedSurrogate,
 };
 use ring::{
     aead, digest,
@@ -279,19 +279,33 @@ fn emit_current<T>(
 ) -> Outcome<T> {
     aivm_secrets_garrett_core::emission::emit_current(PendingEmission { check, emit })
 }
-fn account_request_bytes(route: &core::Route, secret: &Credential) -> Outcome<Zeroizing<Vec<u8>>> {
-    let host = std::str::from_utf8(&route.host).map_err(|_| Error::InternalError)?;
-    let path = std::str::from_utf8(&route.path).map_err(|_| Error::InternalError)?;
-    let port = u16::try_from(route.port).map_err(|_| Error::InternalError)?;
+fn provider_request_bytes(
+    head: &http_wire::Head,
+    secret: &Credential,
+    authentication: &core::Authentication,
+    body: Option<&[u8]>,
+) -> Outcome<Zeroizing<Vec<u8>>> {
     let mut request = Zeroizing::new(Vec::new());
-    http_request::append_line(&mut request, b"GET", path.as_bytes())
-        .map_err(|_| Error::InvalidPolicy)?;
-    request.extend_from_slice(format!("Host: {host}:{port}\r\nAccept: application/json\r\nAccept-Encoding: identity\r\nUser-Agent: aivm-secrets/1\r\nConnection: close\r\n").as_bytes());
-    http_auth::append_header(&mut request, &secret.0, &route.authentication)
-        .map_err(|_| Error::CredentialSource)?;
-    request.extend_from_slice(b"\r\n");
+    http_wire::append_request(&mut request, head, &secret.0, authentication, body).map_err(
+        |error| match error {
+            http_wire::EncodingDenial::InvalidRequest => Error::InvalidPolicy,
+            http_wire::EncodingDenial::InvalidCredential => Error::CredentialSource,
+        },
+    )?;
     Ok(request)
 }
+fn account_request_bytes(route: &core::Route, secret: &Credential) -> Outcome<Zeroizing<Vec<u8>>> {
+    let head = http_wire::Head {
+        method: b"GET".to_vec(),
+        target: route.path.clone(),
+        host: route.host.clone(),
+        port: u16::try_from(route.port).map_err(|_| Error::InternalError)?,
+        accept: b"application/json".to_vec(),
+        headers: Vec::new(),
+    };
+    provider_request_bytes(&head, secret, &route.authentication, None)
+}
+
 impl Executor {
     fn exchange(
         &self,

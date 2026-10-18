@@ -1,5 +1,9 @@
 # Concrete provider request-line refinement
 
+The [complete request encoder follow-up](verified-http-wire.md) composes this
+leaf with the remaining native request bytes. The scope of this earlier leaf
+and its frozen evidence remains unchanged.
+
 Both native provider builders use `http_request::append_line` from the
 extracted Rust core. It validates before appending directly into the caller's
 zeroizing buffer. It does not select a socket, load a credential or send bytes.

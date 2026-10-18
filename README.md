@@ -65,6 +65,10 @@ model under explicit crypto, TLS, provider and key-custody conditions. The
 still has open service, hardware and provider obligations; the whole broker
 is not formally verified.
 
+Both native provider paths now share the [extracted complete HTTP encoder](docs/verified-http-wire.md).
+Its scoped contracts cover input admission, exact request framing and body length;
+route selection, JSON/TLS, parsers and complete I/O mediation remain open.
+
 An explicit [Rust-owned provider profile](docs/verified-provider.md) now carries
 `profile.read` from the authenticated client through credential custody and
 pinned HTTPS to a typed public result, without a Python broker in that path.

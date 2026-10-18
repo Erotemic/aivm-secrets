@@ -34,13 +34,13 @@ work, not a requirement to reproduce Python's host package structure in Rust.
 | CORE-02 | Binding, enrolled state, epochs, signatures | Implemented subset; differential gate still required |
 | CORE-03 | CA, bound certificate/JWT renewal without restart | Native same-key renew/rebind tested; delivery and broader parity open |
 | CORE-04 | Authorization, delegation, approval, budgets | Partial |
-| CORE-05 | Manifest request/effect and disclosure | Partial |
+| CORE-05 | Manifest request/effect and disclosure | Complete native request encoder; finite Python/provider framing tests; broader parity open |
 | CORE-06 | OAuth refresh and same-session current-token lease | Native rollover implemented; finite differential coverage, broader parity gate open |
 | CORE-07 | Durable cross-host revocation | Native client/server tested; broader parity/refinement open |
 | CORE-08 | Globally reserved write keys and no automatic replay | Native dispatch tested against Python and Rust durable servers |
 | CORE-09 | Wire key, required-on-write, approved upstream key header | Native manifest subset tested; broader wire/digest parity open |
 | CORE-10 | Audits, effect/write ambiguity, guest output | Partial |
-| CORE-11 | Trusted paths, TLS authorization and no proxy/redirect | Partial |
+| CORE-11 | Trusted paths, TLS authorization and no proxy/redirect | Extracted framing/admission; route, TLS, parser and whole-service correspondence open |
 
 `implemented subset` is *not* whole-contract parity. Rust already has several
 independently source-linked Lean proofs for its own models; those do not prove

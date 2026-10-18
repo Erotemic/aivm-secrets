@@ -1736,6 +1736,902 @@ def http_request.append_line
   else
     ok (core.result.Result.Err http_request.RequestDenial.InvalidLine, output)
 
+/-- [aivm_secrets_garrett_core::http_wire::MAX_BODY]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 6:0-6:44
+    Visibility: public -/
+@[global_simps, irreducible]
+def http_wire.MAX_BODY : Result Std.Usize := do
+  let i ← 2#usize * 1024#usize
+  i * 1024#usize
+
+/-- [aivm_secrets_garrett_core::http_wire::Header]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 8:0-11:1
+    Visibility: public -/
+structure http_wire.Header where
+  «name» : alloc.vec.Vec Std.U8
+  value : alloc.vec.Vec Std.U8
+
+/-- [aivm_secrets_garrett_core::http_wire::Head]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 12:0-19:1
+    Visibility: public -/
+structure http_wire.Head where
+  method : alloc.vec.Vec Std.U8
+  target : alloc.vec.Vec Std.U8
+  host : alloc.vec.Vec Std.U8
+  port : Std.U16
+  accept : alloc.vec.Vec Std.U8
+  headers : alloc.vec.Vec http_wire.Header
+
+/-- [aivm_secrets_garrett_core::http_wire::EncodingDenial]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 20:0-23:1
+    Visibility: public -/
+@[discriminant isize]
+inductive http_wire.EncodingDenial where
+| InvalidRequest : http_wire.EncodingDenial
+| InvalidCredential : http_wire.EncodingDenial
+
+/-- [aivm_secrets_garrett_core::http_wire::ascii_lower]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 25:0-31:1
+    Visibility: public -/
+def http_wire.ascii_lower (byte : Std.U8) : Result Std.U8 := do
+  if byte >= 65#u8
+  then if byte <= 90#u8
+       then byte + 32#u8
+       else ok byte
+  else ok byte
+
+/-- [aivm_secrets_garrett_core::http_wire::ascii_prefix]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 37:4-44:1
+    Visibility: public -/
+@[rust_loop]
+def http_wire.ascii_prefix_loop
+  («name» : Slice Std.U8) («prefix» : Slice Std.U8) (i : Std.Usize) :
+  Result Bool
+  := do
+  let i1 := Slice.len «prefix»
+  if i < i1
+  then
+    let i2 ← Slice.index_usize «name» i
+    let i3 ← http_wire.ascii_lower i2
+    let i4 ← Slice.index_usize «prefix» i
+    let i5 ← http_wire.ascii_lower i4
+    if i3 != i5
+    then ok false
+    else
+      let i6 ← i + 1#usize
+      http_wire.ascii_prefix_loop «name» «prefix» i6
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_wire::ascii_prefix]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 32:0-44:1
+    Visibility: public -/
+def http_wire.ascii_prefix
+  («name» : Slice Std.U8) («prefix» : Slice Std.U8) : Result Bool := do
+  let i := Slice.len «name»
+  let i1 := Slice.len «prefix»
+  if i < i1
+  then ok false
+  else http_wire.ascii_prefix_loop «name» «prefix» 0#usize
+
+/-- [aivm_secrets_garrett_core::http_wire::ascii_equal]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 45:0-47:1
+    Visibility: public -/
+def http_wire.ascii_equal
+  («name» : Slice Std.U8) (other : Slice Std.U8) : Result Bool := do
+  let i := Slice.len «name»
+  let i1 := Slice.len other
+  if i = i1
+  then http_wire.ascii_prefix «name» other
+  else ok false
+
+/-- [aivm_secrets_garrett_core::http_wire::reserved_name]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 48:0-73:1
+    Visibility: public -/
+def http_wire.reserved_name («name» : Slice Std.U8) : Result Bool := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 6#usize [ 97#u8, 99#u8, 99#u8, 101#u8, 112#u8, 116#u8 ]))
+  let b ← http_wire.ascii_equal «name» s
+  if b
+  then ok true
+  else
+    let s1 ←
+      lift (Array.to_slice
+        (Array.make 15#usize [
+          97#u8, 99#u8, 99#u8, 101#u8, 112#u8, 116#u8, 45#u8, 101#u8, 110#u8,
+          99#u8, 111#u8, 100#u8, 105#u8, 110#u8, 103#u8
+          ]))
+    let b1 ← http_wire.ascii_equal «name» s1
+    if b1
+    then ok true
+    else
+      let s2 ←
+        lift (Array.to_slice
+          (Array.make 13#usize [
+            97#u8, 117#u8, 116#u8, 104#u8, 111#u8, 114#u8, 105#u8, 122#u8,
+            97#u8, 116#u8, 105#u8, 111#u8, 110#u8
+            ]))
+      let b2 ← http_wire.ascii_equal «name» s2
+      if b2
+      then ok true
+      else
+        let s3 ←
+          lift (Array.to_slice
+            (Array.make 10#usize [
+              99#u8, 111#u8, 110#u8, 110#u8, 101#u8, 99#u8, 116#u8, 105#u8,
+              111#u8, 110#u8
+              ]))
+        let b3 ← http_wire.ascii_equal «name» s3
+        if b3
+        then ok true
+        else
+          let s4 ←
+            lift (Array.to_slice
+              (Array.make 16#usize [
+                99#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8, 45#u8,
+                101#u8, 110#u8, 99#u8, 111#u8, 100#u8, 105#u8, 110#u8, 103#u8
+                ]))
+          let b4 ← http_wire.ascii_equal «name» s4
+          if b4
+          then ok true
+          else
+            let s5 ←
+              lift (Array.to_slice
+                (Array.make 14#usize [
+                  99#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8, 45#u8,
+                  108#u8, 101#u8, 110#u8, 103#u8, 116#u8, 104#u8
+                  ]))
+            let b5 ← http_wire.ascii_equal «name» s5
+            if b5
+            then ok true
+            else
+              let s6 ←
+                lift (Array.to_slice
+                  (Array.make 12#usize [
+                    99#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8,
+                    45#u8, 116#u8, 121#u8, 112#u8, 101#u8
+                    ]))
+              let b6 ← http_wire.ascii_equal «name» s6
+              if b6
+              then ok true
+              else
+                let s7 ←
+                  lift (Array.to_slice
+                    (Array.make 6#usize [
+                      99#u8, 111#u8, 111#u8, 107#u8, 105#u8, 101#u8
+                      ]))
+                let b7 ← http_wire.ascii_equal «name» s7
+                if b7
+                then ok true
+                else
+                  let s8 ←
+                    lift (Array.to_slice
+                      (Array.make 6#usize [
+                        101#u8, 120#u8, 112#u8, 101#u8, 99#u8, 116#u8
+                        ]))
+                  let b8 ← http_wire.ascii_equal «name» s8
+                  if b8
+                  then ok true
+                  else
+                    let s9 ←
+                      lift (Array.to_slice
+                        (Array.make 9#usize [
+                          102#u8, 111#u8, 114#u8, 119#u8, 97#u8, 114#u8,
+                          100#u8, 101#u8, 100#u8
+                          ]))
+                    let b9 ← http_wire.ascii_equal «name» s9
+                    if b9
+                    then ok true
+                    else
+                      let s10 ←
+                        lift (Array.to_slice
+                          (Array.make 4#usize [
+                            104#u8, 111#u8, 115#u8, 116#u8
+                            ]))
+                      let b10 ← http_wire.ascii_equal «name» s10
+                      if b10
+                      then ok true
+                      else
+                        let s11 ←
+                          lift (Array.to_slice
+                            (Array.make 10#usize [
+                              107#u8, 101#u8, 101#u8, 112#u8, 45#u8, 97#u8,
+                              108#u8, 105#u8, 118#u8, 101#u8
+                              ]))
+                        let b11 ← http_wire.ascii_equal «name» s11
+                        if b11
+                        then ok true
+                        else
+                          let s12 ←
+                            lift (Array.to_slice
+                              (Array.make 19#usize [
+                                112#u8, 114#u8, 111#u8, 120#u8, 121#u8, 45#u8,
+                                97#u8, 117#u8, 116#u8, 104#u8, 111#u8, 114#u8,
+                                105#u8, 122#u8, 97#u8, 116#u8, 105#u8, 111#u8,
+                                110#u8
+                                ]))
+                          let b12 ← http_wire.ascii_equal «name» s12
+                          if b12
+                          then ok true
+                          else
+                            let s13 ←
+                              lift (Array.to_slice
+                                (Array.make 16#usize [
+                                  112#u8, 114#u8, 111#u8, 120#u8, 121#u8,
+                                  45#u8, 99#u8, 111#u8, 110#u8, 110#u8, 101#u8,
+                                  99#u8, 116#u8, 105#u8, 111#u8, 110#u8
+                                  ]))
+                            let b13 ← http_wire.ascii_equal «name» s13
+                            if b13
+                            then ok true
+                            else
+                              let s14 ←
+                                lift (Array.to_slice
+                                  (Array.make 2#usize [ 116#u8, 101#u8 ]))
+                              let b14 ← http_wire.ascii_equal «name» s14
+                              if b14
+                              then ok true
+                              else
+                                let s15 ←
+                                  lift (Array.to_slice
+                                    (Array.make 7#usize [
+                                      116#u8, 114#u8, 97#u8, 105#u8, 108#u8,
+                                      101#u8, 114#u8
+                                      ]))
+                                let b15 ← http_wire.ascii_equal «name» s15
+                                if b15
+                                then ok true
+                                else
+                                  let s16 ←
+                                    lift (Array.to_slice
+                                      (Array.make 17#usize [
+                                        116#u8, 114#u8, 97#u8, 110#u8, 115#u8,
+                                        102#u8, 101#u8, 114#u8, 45#u8, 101#u8,
+                                        110#u8, 99#u8, 111#u8, 100#u8, 105#u8,
+                                        110#u8, 103#u8
+                                        ]))
+                                  let b16 ←
+                                    http_wire.ascii_equal «name» s16
+                                  if b16
+                                  then ok true
+                                  else
+                                    let s17 ←
+                                      lift (Array.to_slice
+                                        (Array.make 7#usize [
+                                          117#u8, 112#u8, 103#u8, 114#u8,
+                                          97#u8, 100#u8, 101#u8
+                                          ]))
+                                    let b17 ←
+                                      http_wire.ascii_equal «name» s17
+                                    if b17
+                                    then ok true
+                                    else
+                                      let s18 ←
+                                        lift (Array.to_slice
+                                          (Array.make 10#usize [
+                                            117#u8, 115#u8, 101#u8, 114#u8,
+                                            45#u8, 97#u8, 103#u8, 101#u8,
+                                            110#u8, 116#u8
+                                            ]))
+                                      let b18 ←
+                                        http_wire.ascii_equal «name» s18
+                                      if b18
+                                      then ok true
+                                      else
+                                        let s19 ←
+                                          lift (Array.to_slice
+                                            (Array.make 3#usize [
+                                              118#u8, 105#u8, 97#u8
+                                              ]))
+                                        let b19 ←
+                                          http_wire.ascii_equal «name» s19
+                                        if b19
+                                        then ok true
+                                        else
+                                          let s20 ←
+                                            lift (Array.to_slice
+                                              (Array.make 9#usize [
+                                                120#u8, 45#u8, 97#u8, 112#u8,
+                                                105#u8, 45#u8, 107#u8, 101#u8,
+                                                121#u8
+                                                ]))
+                                          let b20 ←
+                                            http_wire.ascii_equal «name» s20
+                                          if b20
+                                          then ok true
+                                          else
+                                            let s21 ←
+                                              lift (Array.to_slice
+                                                (Array.make 6#usize [
+                                                  112#u8, 114#u8, 111#u8,
+                                                  120#u8, 121#u8, 45#u8
+                                                  ]))
+                                            let b21 ←
+                                              http_wire.ascii_prefix «name»
+                                                s21
+                                            if b21
+                                            then ok true
+                                            else
+                                              let s22 ←
+                                                lift (Array.to_slice
+                                                  (Array.make 4#usize [
+                                                    115#u8, 101#u8, 99#u8,
+                                                    45#u8
+                                                    ]))
+                                              let b22 ←
+                                                http_wire.ascii_prefix «name»
+                                                  s22
+                                              if b22
+                                              then ok true
+                                              else
+                                                let s23 ←
+                                                  lift (Array.to_slice
+                                                    (Array.make 12#usize [
+                                                      120#u8, 45#u8, 102#u8,
+                                                      111#u8, 114#u8, 119#u8,
+                                                      97#u8, 114#u8, 100#u8,
+                                                      101#u8, 100#u8, 45#u8
+                                                      ]))
+                                                http_wire.ascii_prefix «name»
+                                                  s23
+
+/-- [aivm_secrets_garrett_core::http_wire::alphanumeric]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 74:0-78:1
+    Visibility: public -/
+def http_wire.alphanumeric (byte : Std.U8) : Result Bool := do
+  if byte >= 97#u8
+  then
+    if byte <= 122#u8
+    then ok true
+    else
+      if byte >= 65#u8
+      then
+        if byte <= 90#u8
+        then ok true
+        else if byte >= 48#u8
+             then ok (byte <= 57#u8)
+             else ok false
+      else if byte >= 48#u8
+           then ok (byte <= 57#u8)
+           else ok false
+  else
+    if byte >= 65#u8
+    then
+      if byte <= 90#u8
+      then ok true
+      else if byte >= 48#u8
+           then ok (byte <= 57#u8)
+           else ok false
+    else if byte >= 48#u8
+         then ok (byte <= 57#u8)
+         else ok false
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_name]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 85:4-92:1
+    Visibility: public -/
+@[rust_loop]
+def http_wire.valid_name_loop
+  («name» : Slice Std.U8) (i : Std.Usize) : Result Bool := do
+  let i1 := Slice.len «name»
+  if i < i1
+  then
+    let i2 ← Slice.index_usize «name» i
+    let b ← http_wire.alphanumeric i2
+    if b
+    then let i3 ← i + 1#usize
+         http_wire.valid_name_loop «name» i3
+    else
+      if i = 0#usize
+      then ok false
+      else
+        if i2 != 45#u8
+        then ok false
+        else let i3 ← i + 1#usize
+             http_wire.valid_name_loop «name» i3
+  else let b ← http_wire.reserved_name «name»
+       ok (¬ b)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_name]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 80:0-92:1
+    Visibility: public -/
+def http_wire.valid_name («name» : Slice Std.U8) : Result Bool := do
+  let i := Slice.len «name»
+  if i = 0#usize
+  then ok false
+  else
+    let i1 := Slice.len «name»
+    if i1 > 64#usize
+    then ok false
+    else http_wire.valid_name_loop «name» 0#usize
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_value]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 101:4-107:1
+    Visibility: public -/
+@[rust_loop]
+def http_wire.valid_value_loop
+  (iter : core.slice.iter.Iter Std.U8) : Result Bool := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok true
+  | some byte =>
+    if byte < 32#u8
+    then ok false
+    else if byte > 126#u8
+         then ok false
+         else http_wire.valid_value_loop iter1
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_value]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 94:0-107:1
+    Visibility: public -/
+def http_wire.valid_value (value : Slice Std.U8) : Result Bool := do
+  let i := Slice.len value
+  if i = 0#usize
+  then ok false
+  else
+    let i1 := Slice.len value
+    if i1 > 256#usize
+    then ok false
+    else
+      let i2 ← Slice.index_usize value 0#usize
+      if i2 = 32#u8
+      then ok false
+      else
+        let i3 := Slice.len value
+        let i4 ← i3 - 1#usize
+        let i5 ← Slice.index_usize value i4
+        if i5 = 32#u8
+        then ok false
+        else
+          let iter ←
+            SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+              value
+          http_wire.valid_value_loop iter
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_header]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 108:0-110:1
+    Visibility: public -/
+def http_wire.valid_header (header : http_wire.Header) : Result Bool := do
+  let s := alloc.vec.Vec.deref header.name
+  let b ← http_wire.valid_name s
+  if b
+  then let s1 := alloc.vec.Vec.deref header.value
+       http_wire.valid_value s1
+  else ok false
+
+/-- [aivm_secrets_garrett_core::http_wire::unique_before]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 116:4-123:1
+    Visibility: public -/
+@[rust_loop]
+def http_wire.unique_before_loop
+  (headers : Slice http_wire.Header) («end» : Std.Usize)
+  («name» : Slice Std.U8) (j : Std.Usize) :
+  Result Bool
+  := do
+  if j < «end»
+  then
+    let h ← Slice.index_usize headers j
+    let s := alloc.vec.Vec.deref h.name
+    let b ← http_wire.ascii_equal s «name»
+    if b
+    then ok false
+    else
+      let j1 ← j + 1#usize
+      http_wire.unique_before_loop headers «end» «name» j1
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_wire::unique_before]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 111:0-123:1
+    Visibility: public -/
+def http_wire.unique_before
+  (headers : Slice http_wire.Header) («end» : Std.Usize)
+  («name» : Slice Std.U8) :
+  Result Bool
+  := do
+  let i := Slice.len headers
+  if «end» > i
+  then ok false
+  else http_wire.unique_before_loop headers «end» «name» 0#usize
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_headers]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 129:4-136:1
+    Visibility: public -/
+@[rust_loop]
+def http_wire.valid_headers_loop
+  (headers : Slice http_wire.Header) (i : Std.Usize) : Result Bool := do
+  let i1 := Slice.len headers
+  if i < i1
+  then
+    let h ← Slice.index_usize headers i
+    let b ← http_wire.valid_header h
+    if b
+    then
+      let s := alloc.vec.Vec.deref h.name
+      let b1 ← http_wire.unique_before headers i s
+      if b1
+      then let i2 ← i + 1#usize
+           http_wire.valid_headers_loop headers i2
+      else ok false
+    else ok false
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_headers]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 124:0-136:1
+    Visibility: public -/
+def http_wire.valid_headers
+  (headers : Slice http_wire.Header) : Result Bool := do
+  let i := Slice.len headers
+  if i > 9#usize
+  then ok false
+  else http_wire.valid_headers_loop headers 0#usize
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_host]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 142:4-148:1
+    Visibility: public -/
+@[rust_loop]
+def http_wire.valid_host_loop
+  (iter : core.slice.iter.Iter Std.U8) : Result Bool := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok true
+  | some byte =>
+    let b ← http_wire.alphanumeric byte
+    if b
+    then http_wire.valid_host_loop iter1
+    else
+      if byte != 46#u8
+      then if byte != 45#u8
+           then ok false
+           else http_wire.valid_host_loop iter1
+      else http_wire.valid_host_loop iter1
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_host]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 138:0-148:1
+    Visibility: public -/
+def http_wire.valid_host (host : Slice Std.U8) : Result Bool := do
+  let i := Slice.len host
+  if i = 0#usize
+  then ok false
+  else
+    let i1 := Slice.len host
+    if i1 > 253#usize
+    then ok false
+    else
+      let iter ←
+        SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+          host
+      http_wire.valid_host_loop iter
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_accept]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 154:4-160:1
+    Visibility: public -/
+@[rust_loop]
+def http_wire.valid_accept_loop
+  (iter : core.slice.iter.Iter Std.U8) : Result Bool := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok true
+  | some byte =>
+    if byte < 33#u8
+    then ok false
+    else if byte > 126#u8
+         then ok false
+         else http_wire.valid_accept_loop iter1
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_accept]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 150:0-160:1
+    Visibility: public -/
+def http_wire.valid_accept (accept : Slice Std.U8) : Result Bool := do
+  let i := Slice.len accept
+  if i = 0#usize
+  then ok false
+  else
+    let i1 := Slice.len accept
+    if i1 > 96#usize
+    then ok false
+    else
+      let iter ←
+        SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+          accept
+      http_wire.valid_accept_loop iter
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_start]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 161:0-167:1
+    Visibility: public -/
+def http_wire.valid_start (head : http_wire.Head) : Result Bool := do
+  let s := alloc.vec.Vec.deref head.host
+  let b ← http_wire.valid_host s
+  if b
+  then
+    if head.port != 0#u16
+    then
+      let s1 := alloc.vec.Vec.deref head.accept
+      let b1 ← http_wire.valid_accept s1
+      if b1
+      then
+        let s2 := alloc.vec.Vec.deref head.method
+        let b2 ← http_request.valid_method s2
+        if b2
+        then
+          let s3 := alloc.vec.Vec.deref head.target
+          http_request.valid_target s3
+        else ok false
+      else ok false
+    else ok false
+  else ok false
+
+/-- [aivm_secrets_garrett_core::http_wire::append_decimal]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 171:0-176:1
+    Visibility: public -/
+def http_wire.append_decimal
+  (output : alloc.vec.Vec Std.U8) (value : Std.Usize) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let output1 ←
+    if value >= 10#usize
+    then do
+         let i ← value / 10#usize
+         http_wire.append_decimal output i
+    else ok output
+  let i ← value % 10#usize
+  let i1 ← lift (UScalar.cast .U8 i)
+  let i2 ← 48#u8 + i1
+  alloc.vec.Vec.push output1 i2
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_body]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 178:0-183:1
+    Visibility: public -/
+def http_wire.valid_body (body : Option (Slice Std.U8)) : Result Bool := do
+  match body with
+  | none => ok true
+  | some bytes =>
+    let i := Slice.len bytes
+    let i1 ← http_wire.MAX_BODY
+    ok (i <= i1)
+
+/-- [aivm_secrets_garrett_core::http_wire::append_headers]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 185:4-190:5
+    Visibility: public -/
+@[rust_loop]
+def http_wire.append_headers_loop
+  (iter : core.slice.iter.Iter http_wire.Header)
+  (output : alloc.vec.Vec Std.U8) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok output
+  | some header =>
+    let s := alloc.vec.Vec.deref header.name
+    let output1 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+    let s1 ← lift (Array.to_slice (Array.make 2#usize [ 58#u8, 32#u8 ]))
+    let output2 ←
+      alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output1 s1
+    let s2 := alloc.vec.Vec.deref header.value
+    let output3 ←
+      alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output2 s2
+    let s3 ← lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
+    let output4 ←
+      alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output3 s3
+    http_wire.append_headers_loop iter1 output4
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_wire::append_headers]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 184:0-191:1
+    Visibility: public -/
+def http_wire.append_headers
+  (output : alloc.vec.Vec Std.U8) (headers : Slice http_wire.Header) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let iter ←
+    SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+      headers
+  http_wire.append_headers_loop iter output
+
+/-- [aivm_secrets_garrett_core::http_wire::append_request::{closure#1}]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 226:17-226:54 -/
+@[reducible]
+def http_wire.append_request.closure_1 := Unit
+
+/-- [aivm_secrets_garrett_core::http_wire::append_request::{impl core::ops::function::FnOnce<(aivm_secrets_garrett_core::http_auth::HeaderDenial,), aivm_secrets_garrett_core::http_wire::EncodingDenial> for aivm_secrets_garrett_core::http_wire::append_request::{closure#1}}::call_once]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 226:17-226:54 -/
+def
+  http_wire.append_request.closure_1.Insts.CoreOpsFunctionFnOnceTupleHeaderDenialEncodingDenial.call_once
+  (c : http_wire.append_request.closure_1)
+  (tupled_args : http_auth.HeaderDenial) :
+  Result http_wire.EncodingDenial
+  := do
+  ok http_wire.EncodingDenial.InvalidCredential
+
+/-- Trait implementation: [aivm_secrets_garrett_core::http_wire::append_request::{impl core::ops::function::FnOnce<(aivm_secrets_garrett_core::http_auth::HeaderDenial,), aivm_secrets_garrett_core::http_wire::EncodingDenial> for aivm_secrets_garrett_core::http_wire::append_request::{closure#1}}]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 226:17-226:54 -/
+@[reducible]
+def
+  http_wire.append_request.closure_1.Insts.CoreOpsFunctionFnOnceTupleHeaderDenialEncodingDenial
+  : core.ops.function.FnOnce http_wire.append_request.closure_1
+  http_auth.HeaderDenial http_wire.EncodingDenial := {
+  call_once :=
+    http_wire.append_request.closure_1.Insts.CoreOpsFunctionFnOnceTupleHeaderDenialEncodingDenial.call_once
+}
+
+/-- [aivm_secrets_garrett_core::http_wire::append_request::{closure}]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 214:17-214:51 -/
+@[reducible]
+def http_wire.append_request.closure := Unit
+
+/-- [aivm_secrets_garrett_core::http_wire::append_request::{impl core::ops::function::FnOnce<(aivm_secrets_garrett_core::http_request::RequestDenial,), aivm_secrets_garrett_core::http_wire::EncodingDenial> for aivm_secrets_garrett_core::http_wire::append_request::{closure}}::call_once]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 214:17-214:51 -/
+def
+  http_wire.append_request.closure.Insts.CoreOpsFunctionFnOnceTupleRequestDenialEncodingDenial.call_once
+  (c : http_wire.append_request.closure)
+  (tupled_args : http_request.RequestDenial) :
+  Result http_wire.EncodingDenial
+  := do
+  ok http_wire.EncodingDenial.InvalidRequest
+
+/-- Trait implementation: [aivm_secrets_garrett_core::http_wire::append_request::{impl core::ops::function::FnOnce<(aivm_secrets_garrett_core::http_request::RequestDenial,), aivm_secrets_garrett_core::http_wire::EncodingDenial> for aivm_secrets_garrett_core::http_wire::append_request::{closure}}]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 214:17-214:51 -/
+@[reducible]
+def
+  http_wire.append_request.closure.Insts.CoreOpsFunctionFnOnceTupleRequestDenialEncodingDenial
+  : core.ops.function.FnOnce http_wire.append_request.closure
+  http_request.RequestDenial http_wire.EncodingDenial := {
+  call_once :=
+    http_wire.append_request.closure.Insts.CoreOpsFunctionFnOnceTupleRequestDenialEncodingDenial.call_once
+}
+
+/-- [aivm_secrets_garrett_core::http_wire::append_request]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 193:0-237:1
+    Visibility: public -/
+def http_wire.append_request
+  (output : alloc.vec.Vec Std.U8) (head : http_wire.Head)
+  (secret : Slice Std.U8) (authentication : credential_use.Authentication)
+  (body : Option (Slice Std.U8)) :
+  Result ((core.result.Result Unit http_wire.EncodingDenial) × (alloc.vec.Vec
+    Std.U8))
+  := do
+  let b ← http_wire.valid_start head
+  if b
+  then
+    let b1 ← http_auth.valid_credential secret
+    if b1
+    then
+      let b2 ← http_wire.valid_body body
+      if b2
+      then
+        let s := alloc.vec.Vec.deref head.headers
+        let b3 ← http_wire.valid_headers s
+        if b3
+        then
+          let s1 := alloc.vec.Vec.deref head.method
+          let s2 := alloc.vec.Vec.deref head.target
+          let (r, output1) ← http_request.append_line output s1 s2
+          let r1 ←
+            core.result.Result.map_err
+              http_wire.append_request.closure.Insts.CoreOpsFunctionFnOnceTupleRequestDenialEncodingDenial
+              r ()
+          let cf ← core.result.Result.Insts.CoreOpsTry.branch r1
+          match cf with
+          | core.ops.control_flow.ControlFlow.Continue _ =>
+            let s3 ←
+              lift (Array.to_slice
+                (Array.make 6#usize [
+                  72#u8, 111#u8, 115#u8, 116#u8, 58#u8, 32#u8
+                  ]))
+            let output2 ←
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output1 s3
+            let s4 := alloc.vec.Vec.deref head.host
+            let output3 ←
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output2 s4
+            let s5 ← lift (Array.to_slice (Array.make 1#usize [ 58#u8 ]))
+            let output4 ←
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output3 s5
+            let i ← lift (UScalar.cast .Usize head.port)
+            let output5 ← http_wire.append_decimal output4 i
+            let s6 ←
+              lift (Array.to_slice
+                (Array.make 10#usize [
+                  13#u8, 10#u8, 65#u8, 99#u8, 99#u8, 101#u8, 112#u8, 116#u8,
+                  58#u8, 32#u8
+                  ]))
+            let output6 ←
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output5 s6
+            let s7 := alloc.vec.Vec.deref head.accept
+            let output7 ←
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output6 s7
+            let s8 ←
+              lift (Array.to_slice
+                (Array.make 76#usize [
+                  13#u8, 10#u8, 65#u8, 99#u8, 99#u8, 101#u8, 112#u8, 116#u8,
+                  45#u8, 69#u8, 110#u8, 99#u8, 111#u8, 100#u8, 105#u8, 110#u8,
+                  103#u8, 58#u8, 32#u8, 105#u8, 100#u8, 101#u8, 110#u8, 116#u8,
+                  105#u8, 116#u8, 121#u8, 13#u8, 10#u8, 85#u8, 115#u8, 101#u8,
+                  114#u8, 45#u8, 65#u8, 103#u8, 101#u8, 110#u8, 116#u8, 58#u8,
+                  32#u8, 97#u8, 105#u8, 118#u8, 109#u8, 45#u8, 115#u8, 101#u8,
+                  99#u8, 114#u8, 101#u8, 116#u8, 115#u8, 47#u8, 49#u8, 13#u8,
+                  10#u8, 67#u8, 111#u8, 110#u8, 110#u8, 101#u8, 99#u8, 116#u8,
+                  105#u8, 111#u8, 110#u8, 58#u8, 32#u8, 99#u8, 108#u8, 111#u8,
+                  115#u8, 101#u8, 13#u8, 10#u8
+                  ]))
+            let output8 ←
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output7 s8
+            let s9 := alloc.vec.Vec.deref head.headers
+            let output9 ← http_wire.append_headers output8 s9
+            let (r2, output10) ←
+              http_auth.append_header output9 secret authentication
+            let r3 ←
+              core.result.Result.map_err
+                http_wire.append_request.closure_1.Insts.CoreOpsFunctionFnOnceTupleHeaderDenialEncodingDenial
+                r2 ()
+            let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r3
+            match cf1 with
+            | core.ops.control_flow.ControlFlow.Continue _ =>
+              let output11 ←
+                match body with
+                | none => ok output10
+                | some bytes =>
+                  do
+                  let s10 ←
+                    lift (Array.to_slice
+                      (Array.make 48#usize [
+                        67#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8,
+                        45#u8, 84#u8, 121#u8, 112#u8, 101#u8, 58#u8, 32#u8,
+                        97#u8, 112#u8, 112#u8, 108#u8, 105#u8, 99#u8, 97#u8,
+                        116#u8, 105#u8, 111#u8, 110#u8, 47#u8, 106#u8, 115#u8,
+                        111#u8, 110#u8, 13#u8, 10#u8, 67#u8, 111#u8, 110#u8,
+                        116#u8, 101#u8, 110#u8, 116#u8, 45#u8, 76#u8, 101#u8,
+                        110#u8, 103#u8, 116#u8, 104#u8, 58#u8, 32#u8
+                        ]))
+                  let output12 ←
+                    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output10
+                      s10
+                  let i1 := Slice.len bytes
+                  let output13 ← http_wire.append_decimal output12 i1
+                  let s11 ←
+                    lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
+                  alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output13
+                    s11
+              let s10 ←
+                lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
+              let output12 ←
+                alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output11 s10
+              match body with
+              | none => ok (core.result.Result.Ok (), output12)
+              | some bytes =>
+                let output13 ←
+                  alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output12
+                    bytes
+                ok (core.result.Result.Ok (), output13)
+            | core.ops.control_flow.ControlFlow.Break residual =>
+              let r4 ←
+                core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+                  Unit (core.convert.FromSame http_wire.EncodingDenial)
+                  residual
+              ok (r4, output10)
+          | core.ops.control_flow.ControlFlow.Break residual =>
+            let r2 ←
+              core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+                Unit (core.convert.FromSame http_wire.EncodingDenial) residual
+            ok (r2, output1)
+        else
+          ok (core.result.Result.Err http_wire.EncodingDenial.InvalidRequest,
+            output)
+      else
+        ok (core.result.Result.Err http_wire.EncodingDenial.InvalidRequest,
+          output)
+    else
+      ok (core.result.Result.Err http_wire.EncodingDenial.InvalidCredential,
+        output)
+  else
+    ok (core.result.Result.Err http_wire.EncodingDenial.InvalidRequest, output)
+
 /-- [aivm_secrets_garrett_core::Denial]
     Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 21:0-23:1
     Visibility: public -/
