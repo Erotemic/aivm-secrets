@@ -1688,3 +1688,23 @@ concurrent packaging attempt also collided on its generated staging tree;
 sequential packaging rebuilt cleanly. The next choices remain broader core
 parity, remote delivery/recovery design,
 implementation-to-trace refinement and independent security review.
+
+## 2026-10-18 12:27:50 -0400
+
+I am moving the existing decoded JSON reflection traversal into the extracted
+core after the accepted guest-bundle checkpoint. This is a useful implementation
+link for the actual secret-release boundary: the byte matcher was proved, but
+its recursive key/text caller was still an adapter premise. The new core borrows
+the existing typed JSON tree, uses explicit recursion fuel and checks every
+child; the independent serialized-byte check stays in place. The focused Lean
+contract and literal-at-any-depth exclusion corollary compile. Direct native
+cases, real provider workflows and production Python broker comparisons pass,
+including quoted/backslash credentials and Unicode-escaped HTTP JSON.
+
+I prefer this bounded refactor over introducing a new effects framework. It
+removes an unproved traversal while preserving the working protocol and selected
+projection behavior. I am confident in the focused contract, but conversion,
+serialization, call sites and native I/O mediation remain outside it. Literal
+reflection is still a defense-in-depth tripwire with an observable denial; it
+cannot prevent a malicious provider from semantically encoding a secret. Broad
+validation and source/proof records are being refreshed before acceptance.

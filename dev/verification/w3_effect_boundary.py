@@ -313,6 +313,20 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'let raw = frame(&mut socket, MAX_REPLY).map_err(|_| Error::OutcomeUnknown)?;' in transport,
             'bridge ingress/reply no longer share frame admission with phase-correct errors')
 
+    disclosure = contents[RUST + 'manifest/disclosure.rs']
+    guard = part(disclosure, 'pub(crate) fn ensure_safe(', '#[cfg(test)]')
+    require(same_order(guard,
+                'json_reflection::safe(&document(v), secret, 65)',
+                'contains(&json::canonical(v), secret)', 'Ok(())')
+            and 'fn reject_reflection(' not in disclosure,
+            'decoded tree or final serialized-byte reflection admission bypassed')
+    tree_guard = contents['rust/crates/aivm-secrets-garrett-core/src/json_reflection.rs'].split('#[cfg(test)]', 1)[0]
+    require('Json::Text(text) => !contains(text, secret)' in tree_guard
+            and 'if contains(&fields[i].0, secret)' in tree_guard
+            and 'if !safe(&values[i], secret, fuel - 1)' in tree_guard
+            and 'if !safe(&fields[i].1, secret, fuel - 1)' in tree_guard,
+            'recursive decoded reflection lost a key/text/child branch')
+
     # Guest-owned publication is separate from broker authority and provider
     # effects. Keep the concrete lock/controller and single-snapshot call sites.
     bundle = contents[RUST + 'identity_bundle.rs']

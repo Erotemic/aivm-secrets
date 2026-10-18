@@ -35,6 +35,16 @@ PROFILES = [
     "native-coordinator-authority-v1",
 ]
 THEOREMS = [
+    'aivm_secrets_garrett_core.json_reflection.Proofs.index_exact',
+    'aivm_secrets_garrett_core.json_reflection.Proofs.array_loop_contract',
+    'aivm_secrets_garrett_core.json_reflection.Proofs.object_loop_contract',
+    'aivm_secrets_garrett_core.json_reflection.Proofs.safe_contract',
+    'aivm_secrets_garrett_core.json_reflection.Proofs.within_excludes_literal',
+    'aivm_secrets_garrett_core.json_reflection.Proofs.accepted_excludes_literal',
+    'aivm_secrets_garrett_core.json_reflection.Proofs.reflected_json_is_refused',
+    'aivm_secrets_garrett_core.json_reflection.Proofs.exhausted_is_refused',
+    'aivm_secrets_garrett_core.json_reflection.Proofs.empty_object_positive_witness',
+
     'aivm_secrets_garrett_core.bundle.Proofs.digest_ne_exact',
     'aivm_secrets_garrett_core.bundle.Proofs.after_current',
     'aivm_secrets_garrett_core.bundle.Proofs.current_failure_stops',
@@ -490,6 +500,7 @@ TESTS = [
     "tests/test_rust_http_wire.py",
     "tests/test_rust_line_framing.py",
     "tests/test_rust_garrett_reflection.py",
+    "tests/test_rust_json_reflection.py",
     "tests/test_rust_garrett_client_material.py",
     "tests/test_identity_bundle.py",
     "tests/test_rust_garrett_tpm_request.py",
@@ -553,6 +564,7 @@ def inputs() -> list[str]:
         "proofs/GarrettManifest.lean",
         "proofs/GarrettDisclosure.lean",
         "proofs/GarrettReflection.lean",
+        "proofs/GarrettJsonReflection.lean",
         "proofs/GarrettClientMaterial.lean",
         "proofs/GarrettBundle.lean",
         "proofs/GarrettEmission.lean",
@@ -774,7 +786,7 @@ def assurance_coordinates() -> dict:
             "Privileged same-key rebinding carries the identical opened opaque broker capability to the existing issuer. Source signature/AEAD, current-CA historical certificate fingerprints, protected owner-only inputs, shared authority lease participation and no-replace publication remain adapter contracts. This is an explicit host authorization, not acceptance of an expired guest JWT; the broker grant and terminal coordinator checks still apply.",
             "The extracted newline validator characterizes the supplied frame and observed buffered suffix exactly. The held BufReader/read_until adapter, read segmentation, JSON decoding, TLS, deadlines and caller error mapping are tested and source-guarded; they are not a proof that arbitrary later-arriving stream bytes are absent or that native I/O is fully mediated.",
             "The extracted complete HTTP request encoder checks public field grammar, reserved/duplicate headers and credential/body admission before changing the buffer, with exact successful bytes under an explicit modeled capacity premise. The production caller supplies route/effect fields and canonical JSON in a zeroizing buffer. Their mapping/serialization, destination selection, TLS, response parsing, memory erasure, provider behavior and whole-service I/O mediation remain separate obligations.",
-            "The manifest HTTPS backend trusts the policy/check/template/GraphQL parsers, JSON-to-typed-tree conversion and selected-tree rendering, reflection traversal/call sites and concrete HTTP/audit ordering. Exact borrowed-byte literal search is extracted and proved. The extracted recursive filter matches an independent selection specification and has exact two-run noninterference under recursive schema agreement; unselected typed-tree fields are unconstrained. These contracts do not refine the remaining adapters or establish arbitrary provider non-disclosure or whole-service trace equivalence. Native configuration explicitly selects unbounded requests and a file source or explicit OAuth override.",
+            "The manifest HTTPS backend trusts the policy/check/template/GraphQL parsers, JSON-to-typed-tree conversion and selected-tree rendering, JSON conversion, traversal call sites, serialized-byte checks and concrete HTTP/audit ordering. Exact borrowed-byte search and the recursive decoded-key/text reflection guard are extracted and proved. Accepted typed trees contain no literal credential in any decoded string or object key, with explicit recursion exhaustion; JSON decoding/rendering, encoded or semantic leakage and the final serialized-byte adapter remain separate. The extracted recursive filter matches an independent selection specification and has exact two-run noninterference under recursive schema agreement; unselected typed-tree fields are unconstrained. These contracts do not refine the remaining adapters or establish arbitrary provider non-disclosure or whole-service trace equivalence. Native configuration explicitly selects unbounded requests and a file source or explicit OAuth override.",
             "Native provider emission rechecks authority and current OAuth token expiry after audit, TLS setup and request construction. The extracted continuation refuses emission on a failed recheck; setup placement, trusted clock sampling, live lease stability and concrete socket writes remain tested adapter contracts. Control admission follows the credential lease wait and checks the outer as well as inner lifetime.",
             "Native TPM CSR creation reuses the validated pinned-key signer and verifies its returned possession request. Local TPM attributes and signatures do not establish hardware provenance; independent fresh attestation approval under a trusted AK remains required. The new CSR, TPM command and JSON/file adapters are tested, not newly formally refined.",
             "Guest bundle installation uses a single versioned public-certificate/opaque-JWT file with cooperating reader/writer locks and expected-current SHA-256. The extracted controller proves exact CAS/staging/publication ordering and conservative uncertainty. The held-directory no-symlink/private-inode, JSON/X.509/token binding, hash, atomic rename, fsync and client snapshot adapters remain reviewed/tested premises. Local consistency is not JWT authentication. Host renewal and guest activation are separate; same-key only, no rollback prevention or private-key rotation.",
@@ -1407,6 +1419,14 @@ def mutate(pattern: str | None = None) -> None:
         (bundle_source, "bundle publish failure reported successful", "Err(_) => Err(InstallFailure::OutcomeUnknown),", "Err(_) => Ok(()),"),
         (bundle_source, "bundle publish uncertainty erased", "Err(_) => Err(InstallFailure::OutcomeUnknown),", "Err(_) => Err(InstallFailure::Unpublished),"),
     ]
+    json_reflection_source = source.with_name("json_reflection.rs")
+    mutations += [
+        (json_reflection_source, "json reflection text skipped", "Json::Text(text) => !contains(text, secret),", "Json::Text(_text) => true,"),
+        (json_reflection_source, "json reflection object key skipped", "if contains(&fields[i].0, secret) {", "if false {"),
+        (json_reflection_source, "json reflection array child skipped", "if !safe(&values[i], secret, fuel - 1) {", "if false {"),
+        (json_reflection_source, "json reflection object child skipped", "if !safe(&fields[i].1, secret, fuel - 1) {", "if false {"),
+        (json_reflection_source, "json reflection exhausted traversal accepted", "if fuel == 0 {\n        return false;", "if fuel == 0 {\n        return true;"),
+    ]
     reflection_source = source.with_name("reflection.rs")
     mutations += [
         (
@@ -1588,6 +1608,7 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettManifest",
                 "GarrettDisclosure",
                 "GarrettReflection",
+                "GarrettJsonReflection",
                 "GarrettClientMaterial",
                 "GarrettBundle",
                 "GarrettEmission",
@@ -1613,6 +1634,7 @@ def mutate(pattern: str | None = None) -> None:
                 "oauth_state.rs": "GarrettOAuth",
                 "oauth_login.rs": "GarrettLogin",
                 "reflection.rs": "GarrettReflection",
+                "json_reflection.rs": "GarrettJsonReflection",
                 "client_material.rs": "GarrettClientMaterial",
                 "bundle.rs": "GarrettBundle",
                 "emission.rs": "GarrettEmission",

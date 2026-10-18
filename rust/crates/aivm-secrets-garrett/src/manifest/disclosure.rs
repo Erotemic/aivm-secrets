@@ -87,7 +87,7 @@ impl Projection {
             .collect()
     }
 }
-fn document(v: &Value) -> filter::Json {
+pub(crate) fn document(v: &Value) -> filter::Json {
     match v {
         Value::Null => filter::Json::Null,
         Value::Bool(b) => filter::Json::Boolean(*b),
@@ -161,34 +161,12 @@ impl Disclosure {
 fn contains(value: &[u8], secret: &[u8]) -> bool {
     aivm_secrets_garrett_core::reflection::contains(value, secret)
 }
-fn reject_reflection(v: &Value, secret: &[u8]) -> Outcome<()> {
-    let bad = match v {
-        Value::String(s) => contains(s.as_bytes(), secret),
-        Value::Array(values) => {
-            for v in values {
-                reject_reflection(v, secret)?;
-            }
-            false
-        }
-        Value::Object(values) => {
-            for (n, v) in values {
-                if contains(n.as_bytes(), secret) {
-                    return Err(Error::UpstreamResponse);
-                }
-                reject_reflection(v, secret)?;
-            }
-            false
-        }
-        _ => false,
-    };
-    if bad {
-        Err(Error::UpstreamResponse)
-    } else {
-        Ok(())
-    }
-}
 pub(crate) fn ensure_safe(v: &Value, secret: &[u8]) -> Outcome<()> {
-    reject_reflection(v, secret)?;
+    // The parser permits at most 64 container levels. One extra step covers
+    // the terminal scalar; exhaustion is a refusal, never an unchecked leaf.
+    if !aivm_secrets_garrett_core::json_reflection::safe(&document(v), secret, 65) {
+        return Err(Error::UpstreamResponse);
+    }
     if contains(&json::canonical(v), secret) {
         return Err(Error::UpstreamResponse);
     }

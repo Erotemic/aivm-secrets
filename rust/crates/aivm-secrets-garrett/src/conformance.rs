@@ -67,6 +67,15 @@ pub(crate) fn verify_attestation_fixture(
     Ok(verified)
 }
 pub fn evaluate(v: &Value) -> Outcome<Value> {
+    if v.get("action").and_then(Value::as_str) == Some("json-reflection") {
+        let m = json::keys(v, &["action", "value", "secret_hex", "fuel"], &[])?;
+        let secret = bytes(&m["secret_hex"])?;
+        let fuel = json::integer(&m["fuel"], 0, 128)? as usize;
+        let tree = crate::manifest::disclosure::document(&m["value"]);
+        return Ok(json!({"ok":true,
+            "decoded_safe":aivm_secrets_garrett_core::json_reflection::safe(&tree, &secret, fuel),
+            "public_safe":crate::manifest::disclosure::ensure_safe(&m["value"], &secret).is_ok()}));
+    }
     if v.get("action").and_then(Value::as_str) == Some("reflection") {
         let m = json::keys(v, &["action", "value_hex", "secret_hex", "start"], &[])?;
         let value = bytes(&m["value_hex"])?;

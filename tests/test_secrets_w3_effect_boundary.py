@@ -49,6 +49,10 @@ def mutate(repo, filename, before, after):
 
 
 @pytest.mark.parametrize('file,old,new', [
+    (RUST + 'manifest/disclosure.rs', 'json_reflection::safe(&document(v), secret, 65)', 'true'),
+    (RUST + 'manifest/disclosure.rs', 'contains(&json::canonical(v), secret)', 'false'),
+    ('rust/crates/aivm-secrets-garrett-core/src/json_reflection.rs',
+     'if contains(&fields[i].0, secret)', 'if false'),
     (RUST + 'tls.rs', 'complete(&data, reader.buffer(), limit)', 'complete(&data, &[], limit)'),
     (RUST + 'tls.rs', 'if !aivm_secrets_garrett_core::line_frame::complete', 'if false && !aivm_secrets_garrett_core::line_frame::complete'),
     (RUST + 'client.rs', 'crate::tls::frame(&mut stream, limit).map_err(|_| Error::OutcomeUnknown)?', 'Ok::<_, Error>(b"{}".to_vec())?'),

@@ -2686,6 +2686,154 @@ def http_wire.append_request
   else
     ok (core.result.Result.Err http_wire.EncodingDenial.InvalidRequest, output)
 
+/-- [aivm_secrets_garrett_core::reflection::matches_at]:
+    Source: 'crates/aivm-secrets-garrett-core/src/reflection.rs', lines 5:0-10:1
+    Visibility: public -/
+def reflection.matches_at
+  (value : Slice Std.U8) (secret : Slice Std.U8) (start : Std.Usize) :
+  Result Bool
+  := do
+  let i := Slice.len value
+  if start > i
+  then ok false
+  else
+    let i1 := Slice.len secret
+    let i2 := Slice.len value
+    let i3 ← i2 - start
+    if i1 > i3
+    then ok false
+    else
+      let i4 := Slice.len secret
+      let i5 ← start + i4
+      let s ←
+        core.slice.index.Slice.index
+          (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) value
+          { start, «end» := i5 }
+      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s secret
+
+/-- [aivm_secrets_garrett_core::reflection::contains]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/reflection.rs', lines 20:4-27:1
+    Visibility: public -/
+@[rust_loop]
+def reflection.contains_loop
+  (value : Slice Std.U8) (secret : Slice Std.U8) (last : Std.Usize)
+  (start : Std.Usize) :
+  Result Bool
+  := do
+  if start <= last
+  then
+    let b ← reflection.matches_at value secret start
+    if b
+    then ok true
+    else
+      let start1 ← start + 1#usize
+      reflection.contains_loop value secret last start1
+  else ok false
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::reflection::contains]:
+    Source: 'crates/aivm-secrets-garrett-core/src/reflection.rs', lines 14:0-27:1
+    Visibility: public -/
+def reflection.contains
+  (value : Slice Std.U8) (secret : Slice Std.U8) : Result Bool := do
+  let i := Slice.len secret
+  if i = 0#usize
+  then ok false
+  else
+    let i1 := Slice.len secret
+    let i2 := Slice.len value
+    if i1 > i2
+    then ok false
+    else
+      let i3 := Slice.len value
+      let i4 := Slice.len secret
+      let last ← i3 - i4
+      reflection.contains_loop value secret last 0#usize
+
+mutual
+
+/-- [aivm_secrets_garrett_core::json_reflection::safe]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_reflection.rs', lines 14:12-37:1
+    Visibility: public -/
+@[rust_loop]
+def json_reflection.safe_loop0
+  (values : alloc.vec.Vec disclosure.Json) (secret : Slice Std.U8)
+  (fuel : Std.Usize) (i : Std.Usize) :
+  Result Bool
+  := do
+  let i1 := alloc.vec.Vec.len values
+  if i < i1
+  then
+    let j ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        disclosure.Json) values i
+    let i2 ← fuel - 1#usize
+    let b ← json_reflection.safe j secret i2
+    if b
+    then
+      let i3 ← i + 1#usize
+      json_reflection.safe_loop0 values secret fuel i3
+    else ok false
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::json_reflection::safe]: loop 1:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_reflection.rs', lines 24:12-37:1
+    Visibility: public -/
+@[rust_loop]
+def json_reflection.safe_loop1
+  (fields : alloc.vec.Vec ((alloc.vec.Vec Std.U8) × disclosure.Json))
+  (secret : Slice Std.U8) (fuel : Std.Usize) (i : Std.Usize) :
+  Result Bool
+  := do
+  let i1 := alloc.vec.Vec.len fields
+  if i < i1
+  then
+    let (v, j) ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        ((alloc.vec.Vec Std.U8) × disclosure.Json)) fields i
+    let s := alloc.vec.Vec.deref v
+    let b ← reflection.contains s secret
+    if b
+    then ok false
+    else
+      let i2 ← fuel - 1#usize
+      let b1 ← json_reflection.safe j secret i2
+      if b1
+      then
+        let i3 ← i + 1#usize
+        json_reflection.safe_loop1 fields secret fuel i3
+      else ok false
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::json_reflection::safe]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_reflection.rs', lines 6:0-37:1
+    Visibility: public -/
+def json_reflection.safe
+  (value : disclosure.Json) (secret : Slice Std.U8) (fuel : Std.Usize) :
+  Result Bool
+  := do
+  if fuel = 0#usize
+  then ok false
+  else
+    match value with
+    | disclosure.Json.Null => ok true
+    | disclosure.Json.Boolean _ => ok true
+    | disclosure.Json.Integer _ => ok true
+    | disclosure.Json.Text text =>
+      let s := alloc.vec.Vec.deref text
+      let b ← reflection.contains s secret
+      ok (¬ b)
+    | disclosure.Json.Array values =>
+      json_reflection.safe_loop0 values secret fuel 0#usize
+    | disclosure.Json.Object fields =>
+      json_reflection.safe_loop1 fields secret fuel 0#usize
+    | disclosure.Json.Opaque => ok true
+partial_fixpoint
+
+end
+
 /-- [aivm_secrets_garrett_core::Denial]
     Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 21:0-23:1
     Visibility: public -/
@@ -3812,70 +3960,6 @@ def rebinding.rebind
     | core.result.Result.Err error => ok (core.result.Result.Err error)
   else let t ← RebinderInst.rejected ops
        ok (core.result.Result.Err t)
-
-/-- [aivm_secrets_garrett_core::reflection::matches_at]:
-    Source: 'crates/aivm-secrets-garrett-core/src/reflection.rs', lines 5:0-10:1
-    Visibility: public -/
-def reflection.matches_at
-  (value : Slice Std.U8) (secret : Slice Std.U8) (start : Std.Usize) :
-  Result Bool
-  := do
-  let i := Slice.len value
-  if start > i
-  then ok false
-  else
-    let i1 := Slice.len secret
-    let i2 := Slice.len value
-    let i3 ← i2 - start
-    if i1 > i3
-    then ok false
-    else
-      let i4 := Slice.len secret
-      let i5 ← start + i4
-      let s ←
-        core.slice.index.Slice.index
-          (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) value
-          { start, «end» := i5 }
-      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s secret
-
-/-- [aivm_secrets_garrett_core::reflection::contains]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/reflection.rs', lines 20:4-27:1
-    Visibility: public -/
-@[rust_loop]
-def reflection.contains_loop
-  (value : Slice Std.U8) (secret : Slice Std.U8) (last : Std.Usize)
-  (start : Std.Usize) :
-  Result Bool
-  := do
-  if start <= last
-  then
-    let b ← reflection.matches_at value secret start
-    if b
-    then ok true
-    else
-      let start1 ← start + 1#usize
-      reflection.contains_loop value secret last start1
-  else ok false
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::reflection::contains]:
-    Source: 'crates/aivm-secrets-garrett-core/src/reflection.rs', lines 14:0-27:1
-    Visibility: public -/
-def reflection.contains
-  (value : Slice Std.U8) (secret : Slice Std.U8) : Result Bool := do
-  let i := Slice.len secret
-  if i = 0#usize
-  then ok false
-  else
-    let i1 := Slice.len secret
-    let i2 := Slice.len value
-    if i1 > i2
-    then ok false
-    else
-      let i3 := Slice.len value
-      let i4 := Slice.len secret
-      let last ← i3 - i4
-      reflection.contains_loop value secret last 0#usize
 
 /-- [aivm_secrets_garrett_core::trust::TrustDenial]
     Source: 'crates/aivm-secrets-garrett-core/src/trust.rs', lines 5:0-9:1

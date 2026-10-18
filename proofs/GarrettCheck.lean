@@ -9,6 +9,7 @@ import GarrettEmission
 import GarrettClientMaterial
 import GarrettBundle
 import GarrettReflection
+import GarrettJsonReflection
 import GarrettDisclosure
 import GarrettManifest
 import GarrettLogin
@@ -413,3 +414,13 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.bundle.Proofs.publication_failure_is_uncertain
 #print axioms aivm_secrets_garrett_core.bundle.Proofs.successful_install_witness
 #print axioms aivm_secrets_garrett_core.bundle.Proofs.success_exact
+
+#print axioms aivm_secrets_garrett_core.json_reflection.Proofs.index_exact
+#print axioms aivm_secrets_garrett_core.json_reflection.Proofs.array_loop_contract
+#print axioms aivm_secrets_garrett_core.json_reflection.Proofs.object_loop_contract
+#print axioms aivm_secrets_garrett_core.json_reflection.Proofs.safe_contract
+#print axioms aivm_secrets_garrett_core.json_reflection.Proofs.within_excludes_literal
+#print axioms aivm_secrets_garrett_core.json_reflection.Proofs.accepted_excludes_literal
+#print axioms aivm_secrets_garrett_core.json_reflection.Proofs.reflected_json_is_refused
+#print axioms aivm_secrets_garrett_core.json_reflection.Proofs.exhausted_is_refused
+#print axioms aivm_secrets_garrett_core.json_reflection.Proofs.empty_object_positive_witness
