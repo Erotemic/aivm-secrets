@@ -121,6 +121,10 @@ the broker retains all authorization and reservation decisions.
 
 ## Reproducible synthetic system check
 
+The [native coordinator operator client](docs/native-coordinator-control.md)
+manages activation, terminal revocation and status without a Python client.
+Both clients preserve uncertainty after a possibly committed operator action.
+
 After provisioning the pinned Rust and optional Lean/Aeneas tools, run
 `python dev/verification/system.py --proofs` (add `--full-tests` for the full
 portable suite). Required Python/native Rust workflow tests fail the gate if

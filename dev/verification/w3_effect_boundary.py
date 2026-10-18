@@ -274,6 +274,28 @@ def review_semantics(contents: dict[str, str]) -> None:
             and guest_call.count('configure(config)?') == 1
             and 'return Err(Error::OutcomeUnknown)' in guest_call,
             'guest invoke changed snapshot selection or post-send uncertainty')
+    member_call = part(coordinate, '    fn call(', '    pub(crate) fn operator(')
+    operator_call = part(coordinate, '    pub(crate) fn operator(', '    fn exchange(')
+    exchange_call = part(coordinate, '    fn exchange(', '\nfn operator_reply(')
+    require('self.exchange(&value, Error::Revoked, Error::Revoked)?' in member_call
+            and 'self.exchange(&value, Error::Unreachable, bad)?' in operator_call
+            and 'Error::OutcomeUnknown' in operator_call
+            and same_order(exchange_call, 'while connection.is_handshaking()',
+                           '.write_all(&bytes)', '.map_err(|_| after)?',
+                           'response(BufReader::new(stream)).map_err(|_| after)'),
+            'coordinator caller/phase error classification or single submission changed')
+    receipt = part(coordinate, 'fn operator_reply(', '\nfn line(')
+    require('if !aivm_secrets_garrett_core::coordinator_authority::operator_acknowledged(' in receipt
+            and 'json::keys(&value, &["ok", "active", "revision"], &[])' in receipt
+            and 'm["active"].as_bool().ok_or(bad)?' in receipt
+            and 'json::integer(&m["revision"], 1, i64::MAX)' in receipt,
+            'operator receipt bypasses exact shape/type or extracted validation')
+    admin = contents[RUST + 'coordinator_admin.rs']
+    require(admin.count('.operator(') == 3
+            and all('self.0.operator(Action::' + name in admin
+                    for name in ['Activate', 'Revoke', 'Status'])
+            and '.operator(' not in request and '.operator(' not in c,
+            'operator client broadened or entered guest custody paths')
     # Host renewal may carry only the source certificate's verified key
     # identity; substituting the current fingerprint would defeat continuity.
     rebinding = contents[RUST + 'authority/rebinding.rs']
@@ -426,7 +448,7 @@ def check(root: Path) -> dict:
         'provider-preflight', 'provider-final', 'guest-reply', 'guest-denial',
         'host-audit', 'host-announcement', 'legacy-forward', 'oauth-startup',
         'host-private', 'host-control', 'guest-close', 'authority-coordinate',
-        'coordination-authority',
+        'coordination-authority', 'operator-coordinate',
     }, 'missing effect class or newly unreviewed channel')
     sinks = json.loads((root / 'docs/planning/aivm-secrets-w0-boundaries.json').read_text())
     w0_ids = {row['id'] for row in sinks['sinks']}

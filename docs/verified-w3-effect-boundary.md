@@ -130,3 +130,16 @@ bytes, ambiguous injected headers, unsafe request targets, and unmodeled 206
 partial responses. The W3 source inventory has been deliberately refreshed.
 See [W6 adapter review](verified-w6-adapter-correspondence.md) for concrete
 unit tests, finite runtime-trace checks and still-unproved assumptions.
+
+## Explicit host coordinator control
+
+The separate `garrett-coordinatorctl` / `coordinator_admin::Client` path adds an
+operator-only effect class and `S-COORDINATOR-ADMIN`. It reuses the member TLS
+transport, but selects only activate/revoke/status from a private host config.
+The primary member sink still forbids those operator actions; guest handlers do
+not invoke the operator wrapper. Typed receipt validation and phase-specific
+operator errors are source-guarded, including deliberate bypass edits. This
+inventory/review is not a transitive call-graph or complete mediation proof.
+See [operator control](native-coordinator-control.md) for concrete tests and the
+separate extracted receipt theorem; remote commit and transport refinement stay
+explicit obligations.

@@ -35,6 +35,7 @@ include proofs/GarrettHttpWireValidation.lean
 include proofs/GarrettHttpWire.lean
 include proofs/GarrettLineFrame.lean
 include proofs/GarrettCoordinatorAuthority.lean
+include proofs/GarrettCoordinatorReply.lean
 recursive-include proofs/generated *.lean
 prune rust/target
 prune proofs/.lake

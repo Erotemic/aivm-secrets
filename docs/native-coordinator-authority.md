@@ -1,5 +1,10 @@
 # Optional native coordination authority
 
+The separate [native operator client](native-coordinator-control.md) activates,
+revokes and inspects principals over the same mTLS protocol. It builds without
+the SQLite/server feature; neither service startup nor broker admission invokes
+operator actions automatically.
+
 `garrett-coordinator` serves the existing coordination protocol using Rust,
 mTLS and one local SQLite database. Python and Rust brokers can use it with
 their existing coordinator configurations. The Python authority remains an

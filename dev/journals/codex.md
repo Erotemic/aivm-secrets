@@ -1799,3 +1799,25 @@ larger claim: client behavior is tested, the new proof is only a shared syntax
 leaf, and neither SQL/native I/O refinement nor service-level confidentiality
 has been established. No live account, VM or physical TPM was involved. The
 active queue still records broad core parity and complete mediation as open.
+
+## 2026-10-18 14:05:37 -0400
+
+I am filling an operational gap in the native coordinator: its service existed,
+but host activation/revocation/status still needed the Python client. The new
+standalone native client reuses mTLS and the existing schema, with operator
+credentials selected only by private host configuration. It does not add guest
+operator verbs or a mandatory SQLite dependency. W0/W3/W6 now distinguish its
+host-only sink from the member admission sink rather than relaxing the latter's
+prohibition on operator actions.
+
+The useful finding was a real Python uncertainty bug: two deterministic mTLS
+cases commit activation/revocation, drop the reply, and previously return
+`revoked`. Both clients now preserve possible submission as `outcome_unknown`,
+make one attempt, and require complete typed receipts. Member transport failures
+keep their fail-closed behavior; Python positive member acknowledgements now
+match the native exact shape/type checks. I am confident in the observed state
+and error evidence, and cautious about remote commit claims: the new Lean proof
+checks the actual receipt gate and joins successful extracted revocation to it,
+while JSON/TLS/transport placement and remote storage remain explicit adapters.
+The distinction between absent status and a permanent tombstone seems a useful
+condition to make precise. Broad parity and complete mediation are still open.

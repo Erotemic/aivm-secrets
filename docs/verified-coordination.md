@@ -22,8 +22,9 @@ example. The member identity belongs to the trusted host broker and is distinct
 from the guest identity. Its private key stays on the host. Provision the
 existing Python server and manually pin member/operator fingerprints using
 [the coordinator workflow](garrett-python-core-extensions.md). The native client
-implements check/reserve/finish; it does not add a Rust server, registration or
-operator activation/revocation endpoint. Neither component requires TPM hardware.
+implements check/reserve/finish. The optional [native server](native-coordinator-authority.md)
+and separate [operator client](native-coordinator-control.md) now supply the
+existing activation/revocation/status protocol without adding guest operator verbs. Neither component requires TPM hardware.
 
 The selected CA and hostname are mandatory. Connections use mTLS/TLS 1.3,
 a bounded fixed endpoint and closed metadata vocabulary, with no proxy,

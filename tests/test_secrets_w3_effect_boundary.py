@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_w3_current_reviewed_effect_boundary():
     assert check(ROOT) == {
-        'sources': len(EXPECTED_SOURCES), 'effects': 13, 'scope': 'native-manifest-https-v1',
+        'sources': len(EXPECTED_SOURCES), 'effects': 14, 'scope': 'native-manifest-https-v1',
     }
 
 
@@ -49,6 +49,10 @@ def mutate(repo, filename, before, after):
 
 
 @pytest.mark.parametrize('file,old,new', [
+    (RUST + 'coordination.rs', 'self.exchange(&value, Error::Unreachable, bad)?',
+     'self.exchange(&value, Error::Unreachable, Error::Revoked)?'),
+    (RUST + 'coordination.rs', 'if !aivm_secrets_garrett_core::coordinator_authority::operator_acknowledged(',
+     'if false && !aivm_secrets_garrett_core::coordinator_authority::operator_acknowledged('),
     (RUST + 'coordinator_authority/server.rs', 'discard_after_reply(&mut stream.sock);', 'let _ = &stream.sock;'),
     (RUST + 'custody/manifest_session.rs',
      'if !aivm_secrets_garrett_core::coordination::valid_retry_key(key.as_bytes())', 'if false'),

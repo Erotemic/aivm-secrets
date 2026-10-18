@@ -35,6 +35,14 @@ PROFILES = [
     "native-coordinator-authority-v1",
 ]
 THEOREMS = [
+    'aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.operator_receipt_contract',
+    'aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.confirmed_revocation_is_tombstone',
+    'aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.absence_cannot_confirm_revocation',
+    'aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.active_state_cannot_confirm_revocation',
+    'aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.absent_status_is_admitted',
+    'aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.activation_receipt_exact',
+    'aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.successful_revocation_has_receipt',
+
     'aivm_secrets_garrett_core.coordination.KeyProofs.retry_byte_contract',
     'aivm_secrets_garrett_core.coordination.KeyProofs.bytes_step',
     'aivm_secrets_garrett_core.coordination.KeyProofs.retry_key_loop_contract',
@@ -515,6 +523,7 @@ TESTS = [
     "tests/test_rust_garrett_dispatch.py",
     "tests/test_rust_coordination.py",
     "tests/test_rust_coordinator_authority.py",
+    "tests/test_coordinator_operator.py",
     "tests/test_rust_bound_renewal.py",
     "tests/test_rust_w6_adapter.py",
     "tests/test_secrets_coordination.py",
@@ -542,6 +551,7 @@ RUNNERS = {
     "AIVM_SECRETS_RUST_OAUTH_ADMIN": "garrett-oauth",
     "AIVM_SECRETS_RUST_MANIFEST_RUNNER": "manifest-conformance",
     "AIVM_SECRETS_RUST_COORDINATOR": "garrett-coordinator",
+    "AIVM_SECRETS_RUST_COORDINATOR_CTL": "garrett-coordinatorctl",
 }
 
 
@@ -588,7 +598,9 @@ def inputs() -> list[str]:
         "proofs/GarrettHttpWire.lean",
         "proofs/GarrettLineFrame.lean",
         "proofs/GarrettCoordinatorAuthority.lean",
+        "proofs/GarrettCoordinatorReply.lean",
         "tests/secrets_vectors/coordination/authority-v1.jsonl",
+        "tests/secrets_vectors/coordination/operator-replies-v1.jsonl",
         "proofs/GarrettProfiles.lean",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
@@ -769,7 +781,7 @@ def assurance_coordinates() -> dict:
         "aeneas_release": base.RELEASE,
         "theorems": THEOREMS,
         "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
-        "implementation_linked": "Aeneas-generated optional coordinator dispatch continuation and issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission, and concrete authentication-header credential validation/exact byte appending and request-line method/target validation/exact single-line construction used by both native provider writers, exact bounded newline frame admission shared by bridge ingress, forwarded broker replies and the guest client, including empty observed suffix and post-send uncertainty mapping as a tested native adapter, and extended to complete request framing with Host/Accept, exact custom-header ordering, case-insensitive reserved/duplicate refusal, concrete decimal port/body length and exact opaque body bytes; exact bounded ASCII retry-name admission shared by the native host and named-operation client; optional coordinator authority exact peer/operator admission, absent-only activation, revocation/reservation/completion decisions and modeled terminal committed-decision histories",
+        "implementation_linked": "Aeneas-generated optional coordinator dispatch continuation and issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission, and concrete authentication-header credential validation/exact byte appending and request-line method/target validation/exact single-line construction used by both native provider writers, exact bounded newline frame admission shared by bridge ingress, forwarded broker replies and the guest client, including empty observed suffix and post-send uncertainty mapping as a tested native adapter, and extended to complete request framing with Host/Accept, exact custom-header ordering, case-insensitive reserved/duplicate refusal, concrete decimal port/body length and exact opaque body bytes; exact bounded ASCII retry-name admission shared by the native host and named-operation client; optional coordinator authority exact peer/operator admission, absent-only activation, revocation/reservation/completion decisions and modeled terminal committed-decision histories; exact operator receipt admission distinguishing absent status from a terminal revocation, composed with successful extracted revocation",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
@@ -791,6 +803,7 @@ def assurance_coordinates() -> dict:
             "Native PKCE login trusts entropy, SHA-256 S256 derivation, HTTP/query decoding and loopback listener/clock adapters. Callback binding and one-shot lifecycle guards are extracted; ready URLs go only to a trusted host operator/browser, and their state/challenge must not be offered as an agent API. Concrete acquisition I/O histories and secret-sink refinement remain open.",
             "Native OAuth sessions seal an opaque vault/provider/subject/epoch-bound marker and select the current ready token under a held vault lock. Explicit refresh may change its generation without changing the grant deadline. HMAC/entropy, lock participation, concrete opener correspondence and clock sampling remain adapter contracts; this is not a whole-service or concurrent filesystem proof.",
             "The optional native coordinator authority retains Python's SQLite schema and mTLS endpoint. Exact operator/member matching and terminal principal/reservation decision histories are extracted and proved; HTTP parsing, authenticated DER-to-hex conversion, row conversion, SQL bindings, commit-before-reply placement, SQLite WAL/FULL durability, concurrency and complete native I/O refinement remain separate library/environment or project-owned adapter obligations. There is no replica, live inode replacement or rollback witness, and no positive admission cache or automatic retry.",
+            "Explicit host coordinator operator calls trust protected operator configuration, concrete pre-send/post-send placement, JSON bool/integer/null conversion, authenticated server identity and truthful committed-state replies. The actual extracted receipt validator distinguishes absent status from a terminal revocation and composes with successful extracted revocation; these facts prove neither remote SQL commit/durability nor JSON/TLS/native I/O refinement. Possible submission without a complete receipt is uncertainty and never triggers an automatic retry.",
             "Native coordinated account/manifest sessions trust the separately authenticated SQLite coordinator for terminal membership decisions and durable globally unique reservations. The extracted dispatch controller requires admission/reservation acknowledgements before invoking a provider and maps failed post-send completion to uncertainty. TLS/HTTP, server durability/rollback, last-check linearization and concrete callback placement remain adapter premises. Native coordinated request fingerprints hash a canonical document rebuilt from parsed policy, with independent Python differential and real durable-record tests. Policy normalization, JSON encoding and SHA-256 remain concrete adapters; finite tests do not establish all-input digest equivalence or broad core parity.",
             "Privileged same-key rebinding carries the identical opened opaque broker capability to the existing issuer. Source signature/AEAD, current-CA historical certificate fingerprints, protected owner-only inputs, shared authority lease participation and no-replace publication remain adapter contracts. This is an explicit host authorization, not acceptance of an expired guest JWT; the broker grant and terminal coordinator checks still apply.",
             "The extracted newline validator characterizes the supplied frame and observed buffered suffix exactly. The held BufReader/read_until adapter, read segmentation, JSON decoding, TLS, deadlines and caller error mapping are tested and source-guarded; they are not a proof that arbitrary later-arriving stream bytes are absent or that native I/O is fully mediated.",
@@ -1436,6 +1449,17 @@ def mutate(pattern: str | None = None) -> None:
         (retry_source, "retry key valid underscore refused", "|| byte == b'_'", "|| byte == b'!'"),
         (retry_source, "retry key final byte skipped", "while i < key.len() {", "while i + 1 < key.len() {"),
     ]
+    operator_source = source.with_name("coordinator_authority.rs")
+    mutations += [
+        (operator_source, "operator receipt absence confirms revocation",
+         "Action::Revoke => match revision {\n            Some(revision) => !active && revision >= 1,\n            None => false,",
+         "Action::Revoke => match revision {\n            Some(revision) => !active && revision >= 1,\n            None => true,"),
+        (operator_source, "operator receipt active state confirms revocation", "!active && revision >= 1", "revision >= 1"),
+        (operator_source, "operator receipt nonpositive revision confirms revocation", "!active && revision >= 1", "!active"),
+        (operator_source, "operator receipt activation ignores initial revision", "active && revision == 1", "active"),
+        (operator_source, "operator receipt active absence admitted", "None => !active,", "None => true,"),
+        (operator_source, "operator receipt member action admitted", "Action::Check | Action::Reserve | Action::Finish => false,", "Action::Check | Action::Reserve | Action::Finish => true,"),
+    ]
     json_reflection_source = source.with_name("json_reflection.rs")
     mutations += [
         (json_reflection_source, "json reflection text skipped", "Json::Text(text) => !contains(text, secret),", "Json::Text(_text) => true,"),
@@ -1641,6 +1665,7 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettHttpWire",
                 "GarrettLineFrame",
                 "GarrettCoordinatorAuthority",
+                "GarrettCoordinatorReply",
             ]
             # These leaves import the extracted crate plus generic standard-
             # model facts. Check the affected leaf first; keep full fallback
@@ -1667,6 +1692,11 @@ def mutate(pattern: str | None = None) -> None:
             if preferred:
                 modules.remove(preferred)
                 modules.insert(0, preferred)
+            if label.startswith("operator receipt "):
+                # Receipt proofs import the authority contracts. Recompile that
+                # dependency against this mutant before checking its consumer.
+                modules.remove("GarrettCoordinatorReply")
+                modules.insert(1, "GarrettCoordinatorReply")
             if source.name == "manifest.rs":
                 modules.remove("GarrettLogin")
                 modules.remove("GarrettManifest")

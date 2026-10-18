@@ -100,3 +100,10 @@ actual native recursive key/text guard against an independent Python oracle and
 production Python broker cases. Literal exclusion is proved for accepted typed
 trees. JSON conversion, rendering, concrete mediation and semantic non-disclosure
 remain open; the final serialized-byte check is retained.
+
+The [native coordinator operator client](native-coordinator-control.md) now covers
+host activation/revocation/status with typed receipts and conservative mutation
+uncertainty. Deterministic committed-but-unanswered Python cases motivated the
+Python change; both clients share real protocol vectors and both authority
+backends. The extracted receipt contract is separate from remote commit, SQL
+durability and JSON/TLS/phase correspondence; CORE-07 remains partial.

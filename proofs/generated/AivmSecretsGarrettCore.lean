@@ -687,6 +687,35 @@ def coordinator_authority.finish
       ok (core.result.Result.Err coordinator_authority.Denial.OutcomeUnknown)
     else ok (core.result.Result.Ok { row with completed := true })
 
+/-- [aivm_secrets_garrett_core::coordinator_authority::operator_acknowledged]:
+    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 144:0-160:1
+    Visibility: public -/
+def coordinator_authority.operator_acknowledged
+  (action : coordinator_authority.Action) (active : Bool)
+  (revision : Option Std.I64) :
+  Result Bool
+  := do
+  match action with
+  | coordinator_authority.Action.Activate =>
+    match revision with
+    | none => ok false
+    | some revision1 => if active
+                        then ok (revision1 = 1#i64)
+                        else ok false
+  | coordinator_authority.Action.Revoke =>
+    match revision with
+    | none => ok false
+    | some revision1 => if active
+                        then ok false
+                        else ok (revision1 >= 1#i64)
+  | coordinator_authority.Action.Status =>
+    match revision with
+    | none => ok (¬ active)
+    | some revision1 => ok (revision1 >= 1#i64)
+  | coordinator_authority.Action.Check => ok false
+  | coordinator_authority.Action.Reserve => ok false
+  | coordinator_authority.Action.Finish => ok false
+
 /-- [aivm_secrets_garrett_core::credential_use::UseDenial]
     Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 5:0-10:1
     Visibility: public -/

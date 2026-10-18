@@ -171,3 +171,15 @@ proof or an exhaustive ban on all alternative decoders.
 No claim of credential theft, whole-service noninterference or full parser
 refinement follows from these cases. The production byte parser remains a
 concrete adapter obligation; the extracted Lean controllers are unchanged.
+
+## Host operator coordinator channel
+
+The inventory now separately classifies `S-COORDINATOR-ADMIN`: host-only mTLS
+activation/revocation/status, fixed typed receipts and conservative post-send
+mutation uncertainty. The member channel's scope is unchanged. Evidence in
+`tests/test_coordinator_operator.py` includes real commit-then-drop faults,
+independent clients/servers, typed public reply vectors, native restart and
+fencing of running native brokers. The extracted receipt gate does not refine
+JSON/TLS, pre-send/post-send placement or remote SQL commit. Those premises are
+named by `COORD-OPERATOR-RUST-01`; the W4/W5 guest trace excludes these privileged
+observations. No complete mediation or whole-service correspondence follows.

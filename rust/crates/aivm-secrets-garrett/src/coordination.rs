@@ -109,9 +109,51 @@ impl Coordinator {
             value["key"] = json!(json::hex(&json!(key), 64).map_err(|_| Error::Revoked)?);
             value["digest"] = json!(json::hex(&json!(digest), 64).map_err(|_| Error::Revoked)?);
         }
-        let body = json::canonical(&value);
+        let reply = self.exchange(&value, Error::Revoked, Error::Revoked)?;
+        acknowledge(action, &reply)
+    }
+    pub(crate) fn operator(
+        &self,
+        action: aivm_secrets_garrett_core::coordinator_authority::Action,
+        members: Option<&[String]>,
+    ) -> Outcome<Value> {
+        use aivm_secrets_garrett_core::coordinator_authority::Action;
+        let name = match action {
+            Action::Activate => "activate",
+            Action::Revoke => "revoke",
+            Action::Status => "status",
+            _ => return Err(Error::InvalidRequest),
+        };
+        let mut value = json!({"action":name,"name":self.principal});
+        if matches!(action, Action::Activate) {
+            let members = members.ok_or(Error::InvalidRequest)?;
+            if members.is_empty() || members.len() > 32 {
+                return Err(Error::InvalidRequest);
+            }
+            let mut names = members
+                .iter()
+                .map(|v| json::hex(&json!(v), 64).map_err(|_| Error::InvalidRequest))
+                .collect::<Outcome<Vec<_>>>()?;
+            names.sort();
+            if names.windows(2).any(|v| v[0] == v[1]) {
+                return Err(Error::InvalidRequest);
+            }
+            value["members"] = json!(names);
+        } else if members.is_some() {
+            return Err(Error::InvalidRequest);
+        }
+        let bad = if matches!(action, Action::Status) {
+            Error::UpstreamResponse
+        } else {
+            Error::OutcomeUnknown
+        };
+        let reply = self.exchange(&value, Error::Unreachable, bad)?;
+        operator_reply(action, reply, bad)
+    }
+    fn exchange(&self, value: &Value, before: Error, after: Error) -> Outcome<Value> {
+        let body = json::canonical(value);
         if body.len() > LIMIT {
-            return Err(Error::Revoked);
+            return Err(before);
         }
         let mut bytes = format!("POST /v1/coordinate HTTP/1.1\r\nHost: {}:{}\r\nContent-Type: application/json\r\nAccept: application/json\r\nAccept-Encoding: identity\r\nConnection: close\r\nContent-Length: {}\r\n\r\n", self.host,self.port,body.len()).into_bytes();
         bytes.extend_from_slice(&body);
@@ -127,8 +169,8 @@ impl Coordinator {
         });
         let addresses = receiver
             .recv_timeout(TIMEOUT)
-            .map_err(|_| Error::Revoked)?
-            .map_err(|_| Error::Revoked)?;
+            .map_err(|_| before)?
+            .map_err(|_| before)?;
         let mut connected = None;
         for address in addresses {
             let remaining = TIMEOUT.saturating_sub(started.elapsed());
@@ -140,38 +182,67 @@ impl Coordinator {
                 break;
             }
         }
-        let mut socket = connected.ok_or(Error::Revoked)?;
+        let mut socket = connected.ok_or(before)?;
         let remaining = TIMEOUT.saturating_sub(started.elapsed());
         if remaining.is_zero() {
-            return Err(Error::Revoked);
+            return Err(before);
         }
         socket
             .set_read_timeout(Some(remaining))
-            .map_err(|_| Error::Revoked)?;
+            .map_err(|_| before)?;
         socket
             .set_write_timeout(Some(remaining))
-            .map_err(|_| Error::Revoked)?;
-        let killer = socket.try_clone().map_err(|_| Error::Revoked)?;
+            .map_err(|_| before)?;
+        let killer = socket.try_clone().map_err(|_| before)?;
         let _deadline = crate::tls::Deadline::start_for(remaining, move || {
             let _ = killer.shutdown(std::net::Shutdown::Both);
         });
-        let name = rustls::pki_types::ServerName::try_from(self.host.clone())
-            .map_err(|_| Error::Revoked)?;
-        let mut connection =
-            ClientConnection::new(self.tls.clone(), name).map_err(|_| Error::Revoked)?;
+        let name =
+            rustls::pki_types::ServerName::try_from(self.host.clone()).map_err(|_| before)?;
+        let mut connection = ClientConnection::new(self.tls.clone(), name).map_err(|_| before)?;
         while connection.is_handshaking() {
-            connection
-                .complete_io(&mut socket)
-                .map_err(|_| Error::Revoked)?;
+            connection.complete_io(&mut socket).map_err(|_| before)?;
         }
         let mut stream = StreamOwned::new(connection, socket);
         stream
             .write_all(&bytes)
             .and_then(|_| stream.flush())
-            .map_err(|_| Error::Revoked)?;
-        let reply = response(BufReader::new(stream))?;
-        acknowledge(action, &reply)
+            .map_err(|_| after)?;
+        response(BufReader::new(stream)).map_err(|_| after)
     }
+}
+
+fn operator_reply(
+    action: aivm_secrets_garrett_core::coordinator_authority::Action,
+    value: Value,
+    bad: Error,
+) -> Outcome<Value> {
+    if value.get("ok") == Some(&json!(false)) {
+        json::keys(&value, &["ok", "code"], &[]).map_err(|_| bad)?;
+        return Err(match value["code"].as_str() {
+            Some("denied") => Error::Denied,
+            Some("revoked") => Error::Revoked,
+            Some("invalid_request") => Error::InvalidRequest,
+            Some("outcome_unknown") => Error::OutcomeUnknown,
+            _ => bad,
+        });
+    }
+    let m = json::keys(&value, &["ok", "active", "revision"], &[]).map_err(|_| bad)?;
+    if m["ok"] != json!(true) {
+        return Err(bad);
+    }
+    let active = m["active"].as_bool().ok_or(bad)?;
+    let revision = if m["revision"].is_null() {
+        None
+    } else {
+        Some(json::integer(&m["revision"], 1, i64::MAX).map_err(|_| bad)?)
+    };
+    if !aivm_secrets_garrett_core::coordinator_authority::operator_acknowledged(
+        action, active, revision,
+    ) {
+        return Err(bad);
+    }
+    Ok(value)
 }
 
 fn line(reader: &mut impl BufRead, maximum: usize) -> Outcome<String> {

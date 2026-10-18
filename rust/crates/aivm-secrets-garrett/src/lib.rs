@@ -6,6 +6,7 @@ pub mod certificates;
 pub mod client;
 pub mod client_material;
 mod coordination;
+pub mod coordinator_admin;
 #[cfg(feature = "coordinator-server")]
 pub mod coordinator_authority;
 pub mod crypto;

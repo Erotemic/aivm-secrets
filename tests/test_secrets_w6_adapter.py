@@ -29,7 +29,7 @@ def fixture_checkout(tmp_path):
 
 def test_w6_all_sinks_classified_and_open_premises_named():
     result = check(ROOT)
-    assert result['channels'] == 12
+    assert result['channels'] == 13
     assert result['remaining'] >= 5
     assert 'review guard only' in result['status']
 

@@ -404,6 +404,42 @@ class CoordinationConfig:
         return cls.parse(codec.loads(data, code='invalid_policy'))
 
 
+def _acknowledge(action: str, data: Any) -> dict[str, Any]:
+    """Accept complete typed receipts; never turn absent state into a tombstone."""
+    operator = action in {'activate', 'revoke', 'status'}
+    bad = ('outcome_unknown' if action in {'activate', 'revoke'} else
+           'upstream_response' if operator else 'revoked')
+    if type(data) is not dict or type(data.get('ok')) is not bool:
+        raise SecretsError(bad)
+    if data['ok'] is False:
+        code = data.get('code')
+        if not operator:
+            raise SecretsError('outcome_unknown' if code == 'outcome_unknown' else 'revoked')
+        if set(data) == {'ok', 'code'} and type(code) is str and code in {
+                'denied', 'revoked', 'invalid_request', 'outcome_unknown'}:
+            raise SecretsError(code)
+        raise SecretsError(bad)
+    if operator:
+        if set(data) != {'ok', 'active', 'revision'} or type(data['active']) is not bool:
+            raise SecretsError(bad)
+        active, revision = data['active'], data['revision']
+        positive = type(revision) is int and 1 <= revision <= 2**63 - 1
+        accepted = (
+            (action == 'activate' and active and positive and revision == 1) or
+            (action == 'revoke' and not active and positive) or
+            (action == 'status' and (positive or (revision is None and not active))))
+    elif action == 'check':
+        accepted = (set(data) == {'ok', 'active', 'revision'} and
+                    data['active'] is True and type(data['revision']) is int and
+                    1 <= data['revision'] <= 2**63 - 1)
+    else:
+        flag = {'reserve': 'reserved', 'finish': 'recorded'}.get(action)
+        accepted = flag is not None and set(data) == {'ok', flag} and data[flag] is True
+    if not accepted:
+        raise SecretsError(bad)
+    return data
+
+
 class CoordinationClient:
     """Host-only, fail-closed mTLS; no proxy, redirects, cache or retries."""
 
@@ -430,29 +466,34 @@ class CoordinationClient:
                                **extra})
         conn = http.client.HTTPSConnection(self.config.host, self.config.port,
                                           timeout=4, context=self._context)
+        operator = action in {'activate', 'revoke', 'status'}
+        mutating = action in {'activate', 'revoke'}
+        sent = False
+        bad_reply = ('outcome_unknown' if mutating else
+                     'upstream_response' if operator else 'revoked')
         try:
+            # Complete peer authentication before marking possible submission.
+            # A partial request write can still commit; never retry it here.
+            conn.connect()
+            sent = True
             conn.request('POST', '/v1/coordinate', body=request,
                          headers={'Content-Type': 'application/json'})
             response = conn.getresponse()
             if response.status != 200 or response.getheader('Content-Type') != 'application/json':
-                raise SecretsError('revoked')
+                raise SecretsError(bad_reply)
             body = response.read(MAX_MESSAGE + 1)
             if len(body) > MAX_MESSAGE:
-                raise SecretsError('revoked')
-            data = codec.loads(body, limit=MAX_MESSAGE)
-            if type(data) is not dict or type(data.get('ok')) is not bool:
-                raise SecretsError('revoked')
-            if data['ok'] is not True:
-                # Never surface arbitrary server text; only a fixed code.
-                code = data.get('code')
-                if code == 'outcome_unknown':
-                    raise SecretsError('outcome_unknown')
-                raise SecretsError('revoked')
-            return data
+                raise SecretsError(bad_reply)
+            try:
+                data = codec.loads(body, limit=MAX_MESSAGE)
+            except SecretsError:
+                raise SecretsError(bad_reply) from None
+            return _acknowledge(action, data)
         except SecretsError:
             raise
         except (OSError, ssl.SSLError, http.client.HTTPException, ValueError):
-            raise SecretsError('revoked') from None
+            code = (bad_reply if sent else 'unreachable') if operator else 'revoked'
+            raise SecretsError(code) from None
         finally:
             conn.close()
 

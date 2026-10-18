@@ -1,5 +1,6 @@
 import GarrettLineFrame
 import GarrettHttpWire
+import GarrettCoordinatorReply
 import GarrettCoordinatorAuthority
 import GarrettHttpRequest
 import GarrettHttpAuth
@@ -432,3 +433,11 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.coordination.KeyProofs.valid_retry_key_contract
 #print axioms aivm_secrets_garrett_core.coordination.KeyProofs.accepted_key_has_no_line_breaks
 #print axioms aivm_secrets_garrett_core.coordination.KeyProofs.valid_key_is_accepted
+
+#print axioms aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.operator_receipt_contract
+#print axioms aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.confirmed_revocation_is_tombstone
+#print axioms aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.absence_cannot_confirm_revocation
+#print axioms aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.active_state_cannot_confirm_revocation
+#print axioms aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.absent_status_is_admitted
+#print axioms aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.activation_receipt_exact
+#print axioms aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.successful_revocation_has_receipt

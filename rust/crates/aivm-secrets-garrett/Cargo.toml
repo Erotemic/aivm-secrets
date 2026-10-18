@@ -48,3 +48,7 @@ path = "src/oauth_main.rs"
 name = "garrett-coordinator"
 path = "src/coordinator_main.rs"
 required-features = ["coordinator-server"]
+
+[[bin]]
+name = "garrett-coordinatorctl"
+path = "src/coordinator_ctl_main.rs"

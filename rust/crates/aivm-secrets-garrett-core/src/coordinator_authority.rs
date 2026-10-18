@@ -139,6 +139,26 @@ pub fn finish(current: Option<Reservation>, digest: &Vec<u8>) -> Result<Reservat
     }
 }
 
+/// A missing principal is a status observation, never a revocation receipt.
+/// JSON shape/type checks and authenticated remote commit remain adapters.
+pub fn operator_acknowledged(action: Action, active: bool, revision: Option<i64>) -> bool {
+    match action {
+        Action::Activate => match revision {
+            Some(revision) => active && revision == 1,
+            None => false,
+        },
+        Action::Revoke => match revision {
+            Some(revision) => !active && revision >= 1,
+            None => false,
+        },
+        Action::Status => match revision {
+            Some(revision) => revision >= 1,
+            None => !active,
+        },
+        Action::Check | Action::Reserve | Action::Finish => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
