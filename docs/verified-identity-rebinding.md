@@ -115,3 +115,7 @@ python dev/verification/garrett.py mutate --mutation-filter '^rebind '
 The filtered command checks the new rebinding mutations; it is not the full
 campaign. CORE-03 remains a tested native subset with explicit adapter and
 cross-language coverage limits, not an all-input equivalence claim.
+
+See [atomic guest identity bundles](guest-identity-bundles.md) for explicit local
+certificate/JWT activation with Python and Rust clients after same-key renewal.
+Host renewal and guest activation remain separate operations.

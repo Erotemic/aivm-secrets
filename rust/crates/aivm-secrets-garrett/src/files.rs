@@ -250,6 +250,28 @@ impl PrivateDirectory {
         .map_err(|_| Error::OutcomeUnknown)?;
         self.sync().map_err(|_| Error::OutcomeUnknown)
     }
+    /// Activate an already durable private staging inode. After entering this
+    /// operation all failed acknowledgements are conservatively uncertain.
+    pub(crate) fn activate_file(&self, staged: &str, target: &str, replace: bool) -> Outcome<()> {
+        Self::name(staged)?;
+        Self::name(target)?;
+        self.file(staged, false)?;
+        if replace {
+            self.file(target, false)?;
+            rustix::fs::renameat(&self.0, staged, &self.0, target)
+                .map_err(|_| Error::OutcomeUnknown)?;
+        } else {
+            rustix::fs::renameat_with(
+                &self.0,
+                staged,
+                &self.0,
+                target,
+                rustix::fs::RenameFlags::NOREPLACE,
+            )
+            .map_err(|_| Error::OutcomeUnknown)?;
+        }
+        self.sync().map_err(|_| Error::OutcomeUnknown)
+    }
     pub(crate) fn publish_directory(&self, staged: &str, target: &str) -> Outcome<()> {
         Self::name(staged)?;
         Self::name(target)?;

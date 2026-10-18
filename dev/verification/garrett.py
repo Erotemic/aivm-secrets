@@ -35,6 +35,16 @@ PROFILES = [
     "native-coordinator-authority-v1",
 ]
 THEOREMS = [
+    'aivm_secrets_garrett_core.bundle.Proofs.digest_ne_exact',
+    'aivm_secrets_garrett_core.bundle.Proofs.after_current',
+    'aivm_secrets_garrett_core.bundle.Proofs.current_failure_stops',
+    'aivm_secrets_garrett_core.bundle.Proofs.changed_never_stages',
+    'aivm_secrets_garrett_core.bundle.Proofs.install_contract',
+    'aivm_secrets_garrett_core.bundle.Proofs.stage_failure_never_publishes',
+    'aivm_secrets_garrett_core.bundle.Proofs.publication_failure_is_uncertain',
+    'aivm_secrets_garrett_core.bundle.Proofs.successful_install_witness',
+    'aivm_secrets_garrett_core.bundle.Proofs.success_exact',
+
     "aivm_secrets_garrett_core.Proofs.bytes_ne_spec",
     "aivm_secrets_garrett_core.Proofs.issue_contract",
     "aivm_secrets_garrett_core.Proofs.present_contract",
@@ -481,6 +491,7 @@ TESTS = [
     "tests/test_rust_line_framing.py",
     "tests/test_rust_garrett_reflection.py",
     "tests/test_rust_garrett_client_material.py",
+    "tests/test_identity_bundle.py",
     "tests/test_rust_garrett_tpm_request.py",
     "tests/test_rust_garrett_dispatch.py",
     "tests/test_rust_coordination.py",
@@ -543,6 +554,7 @@ def inputs() -> list[str]:
         "proofs/GarrettDisclosure.lean",
         "proofs/GarrettReflection.lean",
         "proofs/GarrettClientMaterial.lean",
+        "proofs/GarrettBundle.lean",
         "proofs/GarrettEmission.lean",
         "proofs/GarrettCoordination.lean",
         "proofs/GarrettRebinding.lean",
@@ -765,6 +777,7 @@ def assurance_coordinates() -> dict:
             "The manifest HTTPS backend trusts the policy/check/template/GraphQL parsers, JSON-to-typed-tree conversion and selected-tree rendering, reflection traversal/call sites and concrete HTTP/audit ordering. Exact borrowed-byte literal search is extracted and proved. The extracted recursive filter matches an independent selection specification and has exact two-run noninterference under recursive schema agreement; unselected typed-tree fields are unconstrained. These contracts do not refine the remaining adapters or establish arbitrary provider non-disclosure or whole-service trace equivalence. Native configuration explicitly selects unbounded requests and a file source or explicit OAuth override.",
             "Native provider emission rechecks authority and current OAuth token expiry after audit, TLS setup and request construction. The extracted continuation refuses emission on a failed recheck; setup placement, trusted clock sampling, live lease stability and concrete socket writes remain tested adapter contracts. Control admission follows the credential lease wait and checks the outer as well as inner lifetime.",
             "Native TPM CSR creation reuses the validated pinned-key signer and verifies its returned possession request. Local TPM attributes and signatures do not establish hardware provenance; independent fresh attestation approval under a trusted AK remains required. The new CSR, TPM command and JSON/file adapters are tested, not newly formally refined.",
+            "Guest bundle installation uses a single versioned public-certificate/opaque-JWT file with cooperating reader/writer locks and expected-current SHA-256. The extracted controller proves exact CAS/staging/publication ordering and conservative uncertainty. The held-directory no-symlink/private-inode, JSON/X.509/token binding, hash, atomic rename, fsync and client snapshot adapters remain reviewed/tested premises. Local consistency is not JWT authentication. Host renewal and guest activation are separate; same-key only, no rollback prevention or private-key rotation.",
             "Native software client bootstrap trusts entropy, P-256/CSR/SPKI adapters and held-directory no-replace file publication/durability. The extracted controller proves key acknowledgement before CSR publication and conservative uncertainty; it does not prove the filesystem, private-key memory erasure, signing or CLI I/O. Existing material is never automatically replaced or adopted, and software requests assert no TPM or VM provenance.",
             "Controller histories assume signature verification has prior recorded issuer origin; the ideal signature-origin theorem does not establish a computational byte-level or concrete I/O refinement.",
             "CSR possession, CA constraints/key matching and X.509 signing use the stated rcgen/x509-parser/time adapter contracts; their ASN.1/crypto implementations are not formally refined. TPM approval consumes verified fresh evidence under a trusted AK pin.",
@@ -1386,6 +1399,14 @@ def mutate(pattern: str | None = None) -> None:
             "if fields.len() > 32 {",
         ),
     ]
+    bundle_source = source.with_name("bundle.rs")
+    mutations += [
+        (bundle_source, "bundle CAS bypassed", "if changed {", "if false {"),
+        (bundle_source, "bundle CAS inverted", "if changed {", "if !changed {"),
+        (bundle_source, "bundle staging bypassed", "match store.stage() {", "match Ok::<(), InstallFailure>(()) {"),
+        (bundle_source, "bundle publish failure reported successful", "Err(_) => Err(InstallFailure::OutcomeUnknown),", "Err(_) => Ok(()),"),
+        (bundle_source, "bundle publish uncertainty erased", "Err(_) => Err(InstallFailure::OutcomeUnknown),", "Err(_) => Err(InstallFailure::Unpublished),"),
+    ]
     reflection_source = source.with_name("reflection.rs")
     mutations += [
         (
@@ -1568,6 +1589,7 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettDisclosure",
                 "GarrettReflection",
                 "GarrettClientMaterial",
+                "GarrettBundle",
                 "GarrettEmission",
                 "GarrettCoordination",
                 "GarrettRebinding",
@@ -1592,6 +1614,7 @@ def mutate(pattern: str | None = None) -> None:
                 "oauth_login.rs": "GarrettLogin",
                 "reflection.rs": "GarrettReflection",
                 "client_material.rs": "GarrettClientMaterial",
+                "bundle.rs": "GarrettBundle",
                 "emission.rs": "GarrettEmission",
                 "coordination.rs": "GarrettCoordination",
                 "rebinding.rs": "GarrettRebinding",

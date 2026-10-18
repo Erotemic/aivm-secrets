@@ -1633,3 +1633,33 @@ Frozen df5542e passes 2,524 portable tests without skips and all 296 required wo
 The retained evidence includes the original ordinary-binary hashes, original source hashes and baseline matrix (nine failures, 23 passes), then the corrected 32-case matrix and broad gates. I am confident this is a concrete useful protocol correction: the demonstrated malformed ingress no longer dispatches and the demonstrated malformed post-send frames no longer masquerade as completed answers. It uses normal Rust buffering plus a small pure validator, with no new protocol or runtime framework. Actual read segmentation, later bytes, TLS/JSON/deadline behavior beyond the named cases, complete native mediation, broad core parity and atomic guest identity delivery remain open. No live VM, TPM key or provider credential was used; AIVM remains at its accepted optional-vTPM checkpoint.
 
 The bridge compiler profile now has 3,409 declarations, 9,055 calls and 5,709,025 drop records (1,997 opaque declarations); the coordinator remains at 945 declarations. These are investigation coordinates, not a mediation proof. Ordinary main debug/release brokers have been restored without conformance; the optional coordinator builds separately in both modes, and release help works. Resource accounting is current. This checkpoint changes no VM, CA or provider state and keeps the broader goal open.
+
+## 2026-10-18 11:23:00 -0400
+
+I am closing a practical renewal gap after the accepted newline-framing work:
+clients can now install and consume one certificate/JWT bundle rather than
+manually switching two files. I chose a single versioned guest-owned file and
+an explicit digest CAS, keeping the existing private key, trusted CA, host
+renewal operations and broker wire untouched. Cooperating readers and writers
+hold shared/exclusive locks on the private parent; that avoids a transient
+single-link inode check failure during replacement as well as mixed snapshots.
+Python and native clients use one loaded pair per call. Eight cross-backend
+live renewal scenarios exercised the same running account/manifest broker,
+with old material fenced and fresh material accepted after activation.
+
+The implementation feels more useful than another isolated validation lemma,
+but I am being careful about its limits: the local pair check is unverified
+consistency, not authorization; host renewal and guest activation are still two
+operations with a possible availability gap. Filesystem atomicity, fsync,
+locks, hashes and crypto parsing remain adapter assumptions. Native publication
+has a small extracted CAS/stage/publish controller with checked failure ordering
+and explicit uncertainty. Tests exercise writer races, readers, unsafe files,
+real write failure and a lost parent coordinate after publication. Staging
+artifacts may remain privately on failure; there is no rollback prevention,
+private-key rotation, recovery daemon or new AIVM integration.
+
+I am confident in the focused synthetic workflow and the narrow controller
+contract. Full pinned-toolchain proofs, extraction records and portable/runtime
+gates are being refreshed before accepting this checkpoint. Those checks will
+not establish live VM/provider deployment or complete native mediation, and
+maintainer security review remains necessary.

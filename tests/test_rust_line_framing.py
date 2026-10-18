@@ -33,9 +33,10 @@ def private(path, data):
 
 class ReplyPeer:
     """One authenticated TLS exchange with explicit record-sized reply pieces."""
-    def __init__(self, root, certs, pieces):
+    def __init__(self, root, certs, pieces, *, token=TOKEN):
         self.path = root / 'peer.sock'
         self.certs, self.pieces = certs, pieces
+        self.token = token
         self.seen, self.errors = [], []
 
     def __enter__(self):
@@ -80,7 +81,7 @@ class ReplyPeer:
         self.listener.close()
         assert not self.thread.is_alive(), 'reply peer did not terminate'
         assert not self.errors, self.errors
-        assert self.seen == [dict(version=1, capability=TOKEN, request=REQUEST)]
+        assert self.seen == [dict(version=1, capability=self.token, request=REQUEST)]
 
 
 def client_call(backend, root, certs, listen):

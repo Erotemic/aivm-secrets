@@ -1,9 +1,8 @@
 """Explicit host operator commands for P4a offline enrollment and mTLS.
 
 No default background service. No VM is modified. No external service credential or
-provider API is needed for these commands. Only the `request` subcommand is
-suitable for execution inside the untrusted guest; all other operations are
-host principal-controlled.
+provider API is needed for these commands. Request creation, CSR inspection, bundle installation and calls are
+guest-side operations; authority and OAuth commands are host-controlled.
 """
 
 from __future__ import annotations
@@ -120,11 +119,18 @@ def add_parser(subs):
     call = common('call', authority=False)
     call.add_argument('--socket', type=Path, required=True)
     call.add_argument('--ca', type=Path, required=True)
-    call.add_argument('--certificate', type=Path, required=True)
+    call.add_argument('--certificate', type=Path)
+    call.add_argument('--identity-bundle', type=Path)
     call.add_argument('--key', type=Path, required=True)
-    call.add_argument('--jwt-file', type=Path, required=True)
+    call.add_argument('--jwt-file', type=Path)
     call.add_argument('--request', required=True,
                       help='JSON operation object, not HTTP or GraphQL text')
+
+    install = common('install-bundle', authority=False)
+    install.add_argument('--certificate', type=Path, required=True)
+    install.add_argument('--jwt-file', type=Path, required=True)
+    install.add_argument('--output', type=Path, required=True)
+    install.add_argument('--expected-current')
 
     # Separate host-only OAuth credential acquisition, without an AIVM VM or
     # trusted Garrett identity authority. Provider manifests and vault contents
@@ -307,6 +313,14 @@ def run(args: argparse.Namespace) -> int:
     if args.identity_action == 'inspect-csr':
         print(codec.dumps({'key_fingerprint': inspect_csr(_csr_data(args.csr))}).decode())
         return 0
+    if args.identity_action == 'install-bundle':
+        from .bundle import install
+        result = install(certificate=args.certificate.expanduser().absolute(),
+                         jwt_file=args.jwt_file.expanduser().absolute(),
+                         output=args.output.expanduser().absolute(),
+                         expected_current=args.expected_current)
+        print(codec.dumps(result).decode('ascii'))
+        return 0
     if args.identity_action == 'call':
         from .client import bound_call
         request = codec.loads(args.request, limit=8192)
@@ -315,6 +329,7 @@ def run(args: argparse.Namespace) -> int:
         result = bound_call(
             socket_path=args.socket, ca=args.ca, certificate=args.certificate,
             private_key=args.key, jwt_file=args.jwt_file, request=request,
+            identity_bundle=args.identity_bundle,
         )
         print(codec.dumps(result).decode('ascii'))
         return 0 if result.get('ok') is True else 1

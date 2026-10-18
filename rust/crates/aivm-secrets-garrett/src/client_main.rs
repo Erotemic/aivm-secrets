@@ -1,23 +1,26 @@
 //! One foreground call using an explicitly configured client identity.
 mod client_alias;
-use aivm_secrets_garrett::{client, client_material, files, json, tpm, Error, Outcome};
+use aivm_secrets_garrett::{
+    client, client_material, files, identity_bundle, json, tpm, Error, Outcome,
+};
 use std::{
     io::{Read, Write},
     path::Path,
 };
-fn call(path: &Path, supplied: Option<&serde_json::Value>) -> Outcome<serde_json::Value> {
+struct Configured {
+    client: client::AuthenticatedClientConfig,
+    socket: std::path::PathBuf,
+    server_name: String,
+    bundle: Option<identity_bundle::GuestBundle>,
+}
+fn configure(path: &Path) -> Outcome<Configured> {
     let config = json::parse(&files::read_private(path, 65536)?, 65536)?;
     let m = json::keys(
         &config,
+        &["schema", "socket", "server_name", "key_mode", "server_ca"],
         &[
-            "schema",
-            "socket",
-            "server_name",
             "certificate",
-            "key_mode",
-            "server_ca",
-        ],
-        &[
+            "identity_bundle",
             "private_key",
             "tcti",
             "persistent_handle",
@@ -32,7 +35,19 @@ fn call(path: &Path, supplied: Option<&serde_json::Value>) -> Outcome<serde_json
             .and_then(|v| v.as_str())
             .ok_or(Error::InvalidCapability)
     };
-    let certificate = files::read_private(Path::new(field("certificate")?), 1048576)?;
+    if m.contains_key("certificate") == m.contains_key("identity_bundle") {
+        return Err(Error::InvalidCapability);
+    }
+    let bundle = if m.contains_key("identity_bundle") {
+        Some(identity_bundle::load(Path::new(field("identity_bundle")?))?)
+    } else {
+        None
+    };
+    let certificate = if let Some(bundle) = &bundle {
+        bundle.certificate.clone()
+    } else {
+        files::read_private(Path::new(field("certificate")?), 1048576)?
+    };
     let ca = files::read_private(Path::new(field("server_ca")?), 1048576)?;
     let client = match field("key_mode")? {
         "software" => {
@@ -67,39 +82,80 @@ fn call(path: &Path, supplied: Option<&serde_json::Value>) -> Outcome<serde_json
         }
         _ => return Err(Error::InvalidCapability),
     };
-    let frame = if let Some(frame) = supplied {
-        frame.clone()
-    } else {
-        let mut input = Vec::new();
-        std::io::stdin()
-            .take(65537)
-            .read_to_end(&mut input)
+    Ok(Configured {
+        client,
+        socket: Path::new(field("socket")?).into(),
+        server_name: field("server_name")?.into(),
+        bundle,
+    })
+}
+impl Configured {
+    fn exchange(&self, mut frame: serde_json::Value) -> Outcome<serde_json::Value> {
+        if let Some(bundle) = &self.bundle {
+            // The local bundle interface omits capability. Supplying another
+            // one is an error, never a silent override or stale-pair fallback.
+            let map = json::keys(
+                &frame,
+                &["version"],
+                &["request", "describe", "delegate", "renounce"],
+            )
             .map_err(|_| Error::InvalidRequest)?;
-        json::parse(&input, 65536).map_err(|_| Error::InvalidRequest)?
-    };
-    client::exchange_unix(
-        &client,
-        Path::new(field("socket")?),
-        field("server_name")?,
-        &frame,
-    )
+            if map.len() != 2 || map["version"] != 1 {
+                return Err(Error::InvalidRequest);
+            }
+            frame.as_object_mut().ok_or(Error::InvalidRequest)?.insert(
+                "capability".into(),
+                serde_json::Value::String(bundle.capability.to_string()),
+            );
+        }
+        client::exchange_unix(&self.client, &self.socket, &self.server_name, &frame)
+    }
+}
+fn call(path: &Path) -> Outcome<serde_json::Value> {
+    let config = configure(path)?;
+    let mut input = zeroize::Zeroizing::new(Vec::new());
+    std::io::stdin()
+        .take(65537)
+        .read_to_end(&mut input)
+        .map_err(|_| Error::InvalidRequest)?;
+    let frame = json::parse(&input, 65536).map_err(|_| Error::InvalidRequest)?;
+    config.exchange(frame)
 }
 // The capability stays in a guest-owned private file, not in argv or ambient
 // environment. The broker still authenticates the certificate and capability.
-fn github_action(config: &Path, capability_file: &Path, words: &[String]) -> Outcome<Vec<u8>> {
+fn github_action(
+    config: &Path,
+    capability_file: Option<&Path>,
+    words: &[String],
+) -> Outcome<Vec<u8>> {
     let command = client_alias::GitHubCommand::parse(words)?;
-    let bytes = zeroize::Zeroizing::new(files::read_private(capability_file, 32768)?);
-    let token = std::str::from_utf8(&bytes).map_err(|_| Error::InvalidRequest)?;
-    let token = token.trim_end_matches(['\r', '\n']);
-    if token.len() < 20
-        || token
-            .bytes()
-            .any(|b| b.is_ascii_whitespace() || !b.is_ascii_graphic())
-    {
-        return Err(Error::InvalidRequest);
-    }
-    let reply = call(config, Some(&command.frame(token)))?;
-    command.render(&reply)
+    let config = configure(config)?;
+    let frame = match (&config.bundle, capability_file) {
+        (Some(_), None) => {
+            let mut frame = command.frame("");
+            frame
+                .as_object_mut()
+                .ok_or(Error::InvalidRequest)?
+                .remove("capability");
+            frame
+        }
+        (None, Some(path)) => {
+            let bytes = zeroize::Zeroizing::new(files::read_private(path, 32768)?);
+            let token = std::str::from_utf8(&bytes)
+                .map_err(|_| Error::InvalidRequest)?
+                .trim_end_matches(['\r', '\n']);
+            if token.len() < 20
+                || token
+                    .bytes()
+                    .any(|b| b.is_ascii_whitespace() || !b.is_ascii_graphic())
+            {
+                return Err(Error::InvalidRequest);
+            }
+            command.frame(token)
+        }
+        _ => return Err(Error::InvalidRequest),
+    };
+    command.render(&config.exchange(frame)?)
 }
 
 fn local_action(action: &str, args: &[String]) -> Outcome<serde_json::Value> {
@@ -111,6 +167,28 @@ fn local_action(action: &str, args: &[String]) -> Outcome<serde_json::Value> {
         if options.insert(pair[0].as_str(), pair[1].as_str()).is_some() {
             return Err(Error::InvalidRequest);
         }
+    }
+    if action == "install-bundle" {
+        if options.keys().any(|key| {
+            !matches!(
+                *key,
+                "--certificate" | "--jwt-file" | "--output" | "--expected-current"
+            )
+        }) {
+            return Err(Error::InvalidRequest);
+        }
+        let field = |name| {
+            options
+                .get(name)
+                .map(|value| Path::new(*value))
+                .ok_or(Error::InvalidRequest)
+        };
+        return identity_bundle::install(
+            field("--certificate")?,
+            field("--jwt-file")?,
+            field("--output")?,
+            options.get("--expected-current").copied(),
+        );
     }
     let csr = options.get("--csr").ok_or(Error::InvalidRequest)?;
     if action == "inspect-csr" && options.len() == 1 {
@@ -133,11 +211,11 @@ fn local_action(action: &str, args: &[String]) -> Outcome<serde_json::Value> {
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.as_slice() == ["--help"] {
-        println!("garrett-client --config ABSOLUTE_PRIVATE_JSON\nRead one version-1 broker frame from stdin; return the public reply.\n\ngarrett-client --config ABSOLUTE_PRIVATE_JSON --capability-file PRIVATE_TOKEN_FILE gh pr view 13861 --repo TauCetiProject/TauCeti --json number,title,headRefOid\nOnly explicit gh pr view/diff/checks reads are translated; no gh fallback, remote discovery or writes.\nSelect key_mode software or tpm2 explicitly; no automatic fallback. TPM provenance must be enrolled separately.\n\ngarrett-client request --key-mode software --key ABSOLUTE_NEW_KEY --csr ABSOLUTE_NEW_CSR\ngarrett-client request --key-mode tpm2 --tpm-config ABSOLUTE_PRIVATE_JSON --csr ABSOLUTE_NEW_CSR\ngarrett-client csr-from-key --key-mode software --key ABSOLUTE_EXISTING_KEY --csr ABSOLUTE_NEW_CSR\ngarrett-client inspect-csr --csr ABSOLUTE_CSR\nSoftware request generation creates an exportable key and provides no VM attestation. Existing files are never replaced. If publication is uncertain, retain the key and inspect/recover its CSR.");
+        println!("garrett-client --config ABSOLUTE_PRIVATE_JSON\nRead one version-1 broker frame from stdin; return the public reply.\n\ngarrett-client --config ABSOLUTE_PRIVATE_JSON --capability-file PRIVATE_TOKEN_FILE gh pr view 13861 --repo TauCetiProject/TauCeti --json number,title,headRefOid\nOnly explicit gh pr view/diff/checks reads are translated; no gh fallback, remote discovery or writes.\nSelect key_mode software or tpm2 explicitly; no automatic fallback. TPM provenance must be enrolled separately.\n\ngarrett-client request --key-mode software --key ABSOLUTE_NEW_KEY --csr ABSOLUTE_NEW_CSR\ngarrett-client request --key-mode tpm2 --tpm-config ABSOLUTE_PRIVATE_JSON --csr ABSOLUTE_NEW_CSR\ngarrett-client csr-from-key --key-mode software --key ABSOLUTE_EXISTING_KEY --csr ABSOLUTE_NEW_CSR\ngarrett-client inspect-csr --csr ABSOLUTE_CSR\ngarrett-client install-bundle --certificate PRIVATE_PEM --jwt-file PRIVATE_JWT --output ABSOLUTE_BUNDLE [--expected-current HEX_SHA256]\nA config may select identity_bundle instead of certificate. Then stdin omits capability and gh needs no --capability-file. The separately configured key is unchanged.\nSoftware request generation creates an exportable key and provides no VM attestation. Existing files are never replaced. If publication is uncertain, retain the key and inspect/recover its CSR.");
         return;
     }
     let result: Outcome<Vec<u8>> = if args.len() == 2 && args[0] == "--config" {
-        call(Path::new(&args[1]), None).map(|reply| {
+        call(Path::new(&args[1])).map(|reply| {
             let mut output = json::canonical(&reply);
             output.push(b'\n');
             output
@@ -147,11 +225,15 @@ fn main() {
         && args[2] == "--capability-file"
         && args[4] == "gh"
     {
-        github_action(Path::new(&args[1]), Path::new(&args[3]), &args[4..])
-    } else if let Some(action) = args
-        .first()
-        .filter(|s| matches!(s.as_str(), "request" | "csr-from-key" | "inspect-csr"))
-    {
+        github_action(Path::new(&args[1]), Some(Path::new(&args[3])), &args[4..])
+    } else if args.len() >= 6 && args[0] == "--config" && args[2] == "gh" {
+        github_action(Path::new(&args[1]), None, &args[2..])
+    } else if let Some(action) = args.first().filter(|s| {
+        matches!(
+            s.as_str(),
+            "request" | "csr-from-key" | "inspect-csr" | "install-bundle"
+        )
+    }) {
         local_action(action, &args[1..]).map(|reply| {
             let mut output = json::canonical(&reply);
             output.push(b'\n');

@@ -10,6 +10,7 @@ mod coordination;
 pub mod coordinator_authority;
 pub mod crypto;
 mod custody;
+pub mod identity_bundle;
 pub use custody::ProviderSession;
 pub mod files;
 pub mod json;

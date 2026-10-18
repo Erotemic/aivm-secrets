@@ -221,3 +221,5 @@ pub mod http_request;
 pub mod http_wire;
 
 pub mod line_frame;
+
+pub mod bundle;

@@ -7,6 +7,7 @@ import GarrettRebinding
 import GarrettCoordination
 import GarrettEmission
 import GarrettClientMaterial
+import GarrettBundle
 import GarrettReflection
 import GarrettDisclosure
 import GarrettManifest
@@ -402,3 +403,13 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.line_frame.Proofs.rejected_buffered_suffix
 #print axioms aivm_secrets_garrett_core.line_frame.Proofs.rejected_without_newline
 #print axioms aivm_secrets_garrett_core.line_frame.Proofs.accepted_positive_witness
+
+#print axioms aivm_secrets_garrett_core.bundle.Proofs.digest_ne_exact
+#print axioms aivm_secrets_garrett_core.bundle.Proofs.after_current
+#print axioms aivm_secrets_garrett_core.bundle.Proofs.current_failure_stops
+#print axioms aivm_secrets_garrett_core.bundle.Proofs.changed_never_stages
+#print axioms aivm_secrets_garrett_core.bundle.Proofs.install_contract
+#print axioms aivm_secrets_garrett_core.bundle.Proofs.stage_failure_never_publishes
+#print axioms aivm_secrets_garrett_core.bundle.Proofs.publication_failure_is_uncertain
+#print axioms aivm_secrets_garrett_core.bundle.Proofs.successful_install_witness
+#print axioms aivm_secrets_garrett_core.bundle.Proofs.success_exact

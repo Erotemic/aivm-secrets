@@ -313,6 +313,23 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'let raw = frame(&mut socket, MAX_REPLY).map_err(|_| Error::OutcomeUnknown)?;' in transport,
             'bridge ingress/reply no longer share frame admission with phase-correct errors')
 
+    # Guest-owned publication is separate from broker authority and provider
+    # effects. Keep the concrete lock/controller and single-snapshot call sites.
+    bundle = contents[RUST + 'identity_bundle.rs']
+    installer = part(bundle, 'pub fn install(', '#[cfg(test)]')
+    require(same_order(installer, '.lock_named(LOCK, true)',
+                       'match core::install(&publication, expected)'),
+            'bundle publication bypasses cooperating writer lock or extracted CAS')
+    require('.lock_named(LOCK, false)' in bundle
+            and '.activate_file(name, &self.at.name, self.replace)?;' in bundle
+            and 'parse(&bytes)?;' in bundle,
+            'bundle reader/staged publication/current-file validation contract removed')
+    guest = contents[RUST + 'client_main.rs']
+    require(guest.count('identity_bundle::load(') == 1
+            and 'm.contains_key("certificate") == m.contains_key("identity_bundle")' in guest
+            and '.insert(' in guest and 'bundle.capability.to_string()' in guest,
+            'guest lost exclusive bundle selection or one-snapshot credential loading')
+
     authority = contents[RUST + 'coordinator_authority/ledger.rs']
     handler = part(authority, '    pub(super) fn handle(', '\nfn principal_name(')
     require('peer.certificate_sha256_hex().as_bytes().to_vec()' in handler

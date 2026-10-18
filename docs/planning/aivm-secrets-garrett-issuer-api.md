@@ -126,6 +126,7 @@ without it name an invocation that no longer parses, and the test fails.
 | `retire-issuer` | operator-only | implemented | none | every live token signed by that kid fails at its next presentation |
 | `prune-keys --superseded` | operator-only | planned | never; AIVM does not wrap it | destroys private keys irreversibly |
 | `request` | guest-side | implemented | none; guestctl runs `openssl` itself | makes a key and CSR inside a guest |
+| `install-bundle` | guest-side | implemented | none; standalone explicit local command | CAS installs one certificate/JWT snapshot, without CA authority or private-key rotation |
 | `call` | guest-side | implemented | none; the bound guest client is `aivm_secrets/guest.py` | presents one request to a bridge |
 | `oauth-init` | operator-only | implemented | none | creates a vault |
 | `oauth-login` | operator-only | implemented | none | authorizes interactively in a host browser and stores a credential |

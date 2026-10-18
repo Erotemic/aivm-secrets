@@ -105,3 +105,7 @@ without starting the bridge. A bridge startup failure reporting
   than require identical Python/Rust response bytes.
 - Rust project-wide security, verified isolation, adaptive trace
   noninterference and concrete I/O refinement remain W3-W6/W8 work.
+
+See [atomic guest identity bundles](guest-identity-bundles.md) for explicit local
+certificate/JWT activation with Python and Rust clients after same-key renewal.
+Host renewal and guest activation remain separate operations.

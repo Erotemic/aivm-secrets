@@ -173,6 +173,60 @@ def authority.commit_change
   | core.result.Result.Err _ =>
     ok (core.result.Result.Err authority.CommitDenial.Unpublished)
 
+/-- [aivm_secrets_garrett_core::bundle::InstallFailure]
+    Source: 'crates/aivm-secrets-garrett-core/src/bundle.rs', lines 3:0-7:1
+    Visibility: public -/
+@[discriminant isize]
+inductive bundle.InstallFailure where
+| Changed : bundle.InstallFailure
+| Unpublished : bundle.InstallFailure
+| OutcomeUnknown : bundle.InstallFailure
+
+/-- Trait declaration: [aivm_secrets_garrett_core::bundle::BundleStore]
+    Source: 'crates/aivm-secrets-garrett-core/src/bundle.rs', lines 8:0-12:1
+    Visibility: public -/
+structure bundle.BundleStore (Self : Type _) where
+  current : Self → Result (core.result.Result (Option (alloc.vec.Vec Std.U8))
+    bundle.InstallFailure)
+  stage : Self → Result (core.result.Result Unit bundle.InstallFailure)
+  publish : Self → Result (core.result.Result Unit bundle.InstallFailure)
+
+/-- [aivm_secrets_garrett_core::bundle::install]:
+    Source: 'crates/aivm-secrets-garrett-core/src/bundle.rs', lines 13:0-34:1
+    Visibility: public -/
+def bundle.install
+  {S : Type _} (BundleStoreInst : bundle.BundleStore S) (store : S)
+  (expected : Option (alloc.vec.Vec Std.U8)) :
+  Result (core.result.Result Unit bundle.InstallFailure)
+  := do
+  let r ← BundleStoreInst.current store
+  match r with
+  | core.result.Result.Ok current =>
+    let changed ←
+      match current with
+      | none => match expected with
+                | none => ok false
+                | some _ => ok true
+      | some a =>
+        match expected with
+        | none => ok true
+        | some b =>
+          core.cmp.impls.PartialEqShared.ne (core.cmp.PartialEqVec
+            core.cmp.PartialEqU8) a b
+    if changed
+    then ok (core.result.Result.Err bundle.InstallFailure.Changed)
+    else
+      let r1 ← BundleStoreInst.stage store
+      match r1 with
+      | core.result.Result.Ok _ =>
+        let r2 ← BundleStoreInst.publish store
+        match r2 with
+        | core.result.Result.Ok _ => ok (core.result.Result.Ok ())
+        | core.result.Result.Err _ =>
+          ok (core.result.Result.Err bundle.InstallFailure.OutcomeUnknown)
+      | core.result.Result.Err _ => ok r1
+  | core.result.Result.Err error => ok (core.result.Result.Err error)
+
 /-- [aivm_secrets_garrett_core::client_material::PublishFailure]
     Source: 'crates/aivm-secrets-garrett-core/src/client_material.rs', lines 4:0-7:1
     Visibility: public -/

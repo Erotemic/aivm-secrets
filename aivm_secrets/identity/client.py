@@ -7,6 +7,7 @@ broker. No raw HTTP forwarding, OAuth or fallback to an unbound socket exists.
 from __future__ import annotations
 
 import socket
+import os
 import ssl
 import time
 from pathlib import Path
@@ -73,8 +74,9 @@ def _read_reply(channel: ssl.SSLSocket, deadline: float) -> bytes:
     return line
 
 
-def bound_call(*, socket_path: Path, ca: Path, certificate: Path,
-               private_key: Path, jwt_file: Path,
+def bound_call(*, socket_path: Path, ca: Path, certificate: Path | None = None,
+               private_key: Path, jwt_file: Path | None = None,
+               identity_bundle: Path | None = None,
                request: dict[str, Any],
                reply_deadline: float = RELAYED_REPLY_DEADLINE) -> dict[str, Any]:
     """One framed call; caller supplies no server identity or TLS override.
@@ -90,10 +92,20 @@ def bound_call(*, socket_path: Path, ca: Path, certificate: Path,
     it is a parameter only for tests.
     """
     key = Path(private_key).expanduser().absolute()
-    token = Path(jwt_file).expanduser().absolute()
     read_owned(key, private=True, what='client identity key')
-    jwt = read_owned(token, private=True, limit=65536,
-                     what='bound client token').decode('ascii')
+    bundle = None
+    if identity_bundle is not None:
+        if certificate is not None or jwt_file is not None:
+            raise SecretsError('invalid_request')
+        from .bundle import load
+        bundle = load(Path(identity_bundle).expanduser().absolute())
+        jwt = bundle.capability
+    else:
+        if certificate is None or jwt_file is None:
+            raise SecretsError('invalid_request')
+        token = Path(jwt_file).expanduser().absolute()
+        jwt = read_owned(token, private=True, limit=65536,
+                         what='bound client token').decode('ascii')
     # This client does not trust a JWT claim about the peer. TLS must verify
     # the configured CA and the localhost SAN, even over a forwarded socket.
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -104,7 +116,19 @@ def bound_call(*, socket_path: Path, ca: Path, certificate: Path,
     context.options |= ssl.OP_NO_COMPRESSION
     context.keylog_filename = None
     context.load_verify_locations(cafile=str(Path(ca).expanduser()))
-    context.load_cert_chain(str(Path(certificate).expanduser()), str(key))
+    if bundle is None:
+        context.load_cert_chain(str(Path(certificate).expanduser()), str(key))
+    else:
+        # OpenSSL's Python API takes a path. An anonymous Linux memfd carries
+        # only the public cert from this snapshot; no JWT or key is staged.
+        fd = os.memfd_create('aivm-client-certificate', os.MFD_CLOEXEC)
+        with os.fdopen(fd, 'wb') as stream:
+            stream.write(bundle.certificate)
+            stream.flush()
+            try:
+                context.load_cert_chain(f'/proc/self/fd/{fd}', str(key))
+            except ssl.SSLError:
+                raise SecretsError('invalid_capability') from None
     outgoing = {'version': 1, 'capability': jwt, 'request': request}
     wire.parse_frame(outgoing)
     data = codec.dumps(outgoing) + b'\n'
