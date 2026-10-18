@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_w3_current_reviewed_effect_boundary():
     assert check(ROOT) == {
-        'sources': len(EXPECTED_SOURCES), 'effects': 12, 'scope': 'native-manifest-https-v1',
+        'sources': len(EXPECTED_SOURCES), 'effects': 13, 'scope': 'native-manifest-https-v1',
     }
 
 
@@ -49,6 +49,15 @@ def mutate(repo, filename, before, after):
 
 
 @pytest.mark.parametrize('file,old,new', [
+    (RUST + 'coordinator_authority/ledger.rs', 'core::require_operator(operators, &peer)?;', 'let _ = operators;'),
+    (RUST + 'coordinator_authority/ledger.rs', 'let revision = core::admit(current.as_ref(), &peer)?;', 'let revision = 1;'),
+    (RUST + 'coordinator_authority/ledger.rs', '                core::admit(current.as_ref(), &peer)?;', '                let _ = &peer;'),
+    (RUST + 'coordinator_authority/ledger.rs', 'tx.commit()?;', 'drop(tx);'),
+    (RUST + 'coordinator_authority/ledger.rs',
+     '// No positive response leaves this function before COMMIT acknowledges.\n        tx.commit()?;',
+     '// No positive response leaves this function before COMMIT acknowledges.\n        drop(tx);'),
+    (RUST + 'coordinator_authority/ledger.rs', 'peer.certificate_sha256_hex().as_bytes().to_vec()', 'peer.thumbprint().as_bytes().to_vec()'),
+    (RUST + 'coordinator_authority/server.rs', 'ledger.handle(&peer, operators, &value)', 'unreviewed_reply(&value)'),
     (RUST + 'custody.rs', 'http_request::append_line(', 'unchecked_line('),
     (RUST + 'custody/manifest_session.rs', 'http_request::append_line(', 'unchecked_line('),
     (RUST + 'custody.rs',

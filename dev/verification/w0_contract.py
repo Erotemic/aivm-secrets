@@ -26,6 +26,7 @@ OBS_TREATMENTS = {'included', 'other_principal', 'excluded'}
 AUDIENCES = {
     'guest', 'provider_api', 'oauth_token_provider', 'host_audit',
     'host_operator', 'host_private', 'host_legacy_broker', 'trusted_coordinator',
+    'authenticated_coordinator_member',
 }
 
 

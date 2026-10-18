@@ -304,6 +304,23 @@ impl PrivateDirectory {
         }
         Ok(file)
     }
+    /// Anchor SQLite's pathname-based VFS to this held directory. SQLite
+    /// still owns opening/locking sidecars; the directory is host-private.
+    #[cfg(feature = "coordinator-server")]
+    pub(crate) fn held_path(&self, name: &str) -> Outcome<std::path::PathBuf> {
+        use std::os::fd::AsRawFd;
+        Self::name(name)?;
+        // SQLITE_OPEN_NOFOLLOW rejects /proc/self/fd symlinks as well. Resolve
+        // the held directory, then re-open its trusted path and compare inodes.
+        // SQLite's own VFS still relies on host-controlled directory stability.
+        let resolved = fs::read_link(format!("/proc/self/fd/{}", self.0.as_raw_fd()))
+            .map_err(|_| Error::UnsafeFile)?;
+        let checked = Self::open(&resolved)?;
+        if !self.same_inode(&checked)? {
+            return Err(Error::UnsafeFile);
+        }
+        Ok(resolved.join(name))
+    }
     pub(crate) fn sync(&self) -> Outcome<()> {
         self.0.sync_all().map_err(|_| Error::InternalError)
     }

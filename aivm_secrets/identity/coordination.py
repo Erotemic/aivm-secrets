@@ -81,7 +81,9 @@ class CoordinationLedger:
 
     The protected DB, -wal and -shm files MUST live on durable local storage;
     backups and rollbacks require an external anti-rollback witness. A
-    successful COMMIT is the linearization point. Never replicate the file.
+    mutation's successful COMMIT is its linearization point. Read decisions
+    use their transaction's snapshot; already-admitted effects may complete
+    after a later revocation. Never replicate the file.
     """
 
     def __init__(self, directory: Path):
@@ -129,10 +131,13 @@ class CoordinationLedger:
 
     def activate(self, name: str, members: list[str]) -> dict[str, Any]:
         name = principal_name(name)
-        if (type(members) is not list or not 1 <= len(members) <= MAX_MEMBERS
-                or len(set(members)) != len(members)):
+        if type(members) is not list or not 1 <= len(members) <= MAX_MEMBERS:
             raise SecretsError('invalid_request')
+        # Validate JSON types before hashing for uniqueness; an object/list
+        # member must be a fixed denial rather than an uncaught TypeError.
         members = sorted(_hex64(m) for m in members)
+        if len(set(members)) != len(members):
+            raise SecretsError('invalid_request')
         with self._database() as conn:
             try:
                 conn.execute('BEGIN IMMEDIATE')
@@ -235,13 +240,23 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         server = self.server
         assert isinstance(server, CoordinationServer)
         try:
-            if self.path != '/v1/coordinate' or self.headers.get('Transfer-Encoding'):
+            # One framing interpretation only, including an empty TE field.
+            # BaseHTTPRequestHandler otherwise accepts repeated lengths/types.
+            headers = list(self.headers.items())
+            names = [name.lower() for name, _ in headers]
+            if (self.path != '/v1/coordinate' or 'transfer-encoding' in names
+                    or len(names) != len(set(names))
+                    or sum(len(name) + len(value) + 4 for name, value in headers) > MAX_MESSAGE
+                    or any(not name or any(not (char.isascii() and (char.isalnum() or char == '-'))
+                                           for char in name)
+                           or any(not 32 <= ord(char) <= 126 for char in value)
+                           for name, value in headers)):
                 raise SecretsError('invalid_request')
-            raw_size = self.headers.get('Content-Length', '')
+            raw_size = self.headers.get('Content-Length', '').strip()
             if (not raw_size.isdecimal() or len(raw_size) > 5 or
                     not 1 <= int(raw_size) <= MAX_MESSAGE):
                 raise SecretsError('invalid_request')
-            if self.headers.get('Content-Type') != 'application/json':
+            if self.headers.get('Content-Type', '').strip() != 'application/json':
                 raise SecretsError('invalid_request')
             size = int(raw_size)
             value = codec.loads(self.rfile.read(size), limit=MAX_MESSAGE)
@@ -322,7 +337,7 @@ class CoordinationServer(http.server.ThreadingHTTPServer):
         context.load_cert_chain(str(server_cert), str(server_key))
         # Do not wrap the LISTEN socket: its accept-side TLS handshake may
         # otherwise block the entire accept loop on a stalling peer. Handshake
-        # each accepted client with its own bounded timeout.
+        # each accepted client in its bounded worker slot and timeout.
         self._context = context
         super().__init__(address, _Handler)
 
@@ -338,20 +353,21 @@ class CoordinationServer(http.server.ThreadingHTTPServer):
 
     def process_request_thread(self, request, client_address):
         try:
-            super().process_request_thread(request, client_address)
+            # TLS belongs inside the worker slot. Handshaking in get_request
+            # lets one anonymous socket block every authenticated member.
+            try:
+                tls = self._context.wrap_socket(request, server_side=True)
+            except (OSError, ssl.SSLError):
+                self.shutdown_request(request)
+                return
+            super().process_request_thread(tls, client_address)
         finally:
             self._slots.release()
 
-    def get_request(self) -> tuple[ssl.SSLSocket, Any]:
+    def get_request(self) -> tuple[socket.socket, Any]:
         raw, address = super().get_request()
-        try:
-            raw.settimeout(5.0)
-            tls = self._context.wrap_socket(raw, server_side=True)
-            tls.settimeout(5.0)
-            return tls, address
-        except (OSError, ssl.SSLError):
-            raw.close()
-            raise
+        raw.settimeout(5.0)
+        return raw, address
 
 
 @dataclass(frozen=True)

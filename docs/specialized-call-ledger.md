@@ -11,6 +11,7 @@ sets `complete_mediation` to `false`.
 
 ```bash
 python dev/verification/specialized_calls.py
+python dev/verification/specialized_calls.py --profile coordinator
 python dev/verification/system.py --proofs --full-tests --call-linkage
 ```
 
@@ -51,6 +52,15 @@ every native output path is mediated by that helper.
 The [request-line refinement](verified-http-request.md) adds two more required
 builder-to-`http_request::append_line`/`valid_target` paths with the same limits.
 
+The optional [native authority](native-coordinator-authority.md) has a separate
+`coordinator` target profile. Its root is the named compiled connection handler,
+`coordinator_authority::server::exchange`. Six paths link that handler through
+`Ledger::handle` to operator/member admission and activate/revoke/reserve/finish.
+This does not prove accept-loop/thread-callback reachability, admission dominance,
+SQL semantics or committed-history refinement. SQLite and TLS remain opaque.
+The projector requires the explicitly selected crate and its specialized main;
+a bridge artifact cannot satisfy the authority profile, or conversely.
+
 The projection retains every translated function, including functions outside
 the direct request-root traversal, opaque dependencies, compiler-generated
 helpers and drop-site counts. Charon's trailing `Instantiated` name component
@@ -62,7 +72,7 @@ listed, never silently treated as pure leaves.
 ## Bounded capture and projection
 
 Each invocation creates a fresh private `.tools/specialized-calls-*/` directory.
-Compiler output goes through a private FIFO into gzip, with defaults of:
+Compiler output uses the selected target’s private FIFO and `compiler.ullbc.gz`, with defaults of:
 
 - 8 GiB uncompressed and 512 MiB compressed output;
 - a 300-second compiler deadline;

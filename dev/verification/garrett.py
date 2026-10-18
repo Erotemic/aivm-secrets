@@ -32,6 +32,7 @@ PROFILES = [
     "manifest-https-v1",
     "native-coordination-client-v1",
     "native-same-key-rebinding-v1",
+    "native-coordinator-authority-v1",
 ]
 THEOREMS = [
     "aivm_secrets_garrett_core.Proofs.bytes_ne_spec",
@@ -358,6 +359,35 @@ THEOREMS += [
     'aivm_secrets_garrett_core.http_request.Proofs.successful_line_witness',
 ]
 
+THEOREMS += [
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.peer_bytes_equal',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.peer_from_step',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.peer_from_zero',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.contains_peer_loop_contract',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.contains_peer_contract',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.require_operator_contract',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.activate_existing_rejected',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.activate_new_exact',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.admit_contract',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.revoke_contract',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.revoked_result_is_inactive',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.revocation_denies_every_peer',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.preemptive_revocation_exact',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.reserve_new_exact',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.existing_key_is_spent',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.finish_contract',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.successful_finish_preserves_digest',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.principal_step_preserves_tombstone',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.principal_history_preserves_tombstone',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.no_future_member_admission_after_revocation',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.member_admission_positive_witness',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.matching_finish_exact',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.reservation_step_preserves_spent',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.reservation_history_preserves_spent',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.no_future_reservation_of_spent_key',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.operator_admission_positive_witness',
+]
+
 TESTS = [
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
@@ -378,6 +408,7 @@ TESTS = [
     "tests/test_rust_garrett_tpm_request.py",
     "tests/test_rust_garrett_dispatch.py",
     "tests/test_rust_coordination.py",
+    "tests/test_rust_coordinator_authority.py",
     "tests/test_rust_bound_renewal.py",
     "tests/test_rust_w6_adapter.py",
     "tests/test_secrets_coordination.py",
@@ -404,6 +435,7 @@ RUNNERS = {
     "AIVM_SECRETS_RUST_OAUTH_RUNNER": "oauth-conformance",
     "AIVM_SECRETS_RUST_OAUTH_ADMIN": "garrett-oauth",
     "AIVM_SECRETS_RUST_MANIFEST_RUNNER": "manifest-conformance",
+    "AIVM_SECRETS_RUST_COORDINATOR": "garrett-coordinator",
 }
 
 
@@ -440,6 +472,8 @@ def inputs() -> list[str]:
         "proofs/GarrettRebinding.lean",
         "proofs/GarrettHttpAuth.lean",
         "proofs/GarrettHttpRequest.lean",
+        "proofs/GarrettCoordinatorAuthority.lean",
+        "tests/secrets_vectors/coordination/authority-v1.jsonl",
         "proofs/GarrettProfiles.lean",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
@@ -620,7 +654,7 @@ def assurance_coordinates() -> dict:
         "aeneas_release": base.RELEASE,
         "theorems": THEOREMS,
         "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
-        "implementation_linked": "Aeneas-generated optional coordinator dispatch continuation and issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission, and concrete authentication-header credential validation/exact byte appending and request-line method/target validation/exact single-line construction used by both native provider writers",
+        "implementation_linked": "Aeneas-generated optional coordinator dispatch continuation and issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission, and concrete authentication-header credential validation/exact byte appending and request-line method/target validation/exact single-line construction used by both native provider writers; optional coordinator authority exact peer/operator admission, absent-only activation, revocation/reservation/completion decisions and modeled terminal committed-decision histories",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
@@ -641,6 +675,7 @@ def assurance_coordinates() -> dict:
             "OAuth quarantine and successor persistence are conditional storage-adapter contracts. Native vault locking drains participating refresh/revoke against dispatch and HMAC checks token equality; root snapshot rollback, hostile same-UID replacement and nonparticipating writers are outside that boundary.",
             "Native PKCE login trusts entropy, SHA-256 S256 derivation, HTTP/query decoding and loopback listener/clock adapters. Callback binding and one-shot lifecycle guards are extracted; ready URLs go only to a trusted host operator/browser, and their state/challenge must not be offered as an agent API. Concrete acquisition I/O histories and secret-sink refinement remain open.",
             "Native OAuth sessions seal an opaque vault/provider/subject/epoch-bound marker and select the current ready token under a held vault lock. Explicit refresh may change its generation without changing the grant deadline. HMAC/entropy, lock participation, concrete opener correspondence and clock sampling remain adapter contracts; this is not a whole-service or concurrent filesystem proof.",
+            "The optional native coordinator authority retains Python's SQLite schema and mTLS endpoint. Exact operator/member matching and terminal principal/reservation decision histories are extracted and proved; HTTP parsing, authenticated DER-to-hex conversion, row conversion, SQL bindings, commit-before-reply placement, SQLite WAL/FULL durability, concurrency and complete native I/O refinement remain separate library/environment or project-owned adapter obligations. There is no replica, live inode replacement or rollback witness, and no positive admission cache or automatic retry.",
             "Native coordinated account/manifest sessions trust the separately authenticated SQLite coordinator for terminal membership decisions and durable globally unique reservations. The extracted dispatch controller requires admission/reservation acknowledgements before invoking a provider and maps failed post-send completion to uncertainty. TLS/HTTP, server durability/rollback, last-check linearization and concrete callback placement remain adapter premises. Native coordinated request fingerprints hash a canonical document rebuilt from parsed policy, with independent Python differential and real durable-record tests. Policy normalization, JSON encoding and SHA-256 remain concrete adapters; finite tests do not establish all-input digest equivalence or broad core parity.",
             "Privileged same-key rebinding carries the identical opened opaque broker capability to the existing issuer. Source signature/AEAD, current-CA historical certificate fingerprints, protected owner-only inputs, shared authority lease participation and no-replace publication remain adapter contracts. This is an explicit host authorization, not acceptance of an expired guest JWT; the broker grant and terminal coordinator checks still apply.",
             "The manifest HTTPS backend trusts the policy/check/template/GraphQL parsers, JSON-to-typed-tree conversion and selected-tree rendering, reflection traversal/call sites and concrete HTTP/audit ordering. Exact borrowed-byte literal search is extracted and proved. The extracted recursive filter matches an independent selection specification and has exact two-run noninterference under recursive schema agreement; unselected typed-tree fields are unconstrained. These contracts do not refine the remaining adapters or establish arbitrary provider non-disclosure or whole-service trace equivalence. Native configuration explicitly selects unbounded requests and a file source or explicit OAuth override.",
@@ -1090,6 +1125,23 @@ def mutate(pattern: str | None = None) -> None:
          'output.extend_from_slice(b" HTTP/1.1\\r\\n");',
          'output.extend_from_slice(b" HTTP/1.1\\n");'),
     ]
+    authority_source = source.with_name("coordinator_authority.rs")
+    mutations += [
+        (authority_source, "coordinator authority wrong peer equality", "*member == *peer", "*member != *peer"),
+        (authority_source, "coordinator authority operator gate bypass", "!contains_peer(operators, peer)", "false"),
+        (authority_source, "coordinator authority existing principal reactivated",
+         "Some(_) => Err(Denial::Revoked),",
+         "Some(_) => Ok(Principal { active: true, members, revision: 1 }),"),
+        (authority_source, "coordinator authority preemptive tombstone active", "active: false,", "active: true,"),
+        (authority_source, "coordinator authority revoked row active", "principal.active = false;", "principal.active = true;"),
+        (authority_source, "coordinator authority inactive principal admitted", "!principal.active", "false"),
+        (authority_source, "coordinator authority wrong member admitted", "!contains_peer(&principal.members, peer)", "false"),
+        (authority_source, "coordinator authority spent key reserved again",
+         "Some(_) => Err(Denial::OutcomeUnknown),",
+         "Some(_) => Ok(Reservation { digest, completed: false }),"),
+        (authority_source, "coordinator authority mismatched digest finished", "row.digest != *digest", "false"),
+        (authority_source, "coordinator authority completion not recorded", "row.completed = true;", "row.completed = false;"),
+    ]
     manifest_source = source.with_name("manifest.rs")
     mutations += [
         (manifest_source, "manifest lower range escaped", "*value < *lo", "false"),
@@ -1399,6 +1451,7 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettRebinding",
                 "GarrettHttpAuth",
                 "GarrettHttpRequest",
+                "GarrettCoordinatorAuthority",
             ]
             # These leaves import the extracted crate plus generic standard-
             # model facts. Check the affected leaf first; keep full fallback
@@ -1416,6 +1469,7 @@ def mutate(pattern: str | None = None) -> None:
                 "rebinding.rs": "GarrettRebinding",
                 "http_auth.rs": "GarrettHttpAuth",
                 "http_request.rs": "GarrettHttpRequest",
+                "coordinator_authority.rs": "GarrettCoordinatorAuthority",
             }.get(source.name)
             if preferred:
                 modules.remove(preferred)

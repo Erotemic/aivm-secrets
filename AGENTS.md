@@ -45,6 +45,11 @@ The [request-line refinement](docs/verified-http-request.md) checks the actual
 method/target validator and exact appender used by both writers. It prevents
 framing injection within that segment; full request/destination/I/O refinement
 remains open. Use focused `GarrettHttpRequest.lean` compilation during iteration.
+The optional [native coordinator authority](docs/native-coordinator-authority.md)
+uses the existing mTLS/SQLite protocol and Python schema. Its extracted
+operator/member and terminal decision/history proofs are separate from SQL,
+HTTP, commit/reply and durability refinement. Build it only with the explicit
+`coordinator-server` feature; no ordinary AIVM or broker requirement is added.
 Focus on a useful standalone broker workflow and conditional, implementation-linked credential
 confinement; do not advertise formal VM isolation or whole-service secrecy.
 
@@ -56,7 +61,7 @@ confinement; do not advertise formal VM isolation or whole-service secrecy.
   parity. CLI/alias/UI spelling is non-core; its effects and error semantics
   must obey the core. Current Rust parity is **not** complete for these new
   coordination/idempotency contracts.
-- The Python coordinator is an opt-in, single durable SQLite writer reached
+- The Python and optional Rust coordinators are an opt-in, single durable SQLite writer reached
   over mTLS, not distributed consensus, replicated credential custody, or an
   anti-rollback ledger. Never turn an unavailable coordinator into a cached
   authorization. All coordinated writes require a durable key and one

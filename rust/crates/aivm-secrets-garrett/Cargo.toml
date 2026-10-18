@@ -6,6 +6,7 @@ license.workspace = true
 
 [features]
 conformance = []
+coordinator-server = ["dep:rusqlite"]
 
 [dependencies]
 aivm-secrets-garrett-core = { path = "../aivm-secrets-garrett-core" }
@@ -21,6 +22,7 @@ zeroize = "1"
 rcgen = { version = "=0.14.10", default-features = false, features = ["ring", "pem", "x509-parser", "zeroize"] }
 x509-parser = { version = "0.18", features = ["verify"] }
 time = "0.3"
+rusqlite = { version = "=0.40.2", features = ["bundled"], optional = true }
 
 [[bin]]
 name = "garrett-conformance"
@@ -41,3 +43,8 @@ path = "src/authority_main.rs"
 [[bin]]
 name = "garrett-oauth"
 path = "src/oauth_main.rs"
+
+[[bin]]
+name = "garrett-coordinator"
+path = "src/coordinator_main.rs"
+required-features = ["coordinator-server"]

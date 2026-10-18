@@ -107,7 +107,7 @@ def test_capture_roundtrip_hash_and_fifo_cleanup(tmp_path):
     assert result['status'] == 'captured'
     assert result['plain_bytes'] == len(raw)
     assert result['plain_sha256'] == hashlib.sha256(raw).hexdigest()
-    assert gzip.decompress((tmp_path/'bridge.ullbc.gz').read_bytes()) == raw
+    assert gzip.decompress((tmp_path/'compiler.ullbc.gz').read_bytes()) == raw
     assert not (tmp_path/'garrett_bridge.ullbc').exists()
 
 
@@ -123,7 +123,7 @@ def test_capture_resource_and_process_failures_cannot_pass(tmp_path, failure):
     result = json.loads((tmp_path/'capture.json').read_text())
     assert result['status'] == 'failed'
     assert not (tmp_path/'garrett_bridge.ullbc').exists()
-    assert (tmp_path/'bridge.ullbc.gz').stat().st_size <= limits.compressed
+    assert (tmp_path/'compiler.ullbc.gz').stat().st_size <= limits.compressed
 
 
 def test_capture_deadline_stops_compiler_before_any_output(tmp_path):
@@ -173,3 +173,66 @@ def test_projector_timeout_never_publishes_a_report(tmp_path):
     with pytest.raises(subprocess.TimeoutExpired):
         project_archive(archive,child,tmp_path,Limits(projector_seconds=.1))
     assert not (tmp_path/'projection.json').exists()
+
+
+
+def authority_projection():
+    data = projection()
+    data['translated']['crate_name'] = 'garrett_coordinator'
+    template = deepcopy(data['translated']['fun_decls'][0])
+    def function(i, name, targets=()):
+        result = deepcopy(template)
+        result['def_id'] = i
+        result['item_meta']['name'] = [*name, '<Instantiated>']
+        result['body']['blocks']['direct'] = list(targets)
+        return result
+    native = ['aivm_secrets_garrett', 'coordinator_authority']
+    core = ['aivm_secrets_garrett_core', 'coordinator_authority']
+    data['translated']['fun_decls'] = [
+        function(0, [*native, 'server', 'exchange'], [1]),
+        function(1, [*native, 'ledger', '<Impl>', 'handle'], [2,3,4,5,6,7]),
+        function(2, [*core, 'require_operator'], [8]),
+        function(3, [*core, 'admit'], [8]),
+        *[function(i, [*core, name]) for i, name in
+          enumerate(['activate', 'revoke', 'reserve', 'finish'], 4)],
+        function(8, [*core, 'contains_peer']),
+    ]
+    return data
+
+
+def test_authority_compiled_handler_paths_keep_mediation_open():
+    result = explain(authority_projection(), 'coordinator')
+    assert result['witnesses'] == {
+        'coordinator-operator-admission': [0,1,2,8],
+        'coordinator-member-admission': [0,1,3,8],
+        'coordinator-activate': [0,1,4], 'coordinator-revoke': [0,1,5],
+        'coordinator-reserve': [0,1,6], 'coordinator-finish': [0,1,7]}
+    assert result['complete_mediation'] is False
+    with pytest.raises(LedgerError, match='selected specialized target'):
+        explain(authority_projection())
+
+
+@pytest.mark.parametrize('victim', [2,3,4,5,6,7])
+def test_authority_missing_guard_or_transition_link_fails(victim):
+    data = authority_projection()
+    data['translated']['fun_decls'][1]['body']['blocks']['direct'].remove(victim)
+    with pytest.raises(LedgerError, match='callback link missing'):
+        explain(data, 'coordinator')
+
+
+def test_capture_uses_the_selected_coordinator_fifo(tmp_path):
+    raw = b'coordinator compiler fixture'
+    command = [sys.executable, '-c', 'import sys;open(sys.argv[1],"wb").write(bytes.fromhex(sys.argv[2]))',
+               str(tmp_path / 'garrett_coordinator.ullbc'), raw.hex()]
+    result = capture_process(command, tmp_path, tmp_path,
+                             artifact='garrett_coordinator.ullbc')
+    assert result['artifact'] == 'garrett_coordinator.ullbc'
+    assert gzip.decompress((tmp_path/'compiler.ullbc.gz').read_bytes()) == raw
+    assert not (tmp_path/'garrett_coordinator.ullbc').exists()
+
+
+def test_capture_rejects_unknown_output_name_before_start(tmp_path):
+    before = set(tmp_path.iterdir())
+    with pytest.raises(LedgerError, match='unknown compiler artifact'):
+        capture_process([], tmp_path, tmp_path, artifact='../outside.ullbc')
+    assert set(tmp_path.iterdir()) == before

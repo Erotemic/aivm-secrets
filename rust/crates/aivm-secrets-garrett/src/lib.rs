@@ -6,6 +6,8 @@ pub mod certificates;
 pub mod client;
 pub mod client_material;
 mod coordination;
+#[cfg(feature = "coordinator-server")]
+pub mod coordinator_authority;
 pub mod crypto;
 mod custody;
 pub use custody::ProviderSession;

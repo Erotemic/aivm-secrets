@@ -36,8 +36,8 @@ work, not a requirement to reproduce Python's host package structure in Rust.
 | CORE-04 | Authorization, delegation, approval, budgets | Partial |
 | CORE-05 | Manifest request/effect and disclosure | Partial |
 | CORE-06 | OAuth refresh and same-session current-token lease | Native rollover implemented; finite differential coverage, broader parity gate open |
-| CORE-07 | Durable cross-host revocation | Native client tested; trusted server remains Python |
-| CORE-08 | Globally reserved write keys and no automatic replay | Native dispatch tested against the Python durable server |
+| CORE-07 | Durable cross-host revocation | Native client/server tested; broader parity/refinement open |
+| CORE-08 | Globally reserved write keys and no automatic replay | Native dispatch tested against Python and Rust durable servers |
 | CORE-09 | Wire key, required-on-write, approved upstream key header | Native manifest subset tested; broader wire/digest parity open |
 | CORE-10 | Audits, effect/write ambiguity, guest output | Partial |
 | CORE-11 | Trusted paths, TLS authorization and no proxy/redirect | Partial |
@@ -80,8 +80,9 @@ Python and Rust brokers against one mTLS/SQLite authority. The global retry-key
 derivation interoperates. Native request fingerprints now use a normalized
 document rebuilt from parsed policy, with [finite differential and durable-record
 evidence](verified-policy-normalization.md). Duplicate keys remain refused
-regardless of digest. All-input normalization equivalence, native coordinator
-server behavior and broader core parity remain open.
+regardless of digest. All-input normalization equivalence, The [native authority](native-coordinator-authority.md) now supplies the optional
+Rust server with shared protocol/storage vectors and scoped core/history proofs.
+SQL/TLS/native I/O correspondence and broader core parity remain open.
 
 The [same-key identity rebinding increment](verified-identity-rebinding.md)
 composes native CAS certificate renewal with a host-only rewrap of the identical

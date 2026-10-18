@@ -265,6 +265,32 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'reply.get("result")' in a,
             'guest-owned alias broadened or lost selected-result handling')
 
+    authority = contents[RUST + 'coordinator_authority/ledger.rs']
+    handler = part(authority, '    pub(super) fn handle(', '\nfn principal_name(')
+    require('peer.certificate_sha256_hex().as_bytes().to_vec()' in handler
+            and 'core::require_operator(operators, &peer)?;' in handler
+            and handler.count('core::admit(current.as_ref(), &peer)?;') == 2
+            and all('core::' + name + '(' in handler for name in
+                    ['activate', 'revoke', 'reserve', 'finish']),
+            'coordinator authority bypasses extracted peer/operator/ledger decisions')
+    initialization = part(authority, '        tx.execute_batch(', '    pub fn open(')
+    require(same_order(initialization, 'tx.commit()?;', 'root.sync()?;', 'Ok(Self'),
+            'coordinator initialization acknowledged before durable schema commit')
+    require(handler.count('tx.commit()?;') == 1
+            and same_order(handler, 'let result = match action {', 'tx.commit()?;', 'Ok(result)')
+            and 'DELETE FROM' not in authority.upper()
+            and 'Connection::open_with_flags(' in authority
+            and 'OpenFlags::SQLITE_OPEN_NOFOLLOW' in authority,
+            'coordinator acknowledgement precedes commit or loses retained/private state')
+    server = contents[RUST + 'coordinator_authority/server.rs']
+    exchange = part(server, 'fn exchange(', '\nfn line(')
+    require(same_order(exchange, 'while connection.is_handshaking()',
+                       'tls::VerifiedPeer::from_connection(&connection)?', 'ledger.handle(',
+                       '.write_all(header.as_bytes())')
+            and exchange.count('ledger.handle(') == 1
+            and 'json::canonical(&reply)' in exchange,
+            'coordinator reply bypasses authenticated peer or committed ledger')
+
 
 def check(root: Path) -> dict:
     inventory = json.loads((root / INVENTORY_PATH).read_text())
@@ -290,6 +316,7 @@ def check(root: Path) -> dict:
         'provider-preflight', 'provider-final', 'guest-reply', 'guest-denial',
         'host-audit', 'host-announcement', 'legacy-forward', 'oauth-startup',
         'host-private', 'host-control', 'guest-close', 'authority-coordinate',
+        'coordination-authority',
     }, 'missing effect class or newly unreviewed channel')
     sinks = json.loads((root / 'docs/planning/aivm-secrets-w0-boundaries.json').read_text())
     w0_ids = {row['id'] for row in sinks['sinks']}

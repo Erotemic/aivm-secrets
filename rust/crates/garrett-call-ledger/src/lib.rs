@@ -353,9 +353,25 @@ impl<R: Read> Read for Bounded<R> {
     }
 }
 
+/// Closed compiler target selection; never infer a profile from untrusted input.
+#[derive(Clone, Copy)]
+pub enum CompilerProfile {
+    Bridge,
+    Coordinator,
+}
+impl CompilerProfile {
+    fn crate_name(self) -> &'static str {
+        match self {
+            Self::Bridge => "garrett_bridge",
+            Self::Coordinator => "garrett_coordinator",
+        }
+    }
+}
+
 pub fn project(
     reader: impl Read,
     max_bytes: u64,
+    target: CompilerProfile,
 ) -> Result<Projection, Box<dyn std::error::Error>> {
     let bounded = Bounded {
         inner: reader,
@@ -368,7 +384,7 @@ pub fn project(
     decoder.end()?;
     if data.charon_version != "0.1.291"
         || data.has_errors
-        || data.translated.crate_name != "garrett_bridge"
+        || data.translated.crate_name != target.crate_name()
         || !data.translated.options.monomorphize
         || !data.translated.options.ullbc
     {
@@ -385,11 +401,11 @@ pub fn project(
             .name
             .iter()
             .map(|p| p.0.as_str())
-            .eq(["garrett_bridge", "main"])
+            .eq([target.crate_name(), "main"])
             && f.body.kind == "Unstructured"
             && f.generics.types.0 == 0
     }) {
-        return Err("specialized bridge main body is missing".into());
+        return Err("specialized target main body is missing".into());
     }
     let files: BTreeSet<_> = data.translated.files.iter().map(|f| f.id).collect();
     if files.len() != data.translated.files.len() {
@@ -439,7 +455,31 @@ mod tests {
     }
     fn parse(value: &Value) -> Result<Projection, Box<dyn std::error::Error>> {
         let raw = serde_json::to_vec(value)?;
-        project(raw.as_slice(), raw.len() as u64)
+        project(raw.as_slice(), raw.len() as u64, CompilerProfile::Bridge)
+    }
+
+    #[test]
+    fn selected_coordinator_target_keeps_main_and_header_checks() {
+        let mut input = fixture();
+        input["translated"]["crate_name"] = json!("garrett_coordinator");
+        input["translated"]["fun_decls"][0]["item_meta"]["name"][0] =
+            json!({"Ident":["garrett_coordinator",0]});
+        let raw = serde_json::to_vec(&input).unwrap();
+        assert!(project(
+            raw.as_slice(),
+            raw.len() as u64,
+            CompilerProfile::Coordinator
+        )
+        .is_ok());
+        assert!(project(raw.as_slice(), raw.len() as u64, CompilerProfile::Bridge).is_err());
+        input["translated"]["fun_decls"][0]["body"] = json!("Opaque");
+        let raw = serde_json::to_vec(&input).unwrap();
+        assert!(project(
+            raw.as_slice(),
+            raw.len() as u64,
+            CompilerProfile::Coordinator
+        )
+        .is_err());
     }
 
     #[test]
@@ -524,12 +564,27 @@ mod tests {
     #[test]
     fn byte_limit_and_document_end_are_enforced() {
         let raw = serde_json::to_vec(&fixture()).unwrap();
-        assert!(project(raw.as_slice(), raw.len() as u64).is_ok());
-        assert!(project(raw.as_slice(), (raw.len() - 1) as u64).is_err());
+        assert!(project(raw.as_slice(), raw.len() as u64, CompilerProfile::Bridge).is_ok());
+        assert!(project(
+            raw.as_slice(),
+            (raw.len() - 1) as u64,
+            CompilerProfile::Bridge
+        )
+        .is_err());
         let mut trailing = raw.clone();
         trailing.extend(b" {}");
-        assert!(project(trailing.as_slice(), trailing.len() as u64).is_err());
-        assert!(project(&raw[..raw.len() - 1], raw.len() as u64).is_err());
+        assert!(project(
+            trailing.as_slice(),
+            trailing.len() as u64,
+            CompilerProfile::Bridge
+        )
+        .is_err());
+        assert!(project(
+            &raw[..raw.len() - 1],
+            raw.len() as u64,
+            CompilerProfile::Bridge
+        )
+        .is_err());
     }
 
     #[test]

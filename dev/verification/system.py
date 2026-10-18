@@ -29,6 +29,7 @@ WORKFLOW_TESTS = [
     'tests/test_rust_garrett_dispatch.py',
     'tests/test_rust_oauth_current_session.py',
     'tests/test_rust_coordination.py',
+    'tests/test_rust_coordinator_authority.py',
     'tests/test_rust_bound_renewal.py',
     'tests/test_secrets_primitives_parity.py',
     'tests/test_specialized_calls.py',
@@ -117,7 +118,7 @@ def main() -> int:
     save()
     try:
         run('native-build', ['cargo', 'build', '--locked', '--manifest-path',
-                            'rust/Cargo.toml', '--bins', '--features', 'conformance'])
+                            'rust/Cargo.toml', '--bins', '--features', 'conformance,coordinator-server'])
         # Import only the existing runner registry; do not substitute a Python
         # implementation when a binary is absent or an operation is refused.
         from garrett import RUNNERS
@@ -129,7 +130,7 @@ def main() -> int:
                 raise RuntimeError(f'Missing native runner: {path}')
             env[variable] = str(path)
         run('rust-unit', ['cargo', 'test', '--locked', '--manifest-path',
-                          'rust/Cargo.toml', '--workspace', '--features', 'conformance'])
+                          'rust/Cargo.toml', '--workspace', '--features', 'conformance,coordinator-server'])
         for script in ['w0_contract', 'w3_effect_boundary', 'w4_trace',
                        'w5_noninterference', 'w6_adapter']:
             run(script, [python, f'dev/verification/{script}.py', 'check'])
@@ -143,7 +144,7 @@ def main() -> int:
             run('lean-w4-w5', [python, 'dev/verification/w5_noninterference.py', 'prove'])
             run('lean-profile-emission-oauth', ['lake', '-d', 'proofs', 'build',
                                                '+GarrettProfiles', '+GarrettEmission',
-                                               '+GarrettOAuth', '+GarrettCoordination', '+GarrettRebinding', '+GarrettHttpAuth', '+GarrettHttpRequest'])
+                                               '+GarrettOAuth', '+GarrettCoordination', '+GarrettRebinding', '+GarrettHttpAuth', '+GarrettHttpRequest', '+GarrettCoordinatorAuthority'])
         if args.full_tests:
             with tempfile.TemporaryDirectory(prefix='as-full-', dir='/tmp') as temporary:
                 run('full-python-native', [python, '-m', 'pytest', '-q', '-ra',
@@ -152,6 +153,8 @@ def main() -> int:
         # conformance-backed process tests have finished using their binaries.
         if args.call_linkage:
             run('compiler-callback-links', [python, 'dev/verification/specialized_calls.py'])
+            run('coordinator-callback-links', [python, 'dev/verification/specialized_calls.py',
+                                                '--profile', 'coordinator'])
         if source_fingerprint() != manifest['input_sha256']:
             raise RuntimeError('Source changed during validation; rerun on a stable snapshot')
         manifest['status'] = 'passed'

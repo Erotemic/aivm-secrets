@@ -103,11 +103,15 @@ with the independent Python reference. Rust units check typed acknowledgements,
 HTTP framing and callback ordering/no retry.
 
 CORE-07/08/09 remain **partial**, rather than missing or parity-complete. The
-server is Python. The [policy identity follow-up](verified-policy-normalization.md)
+[optional native authority](native-coordinator-authority.md) now serves the same
+protocol/schema alongside the independent Python server. Both are exercised by
+the native/Python broker workflows, frozen reply/state vectors and restart cases.
+Its core membership and terminal decision/history proofs do not refine SQL/TLS
+or whole-service I/O. The [policy identity follow-up](verified-policy-normalization.md)
 now rebuilds normalized policy before fingerprinting and compares it with Python,
 including actual durable coordinator records. Duplicate keys remain refused
 regardless of fingerprint; all-input normalization equivalence is unproved. Legacy socket
-forwarding, a native coordinator server, broader core equivalence and deployment
+forwarding, broader core equivalence and deployment
 on genuinely separate hosts remain unvalidated.
 
 ```bash

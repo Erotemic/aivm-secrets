@@ -2,7 +2,7 @@
 """Check compiler-specialized callback links, keeping I/O obligations explicit.
 
 No mediation, dominance, data-flow or confidentiality theorem is claimed.
-The compiled bridge's normal feature profile is inspected without executing it.
+The selected compiled bridge/authority profile is inspected without executing it.
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ LIMITS = [
     'Opaque dependencies and their callbacks remain contracts, not traversed implementations.',
     'Implicit drops and unwind effects remain unresolved; counts are static compiler sites.',
     'No credential/data-flow or native byte-trace correspondence is proved.',
-    'Normal compiled target only; other targets and feature combinations need separate evidence.',
+    'Named compiled target/profile only; other targets and feature combinations need separate evidence.',
 ]
 
 
@@ -102,11 +102,12 @@ def stop_group(process):
     process.wait()
 
 
-def capture_process(command, cwd, out, limits=Limits()):
+def capture_process(command, cwd, out, limits=Limits(), artifact="garrett_bridge.ullbc"):
     """Stream only this fresh directory's compiler FIFO into a bounded gzip."""
-    fifo = out / 'garrett_bridge.ullbc'
+    require(artifact in {'garrett_bridge.ullbc', 'garrett_coordinator.ullbc'}, 'unknown compiler artifact')
+    fifo = out / artifact
     os.mkfifo(fifo, 0o600)
-    state = dict(schema=1, status='running', command=command, limits=asdict(limits),
+    state = dict(schema=1, status='running', command=command, artifact=artifact, limits=asdict(limits),
                  plain_bytes=0, error=None)
     digest = hashlib.sha256()
     cancel = threading.Event()
@@ -127,7 +128,7 @@ def capture_process(command, cwd, out, limits=Limits()):
             seen = False
             try:
                 fd = os.open(fifo, os.O_RDONLY | os.O_NONBLOCK)
-                with (out / 'bridge.ullbc.gz').open('wb') as target:
+                with (out / 'compiler.ullbc.gz').open('wb') as target:
                     bounded = LimitedOutput(target, limits.compressed)
                     with gzip.GzipFile(fileobj=bounded, mode='wb', compresslevel=1, mtime=0) as zipped:
                         while not cancel.is_set():
@@ -169,8 +170,8 @@ def capture_process(command, cwd, out, limits=Limits()):
             require(not state['error'], state['error'])
             require(state['exit_code'] == 0, 'compiler failed; see compiler.log')
             require(state['plain_bytes'] > 0, 'compiler emitted no bridge artifact')
-            state.update(status='captured', compressed_bytes=(out/'bridge.ullbc.gz').stat().st_size,
-                         compressed_sha256=sha(out/'bridge.ullbc.gz'))
+            state.update(status='captured', compressed_bytes=(out/'compiler.ullbc.gz').stat().st_size,
+                         compressed_sha256=sha(out/'compiler.ullbc.gz'))
         except BaseException as error:
             state.update(status='failed', error=str(error))
             raise
@@ -234,20 +235,24 @@ def path_through(nodes, stages):
     raise LedgerError('required compiled callback link missing')
 
 
-def explain(projection):
+def explain(projection, profile="bridge"):
     require(projection['projection_schema'] == 1, 'wrong projector schema')
     require(projection['charon_version'] == '0.1.291' and projection['has_errors'] is False,
             'unreviewed or incomplete compiler projection')
-    require(projection['translated']['crate_name'] == 'garrett_bridge'
+    require(profile in {'bridge', 'coordinator'}, 'unknown compiled profile')
+    crate = 'garrett_bridge' if profile == 'bridge' else 'garrett_coordinator'
+    require(projection['translated']['crate_name'] == crate
             and projection['translated']['options']['monomorphize'] is True
             and projection['translated']['options']['ullbc'] is True,
-            'projection is not the specialized bridge')
+            'projection is not the selected specialized target')
     declarations = [f for f in projection['translated']['fun_decls'] if f]
     nodes = {f['def_id']: f for f in declarations}
     require(len(nodes) == len(declarations), 'duplicate projected function ID')
-    root = select(nodes, ('aivm_secrets_garrett', 'tls', 'answer'))
+    root_name = (('aivm_secrets_garrett', 'tls', 'answer') if profile == 'bridge' else
+        ('aivm_secrets_garrett', 'coordinator_authority', 'server', 'exchange'))
+    root = select(nodes, root_name)
     witnesses = {}
-    for label, names in [
+    required_paths = [
         ('account-controller-executor', [
             ('aivm_secrets_garrett_core','protocol','perform'),
             ('aivm_secrets_garrett','custody','execute'),
@@ -275,7 +280,17 @@ def explain(projection):
             ('aivm_secrets_garrett','custody','manifest_session','manifest_request_bytes'),
             ('aivm_secrets_garrett_core','http_request','append_line'),
             ('aivm_secrets_garrett_core','http_request','valid_target')]),
-    ]:
+    ]
+    if profile == 'coordinator':
+        handler = ('aivm_secrets_garrett', 'coordinator_authority', 'ledger', 'handle')
+        core = ('aivm_secrets_garrett_core', 'coordinator_authority')
+        required_paths = [
+            ('coordinator-operator-admission', [handler, (*core, 'require_operator'), (*core, 'contains_peer')]),
+            ('coordinator-member-admission', [handler, (*core, 'admit'), (*core, 'contains_peer')]),
+            *[('coordinator-' + name, [handler, (*core, name)])
+              for name in ['activate', 'revoke', 'reserve', 'finish']],
+        ]
+    for label, names in required_paths:
         witnesses[label] = path_through(nodes, [root, *(select(nodes, n) for n in names)])
     visited = reachable(nodes, root)
     def open_calls(ids):
@@ -289,7 +304,7 @@ def explain(projection):
                     source=dict(file=files[location['file_id']]['name'],
                                 begin=location['beg'], end=location['end']))
     return dict(schema=1, status='callback-witnesses-present', complete_mediation=False,
-                scope='normal compiled bridge callback linkage; not a native trace proof',
+                profile=profile, scope='compiled ' + profile + ' handler linkage; not a native trace proof',
                 limits=LIMITS, counts=dict(functions=len(nodes),
                     calls=sum(f['body']['blocks']['calls'] for f in declarations),
                     drops=sum(f['body']['blocks']['drops'] for f in declarations),
@@ -317,12 +332,12 @@ def native_inputs(root):
     return {n: sha(root/n) for n in sorted(names)}
 
 
-def project_archive(archive, projector, out, limits=Limits()):
+def project_archive(archive, projector, out, limits=Limits(), profile="bridge"):
     partial = out/'projection.partial.json'
     with partial.open('wb') as output, (out/'projector.log').open('w') as log:
         unzip = subprocess.Popen(['gzip', '-dc', '--', str(archive)], stdout=subprocess.PIPE,
                                  stderr=log)
-        process = subprocess.Popen([str(projector),'--max-bytes',str(limits.plain)],
+        process = subprocess.Popen([str(projector),'--max-bytes',str(limits.plain),'--profile',profile],
                                    stdin=unzip.stdout, stdout=output, stderr=log)
         unzip.stdout.close()
         try:
@@ -336,12 +351,12 @@ def project_archive(archive, projector, out, limits=Limits()):
                 p.wait()
     require(partial.stat().st_size <= 64*1024**2, 'projection exceeds review size limit')
     projection = json.loads(partial.read_text())
-    report = explain(projection)
+    report = explain(projection, profile)
     partial.replace(out/'projection.json')
     return report
 
 
-def run(root, charon, limits=Limits()):
+def run(root, charon, limits=Limits(), profile="bridge"):
     (root/'.tools').mkdir(exist_ok=True)
     out = Path(tempfile.mkdtemp(prefix='specialized-calls-', dir=root/'.tools'))
     channel = tomllib.loads((root/'rust/rust-toolchain.toml').read_text())['toolchain']['channel']
@@ -359,15 +374,21 @@ def run(root, charon, limits=Limits()):
     before = native_inputs(root)
     command = [str(charon),'cargo','--preset=raw-mir','--sysroot','default','--monomorphize',
                '--start-from-if-exists','crate::main','--abort-on-error','--error-on-warnings']
-    for name in OPAQUE:
+    require(profile in {'bridge', 'coordinator'}, 'unknown compiled profile')
+    opaque = OPAQUE + (['rusqlite', 'libsqlite3_sys'] if profile == 'coordinator' else [])
+    for name in opaque:
         command += ['--opaque',name]
-    command += ['--dest',str(out),'--','--bin','garrett-bridge','--locked']
-    captured = capture_process(command, root/'rust/crates/aivm-secrets-garrett', out, limits)
+    binary = 'garrett-bridge' if profile == 'bridge' else 'garrett-coordinator'
+    command += ['--dest',str(out),'--','--bin',binary,'--locked']
+    if profile == 'coordinator':
+        command += ['--features', 'coordinator-server']
+    captured = capture_process(command, root/'rust/crates/aivm-secrets-garrett', out, limits,
+                               artifact=binary.replace('-', '_') + '.ullbc')
     require(native_inputs(root) == before, 'native Rust input changed during capture')
     projector = root/'rust/target/release/garrett-call-ledger'
     projector_hash = sha(projector)
-    report = project_archive(out/'bridge.ullbc.gz', projector, out, limits)
-    require(sha(out/'bridge.ullbc.gz') == captured['compressed_sha256'],
+    report = project_archive(out/'compiler.ullbc.gz', projector, out, limits, profile)
+    require(sha(out/'compiler.ullbc.gz') == captured['compressed_sha256'],
             'compiler artifact changed during projection')
     require(native_inputs(root) == before, 'native Rust input changed during projection')
     require({p: sha(Path(p)) for p in compiler_before} == compiler_before,
@@ -390,8 +411,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root',type=Path,default=ROOT)
     parser.add_argument('--charon',type=Path,default=ROOT/'.tools/aeneas/charon')
+    parser.add_argument('--profile', choices=['bridge', 'coordinator'], default='bridge')
     args = parser.parse_args()
-    run(args.root.resolve(),args.charon.resolve())
+    run(args.root.resolve(),args.charon.resolve(),profile=args.profile)
 
 
 if __name__ == '__main__':

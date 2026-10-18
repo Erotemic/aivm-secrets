@@ -239,3 +239,22 @@ def test_two_brokers_use_remote_tls_atomic_write_journal(tmp_path):
     finally:
         h_a.broker.close()
         h_b.broker.close()
+
+
+def test_stalled_unauthenticated_tls_peer_does_not_block_other_members(tmp_path, monkeypatch):
+    """An accepted raw socket must not monopolize the authority's accept loop."""
+    import socket
+    from tests.test_rust_coordination import CoordinatorCase
+
+    with CoordinatorCase(tmp_path / 'coord') as coord:
+        accepted = threading.Event()
+        original = coord.server._context.wrap_socket
+        def observe_handshake(*args, **kwargs):
+            accepted.set()
+            return original(*args, **kwargs)
+        monkeypatch.setattr(coord.server._context, 'wrap_socket', observe_handshake)
+        with socket.create_connection(('127.0.0.1', coord.server.server_address[1])):
+            assert accepted.wait(timeout=2)
+            # This valid authenticated request has its ordinary four-second
+            # deadline; it must succeed while the first socket sends no TLS.
+            assert coord.operator.status() == {'ok': True, 'active': False, 'revision': None}

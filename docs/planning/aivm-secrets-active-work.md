@@ -63,7 +63,11 @@ native rollover without restarting and preserves epoch/lifetime fencing. The [na
 adds terminal revocation checks and shared retry reservation against the Python
 server. The [same-key identity increment](../verified-identity-rebinding.md) also carries
 the existing grant through certificate/JWT renewal without restarting the broker.
-Broader core differential coverage, atomic guest delivery and a native coordinator server remain open.
+The [optional native coordinator authority](../native-coordinator-authority.md) now
+implements the same mTLS/SQLite protocol and schema, with cross-backend vectors,
+broker workflows and scoped core/terminal-history proofs. SQL/TLS/native I/O
+correspondence, broader core differential coverage and atomic guest delivery
+remain open.
 
 The [compiler-derived native call-site ledger](../native-call-ledger.md) is a
 reproducible W3/W6 investigation aid. It preserves all extracted owned bodies
@@ -229,7 +233,7 @@ and [new functionality and trust boundaries](../garrett-python-core-extensions.m
 
 | ID | Python deliverable and status | Rust parity/operational gate |
 | --- | --- | --- |
-| **P-CORE-07** | Durable terminal cross-host principal revocation using one local SQLite coordinator, mTLS member/operator pins, check at every broker and bound-bridge request; tests use synthetic same-host distinct member certificates | Native account/manifest client tested against Python coordinator; native server, real separate-host deployment, rollback witness and operational failover unvalidated |
+| **P-CORE-07** | Durable terminal cross-host principal revocation using one local SQLite coordinator, mTLS member/operator pins, check at every broker and bound-bridge request; tests use synthetic same-host distinct member certificates | Native account/manifest clients and optional native server tested against independent Python implementations; core terminal decision/history proofs compiled; SQL/native I/O refinement, real separate-host deployment, rollback witness and operational failover unvalidated |
 | **P-CORE-06** | Running OAuth broker leases the vault's current access token at each request, preserving capability and enrolled epoch; identity `renew-bound` issues fresh cert/JWT without broker/bridge restart | Rust same-session token rollover implemented and locally tested; same-key native renew/rebind tested without broker restart; broader differential gate incomplete and guest material delivery remains manual |
 | **P-CORE-08/09** | Durable per-principal idempotency reservations before any coordinated write; guest ASCII retry keys, optional explicit upstream `Idempotency-Key`, strict no-replay even after ambiguous result | Native keyed manifest dispatch and shared retry names tested; normalized policy fingerprints checked against Python and durable records; all-input parity and production provider header semantics unverified |
 | **P-PARITY** | All Python modules classified core vs non-core, 11 normative security contracts with Rust status and acceptance criteria | Implement independent Rust behavior and bidirectional negative/positive trace tests before marking any contract parity-complete |

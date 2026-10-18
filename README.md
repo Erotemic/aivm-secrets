@@ -96,6 +96,12 @@ typed response disclosure contract and uses extracted parameter and
 operation/write guards. Client aliases, command resolvers, approvals/delegation,
 JSON/I/O adapter refinement and whole-service verification remain open.
 
+The optional [native coordination authority](docs/native-coordinator-authority.md)
+now serves the same mTLS/SQLite protocol as Python, including terminal revocation
+and shared write reservations. Enable it explicitly with `coordinator-server`.
+Its core decision/history proofs and cross-backend runtime tests retain separate
+SQL/TLS/durability and native I/O obligations.
+
 The native client also supports [key/CSR bootstrap and recovery](docs/verified-client-material.md)
 with explicit software mode, protected no-replace publication and an extracted
 controller for ordered acknowledgement and uncertain outcomes. A provisioned TPM

@@ -1,4 +1,4 @@
-"""Native broker admission against the real durable Python mTLS coordinator."""
+"""Native broker admission against independent Python/Rust durable mTLS authorities."""
 from __future__ import annotations
 
 from contextlib import ExitStack
@@ -76,9 +76,17 @@ class CoordinatorCase:
         return private(self.root / f'member-{index}.json', self.config(self.members[index]))
 
 
+@pytest.fixture(params=['python', 'rust'])
+def coordinator_case(request):
+    if request.param == 'python':
+        return CoordinatorCase
+    from tests.test_rust_coordinator_authority import NativeCoordinatorCase
+    return NativeCoordinatorCase
+
+
 @pytest.mark.parametrize('profile', ['account', 'manifest'])
-def test_native_coordinator_revocation_denies_provider_and_control(tmp_path, profile):
-    with CoordinatorCase(tmp_path / 'coord') as coord, \
+def test_native_coordinator_revocation_denies_provider_and_control(tmp_path, profile, coordinator_case):
+    with coordinator_case(tmp_path / 'coord') as coord, \
             TLSService(provider_directory(tmp_path), host='api.example.org') as provider:
         coord.operator.activate([m[2] for m in coord.members[:2]])
         options = dict(coordination_file=str(coord.member_file()))
@@ -106,8 +114,8 @@ def write_request(key, text='hello'):
 
 
 @pytest.mark.parametrize('upstream_header', [False, True])
-def test_two_native_hosts_share_reservations_across_restart(tmp_path, upstream_header):
-    with CoordinatorCase(tmp_path / 'coord') as coord, \
+def test_two_native_hosts_share_reservations_across_restart(tmp_path, upstream_header, coordinator_case):
+    with coordinator_case(tmp_path / 'coord') as coord, \
             TLSService(provider_directory(tmp_path), host='api.example.org') as provider:
         coord.operator.activate([m[2] for m in coord.members[:2]])
         provider.routes[('PATCH', '/v1/tickets/7')] = dict(id=7)
@@ -147,8 +155,8 @@ def test_two_native_hosts_share_reservations_across_restart(tmp_path, upstream_h
             assert len(provider.seen()) == 2
 
 
-def test_concurrent_native_hosts_dispatch_one_write(tmp_path):
-    with CoordinatorCase(tmp_path / 'coord') as coord, \
+def test_concurrent_native_hosts_dispatch_one_write(tmp_path, coordinator_case):
+    with coordinator_case(tmp_path / 'coord') as coord, \
             TLSService(provider_directory(tmp_path), host='api.example.org') as provider:
         coord.operator.activate([m[2] for m in coord.members[:2]])
         provider.routes[('PATCH', '/v1/tickets/7')] = dict(id=7)
@@ -167,8 +175,8 @@ def test_concurrent_native_hosts_dispatch_one_write(tmp_path):
 
 
 @pytest.mark.parametrize('failure', ['provider-error', 'completion-revocation'])
-def test_uncertain_native_write_is_never_replayed(tmp_path, failure):
-    with CoordinatorCase(tmp_path / 'coord') as coord, \
+def test_uncertain_native_write_is_never_replayed(tmp_path, failure, coordinator_case):
+    with coordinator_case(tmp_path / 'coord') as coord, \
             TLSService(provider_directory(tmp_path), host='api.example.org') as provider:
         coord.operator.activate([coord.members[0][2]])
 
@@ -190,8 +198,8 @@ def test_uncertain_native_write_is_never_replayed(tmp_path, failure):
 
 
 @pytest.mark.parametrize('profile', ['account', 'manifest'])
-def test_remote_revocation_during_provider_setup_prevents_http(tmp_path, profile):
-    with CoordinatorCase(tmp_path / 'coord') as coord, \
+def test_remote_revocation_during_provider_setup_prevents_http(tmp_path, profile, coordinator_case):
+    with coordinator_case(tmp_path / 'coord') as coord, \
             TLSService(provider_directory(tmp_path), host='api.example.org') as provider:
         coord.operator.activate([coord.members[0][2]])
         options = dict(coordination_file=str(coord.member_file()))
@@ -215,8 +223,8 @@ def test_remote_revocation_during_provider_setup_prevents_http(tmp_path, profile
 
 
 @pytest.mark.parametrize('profile', ['account', 'manifest'])
-def test_coordinator_outage_never_uses_cached_admission(tmp_path, profile):
-    with CoordinatorCase(tmp_path / 'coord') as coord, \
+def test_coordinator_outage_never_uses_cached_admission(tmp_path, profile, coordinator_case):
+    with coordinator_case(tmp_path / 'coord') as coord, \
             TLSService(provider_directory(tmp_path), host='api.example.org') as provider:
         coord.operator.activate([coord.members[0][2]])
         options = dict(coordination_file=str(coord.member_file()))
@@ -237,8 +245,8 @@ def test_coordinator_outage_never_uses_cached_admission(tmp_path, profile):
 
 
 @pytest.mark.parametrize('member', [0, 2])
-def test_unregistered_or_wrong_member_has_no_provider_authority(tmp_path, member):
-    with CoordinatorCase(tmp_path / 'coord') as coord, \
+def test_unregistered_or_wrong_member_has_no_provider_authority(tmp_path, member, coordinator_case):
+    with coordinator_case(tmp_path / 'coord') as coord, \
             TLSService(provider_directory(tmp_path), host='api.example.org') as provider:
         if member == 2:
             coord.operator.activate([coord.members[0][2]])
@@ -255,8 +263,8 @@ def test_unregistered_or_wrong_member_has_no_provider_authority(tmp_path, member
 
 
 @pytest.mark.parametrize('key', [None, True, 17, 'short', 'x'*129, 'with space', 'line\nbreak', 'unicode-é-key'])
-def test_native_retry_names_are_strict_transport_metadata(tmp_path, key):
-    with CoordinatorCase(tmp_path / 'coord') as coord, \
+def test_native_retry_names_are_strict_transport_metadata(tmp_path, key, coordinator_case):
+    with coordinator_case(tmp_path / 'coord') as coord, \
             TLSService(provider_directory(tmp_path), host='api.example.org') as provider:
         coord.operator.activate([coord.members[0][2]])
         with ManifestCase(tmp_path, provider, writes='allow',
@@ -266,9 +274,9 @@ def test_native_retry_names_are_strict_transport_metadata(tmp_path, key):
             assert provider.seen() == []
 
 
-def test_file_loaded_coordinator_config_supports_only_explicit_localhost_exception(tmp_path):
+def test_file_loaded_coordinator_config_supports_only_explicit_localhost_exception(tmp_path, coordinator_case):
     # This file-load path previously contradicted the working direct client.
-    with CoordinatorCase(tmp_path / 'coord') as coord:
+    with coordinator_case(tmp_path / 'coord') as coord:
         value = coord.config(coord.members[0])
         assert CoordinationConfig.parse(value).host == 'localhost'
         for host in (None, True, 1, 'LOCALHOST', '127.0.0.1', 'localhost.', 'bad.local', 'x\r\nHost:y'):
@@ -279,13 +287,13 @@ def test_file_loaded_coordinator_config_supports_only_explicit_localhost_excepti
 @pytest.mark.parametrize('first_backend', ['python', 'rust'])
 @pytest.mark.parametrize('native_spelling', ['input', 'normalized', 'reordered'])
 def test_python_and_native_brokers_share_global_retry_names(tmp_path, first_backend,
-                                                           native_spelling):
+                                                           native_spelling, coordinator_case):
     """Both live backends act, and neither replays the other's reserved key."""
     from aivm_secrets.host.egress import HTTPSExecutor
     from aivm_secrets.kernel.service import parse_policy
     from tests.secrets_helpers import Harness, TOKEN
 
-    with CoordinatorCase(tmp_path / 'coord') as coord, \
+    with coordinator_case(tmp_path / 'coord') as coord, \
             TLSService(provider_directory(tmp_path), host='api.example.org') as provider:
         coord.operator.activate([m[2] for m in coord.members[:2]])
         provider.routes[('PATCH', '/v1/tickets/7')] = dict(id=7)
@@ -364,8 +372,8 @@ def test_native_idempotency_policy_field_matches_python(tmp_path):
 
 
 @pytest.mark.parametrize('profile', ['account', 'manifest'])
-def test_native_coordinator_never_falls_back_from_selected_trust_anchor(tmp_path, profile):
-    with CoordinatorCase(tmp_path / 'coord') as coord, \
+def test_native_coordinator_never_falls_back_from_selected_trust_anchor(tmp_path, profile, coordinator_case):
+    with coordinator_case(tmp_path / 'coord') as coord, \
             TLSService(provider_directory(tmp_path), host='api.example.org') as provider:
         coord.operator.activate([coord.members[0][2]])
         config = coord.config(coord.members[0])

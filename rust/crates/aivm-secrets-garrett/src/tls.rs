@@ -59,12 +59,18 @@ impl Drop for Deadline {
 /// Cannot be deserialized or constructed from a client-provided certificate.
 pub(crate) struct VerifiedPeer {
     thumbprint: String,
+    #[cfg(feature = "coordinator-server")]
+    certificate_sha256_hex: String,
 }
 impl VerifiedPeer {
     pub(crate) fn thumbprint(&self) -> &str {
         &self.thumbprint
     }
-    fn from_connection(connection: &ServerConnection) -> Outcome<Self> {
+    #[cfg(feature = "coordinator-server")]
+    pub(crate) fn certificate_sha256_hex(&self) -> &str {
+        &self.certificate_sha256_hex
+    }
+    pub(crate) fn from_connection(connection: &ServerConnection) -> Outcome<Self> {
         if connection.is_handshaking() {
             return Err(Error::InvalidCapability);
         }
@@ -74,11 +80,25 @@ impl VerifiedPeer {
             .ok_or(Error::InvalidCapability)?;
         Ok(Self {
             thumbprint: crypto::certificate_thumbprint(cert.as_ref())?,
+            // Coordinator member identities use hex DER hashes; Garrett JWT
+            // confirmation uses a base64url thumbprint of that same DER hash.
+            #[cfg(feature = "coordinator-server")]
+            certificate_sha256_hex: ring::digest::digest(&ring::digest::SHA256, cert.as_ref())
+                .as_ref()
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect(),
         })
     }
 }
 
 pub struct AuthenticatedServerConfig(Arc<ServerConfig>);
+impl AuthenticatedServerConfig {
+    #[cfg(feature = "coordinator-server")]
+    pub(crate) fn shared(&self) -> Arc<ServerConfig> {
+        self.0.clone()
+    }
+}
 pub fn server_config(
     certificate: &[u8],
     private_key: &[u8],
