@@ -51,6 +51,16 @@ def mutate(repo, filename, before, after):
 @pytest.mark.parametrize('file,old,new', [
     (
         RUST + 'custody/manifest_session.rs',
+        'emit_current(fresh, || {',
+        '(|| {',
+    ),
+    (
+        RUST + 'custody.rs',
+        'aivm_secrets_garrett_core::emission::emit_current(PendingEmission { check, emit })',
+        'emit()',
+    ),
+    (
+        RUST + 'custody/manifest_session.rs',
         'dispatch(PreparedDispatch::final_effect(&effect))?',
         'self.base.executor.exchange_manifest(&self.base.grant.route, &secret, &effect, &self.policy.headers)?',
     ),

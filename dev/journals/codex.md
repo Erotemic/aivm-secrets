@@ -1340,3 +1340,46 @@ confinement, to make the independent trust dimensions visible. Existing
 W4/W5 source/proof inventory checks still pass. The next step is a frozen-source
 full-system rerun after reconciling the pulled Python coordinator inventories;
 no broad parity or whole-service claim is being promoted here.
+
+
+## 2026-10-17 23:48:37 -0400
+
+Ported the saved `de4330e` dispatch-admission work into the pulled W3/W6
+implementation in an isolated worktree while preserving a clean main snapshot.
+The baseline full-system gate passed at ef97326: 2,217 tests, one explicitly
+pending primitive runner, 24 required workflow cases with zero skips, Rust
+units and W4/W5/profile Lean builds. The old runtime still reproduced all eight
+late-expiry failures, including credentialed HTTP after a stalled provider TLS
+handshake and outer-token acceptance after a vault wait. That made this a
+higher-priority Rust change than adding another new feature.
+
+I resolved the overlap by retaining W3's PreparedDispatch and W6's single pure
+wire encoder, then adding the last admission around emission. An automatic
+three-way merge had retained an obsolete inline encoder; I deliberately rebuilt
+that method from the newer baseline and applied just the late callback/control
+changes. The source guards now reject omission of the late callback as well
+as bypass of the extracted controller. Six changed runtime/core sources and
+the small new pure emission module were reviewed; the subsequent pinned
+formatter changes in pulled CLI/disclosure files were checked separately.
+
+All eight regressions pass, along with all 32 required workflow cases on both
+conformance and normal release binaries. Both strict lint modes pass. The
+actual model was regenerated; 213 named audit obligations compiled with the
+allowed axioms, and 287 selected native/reference tests passed in recording.
+W4/W5 recompile with unchanged theorem bodies and narrower status records that
+now acknowledge local kernel success while leaving native refinement open.
+The four new actual Rust mutations were re-extracted and rejected, without
+counting resource errors or unselected mutants as success. This is not a new
+completed 94-mutant audit. I added an explicit optional selection flag so
+incremental guard work does not require claiming or rerunning unrelated proof
+mutations every time; CI retains the complete default campaign.
+
+I also found and reproduced a packaging bug: source archives omitted W4/W5 and
+GarrettProfiles despite the developer gate needing them. Actual tarball coverage
+now catches missing proof modules; the corrected archive passes. I feel good
+about the concrete denied-before-send behavior and deliberately small Rust
+controller. The hard remaining premise is still concrete I/O/lease/clock
+refinement. A last sample does not atomically bound an entire network write,
+and revocation cannot cancel an already admitted provider effect. The next
+verification is the full frozen-source system gate for this adapted patch,
+followed by integration; no wider protocol parity claim is being made.

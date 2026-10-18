@@ -28,10 +28,16 @@ struct PreparedDispatch<'a> {
 }
 impl<'a> PreparedDispatch<'a> {
     fn preflight(effect: &'a Effect) -> Self {
-        Self { phase: DispatchPhase::Preflight, effect }
+        Self {
+            phase: DispatchPhase::Preflight,
+            effect,
+        }
     }
     fn final_effect(effect: &'a Effect) -> Self {
-        Self { phase: DispatchPhase::Final, effect }
+        Self {
+            phase: DispatchPhase::Final,
+            effect,
+        }
     }
 }
 
@@ -229,6 +235,7 @@ impl Session {
                 &secret,
                 effect,
                 &self.policy.headers,
+                &fresh,
             )
         };
         let facts = if let Some(effect) = self.policy.preflight(op, &args)? {
@@ -263,21 +270,25 @@ impl Session {
             release
         }
     }
-    pub(super) fn control(&mut self, inner: &[u8], verb: &str, _now: i64) -> Outcome<Value> {
+    pub(super) fn control(
+        &mut self,
+        verifier: &Verifier,
+        token: &str,
+        peer: &crate::tls::VerifiedPeer,
+        expected: Expectation,
+        verb: &str,
+    ) -> Outcome<Value> {
         let _vault = self
             .base
             .oauth
             .as_ref()
             .map(OAuthSource::active)
             .transpose()?;
-        let (claims, _secret) = self.base.envelope.open(inner)?;
-        core::require_use_current(
-            &claims,
-            &self.base.grant,
-            host_time()?,
-            self.base.elapsed()?,
-        )
-        .map_err(use_error)?;
+        let now = host_time()?;
+        let outer = verifier.open(token, peer, &expected, now)?;
+        let (claims, _secret) = self.base.envelope.open(outer.inner.bytes())?;
+        core::require_use_current(&claims, &self.base.grant, now, self.base.elapsed()?)
+            .map_err(use_error)?;
         if verb == "renounce" {
             self.base.executor.audit.write_record(&json!({"schema":1,"event":"revoked","grant":self.base.executor.audit.grant,"policy":self.base.executor.audit.policy}))?;
             self.base.grant.active = false;
@@ -304,26 +315,40 @@ fn manifest_request_bytes(
     headers: &BTreeMap<String, String>,
 ) -> Outcome<Zeroizing<Vec<u8>>> {
     let host = std::str::from_utf8(&route.host).map_err(|_| Error::InvalidPolicy)?;
-    if host.is_empty() || host.len() > 253
-        || !host.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-')
+    if host.is_empty()
+        || host.len() > 253
+        || !host
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-')
     {
         return Err(Error::InvalidPolicy);
     }
     let port = u16::try_from(route.port).map_err(|_| Error::InvalidPolicy)?;
-    if port == 0 || !matches!(effect.method.as_str(), "GET" | "POST" | "PATCH")
-        || !effect.target.starts_with('/') || effect.target.starts_with("//")
-        || effect.target.len() > 8192 || effect.target.bytes().any(|b| !(33..=126).contains(&b) || b == b'#')
-        || effect.accept.is_empty() || effect.accept.len() > 96
+    if port == 0
+        || !matches!(effect.method.as_str(), "GET" | "POST" | "PATCH")
+        || !effect.target.starts_with('/')
+        || effect.target.starts_with("//")
+        || effect.target.len() > 8192
+        || effect
+            .target
+            .bytes()
+            .any(|b| !(33..=126).contains(&b) || b == b'#')
+        || effect.accept.is_empty()
+        || effect.accept.len() > 96
         || !effect.accept.bytes().all(|b| (33..=126).contains(&b))
     {
         return Err(Error::InvalidPolicy);
     }
-    if secret.0.is_empty() || secret.0.len() > 4096
+    if secret.0.is_empty()
+        || secret.0.len() > 4096
         || !secret.0.iter().all(|b| (b'!'..=b'~').contains(b))
     {
         return Err(Error::CredentialSource);
     }
-    let body = effect.body.as_ref().map(|value| Zeroizing::new(json::canonical(value)));
+    let body = effect
+        .body
+        .as_ref()
+        .map(|value| Zeroizing::new(json::canonical(value)));
     if body.as_ref().is_some_and(|value| value.len() > MAX_BODY) {
         return Err(Error::InvalidPolicy);
     }
@@ -339,17 +364,44 @@ fn manifest_request_bytes(
     let mut seen_headers = std::collections::BTreeSet::new();
     for (name, value) in headers {
         let lower = name.to_ascii_lowercase();
-        if name.is_empty() || name.len() > 64 || !seen_headers.insert(lower.clone())
-            || !name.bytes().enumerate().all(|(index, b)| b.is_ascii_alphanumeric() || index > 0 && b == b'-')
-            || value.is_empty() || value.len() > 256
+        if name.is_empty()
+            || name.len() > 64
+            || !seen_headers.insert(lower.clone())
+            || !name
+                .bytes()
+                .enumerate()
+                .all(|(index, b)| b.is_ascii_alphanumeric() || index > 0 && b == b'-')
+            || value.is_empty()
+            || value.len() > 256
             || !value.bytes().all(|b| (32..=126).contains(&b))
-            || value.starts_with(' ') || value.ends_with(' ')
-            || ["accept", "accept-encoding", "authorization", "connection", "content-encoding",
-                "content-length", "content-type", "cookie", "expect", "forwarded", "host",
-                "keep-alive", "proxy-authorization", "proxy-connection", "te", "trailer",
-                "transfer-encoding", "upgrade", "user-agent", "via", "x-api-key"]
-                .contains(&lower.as_str())
-            || lower.starts_with("proxy-") || lower.starts_with("sec-")
+            || value.starts_with(' ')
+            || value.ends_with(' ')
+            || [
+                "accept",
+                "accept-encoding",
+                "authorization",
+                "connection",
+                "content-encoding",
+                "content-length",
+                "content-type",
+                "cookie",
+                "expect",
+                "forwarded",
+                "host",
+                "keep-alive",
+                "proxy-authorization",
+                "proxy-connection",
+                "te",
+                "trailer",
+                "transfer-encoding",
+                "upgrade",
+                "user-agent",
+                "via",
+                "x-api-key",
+            ]
+            .contains(&lower.as_str())
+            || lower.starts_with("proxy-")
+            || lower.starts_with("sec-")
             || lower.starts_with("x-forwarded-")
         {
             return Err(Error::InvalidPolicy);
@@ -364,7 +416,11 @@ fn manifest_request_bytes(
     request.extend_from_slice(b"\r\n");
     if let Some(body) = &body {
         request.extend_from_slice(
-            format!("Content-Type: application/json\r\nContent-Length: {}\r\n", body.len()).as_bytes(),
+            format!(
+                "Content-Type: application/json\r\nContent-Length: {}\r\n",
+                body.len()
+            )
+            .as_bytes(),
         );
     }
     request.extend_from_slice(b"\r\n");
@@ -381,6 +437,7 @@ impl Executor {
         secret: &Credential,
         effect: &Effect,
         headers: &BTreeMap<String, String>,
+        fresh: &impl Fn() -> Outcome<()>,
     ) -> Outcome<Value> {
         // Validate all outbound bytes before connecting to any provider.
         // A malformed OAuth-issued credential must not reach a socket at all.
@@ -444,11 +501,15 @@ impl Executor {
                 Ok(value)
             }
         };
-        if effect.write {
-            exchange().map_err(|_| Error::OutcomeUnknown)
-        } else {
-            exchange()
-        }
+        // TLS setup has completed. Sample authority again immediately before
+        // credential-bearing HTTP; a denial here has sent no provider request.
+        emit_current(fresh, || {
+            if effect.write {
+                exchange().map_err(|_| Error::OutcomeUnknown)
+            } else {
+                exchange()
+            }
+        })
     }
 }
 
@@ -594,9 +655,12 @@ mod wire_tests {
     }
     fn effect() -> Effect {
         Effect {
-            method: "GET".into(), target: "/v1/pull/7?state=open".into(),
-            accept: "application/json".into(), response: "json".into(),
-            body: None, write: false,
+            method: "GET".into(),
+            target: "/v1/pull/7?state=open".into(),
+            accept: "application/json".into(),
+            response: "json".into(),
+            body: None,
+            write: false,
         }
     }
     fn secret(bytes: &[u8]) -> Credential {
@@ -606,9 +670,17 @@ mod wire_tests {
     fn manifest_wire_is_one_origin_form_request_without_proxy_routing() {
         let mut headers = BTreeMap::new();
         headers.insert("X-GitHub-Api-Version".into(), "2026-03-10".into());
-        let request = manifest_request_bytes(&route(), &secret(b"SYNTHETIC_TOKEN_123456"), &effect(), &headers).unwrap();
+        let request = manifest_request_bytes(
+            &route(),
+            &secret(b"SYNTHETIC_TOKEN_123456"),
+            &effect(),
+            &headers,
+        )
+        .unwrap();
         let wire = String::from_utf8(request.to_vec()).unwrap();
-        assert!(wire.starts_with("GET /v1/pull/7?state=open HTTP/1.1\r\nHost: api.example.org:443\r\n"));
+        assert!(
+            wire.starts_with("GET /v1/pull/7?state=open HTTP/1.1\r\nHost: api.example.org:443\r\n")
+        );
         assert!(wire.contains("\r\nAuthorization: Bearer SYNTHETIC_TOKEN_123456\r\n"));
         assert!(wire.contains("\r\nX-GitHub-Api-Version: 2026-03-10\r\n"));
         assert!(wire.ends_with("\r\n\r\n"));
@@ -620,8 +692,12 @@ mod wire_tests {
         let mut api_route = route();
         api_route.authentication = core::Authentication::ApiKey;
         let request = manifest_request_bytes(
-            &api_route, &secret(b"SYNTHETIC_TOKEN_123456"), &effect(), &BTreeMap::new(),
-        ).unwrap();
+            &api_route,
+            &secret(b"SYNTHETIC_TOKEN_123456"),
+            &effect(),
+            &BTreeMap::new(),
+        )
+        .unwrap();
         let wire = String::from_utf8(request.to_vec()).unwrap();
         assert!(wire.contains("\r\nX-API-Key: SYNTHETIC_TOKEN_123456\r\n"));
         assert!(!wire.contains("Authorization:"));
@@ -629,36 +705,74 @@ mod wire_tests {
     }
     #[test]
     fn manifest_wire_rejects_injected_credential_or_header() {
-        for value in [b"TOKEN\r\nHost: attacker.test".as_slice(), b"TOKEN\nX-Other: evil", b"", b"TOKEN "] {
-            assert!(matches!(manifest_request_bytes(&route(), &secret(value), &effect(), &BTreeMap::new()), Err(Error::CredentialSource)));
+        for value in [
+            b"TOKEN\r\nHost: attacker.test".as_slice(),
+            b"TOKEN\nX-Other: evil",
+            b"",
+            b"TOKEN ",
+        ] {
+            assert!(matches!(
+                manifest_request_bytes(&route(), &secret(value), &effect(), &BTreeMap::new()),
+                Err(Error::CredentialSource)
+            ));
         }
         let mut headers = BTreeMap::new();
         headers.insert("Authorization".into(), "Bearer attacker".into());
-        assert!(matches!(manifest_request_bytes(&route(), &secret(b"GOOD_TOKEN_123456"), &effect(), &headers), Err(Error::InvalidPolicy)));
+        assert!(matches!(
+            manifest_request_bytes(&route(), &secret(b"GOOD_TOKEN_123456"), &effect(), &headers),
+            Err(Error::InvalidPolicy)
+        ));
         headers.clear();
         headers.insert("X-Allowed".into(), "ok\r\nHost: attacker".into());
-        assert!(matches!(manifest_request_bytes(&route(), &secret(b"GOOD_TOKEN_123456"), &effect(), &headers), Err(Error::InvalidPolicy)));
+        assert!(matches!(
+            manifest_request_bytes(&route(), &secret(b"GOOD_TOKEN_123456"), &effect(), &headers),
+            Err(Error::InvalidPolicy)
+        ));
         headers.clear();
         headers.insert("X-Scope".into(), "a".into());
         headers.insert("x-scope".into(), "b".into());
-        assert!(matches!(manifest_request_bytes(&route(), &secret(b"GOOD_TOKEN_123456"), &effect(), &headers), Err(Error::InvalidPolicy)));
+        assert!(matches!(
+            manifest_request_bytes(&route(), &secret(b"GOOD_TOKEN_123456"), &effect(), &headers),
+            Err(Error::InvalidPolicy)
+        ));
     }
     #[test]
     fn manifest_wire_rejects_unreviewed_target_and_renders_bounded_body() {
         let mut bad = effect();
-        for path in ["//attacker.test/", "/ok\r\nX-Injected: yes", "/unsafe#fragment"] {
+        for path in [
+            "//attacker.test/",
+            "/ok\r\nX-Injected: yes",
+            "/unsafe#fragment",
+        ] {
             bad.target = path.into();
-            assert!(matches!(manifest_request_bytes(&route(), &secret(b"GOOD_TOKEN_123456"), &bad, &BTreeMap::new()), Err(Error::InvalidPolicy)));
+            assert!(matches!(
+                manifest_request_bytes(
+                    &route(),
+                    &secret(b"GOOD_TOKEN_123456"),
+                    &bad,
+                    &BTreeMap::new()
+                ),
+                Err(Error::InvalidPolicy)
+            ));
         }
         let mut post = effect();
         post.method = "POST".into();
         post.target = "/graphql".into();
         post.body = Some(json!({"operationName":"Pull","variables":{"pr":7}}));
-        let bytes = manifest_request_bytes(&route(), &secret(b"GOOD_TOKEN_123456"), &post, &BTreeMap::new()).unwrap();
+        let bytes = manifest_request_bytes(
+            &route(),
+            &secret(b"GOOD_TOKEN_123456"),
+            &post,
+            &BTreeMap::new(),
+        )
+        .unwrap();
         let wire = String::from_utf8(bytes.to_vec()).unwrap();
         let (head, body) = wire.split_once("\r\n\r\n").unwrap();
         assert!(head.contains(&format!("Content-Length: {}", body.len())));
-        assert_eq!(serde_json::from_str::<Value>(body).unwrap(), post.body.unwrap());
+        assert_eq!(
+            serde_json::from_str::<Value>(body).unwrap(),
+            post.body.unwrap()
+        );
     }
     #[test]
     fn manifest_response_rejects_redirect_partial_and_ambiguous_framing() {
@@ -679,9 +793,14 @@ mod wire_tests {
     fn manifest_response_accepts_only_bounded_complete_representation() {
         use std::io::Cursor;
         let bytes = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 8\r\n\r\n{\"ok\":1}";
-        assert_eq!(manifest_response(Cursor::new(bytes), "json").unwrap(), b"{\"ok\":1}");
+        assert_eq!(
+            manifest_response(Cursor::new(bytes), "json").unwrap(),
+            b"{\"ok\":1}"
+        );
         let chunked = b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nTransfer-Encoding: chunked\r\n\r\n4\r\nDATA\r\n0\r\n\r\n";
-        assert_eq!(manifest_response(Cursor::new(chunked), "text").unwrap(), b"DATA");
+        assert_eq!(
+            manifest_response(Cursor::new(chunked), "text").unwrap(),
+            b"DATA"
+        );
     }
-
 }

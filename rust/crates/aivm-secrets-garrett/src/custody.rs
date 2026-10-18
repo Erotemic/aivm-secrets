@@ -253,8 +253,37 @@ struct Executor {
     address: IpAddr,
     audit: Audit,
 }
+struct PendingEmission<C, E> {
+    check: C,
+    emit: E,
+}
+impl<C, E, T> aivm_secrets_garrett_core::emission::PendingEmission for PendingEmission<C, E>
+where
+    C: Fn() -> Outcome<()>,
+    E: FnOnce() -> Outcome<T>,
+{
+    type Output = T;
+    type Error = Error;
+    fn recheck(&self) -> Outcome<()> {
+        (self.check)()
+    }
+    fn emit(self) -> Outcome<T> {
+        (self.emit)()
+    }
+}
+fn emit_current<T>(
+    check: impl Fn() -> Outcome<()>,
+    emit: impl FnOnce() -> Outcome<T>,
+) -> Outcome<T> {
+    aivm_secrets_garrett_core::emission::emit_current(PendingEmission { check, emit })
+}
 impl Executor {
-    fn exchange(&self, route: &core::Route, secret: &Credential) -> Outcome<core::ProviderReply> {
+    fn exchange(
+        &self,
+        route: &core::Route,
+        secret: &Credential,
+        fresh: &impl Fn() -> Outcome<()>,
+    ) -> Outcome<core::ProviderReply> {
         let host = std::str::from_utf8(&route.host).map_err(|_| Error::InternalError)?;
         let path = std::str::from_utf8(&route.path).map_err(|_| Error::InternalError)?;
         let port = u16::try_from(route.port).map_err(|_| Error::InternalError)?;
@@ -289,10 +318,12 @@ impl Executor {
         let mut request=Zeroizing::new(format!("GET {path} HTTP/1.1\r\nHost: {host}:{port}\r\nAccept: application/json\r\nAccept-Encoding: identity\r\nUser-Agent: aivm-secrets/1\r\nConnection: close\r\n{auth}").into_bytes());
         request.extend_from_slice(&secret.0);
         request.extend_from_slice(b"\r\n\r\n");
-        stream
-            .write_all(&request)
-            .and_then(|_| stream.flush())
-            .map_err(|_| Error::UpstreamResponse)?;
+        emit_current(fresh, || {
+            stream
+                .write_all(&request)
+                .and_then(|_| stream.flush())
+                .map_err(|_| Error::UpstreamResponse)
+        })?;
         let body = Zeroizing::new(response(BufReader::new(stream))?);
         let value = json::parse(&body, MAX_BODY).map_err(|_| Error::UpstreamResponse)?;
         let id = value.get("id").ok_or(Error::UpstreamResponse)?;
@@ -314,15 +345,24 @@ impl Executor {
         })
     }
 }
-impl core::CredentialExecutor for Executor {
+struct CurrentExecutor<'a, F> {
+    executor: &'a Executor,
+    fresh: F,
+}
+impl<F: Fn() -> Outcome<()>> core::CredentialExecutor for CurrentExecutor<'_, F> {
     type Credential = Credential;
     fn execute(
         &self,
         route: &core::Route,
         credential: &Credential,
     ) -> Result<core::ProviderReply, core::UseDenial> {
-        self.exchange(route, credential)
-            .map_err(|_| core::UseDenial::Upstream)
+        self.executor
+            .exchange(route, credential, &self.fresh)
+            .map_err(|error| match error {
+                Error::InvalidCapability => core::UseDenial::InvalidCapability,
+                Error::Denied => core::UseDenial::Denied,
+                _ => core::UseDenial::Upstream,
+            })
     }
 }
 
@@ -709,11 +749,38 @@ impl AccountSession {
             now,
             elapsed: self.elapsed()?,
         };
+        let current_executor = CurrentExecutor {
+            executor: &self.executor,
+            fresh: || {
+                // Both audit persistence and provider TLS setup can block.
+                // Re-open and re-authorize at the actual emission boundary.
+                let current = protocol::Presentation {
+                    expected: Expectation {
+                        issuer: presentation.expected.issuer.clone(),
+                        audience: presentation.expected.audience.clone(),
+                        subject: presentation.expected.subject.clone(),
+                        epoch: presentation.expected.epoch,
+                    },
+                    peer: presentation.peer.clone(),
+                    now: host_time()?,
+                    elapsed: self.elapsed()?,
+                };
+                protocol::recheck(
+                    verifier,
+                    &self.envelope,
+                    &token.as_bytes().to_vec(),
+                    &self.grant,
+                    &operation,
+                    &current,
+                )
+                .map_err(use_error)
+            },
+        };
         let result = protocol::perform(
             verifier,
             &self.envelope,
             &self.executor.audit,
-            &self.executor,
+            &current_executor,
             &token.as_bytes().to_vec(),
             &self.grant,
             &operation,
@@ -735,13 +802,18 @@ impl AccountSession {
     fn elapsed(&self) -> Outcome<i64> {
         i64::try_from(self.started.elapsed().as_secs()).map_err(|_| Error::InvalidCapability)
     }
-    pub(crate) fn control(&mut self, inner: &[u8], verb: &str, now: i64) -> Outcome<Value> {
+    pub(crate) fn control(
+        &mut self,
+        verifier: &Verifier,
+        token: &str,
+        peer: &crate::tls::VerifiedPeer,
+        expected: Expectation,
+        verb: &str,
+    ) -> Outcome<Value> {
         let _vault_lease = self.oauth.as_ref().map(OAuthSource::active).transpose()?;
-        let now = if self.oauth.is_some() {
-            host_time()?
-        } else {
-            now
-        };
+        let now = host_time()?;
+        let outer = verifier.open(token, peer, &expected, now)?;
+        let inner = outer.inner.bytes();
         if !matches!(verb, "describe" | "renounce") {
             return Err(Error::Denied);
         }
@@ -942,10 +1014,17 @@ impl ProviderSession {
             Backend::Manifest(s) => s.request(verifier, token, peer, expected, value, now),
         }
     }
-    pub(crate) fn control(&mut self, inner: &[u8], verb: &str, now: i64) -> Outcome<Value> {
+    pub(crate) fn control(
+        &mut self,
+        verifier: &Verifier,
+        token: &str,
+        peer: &crate::tls::VerifiedPeer,
+        expected: Expectation,
+        verb: &str,
+    ) -> Outcome<Value> {
         match &mut self.0 {
-            Backend::Account(s) => s.control(inner, verb, now),
-            Backend::Manifest(s) => s.control(inner, verb, now),
+            Backend::Account(s) => s.control(verifier, token, peer, expected, verb),
+            Backend::Manifest(s) => s.control(verifier, token, peer, expected, verb),
         }
     }
 }

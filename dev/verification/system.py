@@ -26,6 +26,7 @@ WORKFLOW_TESTS = [
     'tests/test_rust_w5_noninterference.py',
     'tests/test_rust_w6_adapter.py',
     'tests/test_assurance_profiles.py',
+    'tests/test_rust_garrett_dispatch.py',
     'tests/test_rust_garrett_authority.py::test_tpm_requirement_rejects_software_before_credential_custody',
 ]
 
@@ -72,6 +73,7 @@ def main() -> int:
                     source_dirty=bool(subprocess.check_output(
                         ['git', 'status', '--porcelain'], cwd=ROOT)),
                     scope='synthetic usable workflow; not full protocol parity',
+                    proofs_requested=args.proofs, full_tests_requested=args.full_tests,
                     input_sha256=source_fingerprint())
     report = output / 'report.json'
     env = dict(os.environ)
@@ -116,7 +118,8 @@ def main() -> int:
             env[variable] = str(path)
         run('rust-unit', ['cargo', 'test', '--locked', '--manifest-path',
                           'rust/Cargo.toml', '--workspace', '--features', 'conformance'])
-        for script in ['w0_contract', 'w3_effect_boundary', 'w6_adapter']:
+        for script in ['w0_contract', 'w3_effect_boundary', 'w4_trace',
+                       'w5_noninterference', 'w6_adapter']:
             run(script, [python, f'dev/verification/{script}.py', 'check'])
         with tempfile.TemporaryDirectory(prefix='as-system-', dir='/tmp') as temporary:
             junit = output / 'workflows.xml'
@@ -126,7 +129,8 @@ def main() -> int:
             manifest['required_workflow_tests'] = require_no_skips(junit)
         if args.proofs:
             run('lean-w4-w5', [python, 'dev/verification/w5_noninterference.py', 'prove'])
-            run('lean-profiles', ['lake', '-d', 'proofs', 'build', '+GarrettProfiles'])
+            run('lean-profile-and-emission', ['lake', '-d', 'proofs', 'build',
+                                            '+GarrettProfiles', '+GarrettEmission'])
         if args.full_tests:
             with tempfile.TemporaryDirectory(prefix='as-full-', dir='/tmp') as temporary:
                 run('full-python-native', [python, '-m', 'pytest', '-q', '-ra',

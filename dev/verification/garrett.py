@@ -277,6 +277,17 @@ THEOREMS += [
     "aivm_secrets_garrett_core.client_material.Proofs.successful_request_witness",
 ]
 
+THEOREMS += [
+    "aivm_secrets_garrett_core.emission.Proofs.rejected_before_emission",
+    "aivm_secrets_garrett_core.emission.Proofs.denied_emission_independent",
+    "aivm_secrets_garrett_core.emission.Proofs.admitted_continuation",
+    "aivm_secrets_garrett_core.emission.Proofs.emission_contract",
+    "aivm_secrets_garrett_core.emission.Proofs.successful_emission_witness",
+    "aivm_secrets_garrett_core.protocol.Proofs.recheck_contract",
+    "aivm_secrets_garrett_core.protocol.Proofs.recheck_rejection",
+    "aivm_secrets_garrett_core.protocol.Proofs.recheck_successful_witness",
+]
+
 TESTS = [
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
@@ -291,6 +302,7 @@ TESTS = [
     "tests/test_rust_garrett_reflection.py",
     "tests/test_rust_garrett_client_material.py",
     "tests/test_rust_garrett_tpm_request.py",
+    "tests/test_rust_garrett_dispatch.py",
     "tests/test_secrets_garrett_modularity.py",
     "tests/test_secrets_identity_parity.py",
     "tests/test_secrets_identity_registry_parity.py",
@@ -345,6 +357,8 @@ def inputs() -> list[str]:
         "proofs/GarrettDisclosure.lean",
         "proofs/GarrettReflection.lean",
         "proofs/GarrettClientMaterial.lean",
+        "proofs/GarrettEmission.lean",
+        "proofs/GarrettProfiles.lean",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
         "dev/verification/freshness.py",
@@ -524,7 +538,7 @@ def assurance_coordinates() -> dict:
         "aeneas_release": base.RELEASE,
         "theorems": THEOREMS,
         "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
-        "implementation_linked": "Aeneas-generated issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation",
+        "implementation_linked": "Aeneas-generated issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
@@ -545,6 +559,7 @@ def assurance_coordinates() -> dict:
             "OAuth quarantine and successor persistence are conditional storage-adapter contracts. Native vault locking drains participating refresh/revoke against dispatch and HMAC checks token equality; root snapshot rollback, hostile same-UID replacement and nonparticipating writers are outside that boundary.",
             "Native PKCE login trusts entropy, SHA-256 S256 derivation, HTTP/query decoding and loopback listener/clock adapters. Callback binding and one-shot lifecycle guards are extracted; ready URLs go only to a trusted host operator/browser, and their state/challenge must not be offered as an agent API. Concrete acquisition I/O histories and secret-sink refinement remain open.",
             "The manifest HTTPS backend trusts the policy/check/template/GraphQL parsers, JSON-to-typed-tree conversion and selected-tree rendering, reflection traversal/call sites and concrete HTTP/audit ordering. Exact borrowed-byte literal search is extracted and proved. The extracted recursive filter matches an independent selection specification and has exact two-run noninterference under recursive schema agreement; unselected typed-tree fields are unconstrained. These contracts do not refine the remaining adapters or establish arbitrary provider non-disclosure or whole-service trace equivalence. Native configuration explicitly selects unbounded requests and a file source or explicit OAuth override.",
+            "Native provider emission rechecks authority after audit, TLS setup and request construction. The extracted continuation refuses emission on a failed recheck; setup placement, trusted clock sampling, live lease stability and concrete socket writes remain tested adapter contracts. Control admission follows the credential lease wait and checks the outer as well as inner lifetime.",
             "Native TPM CSR creation reuses the validated pinned-key signer and verifies its returned possession request. Local TPM attributes and signatures do not establish hardware provenance; independent fresh attestation approval under a trusted AK remains required. The new CSR, TPM command and JSON/file adapters are tested, not newly formally refined.",
             "Native software client bootstrap trusts entropy, P-256/CSR/SPKI adapters and held-directory no-replace file publication/durability. The extracted controller proves key acknowledgement before CSR publication and conservative uncertainty; it does not prove the filesystem, private-key memory erasure, signing or CLI I/O. Existing material is never automatically replaced or adopted, and software requests assert no TPM or VM provenance.",
             "Controller histories assume signature verification has prior recorded issuer origin; the ideal signature-origin theorem does not establish a computational byte-level or concrete I/O refinement.",
@@ -600,7 +615,7 @@ def record() -> None:
     print("Recorded checked Garrett source, assumptions and proof coordinates.")
 
 
-def mutate() -> None:
+def mutate(pattern: str | None = None) -> None:
     source = ROOT / "rust/crates/aivm-secrets-garrett-core/src/lib.rs"
     changes = [
         ("missing peer binding", "|| claims.certificate != *peer", "|| false"),
@@ -1141,6 +1156,38 @@ def mutate() -> None:
             "match store.write_csr() {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }\n    match store.write_key() {",
         ),
     ]
+    mutations += [
+        (
+            source.with_name("emission.rs"),
+            "late admission omitted",
+            "    match pending.recheck() {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }",
+            "    let _admitted = ();",
+        ),
+        (
+            source.with_name("emission.rs"),
+            "late admission denial ignored",
+            "    match pending.recheck() {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }",
+            "    let _ignored = pending.recheck();",
+        ),
+        (
+            source.with_name("protocol.rs"),
+            "late protocol checks omitted",
+            "    match prepare(verifier, opener, token, grant, operation, presentation) {\n        Ok(_) => Ok(()),\n        Err(error) => Err(error),\n    }",
+            "    Ok(())",
+        ),
+        (
+            source.with_name("protocol.rs"),
+            "late protocol denial reported admitted",
+            "    match prepare(verifier, opener, token, grant, operation, presentation) {\n        Ok(_) => Ok(()),\n        Err(error) => Err(error),\n    }",
+            "    match prepare(verifier, opener, token, grant, operation, presentation) {\n        Ok(_) => Ok(()),\n        Err(_) => Ok(()),\n    }",
+        ),
+    ]
+    total = len(mutations)
+    if pattern is not None:
+        mutations = [mutation for mutation in mutations if re.search(pattern, mutation[1])]
+        if not mutations:
+            raise SystemExit("no security mutations match the selected filter")
+    print(f"Selected {len(mutations)} of {total} security mutations; filter={pattern!r}", flush=True)
     lean_path = base.run(
         [base.executable("lake"), "env", "printenv", "LEAN_PATH"],
         cwd=PROOFS,
@@ -1206,6 +1253,7 @@ def mutate() -> None:
                 "GarrettDisclosure",
                 "GarrettReflection",
                 "GarrettClientMaterial",
+                "GarrettEmission",
             ]
             # These leaves import the extracted crate plus generic standard-
             # model facts. Check the affected leaf first; keep full fallback
@@ -1218,6 +1266,7 @@ def mutate() -> None:
                 "oauth_login.rs": "GarrettLogin",
                 "reflection.rs": "GarrettReflection",
                 "client_material.rs": "GarrettClientMaterial",
+                "emission.rs": "GarrettEmission",
             }.get(source.name)
             if preferred:
                 modules.remove(preferred)
@@ -1300,7 +1349,10 @@ def main() -> None:
     parser.add_argument(
         "action", choices=["bootstrap", "extract", "record", "check", "mutate"]
     )
+    parser.add_argument("--mutation-filter", help="Run only labels matching this regex; never counts as the full mutation campaign.")
     args = parser.parse_args()
+    if args.mutation_filter is not None and args.action != "mutate":
+        parser.error("--mutation-filter requires the mutate action")
     if args.action == "bootstrap":
         base.bootstrap()
     elif args.action == "extract":
@@ -1312,7 +1364,7 @@ def main() -> None:
         regeneration()
         prove()
         if args.action == "mutate":
-            mutate()
+            mutate(args.mutation_filter)
         else:
             parity()
 

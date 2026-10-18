@@ -114,6 +114,15 @@ def review_semantics(contents: dict[str, str]) -> None:
             'native module added a credentialed socket or HTTP writer')
     require(m.count('exchange_manifest(') == 2,
             'extra native manifest executor call site')
+    transport = part(m, '    fn exchange_manifest(', '\nfn manifest_response(')
+    require(same_order(transport, 'let request = manifest_request_bytes(',
+                       'TcpStream::connect_timeout(', 'while conn.is_handshaking()',
+                       'let exchange = || -> Outcome<Value>', 'emit_current(fresh, || {'),
+            'final authority admission does not follow provider TLS setup')
+    emit = transport.split('emit_current(fresh, || {', 1)[1]
+    require(transport.count('emit_current(fresh, || {') == 1
+            and transport.count('exchange()') == 2 and emit.count('exchange()') == 2,
+            'manifest provider write bypasses late admission continuation')
     require('self.address,' in m and 'route.authentication' in m
             and 'ClientConnection::new(self.tls.clone(), name)' in m,
             'provider request no longer uses the reviewed host route / TLS identity')
@@ -153,6 +162,9 @@ def review_semantics(contents: dict[str, str]) -> None:
     c = contents[RUST + 'custody.rs']
     require('fn write_record(&self, value: &Value)' in c and '.sync_all()' in c,
             'audit persistence acknowledgement changed')
+    require('aivm_secrets_garrett_core::emission::emit_current(PendingEmission { check, emit })' in c
+            and '(self.check)()' in c and '(self.emit)()' in c,
+            'native emission bypasses the extracted admission controller')
     d = contents[RUST + 'manifest/disclosure.rs']
     require('filter::project_fields(' in d and 'ensure_safe(&value, credential)?;' in d,
             'native disclosure no longer selects and reflection-checks public fields')

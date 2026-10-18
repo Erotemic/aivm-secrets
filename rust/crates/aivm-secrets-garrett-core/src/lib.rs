@@ -212,3 +212,4 @@ pub mod disclosure;
 pub mod reflection;
 
 pub mod client_material;
+pub mod emission;

@@ -70,7 +70,7 @@ def check(root: Path = ROOT) -> dict:
     require(spec.get('schema') == 1, 'invalid W5 manifest schema')
     require(spec.get('scope') == 'adaptive-modeled-guest-observations-v1',
             'W5 proof scope changed')
-    require(spec.get('status') == 'candidate-awaiting-lean-kernel',
+    require(spec.get('status') == 'local-kernel-checked-refinement-open',
             'W5 claim status changed without review')
     require(set(spec.get('explicit_release_premises', [])) == EXPECTED_RELEASES,
             'W5 release classification changed without review')

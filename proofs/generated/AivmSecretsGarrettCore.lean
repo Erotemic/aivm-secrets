@@ -1002,6 +1002,28 @@ partial_fixpoint
 
 end
 
+/-- Trait declaration: [aivm_secrets_garrett_core::emission::PendingEmission]
+    Source: 'crates/aivm-secrets-garrett-core/src/emission.rs', lines 5:0-10:1
+    Visibility: public -/
+structure emission.PendingEmission (Self : Type _) (Self_Output : Type _)
+  (Self_Error : Type _) where
+  recheck : Self → Result (core.result.Result Unit Self_Error)
+  emit : Self → Result (core.result.Result Self_Output Self_Error)
+
+/-- [aivm_secrets_garrett_core::emission::emit_current]:
+    Source: 'crates/aivm-secrets-garrett-core/src/emission.rs', lines 12:0-18:1
+    Visibility: public -/
+def emission.emit_current
+  {E : Type _} {Clause0_Output : Type _} {Clause0_Error : Type _}
+  (PendingEmissionInst : emission.PendingEmission E Clause0_Output
+  Clause0_Error) (pending : E) :
+  Result (core.result.Result Clause0_Output Clause0_Error)
+  := do
+  let r ← PendingEmissionInst.recheck pending
+  match r with
+  | core.result.Result.Ok _ => PendingEmissionInst.emit pending
+  | core.result.Result.Err error => ok (core.result.Result.Err error)
+
 /-- [aivm_secrets_garrett_core::enrollment::EnrollmentDenial]
     Source: 'crates/aivm-secrets-garrett-core/src/enrollment.rs', lines 5:0-10:1
     Visibility: public -/
@@ -2079,8 +2101,27 @@ def protocol.prepare
   | core.result.Result.Err _ =>
     ok (core.result.Result.Err credential_use.UseDenial.InvalidCapability)
 
+/-- [aivm_secrets_garrett_core::protocol::recheck]:
+    Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 120:0-136:1
+    Visibility: public -/
+def protocol.recheck
+  {V : Type _} {O : Type _} {Clause0_Secret : Type _} {Clause1_Credential :
+  Type _} (EnvelopeVerifierInst : EnvelopeVerifier V Clause0_Secret)
+  (CredentialOpenerInst : protocol.CredentialOpener O Clause0_Secret
+  Clause1_Credential) (verifier : V) (opener : O)
+  (token : alloc.vec.Vec Std.U8) (grant : credential_use.UseGrant)
+  (operation : alloc.vec.Vec Std.U8) (presentation : protocol.Presentation) :
+  Result (core.result.Result Unit credential_use.UseDenial)
+  := do
+  let r ←
+    protocol.prepare EnvelopeVerifierInst CredentialOpenerInst verifier opener
+      token grant operation presentation
+  match r with
+  | core.result.Result.Ok _ => ok (core.result.Result.Ok ())
+  | core.result.Result.Err error => ok (core.result.Result.Err error)
+
 /-- [aivm_secrets_garrett_core::protocol::perform]:
-    Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 119:0-144:1
+    Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 139:0-164:1
     Visibility: public -/
 def protocol.perform
   {V : Type _} {O : Type _} {A : Type _} {E : Type _} {Clause0_Secret : Type _}

@@ -62,7 +62,7 @@ def check(root: Path = ROOT) -> dict:
     info = json.loads((root / MANIFEST).read_text())
     require(info.get('schema') == 1, 'invalid W4 schema')
     require(info.get('scope') == 'modeled-native-manifest-two-phase-v1', 'incorrect W4 scope')
-    require(info.get('status') == 'candidate-not-yet-kernel-checked', 'incorrect W4 claim status')
+    require(info.get('status') == 'local-kernel-checked-refinement-open', 'incorrect W4 claim status')
     require(set(info.get('core_sha256', {})) == EXPECTED_CORE, 'extracted Rust input coverage changed')
     require(set(info.get('open_obligations', [])) == EXPECTED_TODO, 'missing unproved W4/W6 obligations')
     for name, expected in info['core_sha256'].items():

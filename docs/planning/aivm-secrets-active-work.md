@@ -48,6 +48,18 @@ complete native trace refinement and live deployment/provider gates remain open.
 The [interactive comparison](../assurance-profiles.html) keeps credential
 confinement, surrogate binding and identity-key custody as separate dimensions.
 
+## Native dispatch follow-up
+
+The [dispatch freshness increment](../verified-dispatch-freshness.md) brings
+forward the saved late-admission fix into the newer W3/W6 adapters: eight
+blocking-setup regressions reproduced on the baseline and pass with the fix.
+The small extracted emission controller and repeated protocol admission are
+kernel-checked; concrete clock/lease/call-site correspondence stays explicit.
+The usable-system gate includes the new regressions in both software-key
+workflows. W4/W5 model records report local kernel checking with native
+refinement still open. Native coordinator/idempotency and same-session OAuth
+rollover parity remain the Python-core follow-on queue.
+
 ## Product question and security objective
 
 A hostile agent should be able to perform a *real, specifically authorized*

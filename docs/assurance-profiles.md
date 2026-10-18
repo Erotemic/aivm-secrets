@@ -82,14 +82,18 @@ python dev/verification/assurance_profiles.py check
 ```
 
 The usable-system gate builds independent Rust binaries, runs Rust unit tests,
-checks the W0/W3/W6 source inventories and executes the Python/native workflows.
+checks the W0/W3/W4/W5/W6 source inventories and executes the Python/native workflows.
 It rejects skipped, failed or empty required-workflow reports. Optional full
 suite skips are reported by pytest; they are not native workflow completion.
 It retains command logs, JUnit and a source-fingerprinted JSON report under a
 unique ignored `.tools/system-*` directory. Changing Git-visible source during
 the run invalidates the result. `--proofs` compiles W4/W5 and the new profile
-module; it does not rerun the separate full regeneration/mutation campaign.
+module plus the extracted late-emission contracts; it does not rerun the separate full regeneration/mutation campaign.
 
 The CI Garrett workflow runs the usable-system gate in addition to its existing
 extraction/proof/mutation checks. Hosted CI execution is separate evidence from
 a local pass. The visualization is standalone HTML with no network dependencies.
+
+The [native dispatch freshness record](verified-dispatch-freshness.md) describes
+the last authority sample after TLS setup and the explicit clock/lease premises.
+Its eight native regressions are part of the required usable-system selection.

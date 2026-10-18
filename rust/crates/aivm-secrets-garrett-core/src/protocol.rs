@@ -115,6 +115,26 @@ where
     })
 }
 
+/// Repeat admission after potentially blocking setup, without releasing either
+/// opened capability or plaintext credential to the caller.
+pub fn recheck<V, O>(
+    verifier: &V,
+    opener: &O,
+    token: &Vec<u8>,
+    grant: &UseGrant,
+    operation: &Vec<u8>,
+    presentation: &Presentation,
+) -> Result<(), UseDenial>
+where
+    V: EnvelopeVerifier,
+    O: CredentialOpener<Capability = V::Secret>,
+{
+    match prepare(verifier, opener, token, grant, operation, presentation) {
+        Ok(_) => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
 #[allow(clippy::too_many_arguments)] // Distinct adapters remain explicit proof boundaries.
 pub fn perform<V, O, A, E>(
     verifier: &V,

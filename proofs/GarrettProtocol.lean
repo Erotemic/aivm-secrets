@@ -64,6 +64,39 @@ theorem prepared_contract
             Current inner.claims g p.now.val p.elapsed.val ∧ op = g.operation from
             ⟨envelope, outer.secret, authentic, bound, identity, unsealed, inner_origin, authorized⟩)
 
+/-- A fresh recheck discards opened material, but retains the same exact
+    identity, grant, operation and lifetime guarantees as request preparation. -/
+theorem recheck_contract
+    (Authentic : alloc.vec.Vec U8 → AuthenticatedEnvelope → Prop)
+    (Unsealed : AuthenticatedEnvelope → C → Prop) (InnerOf : C → UseClaims → S → Prop)
+    (verify_contract : vops.verify verifier token ⦃ out =>
+      match out with | .Ok envelope => Authentic token envelope | .Err _ => True ⦄)
+    (unseal_contract : ∀ envelope, vops.«unseal» verifier envelope ⦃ out =>
+      match out with | .Ok capability => Unsealed envelope capability | .Err _ => True ⦄)
+    (inner_contract : ∀ capability, iops.«open» opener capability ⦃ out =>
+      match out with | .Ok inner => InnerOf capability inner.claims inner.credential | .Err _ => True ⦄) :
+    recheck vops iops verifier opener token g op p ⦃ out =>
+      match out with
+      | .Ok _ => ∃ ready, PreparedOrigin token g op p Authentic Unsealed InnerOf ready
+      | .Err _ => True ⦄ := by
+  unfold recheck
+  apply WP.spec_bind (prepared_contract vops iops verifier opener token g op p
+    Authentic Unsealed InnerOf verify_contract unseal_contract inner_contract)
+  intro checked origin
+  cases checked with
+  | Err error => simp
+  | Ok ready => simpa only [WP.spec_ok] using Exists.intro ready origin
+
+theorem recheck_rejection (error : UseDenial)
+    (denied : prepare vops iops verifier opener token g op p = Result.ok (.Err error)) :
+    recheck vops iops verifier opener token g op p = Result.ok (.Err error) := by
+  simp [recheck, denied]
+
+theorem recheck_successful_witness (ready : Prepared S)
+    (admitted : prepare vops iops verifier opener token g op p = Result.ok (.Ok ready)) :
+    recheck vops iops verifier opener token g op p = Result.ok (.Ok ()) := by
+  simp [recheck, admitted]
+
 theorem finish_contract (route : Route) (secret : S)
     (Executed : Route → S → ProviderReply → Prop)
     (execute_contract : eops.execute executor route secret ⦃ out =>

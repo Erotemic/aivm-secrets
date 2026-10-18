@@ -91,7 +91,11 @@ fn github_action(config: &Path, capability_file: &Path, words: &[String]) -> Out
     let bytes = zeroize::Zeroizing::new(files::read_private(capability_file, 32768)?);
     let token = std::str::from_utf8(&bytes).map_err(|_| Error::InvalidRequest)?;
     let token = token.trim_end_matches(['\r', '\n']);
-    if token.len() < 20 || token.bytes().any(|b| b.is_ascii_whitespace() || !b.is_ascii_graphic()) {
+    if token.len() < 20
+        || token
+            .bytes()
+            .any(|b| b.is_ascii_whitespace() || !b.is_ascii_graphic())
+    {
         return Err(Error::InvalidRequest);
     }
     let reply = call(config, Some(&command.frame(token)))?;

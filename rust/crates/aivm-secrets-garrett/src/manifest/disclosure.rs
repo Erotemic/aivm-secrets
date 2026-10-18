@@ -17,7 +17,9 @@ fn public_field_name(value: &str) -> Outcome<()> {
     if bytes.is_empty()
         || bytes.len() > 32
         || !bytes[0].is_ascii_lowercase()
-        || !bytes.iter().all(|b| b.is_ascii_alphanumeric() || *b == b'_')
+        || !bytes
+            .iter()
+            .all(|b| b.is_ascii_alphanumeric() || *b == b'_')
     {
         return bad();
     }
@@ -211,7 +213,9 @@ mod tests {
             "credential": "discarded-private-provider-field"
         });
         assert_eq!(
-            disclosure.project("pr.view", &response, b"broker-secret").unwrap(),
+            disclosure
+                .project("pr.view", &response, b"broker-secret")
+                .unwrap(),
             json!({"number": 13861, "headRefOid": "aabbcc"})
         );
     }
@@ -220,15 +224,27 @@ mod tests {
     fn public_projection_field_names_remain_strictly_bounded() {
         let operations = vec!["pr.view".to_owned()];
         for invalid in [
-            "HeadRefOid", "head-ref-oid", "head.ref.oid", "head ref oid",
-            "head/ref/oid", "_private", "", "abcdefghijklmnopqrstuvwxyzabcdefg",
+            "HeadRefOid",
+            "head-ref-oid",
+            "head.ref.oid",
+            "head ref oid",
+            "head/ref/oid",
+            "_private",
+            "",
+            "abcdefghijklmnopqrstuvwxyzabcdefg",
         ] {
             let mut fields = Map::new();
-            fields.insert(invalid.to_owned(), json!({
-                "at": ["head", "sha"], "type": "text"
-            }));
+            fields.insert(
+                invalid.to_owned(),
+                json!({
+                    "at": ["head", "sha"], "type": "text"
+                }),
+            );
             let config = json!({"pr.view": fields});
-            assert!(Disclosure::parse(&config, &operations).is_err(), "{invalid:?}");
+            assert!(
+                Disclosure::parse(&config, &operations).is_err(),
+                "{invalid:?}"
+            );
         }
     }
 

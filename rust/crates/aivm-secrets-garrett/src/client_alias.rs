@@ -26,13 +26,15 @@ fn repository(value: &str) -> Outcome<String> {
         return Err(Error::InvalidRequest);
     }
     let parts: Vec<&str> = value.split('/').collect();
-    if parts.len() != 2 || parts.iter().any(|part| {
-        part.is_empty()
-            || part.len() > 100
-            || !part
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
-    }) {
+    if parts.len() != 2
+        || parts.iter().any(|part| {
+            part.is_empty()
+                || part.len() > 100
+                || !part
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
+        })
+    {
         return Err(Error::InvalidRequest);
     }
     Ok(value.to_ascii_lowercase())
@@ -171,41 +173,96 @@ mod tests {
     #[test]
     fn explicit_read_commands_only() {
         let view = GitHubCommand::parse(&words(&[
-            "gh", "pr", "view", "13861", "--repo", "TauCetiProject/TauCeti",
-            "--json", "number,title,headRefOid",
+            "gh",
+            "pr",
+            "view",
+            "13861",
+            "--repo",
+            "TauCetiProject/TauCeti",
+            "--json",
+            "number,title,headRefOid",
         ]))
         .unwrap();
-        assert_eq!(view.frame("cap")["request"], json!({
-            "operation":"pr.view",
-            "arguments":{"repository":"taucetiproject/tauceti","pr":13861}
-        }));
-        assert_eq!(String::from_utf8(view.render(&json!({"ok":true,"result":{
-            "number":13861,"title":"Repair","headRefOid":"a", "private":"unreleased"
-        }})).unwrap()).unwrap(), "{\"headRefOid\":\"a\",\"number\":13861,\"title\":\"Repair\"}\n");
+        assert_eq!(
+            view.frame("cap")["request"],
+            json!({
+                "operation":"pr.view",
+                "arguments":{"repository":"taucetiproject/tauceti","pr":13861}
+            })
+        );
+        assert_eq!(
+            String::from_utf8(
+                view.render(&json!({"ok":true,"result":{
+                    "number":13861,"title":"Repair","headRefOid":"a", "private":"unreleased"
+                }}))
+                .unwrap()
+            )
+            .unwrap(),
+            "{\"headRefOid\":\"a\",\"number\":13861,\"title\":\"Repair\"}\n"
+        );
         assert!(GitHubCommand::parse(&words(&["gh", "api", "/user"])).is_err());
         assert!(GitHubCommand::parse(&words(&[
-            "gh", "pr", "comment", "13861", "--repo", "TauCetiProject/TauCeti"
-        ])).is_err());
+            "gh",
+            "pr",
+            "comment",
+            "13861",
+            "--repo",
+            "TauCetiProject/TauCeti"
+        ]))
+        .is_err());
         assert!(GitHubCommand::parse(&words(&[
-            "gh", "pr", "view", "13862", "--repo", "TauCetiProject/TauCeti",
-            "--json", "token"
-        ])).is_err());
+            "gh",
+            "pr",
+            "view",
+            "13862",
+            "--repo",
+            "TauCetiProject/TauCeti",
+            "--json",
+            "token"
+        ]))
+        .is_err());
         assert!(GitHubCommand::parse(&words(&[
-            "gh", "pr", "view", "13861", "--repo", "TauCetiProject/TauCeti",
-            "--repo", "Other/Repo"
-        ])).is_err());
+            "gh",
+            "pr",
+            "view",
+            "13861",
+            "--repo",
+            "TauCetiProject/TauCeti",
+            "--repo",
+            "Other/Repo"
+        ]))
+        .is_err());
     }
 
     #[test]
     fn cannot_render_raw_data_or_failed_reply() {
         let checks = GitHubCommand::parse(&words(&[
-            "gh", "pr", "checks", "13861", "--repo", "TauCetiProject/TauCeti",
-            "--json", "name,status",
-        ])).unwrap();
-        assert_eq!(String::from_utf8(checks.render(&json!({"ok":true,"result":{"checks":[
-            {"name":"lean","status":"completed","internal":"private"}
-        ]}})).unwrap()).unwrap(), "[{\"name\":\"lean\",\"status\":\"completed\"}]\n");
-        assert!(checks.render(&json!({"ok":false,"error":{"code":"denied"}})).is_err());
-        assert!(checks.render(&json!({"ok":true,"result":{"raw":[{}]}})).is_err());
+            "gh",
+            "pr",
+            "checks",
+            "13861",
+            "--repo",
+            "TauCetiProject/TauCeti",
+            "--json",
+            "name,status",
+        ]))
+        .unwrap();
+        assert_eq!(
+            String::from_utf8(
+                checks
+                    .render(&json!({"ok":true,"result":{"checks":[
+                        {"name":"lean","status":"completed","internal":"private"}
+                    ]}}))
+                    .unwrap()
+            )
+            .unwrap(),
+            "[{\"name\":\"lean\",\"status\":\"completed\"}]\n"
+        );
+        assert!(checks
+            .render(&json!({"ok":false,"error":{"code":"denied"}}))
+            .is_err());
+        assert!(checks
+            .render(&json!({"ok":true,"result":{"raw":[{}]}}))
+            .is_err());
     }
 }

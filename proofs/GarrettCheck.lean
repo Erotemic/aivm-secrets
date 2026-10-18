@@ -1,3 +1,4 @@
+import GarrettEmission
 import GarrettClientMaterial
 import GarrettReflection
 import GarrettDisclosure
@@ -229,3 +230,12 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.client_material.Proofs.key_uncertainty_is_not_erased
 #print axioms aivm_secrets_garrett_core.client_material.Proofs.success_requires_both_acknowledgements
 #print axioms aivm_secrets_garrett_core.client_material.Proofs.successful_request_witness
+
+#print axioms aivm_secrets_garrett_core.emission.Proofs.rejected_before_emission
+#print axioms aivm_secrets_garrett_core.emission.Proofs.denied_emission_independent
+#print axioms aivm_secrets_garrett_core.emission.Proofs.admitted_continuation
+#print axioms aivm_secrets_garrett_core.emission.Proofs.emission_contract
+#print axioms aivm_secrets_garrett_core.emission.Proofs.successful_emission_witness
+#print axioms aivm_secrets_garrett_core.protocol.Proofs.recheck_contract
+#print axioms aivm_secrets_garrett_core.protocol.Proofs.recheck_rejection
+#print axioms aivm_secrets_garrett_core.protocol.Proofs.recheck_successful_witness
