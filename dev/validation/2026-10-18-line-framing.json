@@ -1,0 +1,387 @@
+{
+  "schema": 1,
+  "source_commit": "df5542e2c8f89d98f57a165b96694af22f1b3ab3",
+  "source_dirty": false,
+  "scope": "Extracted bounded newline/observed-buffer admission shared by native bridge and client; finite Python/native peer parity",
+  "report_path": ".tools/line-framing-df5542e-system/report.json",
+  "report_sha256": "569f8d6187a0ef66408fe4b518b5351289922a2b1d9ed726960b557d04e39030",
+  "input_fingerprint_sha256": "7b9d221feff23ad97a2feaded4652beb0061f7bc128228b2b5928a0eb31aa4fa",
+  "full_suite": {
+    "passed": 2524,
+    "skipped": 0
+  },
+  "required_workflows": {
+    "conformance": 296,
+    "normal_release_without_conformance": 296,
+    "skipped": 0
+  },
+  "normal_workflow_report_path": ".tools/line-framing-df5542e-validation/normal-report.json",
+  "normal_workflow_report_sha256": "236450a69801d32163bd0a29823a9aaede6caebc6f09ef127e9d58539c148377",
+  "proof_audit": {
+    "named_obligations": 360,
+    "new_obligations": 9,
+    "allowed_axioms": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+    ],
+    "checked_contracts": [
+      "exact total validator equivalence to size bound, empty observed suffix, and payload without newline followed by one newline",
+      "nonempty observed suffix refused",
+      "data without newline refused",
+      "accepted positive witness"
+    ]
+  },
+  "line_framing_mutations": {
+    "source_commit": "df5542e2c8f89d98f57a165b96694af22f1b3ab3",
+    "rejected": 6,
+    "mutation_filter": "^line framing ",
+    "process_exit_code": 0,
+    "full_historical_campaign": false,
+    "names": [
+      "line framing carriage return accepted (GarrettLineFrame)",
+      "line framing first newline accepted with suffix (GarrettLineFrame)",
+      "line framing buffered suffix ignored (GarrettLineFrame)",
+      "line framing size bound ignored (GarrettLineFrame)",
+      "line framing all complete frames refused (GarrettLineFrame)",
+      "line framing unterminated frame accepted (GarrettLineFrame)"
+    ],
+    "log_path": ".tools/line-framing-df5542e-validation/mutations.log",
+    "log_sha256": "f18e645c9cdf29b2263d77b13361a17f81198f91a422c250e8eeebb3e5a39788"
+  },
+  "reproduced_baseline": {
+    "source_commit": "7bc590054ededce31506f9ed189f02b76fae6ee8",
+    "profile": "ordinary release, no conformance",
+    "binary_sha256": {
+      "garrett-client": "ab54ad01cb3cf7d964b005282bd24b03243cba2a0fa701953b30e85f81df767f",
+      "garrett-bridge": "e3fbd78484489268a4a70c7329d26884f586e74ffaf5e23ee2a7232de4e7f128"
+    },
+    "production_source_sha256": {
+      "rust/crates/aivm-secrets-garrett/src/client.rs": "658904ba3046c7a33ba3e6c06d00dd17589fdacde19c7b1596729f639e617ccb",
+      "rust/crates/aivm-secrets-garrett/src/tls.rs": "139074cc190d410a34a7e32c8c066e34e271b38f1608fcb86b5fce97e2ea6392",
+      "rust/crates/aivm-secrets-garrett-core/src/lib.rs": "2c3997778d0b27c55ee11f288292a47b2336587c1970656a19ff7b77477aa10f"
+    },
+    "test_input_sha256": {
+      "tests/test_rust_line_framing.py": "e5fb43d1c31064d84f6449a7e843e0a61a46cf82b9863d709a096d1fb0f3242c",
+      "tests/test_rust_garrett.py": "c01b3c1ea6fe5986b8cdc4248c6d4dde16dad2cc809648db58bd64ffd3828ea9"
+    },
+    "log_sha256": "fdf8f03cb532c37a0ece4a90ffeffcd85b30ffc1ce0e5cdf59ae23a945e6e189",
+    "failed": 9,
+    "passed": 23,
+    "record_path": ".tools/line-framing-df5542e-validation/line-framing-baseline.json",
+    "record_sha256": "bf219495eae5da39610d1915cb49cc8883bc983cac6d0670a2c02b960f6f65b4"
+  },
+  "peer_framing_runtime": {
+    "pytest_cases": 32,
+    "implementations": [
+      "python",
+      "rust"
+    ],
+    "native_profile": "ordinary binaries; independent Python-issued identity",
+    "boundaries": [
+      "guest TLS reply",
+      "guest TLS request before broker/provider dispatch",
+      "forwarded local-broker reply after send"
+    ],
+    "cases": [
+      "complete",
+      "partial reads",
+      "clean EOF without newline",
+      "coalesced trailing bytes",
+      "two frames",
+      "empty/multiline/non-object/non-UTF8 reply",
+      "exact maximum and one byte over"
+    ]
+  },
+  "compiler_profiles": {
+    "bridge": {
+      "report_path": ".tools/line-framing-df5542e-bridge-calls/report.json",
+      "report_sha256": "96eb0b970b483a780333501972ca2ce0bc94832e8587cbb7a74a0e7902b1dd1f",
+      "counts": {
+        "functions": 3409,
+        "calls": 9055,
+        "drops": 5709025,
+        "bodies": {
+          "Unstructured": 1412,
+          "Opaque": 1997
+        }
+      },
+      "direct_handler_nodes": 1021,
+      "opaque_handler_boundaries": 782,
+      "witnesses": {
+        "account-controller-executor": [
+          767,
+          1070,
+          1386,
+          1768,
+          2165,
+          2395,
+          2620
+        ],
+        "coordinated-manifest-executor": [
+          767,
+          1070,
+          1387,
+          1774,
+          2184,
+          2408,
+          2178,
+          2401
+        ],
+        "account-authentication-bytes": [
+          767,
+          1070,
+          1386,
+          1768,
+          2165,
+          2395,
+          2620,
+          2915,
+          2958,
+          3216,
+          3323,
+          1629
+        ],
+        "manifest-authentication-bytes": [
+          767,
+          1070,
+          1387,
+          1774,
+          2184,
+          2408,
+          2178,
+          2401,
+          2635,
+          2958,
+          3216,
+          3323,
+          1629
+        ],
+        "account-request-line": [
+          767,
+          1070,
+          1386,
+          1768,
+          2165,
+          2395,
+          2620,
+          2915,
+          2958,
+          3216,
+          3317,
+          3357
+        ],
+        "manifest-request-line": [
+          767,
+          1070,
+          1387,
+          1774,
+          2184,
+          2408,
+          2178,
+          2401,
+          2635,
+          2958,
+          3216,
+          3317,
+          3357
+        ],
+        "account-complete-header-admission": [
+          767,
+          1070,
+          1386,
+          1768,
+          2165,
+          2395,
+          2620,
+          2915,
+          2958,
+          3216,
+          3316,
+          3359,
+          3389,
+          3403,
+          3391
+        ],
+        "manifest-complete-header-admission": [
+          767,
+          1070,
+          1387,
+          1774,
+          2184,
+          2408,
+          2178,
+          2401,
+          2635,
+          2958,
+          3216,
+          3316,
+          3359,
+          3389,
+          3403,
+          3391
+        ]
+      },
+      "complete_mediation": false,
+      "artifact_sha256": {
+        "aivm_secrets_garrett.ullbc": "953af06f4efcedcf5bbd2f898327002687d8c447edab90edb33da5136e9c959f",
+        "build.log": "09f2b93c4bce5bfb43dca18ca8d9c1dca2831c7d2ffb73b00b96f8f73a607f86",
+        "capture.json": "d8c1b85607374f10680fdf5102165b04bc514fcf930cdd63641ceb224fec2cf0",
+        "compiler.log": "090353cf287ad5c8e9cf684f1fe69a0308d063f9e5c50799ff80994abff50717",
+        "compiler.ullbc.gz": "6cf1d66d5842216f26bb0f126473e6bb4387e162ed875b3775627fa7a5300868",
+        "projection.json": "ed76bceab0ac70ee7d8102e71cae488e102aaa9ea7884f67d8e89757a9136a08",
+        "projector.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "report.json": "96eb0b970b483a780333501972ca2ce0bc94832e8587cbb7a74a0e7902b1dd1f"
+      }
+    },
+    "coordinator": {
+      "report_path": ".tools/line-framing-df5542e-coordinator-calls/report.json",
+      "report_sha256": "f76e3c97e3ba03a79a9bb4e41be5b24b824838aa060a1e4d153bcddbf833b923",
+      "counts": {
+        "functions": 945,
+        "calls": 1434,
+        "drops": 249313,
+        "bodies": {
+          "Unstructured": 264,
+          "Opaque": 681
+        }
+      },
+      "direct_handler_nodes": 351,
+      "opaque_handler_boundaries": 310,
+      "witnesses": {
+        "coordinator-operator-admission": [
+          329,
+          522,
+          665,
+          759,
+          838
+        ],
+        "coordinator-member-admission": [
+          329,
+          522,
+          688,
+          786,
+          838
+        ],
+        "coordinator-activate": [
+          329,
+          522,
+          698
+        ],
+        "coordinator-revoke": [
+          329,
+          522,
+          690
+        ],
+        "coordinator-reserve": [
+          329,
+          522,
+          708
+        ],
+        "coordinator-finish": [
+          329,
+          522,
+          709
+        ]
+      },
+      "complete_mediation": false,
+      "artifact_sha256": {
+        "aivm_secrets_garrett.ullbc": "cdf2ad08b1dad72b22489d6ea299177bd4441d1220ef189f7e616a25b9ea1b0f",
+        "build.log": "3997fc6790b8063b86c119e91f87ac7395ac6cf26135da637dcb229006bc32dc",
+        "capture.json": "8fef3cdfec5e0bb935c086da6d777991309990b1d6364376a33efc9e9d70d9d9",
+        "compiler.log": "30ef6c423afedba993a0b6e6f8c45b417c6eb4c10478a15abadbb307847a4eb9",
+        "compiler.ullbc.gz": "97eabeef6c44698047405c22418837ae896cc579197a55ab9cfa181ffb200d54",
+        "projection.json": "b36e479535712fabce64d66e05f469bf02bcdce8ec2075e5b8252a5a2d6a6d0b",
+        "projector.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "report.json": "f76e3c97e3ba03a79a9bb4e41be5b24b824838aa060a1e4d153bcddbf833b923"
+      }
+    }
+  },
+  "selected_garrett_runtime_tests": 507,
+  "freshness_primitive_runtime_tests": 26,
+  "package_artifact_sha256": {
+    ".tools/line-framing-dist/aivm_secrets-0.2.0-py3-none-any.whl": "167ffb8beb0ae8104243b0d85c30ea314153d7b43e5824c46391c3dad6485fc4",
+    ".tools/line-framing-dist/aivm_secrets-0.2.0.tar.gz": "9c90f3ce637f95de681bad6218a5a9be7d99d402bb3d9bd0ebb60f22ff5299ea"
+  },
+  "input_sha256": {
+    "rust/crates/aivm-secrets-garrett-core/src/line_frame.rs": "f7adcd0565f48a14f78475bc59d5171c2148dfaf19f285a39a001405bf1cff5b",
+    "rust/crates/aivm-secrets-garrett-core/src/lib.rs": "77263ea4cd6e27d5de78416c554315ac92c7005eb70999c4a50657e195c1ac1e",
+    "rust/crates/aivm-secrets-garrett/src/tls.rs": "caaa96ff9d20972f6f68963a50efc6f986d48addd75d9c2eb137a6028bb20ab0",
+    "rust/crates/aivm-secrets-garrett/src/client.rs": "b86b0f410ff82c63dfd6f4745299683cbcdde15a2433a35b31e04acbee4b7d27",
+    "proofs/generated/AivmSecretsGarrettCore.lean": "cea3b96eeb95a693a3c4196344d2a6b02ab709c13fbc4e4123457a2654314757",
+    "proofs/GarrettLineFrame.lean": "f70d26834c9bf8e064b6d04f175f8fbd77a116ff21ddbf893e13ad7d9d15e330",
+    "proofs/GarrettCheck.lean": "12ce311a72e2b642a72b6521ae3bc14ee7ced2d6ae23a05763915b48b8464d3b",
+    "proofs/garrett-manifest.json": "d625bdf6d43ebf07346701d748060466b9fa31a2c9a3e79a6fa0bff0bd04a3cf",
+    "proofs/manifest.json": "ee33c2b8c07a7786760fa1cb80030aae543d7a9bea23e6ad00868d8799ffd8a6",
+    "tests/test_rust_line_framing.py": "e5fb43d1c31064d84f6449a7e843e0a61a46cf82b9863d709a096d1fb0f3242c",
+    "tests/test_rust_garrett.py": "c01b3c1ea6fe5986b8cdc4248c6d4dde16dad2cc809648db58bd64ffd3828ea9",
+    "dev/verification/garrett.py": "91b6a92fb9f13d0f8195a497a4ed9a9ca0f36e441fe2e9ae2a8b08190bc2081d",
+    "dev/verification/system.py": "98f3dcf546f37256ba2b4cf0468979afff032ba1d06e92356ed127bb154e941d",
+    "dev/verification/w3_effect_boundary.py": "c4fcdfeb776a665e47fd17e9ed19f32a356561341a7374d6c27edad3da7605b4",
+    "tests/test_secrets_w3_effect_boundary.py": "16b9034a87e5e5a3da1716b629192f9d85b28d740a18b71b30cdc8520e870712"
+  },
+  "validation_artifact_sha256": {
+    "line-framing-accounting.log": "15baae0de193d71dced25361763f0b27d3479c1cc3e9ff4cc6b5a1b7ba1db3db",
+    "line-framing-baseline-expanded.log": "fdf8f03cb532c37a0ece4a90ffeffcd85b30ffc1ce0e5cdf59ae23a945e6e189",
+    "line-framing-baseline.json": "bf219495eae5da39610d1915cb49cc8883bc983cac6d0670a2c02b960f6f65b4",
+    "line-framing-boundary-tests.log": "eaccc15552988119ba90ebe2ab4d470cd6ddb5b5af79ad025e51b5d7aeaa2a41",
+    "line-framing-clippy.log": "62c8710c8463828e9a82a6878245f38b58c5825f8d3c17f60a61b8e8568ae5d8",
+    "line-framing-evidence.py": "d49699378c6402e18f2eb9f6c3516f53d67dcc677d2696022557fe462c73c206",
+    "line-framing-extract.log": "11be0bfb9019694f8fd845603ba1a90cabf506474bf13bc916a51fe3e916b239",
+    "line-framing-freshness-record.log": "9f66d9bd6b8731425c470bbee31d1f9ff2b2b92226b8840371bc18258f0c2e2a",
+    "line-framing-garrett-record.log": "0db1ddec7c310179dec741b1900f25c1e17ba441458665fd88c2c64b599467f5",
+    "line-framing-guards.log": "78b70f0b1d558747189cdf938e3addacf6b079e2c6a29d4ade1e2adb25b8b1a5",
+    "line-framing-module-build.log": "582ba2ee5d814a0f89ecc87f2402182179fc9c68c1559cf70dcad4f2e70799e3",
+    "line-framing-native-unit.log": "7a49705bbb734a7fe24e35e9a5d2103dda8c10f769b96bc98a63e1dfd0c50fcd",
+    "line-framing-package.log": "cc55dedc885b2b246ac19064c7a240b59dcf88dc8c7a1c02c89acfd68aa1f892",
+    "line-framing-proof.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "line-framing-runtime-bounds.log": "2d46a9d405b307867264ed1fa390649e056c86834bcdf55eca4a2bcd04eb8a4a",
+    "line-framing-system.log": "0acaca210d48d52cde4f614d612eb812d23747070afff183824c35c536323922",
+    "line-framing-unit.log": "074dd926b4dca58caf1eca26c63e33fcea6ac1003e905950f05ce67deee27aeb",
+    "mutations.log": "f18e645c9cdf29b2263d77b13361a17f81198f91a422c250e8eeebb3e5a39788",
+    "normal-build.log": "1d818eca6087986953f943f9fd35d4bce56b907f2277210d6cac5d8d4e50bb62",
+    "normal-report.json": "236450a69801d32163bd0a29823a9aaede6caebc6f09ef127e9d58539c148377",
+    "normal-workflows.log": "2b04ccb24aa2228a70ecc9f64bd4c2b2fce76961117e9b304276101fe8382262",
+    "normal-workflows.xml": "f315546dc2e32f082d34fe182d2eb5f2d3c4649ad13ab1545c169ba121b9e09d",
+    "line-framing-restore-debug.log": "dd621e9ff7c9eac161c730aa8a79332dd68698435a7a84d044d9ad39dfa1f5d2",
+    "line-framing-restore-release.log": "8ac797c33d2841299ff7b0a2f481283d530de7b17253c1d18b0a0b69150da206",
+    "line-framing-restore-coordinator-debug.log": "2a317582f42251b7ec35a509e2d7734bdce5718e1b6c4c0c1f982b4da859a99f",
+    "line-framing-restore-coordinator-release.log": "0849461a43a6389d7c5e05baa7b635c848f192f972a4eb1222db271aa79d1e83",
+    "line-framing-restored-help.log": "5778db245cc8e3c3786c5b38a8a44e222e2bbc8355998aa28e348bf1c0199541",
+    "line-framing-accounting-final.log": "15baae0de193d71dced25361763f0b27d3479c1cc3e9ff4cc6b5a1b7ba1db3db"
+  },
+  "open_obligations": [
+    "standard Read/BufReader/TLS/OS behavior and segmentation",
+    "later-arriving suffix bytes after first accepted frame",
+    "JSON validity and approved disclosure",
+    "handshake/error/deadline parity outside named cases",
+    "whole native I/O mediation and trace refinement",
+    "atomic guest identity delivery and broader normative core parity",
+    "independent maintainer review and live deployment"
+  ],
+  "live_vm_or_provider_credentials_used": false,
+  "restored_builds": {
+    "conformance": false,
+    "broker_profiles": [
+      "debug",
+      "release"
+    ],
+    "optional_coordinator_profiles": [
+      "debug",
+      "release"
+    ],
+    "help_checks": [
+      "garrett-bridge",
+      "garrett-client",
+      "garrett-coordinator"
+    ],
+    "artifact_paths": [
+      ".tools/line-framing-df5542e-validation/line-framing-restore-debug.log",
+      ".tools/line-framing-df5542e-validation/line-framing-restore-release.log",
+      ".tools/line-framing-df5542e-validation/line-framing-restore-coordinator-debug.log",
+      ".tools/line-framing-df5542e-validation/line-framing-restore-coordinator-release.log",
+      ".tools/line-framing-df5542e-validation/line-framing-restored-help.log",
+      ".tools/line-framing-df5542e-validation/line-framing-accounting-final.log"
+    ]
+  }
+}

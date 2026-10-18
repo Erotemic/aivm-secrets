@@ -1,8 +1,8 @@
 # Active work: useful broker workflows and conditional credential confinement
 
 Status: **work plan, not a completed assurance claim**, reconciled 2026-10-18
-against frozen runtime/proof implementation `37d32fd` and its
-[complete request encoding validation record](../../dev/validation/2026-10-18-http-wire.json). This is the authoritative **priority and task queue**
+against frozen runtime/proof implementation `df5542e` and its
+[native frame admission validation record](../../dev/validation/2026-10-18-line-framing.json). This is the authoritative **priority and task queue**
 for new agents. Existing P0-P5, M0-M6, and G0-G5 stages remain useful design,
 implementation history, and prerequisite inventories; they are **not three
 competing current schedules**. Revisit this queue after each accepted milestone.
@@ -107,6 +107,15 @@ paths and six coordinator paths. These are scoped byte/admission and call-path
 results; broad core parity, transitive mediation, atomic guest delivery,
 independent review and live deployment remain open.
 
+The [newline framing follow-up](../verified-line-framing.md) closes nine
+reproduced native acceptance discrepancies at guest ingress and post-send reply
+boundaries. The native client and bridge share the extracted bounded terminal-LF
+and observed-buffer validator. Real Python/native TLS/Unix cases cover partial
+reads, clean EOF, coalesced suffixes and exact limits. The frozen gate passes
+2,524 portable tests, all 296 workflows in both configurations, the 360-name
+Garrett audit and six new framing mutations. Later-arriving bytes, JSON/TLS and
+native mediation remain explicit obligations.
+
 The [parsed-policy identity increment](../verified-policy-normalization.md) closes
 the known raw-document fingerprint difference in coordinated manifest writes.
 Finite differential and durable-record tests are the evidence; normalization
@@ -201,8 +210,8 @@ counts substitute for the obligations above.
 
 Statuses below reflect the checked implementation, with remaining acceptance
 conditions kept explicit. The older milestone plans retain historical detail.
-The [frozen validation record](../../dev/validation/2026-10-18-http-wire.json)
-reports 2,489 portable tests with zero skips and all 264 required workflow tests in
+The [frozen validation record](../../dev/validation/2026-10-18-line-framing.json)
+reports 2,524 portable tests with zero skips and all 296 required workflow tests in
 both conformance and ordinary release modes. These tests do not discharge
 unproved native I/O correspondence or independent security review.
 

@@ -1,9 +1,10 @@
 # Native newline framing and reply uncertainty
 
-Status: the scoped Lean contract, 360-obligation audit, 507 selected native/parity
-cases and 24 native library tests pass. Full frozen runtime/compiler and the
-six-mutation framing campaign are next.
-The last accepted checkpoint remains the complete provider HTTP encoder.
+Status: the [frozen record](../dev/validation/2026-10-18-line-framing.json) binds
+`df5542e` to 2,524 portable tests without skips, 296 required workflows in
+both build configurations, 360 audited Garrett obligations and six rejected
+framing mutations. The nine new obligations cover the scoped validator and its
+supporting lemmas; JSON/TLS/stream/native mediation remain separate boundaries.
 
 The native guest client and bridge now use one bounded frame reader. It requires
 a terminal newline and rejects bytes already buffered beyond that newline. The
