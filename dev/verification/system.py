@@ -33,6 +33,7 @@ WORKFLOW_TESTS = [
     'tests/test_secrets_primitives_parity.py',
     'tests/test_specialized_calls.py',
     'tests/test_rust_policy_normalization.py',
+    'tests/test_rust_http_auth.py',
     'tests/test_rust_garrett_authority.py::test_tpm_requirement_rejects_software_before_credential_custody',
 ]
 
@@ -141,7 +142,7 @@ def main() -> int:
             run('lean-w4-w5', [python, 'dev/verification/w5_noninterference.py', 'prove'])
             run('lean-profile-emission-oauth', ['lake', '-d', 'proofs', 'build',
                                                '+GarrettProfiles', '+GarrettEmission',
-                                               '+GarrettOAuth', '+GarrettCoordination', '+GarrettRebinding'])
+                                               '+GarrettOAuth', '+GarrettCoordination', '+GarrettRebinding', '+GarrettHttpAuth'])
         if args.full_tests:
             with tempfile.TemporaryDirectory(prefix='as-full-', dir='/tmp') as temporary:
                 run('full-python-native', [python, '-m', 'pytest', '-q', '-ra',

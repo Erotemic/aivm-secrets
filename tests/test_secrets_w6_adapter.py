@@ -63,8 +63,9 @@ def test_w6_deleted_credential_header_validation_is_rejected(tmp_path):
     checkout = fixture_checkout(tmp_path)
     path = checkout / SOURCE
     body = path.read_text()
-    assert '!secret.0.iter().all(' in body
-    body = body.replace('!secret.0.iter().all(', 'secret.0.iter().all(', 1)
+    assert '!http_auth::valid_credential(&secret.0)' in body
+    body = body.replace('!http_auth::valid_credential(&secret.0)',
+                        'http_auth::valid_credential(&secret.0)', 1)
     path.write_text(body)
     with pytest.raises(ContractError, match='unvalidated OAuth'):
         check(checkout)

@@ -49,6 +49,12 @@ def mutate(repo, filename, before, after):
 
 
 @pytest.mark.parametrize('file,old,new', [
+    (RUST + 'custody.rs',
+     'http_auth::append_header(&mut request, &secret.0, &route.authentication)',
+     'unchecked_header(&mut request, &secret.0, &route.authentication)'),
+    (RUST + 'custody/manifest_session.rs',
+     'http_auth::append_header(&mut request, &secret.0, &route.authentication)',
+     'unchecked_header(&mut request, &secret.0, &route.authentication)'),
     (RUST + 'json.rs', 'decode(&raw, 0)',
      'serde_json::from_slice(bytes).map_err(|_| Error::InvalidCapability)'),
     (RUST + 'authority/rebinding.rs',

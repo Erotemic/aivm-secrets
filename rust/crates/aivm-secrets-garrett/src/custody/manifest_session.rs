@@ -436,10 +436,7 @@ fn manifest_request_bytes(
     {
         return Err(Error::InvalidPolicy);
     }
-    if secret.0.is_empty()
-        || secret.0.len() > 4096
-        || !secret.0.iter().all(|b| (b'!'..=b'~').contains(b))
-    {
+    if !http_auth::valid_credential(&secret.0) {
         return Err(Error::CredentialSource);
     }
     let body = effect
@@ -506,12 +503,8 @@ fn manifest_request_bytes(
         }
         request.extend_from_slice(format!("{name}: {value}\r\n").as_bytes());
     }
-    request.extend_from_slice(match route.authentication {
-        core::Authentication::Bearer => b"Authorization: Bearer ",
-        core::Authentication::ApiKey => b"X-API-Key: ",
-    });
-    request.extend_from_slice(&secret.0);
-    request.extend_from_slice(b"\r\n");
+    http_auth::append_header(&mut request, &secret.0, &route.authentication)
+        .map_err(|_| Error::CredentialSource)?;
     if let Some(body) = &body {
         request.extend_from_slice(
             format!(

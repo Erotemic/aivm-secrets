@@ -126,7 +126,10 @@ def review_semantics(contents: dict[str, str]) -> None:
             and m.index('let request = manifest_request_bytes(') < m.index('TcpStream::connect_timeout('),
             'provider socket opened before outbound wire validation')
     wire = part(m, 'fn manifest_request_bytes(', 'impl Executor {')
-    require("secret.0.iter().all(" in wire and "Error::CredentialSource" in wire
+    auth_append = 'http_auth::append_header(&mut request, &secret.0, &route.authentication)'
+    require('!http_auth::valid_credential(&secret.0)' in wire
+            and wire.count(auth_append) == 1 and 'Error::CredentialSource' in wire
+            and 'request.extend_from_slice(&secret.0)' not in wire
             and 'effect.target.starts_with("//")' in wire
             and '"authorization"' in wire and '"content-length"' in wire,
             'provider wire encoder lost injection / reserved-header refusal')
@@ -181,6 +184,13 @@ def review_semantics(contents: dict[str, str]) -> None:
     require('write_all(&json::canonical(&announcement))' in b,
             'host-only startup stdout channel changed')
     c = contents[RUST + 'custody.rs']
+    account_wire = part(c, 'fn account_request_bytes(', 'impl Executor {')
+    account_transport = part(c, '    fn exchange(', 'struct CurrentExecutor')
+    require(account_wire.count(auth_append) == 1
+            and 'request.extend_from_slice(&secret.0)' not in account_wire
+            and same_order(account_transport, 'let request = account_request_bytes(route, secret)?;',
+                           'TcpStream::connect_timeout(', 'emit_current(fresh, || {'),
+            'account HTTP bypasses the extracted auth encoder or validates after connection')
     account_control = part(c, 'pub(crate) fn control(', '\nfn use_error(')
     require(same_order(account_control, 'self.check_coordination()?;',
                        'let now = host_time()?;', 'lease.require_current(now)?;',

@@ -6,7 +6,9 @@ use crate::{
     tls::Deadline,
     Error, Outcome,
 };
-use aivm_secrets_garrett_core::{credential_use as core, protocol, Expectation, IssuedSurrogate};
+use aivm_secrets_garrett_core::{
+    credential_use as core, http_auth, protocol, Expectation, IssuedSurrogate,
+};
 use ring::{
     aead, digest,
     rand::{SecureRandom, SystemRandom},
@@ -31,7 +33,7 @@ fn credential(data: &[u8]) -> Outcome<Credential> {
     credential_at_least(data, 16)
 }
 fn credential_at_least(data: &[u8], minimum: usize) -> Outcome<Credential> {
-    if !(minimum..=4096).contains(&data.len()) || !data.iter().all(|b| (b'!'..=b'~').contains(b)) {
+    if data.len() < minimum || !http_auth::valid_credential(data) {
         return Err(Error::CredentialSource);
     }
     Ok(Credential(Zeroizing::new(data.to_vec())))
@@ -277,6 +279,16 @@ fn emit_current<T>(
 ) -> Outcome<T> {
     aivm_secrets_garrett_core::emission::emit_current(PendingEmission { check, emit })
 }
+fn account_request_bytes(route: &core::Route, secret: &Credential) -> Outcome<Zeroizing<Vec<u8>>> {
+    let host = std::str::from_utf8(&route.host).map_err(|_| Error::InternalError)?;
+    let path = std::str::from_utf8(&route.path).map_err(|_| Error::InternalError)?;
+    let port = u16::try_from(route.port).map_err(|_| Error::InternalError)?;
+    let mut request=Zeroizing::new(format!("GET {path} HTTP/1.1\r\nHost: {host}:{port}\r\nAccept: application/json\r\nAccept-Encoding: identity\r\nUser-Agent: aivm-secrets/1\r\nConnection: close\r\n").into_bytes());
+    http_auth::append_header(&mut request, &secret.0, &route.authentication)
+        .map_err(|_| Error::CredentialSource)?;
+    request.extend_from_slice(b"\r\n");
+    Ok(request)
+}
 impl Executor {
     fn exchange(
         &self,
@@ -284,8 +296,9 @@ impl Executor {
         secret: &Credential,
         fresh: &impl Fn() -> Outcome<()>,
     ) -> Outcome<core::ProviderReply> {
+        // Assemble and validate in the zeroizing buffer before any connection.
+        let request = account_request_bytes(route, secret)?;
         let host = std::str::from_utf8(&route.host).map_err(|_| Error::InternalError)?;
-        let path = std::str::from_utf8(&route.path).map_err(|_| Error::InternalError)?;
         let port = u16::try_from(route.port).map_err(|_| Error::InternalError)?;
         let mut socket = TcpStream::connect_timeout(
             &SocketAddr::new(self.address, port),
@@ -311,13 +324,6 @@ impl Executor {
                 .map_err(|_| Error::Unreachable)?;
         }
         let mut stream = StreamOwned::new(conn, socket);
-        let auth = match route.authentication {
-            core::Authentication::Bearer => "Authorization: Bearer ",
-            core::Authentication::ApiKey => "X-API-Key: ",
-        };
-        let mut request=Zeroizing::new(format!("GET {path} HTTP/1.1\r\nHost: {host}:{port}\r\nAccept: application/json\r\nAccept-Encoding: identity\r\nUser-Agent: aivm-secrets/1\r\nConnection: close\r\n{auth}").into_bytes());
-        request.extend_from_slice(&secret.0);
-        request.extend_from_slice(b"\r\n\r\n");
         emit_current(fresh, || {
             stream
                 .write_all(&request)
@@ -1003,7 +1009,51 @@ fn parse_operation(value: &Value) -> Outcome<Vec<u8>> {
 }
 #[cfg(test)]
 mod tests {
-    use super::response;
+    use super::*;
+
+    #[test]
+    fn account_wire_authentication_is_exact_and_host_selected() {
+        for (authentication, expected) in [
+            (core::Authentication::Bearer, "Authorization: Bearer "),
+            (core::Authentication::ApiKey, "X-API-Key: "),
+        ] {
+            let route = core::Route {
+                host: b"api.example.org".to_vec(),
+                port: 443,
+                path: b"/v1/account".to_vec(),
+                authentication,
+            };
+            let secret = Credential(Zeroizing::new(b"SYNTHETIC:token/~+=".to_vec()));
+            let bytes = account_request_bytes(&route, &secret).unwrap();
+            assert_eq!(bytes.as_slice(), format!(
+                "GET /v1/account HTTP/1.1\r\nHost: api.example.org:443\r\nAccept: application/json\r\nAccept-Encoding: identity\r\nUser-Agent: aivm-secrets/1\r\nConnection: close\r\n{expected}SYNTHETIC:token/~+=\r\n\r\n"
+            ).as_bytes());
+        }
+    }
+
+    #[test]
+    fn account_wire_refuses_header_splitting_credentials() {
+        let route = core::Route {
+            host: b"api.example.org".to_vec(),
+            port: 443,
+            path: b"/v1/account".to_vec(),
+            authentication: core::Authentication::Bearer,
+        };
+        for value in [
+            b"".as_slice(),
+            b"TOKEN\r\nHost: attacker.test",
+            b"TOKEN\n\nGET /",
+            b"TOKEN\0",
+            b"TOKEN ",
+            &[255],
+        ] {
+            let secret = Credential(Zeroizing::new(value.to_vec()));
+            assert!(matches!(
+                account_request_bytes(&route, &secret),
+                Err(Error::CredentialSource)
+            ));
+        }
+    }
 
     #[test]
     fn https_framing_is_bounded_and_unambiguous() {

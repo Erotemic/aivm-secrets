@@ -255,6 +255,16 @@ def explain(projection):
         ('coordinated-manifest-executor', [
             ('aivm_secrets_garrett_core','coordination','dispatch'),
             ('aivm_secrets_garrett','custody','manifest_session','exchange_manifest')]),
+        ('account-authentication-bytes', [
+            ('aivm_secrets_garrett','custody','exchange'),
+            ('aivm_secrets_garrett','custody','account_request_bytes'),
+            ('aivm_secrets_garrett_core','http_auth','append_header'),
+            ('aivm_secrets_garrett_core','http_auth','valid_credential')]),
+        ('manifest-authentication-bytes', [
+            ('aivm_secrets_garrett','custody','manifest_session','exchange_manifest'),
+            ('aivm_secrets_garrett','custody','manifest_session','manifest_request_bytes'),
+            ('aivm_secrets_garrett_core','http_auth','append_header'),
+            ('aivm_secrets_garrett_core','http_auth','valid_credential')]),
     ]:
         witnesses[label] = path_through(nodes, [root, *(select(nodes, n) for n in names)])
     visited = reachable(nodes, root)

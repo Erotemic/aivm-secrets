@@ -1,3 +1,4 @@
+import GarrettHttpAuth
 import GarrettRebinding
 import GarrettCoordination
 import GarrettEmission
@@ -270,3 +271,16 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.rebinding.Proofs.open_failure_never_issues
 #print axioms aivm_secrets_garrett_core.rebinding.Proofs.same_secret_reissuance_contract
 #print axioms aivm_secrets_garrett_core.rebinding.Proofs.successful_rebind_witness
+
+#print axioms aivm_secrets_garrett_core.http_auth.Proofs.visible_from_step
+#print axioms aivm_secrets_garrett_core.http_auth.Proofs.valid_credential_loop_contract
+#print axioms aivm_secrets_garrett_core.http_auth.Proofs.valid_credential_contract
+#print axioms aivm_secrets_garrett_core.http_auth.Proofs.extend_bytes_contract
+#print axioms aivm_secrets_garrett_core.http_auth.Proofs.invalid_credential_leaves_buffer_unchanged
+#print axioms aivm_secrets_garrett_core.http_auth.Proofs.accepted_header_exact
+#print axioms aivm_secrets_garrett_core.http_auth.Proofs.valid_credential_has_no_crlf
+#print axioms aivm_secrets_garrett_core.http_auth.Proofs.header_is_single_line
+#print axioms aivm_secrets_garrett_core.http_auth.Proofs.accepted_header_cannot_split
+#print axioms aivm_secrets_garrett_core.http_auth.Proofs.successful_header_requires_valid_credential
+#print axioms aivm_secrets_garrett_core.http_auth.Proofs.valid_credential_positive_witness
+#print axioms aivm_secrets_garrett_core.http_auth.Proofs.successful_header_witness

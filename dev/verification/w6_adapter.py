@@ -59,7 +59,10 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and provider_interpreter.count('TcpStream::connect_timeout(') == 1,
            'native manifest adapter has another provider send')
     encoder = source.split('fn manifest_request_bytes(', 1)[1].split('impl Executor {', 1)[0]
-    ensure('!secret.0.iter().all(' in encoder and 'Error::CredentialSource' in encoder,
+    ensure('!http_auth::valid_credential(&secret.0)' in encoder
+           and encoder.count('http_auth::append_header(&mut request, &secret.0, &route.authentication)') == 1
+           and 'request.extend_from_slice(&secret.0)' not in encoder
+           and 'Error::CredentialSource' in encoder,
            'HTTP header may contain unvalidated OAuth/credential bytes')
     ensure('effect.target.starts_with("//")' in encoder and '"authorization"' in encoder,
            'origin-form request/header override restrictions removed')

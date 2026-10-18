@@ -325,6 +325,21 @@ THEOREMS += [
     "aivm_secrets_garrett_core.rebinding.Proofs.successful_rebind_witness",
 ]
 
+THEOREMS += [
+    "aivm_secrets_garrett_core.http_auth.Proofs.visible_from_step",
+    "aivm_secrets_garrett_core.http_auth.Proofs.valid_credential_loop_contract",
+    "aivm_secrets_garrett_core.http_auth.Proofs.valid_credential_contract",
+    "aivm_secrets_garrett_core.http_auth.Proofs.extend_bytes_contract",
+    "aivm_secrets_garrett_core.http_auth.Proofs.invalid_credential_leaves_buffer_unchanged",
+    "aivm_secrets_garrett_core.http_auth.Proofs.accepted_header_exact",
+    "aivm_secrets_garrett_core.http_auth.Proofs.valid_credential_has_no_crlf",
+    "aivm_secrets_garrett_core.http_auth.Proofs.header_is_single_line",
+    "aivm_secrets_garrett_core.http_auth.Proofs.accepted_header_cannot_split",
+    "aivm_secrets_garrett_core.http_auth.Proofs.successful_header_requires_valid_credential",
+    "aivm_secrets_garrett_core.http_auth.Proofs.valid_credential_positive_witness",
+    "aivm_secrets_garrett_core.http_auth.Proofs.successful_header_witness",
+]
+
 TESTS = [
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
@@ -338,6 +353,7 @@ TESTS = [
     "tests/test_rust_garrett_login.py",
     "tests/test_rust_garrett_manifest.py",
     "tests/test_rust_policy_normalization.py",
+    "tests/test_rust_http_auth.py",
     "tests/test_rust_garrett_reflection.py",
     "tests/test_rust_garrett_client_material.py",
     "tests/test_rust_garrett_tpm_request.py",
@@ -403,6 +419,7 @@ def inputs() -> list[str]:
         "proofs/GarrettEmission.lean",
         "proofs/GarrettCoordination.lean",
         "proofs/GarrettRebinding.lean",
+        "proofs/GarrettHttpAuth.lean",
         "proofs/GarrettProfiles.lean",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
@@ -583,7 +600,7 @@ def assurance_coordinates() -> dict:
         "aeneas_release": base.RELEASE,
         "theorems": THEOREMS,
         "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
-        "implementation_linked": "Aeneas-generated optional coordinator dispatch continuation and issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission",
+        "implementation_linked": "Aeneas-generated optional coordinator dispatch continuation and issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission, and concrete authentication-header credential validation/exact byte appending used by both native provider writers",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
@@ -1024,6 +1041,17 @@ def mutate(pattern: str | None = None) -> None:
             "Stage::Exchanging | Stage::Accepted => (),",
         ),
     ]
+    header_source = source.with_name("http_auth.rs")
+    mutations += [
+        (header_source, "http auth empty credential accepted", "secret.len() == 0", "false"),
+        (header_source, "http auth oversized credential accepted", "secret.len() > 4096", "false"),
+        (header_source, "http auth control byte accepted", "*byte < b'!'", "false"),
+        (header_source, "http auth nonascii byte accepted", "*byte > b'~'", "false"),
+        (header_source, "http auth guard omitted", "!valid_credential(secret)", "false"),
+        (header_source, "http auth wrong selected header", 'b"Authorization: Bearer "', 'b"Authorization: Basic "'),
+        (header_source, "http auth credential substituted", "output.extend_from_slice(secret);", 'output.extend_from_slice(b"REPLACED");'),
+        (header_source, "http auth malformed terminator", 'output.extend_from_slice(b"\\r\\n");', 'output.extend_from_slice(b"\\n");'),
+    ]
     manifest_source = source.with_name("manifest.rs")
     mutations += [
         (manifest_source, "manifest lower range escaped", "*value < *lo", "false"),
@@ -1331,6 +1359,7 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettEmission",
                 "GarrettCoordination",
                 "GarrettRebinding",
+                "GarrettHttpAuth",
             ]
             # These leaves import the extracted crate plus generic standard-
             # model facts. Check the affected leaf first; keep full fallback
@@ -1346,6 +1375,7 @@ def mutate(pattern: str | None = None) -> None:
                 "emission.rs": "GarrettEmission",
                 "coordination.rs": "GarrettCoordination",
                 "rebinding.rs": "GarrettRebinding",
+                "http_auth.rs": "GarrettHttpAuth",
             }.get(source.name)
             if preferred:
                 modules.remove(preferred)

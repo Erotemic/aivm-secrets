@@ -35,8 +35,13 @@ provider request byte encoder, HTTP parser hardening and a native trace/test
 oracle in `docs/verified-w6-adapter-correspondence.md`. Run
 `python dev/verification/w6_adapter.py check` for the reviewed inventory;
 the native Rust unit/process gates must still pass. W6 does **not** prove a
-whole-service implementation-to-trace correspondence, mediation or secrecy. Focus on a useful
-standalone broker workflow and conditional, implementation-linked credential
+whole-service implementation-to-trace correspondence, mediation or secrecy.
+The [authentication-line refinement](docs/verified-http-auth.md) extracts the
+actual native validator/appender for both provider writers. It proves exact
+bytes and rejection of header splitting under its stated buffer bound; it does
+not discharge destination selection, full request formatting or complete I/O
+mediation. Use focused compilation of `GarrettHttpAuth.lean` during development.
+Focus on a useful standalone broker workflow and conditional, implementation-linked credential
 confinement; do not advertise formal VM isolation or whole-service secrecy.
 
 - Python's normative core (including new durable coordinator decisions,

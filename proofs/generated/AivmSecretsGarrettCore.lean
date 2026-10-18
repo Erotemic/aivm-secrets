@@ -1226,6 +1226,91 @@ def enrollment.enroll_client
     | core.result.Result.Err error => ok (core.result.Result.Err error)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
+/-- [aivm_secrets_garrett_core::http_auth::HeaderDenial]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_auth.rs', lines 5:0-7:1
+    Visibility: public -/
+@[discriminant isize]
+inductive http_auth.HeaderDenial where
+| InvalidCredential : http_auth.HeaderDenial
+
+/-- [aivm_secrets_garrett_core::http_auth::valid_credential]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_auth.rs', lines 15:4-21:1
+    Visibility: public -/
+@[rust_loop]
+def http_auth.valid_credential_loop
+  (iter : core.slice.iter.Iter Std.U8) : Result Bool := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok true
+  | some byte =>
+    if byte < 33#u8
+    then ok false
+    else
+      if byte > 126#u8
+      then ok false
+      else http_auth.valid_credential_loop iter1
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_auth::valid_credential]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_auth.rs', lines 11:0-21:1
+    Visibility: public -/
+def http_auth.valid_credential (secret : Slice Std.U8) : Result Bool := do
+  let i := Slice.len secret
+  if i = 0#usize
+  then ok false
+  else
+    let i1 := Slice.len secret
+    if i1 > 4096#usize
+    then ok false
+    else
+      let iter ←
+        SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+          secret
+      http_auth.valid_credential_loop iter
+
+/-- [aivm_secrets_garrett_core::http_auth::append_header]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_auth.rs', lines 23:0-38:1
+    Visibility: public -/
+def http_auth.append_header
+  (output : alloc.vec.Vec Std.U8) (secret : Slice Std.U8)
+  (authentication : credential_use.Authentication) :
+  Result ((core.result.Result Unit http_auth.HeaderDenial) × (alloc.vec.Vec
+    Std.U8))
+  := do
+  let b ← http_auth.valid_credential secret
+  if b
+  then
+    let output1 ←
+      match authentication with
+      | credential_use.Authentication.Bearer =>
+        do
+        let s ←
+          lift (Array.to_slice
+            (Array.make 22#usize [
+              65#u8, 117#u8, 116#u8, 104#u8, 111#u8, 114#u8, 105#u8, 122#u8,
+              97#u8, 116#u8, 105#u8, 111#u8, 110#u8, 58#u8, 32#u8, 66#u8,
+              101#u8, 97#u8, 114#u8, 101#u8, 114#u8, 32#u8
+              ]))
+        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+      | credential_use.Authentication.ApiKey =>
+        do
+        let s ←
+          lift (Array.to_slice
+            (Array.make 11#usize [
+              88#u8, 45#u8, 65#u8, 80#u8, 73#u8, 45#u8, 75#u8, 101#u8, 121#u8,
+              58#u8, 32#u8
+              ]))
+        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+    let output2 ←
+      alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output1 secret
+    let s ← lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
+    let output3 ←
+      alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output2 s
+    ok (core.result.Result.Ok (), output3)
+  else
+    ok (core.result.Result.Err http_auth.HeaderDenial.InvalidCredential,
+      output)
+
 /-- [aivm_secrets_garrett_core::Denial]
     Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 20:0-22:1
     Visibility: public -/

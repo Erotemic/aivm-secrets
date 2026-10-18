@@ -42,6 +42,12 @@ authorization, or that no other path can emit bytes. The independently checked
 Lean controller contracts, concrete adapter tests and environmental premises
 retain their separate scopes.
 
+The [authentication-line refinement](verified-http-auth.md) adds two required
+paths through the account/manifest byte builders to the extracted
+`http_auth::append_header` and its validator. The helper has a separate exact
+byte theorem. These additional graph witnesses still do not establish that
+every native output path is mediated by that helper.
+
 The projection retains every translated function, including functions outside
 the direct request-root traversal, opaque dependencies, compiler-generated
 helpers and drop-site counts. Charon's trailing `Instantiated` name component

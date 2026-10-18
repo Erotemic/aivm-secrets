@@ -7,11 +7,11 @@ The initial report below predates the local native validation recorded in
 synthetic process workflows now run on the pinned local toolchain; this does
 not close the whole-service correspondence obligations.
 
-**Status: candidate implementation and test oracle. Not whole-service formal
-refinement.** Rust unit tests and native subprocess tests require a successful
-pinned-toolchain run on the maintainer's host. The Python source guard, oracle
-negative controls, and structural regression tests pass in the authoring
-container; native tests are skipped here because binaries are absent.
+**Status: locally tested native adapters; full native trace refinement remains
+open.** Frozen [policy-normalization validation](../dev/validation/2026-10-18-policy-normalization.json)
+records the runnable native suite. The [authentication-line follow-up](verified-http-auth.md)
+adds an extracted, kernel-checked byte leaf used by both provider writers.
+Other encoder/parser/call-site obligations remain separate from that result.
 
 This milestone follows W4's finite source-controller trace and W5's conditional
 information-flow relation. Both concern **modeled** events. W6 now checks
@@ -85,7 +85,7 @@ they are not sound static program analysis.
 
 ## Reviewed channels and unresolved premises
 
-`docs/planning/aivm-secrets-w6-adapters.json` classifies **all ten** W0
+`docs/planning/aivm-secrets-w6-adapters.json` classifies **all eleven** W0
 sinks, links them to Rust code, W4 modeled events (or exclusions), concrete
 tests and assumption-ledger IDs. The three principal primary-scope sinks are
 provider HTTPS, host audit and guest frame. Guest connection closure is an
@@ -103,7 +103,7 @@ The following are **not discharged** by W6:
   correctness, which remain assumptions until separately evidenced;
 - guest-visible timing, close/error/length and literal-reflection oracles;
 - semantic leakage through provider-controlled but authorized result fields;
-- native Rust execution and Rust unit gates in this authoring environment;
+- all-input refinement of the remaining native request/parser/render adapters;
 - live GitHub and AIVM virtualization evidence (W7/W8).
 
 ## Focused acceptance commands
