@@ -1,3 +1,4 @@
+import GarrettHttpRequest
 import GarrettHttpAuth
 import GarrettRebinding
 import GarrettCoordination
@@ -284,3 +285,19 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.http_auth.Proofs.successful_header_requires_valid_credential
 #print axioms aivm_secrets_garrett_core.http_auth.Proofs.valid_credential_positive_witness
 #print axioms aivm_secrets_garrett_core.http_auth.Proofs.successful_header_witness
+
+#print axioms aivm_secrets_garrett_core.http_request.Proofs.slice_bytes_equal
+#print axioms aivm_secrets_garrett_core.http_request.Proofs.valid_method_contract
+#print axioms aivm_secrets_garrett_core.http_request.Proofs.target_bytes_step
+#print axioms aivm_secrets_garrett_core.http_request.Proofs.target_loop_contract
+#print axioms aivm_secrets_garrett_core.http_request.Proofs.valid_target_loop0_contract
+#print axioms aivm_secrets_garrett_core.http_request.Proofs.valid_target_loop1_contract
+#print axioms aivm_secrets_garrett_core.http_request.Proofs.valid_target_contract
+#print axioms aivm_secrets_garrett_core.http_request.Proofs.invalid_line_leaves_buffer_unchanged
+#print axioms aivm_secrets_garrett_core.http_request.Proofs.accepted_line_exact
+#print axioms aivm_secrets_garrett_core.http_request.Proofs.successful_line_requires_validation
+#print axioms aivm_secrets_garrett_core.http_request.Proofs.valid_target_has_no_delimiters
+#print axioms aivm_secrets_garrett_core.http_request.Proofs.line_has_only_fixed_delimiters
+#print axioms aivm_secrets_garrett_core.http_request.Proofs.accepted_line_cannot_split
+#print axioms aivm_secrets_garrett_core.http_request.Proofs.valid_line_positive_witness
+#print axioms aivm_secrets_garrett_core.http_request.Proofs.successful_line_witness

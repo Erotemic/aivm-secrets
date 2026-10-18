@@ -216,3 +216,4 @@ pub mod reflection;
 pub mod client_material;
 pub mod emission;
 pub mod http_auth;
+pub mod http_request;

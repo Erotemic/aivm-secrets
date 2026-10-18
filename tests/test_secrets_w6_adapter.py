@@ -85,3 +85,13 @@ def test_w6_new_provider_send_or_public_raw_return_is_rejected(tmp_path):
     path.write_text(body)
     with pytest.raises(ContractError, match='raw provider body'):
         check(checkout)
+
+
+def test_w6_request_line_bypass_is_rejected(tmp_path):
+    checkout = fixture_checkout(tmp_path)
+    path = checkout / SOURCE
+    original = path.read_text()
+    assert original.count('http_request::append_line(') == 1
+    path.write_text(original.replace('http_request::append_line(', 'unchecked_line(', 1))
+    with pytest.raises(ContractError, match='origin-form'):
+        check(checkout)

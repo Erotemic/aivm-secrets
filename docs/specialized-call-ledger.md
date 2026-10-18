@@ -48,6 +48,9 @@ paths through the account/manifest byte builders to the extracted
 byte theorem. These additional graph witnesses still do not establish that
 every native output path is mediated by that helper.
 
+The [request-line refinement](verified-http-request.md) adds two more required
+builder-to-`http_request::append_line`/`valid_target` paths with the same limits.
+
 The projection retains every translated function, including functions outside
 the direct request-root traversal, opaque dependencies, compiler-generated
 helpers and drop-site counts. Charon's trailing `Instantiated` name component

@@ -7,7 +7,7 @@ use crate::{
     Error, Outcome,
 };
 use aivm_secrets_garrett_core::{
-    credential_use as core, http_auth, protocol, Expectation, IssuedSurrogate,
+    credential_use as core, http_auth, http_request, protocol, Expectation, IssuedSurrogate,
 };
 use ring::{
     aead, digest,
@@ -283,7 +283,10 @@ fn account_request_bytes(route: &core::Route, secret: &Credential) -> Outcome<Ze
     let host = std::str::from_utf8(&route.host).map_err(|_| Error::InternalError)?;
     let path = std::str::from_utf8(&route.path).map_err(|_| Error::InternalError)?;
     let port = u16::try_from(route.port).map_err(|_| Error::InternalError)?;
-    let mut request=Zeroizing::new(format!("GET {path} HTTP/1.1\r\nHost: {host}:{port}\r\nAccept: application/json\r\nAccept-Encoding: identity\r\nUser-Agent: aivm-secrets/1\r\nConnection: close\r\n").into_bytes());
+    let mut request = Zeroizing::new(Vec::new());
+    http_request::append_line(&mut request, b"GET", path.as_bytes())
+        .map_err(|_| Error::InvalidPolicy)?;
+    request.extend_from_slice(format!("Host: {host}:{port}\r\nAccept: application/json\r\nAccept-Encoding: identity\r\nUser-Agent: aivm-secrets/1\r\nConnection: close\r\n").as_bytes());
     http_auth::append_header(&mut request, &secret.0, &route.authentication)
         .map_err(|_| Error::CredentialSource)?;
     request.extend_from_slice(b"\r\n");

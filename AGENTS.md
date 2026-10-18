@@ -41,6 +41,10 @@ actual native validator/appender for both provider writers. It proves exact
 bytes and rejection of header splitting under its stated buffer bound; it does
 not discharge destination selection, full request formatting or complete I/O
 mediation. Use focused compilation of `GarrettHttpAuth.lean` during development.
+The [request-line refinement](docs/verified-http-request.md) checks the actual
+method/target validator and exact appender used by both writers. It prevents
+framing injection within that segment; full request/destination/I/O refinement
+remains open. Use focused `GarrettHttpRequest.lean` compilation during iteration.
 Focus on a useful standalone broker workflow and conditional, implementation-linked credential
 confinement; do not advertise formal VM isolation or whole-service secrecy.
 

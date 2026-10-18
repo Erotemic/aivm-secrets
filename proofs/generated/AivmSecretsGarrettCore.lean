@@ -20,6 +20,18 @@ set_option maxRecDepth 2048
 
 namespace aivm_secrets_garrett_core
 
+/-- Trait implementation: [core::slice::cmp::{impl core::cmp::PartialEq<[U]> for [T]}]
+    Source: '/rustc/library/core/src/slice/cmp.rs', lines 14:0-16:28
+    Name pattern: [core::cmp::PartialEq<[@T], [@U]>] -/
+@[reducible, rust_trait_impl "core::cmp::PartialEq<[@T], [@U]>"]
+impl_def Slice.Insts.CoreCmpPartialEqSlice {T : Type _} {U : Type _}
+  (cmpPartialEqInst : core.cmp.PartialEq T U) : core.cmp.PartialEq (Slice T)
+  (Slice U) := {
+  eq := core.slice.cmp.PartialEqSlice.eq cmpPartialEqInst
+  ne := core.cmp.PartialEq.ne.trait_default (Slice.Insts.CoreCmpPartialEqSlice
+    cmpPartialEqInst)
+}
+
 /-- [aivm_secrets_garrett_core::authority::AuthorityDenial]
     Source: 'crates/aivm-secrets-garrett-core/src/authority.rs', lines 3:0-7:1
     Visibility: public -/
@@ -1310,6 +1322,146 @@ def http_auth.append_header
   else
     ok (core.result.Result.Err http_auth.HeaderDenial.InvalidCredential,
       output)
+
+/-- [aivm_secrets_garrett_core::http_request::RequestDenial]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_request.rs', lines 3:0-5:1
+    Visibility: public -/
+@[discriminant isize]
+inductive http_request.RequestDenial where
+| InvalidLine : http_request.RequestDenial
+
+/-- [aivm_secrets_garrett_core::http_request::valid_method]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_request.rs', lines 7:0-12:1
+    Visibility: public -/
+def http_request.valid_method (method : Slice Std.U8) : Result Bool := do
+  let get ←
+    lift (Array.to_slice (Array.make 3#usize [ 71#u8, 69#u8, 84#u8 ]))
+  let post ←
+    lift (Array.to_slice (Array.make 4#usize [ 80#u8, 79#u8, 83#u8, 84#u8 ]))
+  let patch ←
+    lift (Array.to_slice
+      (Array.make 5#usize [ 80#u8, 65#u8, 84#u8, 67#u8, 72#u8 ]))
+  let b ← core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 method get
+  if b
+  then ok true
+  else
+    let b1 ←
+      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 method post
+    if b1
+    then ok true
+    else core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 method patch
+
+/-- [aivm_secrets_garrett_core::http_request::valid_target]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_request.rs', lines 23:4-29:1
+    Visibility: public -/
+@[rust_loop]
+def http_request.valid_target_loop0
+  (iter : core.slice.iter.Iter Std.U8) : Result Bool := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok true
+  | some byte =>
+    if byte < 33#u8
+    then ok false
+    else
+      if byte > 126#u8
+      then ok false
+      else
+        if byte = 35#u8
+        then ok false
+        else http_request.valid_target_loop0 iter1
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_request::valid_target]: loop 1:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_request.rs', lines 23:4-29:1
+    Visibility: public -/
+@[rust_loop]
+def http_request.valid_target_loop1
+  (iter : core.slice.iter.Iter Std.U8) : Result Bool := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok true
+  | some byte =>
+    if byte < 33#u8
+    then ok false
+    else
+      if byte > 126#u8
+      then ok false
+      else
+        if byte = 35#u8
+        then ok false
+        else http_request.valid_target_loop1 iter1
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_request::valid_target]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_request.rs', lines 16:0-29:1
+    Visibility: public -/
+def http_request.valid_target (target : Slice Std.U8) : Result Bool := do
+  let i := Slice.len target
+  if i = 0#usize
+  then ok false
+  else
+    let i1 := Slice.len target
+    if i1 > 8192#usize
+    then ok false
+    else
+      let i2 ← Slice.index_usize target 0#usize
+      if i2 != 47#u8
+      then ok false
+      else
+        let i3 := Slice.len target
+        if i3 > 1#usize
+        then
+          let i4 ← Slice.index_usize target 1#usize
+          if i4 = 47#u8
+          then ok false
+          else
+            let iter ←
+              SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+                target
+            http_request.valid_target_loop0 iter
+        else
+          let iter ←
+            SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+              target
+          http_request.valid_target_loop1 iter
+
+/-- [aivm_secrets_garrett_core::http_request::append_line]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_request.rs', lines 31:0-44:1
+    Visibility: public -/
+def http_request.append_line
+  (output : alloc.vec.Vec Std.U8) (method : Slice Std.U8)
+  (target : Slice Std.U8) :
+  Result ((core.result.Result Unit http_request.RequestDenial) ×
+    (alloc.vec.Vec Std.U8))
+  := do
+  let b ← http_request.valid_method method
+  if b
+  then
+    let b1 ← http_request.valid_target target
+    if b1
+    then
+      let output1 ←
+        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output method
+      let s ← lift (Array.to_slice (Array.make 1#usize [ 32#u8 ]))
+      let output2 ←
+        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output1 s
+      let output3 ←
+        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output2 target
+      let s1 ←
+        lift (Array.to_slice
+          (Array.make 11#usize [
+            32#u8, 72#u8, 84#u8, 84#u8, 80#u8, 47#u8, 49#u8, 46#u8, 49#u8,
+            13#u8, 10#u8
+            ]))
+      let output4 ←
+        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output3 s1
+      ok (core.result.Result.Ok (), output4)
+    else
+      ok (core.result.Result.Err http_request.RequestDenial.InvalidLine,
+        output)
+  else
+    ok (core.result.Result.Err http_request.RequestDenial.InvalidLine, output)
 
 /-- [aivm_secrets_garrett_core::Denial]
     Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 20:0-22:1

@@ -11,7 +11,9 @@ not close the whole-service correspondence obligations.
 open.** Frozen [policy-normalization validation](../dev/validation/2026-10-18-policy-normalization.json)
 records the runnable native suite. The [authentication-line follow-up](verified-http-auth.md)
 adds an extracted, kernel-checked byte leaf used by both provider writers.
-Other encoder/parser/call-site obligations remain separate from that result.
+The [request-line refinement](verified-http-request.md) additionally checks exact
+method/target bytes and framing. Remaining Host/header/body encoders, parsers and
+call-site obligations stay open.
 
 This milestone follows W4's finite source-controller trace and W5's conditional
 information-flow relation. Both concern **modeled** events. W6 now checks

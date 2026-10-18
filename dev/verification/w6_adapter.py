@@ -64,7 +64,9 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and 'request.extend_from_slice(&secret.0)' not in encoder
            and 'Error::CredentialSource' in encoder,
            'HTTP header may contain unvalidated OAuth/credential bytes')
-    ensure('effect.target.starts_with("//")' in encoder and '"authorization"' in encoder,
+    ensure(encoder.count("http_request::append_line(") == 1
+           and "effect.method.as_bytes()," in encoder and "effect.target.as_bytes()," in encoder
+           and '"authorization"' in encoder,
            'origin-form request/header override restrictions removed')
     ensure('if status == 206 {' in source, 'partial response is no longer refused')
     ensure('self.disclosure.project(&op.name, &raw, &secret.0)?' in source

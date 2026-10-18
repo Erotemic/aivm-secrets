@@ -422,20 +422,19 @@ fn manifest_request_bytes(
     }
     let port = u16::try_from(route.port).map_err(|_| Error::InvalidPolicy)?;
     if port == 0
-        || !matches!(effect.method.as_str(), "GET" | "POST" | "PATCH")
-        || !effect.target.starts_with('/')
-        || effect.target.starts_with("//")
-        || effect.target.len() > 8192
-        || effect
-            .target
-            .bytes()
-            .any(|b| !(33..=126).contains(&b) || b == b'#')
         || effect.accept.is_empty()
         || effect.accept.len() > 96
         || !effect.accept.bytes().all(|b| (33..=126).contains(&b))
     {
         return Err(Error::InvalidPolicy);
     }
+    let mut request = Zeroizing::new(Vec::new());
+    http_request::append_line(
+        &mut request,
+        effect.method.as_bytes(),
+        effect.target.as_bytes(),
+    )
+    .map_err(|_| Error::InvalidPolicy)?;
     if !http_auth::valid_credential(&secret.0) {
         return Err(Error::CredentialSource);
     }
@@ -446,12 +445,10 @@ fn manifest_request_bytes(
     if body.as_ref().is_some_and(|value| value.len() > MAX_BODY) {
         return Err(Error::InvalidPolicy);
     }
-    let mut request = Zeroizing::new(
-        format!(
-            "{} {} HTTP/1.1\r\nHost: {host}:{port}\r\nAccept: {}\r\nAccept-Encoding: identity\r\nUser-Agent: aivm-secrets/1\r\nConnection: close\r\n",
-            effect.method, effect.target, effect.accept,
-        ).into_bytes(),
-    );
+    request.extend_from_slice(format!(
+        "Host: {host}:{port}\r\nAccept: {}\r\nAccept-Encoding: identity\r\nUser-Agent: aivm-secrets/1\r\nConnection: close\r\n",
+        effect.accept,
+    ).as_bytes());
     // Eight policy headers plus one explicitly derived write-retry header.
     if headers.len() > 9 {
         return Err(Error::InvalidPolicy);

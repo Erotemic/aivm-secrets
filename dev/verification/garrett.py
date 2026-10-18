@@ -340,6 +340,24 @@ THEOREMS += [
     "aivm_secrets_garrett_core.http_auth.Proofs.successful_header_witness",
 ]
 
+THEOREMS += [
+    'aivm_secrets_garrett_core.http_request.Proofs.slice_bytes_equal',
+    'aivm_secrets_garrett_core.http_request.Proofs.valid_method_contract',
+    'aivm_secrets_garrett_core.http_request.Proofs.target_bytes_step',
+    'aivm_secrets_garrett_core.http_request.Proofs.target_loop_contract',
+    'aivm_secrets_garrett_core.http_request.Proofs.valid_target_loop0_contract',
+    'aivm_secrets_garrett_core.http_request.Proofs.valid_target_loop1_contract',
+    'aivm_secrets_garrett_core.http_request.Proofs.valid_target_contract',
+    'aivm_secrets_garrett_core.http_request.Proofs.invalid_line_leaves_buffer_unchanged',
+    'aivm_secrets_garrett_core.http_request.Proofs.accepted_line_exact',
+    'aivm_secrets_garrett_core.http_request.Proofs.successful_line_requires_validation',
+    'aivm_secrets_garrett_core.http_request.Proofs.valid_target_has_no_delimiters',
+    'aivm_secrets_garrett_core.http_request.Proofs.line_has_only_fixed_delimiters',
+    'aivm_secrets_garrett_core.http_request.Proofs.accepted_line_cannot_split',
+    'aivm_secrets_garrett_core.http_request.Proofs.valid_line_positive_witness',
+    'aivm_secrets_garrett_core.http_request.Proofs.successful_line_witness',
+]
+
 TESTS = [
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
@@ -354,6 +372,7 @@ TESTS = [
     "tests/test_rust_garrett_manifest.py",
     "tests/test_rust_policy_normalization.py",
     "tests/test_rust_http_auth.py",
+    "tests/test_rust_http_request.py",
     "tests/test_rust_garrett_reflection.py",
     "tests/test_rust_garrett_client_material.py",
     "tests/test_rust_garrett_tpm_request.py",
@@ -420,6 +439,7 @@ def inputs() -> list[str]:
         "proofs/GarrettCoordination.lean",
         "proofs/GarrettRebinding.lean",
         "proofs/GarrettHttpAuth.lean",
+        "proofs/GarrettHttpRequest.lean",
         "proofs/GarrettProfiles.lean",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
@@ -600,7 +620,7 @@ def assurance_coordinates() -> dict:
         "aeneas_release": base.RELEASE,
         "theorems": THEOREMS,
         "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
-        "implementation_linked": "Aeneas-generated optional coordinator dispatch continuation and issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission, and concrete authentication-header credential validation/exact byte appending used by both native provider writers",
+        "implementation_linked": "Aeneas-generated optional coordinator dispatch continuation and issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission, and concrete authentication-header credential validation/exact byte appending and request-line method/target validation/exact single-line construction used by both native provider writers",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
@@ -1054,6 +1074,22 @@ def mutate(pattern: str | None = None) -> None:
         (header_source, "http auth credential substituted", "output.extend_from_slice(secret);", 'output.extend_from_slice(b"REPLACED");'),
         (header_source, "http auth malformed terminator", 'output.extend_from_slice(b"\\r\\n");', 'output.extend_from_slice(b"\\n");'),
     ]
+    request_source = source.with_name("http_request.rs")
+    mutations += [
+        (request_source, "http request empty target accepted", "target.len() == 0", "false"),
+        (request_source, "http request oversized target accepted", "target.len() > 8192", "false"),
+        (request_source, "http request absolute target accepted", "target[0] != b'/'", "false"),
+        (request_source, "http request network target accepted", "target[1] == b'/'", "false"),
+        (request_source, "http request control delimiter accepted", "*byte < b'!'", "false"),
+        (request_source, "http request nonascii target accepted", "*byte > b'~'", "false"),
+        (request_source, "http request fragment accepted", "*byte == b'#'", "false"),
+        (request_source, "http request method guard omitted", "!valid_method(method)", "false"),
+        (request_source, "http request target guard omitted", "!valid_target(target)", "false"),
+        (request_source, "http request selected target substituted", "output.extend_from_slice(target);", 'output.extend_from_slice(b"/REPLACED");'),
+        (request_source, "http request malformed version delimiter",
+         'output.extend_from_slice(b" HTTP/1.1\\r\\n");',
+         'output.extend_from_slice(b" HTTP/1.1\\n");'),
+    ]
     manifest_source = source.with_name("manifest.rs")
     mutations += [
         (manifest_source, "manifest lower range escaped", "*value < *lo", "false"),
@@ -1362,6 +1398,7 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettCoordination",
                 "GarrettRebinding",
                 "GarrettHttpAuth",
+                "GarrettHttpRequest",
             ]
             # These leaves import the extracted crate plus generic standard-
             # model facts. Check the affected leaf first; keep full fallback
@@ -1378,6 +1415,7 @@ def mutate(pattern: str | None = None) -> None:
                 "coordination.rs": "GarrettCoordination",
                 "rebinding.rs": "GarrettRebinding",
                 "http_auth.rs": "GarrettHttpAuth",
+                "http_request.rs": "GarrettHttpRequest",
             }.get(source.name)
             if preferred:
                 modules.remove(preferred)

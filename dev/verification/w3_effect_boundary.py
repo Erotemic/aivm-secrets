@@ -130,7 +130,8 @@ def review_semantics(contents: dict[str, str]) -> None:
     require('!http_auth::valid_credential(&secret.0)' in wire
             and wire.count(auth_append) == 1 and 'Error::CredentialSource' in wire
             and 'request.extend_from_slice(&secret.0)' not in wire
-            and 'effect.target.starts_with("//")' in wire
+            and wire.count("http_request::append_line(") == 1
+            and "effect.method.as_bytes()," in wire and "effect.target.as_bytes()," in wire
             and '"authorization"' in wire and '"content-length"' in wire,
             'provider wire encoder lost injection / reserved-header refusal')
     require('if status == 206 {' in m, 'unreviewed partial response release')
@@ -186,7 +187,8 @@ def review_semantics(contents: dict[str, str]) -> None:
     c = contents[RUST + 'custody.rs']
     account_wire = part(c, 'fn account_request_bytes(', 'impl Executor {')
     account_transport = part(c, '    fn exchange(', 'struct CurrentExecutor')
-    require(account_wire.count(auth_append) == 1
+    require(account_wire.count('http_request::append_line(&mut request, b"GET", path.as_bytes())') == 1
+            and account_wire.count(auth_append) == 1
             and 'request.extend_from_slice(&secret.0)' not in account_wire
             and same_order(account_transport, 'let request = account_request_bytes(route, secret)?;',
                            'TcpStream::connect_timeout(', 'emit_current(fresh, || {'),
