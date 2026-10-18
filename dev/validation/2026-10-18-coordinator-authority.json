@@ -1,0 +1,162 @@
+{
+  "schema": 1,
+  "source_commit": "3c3b7d1873c4a1900b377cf226c4f3f1aea0a2ad",
+  "source_dirty": false,
+  "scope": "Optional native mTLS/SQLite authority, independent reference/native workflows and extracted terminal decision/history contracts",
+  "report_path": ".tools/coordinator-system-3c3b7d1/report.json",
+  "report_sha256": "395d64c77dc6df004fdffd0830420b503ea73138898bf4fb3c6e4383cf5c7666",
+  "input_fingerprint_sha256": "03055ed4f11ed14e104e9100847be2901efdc25505fa25fd924d426ba56f1e94",
+  "full_suite": {
+    "passed": 2468,
+    "skipped": 0
+  },
+  "required_workflows": {
+    "conformance": 246,
+    "normal_release_without_conformance": 246,
+    "skipped": 0
+  },
+  "normal_workflow_report_path": ".tools/coordinator-validation-3c3b7d1/normal-report.json",
+  "normal_workflow_report_sha256": "90d93f8642af0346703ef9c5902a1722ecdde605e944bbc201cea8117e0efb86",
+  "authority_mutations": {
+    "rejected": 10,
+    "full_historical_campaign": false,
+    "report_path": ".tools/coordinator-validation-3c3b7d1/mutations.json",
+    "report_sha256": "6a49b414d86d7d30fb60e41a19dcb251c0cd9a5270b635dcba4271bb4c24cc75"
+  },
+  "compiler_profiles": {
+    "bridge": {
+      "report_path": ".tools/coordinator-bridge-calls-3c3b7d1/report.json",
+      "report_sha256": "a52288f018d6078b83e7a2ae0e5604a1b6db514591991f45ae590c0a3c5ebba4",
+      "artifacts_sha256": {
+        "capture.json": "3e8a045fb4744937c66514c2586892b51a59bf2c811066dddd1c2a890f9e165f",
+        "compiler.ullbc.gz": "c923bf5431c02ff23a5967429b4e6ff00175c0627bd2dac607634ee25378a7ae",
+        "projection.json": "cb8c9656ffedb7182165097c8723dc8bbd8c3653bc00b5499d9df93fab7e4564",
+        "compiler.log": "252a438b4f80d490d365a2f22b12cd165ab2b06ea080da26e7a307d01506d5d6",
+        "projector.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "build.log": "92e06e4842c2fa9a2139c34892b15d58451290c4ed4fe3a60c23f8f551bc9ec1"
+      },
+      "counts": {
+        "functions": 3399,
+        "calls": 9034,
+        "drops": 5709238,
+        "bodies": {
+          "Unstructured": 1401,
+          "Opaque": 1998
+        }
+      },
+      "direct_handler_nodes": 1005,
+      "opaque_handler_boundaries": 785,
+      "witness_names": [
+        "account-controller-executor",
+        "coordinated-manifest-executor",
+        "account-authentication-bytes",
+        "manifest-authentication-bytes",
+        "account-request-line",
+        "manifest-request-line"
+      ],
+      "complete_mediation": false
+    },
+    "coordinator": {
+      "report_path": ".tools/coordinator-coordinator-calls-3c3b7d1/report.json",
+      "report_sha256": "a12f67bddfa17fb58084486b7fe5812672427d446505167e841267cc90e04c99",
+      "artifacts_sha256": {
+        "capture.json": "ed21a2a5a5557e295c1b4caca8d5b8b7ff74bb41b1caf33b6161237b8a5bffe1",
+        "compiler.ullbc.gz": "14fafdfbdd1df350ae0fa47ac848e0241f5c26f0397f9662738b441cad7d8074",
+        "projection.json": "7144df2dc808304b0daf6a2a6a0d40fd4448e3ec21d0ff3dccef7c0e69ec4253",
+        "compiler.log": "21eef508c7d923c6d10758448ac1d15f4359bcd89f9186cde8b2efc8acbc1a72",
+        "projector.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "build.log": "3997fc6790b8063b86c119e91f87ac7395ac6cf26135da637dcb229006bc32dc"
+      },
+      "counts": {
+        "functions": 942,
+        "calls": 1447,
+        "drops": 250578,
+        "bodies": {
+          "Unstructured": 264,
+          "Opaque": 678
+        }
+      },
+      "direct_handler_nodes": 346,
+      "opaque_handler_boundaries": 307,
+      "witness_names": [
+        "coordinator-operator-admission",
+        "coordinator-member-admission",
+        "coordinator-activate",
+        "coordinator-revoke",
+        "coordinator-reserve",
+        "coordinator-finish"
+      ],
+      "complete_mediation": false
+    }
+  },
+  "proof_and_source_sha256": {
+    "rust/crates/aivm-secrets-garrett-core/src/coordinator_authority.rs": "a0c8d49124a3fd8fa62cce69cdf6eef9cfb2659cc2557264f5feca66189aa77d",
+    "proofs/GarrettCoordinatorAuthority.lean": "cac8e772987b0c30d8c6b4ee9d8beb0a66b318b6d60d8db65bf321c02271d796",
+    "proofs/generated/AivmSecretsGarrettCore.lean": "8331739126fa5807d2a16bc564ba8458a20946cb12ff359025e82b1115eb54b8",
+    "rust/crates/aivm-secrets-garrett/src/coordinator_authority/ledger.rs": "f45d5ec76ad3725a744fb5be5136477ab84fa890ccc07cb3e6b655d7e61f3c59",
+    "rust/crates/aivm-secrets-garrett/src/coordinator_authority/server.rs": "98594a629722dca11d5367553f3df8b61bb0fce89075527224b3f0a4fc2d1361",
+    "rust/crates/aivm-secrets-garrett/src/coordinator_main.rs": "fcfcfcf85596e60c06ff8bf6dd0ca703445b4d85d303e4594f6ea74480c64391",
+    "aivm_secrets/identity/coordination.py": "8a088882409c7e38259b756a3a14ac37190e5a3ee32012879c25d1f2aa6df8e6",
+    "tests/secrets_vectors/coordination/authority-v1.jsonl": "1cfc0fc2a06dabfce053d5c7f09d6ddf35cd903c08c924ef582f6a0e1f595e22"
+  },
+  "evidence_log_sha256": {
+    "coordinator-brokers-runtime.log": "2c4fe27d64eb21940898a2988491614168c290e385cc5b66d373846458685125",
+    "coordinator-clippy-final.log": "631c0847fe2877650815dc58b3e88de30a4e81b4307bd5b4dd9e1b7d1780ced0",
+    "coordinator-compiler-probe-fixed.log": "705457f2db1a34d61d08a35f79536a6637eef0a99dfd2e20974b0f63555b325b",
+    "coordinator-compiler-probe.log": "05ec5696c49ac9a5dfebdac3df65d1ef61f7340f76ec5795bcd2950d6dfd209d",
+    "coordinator-extract-final.log": "c50037ab899b7c23081c36f017510191751f2ce63a84f0e16119c1198f6202a0",
+    "coordinator-freshness-record.log": "bcdc31136795c60ca758f6abb893d3f02a33787e639cf256cd159ca965dfafbf",
+    "coordinator-garrett-record.log": "8cb688d70c90f5392b790309708606699744f8ae240cdea9ac9e9d2b313f6a5c",
+    "coordinator-http-baseline.log": "5c8f7de6d598686999df1b7dd019f920bb637a322c20cecdfdbf6bc7e2e3ff95",
+    "coordinator-member-types-baseline.log": "cb343f79ad3f002cb58d188d6ac183cab20a54256ac72521fb2f58a7a87ca4c7",
+    "coordinator-package-boundaries.log": "0143f5622d9d5ff11f0262671e29dc67474d6686669daed593d867fa45403d8d",
+    "coordinator-package-build.log": "0118cb61e99da4eba6d36c43137a3d284e7459835c6b8904278d5f160476d525",
+    "coordinator-projector-unit-fixed.log": "8fbb29c1d36205bb8032fc645bfd941a4349e1fc8a757a172a62decbff83b4ef",
+    "coordinator-proof-8.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "coordinator-reproject-probe.log": "a4008e5ccd0a6054e98a4edc397ef4487f7a33686cc0a39ed4109273ec39d7b2",
+    "coordinator-runtime-first.log": "f6bd4d21b01a851c2eed55b56baa4841519bd9ed63a322649fd0143a569dda23",
+    "coordinator-runtime-fourth.log": "91f7c111aaa7d5514214bcde1b9bc1f41967272bb27a702708f0b9162e579f8c",
+    "coordinator-runtime-reviewed.log": "a107b62699bff4413fedf1dc6e00e145e406af0a836189fd95e88c8efe38bcd6",
+    "coordinator-runtime-second.log": "26dc867438990cefb0efeda866aa873a885f87552bcaf6a90b59dddc25e46dd9",
+    "coordinator-runtime-third.log": "8b5f6ea51869546653b8c05a463aff0fc5cf7bb4e631ab74b219455519f3d734",
+    "coordinator-rust-unit-final.log": "72dac8e93bac1bcfc14c616349430119a245b5d9643ae05f4ae4bdde57d02d1b",
+    "coordinator-stalled-baseline.log": "a32981658f2b1310e1404de6c5358cbbd5dac2de3a312488f435f655fb5f13d0",
+    "coordinator-stalled-fixed.log": "364fae48cbe8f4ef8e995f8fb3224d43792e784eb9919ceefea2fe0106918edf",
+    "coordinator-system.log": "c0d6e1fefc42472cece4dff985fc14ded17b5e7dcf983bc45da171dcf02a811f",
+    "coordinator-w4-w5.log": "db00e4091d44a0b16c69811a716ac52921971c2b134e79432d50d1714005d5ad",
+    "mutations.json": "6a49b414d86d7d30fb60e41a19dcb251c0cd9a5270b635dcba4271bb4c24cc75",
+    "mutations.log": "279456bd5d1471bc66188f7ba1c3ef3e72693921039b6ba26cfef6afa764db3d",
+    "normal-build.log": "66679436177078ca00d6bd5808915f636c646286794ed892d1d840900840fa42",
+    "normal-report.json": "90d93f8642af0346703ef9c5902a1722ecdde605e944bbc201cea8117e0efb86",
+    "normal-workflows.log": "71e3bc8a058a7c3cda4d0f04de034a5797687dcdcfa282e51774755a5f4d1cc6",
+    "normal-workflows.xml": "634e56cc331bb536daf7f8f6dc050d11e98af372fcf2087d4e6bb744156910e2",
+    "coordinator-ordinary-debug.log": "8c1a0884c4e041a274559037f6eec5221ca7c445a291c713ed588dd75dc9ac9b",
+    "coordinator-ordinary-release.log": "393ab47743a6cd3291c0cb8b37bf1647768bb58b02043c8df6c575b1d1d8151b"
+  },
+  "reproduced_python_baselines": [
+    "A stalled raw socket held the accept-side TLS handshake and made an authenticated client exceed its four-second deadline.",
+    "Duplicate Content-Length, duplicate Content-Type and empty Transfer-Encoding were accepted instead of fixed invalid_request denial.",
+    "Unhashable activation member values produced internal_error rather than the declared invalid_request type denial."
+  ],
+  "development_findings": [
+    "SQLite no-follow opening rejects proc-fd symlink paths; resolved directory paths are re-opened/compared to held inodes while SQLite still owns pathname VFS operations.",
+    "Coordinator certificate identities use hex DER hashes rather than JWT base64url thumbprints. Both are derived from the authenticated TLS certificate.",
+    "A persistent mutex-protected native writer connection avoids per-RPC PRAGMA/sidecar races; every RPC still reads rows inside a fresh transaction.",
+    "The optional authority needs its own bounded compiler FIFO and explicit projector target; Result.and_then hid the handler call behind an opaque callback, replaced by an ordinary explicit match.",
+    "Negative source tests exposed insufficient presence-only admission checking; both check and write call sites are now required."
+  ],
+  "checked_scope": [
+    "26 new authority obligations within a 292-name Garrett audit with only allowed standard logical axioms; exact peer/operator membership, activation/revocation, reservation/completion and positive witnesses.",
+    "Pure modeled histories of actual successful Rust decisions preserve a tombstone and a spent key; they do not prove the native SQL/server trace implements that history.",
+    "Native initializer/server and independent Python authority/clients share schema and 35 frozen protocol rows, exact replies/durable state, restarts, roles, wrong peers, framing/type denials, private-path refusal and no automatic replay.",
+    "Native/Python brokers run against both authorities, including global revocation, uncertain writes, competing retry names, policy fingerprints and outage behavior.",
+    "Both compiler profiles retain six required paths and explicit opaque/dependency/drop obligations. Neither profile establishes dominance, data-flow, accept-loop reachability or complete mediation."
+  ],
+  "remaining": [
+    "Action-to-role, authenticated certificate fingerprint, HTTP/JSON/row/SQL bindings and commit-before-reply correspondence remain project-owned native adapter refinements.",
+    "SQLite/OS durability and transaction semantics, trusted CA/operator policy, protected principal-owned files and stable single local database inode remain assumptions; no replicas, snapshot rollback resistance or operational failover proof.",
+    "W3 transitive I/O mediation, native trace refinement and whole-service noninterference; remaining provider Host/header/body/parser/render refinements.",
+    "Broader Python/Rust core parity, atomic renewed-identity guest delivery, independent security review, real separate hosts/live provider and VM/TPM deployment evidence."
+  ],
+  "ordinary_local_builds": "Default broker/debug/release binaries rebuilt without conformance; optional coordinator binary then built explicitly with coordinator-server and no conformance. Implementation/proof sources unchanged after frozen validation."
+}
