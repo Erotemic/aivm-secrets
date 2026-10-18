@@ -1440,3 +1440,7 @@ axiom audit. The strengthened two-phase concurrency regression passed in that
 selection; source-archive and independent boundary negatives passed 19 cases.
 The full source-frozen system gate and targeted extracted mutations remain the
 integration gates for this commit. Package wheel and source archive built.
+
+## 2026-10-18 00:35:27 -0400
+
+The frozen 634f861 OAuth rollover checkpoint passed 2,243 full-suite tests with the one explicitly pending primitive-runner skip, all 43 required native/reference workflows, and the same 43 workflows on normal release binaries without conformance support. I integrated it into main and rebuilt the ordinary binaries. All 95 re-extracted Rust mutations were rejected by unchanged Lean obligations; this replaces the prior selected-three evidence with a complete campaign for that source. The report and logs are retained under .tools, with curated source/fingerprint evidence in dev/validation/2026-10-18-oauth-rollover.json. I am confident this is a usable checkpoint while the separate coordinator worktree continues. It remains conditional, finite evidence: neither whole-service secrecy nor full Python/Rust parity or physical TPM provenance is established.

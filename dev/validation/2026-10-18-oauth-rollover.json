@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "source_commit": "634f8618e1b4b21a5d0543d276fd3739414eb651",
+  "source_dirty": false,
+  "scope": "Frozen synthetic usable-system checkpoint; not whole-service verification or full Python/Rust core parity",
+  "report_path": ".tools/rollover-system-634f861/report.json",
+  "report_sha256": "e24a61b7fb1b319fd5e90e419d4ebbc13186c4c8276572c46097c43beef2b4d5",
+  "input_fingerprint_sha256": "a7ae20744d5ca4a5e987e0bc0faeba0b96e08c60a370bdaaf4044fbc945e9057",
+  "full_suite": {
+    "passed": 2243,
+    "skipped": 1,
+    "skip": "Independent full primitives runner remains pending; no parity claimed"
+  },
+  "required_workflows": {
+    "conformance": 43,
+    "normal_release_without_conformance": 43,
+    "skipped": 0
+  },
+  "extracted_mutations": {
+    "selected": 95,
+    "total": 95,
+    "rejected": 95,
+    "status": "passed",
+    "log_sha256": "4f0ca2092c483facfb3c89b51eb75f1dd6babb883efa6ab8e8ce857cc712dfc3"
+  },
+  "checked_scope": [
+    "220 named Garrett axiom checks with only standard Lean axioms",
+    "Seven new extracted current-token lease lemmas",
+    "W0/W3/W4/W5/W6 source inventories",
+    "W4/W5, configuration profiles, late emission and OAuth Lean compilation",
+    "Strict Rust lint in normal and conformance modes, native units, source/wheel archive build"
+  ],
+  "limits": [
+    "No live provider account or VM test",
+    "Synthetic software TPM tests do not establish physical TPM provenance",
+    "Concrete I/O, clocks, locks, custody/opening and crypto remain explicit adapter contracts",
+    "Native coordination/idempotency follow-up is separate work, not in this source checkpoint"
+  ]
+}
