@@ -93,3 +93,10 @@ The [same-key identity rebinding increment](verified-identity-rebinding.md)
 composes native CAS certificate renewal with a host-only rewrap of the identical
 opaque broker capability. Both running native profiles and independent Python
 JWT opening are tested; the guest file swap remains an operator responsibility.
+
+
+The [decoded JSON reflection increment](verified-json-reflection.md) checks the
+actual native recursive key/text guard against an independent Python oracle and
+production Python broker cases. Literal exclusion is proved for accepted typed
+trees. JSON conversion, rendering, concrete mediation and semantic non-disclosure
+remain open; the final serialized-byte check is retained.

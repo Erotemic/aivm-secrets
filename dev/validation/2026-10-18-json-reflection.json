@@ -1,0 +1,169 @@
+{
+  "schema": 1,
+  "source_commit": "f123fcd667d20595f05458871d7168ebc839229a",
+  "source_dirty": false,
+  "scope": "Actual native recursive decoded JSON key/text literal-credential check, separate final serialized-byte guard, finite Python/native preservation tests",
+  "report": {
+    "path": ".tools/system-ub0sdz45/report.json",
+    "sha256": "36d0bd61fb2ec93749d73e9adced8170ed7028d6360b66b477b688f31bec11f9"
+  },
+  "full_suite": {
+    "passed": 2606,
+    "skipped": 0
+  },
+  "required_workflows": {
+    "conformance": 365,
+    "normal_release_without_conformance": 365,
+    "skipped": 0
+  },
+  "normal_report": {
+    "path": ".tools/json-reflection-normal-validation/report.json",
+    "sha256": "3aa2c34e0f07a8f58c21852011d8b48bbf89299eace19e6a93b639b74b350b9d"
+  },
+  "selected_core_parity": {
+    "passed": 585,
+    "skipped": 0,
+    "log": {
+      "path": ".tools/json-reflection-f123fcd-validation/json-reflection-garrett.log",
+      "sha256": "571cf999d5a897278f3dcd1fe8b6053027ff9f8f991b2f4b8f805aa2dfec7a6f"
+    }
+  },
+  "focused_runtime": {
+    "pytest_cases": 17,
+    "differential_rows": 7950,
+    "python_broker_comparisons": 8,
+    "native_provider_cases": 8,
+    "new_core_unit_tests": 2,
+    "source_archive_boundary_catalogue_tests": 51
+  },
+  "proof_audit": {
+    "named_obligations": 378,
+    "new_obligations": 9,
+    "allowed_axioms": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+    ],
+    "checked_contracts": [
+      "exact recursive depth-bounded admission for every decoded text/key and array/object child",
+      "acceptance excludes an independently defined literal occurrence at any tree depth",
+      "any such literal occurrence forces refusal",
+      "exhaustion is refusal",
+      "empty object accepted witness"
+    ]
+  },
+  "json_reflection_mutations": {
+    "rejected": 5,
+    "registered_total": 169,
+    "mutation_filter": "^json reflection ",
+    "process_exit_code": 0,
+    "full_historical_campaign": false,
+    "names": [
+      "json reflection array child skipped (GarrettJsonReflection)",
+      "json reflection object child skipped (GarrettJsonReflection)",
+      "json reflection object key skipped (GarrettJsonReflection)",
+      "json reflection text skipped (GarrettJsonReflection)",
+      "json reflection exhausted traversal accepted (GarrettJsonReflection)"
+    ],
+    "log": {
+      "path": ".tools/json-reflection-f123fcd-validation/json-reflection-mutations.log",
+      "sha256": "886c4adc92584a84f1b6cba072b8e8d6b4dde5d6fb7f10447c72f91970070542"
+    }
+  },
+  "packaging": {
+    "wheel": {
+      "path": "dist/aivm_secrets-0.2.0-py3-none-any.whl",
+      "sha256": "0486cf0b497578c53352c665e46a6b64a9c0232968a3f283ec70e7805e372b26"
+    },
+    "source_distribution": {
+      "path": "dist/aivm_secrets-0.2.0.tar.gz",
+      "sha256": "6b725e92cfce1dc8c3ca3a25a18eb50eba0388cca7101661f8141a5c0dc5f27b"
+    },
+    "all_232_pinned_archive_inputs_match": true,
+    "log": {
+      "path": ".tools/json-reflection-f123fcd-validation/json-reflection-package.log",
+      "sha256": "f5dc9fdf2ffe37e87efedbb04a36803d02d3a0c1c87352c2f4a1ba572089fd7f"
+    }
+  },
+  "w3": {
+    "reviewed_rust_build_sources": 85,
+    "effect_classes": 13,
+    "complete_mediation": false
+  },
+  "compiler_call_linkage": {
+    "rerun": false,
+    "note": "No fresh transitive call-ledger or dominance claim; the new pure guard and its concrete call site are separately checked/tested"
+  },
+  "commands": [
+    ".venv/bin/python dev/verification/freshness.py record",
+    ".venv/bin/python dev/verification/garrett.py record",
+    ".venv/bin/python dev/verification/garrett.py mutate --mutation-filter \"^json reflection \"",
+    ".venv/bin/python dev/verification/system.py --proofs --full-tests",
+    ".venv/bin/python -m build"
+  ],
+  "normal_release_commands": [
+    [
+      "cargo",
+      "build",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "rust/Cargo.toml",
+      "-p",
+      "aivm-secrets-garrett",
+      "--no-default-features",
+      "--features",
+      "coordinator-server",
+      "--bin",
+      "garrett-coordinator"
+    ],
+    [
+      "cargo",
+      "build",
+      "--locked",
+      "--release",
+      "--manifest-path",
+      "rust/Cargo.toml",
+      "-p",
+      "aivm-secrets-garrett",
+      "--no-default-features",
+      "--bins"
+    ],
+    [
+      "/home/local/KHQ/jon.crall/code/aivm-secrets/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "-ra",
+      "--junitxml",
+      "/home/local/KHQ/jon.crall/code/aivm-secrets/.tools/json-reflection-normal-validation/workflows.xml",
+      "tests/test_secrets_w1_github_workflow.py",
+      "tests/test_rust_w2_github_workflow.py",
+      "tests/test_rust_w5_noninterference.py",
+      "tests/test_rust_w6_adapter.py",
+      "tests/test_assurance_profiles.py",
+      "tests/test_rust_garrett_dispatch.py",
+      "tests/test_rust_oauth_current_session.py",
+      "tests/test_rust_coordination.py",
+      "tests/test_rust_coordinator_authority.py",
+      "tests/test_rust_bound_renewal.py",
+      "tests/test_secrets_primitives_parity.py",
+      "tests/test_specialized_calls.py",
+      "tests/test_rust_policy_normalization.py",
+      "tests/test_rust_http_auth.py",
+      "tests/test_rust_http_request.py",
+      "tests/test_rust_http_wire.py",
+      "tests/test_rust_line_framing.py",
+      "tests/test_rust_json_reflection.py::test_actual_manifest_checks_selected_decoded_text_before_release",
+      "tests/test_identity_bundle.py",
+      "tests/test_rust_garrett_authority.py::test_tpm_requirement_rejects_software_before_credential_custody"
+    ]
+  ],
+  "limitations": [
+    "The guarantee concerns accepted typed trees, decoded text and object keys; JSON conversion/rendering, native call-site mediation and serialized-byte checks remain adapter obligations.",
+    "Numbers, punctuation and serialized cross-fragment matches require the independent canonical-byte check.",
+    "Literal matching does not prevent alternate encodings or arbitrary semantic leakage from a malicious provider.",
+    "Reflection refusal remains an observable oracle. Existing equal-approved-declassification/reflection-status premises are retained.",
+    "No broader Python/Rust parity, whole-service confidentiality, hardware TPM, live VM or live provider validation is established."
+  ]
+}

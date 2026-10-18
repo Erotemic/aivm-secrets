@@ -1708,3 +1708,23 @@ serialization, call sites and native I/O mediation remain outside it. Literal
 reflection is still a defense-in-depth tripwire with an observable denial; it
 cannot prevent a malicious provider from semantically encoding a secret. Broad
 validation and source/proof records are being refreshed before acceptance.
+
+## 2026-10-18 12:49:13 -0400
+
+Accepted `f123fcd` after 2,606 portable tests without skips and 365 required
+workflows in each build mode. The 378-name Garrett audit includes nine decoded
+JSON traversal obligations. All five targeted branch/exhaustion mutations are
+rejected; three source-bypass regressions also reject changes after their source
+fingerprints are updated. The distribution builds and its archive matches all
+232 pinned Garrett inputs. Evidence is indexed in
+`dev/validation/2026-10-18-json-reflection.json`.
+
+The valuable result is an implementation-linked exclusion of literal credentials
+from accepted decoded text/keys, rather than just trust in a recursive adapter.
+I am comfortable accepting this small core refactor: the actual provider cases
+preserve selected/discarded behavior and the independent serialized-byte check.
+The remaining uncertainty is substantial and explicit: parser/converter/render
+contracts, concrete mediation, encoded or semantic provider leakage and an
+observable rejection oracle. Existing W4/W5 claims stay scoped, and no hardware,
+VM or live provider evidence is inferred. Complete service assurance remains
+an open objective, not the meaning of this checkpoint.

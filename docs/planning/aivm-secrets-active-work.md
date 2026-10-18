@@ -1,8 +1,8 @@
 # Active work: useful broker workflows and conditional credential confinement
 
 Status: **work plan, not a completed assurance claim**, reconciled 2026-10-18
-against frozen runtime/proof implementation `dee53f9` and its
-[guest bundle validation record](../../dev/validation/2026-10-18-guest-bundles.json). This is the authoritative **priority and task queue**
+against frozen runtime/proof implementation `f123fcd` and its
+[decoded JSON reflection validation record](../../dev/validation/2026-10-18-json-reflection.json). This is the authoritative **priority and task queue**
 for new agents. Existing P0-P5, M0-M6, and G0-G5 stages remain useful design,
 implementation history, and prerequisite inventories; they are **not three
 competing current schedules**. Revisit this queue after each accepted milestone.
@@ -129,6 +129,17 @@ Host renewal and guest activation remain separate operations; remote delivery,
 private-key rotation, rollback protection and uninterrupted availability are not
 provided. This closes the local pair-activation step, not whole-service secrecy.
 
+The [decoded JSON reflection increment](../verified-json-reflection.md) moves
+the existing native key/text traversal into the extracted core. Its exact
+recursive admission contract and accepted-tree literal exclusion theorem cover
+all array/object children, with explicit depth exhaustion and an accepted witness.
+The final serialized-byte check remains independent. Native provider and Python
+broker cases cover nested selected text, JSON escapes and discarded credentials.
+Frozen validation passes 2,606 portable tests, 365 workflows in both build modes,
+the 378-name audit and five new traversal mutations. JSON conversion, rendering,
+call-site mediation, alternate encodings, semantic leakage and the observable
+reflection-denial oracle remain explicit limitations.
+
 The [parsed-policy identity increment](../verified-policy-normalization.md) closes
 the known raw-document fingerprint difference in coordinated manifest writes.
 Finite differential and durable-record tests are the evidence; normalization
@@ -223,8 +234,8 @@ counts substitute for the obligations above.
 
 Statuses below reflect the checked implementation, with remaining acceptance
 conditions kept explicit. The older milestone plans retain historical detail.
-The [frozen validation record](../../dev/validation/2026-10-18-line-framing.json)
-reports 2,524 portable tests with zero skips and all 296 required workflow tests in
+The [frozen validation record](../../dev/validation/2026-10-18-json-reflection.json)
+reports 2,606 portable tests with zero skips and all 365 required workflow tests in
 both conformance and ordinary release modes. These tests do not discharge
 unproved native I/O correspondence or independent security review.
 
