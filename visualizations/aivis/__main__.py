@@ -70,6 +70,35 @@ def _render(args, *, scene_id: str | None = None) -> int:
     return subprocess.run(cmd, cwd=VIS_ROOT, env=env, check=False).returncode
 
 
+def _all(args) -> int:
+    """Refresh only changed Manim clips and the browser presentation."""
+    from aivis.presentation import build_presentation, find_manim_video
+
+    if args.still or args.animation is not None:
+        raise ValueError('all builds videos; --still/--animation apply to render only')
+    if args.dry_run:
+        _, scenes = load_catalog()
+        for scene in scenes:
+            _render(args, scene_id=scene.id)
+        return 0
+
+    def render_scene(scene_id: str) -> Path:
+        returncode = _render(args, scene_id=scene_id)
+        if returncode:
+            raise RuntimeError(f'failed to render {scene_id} (exit code {returncode})')
+        return find_manim_video(scene_id, args.quality)
+
+    output, changed = build_presentation(
+        quality=args.quality, theme=args.theme, speed=args.speed,
+        force=getattr(args, 'force', False), render_scene=render_scene)
+    print(f'Updated {len(changed)} scene videos; {len(load_catalog()[1])-len(changed)} reused.', flush=True)
+    print(f'HTML presentation: {output}', flush=True)
+    if args.open_result:
+        import webbrowser
+        webbrowser.open(output.as_uri())
+    return 0
+
+
 def _preview(scene_id: str, beat: str = 'last', theme: str = 'dark') -> Path:
     plan = get_scene(scene_id).diagram()
     selected: str | int = int(beat) if beat.isdecimal() else beat
@@ -81,7 +110,9 @@ def _preview(scene_id: str, beat: str = 'last', theme: str = 'dark') -> Path:
 
 def _snapshot() -> tuple[tuple[str, int, int], ...]:
     """Watch only authored source and storyboard, never generated Manim media."""
-    files = [* (VIS_ROOT / 'aivis').rglob('*.py'), * (VIS_ROOT / 'storyboards').glob('*.toml')]
+    files = [* (VIS_ROOT / 'aivis').rglob('*.py'),
+             * (VIS_ROOT / 'storyboards').glob('*.toml'),
+             * (VIS_ROOT / 'aivis/assets/icons').glob('*.svg')]
     return tuple(sorted((str(path), path.stat().st_mtime_ns, path.stat().st_size)
                         for path in files if path.is_file()))
 
@@ -99,11 +130,15 @@ def make_parser() -> argparse.ArgumentParser:
     preview.add_argument('scene', help='scene ID or all')
     preview.add_argument('--beat', default='last', help='zero-based number, named beat, or last')
     preview.add_argument('--theme', choices=['dark','light'], default='dark')
-    for name in ('render', 'deck', 'watch'):
-        cmd = commands.add_parser(name, help={'render':'render one Manim scene', 'deck':'render each scene separately',
-                                               'watch':'rerun preview/render when authored files change'}[name])
-        if name != 'deck':
-            cmd.add_argument('scene', help='scene ID')
+    for name in ('render', 'deck', 'watch', 'all'):
+        cmd = commands.add_parser(name, help={
+            'render':'render one Manim scene',
+            'deck':'legacy: render each scene separately (no HTML)',
+            'watch':'refresh previews, a scene, or all changed clips after edits',
+            'all':'render changed Manim clips and build an HTML presentation',
+        }[name])
+        if name not in ('deck', 'all'):
+            cmd.add_argument('scene', help='scene ID or all for watch')
         cmd.add_argument('--quality', choices=['l','m','h','p'], default='l')
         cmd.add_argument('--theme', choices=['dark','light'], default='dark')
         cmd.add_argument('--speed', type=float, default=1.0, help='animation playback speed')
@@ -111,8 +146,10 @@ def make_parser() -> argparse.ArgumentParser:
         cmd.add_argument('--animation', help='Manim play indices: N or N,M')
         cmd.add_argument('--open', dest='open_result', action='store_true', help='Manim -p (open local viewer)')
         cmd.add_argument('--dry-run', action='store_true', help='print command without rendering')
+        if name == 'all':
+            cmd.add_argument('--force', action='store_true', help='rerender every Manim scene')
         if name == 'watch':
-            cmd.add_argument('--mode', choices=['preview','render','gallery'], default='preview')
+            cmd.add_argument('--mode', choices=['preview','render','gallery','all'], default='preview')
             cmd.add_argument('--beat', default='last')
             cmd.add_argument('--interval', type=float, default=0.7)
     return parser
@@ -158,6 +195,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.action == 'render':
             return _render(args)
+        if args.action == 'all':
+            return _all(args)
         if args.action == 'deck':
             _, scenes = load_catalog()
             for scene in scenes:
@@ -171,7 +210,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.scene != 'all':
                 get_scene(args.scene)  # refuse typo before entering the long-running loop
             elif args.mode == 'render':
-                raise ValueError('watch all is supported for preview/gallery only')
+                raise ValueError('watch all in Manim mode uses --mode all, not --mode render')
             print(f'Watching {args.scene}; Ctrl-C to stop.', flush=True)
             previous = None
             try:
@@ -186,6 +225,11 @@ def main(argv: list[str] | None = None) -> int:
                                 command += [args.scene, '--beat', args.beat]
                             command += ['--theme', args.theme]
                             subprocess.run(command, cwd=VIS_ROOT, check=False)
+                        elif args.mode == 'all':
+                            command=[sys.executable, '-m', 'aivis', 'all',
+                                     '--quality', args.quality, '--theme', args.theme,
+                                     '--speed', str(args.speed)]
+                            subprocess.run(command, cwd=VIS_ROOT, check=False)
                         else:
                             _render(args)
                     time.sleep(args.interval)
@@ -193,7 +237,7 @@ def main(argv: list[str] | None = None) -> int:
                 print('\nStopped watching.')
                 return 0
         return 2
-    except (ValueError, FileNotFoundError, ImportError) as error:
+    except (ValueError, FileNotFoundError, ImportError, RuntimeError) as error:
         print(f'aivis: {error}', file=sys.stderr)
         return 2
 

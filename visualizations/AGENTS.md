@@ -29,3 +29,24 @@ Treat scene notes and source paths as a reviewable account of the code, not
 something the animation itself can certify. Use one Manim scene render for
 motion checks when dependencies are available. Do not add theorem axiom dumps
 or invoke the Lean suite during routine visual revisions.
+
+## Garrett information-flow scenes and combined HTML rendering
+
+The storyboard now includes `garrett_enroll`, `garrett_issue`,
+`garrett_present`, and `garrett_stolen` before `gh_diff`. Prefer readable
+actor/packet labels to proof jargon. Private signing keys and host provider
+credentials never travel to the untrusted guest; nested encrypted layers
+are an X-ray for the audience only. Do not confuse a signed claim with
+encryption, or possession of a copied surrogate with possession of its bound
+client signing key. For precise source links, edit `storyboards/overview.toml`.
+
+The authoring fast path is `python -m aivis gallery`. For a video + HTML
+presentation use `make all PYTHON=.venv/bin/python QUALITY=l`, then open
+`.build/presentation/index.html`. `make watch-all` rebuilds changed scenes
+and HTML when authored Python/TOML/SVG changes. Both Manim and the SVG
+renderer use the icons in `aivis/assets/icons/`; do not duplicate artwork.
+All build output belongs under `.build/`, not source control.
+
+An HTML presentation contains normal `.mp4` files alongside `index.html`:
+keep the whole `.build/presentation/` directory together when sharing it.
+The ability to animate a protocol is not a formal correctness claim.

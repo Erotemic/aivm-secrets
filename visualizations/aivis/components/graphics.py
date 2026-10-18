@@ -8,10 +8,11 @@ from __future__ import annotations
 import numpy as np
 from manim import (
     Arrow, DashedVMobject, Line, RoundedRectangle, Text, VGroup,
-    LEFT, RIGHT, UP, DOWN,
+    LEFT, RIGHT, UP, DOWN, SVGMobject,
 )
 
 from aivis.diagram import Link, Node, Region
+from aivis.icons import icon_name, icon_path, icon_art
 
 
 def xy(point: tuple[float, float]) -> np.ndarray:
@@ -36,12 +37,23 @@ def node_card(n: Node, colors: dict) -> VGroup:
         fill_color=colors['surface'], fill_opacity=1.0,
     ).move_to(xy(n.xy))
     heading = Text(n.title, font_size=23, color=colors['foreground'], weight='BOLD')
-    _fit(heading, n.width-0.18)
-    heading.move_to(box.get_center()+UP*0.13)
+    _fit(heading, n.width-0.92)
+    heading.move_to(box.get_center()+RIGHT*0.35+UP*0.13)
     secondary = Text(n.subtitle, font_size=15, color=colors['muted'])
-    _fit(secondary, n.width-0.19)
-    secondary.move_to(box.get_center()+DOWN*0.26)
-    group = VGroup(box, heading, secondary)
+    _fit(secondary, n.width-0.92)
+    secondary.move_to(box.get_center()+RIGHT*0.35+DOWN*0.26)
+    name = icon_name(n)
+    logo = SVGMobject(str(icon_path(name)))
+    logo.set_height(min(0.47, n.height * 0.45))
+    filled, _ = icon_art(name)
+    if filled:
+        logo.set_fill(colors[n.role], opacity=1)
+        logo.set_stroke(width=0)
+    else:
+        logo.set_fill(opacity=0)
+        logo.set_stroke(colors[n.role], width=2.2)
+    logo.move_to(box.get_center() + LEFT*(n.width/2-0.37))
+    group = VGroup(box, logo, heading, secondary)
     if n.tag:
         tag = Text(n.tag, font_size=11, color=colors[n.role], weight='BOLD')
         _fit(tag, n.width-0.25)

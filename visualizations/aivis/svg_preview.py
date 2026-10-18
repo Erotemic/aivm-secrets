@@ -8,6 +8,7 @@ from xml.sax.saxutils import escape
 
 from aivis.diagram import Diagram, Node, Region, Link, Package, Knowledge, layer_geometry
 from aivis.palette import palette
+from aivis.icons import embedded_icon, icon_name
 
 CANVAS_W = 1440
 CANVAS_H = 810
@@ -35,12 +36,20 @@ def _node(n: Node, colors: dict, *, highlight: bool) -> str:
     x, y = sx(n.xy[0]), sy(n.xy[1])
     w, h = n.width*SCALE, n.height*SCALE
     stroke = colors[n.role]
+    icon_x = x - w/2 + 35
+    text_x = x + 35
+    # Approximate SVG font metrics and reserve left space for the icon.
+    # Manim makes the equivalent adjustment with measured Text.width.
+    available = max(75.0, w - 94.0)
+    heading_size = min(22.0, max(12.0, available / (max(1, len(n.title)) * 0.60)))
     parts = [f'<rect x="{x-w/2:.1f}" y="{y-h/2:.1f}" width="{w:.1f}" height="{h:.1f}" rx="14" '
              f'fill="{colors["surface"]}" stroke="{stroke}" stroke-width="{4 if highlight else 2.4}"/>',
-             f'<text x="{x:.1f}" y="{y-3:.1f}" text-anchor="middle" font-weight="600" '
-             f'font-size="22" fill="{colors["foreground"]}">{_xml(n.title)}</text>']
-    for i, line in enumerate(textwrap.wrap(n.subtitle, width=max(18, int(w/7.4)))[:2]):
-        parts.append(f'<text x="{x:.1f}" y="{y+24+i*16:.1f}" text-anchor="middle" font-size="14" '
+             embedded_icon(icon_name(n), x=icon_x, y=y-1, size=45, color=stroke),
+             f'<text x="{text_x:.1f}" y="{y-3:.1f}" text-anchor="middle" font-weight="600" '
+             f'font-size="{heading_size:.1f}" fill="{colors["foreground"]}">{_xml(n.title)}</text>']
+    for i, line in enumerate(textwrap.wrap(n.subtitle, width=max(12, int(available/8.4)))[:2]):
+        subtitle_size = min(14.0, max(10.0, available / (max(1, len(line)) * 0.62)))
+        parts.append(f'<text x="{text_x:.1f}" y="{y+24+i*16:.1f}" text-anchor="middle" font-size="{subtitle_size:.1f}" '
                      f'fill="{colors["muted"]}">{_xml(line)}</text>')
     if n.tag:
         parts.append(f'<text x="{x+w/2-9:.1f}" y="{y-h/2+13:.1f}" text-anchor="end" '

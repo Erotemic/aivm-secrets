@@ -1,10 +1,10 @@
 # Run from visualizations/. No Rust/Lean setup is required for authoring.
 PYTHON ?= python
-SCENE ?= gh_diff
+SCENE ?= garrett_present
 BEAT ?= last
 QUALITY ?= l
 
-.PHONY: help list storyboard check preview gallery render still watch watch-preview watch-gallery deck test
+.PHONY: help list storyboard check preview gallery render still watch watch-preview watch-gallery deck all watch-all test
 help:
 	@echo 'list                 scenes, status, editable plan files'
 	@echo 'storyboard           narrated scene outline + source mapping'
@@ -15,10 +15,13 @@ help:
 	@echo 'watch                rerender one scene after source changes'
 	@echo 'watch-preview        redraw SVG after source changes (no Manim needed)'
 	@echo 'watch-gallery        rebuild interactive HTML after edits (no Manim needed)'
-	@echo 'deck                 render all scene clips individually'
+	@echo 'deck                 render all scene clips individually (legacy)'
+	@echo 'all                  render changed Manim clips + HTML presentation'
+	@echo 'watch-all            rebuild changed clips + HTML after edits'
 	@echo 'test                 standalone authoring tests'
 	@echo 'Usage: make preview SCENE=packaging BEAT=ciphertext'
 	@echo '       make watch SCENE=gh_diff QUALITY=l'
+	@echo '       make all QUALITY=l  (then open .build/presentation/index.html)'
 list:
 	$(PYTHON) -m aivis list
 storyboard:
@@ -43,3 +46,9 @@ deck:
 	$(PYTHON) -m aivis deck --quality $(QUALITY)
 test:
 	$(PYTHON) -m pytest -q
+
+# This is the default for a full presentation, not the older bare `deck`.
+all:
+	$(PYTHON) -m aivis all --quality $(QUALITY)
+watch-all:
+	$(PYTHON) -m aivis watch all --mode all --quality $(QUALITY)

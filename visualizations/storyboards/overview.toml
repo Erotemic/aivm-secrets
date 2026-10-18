@@ -26,6 +26,27 @@ narration = "Watch the three columns. The agent begins with an intent, the surro
 sources = ["docs/verified-garrett.md", "docs/planning/aivm-secrets-assumptions.json"]
 
 [[scene]]
+id = "garrett_enroll"
+file = "aivis/scenes/garrett_enroll.py"
+class = "GarrettEnrollScene"
+plan = "aivis.plans.garrett_enroll"
+status = "source-linked-controller"
+claim = "The authority approves an enrolled client key and records a certificate with a current epoch; the private key stays on the client."
+narration = "The client creates a key and submits a CSR. The host approves the key fingerprint or TPM evidence before signing a certificate. The host records the subject and epoch. A CSR alone cannot enroll itself."
+sources = ["proofs/GarrettEnrollment.lean", "docs/verified-enrollment.md", "docs/verified-garrett.md"]
+
+[[scene]]
+id = "garrett_issue"
+file = "aivis/scenes/garrett_issue.py"
+class = "GarrettIssueScene"
+plan = "aivis.plans.garrett_issue"
+status = "source-linked-controller"
+claim = "The host binds encrypted inner capability material to the enrolled certificate and issues an AES-GCM-encrypted, Ed25519-signed outer surrogate."
+narration = "The host keeps the provider credential in an inner aivs1 capability. The issuer selects the enrolled client certificate thumbprint, subject, epoch and bounded lifetime. It seals the inner capability in the signed outer surrogate. The client can carry the surrogate but cannot read the credential."
+sources = ["proofs/Garrett.lean", "docs/verified-garrett.md"]
+proof_anchors = ["aivm_secrets_garrett_core.Proofs.issuance_cannot_outlive_enrollment", "aivm_secrets_garrett_core.Proofs.issue_surrogate_contract"]
+
+[[scene]]
 id = "packaging"
 file = "aivis/scenes/packaging.py"
 class = "NestedSurrogateScene"
@@ -36,13 +57,35 @@ narration = "The outer token is signed. Its public claims are readable. The seal
 sources = ["docs/verified-garrett.md", "docs/planning/aivm-secrets-garrett-identity.md"]
 
 [[scene]]
+id = "garrett_present"
+file = "aivis/scenes/garrett_present.py"
+class = "GarrettPresentScene"
+plan = "aivis.plans.garrett_present"
+status = "source-linked-controller"
+claim = "The bridge uses the certificate from the actual TLS peer to validate the presented surrogate before opening inner capability material."
+narration = "The client authenticates using its private key and sends the surrogate. The bridge checks the signed claims against the current enrolled subject, cert, epoch and time before unsealing. The host broker independently checks the inner grant. Returning the public reply depends on the configured response rules and the concrete adapter."
+sources = ["proofs/Garrett.lean", "docs/verified-garrett.md", "proofs/GarrettProtocol.lean"]
+proof_anchors = ["aivm_secrets_garrett_core.Proofs.present_accepted_iff", "aivm_secrets_garrett_core.Proofs.open_rejects_unbound_before_unsealing"]
+
+[[scene]]
+id = "garrett_stolen"
+file = "aivis/scenes/garrett_stolen.py"
+class = "GarrettStolenScene"
+plan = "aivis.plans.garrett_stolen"
+status = "source-linked-controller"
+claim = "Copying a surrogate does not authorize a different TLS client: a thumbprint mismatch is rejected before unsealing."
+narration = "The attacker has a copy of the surrogate but only certificate B and key B. It connects as B. The token was issued for A, so the host rejects without opening the inner capability. This depends on the attacker lacking A's signing oracle and on authentic peer evidence."
+sources = ["proofs/Garrett.lean", "docs/verified-garrett.md", "docs/verified-enrollment.md"]
+proof_anchors = ["aivm_secrets_garrett_core.Proofs.stolen_surrogate_wrong_peer", "aivm_secrets_garrett_core.Proofs.open_stolen_surrogate_rejected"]
+
+[[scene]]
 id = "gh_diff"
 file = "aivis/scenes/gh_diff.py"
 class = "GitHubDiffWalkthroughScene"
 plan = "aivis.plans.gh_diff"
 status = "architecture"
-claim = "An idealized gh pr diff request is converted to a narrow typed operation; the host sends the authorized request and returns the selected diff."
-narration = "Example: TauCetiProject/TauCeti PR 13861. The agent wants a diff. A narrow gh-compatible client translates this into pr.diff, with the repo and PR number. The host checks the current grant and fixed route, may check PR facts, records audit, adds its own credential, and calls GitHub. The guest receives permitted diff content. This is not arbitrary gh forwarding and does not imply full I/O proof."
+claim = "After Garrett authenticates and opens the client surrogate, an idealized gh pr diff request is converted to a narrow typed operation; the host sends the authorized request and returns the selected diff."
+narration = "Example: TauCetiProject/TauCeti PR 13861. The agent wants a diff. A narrow gh-compatible client translates this into pr.diff, with the repo and PR number. Garrett admission binds this request to the authenticated client certificate before any inner credential authorization. The host checks the current grant and fixed route, may check PR facts, records audit, adds its own credential, and calls GitHub. The guest receives permitted diff content. This is not arbitrary gh forwarding and does not imply full I/O proof."
 sources = ["docs/examples/aivm-secrets-tauceti-gh2.json", "docs/verified-garrett.md"]
 optional_sources = ["rust/crates/aivm-secrets-garrett/src/client_alias.rs", "docs/standalone-rust-github-workflow.md"]
 

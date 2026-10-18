@@ -29,6 +29,7 @@ class Node:
     height: float = 1.12
     role: str = 'neutral'
     tag: str = ''
+    icon: str = ''  # see aivis/icons.py; inferred from role when empty
 
 
 @dataclass(frozen=True)
@@ -222,7 +223,9 @@ def validate(plan: Diagram) -> None:
     links = plan.link_map()
     packages = plan.package_map()
     layer_ids = set()
+    from aivis.icons import icon_name, icon_art
     for node in plan.nodes:
+        icon_art(icon_name(node))
         if node.role not in ROLES or node.width <= 0 or node.height <= 0:
             raise ValueError(f'{plan.key}: invalid node {node.key}')
         if not _inside(node.xy, node.width, node.height):

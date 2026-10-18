@@ -8,13 +8,16 @@ from __future__ import annotations
 import base64
 import json
 from pathlib import Path
+from typing import Mapping
 
 from aivis.catalog import load_catalog
 from aivis.svg_preview import render_svg
 
 
-def build_gallery(target: Path, *, theme: str = 'dark') -> Path:
+def build_gallery(target: Path, *, theme: str = 'dark',
+                  videos: Mapping[str, str] | None = None) -> Path:
     deck, scenes = load_catalog()
+    videos = videos or {}
     payload = []
     for scene in scenes:
         diagram = scene.diagram()
@@ -34,6 +37,7 @@ def build_gallery(target: Path, *, theme: str = 'dark') -> Path:
             })
         payload.append({
             'id': scene.id, 'title': diagram.title,
+            'video': videos.get(scene.id, ''),
             'status': scene.status, 'claim': scene.claim,
             'narration': scene.narration,
             'sources': list(scene.sources),
@@ -61,6 +65,11 @@ h1{font-size:26px;font-weight:650;margin:6px 0 6px} p{margin:4px 0 12px;color:#b
 select,button,input{accent-color:#64c9f2;color:#eff6fb;background:#172c3f;border:1px solid #3c6479;border-radius:9px;font-size:16px;padding:8px 12px}
 button{cursor:pointer}button:hover{background:#28516c}input[type=range]{padding:0;width:250px;max-width:35vw}
 #image{display:block;width:100%;height:auto;box-shadow:0 7px 35px #0009;border-radius:7px;background:#0b1422}
+#video{display:none;width:100%;max-height:76vh;aspect-ratio:16/9;background:#0b1422;border-radius:8px}
+#mode-switch{display:flex;gap:8px;margin:8px 0}
+#mode-switch[hidden],#video[hidden]{display:none!important}
+#video[src]{display:block}
+#image[hidden]{display:none}
 .foot{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
 .panel{background:#152638;border:1px solid #28465b;border-radius:12px;padding:16px}
 .panel strong{color:#6fe0b7}.panel span{color:#d2e3f0}.panel p{line-height:1.5}.inventory{grid-column:1 / -1}.inventory-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:8px}.inventory-grid h3{font-size:14px;margin:4px 0;color:#74ceec}.inventory-grid ul{margin-top:4px}@media(max-width:850px){.inventory-grid{grid-template-columns:1fr}}
@@ -78,7 +87,13 @@ code{color:#f4c474;overflow-wrap:anywhere} ul{padding-left:21px;margin:9px 0;col
 <button id="next" type="button" aria-label="Next beat">Next</button>
 <strong id="number" aria-live="polite"></strong>
 </div>
+<div id="mode-switch" hidden>
+  <button type="button" id="motion">Play animation</button>
+  <button type="button" id="still">Step through diagrams</button>
+</div>
+<video id="video" controls preload="metadata" playsinline hidden aria-label="Rendered Manim scene"></video>
 <img id="image" alt="Editable protocol diagram">
+
 <div class="foot">
   <div class="panel"><strong id="status"></strong><p id="claim"></p><strong>Explanation</strong><p id="narration"></p></div>
   <div class="panel"><strong>Edit</strong><p id="editpaths"></p><strong>Source files</strong><ul id="sources"></ul></div>
@@ -90,13 +105,28 @@ const data = JSON.parse(document.getElementById('story-data').textContent);
 const scenes = data.scenes;
 const sceneSelect = document.getElementById('scene');
 const beatRange = document.getElementById('beat');
+const player = document.getElementById('video');
+const image = document.getElementById('image');
+const modeSwitch = document.getElementById('mode-switch');
+let showMotion = true;
+function setMode(){
+  const s = scenes.find(x=>x.id===sceneSelect.value)||scenes[0];
+  const isVideo = Boolean(s.video) && showMotion;
+  player.hidden = !isVideo;
+  image.hidden = isVideo;
+  document.getElementById('beat').disabled = isVideo;
+  document.getElementById('previous').disabled = isVideo;
+  document.getElementById('next').disabled = isVideo;
+}
+document.getElementById('motion').addEventListener('click',()=>{showMotion=true;setMode();});
+document.getElementById('still').addEventListener('click',()=>{showMotion=false;player.pause();setMode();});
 for(const s of scenes){const o=document.createElement('option');o.value=s.id;o.textContent=s.id+' — '+s.title;sceneSelect.append(o);}
 function show(){
   const s = scenes.find(x=>x.id===sceneSelect.value)||scenes[0];
   const j = Math.min(Math.max(Number(beatRange.value),0),s.beats.length-1);
   const b=s.beats[j];
   document.getElementById('number').textContent=b.id+'  ('+(j+1)+'/'+s.beats.length+')';
-  document.getElementById('image').src=b.image;
+  image.src=b.image;
   document.getElementById('image').alt=s.title+' — '+b.caption;
   document.getElementById('status').textContent=b.status.toUpperCase();
   document.getElementById('claim').textContent=s.claim;
@@ -115,7 +145,16 @@ function show(){
     section.append(heading,list);inventory.append(section);
   }
 }
-function selectedChanged(){const s=scenes.find(x=>x.id===sceneSelect.value);beatRange.max=s.beats.length-1;beatRange.value=0;show();}
+function selectedChanged(){
+  const s=scenes.find(x=>x.id===sceneSelect.value);
+  beatRange.max=s.beats.length-1;beatRange.value=0;
+  player.pause();
+  player.removeAttribute('src');
+  player.load();
+  if(s.video){player.src=s.video;player.load();}
+  modeSwitch.hidden=!s.video;
+  setMode();show();
+}
 sceneSelect.addEventListener('change',selectedChanged);
 beatRange.addEventListener('input',show);
 document.getElementById('previous').addEventListener('click',()=>{beatRange.value=Math.max(0,Number(beatRange.value)-1);show();});
