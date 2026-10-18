@@ -166,3 +166,11 @@ The filtered campaign targets only the new authority decisions. Compiler paths
 start at the named compiled connection handler; they do not prove accept-loop
 reachability, admission dominance or complete I/O mediation. TPM, VM and live
 provider evidence remain separate from this local service.
+
+The [typed authorization validation record](../dev/validation/2026-10-18-coordinator-dispatch.json)
+binds source `078ef2d`, 2,472 portable tests with zero skips, 250 required workflow
+tests in each build mode, 299 audited Garrett obligations and four newly
+re-extracted role-dispatch mutations. It preserves both compiler profiles and
+keeps their mediation obligations open. The earlier
+[authority port record](../dev/validation/2026-10-18-coordinator-authority.json)
+retains the original cross-backend port and reproduced Python regressions.

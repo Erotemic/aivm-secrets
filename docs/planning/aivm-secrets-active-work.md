@@ -1,8 +1,8 @@
 # Active work: useful broker workflows and conditional credential confinement
 
 Status: **work plan, not a completed assurance claim**, reconciled 2026-10-18
-against frozen runtime/proof implementation `3c3b7d1` and its
-[native-authority validation record](../../dev/validation/2026-10-18-coordinator-authority.json). This is the authoritative **priority and task queue**
+against frozen runtime/proof implementation `078ef2d` and its
+[coordinator authorization validation record](../../dev/validation/2026-10-18-coordinator-dispatch.json). This is the authoritative **priority and task queue**
 for new agents. Existing P0-P5, M0-M6, and G0-G5 stages remain useful design,
 implementation history, and prerequisite inventories; they are **not three
 competing current schedules**. Revisit this queue after each accepted milestone.
@@ -67,7 +67,13 @@ The [optional native coordinator authority](../native-coordinator-authority.md) 
 implements the same mTLS/SQLite protocol and schema, with cross-backend vectors,
 broker workflows and scoped core/terminal-history proofs. SQL/TLS/native I/O
 correspondence, broader core differential coverage and atomic guest delivery
-remain open.
+remain open. The typed admission follow-up moves exhaustive action-to-role
+selection into the extracted core: operator authority does not imply active
+principal membership, nor does membership grant operator authority. Lean checks
+the exact gate for every action, terminal denial of all member actions and
+positive role-gate witnesses. A 144-case Python/native role-state matrix retains
+both durable tables on denial. Wire-to-enum, SQL and native I/O correspondence
+remain separate obligations.
 
 The [compiler-derived native call-site ledger](../native-call-ledger.md) is a
 reproducible W3/W6 investigation aid. It preserves all extracted owned bodies
@@ -182,8 +188,8 @@ counts substitute for the obligations above.
 
 Statuses below reflect the checked implementation, with remaining acceptance
 conditions kept explicit. The older milestone plans retain historical detail.
-The [frozen validation record](../../dev/validation/2026-10-18-coordinator-authority.json)
-reports 2,468 portable tests with zero skips and all 246 required workflows in
+The [frozen validation record](../../dev/validation/2026-10-18-coordinator-dispatch.json)
+reports 2,472 portable tests with zero skips and all 250 required workflow tests in
 both conformance and ordinary release modes. These tests do not discharge
 unproved native I/O correspondence or independent security review.
 
@@ -195,7 +201,7 @@ unproved native I/O correspondence or independent security review.
 | **W3 — Rust core / boundary agent** | Audit all guest-request reachable paths that can perform I/O (`request`, `describe`, `renounce`, refresh, error paths and any reachable administrative handlers). Define a *closed typed effect vocabulary* and identify every constructor and interpreter. Refactor narrowly where needed so no alternate secret-bearing/public-output path bypasses admission or typed disclosure. Add source/call-graph gates and deliberate bypass mutants. | **Native build and reviewed-source/negative gates pass; transitive reachability and independent review remain open.** The [inventory](aivm-secrets-w3-reachability.json) pins the reviewed Rust/build files and 13 effect classes; the checker reports the current source count. The [compiler ledger](../native-call-ledger.md) preserves unresolved callbacks, dependency boundaries and drops; it is not a completeness proof. Continue W3/W6 at those gaps. |
 | **W4 — Lean / core verification agent** | State and prove SINK-01 + TRACE-01 for the **extracted actual Rust transitions**, including authorized success, denial, failed preflight, refused audit, provider failure, revocation-at-linearization and allowed declassification. Explicitly connect the existing `protocol.rs`/`credential_use.rs`/`manifest.rs`/`disclosure.rs` proofs; no premises that merely assert the conclusion. | **Scoped W4 trace lemmas compiled in the maintainer's pinned Lean environment; native I/O correspondence remains W6.** See [W4 scope and validation](../verified-w4-core-trace.md). Existing controller proofs are inputs, not completion. |
 | **W5 — Lean / information-flow agent** | Prove NI-TRACE-01 over a clearly defined two-run, adaptive finite-trace observation relation. Decide how secret-dependent literal-reflection rejections are handled; do not hide them under an unchecked assumption of equal public behavior. Supply successful/denied witnesses and attacker-chosen field mutations. | **Modeled Lean and native finite runtime gates pass; serialized-byte/native trace refinement remains open.** See [W5 scope](aivm-secrets-w5-proof-scope.json) and [review](../verified-w5-information-flow.md). Equal approved declassifications remain an explicit premise; finite runtime witnesses do not prove service-level noninterference. |
-| **W6 — Adapter / integration verification agent** | Enumerate Rust actual bytes/sinks and show adapter correspondence to typed effects with adversarial TLS/HTTP, JSON parser/render, fixed route, header, proxy/redirect, audit and error-path tests. Refine selected adapters in Lean where tractable; list each remaining contract with an owner and negative test. No unscoped `std::net`/`println!` bypass. | **Twelve-sink review inventory, native unit/process gates and concrete hardening pass; authentication/request-line and optional authority core/history refinements compiled; broader refinement remains open.** The [W6 review](../verified-w6-adapter-correspondence.md) records actual provider/audit/guest traces and the reproduced JSON marker-object fix. Complete mediation and the remaining byte-adapter proofs remain deliverables. |
+| **W6 — Adapter / integration verification agent** | Enumerate Rust actual bytes/sinks and show adapter correspondence to typed effects with adversarial TLS/HTTP, JSON parser/render, fixed route, header, proxy/redirect, audit and error-path tests. Refine selected adapters in Lean where tractable; list each remaining contract with an owner and negative test. No unscoped `std::net`/`println!` bypass. | **Twelve-sink review inventory, native unit/process gates and concrete hardening pass; authentication/request-line and optional authority typed-role/core/history refinements compiled; broader refinement remains open.** The [W6 review](../verified-w6-adapter-correspondence.md) records actual provider/audit/guest traces and the reproduced JSON marker-object fix. Complete mediation and the remaining byte-adapter proofs remain deliverables. |
 | **W7 — Operator / release agent** | Opt-in *read-only* live GitHub smoke test using an intentionally narrow disposable credential, then publish exact passing commands and a claim matrix: tested behavior, extracted proofs, assumed adapters, deployment evidence, excluded channels. Never require live credentials in ordinary CI. | **Local W1/W2 prerequisites pass; opt-in live provider smoke remains unexecuted.** Requires an intentionally narrow disposable credential and explicit operator selection; not a prerequisite for local proof development. |
 | **W8 — AIVM / deployment agent** | Translate the environmental compartment contract to one chosen AIVM VM profile, test host-file/privileged-socket absence, identity/transport, network destinations and teardown. Keep KVM, guest kernel and firewall as deployment assumptions, not inferred properties of the Rust proof. | **Separate downstream integration; deployment validation remains open.** Optional AIVM vTPM creation/offline upgrade is implemented at `24c5fe0`, with no live VM evidence. A device alone does not establish protected identity custody. W8 remains nonblocking for W0-W7. |
 

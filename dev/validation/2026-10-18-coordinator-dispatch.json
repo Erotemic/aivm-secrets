@@ -1,0 +1,345 @@
+{
+  "schema": 1,
+  "source_commit": "078ef2d3c0d36da32acb80fbe2b43572ba888b0f",
+  "source_dirty": false,
+  "scope": "Exhaustive extracted coordinator action-to-role authorization; native/reference role-state parity",
+  "report_path": ".tools/authority-dispatch-078ef2d-system/report.json",
+  "report_sha256": "cfe50dc0d519b967caa942d0e6eb6e345824e568824ad36b82dd2db2a367fec9",
+  "input_fingerprint_sha256": "2706097073da344682ed89dda5462b32be66410ba61b5c05a2e73050b6378d78",
+  "full_suite": {
+    "passed": 2472,
+    "skipped": 0
+  },
+  "required_workflows": {
+    "conformance": 250,
+    "normal_release_without_conformance": 250,
+    "skipped": 0
+  },
+  "normal_workflow_report_path": ".tools/authority-dispatch-078ef2d-validation/normal-report.json",
+  "normal_workflow_report_sha256": "dc18bfcd06d281c407010eb8ed81e44f2ffcacf4ada4c74f119392659ed4d965",
+  "proof_audit": {
+    "named_obligations": 299,
+    "new_obligations": 7,
+    "allowed_axioms": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+    ]
+  },
+  "authority_dispatch_mutations": {
+    "rejected": 4,
+    "mutation_filter": "^coordinator dispatch ",
+    "process_exit_code": 0,
+    "full_historical_campaign": false,
+    "names": [
+      "coordinator dispatch operator classification omitted (GarrettCoordinatorAuthority)",
+      "coordinator dispatch member check omitted (GarrettCoordinatorAuthority)",
+      "coordinator dispatch reservation requires operator instead of member (GarrettCoordinatorAuthority)",
+      "coordinator dispatch final operator check omitted (GarrettCoordinatorAuthority)"
+    ],
+    "log_path": ".tools/authority-dispatch-078ef2d-validation/mutations.log",
+    "log_sha256": "577a86ec3e806095f779dbbadfca5a0129bc9c859d64a369c7b8297b267e9729"
+  },
+  "role_state_matrix": {
+    "implementations": [
+      "python",
+      "rust"
+    ],
+    "actions": 6,
+    "principal_states": [
+      "absent",
+      "active",
+      "revoked"
+    ],
+    "actors": [
+      "member",
+      "outsider",
+      "operator",
+      "operator-member"
+    ],
+    "protocol_cases": 144,
+    "pytest_cases": 2,
+    "denial_preserves_both_tables": true
+  },
+  "compiler_profiles": {
+    "bridge": {
+      "report_path": ".tools/authority-dispatch-078ef2d-bridge-calls/report.json",
+      "report_sha256": "fd7bb9e255bba577bb534c1fd4464d5e300deb193f37877e5037354e453b3986",
+      "counts": {
+        "functions": 3399,
+        "calls": 9034,
+        "drops": 5709238,
+        "bodies": {
+          "Unstructured": 1401,
+          "Opaque": 1998
+        }
+      },
+      "direct_handler_nodes": 1005,
+      "opaque_handler_boundaries": 785,
+      "witnesses": {
+        "account-controller-executor": [
+          767,
+          1067,
+          1384,
+          1766,
+          2162,
+          2393,
+          2618
+        ],
+        "coordinated-manifest-executor": [
+          767,
+          1067,
+          1385,
+          1772,
+          2181,
+          2406,
+          2175,
+          2399
+        ],
+        "account-authentication-bytes": [
+          767,
+          1067,
+          1384,
+          1766,
+          2162,
+          2393,
+          2618,
+          2913,
+          2966,
+          1627
+        ],
+        "manifest-authentication-bytes": [
+          767,
+          1067,
+          1385,
+          1772,
+          2181,
+          2406,
+          2175,
+          2399,
+          2633,
+          2966,
+          1627
+        ],
+        "account-request-line": [
+          767,
+          1067,
+          1384,
+          1766,
+          2162,
+          2393,
+          2618,
+          2913,
+          2959,
+          3235
+        ],
+        "manifest-request-line": [
+          767,
+          1067,
+          1385,
+          1772,
+          2181,
+          2406,
+          2175,
+          2399,
+          2633,
+          2959,
+          3235
+        ]
+      },
+      "complete_mediation": false,
+      "artifact_sha256": {
+        "aivm_secrets_garrett.ullbc": "746787e0d619f6be178fc9ce0b5ad8806ae58f86847bf21fb489c068792b1de8",
+        "build.log": "09f2b93c4bce5bfb43dca18ca8d9c1dca2831c7d2ffb73b00b96f8f73a607f86",
+        "capture.json": "b92ffbdb16ed35f6ca1976a9a14282e11dc1ab72b53d2959971aa0bdf76ed5e1",
+        "compiler.log": "db87374aac9faa54e957156f72fc4362d928121e9ae61c06644183564af94141",
+        "compiler.ullbc.gz": "443bc15e6282bb85e2e366965412780c46a8551621a811f1fb5d6b8858c070d9",
+        "projection.json": "cb8c9656ffedb7182165097c8723dc8bbd8c3653bc00b5499d9df93fab7e4564",
+        "projector.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "report.json": "fd7bb9e255bba577bb534c1fd4464d5e300deb193f37877e5037354e453b3986"
+      }
+    },
+    "coordinator": {
+      "report_path": ".tools/authority-dispatch-078ef2d-coordinator-calls/report.json",
+      "report_sha256": "7e7283e85e0862775a154062e8cc0673587f8a94afc300aaf7df3bb577001a22",
+      "counts": {
+        "functions": 945,
+        "calls": 1434,
+        "drops": 249313,
+        "bodies": {
+          "Unstructured": 264,
+          "Opaque": 681
+        }
+      },
+      "direct_handler_nodes": 351,
+      "opaque_handler_boundaries": 310,
+      "witnesses": {
+        "coordinator-operator-admission": [
+          329,
+          522,
+          665,
+          759,
+          838
+        ],
+        "coordinator-member-admission": [
+          329,
+          522,
+          688,
+          786,
+          838
+        ],
+        "coordinator-activate": [
+          329,
+          522,
+          698
+        ],
+        "coordinator-revoke": [
+          329,
+          522,
+          690
+        ],
+        "coordinator-reserve": [
+          329,
+          522,
+          708
+        ],
+        "coordinator-finish": [
+          329,
+          522,
+          709
+        ]
+      },
+      "complete_mediation": false,
+      "artifact_sha256": {
+        "aivm_secrets_garrett.ullbc": "08016f704fa8e342fc35cac22174f2182f832e70a5f0ad2d2aa2114df646b5b1",
+        "build.log": "3997fc6790b8063b86c119e91f87ac7395ac6cf26135da637dcb229006bc32dc",
+        "capture.json": "c1f2d47f2f36bea7533c65468af778fd30562e3cae5db4173dfbc136bc59b378",
+        "compiler.log": "2cc8faa291e724da078f13d2f1b3581531ec6b3c4e3637b19b943586e934c38c",
+        "compiler.ullbc.gz": "2c671b0dadfc864069aa8e1e9532ac154badf528f20e15fe9fde02a72f4c5e03",
+        "projection.json": "b36e479535712fabce64d66e05f469bf02bcdce8ec2075e5b8252a5a2d6a6d0b",
+        "projector.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "report.json": "7e7283e85e0862775a154062e8cc0673587f8a94afc300aaf7df3bb577001a22"
+      }
+    }
+  },
+  "proof_and_source_sha256": {
+    "rust/crates/aivm-secrets-garrett-core/src/coordinator_authority.rs": "b89ccdbb230d678f24abac9810ebeb8339bf5779ce63d8aea94381ce7cee5c57",
+    "rust/crates/aivm-secrets-garrett/src/coordinator_authority/ledger.rs": "924a6319c2b02664c681d0f0864d6b1c400e75a89d7842b1deff64a5d6987643",
+    "proofs/generated/AivmSecretsGarrettCore.lean": "1fc04c6aeeb0fdb8bb610eb4511cadb2b3a491fc2f0713dda7f9b359e717d1fb",
+    "proofs/GarrettCoordinatorAuthority.lean": "6048693b413c94c1c059304c198bae8ff64b87314b89c94e2b245a732b35a26a",
+    "proofs/GarrettCheck.lean": "7002537fe1d9cef9bddecab76ee56a3109b3f92a488ee8f4089f0b8130f3de7f",
+    "proofs/garrett-manifest.json": "8332bdd7737f43dbb0b7efe51a33f329c9e612711f235718b1c240b03c0a8d1b",
+    "tests/test_rust_coordinator_authority.py": "808ed5fe7fae01bceaf60a048f56918854482d4e11c3bcb4f2130fe53d76130c",
+    "tests/test_secrets_w3_effect_boundary.py": "20801a7ed6131443bdb5bf6a01c0c4f68a0ae43317b5d99f52604330e5d11560",
+    "dev/verification/w3_effect_boundary.py": "b36836e41ed827f48a677f050f99c18d291a0b40b382d3e2e6cbfeb9248fb377",
+    "dev/verification/specialized_calls.py": "565c75add8442963cb3b02ffe7e3b1abd98e84c43930b2c0184f1c89c7779eff",
+    "tests/test_specialized_calls.py": "c480e1d91318d6f3245b0909fe79668278a8261d04f699de5524168409670fc3"
+  },
+  "evidence_log_sha256": {
+    "authority-dispatch-accounting.log": "15baae0de193d71dced25361763f0b27d3479c1cc3e9ff4cc6b5a1b7ba1db3db",
+    "authority-dispatch-build.log": "27a5ff1583632ec48750624f13b29d1a451eaca84036e3337ff31bcfcf898b7b",
+    "authority-dispatch-check.log": "57afdd4a3d1850124ac12942b9b165b7bcb5f6219a12f249c9866b798742d620",
+    "authority-dispatch-evidence.py": "6b340edb4298fce2640136f0f478db9ba602af9355e484ebcc0bc461e1a2f597",
+    "authority-dispatch-extract.log": "f156afdfc785397ae0d208f60050e86c630b2d7dccf4f667adf0d95105d08f0b",
+    "authority-dispatch-freshness.log": "40e0e9b05670b732f9c8d37dd7d93ec36854286009c1ecc32f95287979bdd928",
+    "authority-dispatch-guards.log": "145742930cfd0438abc15bf1779192d68fbf2c2761dde0bd8a27313f1e54b7dd",
+    "authority-dispatch-lean.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "authority-dispatch-package.log": "13a6f398d5f1085eec483fd7132b1155618842a3ac5901edf24f33ee40830f8f",
+    "authority-dispatch-record.log": "1ea956ef1f9c8f3c4ccd4f9a00eeb6593a7dbde0fb03bd7e4bfd1b3bbb98ae3b",
+    "authority-dispatch-runtime.log": "53d7ea3d4615a1be4b6fdbe544ac0ef4934e1347ffdfbb796fe64585d310dfdf",
+    "authority-dispatch-system.log": "438168b7a4534de8b26e680a94098da16d04fd90fed08961e2b46ba5266cd478",
+    "mutations.log": "577a86ec3e806095f779dbbadfca5a0129bc9c859d64a369c7b8297b267e9729",
+    "normal-build.log": "e92c526c16cc5d61b65022a1fb91a5ee09151073d666498a1cd1d3ceec62402e",
+    "normal-report.json": "dc18bfcd06d281c407010eb8ed81e44f2ffcacf4ada4c74f119392659ed4d965",
+    "normal-workflows.log": "fcdc5438b73b0183647a5cbd35dc8ab7e9c6c331e246fe5e447bdfb0d69d1dfd",
+    "normal-workflows.xml": "5085a01b43bc661854b59320d5bd5308113782a3c9f4dfa4dca51c1ad4848ab9",
+    "authority-dispatch-ordinary-debug.log": "f009b56889b93a2e77304987bd853b81852301a87c93145a0a79db2de0d003c0",
+    "authority-dispatch-ordinary-release.log": "f425cd7b37ed73f4c4e32e782dafea6154a90f440e6040f36882a608c2b30009",
+    "authority-dispatch-ordinary-coordinator-debug.log": "fecede7c2157efe2f16c8c8b9dce94b0fb4dd384dca8207046c8bf7636eb0ffe",
+    "authority-dispatch-ordinary-coordinator-release.log": "03b3f8a1b0e6fa76a5aa42365bcc9f798c8313b81ed312b7cfe0df426c8d2bfb",
+    "authority-dispatch-coordinator-help.log": "29ac87cd9235a3d34773d9d15d5928ac5fc64681b706b56adb19f53c29d31e9f",
+    "authority-dispatch-accounting-final.log": "15baae0de193d71dced25361763f0b27d3479c1cc3e9ff4cc6b5a1b7ba1db3db"
+  },
+  "checked_scope": [
+    "The actual core classifies every typed action and admits only its designated operator or active-principal member, with exact snapshot revision returns for member actions.",
+    "Operator authority never substitutes for membership; membership never substitutes for operator authority.",
+    "Every member action is refused after a tombstone under the existing modeled committed-decision history.",
+    "Positive role-gate witnesses cover every action; later activation/reservation decisions may still refuse an admitted role.",
+    "Native code parses one immutable typed action and authorizes it before interpreting that same action; structural guards and real-process tests cover this adapter, separately from Lean.",
+    "Compiled paths reach the exhaustive gates and old decision leaves; opaque dependency/drop obligations remain explicit."
+  ],
+  "remaining": [
+    "Wire-string-to-action mapping, authenticated peer fingerprint derivation, row/SQL/JSON conversion, commit-before-reply ordering and native I/O correspondence.",
+    "Trusted CA/operator policy, protected files, stable single local database inode, SQLite/OS durability and transaction semantics; no replicas or snapshot rollback resistance.",
+    "W3 complete mediation, whole-service trace refinement/noninterference, remaining HTTP/provider/render adapters and broader Python/Rust core parity.",
+    "Atomic guest identity delivery, independent security review and live provider/host/VM/TPM deployment evidence."
+  ],
+  "ordinary_local_builds": {
+    "status": "passed",
+    "after_validation": true,
+    "conformance": false,
+    "broker_features": [],
+    "coordinator_features": [
+      "coordinator-server"
+    ],
+    "commands": [
+      [
+        "cargo",
+        "+nightly-2026-09-17",
+        "build",
+        "--locked",
+        "--manifest-path",
+        "rust/Cargo.toml",
+        "--bins",
+        "--no-default-features"
+      ],
+      [
+        "cargo",
+        "+nightly-2026-09-17",
+        "build",
+        "--locked",
+        "--manifest-path",
+        "rust/Cargo.toml",
+        "--release",
+        "--bins",
+        "--no-default-features"
+      ],
+      [
+        "cargo",
+        "+nightly-2026-09-17",
+        "build",
+        "--locked",
+        "--manifest-path",
+        "rust/Cargo.toml",
+        "--bin",
+        "garrett-coordinator",
+        "--no-default-features",
+        "--features",
+        "coordinator-server"
+      ],
+      [
+        "cargo",
+        "+nightly-2026-09-17",
+        "build",
+        "--locked",
+        "--manifest-path",
+        "rust/Cargo.toml",
+        "--release",
+        "--bin",
+        "garrett-coordinator",
+        "--no-default-features",
+        "--features",
+        "coordinator-server"
+      ]
+    ],
+    "logs": {
+      "authority-dispatch-ordinary-debug.log": "f009b56889b93a2e77304987bd853b81852301a87c93145a0a79db2de0d003c0",
+      "authority-dispatch-ordinary-release.log": "f425cd7b37ed73f4c4e32e782dafea6154a90f440e6040f36882a608c2b30009",
+      "authority-dispatch-ordinary-coordinator-debug.log": "fecede7c2157efe2f16c8c8b9dce94b0fb4dd384dca8207046c8bf7636eb0ffe",
+      "authority-dispatch-ordinary-coordinator-release.log": "03b3f8a1b0e6fa76a5aa42365bcc9f798c8313b81ed312b7cfe0df426c8d2bfb",
+      "authority-dispatch-coordinator-help.log": "29ac87cd9235a3d34773d9d15d5928ac5fc64681b706b56adb19f53c29d31e9f",
+      "authority-dispatch-accounting-final.log": "15baae0de193d71dced25361763f0b27d3479c1cc3e9ff4cc6b5a1b7ba1db3db"
+    },
+    "coordinator_release_help_exit_code": 0
+  }
+}
