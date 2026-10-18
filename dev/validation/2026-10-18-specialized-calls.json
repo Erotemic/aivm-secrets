@@ -1,0 +1,359 @@
+{
+  "schema": 1,
+  "source_commit": "417e20d4a5e5d3fef8323f63d7b4ae2961f0208d",
+  "source_dirty": false,
+  "scope": "Frozen normal-native compiler callback linkage and synthetic system regression checkpoint",
+  "report_path": ".tools/specialized-system-417e20d/report.json",
+  "report_sha256": "bf1cd1d1ae72b9a0630edbfbfa5370b83d50f05ecfee259fd5dcbd51b90a51f1",
+  "input_fingerprint_sha256": "c322f218f1db740d0b24d0e259db072433ad29dc9b9523fd6c4d439c07e8047a",
+  "full_suite": {
+    "passed": 2347,
+    "skipped": 0
+  },
+  "required_workflows": {
+    "conformance": 139,
+    "normal_release_without_conformance": 139,
+    "skipped": 0
+  },
+  "normal_workflow_report_path": ".tools/specialized-validation-417e20d/specialized-normal-workflows.json",
+  "normal_workflow_report_sha256": "d8e4efacf792c34969527cbfb9155ddbdc3b07b2d46a23e6a25afeca58cf8abe",
+  "compiler_report_path": ".tools/specialized-calls-417e20d/report.json",
+  "compiler_report_sha256": "9f1b508acf8597da83c1ee3fce0f14e05f5b9da0f671b5fa92d373a1cb65067f",
+  "compiler_artifacts_sha256": {
+    "capture.json": "5f369f0e5cff7d9600f3c5845ca73b3303b77af17fdc159d97f595ace882db8a",
+    "bridge.ullbc.gz": "0532225600e1017fe89607d899f0b0ed2b1b0a7c9ba500046ac4fad11d25a1e8",
+    "projection.json": "e740d2dd25e7131a1ca40c0f1c60eae64ac8fa60654b02f70dba5257773e4777",
+    "compiler.log": "b9d2b081ed09009fb42b135871dd3954db1fedcc980cd3f80395870155e43531",
+    "projector.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build.log": "f2d2b4c830432811def73b0f629972f2cd107dc27bd8d2608d23276f30d5737a"
+  },
+  "compiler_capture": {
+    "plain_bytes": 4394893569,
+    "compressed_bytes": 150432233,
+    "seconds": 94.141,
+    "limits": {
+      "plain": 8589934592,
+      "compressed": 536870912,
+      "compiler_seconds": 300,
+      "projector_seconds": 120
+    },
+    "plain_sha256": "f27309c1519b43a0070089ddb64389bf4ed64425db4dfff62a4692bcdbb41e2e"
+  },
+  "compiler_counts": {
+    "functions": 3316,
+    "calls": 8687,
+    "drops": 5705541,
+    "bodies": {
+      "Unstructured": 1368,
+      "Opaque": 1948
+    }
+  },
+  "direct_request_root_nodes": 994,
+  "opaque_request_root_boundaries": 780,
+  "unresolved_function_calls": {
+    "2056": {
+      "Trait": 2
+    }
+  },
+  "witnesses": {
+    "account-controller-executor": [
+      {
+        "id": 767,
+        "name": "aivm_secrets_garrett::tls::<Impl>::answer::<Instantiated>",
+        "source": {
+          "file": {
+            "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+          },
+          "begin": {
+            "line": 326,
+            "col": 4
+          },
+          "end": {
+            "line": 331,
+            "col": 23
+          }
+        }
+      },
+      {
+        "id": 1067,
+        "name": "aivm_secrets_garrett::custody::<Impl>::request",
+        "source": {
+          "file": {
+            "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+          },
+          "begin": {
+            "line": 1072,
+            "col": 4
+          },
+          "end": {
+            "line": 1080,
+            "col": 23
+          }
+        }
+      },
+      {
+        "id": 1382,
+        "name": "aivm_secrets_garrett::custody::<Impl>::request",
+        "source": {
+          "file": {
+            "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+          },
+          "begin": {
+            "line": 754,
+            "col": 4
+          },
+          "end": {
+            "line": 762,
+            "col": 23
+          }
+        }
+      },
+      {
+        "id": 1745,
+        "name": "aivm_secrets_garrett_core::protocol::perform::<Instantiated>",
+        "source": {
+          "file": {
+            "Local": "crates/aivm-secrets-garrett-core/src/protocol.rs"
+          },
+          "begin": {
+            "line": 139,
+            "col": 0
+          },
+          "end": {
+            "line": 153,
+            "col": 54
+          }
+        }
+      },
+      {
+        "id": 2115,
+        "name": "aivm_secrets_garrett_core::credential_use::finish_use::<Instantiated>",
+        "source": {
+          "file": {
+            "Local": "crates/aivm-secrets-garrett-core/src/credential_use.rs"
+          },
+          "begin": {
+            "line": 124,
+            "col": 0
+          },
+          "end": {
+            "line": 128,
+            "col": 35
+          }
+        }
+      },
+      {
+        "id": 2331,
+        "name": "aivm_secrets_garrett::custody::<Impl>::execute::<Instantiated>",
+        "source": {
+          "file": {
+            "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+          },
+          "begin": {
+            "line": 354,
+            "col": 4
+          },
+          "end": {
+            "line": 358,
+            "col": 53
+          }
+        }
+      },
+      {
+        "id": 2550,
+        "name": "aivm_secrets_garrett::custody::<Impl>::exchange::<Instantiated>",
+        "source": {
+          "file": {
+            "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+          },
+          "begin": {
+            "line": 281,
+            "col": 4
+          },
+          "end": {
+            "line": 286,
+            "col": 37
+          }
+        }
+      }
+    ],
+    "coordinated-manifest-executor": [
+      {
+        "id": 767,
+        "name": "aivm_secrets_garrett::tls::<Impl>::answer::<Instantiated>",
+        "source": {
+          "file": {
+            "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+          },
+          "begin": {
+            "line": 326,
+            "col": 4
+          },
+          "end": {
+            "line": 331,
+            "col": 23
+          }
+        }
+      },
+      {
+        "id": 1067,
+        "name": "aivm_secrets_garrett::custody::<Impl>::request",
+        "source": {
+          "file": {
+            "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+          },
+          "begin": {
+            "line": 1072,
+            "col": 4
+          },
+          "end": {
+            "line": 1080,
+            "col": 23
+          }
+        }
+      },
+      {
+        "id": 1383,
+        "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::request",
+        "source": {
+          "file": {
+            "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+          },
+          "begin": {
+            "line": 157,
+            "col": 4
+          },
+          "end": {
+            "line": 165,
+            "col": 23
+          }
+        }
+      },
+      {
+        "id": 1751,
+        "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::request::<Impl>::call",
+        "source": {
+          "file": {
+            "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+          },
+          "begin": {
+            "line": 285,
+            "col": 23
+          },
+          "end": {
+            "line": 285,
+            "col": 73
+          }
+        }
+      },
+      {
+        "id": 2133,
+        "name": "aivm_secrets_garrett_core::coordination::dispatch::<Instantiated>",
+        "source": {
+          "file": {
+            "Local": "crates/aivm-secrets-garrett-core/src/coordination.rs"
+          },
+          "begin": {
+            "line": 13,
+            "col": 0
+          },
+          "end": {
+            "line": 13,
+            "col": 87
+          }
+        }
+      },
+      {
+        "id": 2344,
+        "name": "aivm_secrets_garrett::coordination::<Impl>::emit::<Instantiated>",
+        "source": {
+          "file": {
+            "Local": "crates/aivm-secrets-garrett/src/coordination.rs"
+          },
+          "begin": {
+            "line": 286,
+            "col": 4
+          },
+          "end": {
+            "line": 286,
+            "col": 36
+          }
+        }
+      },
+      {
+        "id": 2127,
+        "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::request::<Impl>::call",
+        "source": {
+          "file": {
+            "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+          },
+          "begin": {
+            "line": 319,
+            "col": 22
+          },
+          "end": {
+            "line": 319,
+            "col": 24
+          }
+        }
+      },
+      {
+        "id": 2337,
+        "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::exchange_manifest::<Instantiated>",
+        "source": {
+          "file": {
+            "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+          },
+          "begin": {
+            "line": 533,
+            "col": 4
+          },
+          "end": {
+            "line": 540,
+            "col": 23
+          }
+        }
+      }
+    ]
+  },
+  "complete_mediation": false,
+  "independent_projection_comparison_path": ".tools/specialized-validation-417e20d/independent-projection/comparison.json",
+  "independent_projection_comparison_sha256": "db744159e4052e64d121cc5ef1ac7794eab0ca1529de4bf4d7de1f7b15e47fce",
+  "evidence_log_sha256": {
+    "ledger-clippy-final.log": "21361be2092d13fdbc0daef2e0b2c81478f9fd4a65d0b80a666c1c7694833893",
+    "ledger-unit.log": "dee45d56d5ce57b46ffa995403f439b0bb7f5c3a7fd03cff154cbf65820717fc",
+    "mono-events.log": "1c212ce58a1bf5ac9da6e116873e9ba729ae2771c1b7a7945fb6072c186544a0",
+    "mono-events.py": "4811b6a05c77c92cb279be2f95bd1f4d6625f203c7b5fcdcde6160827b4ace09",
+    "projector-performance.log": "c7807463ead64a1c6df2103122f501c749dd91212bd1eaec6838a5a0fd8dd7a0",
+    "specialized-archive-test.log": "a33286c6a594617561f0e2dcac2a49e43285cbd1cba8a7c7c6e90fb2dbe961c8",
+    "specialized-freshness-record.log": "9e78e7b78083dfb31f6362fdafe34bbf429a5a2a41e6036ebe8d099695c1cf6a",
+    "specialized-garrett-record.log": "f6c2219a7d02aaa94c05ff38d88a70e436e8dea99b02ecfeb6923cd782612aa1",
+    "specialized-gates-final.log": "76ce6b94279c03e25f2fe25fbfd4e995bce925b39020a129893d82c4dcee20c6",
+    "specialized-normal-build.log": "589bc5a726236656b9bb1506e7385e8671d3045b119ceac1c590c4676620a147",
+    "specialized-normal-workflows.json": "d8e4efacf792c34969527cbfb9155ddbdc3b07b2d46a23e6a25afeca58cf8abe",
+    "specialized-normal-workflows.log": "267749dd8009c7cd6c3a7d4fda525793007ec63b4e42a6d5f74918e954307ec1",
+    "specialized-normal-workflows.xml": "6b47589c9d75fa1fc617d829f893c6725e3ed36d15ba2a17145af2cb1e841513",
+    "specialized-package.log": "983d293ec477590692f580b783ea5f9b07a49721b006a13c71fe946c32845383",
+    "specialized-review-tests.log": "989f2186e17584cd72b29e67924031f029f6bc23fc88a386ec25c776f564cb72",
+    "specialized-system.log": "da29e7b5f66d595cfe37768b1deff30339d00442a929685cedda24ce14fef311",
+    "specialized-unit.log": "368442f9d96808211014938c6662c1aac70f4bf59cf47f3a2fe53f05e60d8b55",
+    "specialized-w4-w5.log": "db00e4091d44a0b16c69811a716ac52921971c2b134e79432d50d1714005d5ad"
+  },
+  "checked_scope": [
+    "Both intended concrete account and coordinated-manifest controller/executor call paths in normal-feature specialized bridge.",
+    "Seven Rust projection tests and nineteen Python orchestration/linkage regressions; workspace tests, strict projector lint and packaging/archive checks.",
+    "372 selected Garrett and 26 optimized primitive/freshness tests; 239 Garrett and ten freshness named axiom checks; W4/W5 and selected dependency modules compile.",
+    "W0/W3/W4/W5/W6 checks; broker/core Rust and generated Lean decision sources unchanged."
+  ],
+  "limits": [
+    "Call paths show selected compiled bindings, not an executable trace or admission dominance.",
+    "Opaque dependencies and their callbacks remain contracts, not traversed implementations.",
+    "Implicit drops and unwind effects remain unresolved; counts are static compiler sites.",
+    "No credential/data-flow or native byte-trace correspondence is proved.",
+    "Normal compiled target only; other targets and feature combinations need separate evidence.",
+    "Independent full-artifact comparison checked common fields of the development prototype, not a proof of parser correctness.",
+    "Output and elapsed-time caps are not a compiler memory cap.",
+    "Existing 107-mutation campaign belongs to 8ef98e7; unchanged pure decision sources were not subjected to a newly claimed campaign.",
+    "Broad Python/Rust parity, complete native I/O correspondence and live provider/VM/TPM deployment validation remain open."
+  ]
+}
