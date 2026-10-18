@@ -34,5 +34,7 @@ jobs:
         run: python dev/verification/garrett.py bootstrap
       - name: Regenerate, prove, lint and replay independent protocol contracts
         run: python dev/verification/garrett.py check
+      - name: Exercise usable Python and native Rust workflows without skipped backends
+        run: python dev/verification/system.py --proofs
       - name: Require security mutations to break the extracted proofs
         run: python dev/verification/garrett.py mutate

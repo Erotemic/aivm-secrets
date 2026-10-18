@@ -103,3 +103,13 @@ key can sign a CSR without exporting key material or requiring an existing clien
 certificate. Tests carry that CSR through fresh attestation enrollment and a
 TPM-signed provider call under isolated emulation; hardware provenance remains
 a deployment assumption.
+
+## Reproducible synthetic system check
+
+After provisioning the pinned Rust and optional Lean/Aeneas tools, run
+`python dev/verification/system.py --proofs` (add `--full-tests` for the full
+portable suite). Required Python/native Rust workflow tests fail the gate if
+a backend is skipped. No VM, physical TPM or live provider account is needed.
+See [configuration-dependent assurance](docs/assurance-profiles.md) and the
+[interactive comparison](docs/assurance-profiles.html) for the separate
+credential-confinement, identity-binding and key-custody claims and assumptions.

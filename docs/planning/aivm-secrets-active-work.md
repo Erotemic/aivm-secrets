@@ -34,6 +34,20 @@ Sources of truth for technical detail remain the
 them; it does not silently change protocol formats, current policies, or
 already verified theorems.
 
+## Local validation update, 2026-10-17
+
+The previously uncompiled native overlays now build on the pinned toolchain.
+The combined W1/W2/W5/W6 native/reference workflows pass 20 tests with zero
+skips, Rust workspace unit tests pass, and W4/W5 compile under Lean. These
+results close the local build/runtime availability gap in the historical
+snapshot table below, not the outstanding semantic refinement/security review.
+The [usable-system gate and configuration comparison](../assurance-profiles.md)
+add fail-on-skip automation, copied-software-key runtime witnesses and a separate
+conditional protocol-profile theorem module. Broad Python/Rust core parity,
+complete native trace refinement and live deployment/provider gates remain open.
+The [interactive comparison](../assurance-profiles.html) keeps credential
+confinement, surrogate binding and identity-key custody as separate dimensions.
+
 ## Product question and security objective
 
 A hostile agent should be able to perform a *real, specifically authorized*

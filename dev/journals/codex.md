@@ -1305,3 +1305,38 @@ The 155 source-boundary/operator tests pass. I'm confident these are accurate
 inventories, while remaining aware that string/AST checks are tripwires and
 not sound transitive Python call-graph or TLS proofs. Rust coordinator parity
 is still explicitly missing.
+
+
+## 2026-10-17 23:27:09 -0400
+
+Added a usable-system acceptance command and a configuration-dependent
+assurance comparison. I wanted the next result to say something a practitioner
+can exercise: the same copied software identity succeeds at an allowed read
+in Python and native Rust, cannot expand its scope, never receives the literal
+provider token in the observed replies, and stops after enrollment revocation.
+These two real TLS/provider tests pass. The existing native TPM-required guard
+also rejects software assurance before credential custody without needing TPM
+hardware. The new gate builds native backends, rejects skipped/failed/empty
+required-workflow reports, pins Rust/Lean explicitly, and fingerprints all
+Git-visible inputs so editing during validation cannot produce a passing
+snapshot. CI now invokes the gate alongside the existing extraction/mutations.
+
+The seven new GarrettProfiles Lean theorems compile. They separate provider
+credential confinement from copying the client identity, show why device
+presence alone adds no custody property, and give explicit signing-oracle and
+arbitrary-host-execution counterexamples. I am satisfied that these address
+the user's configuration question without making the Rust core larger just
+to collect theorems. They are symbolic ideal-cryptography results with a
+trace-refinement premise, not newly extracted deployed-service proofs or proof
+of a physical TPM. Native I/O completeness, byte-level release policies,
+coordinator Rust parity and real AIVM guest enrollment remain open work.
+
+The standalone HTML comparison is generated from a versioned profile inventory.
+Its axes are qualitative deployment stages and named conditional properties,
+not invented security scores. A real browser exercised all selectors and
+checked desktop/mobile layout and error-free rendering. The host-execution
+example deliberately retains strong client custody while losing provider
+confinement, to make the independent trust dimensions visible. Existing
+W4/W5 source/proof inventory checks still pass. The next step is a frozen-source
+full-system rerun after reconciling the pulled Python coordinator inventories;
+no broad parity or whole-service claim is being promoted here.

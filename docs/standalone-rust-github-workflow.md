@@ -1,12 +1,14 @@
 # W2: native Rust GitHub-like PR workflow
 
-**Implementation status:** Native Rust CLI translation and the synthetic
-end-to-end test are authored against the W0/W1 baseline. They have **not been
-compiled or exercised with a Rust binary in the overlay-building environment**
-(no Rust toolchain or Garrett executables were available there). The standalone
-policy-shape test passes. Runtime acceptance remains conditional on successfully
-running the tests below with the pinned toolchain; do not mark W2 verified based
-on the skipped tests.
+**Local runtime validation (2026-10-17):** the pinned Rust binaries compile,
+Rust workspace unit tests pass, and the combined W1/W2/W5/W6 workflow selection
+passes 20 tests with **zero skips**. This supersedes the original overlay's
+uncompiled status. The repeatable gate is now
+`python dev/verification/system.py --proofs`; it additionally exercises the
+Python/Rust copied-software-identity scenario and rejects software enrollment
+when a native TPM-required profile is selected. Hosted CI and live GitHub
+validation remain separate gates. Neither successful runtime tests nor the
+scoped Lean proofs establish whole-service confidentiality or VM isolation.
 
 ## What is exercised
 

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Garrett: security and deployment choices</title>
+<style>
+:root{color-scheme:dark;--bg:#101a26;--card:#192839;--ink:#edf3fa;--muted:#b4c3d5;--accent:#70e2bd}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,sans-serif}
+main{max-width:1150px;margin:auto;padding:48px 24px}h1{font-size:clamp(28px,5vw,46px);line-height:1.15;margin:8px 0 20px}h2{font-size:22px}
+p{max-width:90ch}.eyebrow{color:var(--accent);text-transform:uppercase;letter-spacing:.14em;font-size:12px;font-weight:700}
+.muted,small{color:var(--muted)}.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:16px;margin:28px 0}
+.chart,.detail{background:var(--card);padding:18px;border:1px solid #314255;border-radius:12px}.chart h2{font-size:16px;margin:0}
+svg{width:100%;height:auto}svg text{font:10px system-ui;fill:var(--muted)}svg .axis{fill:none;stroke:#496079;stroke-width:1}
+.choices{display:flex;gap:10px;flex-wrap:wrap;margin:25px 0}button{color:var(--ink);background:var(--card);border:1px solid #496079;padding:10px 14px;border-radius:7px;cursor:pointer;font:inherit}
+button[aria-pressed=true]{border-color:var(--accent);background:#174b45}.claims{display:grid;gap:8px;margin:16px 0}.yes{color:var(--accent)}.no{color:#f5c78c}
+.details{display:grid;grid-template-columns:1fr 1fr;gap:20px}li{margin:7px 0}a{color:#9bc5ff}@media(max-width:700px){.details{grid-template-columns:1fr}main{padding:25px 16px}}
+</style>
+<main>
+<div class="eyebrow">Garrett assurance profiles</div>
+<h1>What additional setup buys</h1>
+<p>Provider credentials can stay with the broker even when the client uses an exportable software key.
+A TPM adds a separate key-custody property only when the key actually uses it and its provenance is verified.</p>
+<p class="muted">The curves compare conditional properties against qualitative deployment steps.
+They are not measured attack probabilities or a total security score. Each positive claim requires the shared premises below.</p>
+<div id="charts" class="charts"></div>
+<small>Stages: 1 local broker · 2 bound software key · 3 vTPM device only · 4 verified TPM key.
+More setup can leave the guarantees unchanged. The host-execution comparison is shown separately.</small>
+<div id="choices" class="choices" aria-label="Choose a configuration"></div>
+<section class="detail" aria-live="polite"><h2 id="label"></h2><p id="setup"></p><div id="claims" class="claims"></div><p id="availability"></p><p id="limits" class="muted"></p></section>
+<div class="details"><section><h2>Shared premises</h2><ul id="premises"></ul></section>
+<section><h2>Never inferred from this choice</h2><ul id="excluded"></ul></section></div>
+<p class="muted">Evidence: <a href="../proofs/GarrettProfiles.lean">Lean protocol model</a>,
+<a href="../tests/test_assurance_profiles.py">Python/native Rust copy, scope and revocation tests</a>,
+<a href="planning/aivm-secrets-assurance-profiles.json">profile definitions</a>,
+<a href="assurance-profiles.md">scope and operating guidance</a>.
+This comparison neither attests a running deployment nor claims whole-service formal verification.</p>
+</main>
+<script type="application/json" id="profile-data">{"schema": 1, "scope": "conditional configuration comparison; not runtime attestation or whole-service verification", "shared_assumptions": ["The host, broker credential store and issuer keys are trusted and inaccessible to the guest.", "Actual I/O refines the reviewed authorization/disclosure model; complete native refinement is still open.", "Cryptographic primitives and authenticated transport meet their stated contracts.", "The selected provider and reviewed release policy do not disclose credentials through unmodeled encodings or channels."], "claim_labels": {"provider_confinement": "Provider credential remains broker-held", "surrogate_binding": "A stolen surrogate alone is insufficient", "guest_file_key_theft_resistance": "Guest files alone cannot copy the identity key"}, "profiles": [{"id": "local-broker", "label": "Local broker", "setup": "Host-local socket, capability and reviewed operation policy", "availability": "Python standalone workflow tested; no CA or TPM required. The native Rust acceptance workflow uses certificate binding.", "claims": {"provider_confinement": true, "surrogate_binding": false, "guest_file_key_theft_resistance": false}, "limits": "Local capabilities rely on socket/session isolation. No enrolled-key or hardware provenance claim."}, {"id": "bound-software", "label": "Bound software key", "setup": "Add a CA, enrolled client certificate and certificate-bound surrogate", "availability": "Python and native Rust mTLS/provider workflows tested without TPM hardware.", "claims": {"provider_confinement": true, "surrogate_binding": true, "guest_file_key_theft_resistance": false}, "limits": "A copy of the client key plus certificate and surrogate can authenticate. Scope and revocation still apply."}, {"id": "device-only", "label": "Add a vTPM device", "setup": "Add swtpm and a VM device; keep the existing software identity key", "availability": "AIVM creation/offline upgrade has simulated-daemon coverage; real libvirt lifecycle validation is open.", "claims": {"provider_confinement": true, "surrogate_binding": true, "guest_file_key_theft_resistance": false}, "limits": "Device presence changes no key-custody claim. AIVM does not automatically move existing keys into a TPM."}, {"id": "verified-tpm-key", "label": "Verified TPM key", "setup": "Generate/use a TPM key, independently establish its provenance, and enforce the enrollment assurance mode", "availability": "Native Rust has explicit TPM tooling/enrollment and isolated emulator tests. AIVM guest enrollment integration and real hardware provenance remain separate gates; Python parity is not claimed.", "claims": {"provider_confinement": true, "surrogate_binding": true, "guest_file_key_theft_resistance": true}, "limits": "Requires verified non-exportability, protected authorization and trusted TPM/AK provenance. Guest signing access can relay authentication. A vTPM host can copy its state."}, {"id": "arbitrary-host-exec", "label": "Credential-bearing host program", "setup": "Keep the verified TPM client identity, but give an arbitrary host executable the provider credential", "availability": "Architecture comparison only; this work adds no host-exec feature.", "claims": {"provider_confinement": false, "surrogate_binding": true, "guest_file_key_theft_resistance": true}, "limits": "Even with strong client identity custody, an executable given a provider credential can disclose it. These are independent security dimensions."}], "never_inferred": ["That the host cannot copy software vTPM state", "That an authorized guest cannot act as a signing relay", "That the guest or a particular agent process is uncompromised", "That a guest vTPM provides host rollback resistance", "That a successful Lean model check proves complete deployed-service secrecy"], "lean_module": "proofs/GarrettProfiles.lean", "theorems": ["provider_credential_confined_in_every_profile", "software_identity_copy_witness", "device_presence_does_not_change_key_protection", "copied_software_identity_does_not_reveal_provider", "verified_custody_prevents_key_export", "signing_oracle_can_authenticate_without_key_export", "credential_bearing_arbitrary_host_execution_counterexample"], "runtime_test": "tests/test_assurance_profiles.py"}</script>
+<script>
+'use strict';
+const data=JSON.parse(document.getElementById('profile-data').textContent);
+const colors=['#70e2bd','#afacff','#f5c78c'];
+Object.entries(data.claim_labels).forEach(([key,label],i)=>{
+ const values=data.profiles.slice(0,4).map(p=>p.claims[key]);
+ const points=values.map((v,j)=>`${42+j*67},${v?55:150}`).join(' ');
+ const chart=document.createElement('section');chart.className='chart';
+ const heading=document.createElement('h2');heading.textContent=label;chart.append(heading);
+ chart.insertAdjacentHTML('beforeend',`<svg viewBox="0 0 290 200" role="img" aria-label="Conditional property across four deployment stages">
+ <path class="axis" d="M35 40V168H270"/><text x="0" y="29">Conditional</text><text x="0" y="187">Not provided</text>
+ <polyline points="${points}" fill="none" stroke="${colors[i]}" stroke-width="3"/>
+ ${values.map((v,j)=>`<circle cx="${42+j*67}" cy="${v?55:150}" r="5" fill="${colors[i]}"/><text x="${39+j*67}" y="165">${j+1}</text>`).join('')}</svg>`);
+ document.getElementById('charts').append(chart);
+});
+function choose(index){
+ const p=data.profiles[index];
+ document.getElementById('label').textContent=p.label;
+ document.getElementById('setup').textContent=p.setup;
+ document.getElementById('availability').textContent=p.availability;
+ document.getElementById('limits').textContent=p.limits;
+ const claims=document.getElementById('claims');claims.replaceChildren();
+ Object.entries(data.claim_labels).forEach(([key,label])=>{const row=document.createElement('div');row.className=p.claims[key]?'yes':'no';row.textContent=(p.claims[key]?'Conditional: ':'Not provided: ')+label;claims.append(row)});
+ document.querySelectorAll('button').forEach((button,i)=>button.setAttribute('aria-pressed',String(i===index)));
+}
+data.profiles.forEach((p,i)=>{const button=document.createElement('button');button.textContent=p.label;button.onclick=()=>choose(i);document.getElementById('choices').append(button)});
+for(const [target,values] of [['premises',data.shared_assumptions],['excluded',data.never_inferred]]){
+ for(const value of values){const item=document.createElement('li');item.textContent=value;document.getElementById(target).append(item)}
+}
+choose(1);
+</script></html>
