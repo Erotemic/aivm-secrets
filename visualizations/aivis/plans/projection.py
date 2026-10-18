@@ -1,0 +1,48 @@
+"""EDIT HERE: what the broker removes from an untrusted provider response."""
+from aivis.diagram import Beat, Diagram, Knowledge, Link, Node
+
+PLAN=Diagram(
+    key='projection',
+    title='The provider reply is not the agent reply',
+    kicker='Show the fields that are present, selected, removed, and returned.',
+    nodes=(
+        Node('raw','GitHub response','Untrusted provider data',(-4.77,1.63),2.72,1.12,'provider'),
+        Node('selection','Host filter','Manifest disclosure rule',(0,1.63),2.72,1.12,'policy'),
+        Node('agent','Agent output','Only selected fields',(4.77,1.63),2.72,1.12,'guest'),
+    ),
+    links=(
+        Link('raw_filter','raw','selection','parse JSON / diff',((-3.39,1.63),(-1.39,1.63)),'provider',label_xy=(-2.35,2.10)),
+        Link('selected','selection','agent','selected reply',((1.39,1.63),(3.39,1.63)),'guest',label_xy=(2.38,2.10)),
+    ),
+    beats=(
+        Beat('full','The host can see the whole API response; the agent is not sent that object.',
+             nodes=('raw','selection','agent'),links=('raw_filter',),packet='raw_filter',packet_label='raw JSON',
+             knowledge=(Knowledge('raw',(-4.77,-0.86),
+                                  ('number: 13861','title: ...','head.sha: ...','extra provider fields'),3.72,2.7),
+                        Knowledge('selection',(0,-0.86),
+                                  ('allow: number','allow: title','allow: headRefOid','exclude everything else'),3.72,2.7),
+                        Knowledge('agent',(4.77,-0.86),('no reply yet',),3.72,2.7)),status='implemented'),
+        Beat('drop','The host selects the declared paths and leaves other fields behind.',
+             focus=('selection',),
+             knowledge=(Knowledge('raw',(-4.77,-0.86),
+                                  ('number: 13861','title: ...','head.sha: ...','opaque_extra: SECRET'),3.72,2.7),
+                        Knowledge('selection',(0,-0.86),
+                                  ('number -> number','title -> title','head.sha -> headRefOid','opaque_extra is ignored'),3.72,2.7),
+                        Knowledge('agent',(4.77,-0.86),('no reply yet',),3.72,2.7)),status='implemented'),
+        Beat('send','The guest receives the selected reply, not arbitrary provider JSON.',
+             links=('selected',),packet='selected',packet_label='selected fields',
+             knowledge=(Knowledge('raw',(-4.77,-0.86),
+                                  ('number, title, head.sha','other provider fields'),3.72,2.7),
+                        Knowledge('selection',(0,-0.86),
+                                  ('selected fields only','budget + type checks','literal reflection check'),3.72,2.7),
+                        Knowledge('agent',(4.77,-0.86),
+                                  ('number: 13861','title: ...','headRefOid: ...','NO opaque_extra'),3.72,2.7)),status='implemented'),
+        Beat('diff','For gh pr diff, the analogous allowed output is the selected diff body.',
+             focus=('agent',),status='idealized',
+             knowledge=(Knowledge('raw',(-4.77,-0.86),('full .diff response','possibly unsafe content'),3.72,2.7),
+                        Knowledge('selection',(0,-0.86),('pr.diff text-only rule','size + reflection checks'),3.72,2.7),
+                        Knowledge('agent',(4.77,-0.86),('approved diff text','no bearer token'),3.72,2.7)),
+             ),
+    ),
+    footer='A selected field may still be malicious. Selection alone is not a proof that the content is safe.',
+)

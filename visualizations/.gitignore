@@ -1,0 +1,7 @@
+# Generated renders and local editor state; source and storyboards are committed.
+.build/
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo

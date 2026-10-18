@@ -1,0 +1,93 @@
+# The scenes are meant to be edited, not treated as proof artifacts.
+# Copy/claim edits: here. Geometry/beat changes: aivis/plans/<id>.py.
+[deck]
+name = "information-flow"
+title = "Where the secret goes"
+audience = "engineers, security reviewers, maintainers"
+
+[[scene]]
+id = "legend"
+file = "aivis/scenes/legend.py"
+class = "VisualLegendScene"
+plan = "aivis.plans.legend"
+status = "architecture"
+claim = "The diagrams distinguish readable, signed, encrypted and host-private data."
+narration = "A signature does not hide contents. Ciphertext can be carried by the guest without being readable. The exploded views are for the viewer, not the agent."
+sources = ["docs/verified-garrett.md", "docs/planning/aivm-secrets-design.md"]
+
+[[scene]]
+id = "boundary"
+file = "aivis/scenes/boundary.py"
+class = "TrustBoundaryScene"
+plan = "aivis.plans.boundary"
+status = "architecture"
+claim = "The broker uses a host-held bearer token; the agent sends a bound surrogate and a typed request."
+narration = "Watch the three columns. The agent begins with an intent, the surrogate and its client identity. The host has the provider credential and the policy. GitHub gets an authenticated HTTPS request. Afterward the agent sees only what the broker releases. Host and VM separation depends on deployment."
+sources = ["docs/verified-garrett.md", "docs/planning/aivm-secrets-assumptions.json"]
+
+[[scene]]
+id = "packaging"
+file = "aivis/scenes/packaging.py"
+class = "NestedSurrogateScene"
+plan = "aivis.plans.packaging"
+status = "architecture"
+claim = "A signed certificate-bound surrogate contains encrypted inner capability material; the actual credential stays unreadable to the guest."
+narration = "The outer token is signed. Its public claims are readable. The sealed layer is encrypted using AES-GCM, and it contains the inner aivs1 capability that protects the service credential again. This is a cross-section for teaching; it does not reveal the credential to the agent."
+sources = ["docs/verified-garrett.md", "docs/planning/aivm-secrets-garrett-identity.md"]
+
+[[scene]]
+id = "gh_diff"
+file = "aivis/scenes/gh_diff.py"
+class = "GitHubDiffWalkthroughScene"
+plan = "aivis.plans.gh_diff"
+status = "architecture"
+claim = "An idealized gh pr diff request is converted to a narrow typed operation; the host sends the authorized request and returns the selected diff."
+narration = "Example: TauCetiProject/TauCeti PR 13861. The agent wants a diff. A narrow gh-compatible client translates this into pr.diff, with the repo and PR number. The host checks the current grant and fixed route, may check PR facts, records audit, adds its own credential, and calls GitHub. The guest receives permitted diff content. This is not arbitrary gh forwarding and does not imply full I/O proof."
+sources = ["docs/examples/aivm-secrets-tauceti-gh2.json", "docs/verified-garrett.md"]
+optional_sources = ["rust/crates/aivm-secrets-garrett/src/client_alias.rs", "docs/standalone-rust-github-workflow.md"]
+
+[[scene]]
+id = "dispatch"
+file = "aivis/scenes/dispatch.py"
+class = "AuthorizedDispatchScene"
+plan = "aivis.plans.dispatch"
+status = "source-linked-controller"
+claim = "The broker checks operation, grant, optional provider facts, and audit before a credentialed dispatch."
+narration = "The host picks the method, URL and limits from a manifest. The agent cannot choose an arbitrary API route. If a check or the durable audit fails, this request stops. The native adapter still needs complete correspondence work."
+sources = ["proofs/GarrettManifest.lean", "rust/crates/aivm-secrets-garrett/src/manifest.rs"]
+optional_sources = ["rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs"]
+proof_anchors = ["manifest.Proofs.authorize_contract", "manifest.Proofs.stale_grant_cannot_dispatch"]
+
+[[scene]]
+id = "projection"
+file = "aivis/scenes/projection.py"
+class = "SelectiveDisclosureScene"
+plan = "aivis.plans.projection"
+status = "source-linked-controller"
+claim = "The host chooses public reply fields; other provider data is not returned by the projected reply."
+narration = "One raw JSON object can contain many fields. The host selects number, title and head SHA using its schema. Extra fields are discarded. A text diff uses an explicit read-only rule rather than forwarding the entire response object. Selection is not a guarantee against malicious text or every side channel."
+sources = ["proofs/GarrettDisclosure.lean", "docs/verified-disclosure.md"]
+proof_anchors = ["disclosure.Proofs.ignored_input_field_noninterference", "disclosure.Proofs.recursive_projection_noninterference"]
+
+[[scene]]
+id = "reflection"
+file = "aivis/scenes/reflection.py"
+class = "ReflectionOracleScene"
+plan = "aivis.plans.reflection"
+status = "conditional-model"
+claim = "Literal credential reflection is rejected; allow versus deny can itself reveal information."
+narration = "If selected text literally contains the credential, the broker blocks it. With a different host credential, the same text may be released. The guest can observe the difference, so the response status cannot be treated as secret-independent."
+sources = ["proofs/GarrettReflection.lean", "docs/verified-garrett.md"]
+proof_anchors = ["reflection.Proofs.reflected_credential_is_detected"]
+optional_sources = ["proofs/GarrettNoninterference.lean"]
+
+[[scene]]
+id = "evidence"
+file = "aivis/scenes/evidence.py"
+class = "EvidenceChainScene"
+plan = "aivis.plans.evidence"
+status = "open"
+claim = "The native read-only workflow and selected Rust controllers exist; complete runtime correspondence and VM isolation are separate obligations."
+narration = "The code includes a narrow Rust GitHub operation path, subject to integration testing. The extracted controller has verified pieces; W4 and W5 are conditional trace models. W6 must connect the real network, serialization and audit effects to the model. W8 is about deployment isolation."
+sources = ["docs/verified-garrett.md", "docs/verified-composition.md", "docs/planning/aivm-secrets-assumptions.json"]
+optional_sources = ["docs/verified-w4-core-trace.md", "docs/verified-w5-information-flow.md", "docs/standalone-rust-github-workflow.md"]

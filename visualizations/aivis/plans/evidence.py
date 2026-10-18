@@ -1,0 +1,42 @@
+"""EDIT HERE: implementation status, shown after the worked example."""
+from aivis.diagram import Beat, Diagram, Knowledge, Node
+
+PLAN=Diagram(
+    key='evidence',
+    title='Which parts are running today?',
+    kicker='A diagram of the target flow is not proof that every component is deployed.',
+    nodes=(
+        Node('code','In the code','Available components',(-4.77,1.65),2.85,1.11,'broker'),
+        Node('logic','In Lean','Scoped controller results',(0,1.65),2.85,1.11,'policy'),
+        Node('missing','Still needed','Deployment and I/O checks',(4.77,1.65),2.85,1.11,'open'),
+    ),
+    links=(),
+    beats=(
+        Beat('available','There is native Rust code for a constrained read-only GitHub workflow.',
+             nodes=('code','logic','missing'),focus=('code',),status='implemented',
+             knowledge=(Knowledge('code',(-4.77,-0.85),
+                                  ('bound TLS surrogate','read-only gh subset (W2)','host manifest policy','audit + response filter'),3.82,2.73),
+                        Knowledge('logic',(0,-0.85),('Rust extracted by Aeneas','grant/operation checks','disclosure projection'),3.82,2.73),
+                        Knowledge('missing',(4.77,-0.85),('W2 native integration gate','deployment isolation check'),3.82,2.73))),
+        Beat('proof','Lean covers particular extracted decisions, not every byte sent by the process.',
+             focus=('logic',),status='implemented',
+             knowledge=(Knowledge('code',(-4.77,-0.85),('real Rust and TLS adapters','behavioral tests'),3.82,2.73),
+                        Knowledge('logic',(0,-0.85),
+                                  ('manifest guards','selected-field filter','W4 modeled trace','W5 conditional model'),3.82,2.73),
+                        Knowledge('missing',(4.77,-0.85),
+                                   ('exact I/O correspondence (W6)','full protocol observation'),3.82,2.73))),
+        Beat('environment','Host custody, TLS identity and VM isolation depend on the deployment.',
+             focus=('missing',),status='assumed',
+             knowledge=(Knowledge('code',(-4.77,-0.85),('issuer + broker','host file permissions'),3.82,2.73),
+                        Knowledge('logic',(0,-0.85),('conditional theorems','named assumptions'),3.82,2.73),
+                        Knowledge('missing',(4.77,-0.85),
+                                   ('VM/channel isolation (W8)','TLS/crypto assumptions','no alternate egress paths'),3.82,2.73))),
+        Beat('limits','Do not describe arbitrary gh commands, guest network isolation or the whole service as proved.',
+             focus=('missing',),status='open',
+             knowledge=(Knowledge('code',(-4.77,-0.85),('selected read-only gh actions','not arbitrary gh forwarding'),3.82,2.73),
+                        Knowledge('logic',(0,-0.85),('controller/model proofs','under stated conditions'),3.82,2.73),
+                        Knowledge('missing',(4.77,-0.85),
+                                   ('native I/O proof (W6)','deployment verification (W8)','unmodeled side channels'),3.82,2.73))),
+    ),
+    footer='Status is for this operation; W6/W8 remain open, not a whole-service certificate.',
+)
