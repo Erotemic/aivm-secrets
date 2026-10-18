@@ -1383,3 +1383,28 @@ refinement. A last sample does not atomically bound an entire network write,
 and revocation cannot cancel an already admitted provider effect. The next
 verification is the full frozen-source system gate for this adapted patch,
 followed by integration; no wider protocol parity claim is being made.
+
+
+## 2026-10-17 23:58:00 -0400
+
+The frozen 323a3e2 gate completed with 2,228 passing tests and one explicitly
+pending full-primitive runner, 32 required workflows without skips, Rust unit
+checks, W0/W3/W4/W5/W6 inventories, and W4/W5/profile/emission kernel builds.
+The source was clean and unchanged throughout the run. I fast-forwarded main
+to that implementation checkpoint, copied its report/log directory into the
+main checkout's ignored tools area, and rebuilt the ordinary debug and release
+Rust binaries without conformance support. The curated validation JSON names
+the exact source and keeps the four-of-94 mutation scope explicit. This is a
+usable synthetic baseline, not a declaration of complete core parity.
+
+I started the next requested usability increment in a separate
+`garrett-oauth-rollover` worktree. Two new account/manifest scenarios reproduce
+the real Rust gap after an explicit refresh: Python's current-epoch lease
+accepts the successor, while the running native broker rejects it. No Rust
+rollover implementation has been made yet. I intend to keep revocation and
+re-enrollment epoch fencing, hold one current-token lease across both provider
+effects, repeat its expiry check at late emission, and seal an opaque session
+marker instead of retaining the original bearer in the capability. The proof
+should extend the small existing OAuth guard rather than invent a new broker
+state machine. The main uncertainty is correctly tying that marker, selected
+vault/provider/subject and held lease together without weakening binding.

@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "source_commit": "323a3e2e40ff151519709c8986c43b8b8e433cb2",
+  "scope": "Synthetic usable-system and conditional source-controller evidence; not full protocol parity or whole-service secrecy",
+  "command": "python dev/verification/system.py --proofs --full-tests",
+  "rust_toolchain": "nightly-2026-09-17",
+  "lean_toolchain": "leanprover/lean4:v4.35.0",
+  "full_tests": {
+    "passed": 2228,
+    "skipped": 1,
+    "skip": "Pending independent full primitives runner; no full primitive parity claimed"
+  },
+  "required_workflows": {
+    "passed": 32,
+    "skipped": 0
+  },
+  "normal_release_workflows": {
+    "passed": 32,
+    "skipped": 0,
+    "conformance": false
+  },
+  "new_expiry_regressions": {
+    "failed_before": 8,
+    "passed_after": 8
+  },
+  "selected_rust_mutations": {
+    "selected": 4,
+    "available": 94,
+    "rejected": 4,
+    "filter": "^late ",
+    "full_campaign_completed": false
+  },
+  "garrett_named_axiom_audit": {
+    "obligations": 213,
+    "passed": true,
+    "allowed_axioms": [
+      "Classical.choice",
+      "Quot.sound",
+      "propext"
+    ]
+  },
+  "separate_kernel_checked_modules": [
+    "GarrettConfinement",
+    "GarrettNoninterference",
+    "GarrettProfiles"
+  ],
+  "source_input_digest": "3d0c62446ffb220816f399de54309bdcfe1a7ad40eb30348c83ba47d34e9ffae",
+  "local_report": ".tools/dispatch-system-323a3e2/report.json",
+  "limits": [
+    "Concrete native I/O refinement and clock/lease contracts remain explicit assumptions.",
+    "No real libvirt VM lifecycle, physical TPM provenance or live provider account was validated.",
+    "Rust coordinator/idempotency and same-session renewal parity remain open."
+  ]
+}
