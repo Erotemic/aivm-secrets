@@ -213,6 +213,28 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'value[flag] != json!(true)' in coordinate
             and 'fn outcome_unknown(&self) -> Error' in coordinate,
             'coordinator admission caches or accepts an untyped acknowledgement')
+    # Host renewal may carry only the source certificate's verified key
+    # identity; substituting the current fingerprint would defeat continuity.
+    rebinding = contents[RUST + 'authority/rebinding.rs']
+    prepare = part(rebinding, 'pub fn rebind_to_file(', '        Ok(result)')
+    require(same_order(prepare, 'self.root.lock(false)?;',
+                       'self.current()?;', '.verify(&token.as_bytes().to_vec())',
+                       'read_registry(', 'certificates::inspect_client(&old_pem, &ca)?;',
+                       'let now = clock()?;', 'gate::rebind('),
+            'host rebinding bypasses stable state, signature or certificate preparation')
+    require('crypto::certificate_thumbprint(&prior.der)? != old_thumb' in prepare
+            and '&prior.fingerprint.as_bytes().to_vec(),' in prepare
+            and '&expected_thumbprint.as_bytes().to_vec(),' in prepare
+            and '.unseal(' not in prepare,
+            'host rebinding forges source key/CAS evidence or opens before its guard')
+    require(rebinding.count('.unseal(self.envelope)') == 1
+            and 'secret.bytes(),' in rebinding and 'self.authority.issue_to_file(' in rebinding,
+            'rebinding does not carry exactly the guarded opaque capability')
+    host = contents[RUST + 'authority_main.rs']
+    handler = part(host, '"rebind" => {', '"issue" => {')
+    require('files::read_private(' in handler and '"expected_epoch"' in handler
+            and '"expected_thumbprint"' in handler and '"client_assurance"' in handler,
+            'host rebinding lost private input or explicit target/assurance selection')
     d = contents[RUST + 'manifest/disclosure.rs']
     require('filter::project_fields(' in d and 'ensure_safe(&value, credential)?;' in d,
             'native disclosure no longer selects and reflection-checks public fields')

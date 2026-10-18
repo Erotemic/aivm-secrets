@@ -32,7 +32,7 @@ work, not a requirement to reproduce Python's host package structure in Rust.
 | --- | --- | --- |
 | CORE-01 | Canonical JSON/wire/denials | Implemented subset; differential gate still required |
 | CORE-02 | Binding, enrolled state, epochs, signatures | Implemented subset; differential gate still required |
-| CORE-03 | CA, bound certificate/JWT renewal without restart | Partial |
+| CORE-03 | CA, bound certificate/JWT renewal without restart | Native same-key renew/rebind tested; delivery and broader parity open |
 | CORE-04 | Authorization, delegation, approval, budgets | Partial |
 | CORE-05 | Manifest request/effect and disclosure | Partial |
 | CORE-06 | OAuth refresh and same-session current-token lease | Native rollover implemented; finite differential coverage, broader parity gate open |
@@ -75,3 +75,8 @@ derivation interoperates; native request fingerprints currently hash the
 validated native policy document, whereas Python hashes normalized policy
 serialization. Duplicate keys are refused regardless of digest, so this does
 not permit replay; it remains an explicit opaque-fingerprint parity gap.
+
+The [same-key identity rebinding increment](verified-identity-rebinding.md)
+composes native CAS certificate renewal with a host-only rewrap of the identical
+opaque broker capability. Both running native profiles and independent Python
+JWT opening are tested; the guest file swap remains an operator responsibility.

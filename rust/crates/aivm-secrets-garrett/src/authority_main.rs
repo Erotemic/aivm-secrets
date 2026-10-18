@@ -165,6 +165,44 @@ fn execute(action: &str, root: &Path, request: &Value) -> Outcome<Value> {
                 now,
             )
         }
+        "rebind" => {
+            json::keys(
+                request,
+                &[
+                    "subject",
+                    "surrogate_file",
+                    "expected_epoch",
+                    "expected_thumbprint",
+                    "output",
+                    "client_assurance",
+                ],
+                &["now", "lifetime"],
+            )?;
+            let require_tpm = match text(request, "client_assurance")? {
+                "any-enrolled" => false,
+                "attested-tpm" => true,
+                _ => return Err(Error::InvalidRequest),
+            };
+            let source = zeroize::Zeroizing::new(files::read_private(
+                Path::new(text(request, "surrogate_file")?),
+                32768,
+            )?);
+            let lifetime = request
+                .get("lifetime")
+                .map(|v| json::integer(v, 1, 3600))
+                .transpose()?
+                .unwrap_or(900);
+            authority.rebind_to_file(
+                text(request, "subject")?,
+                &source,
+                json::integer(&request["expected_epoch"], 0, i32::MAX as i64)?,
+                text(request, "expected_thumbprint")?,
+                Path::new(text(request, "output")?),
+                lifetime,
+                require_tpm,
+                || stamp(request),
+            )
+        }
         "issue" => {
             json::keys(
                 request,
@@ -274,7 +312,7 @@ fn execute(action: &str, root: &Path, request: &Value) -> Outcome<Value> {
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     if args.as_slice() == ["--help"] {
-        println!("garrett-authority ACTION --root ABSOLUTE_PRIVATE_ROOT [--request PRIVATE_JSON]\nActions: init, status, enroll, renew, enroll-tpm, renew-tpm, public-client, revoke, revoke-if-current, forget, prune, rotate-issuer, retire-issuer, renew-server, rotate-ca, transactions, transaction-status, recover, issue.\nTPM enrollment emits a fresh challenge, then accepts one bounded evidence frame on stdin.\nRecovery requires an explicit transaction ID and reviewed plan SHA-256.\nExperimental and unaudited; host operations only, no private-key output.");
+        println!("garrett-authority ACTION --root ABSOLUTE_PRIVATE_ROOT [--request PRIVATE_JSON]\nActions: init, status, enroll, renew, enroll-tpm, renew-tpm, public-client, revoke, revoke-if-current, forget, prune, rotate-issuer, retire-issuer, renew-server, rotate-ca, transactions, transaction-status, recover, issue, rebind.\nTPM enrollment emits a fresh challenge, then accepts one bounded evidence frame on stdin.\nRecovery requires an explicit transaction ID and reviewed plan SHA-256.\nExperimental and unaudited; host operations only, no private-key output.");
         return;
     }
     let result = (|| -> Outcome<Value> {

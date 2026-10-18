@@ -1,3 +1,4 @@
+import GarrettRebinding
 import GarrettCoordination
 import GarrettEmission
 import GarrettClientMaterial
@@ -256,3 +257,16 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.coordination.Proofs.read_success_witness
 #print axioms aivm_secrets_garrett_core.coordination.Proofs.write_success_witness
 #print axioms aivm_secrets_garrett_core.coordination.Proofs.write_acknowledgement_contract
+
+#print axioms aivm_secrets_garrett_core.rebinding.Proofs.permitted_contract
+#print axioms aivm_secrets_garrett_core.rebinding.Proofs.permitted_exact
+#print axioms aivm_secrets_garrett_core.rebinding.Proofs.same_identity_and_key_required
+#print axioms aivm_secrets_garrett_core.rebinding.Proofs.stale_target_epoch_refused
+#print axioms aivm_secrets_garrett_core.rebinding.Proofs.changed_target_certificate_refused
+#print axioms aivm_secrets_garrett_core.rebinding.Proofs.changed_key_refused
+#print axioms aivm_secrets_garrett_core.rebinding.Proofs.inactive_target_refused
+#print axioms aivm_secrets_garrett_core.rebinding.Proofs.expired_target_refused
+#print axioms aivm_secrets_garrett_core.rebinding.Proofs.denied_before_open_or_issue
+#print axioms aivm_secrets_garrett_core.rebinding.Proofs.open_failure_never_issues
+#print axioms aivm_secrets_garrett_core.rebinding.Proofs.same_secret_reissuance_contract
+#print axioms aivm_secrets_garrett_core.rebinding.Proofs.successful_rebind_witness

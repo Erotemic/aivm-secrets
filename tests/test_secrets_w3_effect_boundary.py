@@ -49,6 +49,14 @@ def mutate(repo, filename, before, after):
 
 
 @pytest.mark.parametrize('file,old,new', [
+    (RUST + 'authority/rebinding.rs',
+     'let now = clock()?;', 'let now = 0;'),
+    (RUST + 'authority/rebinding.rs',
+     '&prior.fingerprint.as_bytes().to_vec(),', '&current.fingerprint.as_bytes().to_vec(),'),
+    (RUST + 'authority/rebinding.rs',
+     'let _lease = self.root.lock(false)?;', 'let _lease = ();'),
+    (RUST + 'authority/rebinding.rs',
+     '&expected_thumbprint.as_bytes().to_vec(),', '&target.certificate,'),
     (RUST + 'custody.rs',
      'self.check_coordination()?;\n        let now = host_time()?;',
      'let now = host_time()?;\n        self.check_coordination()?;'),

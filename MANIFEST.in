@@ -20,7 +20,7 @@ include proofs/GarrettManifest.lean
 include proofs/GarrettDisclosure.lean
 include proofs/GarrettReflection.lean
 include proofs/GarrettClientMaterial.lean
-include proofs/GarrettEmission.lean proofs/GarrettCoordination.lean
+include proofs/GarrettEmission.lean proofs/GarrettCoordination.lean proofs/GarrettRebinding.lean
 include proofs/GarrettConfinement.lean proofs/GarrettNoninterference.lean proofs/GarrettProfiles.lean
 include proofs/GarrettFoundation.lean
 recursive-include proofs/generated *.lean

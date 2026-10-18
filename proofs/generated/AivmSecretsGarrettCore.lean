@@ -1227,14 +1227,14 @@ def enrollment.enroll_client
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::Denial]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 19:0-21:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 20:0-22:1
     Visibility: public -/
 @[discriminant isize]
 inductive Denial where
 | InvalidCapability : Denial
 
 /-- [aivm_secrets_garrett_core::Claims]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 23:0-32:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 24:0-33:1
     Visibility: public -/
 structure Claims where
   issuer : alloc.vec.Vec Std.U8
@@ -1247,7 +1247,7 @@ structure Claims where
   certificate : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::Expectation]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 34:0-39:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 35:0-40:1
     Visibility: public -/
 structure Expectation where
   issuer : alloc.vec.Vec Std.U8
@@ -1256,7 +1256,7 @@ structure Expectation where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::IssueWindow]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 41:0-45:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 42:0-46:1
     Visibility: public -/
 structure IssueWindow where
   issued_at : Std.I64
@@ -1264,7 +1264,7 @@ structure IssueWindow where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::issue_window]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 48:0-75:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 49:0-76:1
     Visibility: public -/
 def issue_window
   (active : Bool) (epoch : Std.I64) (not_after : Std.I64) (now : Std.I64)
@@ -1308,7 +1308,7 @@ def issue_window
   else ok (core.result.Result.Err Denial.InvalidCapability)
 
 /-- [aivm_secrets_garrett_core::present]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 79:0-106:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 80:0-107:1
     Visibility: public -/
 def present
   (claims : Claims) (expected : Expectation) (peer : alloc.vec.Vec Std.U8)
@@ -1372,21 +1372,21 @@ def present
                           else ok (core.result.Result.Ok ())
 
 /-- [aivm_secrets_garrett_core::AuthenticatedEnvelope]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 110:0-113:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 111:0-114:1
     Visibility: public -/
 structure AuthenticatedEnvelope where
   claims : Claims
   encrypted : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::OpenedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 115:0-118:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 116:0-119:1
     Visibility: public -/
 structure OpenedSurrogate (S : Type _) where
   claims : Claims
   secret : S
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeVerifier]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 121:0-125:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 122:0-126:1
     Visibility: public -/
 structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
   verify : Self → alloc.vec.Vec Std.U8 → Result (core.result.Result
@@ -1395,7 +1395,7 @@ structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
     Self_Secret Denial)
 
 /-- [aivm_secrets_garrett_core::open_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 130:0-152:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 131:0-153:1
     Visibility: public -/
 def open_surrogate
   {V : Type _} {Clause0_Secret : Type _} (EnvelopeVerifierInst :
@@ -1419,7 +1419,7 @@ def open_surrogate
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssueInputs]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 154:0-163:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 155:0-164:1
     Visibility: public -/
 structure IssueInputs where
   issuer : alloc.vec.Vec Std.U8
@@ -1432,7 +1432,7 @@ structure IssueInputs where
   not_after : Std.I64
 
 /-- [aivm_secrets_garrett_core::prepare_issue]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 166:0-181:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 167:0-182:1
     Visibility: public -/
 def prepare_issue
   (input : IssueInputs) (now : Std.I64) (lifetime : Std.I64) :
@@ -1455,21 +1455,21 @@ def prepare_issue
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssuedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 183:0-186:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 184:0-187:1
     Visibility: public -/
 structure IssuedSurrogate where
   claims : Claims
   token : alloc.vec.Vec Std.U8
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeIssuer]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 188:0-191:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 189:0-192:1
     Visibility: public -/
 structure EnvelopeIssuer (Self : Type _) (Self_Secret : Type _) where
   «seal» : Self → Claims → Self_Secret → Result (core.result.Result
     (alloc.vec.Vec Std.U8) Denial)
 
 /-- [aivm_secrets_garrett_core::issue_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 193:0-209:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 194:0-210:1
     Visibility: public -/
 def issue_surrogate
   {I : Type _} {Clause0_Secret : Type _} (EnvelopeIssuerInst : EnvelopeIssuer I
@@ -2221,6 +2221,102 @@ def protocol.perform
         ready.credential grant.route
     | core.result.Result.Err error => ok (core.result.Result.Err error)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
+
+/-- [aivm_secrets_garrett_core::rebinding::Target]
+    Source: 'crates/aivm-secrets-garrett-core/src/rebinding.rs', lines 6:0-12:1
+    Visibility: public -/
+structure rebinding.Target where
+  identity : Expectation
+  certificate : alloc.vec.Vec Std.U8
+  key : alloc.vec.Vec Std.U8
+  active : Bool
+  not_after : Std.I64
+
+/-- [aivm_secrets_garrett_core::rebinding::permitted]:
+    Source: 'crates/aivm-secrets-garrett-core/src/rebinding.rs', lines 14:0-32:1
+    Visibility: public -/
+def rebinding.permitted
+  (source : Claims) (source_key : alloc.vec.Vec Std.U8)
+  (target : rebinding.Target) (expected_epoch : Std.I64)
+  (expected_certificate : alloc.vec.Vec Std.U8) (now : Std.I64) :
+  Result Bool
+  := do
+  if target.active
+  then
+    let b ←
+      alloc.vec.partial_eq.PartialEqVec.eq core.cmp.PartialEqU8 source.issuer
+        target.identity.issuer
+    if b
+    then
+      let b1 ←
+        alloc.vec.partial_eq.PartialEqVec.eq core.cmp.PartialEqU8
+          source.audience target.identity.audience
+      if b1
+      then
+        let b2 ←
+          alloc.vec.partial_eq.PartialEqVec.eq core.cmp.PartialEqU8
+            source.subject target.identity.subject
+        if b2
+        then
+          let b3 ←
+            alloc.vec.partial_eq.PartialEqVec.eq core.cmp.PartialEqU8
+              source_key target.key
+          if b3
+          then
+            if source.epoch <= target.identity.epoch
+            then
+              if target.identity.epoch = expected_epoch
+              then
+                let b4 ←
+                  alloc.vec.partial_eq.PartialEqVec.eq core.cmp.PartialEqU8
+                    target.certificate expected_certificate
+                if b4
+                then
+                  if now >= 0#i64
+                  then ok (now < target.not_after)
+                  else ok false
+                else ok false
+              else ok false
+            else ok false
+          else ok false
+        else ok false
+      else ok false
+    else ok false
+  else ok false
+
+/-- Trait declaration: [aivm_secrets_garrett_core::rebinding::Rebinder]
+    Source: 'crates/aivm-secrets-garrett-core/src/rebinding.rs', lines 34:0-41:1
+    Visibility: public -/
+structure rebinding.Rebinder (Self : Type _) (Self_Secret : Type _)
+  (Self_Output : Type _) (Self_Error : Type _) where
+  rejected : Self → Result Self_Error
+  «open» : Self → Result (core.result.Result Self_Secret Self_Error)
+  issue : Self → Self_Secret → Result (core.result.Result Self_Output
+    Self_Error)
+
+/-- [aivm_secrets_garrett_core::rebinding::rebind]:
+    Source: 'crates/aivm-secrets-garrett-core/src/rebinding.rs', lines 43:0-67:1
+    Visibility: public -/
+def rebinding.rebind
+  {R : Type _} {Clause0_Secret : Type _} {Clause0_Output : Type _}
+  {Clause0_Error : Type _} (RebinderInst : rebinding.Rebinder R Clause0_Secret
+  Clause0_Output Clause0_Error) (ops : R) (source : Claims)
+  (source_key : alloc.vec.Vec Std.U8) (target : rebinding.Target)
+  (expected_epoch : Std.I64) (expected_certificate : alloc.vec.Vec Std.U8)
+  (now : Std.I64) :
+  Result (core.result.Result Clause0_Output Clause0_Error)
+  := do
+  let b ←
+    rebinding.permitted source source_key target expected_epoch
+      expected_certificate now
+  if b
+  then
+    let r ← RebinderInst.«open» ops
+    match r with
+    | core.result.Result.Ok secret => RebinderInst.issue ops secret
+    | core.result.Result.Err error => ok (core.result.Result.Err error)
+  else let t ← RebinderInst.rejected ops
+       ok (core.result.Result.Err t)
 
 /-- [aivm_secrets_garrett_core::reflection::matches_at]:
     Source: 'crates/aivm-secrets-garrett-core/src/reflection.rs', lines 5:0-10:1

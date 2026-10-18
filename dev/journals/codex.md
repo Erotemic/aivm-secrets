@@ -1458,3 +1458,18 @@ The final recording gate passed 338 selected Rust/reference tests, 19 Rust unit 
 ## 2026-10-18 01:07:18 -0400
 
 The frozen 6817617 coordinator checkpoint passed 2,283 full-suite tests with one pending primitive-runner skip and all 78 required workflows, including a second run on ordinary release binaries without conformance support. All 99 re-extracted Rust mutations were rejected by unchanged Lean obligations. I integrated it into main, rebuilt normal binaries and retained the source-fingerprinted report/logs plus a curated validation record. I am confident in the tested client/reservation path, not remote storage or whole-service refinement: the coordinator server remains Python and native policy fingerprint normalization remains an explicit parity gap. A separate worktree now carries the next same-key certificate/JWT renewal increment and its independent tests; those are not evidence for this source snapshot.
+
+## 2026-10-18 01:08:46 -0400
+
+I am closing the native bound-identity renewal gap after the frozen coordinator checkpoint. The useful API is a narrow host rebind action after existing CAS renewal, not a new plaintext inner-capability export or broker control endpoint. The source JWT is verified under an enabled issuer, its retained current-CA certificate supplies the source key fingerprint, and a held shared authority lease protects current-target CAS through no-replace output publication. The new extracted continuation opens only after the identity/key/target guard, then passes exactly that opaque capability to the existing issuer.
+
+The first real account/manifest workflows failed on the absent command and now succeed without restarting either broker. Python independently opens the emitted JWT and sees the same opaque capability; old and mixed identity pairs fail. Nineteen runtime cases include stale/retargeted metadata, unsafe files, revocation, lost history, a competing authority wait, original grant expiry and terminal global revocation. Twelve Lean lemmas compile against the actual Rust. I changed the guard to ordinary Rust equality/conjunction and reused the existing standard-model equality lemma rather than bending runtime style around proof tactics. My main uncertainty remains concrete crypto/file/lease correspondence and manual multi-file guest delivery. Source expiry is deliberately not host authorization: a trusted operator may rewrap an old JWT, while current target and underlying broker grant still enforce admission. I am confident in this scoped behavior, not whole-service secrecy or complete CORE-03 parity. Full recording and a frozen system gate remain before integration.
+
+A final timing regression reproduced pre-wait issuance timestamps in the new normal CLI path. Rebinding now accepts a clock callback and samples it after the authority lease and certificate preparation, matching the existing native admission pattern. Explicit operator test time retains its existing meaning. All 20 runtime cases pass with that ordering; the final recording run follows the source update.
+
+The final source recording passed 358 selected Rust/reference tests, 19 Rust
+unit cases, strict lint in both modes and all 239 named Garrett axiom checks.
+The 37-case source-boundary selection, independent archive/catalogue tests,
+W4/W5 compilation and package builds also passed. I am freezing this source
+before the full-system gate and the eight new re-extracted rebinding mutations;
+those checks are not being treated as already completed.

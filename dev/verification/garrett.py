@@ -31,6 +31,7 @@ PROFILES = [
     "native-pkce-login-v1",
     "manifest-https-v1",
     "native-coordination-client-v1",
+    "native-same-key-rebinding-v1",
 ]
 THEOREMS = [
     "aivm_secrets_garrett_core.Proofs.bytes_ne_spec",
@@ -309,6 +310,21 @@ THEOREMS += [
     "aivm_secrets_garrett_core.coordination.Proofs.write_acknowledgement_contract",
 ]
 
+THEOREMS += [
+    "aivm_secrets_garrett_core.rebinding.Proofs.permitted_contract",
+    "aivm_secrets_garrett_core.rebinding.Proofs.permitted_exact",
+    "aivm_secrets_garrett_core.rebinding.Proofs.same_identity_and_key_required",
+    "aivm_secrets_garrett_core.rebinding.Proofs.stale_target_epoch_refused",
+    "aivm_secrets_garrett_core.rebinding.Proofs.changed_target_certificate_refused",
+    "aivm_secrets_garrett_core.rebinding.Proofs.changed_key_refused",
+    "aivm_secrets_garrett_core.rebinding.Proofs.inactive_target_refused",
+    "aivm_secrets_garrett_core.rebinding.Proofs.expired_target_refused",
+    "aivm_secrets_garrett_core.rebinding.Proofs.denied_before_open_or_issue",
+    "aivm_secrets_garrett_core.rebinding.Proofs.open_failure_never_issues",
+    "aivm_secrets_garrett_core.rebinding.Proofs.same_secret_reissuance_contract",
+    "aivm_secrets_garrett_core.rebinding.Proofs.successful_rebind_witness",
+]
+
 TESTS = [
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
@@ -326,6 +342,7 @@ TESTS = [
     "tests/test_rust_garrett_tpm_request.py",
     "tests/test_rust_garrett_dispatch.py",
     "tests/test_rust_coordination.py",
+    "tests/test_rust_bound_renewal.py",
     "tests/test_secrets_coordination.py",
     "tests/test_secrets_garrett_modularity.py",
     "tests/test_secrets_identity_parity.py",
@@ -383,6 +400,7 @@ def inputs() -> list[str]:
         "proofs/GarrettClientMaterial.lean",
         "proofs/GarrettEmission.lean",
         "proofs/GarrettCoordination.lean",
+        "proofs/GarrettRebinding.lean",
         "proofs/GarrettProfiles.lean",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
@@ -585,6 +603,7 @@ def assurance_coordinates() -> dict:
             "Native PKCE login trusts entropy, SHA-256 S256 derivation, HTTP/query decoding and loopback listener/clock adapters. Callback binding and one-shot lifecycle guards are extracted; ready URLs go only to a trusted host operator/browser, and their state/challenge must not be offered as an agent API. Concrete acquisition I/O histories and secret-sink refinement remain open.",
             "Native OAuth sessions seal an opaque vault/provider/subject/epoch-bound marker and select the current ready token under a held vault lock. Explicit refresh may change its generation without changing the grant deadline. HMAC/entropy, lock participation, concrete opener correspondence and clock sampling remain adapter contracts; this is not a whole-service or concurrent filesystem proof.",
             "Native coordinated account/manifest sessions trust the separately authenticated SQLite coordinator for terminal membership decisions and durable globally unique reservations. The extracted dispatch controller requires admission/reservation acknowledgements before invoking a provider and maps failed post-send completion to uncertainty. TLS/HTTP, server durability/rollback, last-check linearization and concrete callback placement remain adapter premises. Native request fingerprints hash the validated native policy document, not Python normalized policy serialization; global key derivation and no-replay behavior interoperate, not all-input digest equivalence.",
+            "Privileged same-key rebinding carries the identical opened opaque broker capability to the existing issuer. Source signature/AEAD, current-CA historical certificate fingerprints, protected owner-only inputs, shared authority lease participation and no-replace publication remain adapter contracts. This is an explicit host authorization, not acceptance of an expired guest JWT; the broker grant and terminal coordinator checks still apply.",
             "The manifest HTTPS backend trusts the policy/check/template/GraphQL parsers, JSON-to-typed-tree conversion and selected-tree rendering, reflection traversal/call sites and concrete HTTP/audit ordering. Exact borrowed-byte literal search is extracted and proved. The extracted recursive filter matches an independent selection specification and has exact two-run noninterference under recursive schema agreement; unselected typed-tree fields are unconstrained. These contracts do not refine the remaining adapters or establish arbitrary provider non-disclosure or whole-service trace equivalence. Native configuration explicitly selects unbounded requests and a file source or explicit OAuth override.",
             "Native provider emission rechecks authority and current OAuth token expiry after audit, TLS setup and request construction. The extracted continuation refuses emission on a failed recheck; setup placement, trusted clock sampling, live lease stability and concrete socket writes remain tested adapter contracts. Control admission follows the credential lease wait and checks the outer as well as inner lifetime.",
             "Native TPM CSR creation reuses the validated pinned-key signer and verifies its returned possession request. Local TPM attributes and signatures do not establish hardware provenance; independent fresh attestation approval under a trusted AK remains required. The new CSR, TPM command and JSON/file adapters are tested, not newly formally refined.",
@@ -1225,6 +1244,17 @@ def mutate(pattern: str | None = None) -> None:
         (coordinated, "coordinated failed completion reports success",
          "Err(_) => return Err(ops.outcome_unknown()),", "Err(_) => (),"),
     ]
+    rebinding = source.with_name("rebinding.rs")
+    mutations += [
+        (rebinding, "rebind same-key check omitted", "&& *source_key == target.key", "&& true"),
+        (rebinding, "rebind subject check omitted", "&& source.subject == target.identity.subject", "&& true"),
+        (rebinding, "rebind target epoch CAS omitted", "&& target.identity.epoch == expected_epoch", "&& true"),
+        (rebinding, "rebind target certificate CAS omitted", "&& target.certificate == *expected_certificate", "&& true"),
+        (rebinding, "rebind target expiry omitted", "&& now < target.not_after", "&& true"),
+        (rebinding, "rebind backwards epoch accepted", "&& source.epoch <= target.identity.epoch", "&& true"),
+        (rebinding, "rebind inactive target accepted", "    target.active\n", "    true\n"),
+        (rebinding, "rebind admission before open bypassed", "if !permitted(", "if false && !permitted("),
+    ]
     total = len(mutations)
     if pattern is not None:
         mutations = [mutation for mutation in mutations if re.search(pattern, mutation[1])]
@@ -1298,6 +1328,7 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettClientMaterial",
                 "GarrettEmission",
                 "GarrettCoordination",
+                "GarrettRebinding",
             ]
             # These leaves import the extracted crate plus generic standard-
             # model facts. Check the affected leaf first; keep full fallback
@@ -1312,6 +1343,7 @@ def mutate(pattern: str | None = None) -> None:
                 "client_material.rs": "GarrettClientMaterial",
                 "emission.rs": "GarrettEmission",
                 "coordination.rs": "GarrettCoordination",
+                "rebinding.rs": "GarrettRebinding",
             }.get(source.name)
             if preferred:
                 modules.remove(preferred)

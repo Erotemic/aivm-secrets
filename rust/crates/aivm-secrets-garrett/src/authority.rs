@@ -22,6 +22,7 @@ use zeroize::Zeroizing;
 
 mod administration;
 mod issuance;
+mod rebinding;
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()

@@ -14,6 +14,7 @@ pub mod manifest;
 pub mod oauth_login;
 pub mod oauth_state;
 pub mod protocol;
+pub mod rebinding;
 pub mod trust;
 
 pub enum Denial {

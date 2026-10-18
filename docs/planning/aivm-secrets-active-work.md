@@ -60,7 +60,9 @@ workflows. W4/W5 model records report local kernel checking with native
 refinement still open. The [current-session OAuth increment](../verified-oauth-current-session.md) adds
 native rollover without restarting and preserves epoch/lifetime fencing. The [native coordinator client and keyed-write increment](../verified-coordination.md)
 adds terminal revocation checks and shared retry reservation against the Python
-server. Broader core differential coverage and a native coordinator server remain open.
+server. The [same-key identity increment](../verified-identity-rebinding.md) also carries
+the existing grant through certificate/JWT renewal without restarting the broker.
+Broader core differential coverage, atomic guest delivery and a native coordinator server remain open.
 
 ## Product question and security objective
 
@@ -193,7 +195,7 @@ and [new functionality and trust boundaries](../garrett-python-core-extensions.m
 | ID | Python deliverable and status | Rust parity/operational gate |
 | --- | --- | --- |
 | **P-CORE-07** | Durable terminal cross-host principal revocation using one local SQLite coordinator, mTLS member/operator pins, check at every broker and bound-bridge request; tests use synthetic same-host distinct member certificates | Native account/manifest client tested against Python coordinator; native server, real separate-host deployment, rollback witness and operational failover unvalidated |
-| **P-CORE-06** | Running OAuth broker leases the vault's current access token at each request, preserving capability and enrolled epoch; identity `renew-bound` issues fresh cert/JWT without broker/bridge restart | Rust same-session token rollover implemented and locally tested; bound identity workflow and broader differential gate incomplete; guest material delivery remains manual |
+| **P-CORE-06** | Running OAuth broker leases the vault's current access token at each request, preserving capability and enrolled epoch; identity `renew-bound` issues fresh cert/JWT without broker/bridge restart | Rust same-session token rollover implemented and locally tested; same-key native renew/rebind tested without broker restart; broader differential gate incomplete and guest material delivery remains manual |
 | **P-CORE-08/09** | Durable per-principal idempotency reservations before any coordinated write; guest ASCII retry keys, optional explicit upstream `Idempotency-Key`, strict no-replay even after ambiguous result | Native keyed manifest dispatch and shared retry names tested; normalized policy fingerprint parity and production provider header semantics unverified |
 | **P-PARITY** | All Python modules classified core vs non-core, 11 normative security contracts with Rust status and acceptance criteria | Implement independent Rust behavior and bidirectional negative/positive trace tests before marking any contract parity-complete |
 
