@@ -113,18 +113,22 @@ anti-rollback witness. Stop the authority before an explicitly reviewed move.
 ## Checked Rust/Lean scope
 
 `proofs/GarrettCoordinatorAuthority.lean` checks the extracted production core:
-exact peer matching, operator/member admission, absent-only activation,
+exact peer matching, exhaustive typed action-to-role authorization, absent-only activation,
 revocation, reservation and completion decisions. It also proves, over histories
 of those actual successful decisions plus unchanged rows:
 
 - A tombstone remains a tombstone, and no later peer is admitted for that name.
 - A spent key remains present, and no later reservation succeeds for that key.
 - Matching completion preserves the digest and has an exact successful return.
-- Positive member/operator witnesses rule out an always-deny implementation.
+- Operators cannot use check/reserve/finish without active principal membership;
+  members cannot activate/revoke/inspect status without configured operator authority.
+- Every member action remains denied after a tombstone under the modeled history.
+- Positive authorization witnesses cover every typed action. They concern the
+  role gate; activation/reservation can still be refused by the later row decision.
 
 These are **pure decision and modeled committed-history proofs**. They do not
 prove SQLite statements, transaction isolation/durability, row/JSON conversion,
-HTTP/action-to-role parsing, fingerprint derivation, TLS authentication, native commit/reply
+wire-string-to-typed-action parsing, fingerprint derivation, TLS authentication, native commit/reply
 placement or whole-service mediation. The source guards, compiler paths and
 runtime tests provide separate evidence for those adapters; they are not a
 substitute for a native trace-refinement proof. This service is experimental
@@ -138,7 +142,10 @@ with independent Python TLS clients. The frozen
 replies and durable rows in both implementations. Cases cover roles, active
 members, wrong peers, duplicate/different-digest writes, preemptive/repeated
 revocation, malformed typed requests, HTTP framing, restarts, cross-backend
-storage, unsafe paths and missing client certificates. Broker workflows run
+storage, unsafe paths and missing client certificates. A 144-case cross-backend
+matrix exercises all six actions across absent/active/revoked principals,
+ordinary members, outsiders, operators and operators explicitly enrolled as
+members; every denied call must leave both durable tables unchanged. Broker workflows run
 against both authority backends in `tests/test_rust_coordination.py`.
 
 This port reproduced and fixed Python accepting duplicate length/type fields
@@ -150,7 +157,7 @@ forms can still differ; full all-input wire/core parity is not claimed.
 
 ```bash
 python dev/verification/garrett.py record
-python dev/verification/garrett.py mutate --mutation-filter '^coordinator authority '
+python dev/verification/garrett.py mutate --mutation-filter '^coordinator (authority|dispatch) '
 python dev/verification/system.py --proofs --full-tests --call-linkage
 python dev/verification/specialized_calls.py --profile coordinator
 ```

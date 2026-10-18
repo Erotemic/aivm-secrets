@@ -190,12 +190,14 @@ def authority_projection():
     core = ['aivm_secrets_garrett_core', 'coordinator_authority']
     data['translated']['fun_decls'] = [
         function(0, [*native, 'server', 'exchange'], [1]),
-        function(1, [*native, 'ledger', '<Impl>', 'handle'], [2,3,4,5,6,7]),
+        function(1, [*native, 'ledger', '<Impl>', 'handle'], [9,10,4,5,6,7]),
         function(2, [*core, 'require_operator'], [8]),
         function(3, [*core, 'admit'], [8]),
         *[function(i, [*core, name]) for i, name in
           enumerate(['activate', 'revoke', 'reserve', 'finish'], 4)],
         function(8, [*core, 'contains_peer']),
+        function(9, [*core, 'require_operator_for'], [2]),
+        function(10, [*core, 'authorize'], [9,3]),
     ]
     return data
 
@@ -203,8 +205,8 @@ def authority_projection():
 def test_authority_compiled_handler_paths_keep_mediation_open():
     result = explain(authority_projection(), 'coordinator')
     assert result['witnesses'] == {
-        'coordinator-operator-admission': [0,1,2,8],
-        'coordinator-member-admission': [0,1,3,8],
+        'coordinator-operator-admission': [0,1,9,2,8],
+        'coordinator-member-admission': [0,1,10,3,8],
         'coordinator-activate': [0,1,4], 'coordinator-revoke': [0,1,5],
         'coordinator-reserve': [0,1,6], 'coordinator-finish': [0,1,7]}
     assert result['complete_mediation'] is False
@@ -212,12 +214,21 @@ def test_authority_compiled_handler_paths_keep_mediation_open():
         explain(authority_projection())
 
 
-@pytest.mark.parametrize('victim', [2,3,4,5,6,7])
-def test_authority_missing_guard_or_transition_link_fails(victim):
+@pytest.mark.parametrize('caller,victim', [(1,10),(9,2),(10,3),
+                                               (1,4),(1,5),(1,6),(1,7)])
+def test_authority_missing_guard_or_transition_link_fails(caller, victim):
     data = authority_projection()
-    data['translated']['fun_decls'][1]['body']['blocks']['direct'].remove(victim)
+    data['translated']['fun_decls'][caller]['body']['blocks']['direct'].remove(victim)
     with pytest.raises(LedgerError, match='callback link missing'):
         explain(data, 'coordinator')
+
+
+def test_authority_final_gate_retains_operator_path_without_early_check():
+    data = authority_projection()
+    data['translated']['fun_decls'][1]['body']['blocks']['direct'].remove(9)
+    result = explain(data, 'coordinator')
+    assert result['witnesses']['coordinator-operator-admission'] == [0,1,10,9,2,8]
+    assert result['complete_mediation'] is False
 
 
 def test_capture_uses_the_selected_coordinator_fifo(tmp_path):

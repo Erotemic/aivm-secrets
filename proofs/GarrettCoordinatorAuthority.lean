@@ -360,4 +360,125 @@ theorem operator_admission_positive_witness :
   rw [admitted] at returned
   exact returned
 
+attribute [local instance] Classical.propDecidable
+
+/-- Wire strings are parsed by the native adapter. This predicate classifies
+    the closed action type passed to the actual extracted authorization gate. -/
+def OperatorAction : Action → Prop
+  | .Activate | .Revoke | .Status => True
+  | .Check | .Reserve | .Finish => False
+
+noncomputable def ExpectedMemberAdmission (current : Option Principal)
+    (peer : alloc.vec.Vec U8) : core.result.Result (Option I64) Denial := by
+  classical
+  exact match current with
+  | none => .Err .Revoked
+  | some row => if row.active = true ∧ peer ∈ row.members.val
+      then .Ok (some row.revision) else .Err .Revoked
+
+noncomputable def ExpectedAuthorization (action : Action)
+    (operators : Slice (alloc.vec.Vec U8)) (peer : alloc.vec.Vec U8)
+    (current : Option Principal) : core.result.Result (Option I64) Denial := by
+  classical
+  exact if OperatorAction action then
+    if peer ∈ operators.val then .Ok none else .Err .Denied
+  else ExpectedMemberAdmission current peer
+
+theorem require_operator_exact (operators : Slice (alloc.vec.Vec U8))
+    (peer : alloc.vec.Vec U8) :
+    require_operator operators peer = Result.ok
+      (if peer ∈ operators.val then .Ok () else .Err .Denied) := by
+  classical
+  obtain ⟨out, returned, property⟩ := returned_of_spec (require_operator_contract operators peer)
+  by_cases member : peer ∈ operators.val
+  · simpa only [ite_eq_left member, property.1.mpr member] using returned
+  · simpa only [ite_eq_right member, property.2.mpr member] using returned
+
+theorem require_operator_for_exact (action : Action)
+    (operators : Slice (alloc.vec.Vec U8)) (peer : alloc.vec.Vec U8) :
+    require_operator_for action operators peer = Result.ok
+      (if OperatorAction action ∧ peer ∉ operators.val then .Err .Denied else .Ok ()) := by
+  classical
+  cases action <;> simp [require_operator_for, require_operator_exact, OperatorAction]
+
+theorem authorize_exact (action : Action) (operators : Slice (alloc.vec.Vec U8))
+    (peer : alloc.vec.Vec U8) (current : Option Principal) :
+    authorize action operators peer current = Result.ok (ExpectedAuthorization action operators peer current) := by
+  classical
+  obtain ⟨out, returned, property⟩ := returned_of_spec (admit_contract current peer)
+  have member_exact : (do
+      let r ← admit current peer
+      match r with
+      | .Ok revision => Result.ok (core.result.Result.Ok (some revision))
+      | .Err denial => Result.ok (core.result.Result.Err denial)) =
+        Result.ok (ExpectedMemberAdmission current peer) := by
+    rw [returned]
+    simp only [bind_ok]
+    rcases property.2 with revoked | ⟨revision, allowed⟩
+    · rw [revoked]
+      cases current with
+      | none => rfl
+      | some row =>
+        have unavailable : ¬(row.active = true ∧ peer ∈ row.members.val) := by
+          intro present
+          have positive := (property.1 row.revision).mpr ⟨row, rfl, present.1, present.2, rfl⟩
+          rw [revoked] at positive
+          cases positive
+        simp [ExpectedMemberAdmission, unavailable]
+    · rw [allowed]
+      obtain ⟨row, snapshot, active, member, equal⟩ := (property.1 revision).mp allowed
+      simp [ExpectedMemberAdmission, snapshot, active, member, equal]
+  by_cases operator : peer ∈ operators.val <;> cases action <;>
+    simp [authorize, require_operator_for, require_operator_exact,
+      ExpectedAuthorization, OperatorAction, operator,
+      core.result.Result.Insts.CoreOpsTry.branch,
+      core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual]
+  all_goals
+    rw [returned] at member_exact ⊢
+    cases out <;> simpa [core.result.Result.Insts.CoreOpsTry.branch,
+      core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual] using member_exact
+
+/-- An operator certificate is not a substitute for principal membership. -/
+theorem operator_without_membership_denied (action : Action)
+    (member_action : ¬OperatorAction action) (operators : Slice (alloc.vec.Vec U8))
+    (peer : alloc.vec.Vec U8) (current : Option Principal)
+    (unavailable : ∀ row, current = some row →
+      ¬(row.active = true ∧ peer ∈ row.members.val)) :
+    authorize action operators peer current = Result.ok (.Err .Revoked) := by
+  rw [authorize_exact]
+  simp only [ExpectedAuthorization, ite_eq_right member_action]
+  cases current with
+  | none => rfl
+  | some row => simp [ExpectedMemberAdmission, unavailable row rfl]
+
+/-- Principal membership is not a substitute for configured operator authority. -/
+theorem member_without_operator_denied (action : Action)
+    (operator_action : OperatorAction action) (operators : Slice (alloc.vec.Vec U8))
+    (peer : alloc.vec.Vec U8) (current : Option Principal) (absent : peer ∉ operators.val) :
+    authorize action operators peer current = Result.ok (.Err .Denied) := by
+  rw [authorize_exact]
+  simp [ExpectedAuthorization, operator_action, absent]
+
+theorem every_member_action_denied_after_revocation {before after : Option Principal}
+    (revoked : Tombstone before) (history : PrincipalHistory before after)
+    (action : Action) (member_action : ¬OperatorAction action)
+    (operators : Slice (alloc.vec.Vec U8)) (peer : alloc.vec.Vec U8) :
+    authorize action operators peer after = Result.ok (.Err .Revoked) := by
+  obtain ⟨row, snapshot, inactive⟩ := principal_history_preserves_tombstone history revoked
+  apply operator_without_membership_denied action member_action operators peer after
+  intro other equal
+  rw [snapshot] at equal
+  cases Option.some.inj equal
+  simp [inactive]
+
+theorem every_action_authorization_positive_witness (action : Action) :
+    authorize action witnessMembers.slice witnessPeer (some witnessPrincipal) =
+      Result.ok (.Ok (if OperatorAction action then none else some 1#i64)) := by
+  classical
+  have member : witnessPeer ∈ witnessMembers.val := by simp [witnessMembers]
+  have operator : witnessPeer ∈ witnessMembers.slice.val := member
+  rw [authorize_exact]
+  by_cases role : OperatorAction action <;>
+    simp [ExpectedAuthorization, ExpectedMemberAdmission, witnessPrincipal, member, operator, role]
+
 end aivm_secrets_garrett_core.coordinator_authority.Proofs

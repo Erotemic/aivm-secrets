@@ -330,3 +330,70 @@ def test_frozen_authority_protocol_vectors_and_durable_state(tmp_path, backend):
                 ('blocked-before-registration', 0, 1), ('other', 1, 1), ('team', 0, 3)]
             assert db.execute('SELECT name,key,digest,state FROM writes ORDER BY name').fetchall() == [
                 ('other', KEY, DIGEST, 'reserved'), ('team', KEY, DIGEST, 'completed')]
+
+
+@pytest.mark.parametrize('backend', ['python', 'rust'])
+def test_every_authority_action_obeys_role_and_principal_snapshot(tmp_path, backend):
+    """Exercise all six actions, including operators lacking member authority.
+
+    Every denied call must leave both durable tables unchanged. Separate names
+    keep successful mutations from changing the next row of the role matrix.
+    """
+    import http.client
+    case = CoordinatorCase if backend == 'python' else NativeCoordinatorCase
+    actions = ('activate', 'revoke', 'status', 'check', 'reserve', 'finish')
+    with case(tmp_path / 'coord') as coord:
+        port = coord.port if hasattr(coord, 'port') else coord.server.server_address[1]
+        for state in ('absent', 'active', 'revoked'):
+            for actor in ('member', 'outsider', 'operator', 'operator-member'):
+                for action in actions:
+                    name = f'{state}-{actor}-{action}'
+                    coord.operator.config = replace(coord.operator.config, principal=name)
+                    members = [coord.members[0][2]]
+                    if actor == 'operator-member':
+                        members.append(coord.operator_material[2])
+                    if state != 'absent':
+                        coord.operator.activate(members)
+                        if action == 'finish':
+                            member = coord.client(coord.members[0])
+                            member.config = replace(member.config, principal=name)
+                            member.reserve(KEY, DIGEST)
+                        if state == 'revoked':
+                            coord.operator.revoke()
+                    material = (coord.operator_material if actor.startswith('operator') else
+                                coord.members[0 if actor == 'member' else 1])
+                    client = coord.client(material)
+                    request = dict(action=action, name=name)
+                    if action == 'activate':
+                        request['members'] = members
+                    elif action in ('reserve', 'finish'):
+                        request.update(key=KEY, digest=DIGEST)
+                    if action in ('activate', 'revoke', 'status'):
+                        denial = (None if actor.startswith('operator') else 'denied')
+                        if denial is None and action == 'activate' and state != 'absent':
+                            denial = 'revoked'
+                    else:
+                        denial = (None if state == 'active' and
+                                  actor in ('member', 'operator-member') else 'revoked')
+                    with sqlite3.connect(coord.ledger.path) as db:
+                        before = [db.execute(f'SELECT * FROM {table} ORDER BY name').fetchall()
+                                  for table in ('principals', 'writes')]
+                    conn = http.client.HTTPSConnection('localhost', port,
+                        context=client._context, timeout=4)
+                    try:
+                        conn.request('POST', '/v1/coordinate', body=json.dumps(request),
+                                     headers={'Content-Type': 'application/json'})
+                        response = conn.getresponse()
+                        assert response.status == 200
+                        reply = json.loads(response.read())
+                    finally:
+                        conn.close()
+                    context = (backend, state, actor, action, reply)
+                    if denial is None:
+                        assert reply['ok'] is True, context
+                    else:
+                        assert reply == {'ok': False, 'code': denial}, context
+                        with sqlite3.connect(coord.ledger.path) as db:
+                            after = [db.execute(f'SELECT * FROM {table} ORDER BY name').fetchall()
+                                     for table in ('principals', 'writes')]
+                        assert after == before, context

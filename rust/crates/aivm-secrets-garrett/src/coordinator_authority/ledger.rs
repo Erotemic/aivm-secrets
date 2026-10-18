@@ -100,26 +100,32 @@ impl Ledger {
     ) -> Result<Value> {
         let data = json::keys(value, &["action", "name"], &["members", "key", "digest"])
             .map_err(|_| Error::InvalidRequest)?;
-        let action = data["action"].as_str().ok_or(Error::InvalidRequest)?;
-        let name = principal_name(&data["name"])?;
-        let peer = peer.certificate_sha256_hex().as_bytes().to_vec();
-        let admin = matches!(action, "activate" | "revoke" | "status");
-        if admin {
-            core::require_operator(operators, &peer)?;
-        }
-        let required = match action {
-            "activate" => vec!["action", "name", "members"],
-            "check" | "revoke" | "status" => vec!["action", "name"],
-            "reserve" | "finish" => vec!["action", "name", "key", "digest"],
+        let action = match data["action"].as_str() {
+            Some("activate") => core::Action::Activate,
+            Some("revoke") => core::Action::Revoke,
+            Some("status") => core::Action::Status,
+            Some("check") => core::Action::Check,
+            Some("reserve") => core::Action::Reserve,
+            Some("finish") => core::Action::Finish,
             _ => return Err(Error::InvalidRequest.into()),
         };
+        let name = principal_name(&data["name"])?;
+        let peer = peer.certificate_sha256_hex().as_bytes().to_vec();
+        core::require_operator_for(action, operators, &peer)?;
+        let required = match action {
+            core::Action::Activate => vec!["action", "name", "members"],
+            core::Action::Check | core::Action::Revoke | core::Action::Status => {
+                vec!["action", "name"]
+            }
+            core::Action::Reserve | core::Action::Finish => vec!["action", "name", "key", "digest"],
+        };
         json::keys(value, &required, &[]).map_err(|_| Error::InvalidRequest)?;
-        let members = if action == "activate" {
+        let members = if matches!(action, core::Action::Activate) {
             Some(member_bytes(&data["members"])?)
         } else {
             None
         };
-        let write = if matches!(action, "reserve" | "finish") {
+        let write = if matches!(action, core::Action::Reserve | core::Action::Finish) {
             Some((
                 json::hex(&data["key"], 64).map_err(|_| Error::InvalidRequest)?,
                 json::hex(&data["digest"], 64).map_err(|_| Error::InvalidRequest)?,
@@ -132,15 +138,16 @@ impl Ledger {
             .lock()
             .map_err(|_| AuthorityError::Storage)?;
         Self::checked_files(&self.root)?;
-        let behavior = if matches!(action, "check" | "status") {
+        let behavior = if matches!(action, core::Action::Check | core::Action::Status) {
             TransactionBehavior::Deferred
         } else {
             TransactionBehavior::Immediate
         };
         let tx = conn.transaction_with_behavior(behavior)?;
         let current = read_principal(&tx, name)?;
+        let admission = core::authorize(action, operators, &peer, current.as_ref())?;
         let result = match action {
-            "activate" => {
+            core::Action::Activate => {
                 let row = core::activate(current.as_ref(), members.ok_or(Error::InvalidRequest)?)?;
                 tx.execute(
                     "INSERT INTO principals VALUES (?,?,?,?)",
@@ -153,7 +160,7 @@ impl Ledger {
                 )?;
                 json!({"active":row.active,"revision":row.revision})
             }
-            "revoke" => {
+            core::Action::Revoke => {
                 let row = core::revoke(current)?;
                 tx.execute(
                     "INSERT INTO principals VALUES (?,?,?,?) ON CONFLICT(name)
@@ -167,19 +174,18 @@ impl Ledger {
                 )?;
                 json!({"active":row.active,"revision":row.revision})
             }
-            "status" => match current {
+            core::Action::Status => match current {
                 None => json!({"active":false,"revision":null}),
                 Some(row) => json!({"active":row.active,"revision":row.revision}),
             },
-            "check" => {
-                let revision = core::admit(current.as_ref(), &peer)?;
+            core::Action::Check => {
+                let revision = admission.ok_or(AuthorityError::Storage)?;
                 json!({"active":true,"revision":revision})
             }
-            "reserve" | "finish" => {
-                core::admit(current.as_ref(), &peer)?;
+            core::Action::Reserve | core::Action::Finish => {
                 let (key, digest) = write.ok_or(Error::InvalidRequest)?;
                 let prior = read_reservation(&tx, name, &key)?;
-                if action == "reserve" {
+                if matches!(action, core::Action::Reserve) {
                     let row = core::reserve(prior.as_ref(), digest.into_bytes())?;
                     let state = reservation_state(&row);
                     let digest =
@@ -204,7 +210,6 @@ impl Ledger {
                     json!({"recorded":true})
                 }
             }
-            _ => return Err(Error::InvalidRequest.into()),
         };
         // No positive response leaves this function before COMMIT acknowledges.
         tx.commit()?;

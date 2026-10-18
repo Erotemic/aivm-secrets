@@ -266,8 +266,45 @@ def coordination.dispatch
       | core.result.Result.Err _ => ok r1
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
+/-- [aivm_secrets_garrett_core::coordinator_authority::Action]
+    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 7:0-14:1
+    Visibility: public -/
+@[discriminant isize]
+inductive coordinator_authority.Action where
+| Activate : coordinator_authority.Action
+| Revoke : coordinator_authority.Action
+| Status : coordinator_authority.Action
+| Check : coordinator_authority.Action
+| Reserve : coordinator_authority.Action
+| Finish : coordinator_authority.Action
+
+/-- [aivm_secrets_garrett_core::coordinator_authority::{impl core::clone::Clone for aivm_secrets_garrett_core::coordinator_authority::Action}::clone]:
+    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 6:9-6:14
+    Visibility: public -/
+def coordinator_authority.Action.Insts.CoreCloneClone.clone
+  (self : coordinator_authority.Action) :
+  Result coordinator_authority.Action
+  := do
+  ok self
+
+/-- Trait implementation: [aivm_secrets_garrett_core::coordinator_authority::{impl core::clone::Clone for aivm_secrets_garrett_core::coordinator_authority::Action}]
+    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 6:9-6:14 -/
+@[reducible]
+def coordinator_authority.Action.Insts.CoreCloneClone : core.clone.Clone
+  coordinator_authority.Action := {
+  clone := coordinator_authority.Action.Insts.CoreCloneClone.clone
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::coordinator_authority::{impl core::marker::Copy for aivm_secrets_garrett_core::coordinator_authority::Action}]
+    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 6:16-6:20 -/
+@[reducible]
+def coordinator_authority.Action.Insts.CoreMarkerCopy : core.marker.Copy
+  coordinator_authority.Action := {
+  cloneInst := coordinator_authority.Action.Insts.CoreCloneClone
+}
+
 /-- [aivm_secrets_garrett_core::coordinator_authority::Denial]
-    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 5:0-10:1
+    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 16:0-21:1
     Visibility: public -/
 @[discriminant isize]
 inductive coordinator_authority.Denial where
@@ -277,7 +314,7 @@ inductive coordinator_authority.Denial where
 | Storage : coordinator_authority.Denial
 
 /-- [aivm_secrets_garrett_core::coordinator_authority::Principal]
-    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 11:0-15:1
+    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 22:0-26:1
     Visibility: public -/
 structure coordinator_authority.Principal where
   active : Bool
@@ -285,14 +322,14 @@ structure coordinator_authority.Principal where
   revision : Std.I64
 
 /-- [aivm_secrets_garrett_core::coordinator_authority::Reservation]
-    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 16:0-19:1
+    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 27:0-30:1
     Visibility: public -/
 structure coordinator_authority.Reservation where
   digest : alloc.vec.Vec Std.U8
   completed : Bool
 
 /-- [aivm_secrets_garrett_core::coordinator_authority::contains_peer]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 22:4-28:1
+    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 33:4-39:1
     Visibility: public -/
 @[rust_loop]
 def coordinator_authority.contains_peer_loop
@@ -312,7 +349,7 @@ def coordinator_authority.contains_peer_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::coordinator_authority::contains_peer]:
-    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 21:0-28:1
+    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 32:0-39:1
     Visibility: public -/
 def coordinator_authority.contains_peer
   (members : Slice (alloc.vec.Vec Std.U8)) (peer : alloc.vec.Vec Std.U8) :
@@ -324,7 +361,7 @@ def coordinator_authority.contains_peer
   coordinator_authority.contains_peer_loop iter peer
 
 /-- [aivm_secrets_garrett_core::coordinator_authority::require_operator]:
-    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 30:0-35:1
+    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 41:0-46:1
     Visibility: public -/
 def coordinator_authority.require_operator
   (operators : Slice (alloc.vec.Vec Std.U8)) (peer : alloc.vec.Vec Std.U8) :
@@ -335,8 +372,99 @@ def coordinator_authority.require_operator
   then ok (core.result.Result.Ok ())
   else ok (core.result.Result.Err coordinator_authority.Denial.Denied)
 
+/-- [aivm_secrets_garrett_core::coordinator_authority::require_operator_for]:
+    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 50:0-59:1
+    Visibility: public -/
+def coordinator_authority.require_operator_for
+  (action : coordinator_authority.Action)
+  (operators : Slice (alloc.vec.Vec Std.U8)) (peer : alloc.vec.Vec Std.U8) :
+  Result (core.result.Result Unit coordinator_authority.Denial)
+  := do
+  match action with
+  | coordinator_authority.Action.Activate =>
+    coordinator_authority.require_operator operators peer
+  | coordinator_authority.Action.Revoke =>
+    coordinator_authority.require_operator operators peer
+  | coordinator_authority.Action.Status =>
+    coordinator_authority.require_operator operators peer
+  | coordinator_authority.Action.Check => ok (core.result.Result.Ok ())
+  | coordinator_authority.Action.Reserve => ok (core.result.Result.Ok ())
+  | coordinator_authority.Action.Finish => ok (core.result.Result.Ok ())
+
+/-- [aivm_secrets_garrett_core::coordinator_authority::admit]:
+    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 105:0-117:1
+    Visibility: public -/
+def coordinator_authority.admit
+  (current : Option coordinator_authority.Principal)
+  (peer : alloc.vec.Vec Std.U8) :
+  Result (core.result.Result Std.I64 coordinator_authority.Denial)
+  := do
+  match current with
+  | none => ok (core.result.Result.Err coordinator_authority.Denial.Revoked)
+  | some principal =>
+    if principal.active
+    then
+      let s := alloc.vec.Vec.deref principal.members
+      let b ← coordinator_authority.contains_peer s peer
+      if b
+      then ok (core.result.Result.Ok principal.revision)
+      else ok (core.result.Result.Err coordinator_authority.Denial.Revoked)
+    else ok (core.result.Result.Err coordinator_authority.Denial.Revoked)
+
+/-- [aivm_secrets_garrett_core::coordinator_authority::authorize]:
+    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 63:0-74:1
+    Visibility: public -/
+def coordinator_authority.authorize
+  (action : coordinator_authority.Action)
+  (operators : Slice (alloc.vec.Vec Std.U8)) (peer : alloc.vec.Vec Std.U8)
+  (current : Option coordinator_authority.Principal) :
+  Result (core.result.Result (Option Std.I64) coordinator_authority.Denial)
+  := do
+  let r ← coordinator_authority.require_operator_for action operators peer
+  let cf ← core.result.Result.Insts.CoreOpsTry.branch r
+  match cf with
+  | core.ops.control_flow.ControlFlow.Continue _ =>
+    match action with
+    | coordinator_authority.Action.Activate => ok (core.result.Result.Ok none)
+    | coordinator_authority.Action.Revoke => ok (core.result.Result.Ok none)
+    | coordinator_authority.Action.Status => ok (core.result.Result.Ok none)
+    | coordinator_authority.Action.Check =>
+      let r1 ← coordinator_authority.admit current peer
+      let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
+      match cf1 with
+      | core.ops.control_flow.ControlFlow.Continue val =>
+        ok (core.result.Result.Ok (some val))
+      | core.ops.control_flow.ControlFlow.Break residual =>
+        core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+          (Option Std.I64) (core.convert.FromSame coordinator_authority.Denial)
+          residual
+    | coordinator_authority.Action.Reserve =>
+      let r1 ← coordinator_authority.admit current peer
+      let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
+      match cf1 with
+      | core.ops.control_flow.ControlFlow.Continue val =>
+        ok (core.result.Result.Ok (some val))
+      | core.ops.control_flow.ControlFlow.Break residual =>
+        core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+          (Option Std.I64) (core.convert.FromSame coordinator_authority.Denial)
+          residual
+    | coordinator_authority.Action.Finish =>
+      let r1 ← coordinator_authority.admit current peer
+      let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
+      match cf1 with
+      | core.ops.control_flow.ControlFlow.Continue val =>
+        ok (core.result.Result.Ok (some val))
+      | core.ops.control_flow.ControlFlow.Break residual =>
+        core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+          (Option Std.I64) (core.convert.FromSame coordinator_authority.Denial)
+          residual
+  | core.ops.control_flow.ControlFlow.Break residual =>
+    core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+      (Option Std.I64) (core.convert.FromSame coordinator_authority.Denial)
+      residual
+
 /-- [aivm_secrets_garrett_core::coordinator_authority::activate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 37:0-46:1
+    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 76:0-85:1
     Visibility: public -/
 def coordinator_authority.activate
   (current : Option coordinator_authority.Principal)
@@ -350,7 +478,7 @@ def coordinator_authority.activate
   | some _ => ok (core.result.Result.Err coordinator_authority.Denial.Revoked)
 
 /-- [aivm_secrets_garrett_core::coordinator_authority::revoke]:
-    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 48:0-64:1
+    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 87:0-103:1
     Visibility: public -/
 def coordinator_authority.revoke
   (current : Option coordinator_authority.Principal) :
@@ -376,28 +504,8 @@ def coordinator_authority.revoke
         ok (core.result.Result.Ok
           { principal with active := false, revision := i })
 
-/-- [aivm_secrets_garrett_core::coordinator_authority::admit]:
-    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 66:0-78:1
-    Visibility: public -/
-def coordinator_authority.admit
-  (current : Option coordinator_authority.Principal)
-  (peer : alloc.vec.Vec Std.U8) :
-  Result (core.result.Result Std.I64 coordinator_authority.Denial)
-  := do
-  match current with
-  | none => ok (core.result.Result.Err coordinator_authority.Denial.Revoked)
-  | some principal =>
-    if principal.active
-    then
-      let s := alloc.vec.Vec.deref principal.members
-      let b ← coordinator_authority.contains_peer s peer
-      if b
-      then ok (core.result.Result.Ok principal.revision)
-      else ok (core.result.Result.Err coordinator_authority.Denial.Revoked)
-    else ok (core.result.Result.Err coordinator_authority.Denial.Revoked)
-
 /-- [aivm_secrets_garrett_core::coordinator_authority::reserve]:
-    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 80:0-88:1
+    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 119:0-127:1
     Visibility: public -/
 def coordinator_authority.reserve
   (current : Option coordinator_authority.Reservation)
@@ -411,7 +519,7 @@ def coordinator_authority.reserve
     ok (core.result.Result.Err coordinator_authority.Denial.OutcomeUnknown)
 
 /-- [aivm_secrets_garrett_core::coordinator_authority::finish]:
-    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 90:0-101:1
+    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 129:0-140:1
     Visibility: public -/
 def coordinator_authority.finish
   (current : Option coordinator_authority.Reservation)

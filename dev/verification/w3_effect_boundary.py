@@ -268,8 +268,14 @@ def review_semantics(contents: dict[str, str]) -> None:
     authority = contents[RUST + 'coordinator_authority/ledger.rs']
     handler = part(authority, '    pub(super) fn handle(', '\nfn principal_name(')
     require('peer.certificate_sha256_hex().as_bytes().to_vec()' in handler
-            and 'core::require_operator(operators, &peer)?;' in handler
-            and handler.count('core::admit(current.as_ref(), &peer)?;') == 2
+            and 'core::require_operator_for(action, operators, &peer)?;' in handler
+            and handler.count('core::authorize(action, operators, &peer, current.as_ref())?;') == 1
+            and 'core::admit(' not in handler
+            and all(f'Some("{name}") => core::Action::{name.title()}' in handler
+                    for name in ['activate', 'revoke', 'status', 'check', 'reserve', 'finish'])
+            and same_order(handler, 'let current = read_principal(',
+                           'core::authorize(action, operators, &peer, current.as_ref())?;',
+                           'let result = match action {', 'tx.commit()?;')
             and all('core::' + name + '(' in handler for name in
                     ['activate', 'revoke', 'reserve', 'finish']),
             'coordinator authority bypasses extracted peer/operator/ledger decisions')

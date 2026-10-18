@@ -49,9 +49,9 @@ def mutate(repo, filename, before, after):
 
 
 @pytest.mark.parametrize('file,old,new', [
-    (RUST + 'coordinator_authority/ledger.rs', 'core::require_operator(operators, &peer)?;', 'let _ = operators;'),
-    (RUST + 'coordinator_authority/ledger.rs', 'let revision = core::admit(current.as_ref(), &peer)?;', 'let revision = 1;'),
-    (RUST + 'coordinator_authority/ledger.rs', '                core::admit(current.as_ref(), &peer)?;', '                let _ = &peer;'),
+    (RUST + 'coordinator_authority/ledger.rs', 'core::require_operator_for(action, operators, &peer)?;', 'let _ = operators;'),
+    (RUST + 'coordinator_authority/ledger.rs', 'let admission = core::authorize(action, operators, &peer, current.as_ref())?;', 'let admission = Some(1);'),
+    (RUST + 'coordinator_authority/ledger.rs', 'Some("reserve") => core::Action::Reserve,', 'Some("reserve") => core::Action::Status,'),
     (RUST + 'coordinator_authority/ledger.rs', 'tx.commit()?;', 'drop(tx);'),
     (RUST + 'coordinator_authority/ledger.rs',
      '// No positive response leaves this function before COMMIT acknowledges.\n        tx.commit()?;',

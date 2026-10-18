@@ -386,6 +386,13 @@ THEOREMS += [
     'aivm_secrets_garrett_core.coordinator_authority.Proofs.reservation_history_preserves_spent',
     'aivm_secrets_garrett_core.coordinator_authority.Proofs.no_future_reservation_of_spent_key',
     'aivm_secrets_garrett_core.coordinator_authority.Proofs.operator_admission_positive_witness',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.require_operator_exact',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.require_operator_for_exact',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.authorize_exact',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.operator_without_membership_denied',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.member_without_operator_denied',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.every_member_action_denied_after_revocation',
+    'aivm_secrets_garrett_core.coordinator_authority.Proofs.every_action_authorization_positive_witness',
 ]
 
 TESTS = [
@@ -1127,6 +1134,17 @@ def mutate(pattern: str | None = None) -> None:
     ]
     authority_source = source.with_name("coordinator_authority.rs")
     mutations += [
+        (authority_source, "coordinator dispatch operator classification omitted",
+         "Action::Activate | Action::Revoke | Action::Status => require_operator(operators, peer),",
+         "Action::Activate | Action::Revoke | Action::Status => Ok(()),"),
+        (authority_source, "coordinator dispatch final operator check omitted",
+         "require_operator_for(action, operators, peer)?;", "let _ = operators;"),
+        (authority_source, "coordinator dispatch member check omitted",
+         "Action::Check | Action::Reserve | Action::Finish => Ok(Some(admit(current, peer)?)),",
+         "Action::Check | Action::Reserve | Action::Finish => Ok(Some(1)),"),
+        (authority_source, "coordinator dispatch reservation requires operator instead of member",
+         "Action::Check | Action::Reserve | Action::Finish => Ok(()),",
+         "Action::Reserve => require_operator(operators, peer), Action::Check | Action::Finish => Ok(()),"),
         (authority_source, "coordinator authority wrong peer equality", "*member == *peer", "*member != *peer"),
         (authority_source, "coordinator authority operator gate bypass", "!contains_peer(operators, peer)", "false"),
         (authority_source, "coordinator authority existing principal reactivated",

@@ -55,7 +55,8 @@ builder-to-`http_request::append_line`/`valid_target` paths with the same limits
 The optional [native authority](native-coordinator-authority.md) has a separate
 `coordinator` target profile. Its root is the named compiled connection handler,
 `coordinator_authority::server::exchange`. Six paths link that handler through
-`Ledger::handle` to operator/member admission and activate/revoke/reserve/finish.
+`Ledger::handle` through the typed `require_operator_for`/`authorize` gates to
+operator/member admission, plus activate/revoke/reserve/finish.
 This does not prove accept-loop/thread-callback reachability, admission dominance,
 SQL semantics or committed-history refinement. SQLite and TLS remain opaque.
 The projector requires the explicitly selected crate and its specialized main;

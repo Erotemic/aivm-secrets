@@ -285,8 +285,8 @@ def explain(projection, profile="bridge"):
         handler = ('aivm_secrets_garrett', 'coordinator_authority', 'ledger', 'handle')
         core = ('aivm_secrets_garrett_core', 'coordinator_authority')
         required_paths = [
-            ('coordinator-operator-admission', [handler, (*core, 'require_operator'), (*core, 'contains_peer')]),
-            ('coordinator-member-admission', [handler, (*core, 'admit'), (*core, 'contains_peer')]),
+            ('coordinator-operator-admission', [handler, (*core, 'require_operator_for'), (*core, 'require_operator'), (*core, 'contains_peer')]),
+            ('coordinator-member-admission', [handler, (*core, 'authorize'), (*core, 'admit'), (*core, 'contains_peer')]),
             *[('coordinator-' + name, [handler, (*core, name)])
               for name in ['activate', 'revoke', 'reserve', 'finish']],
         ]

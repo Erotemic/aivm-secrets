@@ -2,6 +2,17 @@
 //! SQLite lookup/commit, peer authentication and host parsing are adapters.
 #![allow(clippy::ptr_arg)]
 
+/// Keep wire parsing in the adapter, but classify every supported action here.
+#[derive(Clone, Copy)]
+pub enum Action {
+    Activate,
+    Revoke,
+    Status,
+    Check,
+    Reserve,
+    Finish,
+}
+
 pub enum Denial {
     Denied,
     Revoked,
@@ -32,6 +43,34 @@ pub fn require_operator(operators: &[Vec<u8>], peer: &Vec<u8>) -> Result<(), Den
         return Err(Denial::Denied);
     }
     Ok(())
+}
+
+/// Early operator rejection preserves the wire protocol's validation order.
+/// Member admission needs the principal snapshot and happens in `authorize`.
+pub fn require_operator_for(
+    action: Action,
+    operators: &[Vec<u8>],
+    peer: &Vec<u8>,
+) -> Result<(), Denial> {
+    match action {
+        Action::Activate | Action::Revoke | Action::Status => require_operator(operators, peer),
+        Action::Check | Action::Reserve | Action::Finish => Ok(()),
+    }
+}
+
+/// One exhaustive gate before the adapter interprets any action against rows.
+/// Operator authority does not imply membership in a principal, or vice versa.
+pub fn authorize(
+    action: Action,
+    operators: &[Vec<u8>],
+    peer: &Vec<u8>,
+    current: Option<&Principal>,
+) -> Result<Option<i64>, Denial> {
+    require_operator_for(action, operators, peer)?;
+    match action {
+        Action::Activate | Action::Revoke | Action::Status => Ok(None),
+        Action::Check | Action::Reserve | Action::Finish => Ok(Some(admit(current, peer)?)),
+    }
 }
 
 pub fn activate(current: Option<&Principal>, members: Vec<Vec<u8>>) -> Result<Principal, Denial> {

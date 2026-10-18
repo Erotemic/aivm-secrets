@@ -47,7 +47,7 @@ framing injection within that segment; full request/destination/I/O refinement
 remains open. Use focused `GarrettHttpRequest.lean` compilation during iteration.
 The optional [native coordinator authority](docs/native-coordinator-authority.md)
 uses the existing mTLS/SQLite protocol and Python schema. Its extracted
-operator/member and terminal decision/history proofs are separate from SQL,
+exhaustive typed action/role authorization and terminal decision/history proofs are separate from SQL,
 HTTP, commit/reply and durability refinement. Build it only with the explicit
 `coordinator-server` feature; no ordinary AIVM or broker requirement is added.
 Focus on a useful standalone broker workflow and conditional, implementation-linked credential
