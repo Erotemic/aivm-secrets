@@ -490,14 +490,14 @@ struct OAuthSource {
     vault: crate::oauth_vault::OAuthVault,
     provider: crate::oauth_vault::provider::Provider,
     subject: String,
-    lease: crate::oauth_vault::Lease,
+    binding: crate::oauth_vault::SessionBinding,
 }
 impl OAuthSource {
-    fn active(&self) -> Outcome<std::fs::File> {
+    fn active(&self) -> Outcome<crate::oauth_vault::CurrentCredential> {
         // Sample after blocking: adding rounded elapsed seconds can admit a
         // request on the wrong side of a wall-clock expiry boundary.
         self.vault
-            .active_lease(&self.provider, &self.subject, &self.lease, || {
+            .current_lease(&self.provider, &self.subject, &self.binding, || {
                 host_time().unwrap_or(i64::MAX)
             })
             .map_err(|_| Error::CredentialSource)
@@ -633,15 +633,15 @@ impl AccountSession {
                     fields.get("transport").unwrap_or(&json!({})),
                 )
                 .map_err(|_| Error::CredentialSource)?;
-            let lifetime = lifetime.min(lease.expires_at() - now);
-            let secret = Credential(Zeroizing::new(lease.credential().to_vec()));
+            let session_binding = vault.bind_session(&provider, &subject, &lease)?;
+            let secret = Credential(Zeroizing::new(session_binding.marker().to_vec()));
             (
                 secret,
                 Some(OAuthSource {
                     vault,
                     provider,
                     subject,
-                    lease,
+                    binding: session_binding,
                 }),
                 lifetime,
             )
@@ -690,6 +690,16 @@ impl AccountSession {
             inner,
             oauth,
         })
+    }
+    fn opener<'a>(
+        &'a self,
+        current: Option<&'a crate::oauth_vault::CurrentCredential>,
+    ) -> SessionOpener<'a> {
+        SessionOpener {
+            envelope: &self.envelope,
+            source: self.oauth.as_ref(),
+            current,
+        }
     }
     #[allow(clippy::too_many_arguments)] // Mirrors the enrollment issuer contract.
     pub fn issue(
@@ -742,6 +752,7 @@ impl AccountSession {
         } else {
             now
         };
+        let opener = self.opener(_vault_lease.as_ref());
         let operation = parse_operation(value)?;
         let presentation = protocol::Presentation {
             expected,
@@ -765,9 +776,12 @@ impl AccountSession {
                     now: host_time()?,
                     elapsed: self.elapsed()?,
                 };
+                if let Some(lease) = &_vault_lease {
+                    lease.require_current(current.now)?;
+                }
                 protocol::recheck(
                     verifier,
-                    &self.envelope,
+                    &opener,
                     &token.as_bytes().to_vec(),
                     &self.grant,
                     &operation,
@@ -778,7 +792,7 @@ impl AccountSession {
         };
         let result = protocol::perform(
             verifier,
-            &self.envelope,
+            &opener,
             &self.executor.audit,
             &current_executor,
             &token.as_bytes().to_vec(),
@@ -813,11 +827,13 @@ impl AccountSession {
         let _vault_lease = self.oauth.as_ref().map(OAuthSource::active).transpose()?;
         let now = host_time()?;
         let outer = verifier.open(token, peer, &expected, now)?;
-        let inner = outer.inner.bytes();
         if !matches!(verb, "describe" | "renounce") {
             return Err(Error::Denied);
         }
-        let (opened, _secret) = self.envelope.open(inner)?;
+        let opened =
+            protocol::CredentialOpener::open(&self.opener(_vault_lease.as_ref()), &outer.inner)
+                .map_err(use_error)?
+                .claims;
         core::authorize_use(
             &opened,
             &self.grant,
@@ -877,6 +893,38 @@ impl protocol::IssuanceObserver for Audit {
             .map_err(|_| aivm_secrets_garrett_core::Denial::InvalidCapability)?;
         self.write_record(&json!({"schema":1,"event":"issued","grant":self.grant,"policy":self.policy,"identity":identity}))
             .map_err(|_| aivm_secrets_garrett_core::Denial::InvalidCapability)
+    }
+}
+struct SessionOpener<'a> {
+    envelope: &'a InnerEnvelope,
+    source: Option<&'a OAuthSource>,
+    current: Option<&'a crate::oauth_vault::CurrentCredential>,
+}
+impl protocol::CredentialOpener for SessionOpener<'_> {
+    type Capability = InnerCapability;
+    type Credential = Credential;
+    fn open(
+        &self,
+        capability: &InnerCapability,
+    ) -> Result<protocol::OpenedCredential<Credential>, core::UseDenial> {
+        let mut opened = protocol::CredentialOpener::open(self.envelope, capability)?;
+        match (self.source, self.current) {
+            (None, None) => (),
+            (Some(source), Some(current)) => {
+                source
+                    .vault
+                    .verify_session_marker(
+                        &source.provider,
+                        &source.subject,
+                        &source.binding,
+                        &opened.credential.0,
+                    )
+                    .map_err(|_| core::UseDenial::InvalidCapability)?;
+                opened.credential = Credential(Zeroizing::new(current.credential().to_vec()));
+            }
+            _ => return Err(core::UseDenial::InvalidCapability),
+        }
+        Ok(opened)
     }
 }
 impl protocol::CredentialOpener for InnerEnvelope {

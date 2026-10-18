@@ -104,6 +104,28 @@ pub fn require_lease(
     }
     Ok(())
 }
+/// A running session pins enrollment epoch, while each request selects the
+/// vault's current generation. Renewal never bypasses ready/active/expiry.
+pub fn require_current_lease(
+    active: bool,
+    state: &RefreshState,
+    current: &LeaseMeta,
+    expected_epoch: i64,
+    now: i64,
+) -> Result<(), RefreshDenial> {
+    require_lease(
+        active,
+        state,
+        current,
+        &LeaseMeta {
+            epoch: expected_epoch,
+            generation: current.generation,
+            expires_at: current.expires_at,
+        },
+        now,
+    )
+}
+
 pub enum StoreFailure {
     Failed,
 }

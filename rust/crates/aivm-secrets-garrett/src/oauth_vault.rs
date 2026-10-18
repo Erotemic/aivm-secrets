@@ -267,19 +267,45 @@ pub struct OAuthVault {
     lease_key: hmac::Key,
 }
 pub(crate) struct Lease {
-    credential: Zeroizing<String>,
     meta: core::LeaseMeta,
-    tag: Vec<u8>,
 }
 impl Lease {
+    fn public_metadata(&self) -> Value {
+        json!({"epoch":self.meta.epoch,"generation":self.meta.generation,"expires_at":self.meta.expires_at})
+    }
+}
+/// Opaque, vault/provider/subject-bound session material, never an OAuth token.
+pub(crate) struct SessionBinding {
+    marker: Zeroizing<String>,
+    epoch: i64,
+    tag: Vec<u8>,
+}
+impl SessionBinding {
+    pub(crate) fn marker(&self) -> &[u8] {
+        self.marker.as_bytes()
+    }
+}
+/// The private lock spans preflight, final emission and reply projection.
+/// Keep only the current access token, not its refresh token, in this scope.
+pub(crate) struct CurrentCredential {
+    _lock: File,
+    credential: Zeroizing<String>,
+    meta: core::LeaseMeta,
+    expected_epoch: i64,
+}
+impl CurrentCredential {
     pub(crate) fn credential(&self) -> &[u8] {
         self.credential.as_bytes()
     }
-    pub(crate) fn expires_at(&self) -> i64 {
-        self.meta.expires_at
-    }
-    fn public_metadata(&self) -> Value {
-        json!({"epoch":self.meta.epoch,"generation":self.meta.generation,"expires_at":self.meta.expires_at})
+    pub(crate) fn require_current(&self, now: i64) -> Outcome<()> {
+        core::require_current_lease(
+            true,
+            &core::RefreshState::Ready,
+            &self.meta,
+            self.expected_epoch,
+            now,
+        )
+        .map_err(|_| Error::CredentialSource)
     }
 }
 impl OAuthVault {
@@ -295,7 +321,7 @@ impl OAuthVault {
         );
         let prk = hkdf::Salt::new(hkdf::HKDF_SHA256, b"aivm-secrets/oauth-lease/v1").extract(&key);
         let lease_key = hmac::Key::from(
-            prk.expand(&[b"credential-equality"], hmac::HMAC_SHA256)
+            prk.expand(&[b"current-session-binding"], hmac::HMAC_SHA256)
                 .map_err(|_| Error::InternalError)?,
         );
         Ok(Self {
@@ -566,20 +592,58 @@ impl OAuthVault {
             &core::RefreshState::Ready,
         ))
     }
-    fn lease_message(
+    fn session_message(
         &self,
         provider: &Provider,
         subject: &str,
-        row: &Row,
-        grant: &Grant,
-    ) -> Outcome<Zeroizing<Vec<u8>>> {
-        let mut message = Zeroizing::new(account(provider, subject)?.into_bytes());
+        epoch: i64,
+        marker: &[u8],
+    ) -> Outcome<Vec<u8>> {
+        if marker.len() != 64 {
+            return Err(Error::Revoked);
+        }
+        let mut message = b"aivm-secrets/oauth-current-session/v1\0".to_vec();
+        message.extend_from_slice(account(provider, subject)?.as_bytes());
         message.extend_from_slice(provider.digest.as_bytes());
-        message.extend_from_slice(&row.epoch.to_be_bytes());
-        message.extend_from_slice(&grant.generation.to_be_bytes());
-        message.extend_from_slice(&grant.expires.to_be_bytes());
-        message.extend_from_slice(grant.access.as_bytes());
+        message.extend_from_slice(&epoch.to_be_bytes());
+        message.extend_from_slice(marker);
         Ok(message)
+    }
+    pub(crate) fn bind_session(
+        &self,
+        provider: &Provider,
+        subject: &str,
+        snapshot: &Lease,
+    ) -> Outcome<SessionBinding> {
+        let marker = Zeroizing::new(
+            random::<32>()?
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>(),
+        );
+        let tag = hmac::sign(
+            &self.lease_key,
+            &self.session_message(provider, subject, snapshot.meta.epoch, marker.as_bytes())?,
+        );
+        Ok(SessionBinding {
+            marker,
+            epoch: snapshot.meta.epoch,
+            tag: tag.as_ref().to_vec(),
+        })
+    }
+    pub(crate) fn verify_session_marker(
+        &self,
+        provider: &Provider,
+        subject: &str,
+        binding: &SessionBinding,
+        marker: &[u8],
+    ) -> Outcome<()> {
+        hmac::verify(
+            &self.lease_key,
+            &self.session_message(provider, subject, binding.epoch, marker)?,
+            &binding.tag,
+        )
+        .map_err(|_| Error::Revoked)
     }
     pub(crate) fn session_snapshot(
         &self,
@@ -622,18 +686,12 @@ impl OAuthVault {
         if now < 0 || now >= grant.expires {
             return Err(Error::Expired.into());
         }
-        let tag = hmac::sign(
-            &self.lease_key,
-            &self.lease_message(provider, subject, &row, grant)?,
-        );
         Ok(Lease {
-            credential: Zeroizing::new((*grant.access).to_owned()),
             meta: core::LeaseMeta {
                 epoch: row.epoch,
                 generation: grant.generation,
                 expires_at: grant.expires,
             },
-            tag: tag.as_ref().to_vec(),
         })
     }
     pub fn session_check(
@@ -649,35 +707,30 @@ impl OAuthVault {
             .session_snapshot(provider, subject, resource_host, now, force, transport)?
             .public_metadata())
     }
-    pub(crate) fn active_lease(
+    pub(crate) fn current_lease(
         &self,
         provider: &Provider,
         subject: &str,
-        lease: &Lease,
+        binding: &SessionBinding,
         clock: impl Fn() -> i64,
-    ) -> OAuthOutcome<File> {
+    ) -> OAuthOutcome<CurrentCredential> {
         let lock = self.root.lock_named(".vault.lock", true)?;
+        self.verify_session_marker(provider, subject, binding, binding.marker())?;
         let row = self.read(provider, subject, false)?;
         let grant = row.grant.as_ref().ok_or(Error::Revoked)?;
-        core::require_lease(
-            row.active,
-            &row.state,
-            &core::LeaseMeta {
-                epoch: row.epoch,
-                generation: grant.generation,
-                expires_at: grant.expires,
-            },
-            &lease.meta,
-            clock(),
-        )
-        .map_err(|e| OAuthError::refresh(e, &row.state))?;
-        hmac::verify(
-            &self.lease_key,
-            &self.lease_message(provider, subject, &row, grant)?,
-            &lease.tag,
-        )
-        .map_err(|_| Error::Revoked)?;
-        Ok(lock)
+        let meta = core::LeaseMeta {
+            epoch: row.epoch,
+            generation: grant.generation,
+            expires_at: grant.expires,
+        };
+        core::require_current_lease(row.active, &row.state, &meta, binding.epoch, clock())
+            .map_err(|error| OAuthError::refresh(error, &row.state))?;
+        Ok(CurrentCredential {
+            _lock: lock,
+            credential: Zeroizing::new((*grant.access).to_owned()),
+            meta,
+            expected_epoch: binding.epoch,
+        })
     }
 }
 struct RefreshWork<'a> {
@@ -746,5 +799,76 @@ impl core::RefreshOps for RefreshWork<'_> {
         self.audit
             .record(name, self.now, code)
             .map_err(|_| core::StoreFailure::Failed)
+    }
+}
+
+#[cfg(test)]
+mod current_session_tests {
+    use super::*;
+    use std::{fs, os::unix::fs::DirBuilderExt, path::PathBuf};
+
+    struct Sandbox(PathBuf);
+    impl Sandbox {
+        fn new() -> Self {
+            let nonce = sha(&random::<32>().unwrap());
+            let path = std::env::temp_dir().join(format!("as-current-{}", &nonce[..24]));
+            fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
+            Self(path)
+        }
+    }
+    impl Drop for Sandbox {
+        fn drop(&mut self) {
+            fs::remove_dir_all(&self.0).unwrap();
+        }
+    }
+
+    #[test]
+    fn current_binding_rejects_vault_subject_provider_marker_and_epoch_substitution() {
+        let sandbox = Sandbox::new();
+        let first = OAuthVault::initialize(&sandbox.0.join("first")).unwrap();
+        let second = OAuthVault::initialize(&sandbox.0.join("second")).unwrap();
+        let document = json!({
+            "schema":1,"name":"synthetic","client_id":"test-client",
+            "authorization_url":"https://login.example.org/authorize",
+            "token_url":"https://login.example.org/token",
+            "resource_host":"api.example.org","callback_port":18765,"scopes":["read"]
+        });
+        let provider = Provider::from_value(&document).unwrap();
+        let mut other = document.clone();
+        other["client_id"] = json!("other-client");
+        let other_provider = Provider::from_value(&other).unwrap();
+        let snapshot = Lease {
+            meta: core::LeaseMeta {
+                epoch: 3,
+                generation: 1,
+                expires_at: 2000,
+            },
+        };
+        let binding = first.bind_session(&provider, "vm-test", &snapshot).unwrap();
+        assert!(first
+            .verify_session_marker(&provider, "vm-test", &binding, binding.marker())
+            .is_ok());
+        assert!(second
+            .verify_session_marker(&provider, "vm-test", &binding, binding.marker())
+            .is_err());
+        assert!(first
+            .verify_session_marker(&provider, "other-subject", &binding, binding.marker())
+            .is_err());
+        assert!(first
+            .verify_session_marker(&other_provider, "vm-test", &binding, binding.marker())
+            .is_err());
+        let mut changed = binding.marker().to_vec();
+        changed[0] ^= 1;
+        assert!(first
+            .verify_session_marker(&provider, "vm-test", &binding, &changed)
+            .is_err());
+        let changed_epoch = SessionBinding {
+            marker: Zeroizing::new(binding.marker.to_string()),
+            epoch: 4,
+            tag: binding.tag.clone(),
+        };
+        assert!(first
+            .verify_session_marker(&provider, "vm-test", &changed_epoch, changed_epoch.marker())
+            .is_err());
     }
 }

@@ -35,7 +35,7 @@ work, not a requirement to reproduce Python's host package structure in Rust.
 | CORE-03 | CA, bound certificate/JWT renewal without restart | Partial |
 | CORE-04 | Authorization, delegation, approval, budgets | Partial |
 | CORE-05 | Manifest request/effect and disclosure | Partial |
-| CORE-06 | OAuth refresh and same-session current-token lease | Partial |
+| CORE-06 | OAuth refresh and same-session current-token lease | Native rollover implemented; finite differential coverage, broader parity gate open |
 | **CORE-07** | **Durable cross-host revocation** | **Missing** |
 | **CORE-08** | **Globally reserved write keys and no automatic replay** | **Missing** |
 | **CORE-09** | **Wire key, required-on-write, approved upstream key header** | **Missing** |

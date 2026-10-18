@@ -165,6 +165,24 @@ def review_semantics(contents: dict[str, str]) -> None:
     require('aivm_secrets_garrett_core::emission::emit_current(PendingEmission { check, emit })' in c
             and '(self.check)()' in c and '(self.emit)()' in c,
             'native emission bypasses the extracted admission controller')
+    # Current OAuth tokens are selected under a held lease before entering
+    # the proved controller, rather than substituted by the HTTP interpreter.
+    vault = contents[RUST + 'oauth_vault.rs']
+    current = part(vault, 'pub(crate) fn current_lease(', '\nstruct RefreshWork')
+    require(same_order(current, 'lock_named(".vault.lock", true)',
+                       'verify_session_marker(', 'self.read(', 'core::require_current_lease(',
+                       'Ok(CurrentCredential {', '_lock: lock,'),
+            'OAuth current credential bypasses locking, marker or epoch admission')
+    require('self.refresh(' not in current and 'session_snapshot(' not in current,
+            'guest current-token lease attempts implicit refresh')
+    opener = part(c, 'impl protocol::CredentialOpener for SessionOpener',
+                  'impl protocol::CredentialOpener for InnerEnvelope')
+    require(same_order(opener, 'verify_session_marker(', 'opened.credential = Credential('),
+            'OAuth capability marker not checked before credential substitution')
+    require('Credential(Zeroizing::new(session_binding.marker().to_vec()))' in c
+            and 'lease.require_current(current.now)?;' in c
+            and 'lease.require_current(current)?;' in request,
+            'OAuth session lost opaque sealing or late token-expiry admission')
     d = contents[RUST + 'manifest/disclosure.rs']
     require('filter::project_fields(' in d and 'ensure_safe(&value, credential)?;' in d,
             'native disclosure no longer selects and reflection-checks public fields')

@@ -50,6 +50,26 @@ def mutate(repo, filename, before, after):
 
 @pytest.mark.parametrize('file,old,new', [
     (
+        RUST + 'oauth_vault.rs',
+        'core::require_current_lease(row.active, &row.state, &meta, binding.epoch, clock())',
+        'Ok::<(), core::RefreshDenial>(())',
+    ),
+    (
+        RUST + 'custody.rs',
+        '.verify_session_marker(',
+        '.unchecked_marker(',
+    ),
+    (
+        RUST + 'custody/manifest_session.rs',
+        'lease.require_current(current)?;',
+        'let _ = current;',
+    ),
+    (
+        RUST + 'custody.rs',
+        'lease.require_current(current.now)?;',
+        'let _ = current.now;',
+    ),
+    (
         RUST + 'custody/manifest_session.rs',
         'emit_current(fresh, || {',
         '(|| {',

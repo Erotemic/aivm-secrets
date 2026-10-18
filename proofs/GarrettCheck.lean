@@ -239,3 +239,11 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.protocol.Proofs.recheck_contract
 #print axioms aivm_secrets_garrett_core.protocol.Proofs.recheck_rejection
 #print axioms aivm_secrets_garrett_core.protocol.Proofs.recheck_successful_witness
+
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.current_lease_contract
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.revoked_current_session_rejected
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.reenrollment_fences_current_session
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.unsettled_current_session_cannot_dispatch
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.expired_current_session_cannot_dispatch
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.current_session_generation_independent
+#print axioms aivm_secrets_garrett_core.oauth_state.Proofs.renewed_current_session_positive_witness

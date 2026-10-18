@@ -27,6 +27,7 @@ WORKFLOW_TESTS = [
     'tests/test_rust_w6_adapter.py',
     'tests/test_assurance_profiles.py',
     'tests/test_rust_garrett_dispatch.py',
+    'tests/test_rust_oauth_current_session.py',
     'tests/test_rust_garrett_authority.py::test_tpm_requirement_rejects_software_before_credential_custody',
 ]
 
@@ -129,8 +130,9 @@ def main() -> int:
             manifest['required_workflow_tests'] = require_no_skips(junit)
         if args.proofs:
             run('lean-w4-w5', [python, 'dev/verification/w5_noninterference.py', 'prove'])
-            run('lean-profile-and-emission', ['lake', '-d', 'proofs', 'build',
-                                            '+GarrettProfiles', '+GarrettEmission'])
+            run('lean-profile-emission-oauth', ['lake', '-d', 'proofs', 'build',
+                                               '+GarrettProfiles', '+GarrettEmission',
+                                               '+GarrettOAuth'])
         if args.full_tests:
             with tempfile.TemporaryDirectory(prefix='as-full-', dir='/tmp') as temporary:
                 run('full-python-native', [python, '-m', 'pytest', '-q', '-ra',

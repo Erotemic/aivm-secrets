@@ -93,6 +93,54 @@ theorem lease_positive_witness :
     require_lease true .Ready ⟨0#i64, 1#i64, 2000#i64⟩ ⟨0#i64, 1#i64, 2000#i64⟩ 1000#i64 =
       Result.ok (.Ok ()) := by simp [require_lease]
 
+/-- Session capabilities bind enrollment epoch; token generations may change.
+    Concrete locking, vault authentication and marker opening are adapter premises. -/
+def CurrentLeaseAllowed (active : Bool) (state : RefreshState) (current : LeaseMeta)
+    (epoch now : I64) : Prop :=
+  active = true ∧ state = .Ready ∧ current.epoch = epoch ∧
+    0 ≤ now.val ∧ now.val < current.expires_at.val
+
+theorem current_lease_contract (active : Bool) (state : RefreshState)
+    (current : LeaseMeta) (epoch now : I64) :
+    require_current_lease active state current epoch now ⦃ out =>
+      out = .Ok () ↔ CurrentLeaseAllowed active state current epoch now ⦄ := by
+  simpa [require_current_lease, LeaseAllowed, CurrentLeaseAllowed] using
+    lease_contract active state current { current with epoch := epoch } now
+
+theorem revoked_current_session_rejected (state : RefreshState)
+    (current : LeaseMeta) (epoch now : I64) :
+    require_current_lease false state current epoch now = Result.ok (.Err .Revoked) := by
+  simp [require_current_lease, require_lease]
+
+theorem reenrollment_fences_current_session (state : RefreshState)
+    (current : LeaseMeta) (epoch now : I64) (changed : current.epoch ≠ epoch) :
+    require_current_lease true state current epoch now = Result.ok (.Err .Revoked) := by
+  simp [require_current_lease, require_lease, changed]
+
+theorem unsettled_current_session_cannot_dispatch (active : Bool) (state : RefreshState)
+    (current : LeaseMeta) (epoch now : I64) (unsettled : state ≠ .Ready) :
+    require_current_lease active state current epoch now ⦃ out => out ≠ .Ok () ⦄ := by
+  apply WP.spec_mono (current_lease_contract active state current epoch now)
+  intro out contract accepted
+  exact unsettled (contract.mp accepted).2.1
+
+theorem expired_current_session_cannot_dispatch (active : Bool) (state : RefreshState)
+    (current : LeaseMeta) (epoch now : I64) (expired : current.expires_at.val ≤ now.val) :
+    require_current_lease active state current epoch now ⦃ out => out ≠ .Ok () ⦄ := by
+  apply WP.spec_mono (current_lease_contract active state current epoch now)
+  intro out contract accepted
+  exact (Int.not_lt.mpr expired) (contract.mp accepted).2.2.2.2
+
+theorem current_session_generation_independent (active : Bool) (state : RefreshState)
+    (current : LeaseMeta) (generation epoch now : I64) :
+    require_current_lease active state { current with generation := generation } epoch now =
+      require_current_lease active state current epoch now := by
+  simp [require_current_lease, require_lease]
+
+theorem renewed_current_session_positive_witness :
+    require_current_lease true .Ready ⟨3#i64, 7#i64, 4000#i64⟩ 3#i64 2000#i64 =
+      Result.ok (.Ok ()) := by simp [require_current_lease, require_lease]
+
 /-- Storage durability and transport behavior remain explicit adapter contracts.
     The extracted controller obtains durable quarantine before exchange and
     successor persistence before returning any usable successor. -/

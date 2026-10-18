@@ -57,8 +57,9 @@ The small extracted emission controller and repeated protocol admission are
 kernel-checked; concrete clock/lease/call-site correspondence stays explicit.
 The usable-system gate includes the new regressions in both software-key
 workflows. W4/W5 model records report local kernel checking with native
-refinement still open. Native coordinator/idempotency and same-session OAuth
-rollover parity remain the Python-core follow-on queue.
+refinement still open. The [current-session OAuth increment](../verified-oauth-current-session.md) adds
+native rollover without restarting and preserves epoch/lifetime fencing. Native
+coordinator/idempotency and broader core differential coverage remain open.
 
 ## Product question and security objective
 
@@ -191,7 +192,7 @@ and [new functionality and trust boundaries](../garrett-python-core-extensions.m
 | ID | Python deliverable and status | Rust parity/operational gate |
 | --- | --- | --- |
 | **P-CORE-07** | Durable terminal cross-host principal revocation using one local SQLite coordinator, mTLS member/operator pins, check at every broker and bound-bridge request; tests use synthetic same-host distinct member certificates | Rust global revocation missing; real separate-host deployment, rollback witness and operational failover unvalidated |
-| **P-CORE-06** | Running OAuth broker leases the vault's current access token at each request, preserving capability and enrolled epoch; identity `renew-bound` issues fresh cert/JWT without broker/bridge restart | Rust same-session token rollover and bound identity workflow incomplete; guest material delivery remains manual |
+| **P-CORE-06** | Running OAuth broker leases the vault's current access token at each request, preserving capability and enrolled epoch; identity `renew-bound` issues fresh cert/JWT without broker/bridge restart | Rust same-session token rollover implemented and locally tested; bound identity workflow and broader differential gate incomplete; guest material delivery remains manual |
 | **P-CORE-08/09** | Durable per-principal idempotency reservations before any coordinated write; guest ASCII retry keys, optional explicit upstream `Idempotency-Key`, strict no-replay even after ambiguous result | Rust journal/wire contract missing; production provider header semantics unverified |
 | **P-PARITY** | All Python modules classified core vs non-core, 11 normative security contracts with Rust status and acceptance criteria | Implement independent Rust behavior and bidirectional negative/positive trace tests before marking any contract parity-complete |
 

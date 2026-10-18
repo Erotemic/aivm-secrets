@@ -519,15 +519,18 @@ The account-status-v1 broker configuration accepts exactly one of
 ```
 
 The OAuth source requires bearer authentication and the exact approved resource
-host. It may refresh near expiration, then retains a private snapshot and HMAC
-witness of the token plus profile/account/epoch/generation/expiry. Each issuance,
-control operation and provider request checks a current vault record under a
-lease; provider requests retain that lease through egress. Admission samples
-wall time again after waiting on the vault lock, including waits that cross an
-expiry boundary in less than one second. Refresh and revocation
-wait for admitted calls to finish, and completed changes fence older sessions.
-Even token replacement with unchanged public metadata fails the HMAC check.
-An unavailable or invalid vault never selects a credential-file fallback.
+host. Host startup may explicitly refresh near expiration. A running session
+seals an opaque vault/provider/subject/epoch-bound marker rather than the original
+access token. Each request selects the current ready, active, unexpired token
+under a held vault lease; refresh can change the generation without restarting
+the broker. Revocation or re-enrollment fences the captured epoch. The lease spans
+preflight, final egress and reply projection, so participating refresh/revocation
+writers wait for the complete operation. Admission samples wall time after the
+vault wait and after provider TLS setup; current token expiry and the original
+grant deadline both remain enforced. Guest requests never trigger implicit
+refresh, and an invalid/unavailable vault never selects a file fallback.
+See the [current-session increment](verified-oauth-current-session.md) for exact
+proof scope, adversarial tests and remaining core parity gaps.
 
 The native OAuth checkpoint passes **1,975 full-suite tests**, with the one
 expected pending general Rust primitive-runner skip (279.26 seconds), using

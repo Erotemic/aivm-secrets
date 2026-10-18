@@ -176,6 +176,16 @@ THEOREMS += [
 ]
 
 THEOREMS += [
+    "aivm_secrets_garrett_core.oauth_state.Proofs.current_lease_contract",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.revoked_current_session_rejected",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.reenrollment_fences_current_session",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.unsettled_current_session_cannot_dispatch",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.expired_current_session_cannot_dispatch",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.current_session_generation_independent",
+    "aivm_secrets_garrett_core.oauth_state.Proofs.renewed_current_session_positive_witness",
+]
+
+THEOREMS += [
     "aivm_secrets_garrett_core.oauth_login.Proofs.bytes_ne_exact",
     "aivm_secrets_garrett_core.oauth_login.Proofs.current_contract",
     "aivm_secrets_garrett_core.oauth_login.Proofs.claim_contract",
@@ -297,6 +307,7 @@ TESTS = [
     "tests/test_rust_garrett_lifecycle.py",
     "tests/test_rust_garrett_issuance.py",
     "tests/test_rust_garrett_oauth_vault.py",
+    "tests/test_rust_oauth_current_session.py",
     "tests/test_rust_garrett_login.py",
     "tests/test_rust_garrett_manifest.py",
     "tests/test_rust_garrett_reflection.py",
@@ -558,8 +569,9 @@ def assurance_coordinates() -> dict:
             "Native file issuance acknowledges public claims before atomic no-replace output publication under a held authority lease. Private output storage and explicit delivery are trusted host operations; publication/completion errors may leave a usable file and require reconciliation.",
             "OAuth quarantine and successor persistence are conditional storage-adapter contracts. Native vault locking drains participating refresh/revoke against dispatch and HMAC checks token equality; root snapshot rollback, hostile same-UID replacement and nonparticipating writers are outside that boundary.",
             "Native PKCE login trusts entropy, SHA-256 S256 derivation, HTTP/query decoding and loopback listener/clock adapters. Callback binding and one-shot lifecycle guards are extracted; ready URLs go only to a trusted host operator/browser, and their state/challenge must not be offered as an agent API. Concrete acquisition I/O histories and secret-sink refinement remain open.",
+            "Native OAuth sessions seal an opaque vault/provider/subject/epoch-bound marker and select the current ready token under a held vault lock. Explicit refresh may change its generation without changing the grant deadline. HMAC/entropy, lock participation, concrete opener correspondence and clock sampling remain adapter contracts; this is not a whole-service or concurrent filesystem proof.",
             "The manifest HTTPS backend trusts the policy/check/template/GraphQL parsers, JSON-to-typed-tree conversion and selected-tree rendering, reflection traversal/call sites and concrete HTTP/audit ordering. Exact borrowed-byte literal search is extracted and proved. The extracted recursive filter matches an independent selection specification and has exact two-run noninterference under recursive schema agreement; unselected typed-tree fields are unconstrained. These contracts do not refine the remaining adapters or establish arbitrary provider non-disclosure or whole-service trace equivalence. Native configuration explicitly selects unbounded requests and a file source or explicit OAuth override.",
-            "Native provider emission rechecks authority after audit, TLS setup and request construction. The extracted continuation refuses emission on a failed recheck; setup placement, trusted clock sampling, live lease stability and concrete socket writes remain tested adapter contracts. Control admission follows the credential lease wait and checks the outer as well as inner lifetime.",
+            "Native provider emission rechecks authority and current OAuth token expiry after audit, TLS setup and request construction. The extracted continuation refuses emission on a failed recheck; setup placement, trusted clock sampling, live lease stability and concrete socket writes remain tested adapter contracts. Control admission follows the credential lease wait and checks the outer as well as inner lifetime.",
             "Native TPM CSR creation reuses the validated pinned-key signer and verifies its returned possession request. Local TPM attributes and signatures do not establish hardware provenance; independent fresh attestation approval under a trusted AK remains required. The new CSR, TPM command and JSON/file adapters are tested, not newly formally refined.",
             "Native software client bootstrap trusts entropy, P-256/CSR/SPKI adapters and held-directory no-replace file publication/durability. The extracted controller proves key acknowledgement before CSR publication and conservative uncertainty; it does not prove the filesystem, private-key memory erasure, signing or CLI I/O. Existing material is never automatically replaced or adopted, and software requests assert no TPM or VM provenance.",
             "Controller histories assume signature verification has prior recorded issuer origin; the ideal signature-origin theorem does not establish a computational byte-level or concrete I/O refinement.",
@@ -897,6 +909,14 @@ def mutate(pattern: str | None = None) -> None:
             "OAuth expired lease accepted",
             "now >= current.expires_at",
             "now > current.expires_at",
+        ),
+    ]
+    mutations += [
+        (
+            oauth_source,
+            "current session epoch rebound to current vault",
+            "epoch: expected_epoch,",
+            "epoch: current.epoch,",
         ),
     ]
     login_source = source.with_name("oauth_login.rs")

@@ -173,7 +173,11 @@ impl Session {
             now,
         )
         .map_err(|_| Error::InvalidCapability)?;
-        let (claims, secret) = self.base.envelope.open(outer.secret.bytes())?;
+        let opened =
+            protocol::CredentialOpener::open(&self.base.opener(_vault.as_ref()), &outer.secret)
+                .map_err(use_error)?;
+        let claims = opened.claims;
+        let secret = opened.credential;
         let (op, args) = self.policy.operation(value)?;
         guards::authorize(
             &claims,
@@ -197,6 +201,9 @@ impl Session {
         .as_ref());
         let fresh = || -> Outcome<()> {
             let current = host_time()?;
+            if let Some(lease) = &_vault {
+                lease.require_current(current)?;
+            }
             aivm_secrets_garrett_core::present(
                 &outer.claims,
                 &expected,
@@ -286,7 +293,10 @@ impl Session {
             .transpose()?;
         let now = host_time()?;
         let outer = verifier.open(token, peer, &expected, now)?;
-        let (claims, _secret) = self.base.envelope.open(outer.inner.bytes())?;
+        let claims =
+            protocol::CredentialOpener::open(&self.base.opener(_vault.as_ref()), &outer.inner)
+                .map_err(use_error)?
+                .claims;
         core::require_use_current(&claims, &self.base.grant, now, self.base.elapsed()?)
             .map_err(use_error)?;
         if verb == "renounce" {

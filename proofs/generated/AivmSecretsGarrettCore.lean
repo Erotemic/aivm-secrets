@@ -1891,15 +1891,27 @@ def oauth_state.require_lease
             ok (core.result.Result.Err oauth_state.RefreshDenial.Unsettled)
   else ok (core.result.Result.Err oauth_state.RefreshDenial.Revoked)
 
+/-- [aivm_secrets_garrett_core::oauth_state::require_current_lease]:
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 109:0-127:1
+    Visibility: public -/
+def oauth_state.require_current_lease
+  (active : Bool) (state : oauth_state.RefreshState)
+  (current : oauth_state.LeaseMeta) (expected_epoch : Std.I64) (now : Std.I64)
+  :
+  Result (core.result.Result Unit oauth_state.RefreshDenial)
+  := do
+  oauth_state.require_lease active state current
+    { current with epoch := expected_epoch } now
+
 /-- [aivm_secrets_garrett_core::oauth_state::StoreFailure]
-    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 107:0-109:1
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 129:0-131:1
     Visibility: public -/
 @[discriminant isize]
 inductive oauth_state.StoreFailure where
 | Failed : oauth_state.StoreFailure
 
 /-- Trait declaration: [aivm_secrets_garrett_core::oauth_state::RefreshOps]
-    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 110:0-118:1
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 132:0-140:1
     Visibility: public -/
 structure oauth_state.RefreshOps (Self : Type _) (Self_Successor : Type _)
   where
@@ -1916,7 +1928,7 @@ structure oauth_state.RefreshOps (Self : Type _) (Self_Successor : Type _)
     Unit oauth_state.StoreFailure)
 
 /-- [aivm_secrets_garrett_core::oauth_state::refresh_once]:
-    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 120:0-169:1
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 142:0-191:1
     Visibility: public -/
 def oauth_state.refresh_once
   {O : Type _} {Clause0_Successor : Type _} (RefreshOpsInst :

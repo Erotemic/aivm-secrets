@@ -1408,3 +1408,35 @@ marker instead of retaining the original bearer in the capability. The proof
 should extend the small existing OAuth guard rather than invent a new broker
 state machine. The main uncertainty is correctly tying that marker, selected
 vault/provider/subject and held lease together without weakening binding.
+
+## 2026-10-18 00:12:00 -0400
+
+I am closing the native current-token session gap after the separately completed
+AIVM vTPM checkpoint and native late-dispatch checkpoint. The positive workflow
+was easy to reproduce as a real failure: Python accepts an explicitly refreshed
+same-epoch access token, while both Rust sessions rejected their next request.
+I prefer matching that useful contract over preserving an unreleased snapshot
+behavior. The capability now contains an opaque authenticated session marker;
+the private opener selects the current access token before the extracted
+controller sees it. Refresh does not silently extend the grant or happen on a
+guest request. No stored schema or guest-selected credential authority changed.
+
+My main concern was accidentally weakening revocation or allowing a shorter
+successor token to outlive itself during TLS. The lease spans both provider
+phases, and a separate last-sample expiry check covers that deadline. Adversarial
+process tests cover re-enrollment, original session expiry, TLS delay and
+concurrent refresh; a unit test checks marker context substitution. Seven
+additional Lean lemmas compile from the new 22-line Rust guard without changing
+older snapshot contracts. W4/W5 compile without weakened statements. I am
+confident in this scoped increment, not in a whole-service secrecy claim: lock
+participation, native opener/HMAC/clock correspondence, source mediation and
+I/O refinement remain explicit. Native durable coordination and keyed writes
+are still the next substantive core parity gaps. Broader validation and
+source-frozen evidence must pass before integrating this worktree.
+
+The final recorded gate passed 298 selected Rust/reference tests, 16 Rust unit
+checks, strict lint in normal and conformance modes and the expanded 220-name
+axiom audit. The strengthened two-phase concurrency regression passed in that
+selection; source-archive and independent boundary negatives passed 19 cases.
+The full source-frozen system gate and targeted extracted mutations remain the
+integration gates for this commit. Package wheel and source archive built.

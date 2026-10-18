@@ -449,7 +449,7 @@ def test_successor_persistence_failure_keeps_spent_token_quarantined(tmp_path):
 
 
 @pytest.mark.parametrize("change", ["refresh", "same_metadata_new_token"])
-def test_native_session_is_fenced_after_token_replacement(tmp_path, change):
+def test_native_session_uses_current_token_until_enrollment_is_revoked(tmp_path, change):
     case = VaultCase(tmp_path)
     stamp = int(time.time())
     case.enroll(access_token=TOKEN, expires_at=stamp + 3600)
@@ -478,8 +478,14 @@ def test_native_session_is_fenced_after_token_replacement(tmp_path, change):
                 row = case.row()
                 row["grant"]["access_token"] = SUCCESSOR
                 case.reference._write(case.provider, "vm-test", row)
+            # This intentionally follows Python's new current-epoch contract:
+            # a trusted owner may update the vault credential without ending
+            # the session. The independent session marker still pins epoch.
+            assert session.invoke()["ok"]
+            assert resource.requests[-1]["headers"]["authorization"] == "Bearer " + SUCCESSOR
+            case.call("revoke", now=stamp)
             assert not session.invoke()["ok"]
-            assert len(resource.requests) == 1
+            assert len(resource.requests) == 2
 
 
 @pytest.mark.parametrize(
