@@ -1048,7 +1048,9 @@ def mutate(pattern: str | None = None) -> None:
         (header_source, "http auth control byte accepted", "*byte < b'!'", "false"),
         (header_source, "http auth nonascii byte accepted", "*byte > b'~'", "false"),
         (header_source, "http auth guard omitted", "!valid_credential(secret)", "false"),
-        (header_source, "http auth wrong selected header", 'b"Authorization: Bearer "', 'b"Authorization: Basic "'),
+        (header_source, "http auth wrong selected header",
+         'Authentication::Bearer => output.extend_from_slice(b"Authorization: Bearer "),',
+         'Authentication::Bearer => output.extend_from_slice(b"Authorization: Basic "),'),
         (header_source, "http auth credential substituted", "output.extend_from_slice(secret);", 'output.extend_from_slice(b"REPLACED");'),
         (header_source, "http auth malformed terminator", 'output.extend_from_slice(b"\\r\\n");', 'output.extend_from_slice(b"\\n");'),
     ]

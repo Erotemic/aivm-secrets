@@ -380,7 +380,7 @@
     "aivm_secrets/transport/framing.py": "62c0ba7da18cb4a2713b45ee8a3c218d6bfb0362116d3c05719c499ce3be689f",
     "aivm_secrets/transport/names.py": "f3fb1439a3fd26c3abb24528decca41bb4272b2a0c7e99f2d4989b3e0a6c2255",
     "dev/verification/freshness.py": "544972fd0fef784c6566ce679aab43c27a062080d9ff7ec7cf5c341d8a377264",
-    "dev/verification/garrett.py": "07c762404aa5ea0b57439ad08e59134b842e527191f313806469e7399b6dac5d",
+    "dev/verification/garrett.py": "036ddb8ffc1abcc0d571264552d5ff01e5464449f3128daf2ff5b0d839271ace",
     "proofs/Garrett.lean": "0f9e9c8560489bf1ebae07c789af41a97dd96c1ac2fc25c528bd1a03a08ac68c",
     "proofs/GarrettAuthority.lean": "9028ba4af06a597b63cb1b0c86a485025d7325fa2a9786496ba7da37aa54b6b6",
     "proofs/GarrettCheck.lean": "cfd7b109fa94c14270840647134ef7e55aea8cd7b69fa722acb32c675efe5928",
