@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "source_commit": "6817617e0ac17fc237ca71a38cadb37c5fecaa1a",
+  "source_dirty": false,
+  "scope": "Frozen synthetic native coordinator-client and keyed-write checkpoint; trusted server remains Python",
+  "report_path": ".tools/coordination-system-6817617/report.json",
+  "report_sha256": "00928442f70d659425f7f71484086ed99a7a2d214ea25e1a83a96eaf2443dcc5",
+  "input_fingerprint_sha256": "bf127c2cee59dc923c0efd28c2eeee483619242a5a2dab115341a86cdc05bfef",
+  "full_suite": {
+    "passed": 2283,
+    "skipped": 1,
+    "skip": "Independent full primitives runner pending; no parity claim"
+  },
+  "required_workflows": {
+    "conformance": 78,
+    "normal_release_without_conformance": 78,
+    "skipped": 0
+  },
+  "extracted_mutations": {
+    "selected": 99,
+    "total": 99,
+    "rejected": 99,
+    "status": "passed",
+    "log_sha256": "367ed54db22026c068f211563d43cbbfccc48f42b0ff65acd34391fba0721ca3"
+  },
+  "checked_scope": [
+    "227 named Garrett axiom checks with only standard Lean axioms",
+    "Seven extracted coordinator dispatch lemmas",
+    "Eight delayed-coordinator outer/current-token control expiry cases",
+    "Real Python/native broker shared retry-name tests",
+    "W0/W3/W4/W5/W6 inventories and focused Lean builds",
+    "Strict Rust lint in both modes, 19 native unit cases and source/wheel builds"
+  ],
+  "limits": [
+    "Single trusted Python SQLite/mTLS authority, not a native coordinator server or distributed consensus",
+    "Native opaque request fingerprint hashes native policy document; Python normalized digest parity remains open",
+    "Concrete I/O, locks, cryptography, clock and durable remote acknowledgements remain adapter contracts",
+    "No live provider account, distinct physical host or VM validation",
+    "Standalone same-key identity rebinding is a separate follow-up, not included in this source"
+  ]
+}
