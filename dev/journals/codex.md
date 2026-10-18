@@ -1473,3 +1473,7 @@ The 37-case source-boundary selection, independent archive/catalogue tests,
 W4/W5 compilation and package builds also passed. I am freezing this source
 before the full-system gate and the eight new re-extracted rebinding mutations;
 those checks are not being treated as already completed.
+
+## 2026-10-18 01:36:59 -0400
+
+Recorded the frozen `8ef98e7` identity-rebinding checkpoint: 2,307 full-suite passes, the one explicitly pending independent primitives runner, and all 98 required workflows with both conformance and ordinary release binaries. All 107 re-extracted Rust mutations were rejected; the named Garrett audit now covers 239 declarations. I am confident about the tested continuity and original-grant boundaries, including the independently opened inner capability and post-lock clock regression. The important remaining uncertainty is concrete adapter and whole-service correspondence, not another guard-count claim. Renewal remains two privileged host steps with manual guest delivery; a fresh outer JWT does not extend the original grant or remove global revocation. The next investigation is a compiler-derived native call-site ledger that exposes callbacks, dependency boundaries, drops and unwind rather than claiming the source inventory is exhaustive.

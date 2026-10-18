@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "source_commit": "8ef98e7e5746573c2305c05bfbd3660d7e2a76bb",
+  "source_dirty": false,
+  "scope": "Frozen synthetic same-key native identity renewal/rebinding checkpoint",
+  "report_path": ".tools/rebinding-system-8ef98e7/report.json",
+  "report_sha256": "8011421dbfef7ed6e62ab6a7a499166d881646bedda5987f9012c5679e7165c7",
+  "input_fingerprint_sha256": "2e26043a65c43d25ce5d1184765af8e88f954c18c4767303b8cbe4a88dc1bdb5",
+  "full_suite": {
+    "passed": 2307,
+    "skipped": 1,
+    "skip": "Independent full primitives runner pending; no parity claim"
+  },
+  "required_workflows": {
+    "conformance": 98,
+    "normal_release_without_conformance": 98,
+    "skipped": 0
+  },
+  "extracted_mutations": {
+    "selected": 107,
+    "total": 107,
+    "rejected": 107,
+    "status": "passed",
+    "log_sha256": "63a9fcbb66e480b5a9a5bb13556826306c0f48c6392a449c8091920429fb38cc"
+  },
+  "checked_scope": [
+    "239 named Garrett axiom checks with only standard Lean axioms",
+    "Twelve extracted rebinding guard/controller lemmas",
+    "Twenty actual native renewal/rebinding scenarios across both broker profiles",
+    "Independent Python opening confirms byte-for-byte preservation of the opaque inner grant",
+    "Post-authority-wait issuance-clock regression reproduced before the fix",
+    "W0/W3/W4/W5/W6 inventories, focused Lean builds, strict Rust lint in both modes, 19 native unit cases and source/wheel builds"
+  ],
+  "limits": [
+    "Host-only two-step renewal then rebinding; atomic guest certificate/JWT delivery remains manual",
+    "Signature/AEAD, certificate fingerprints, file ownership, no-symlink publication, participating authority locks and clocks remain concrete adapter contracts",
+    "Global revocation remains enforced by the optional trusted Python SQLite coordinator; no consensus or anti-rollback proof",
+    "No whole-service I/O refinement, general Python/Rust equivalence, live provider, physical TPM or VM validation"
+  ]
+}
