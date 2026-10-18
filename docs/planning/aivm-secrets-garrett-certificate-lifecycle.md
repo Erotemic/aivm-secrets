@@ -129,11 +129,15 @@ with no retired keys. Two consequences:
   checked across every row.
 
 `identity enroll --replace` also takes an optional compare-and-swap,
-`--expected-epoch N --expected-certificate-sha256 T` (both, and only with
+`--expected-epoch N --expected-certificate-sha256=T` (both, and only with
 `--replace`): the replacement commits only if the row is still at that epoch
 and thumbprint, active or not, and is otherwise refused (`revoked`). Plain
 `--replace` remains the unconditional emergency path. AIVM does not pass the
 CAS yet.
+
+Use one `--expected-certificate-sha256=<thumbprint>` argv word for all guarded
+identity operations. The RFC 8705 value is base64url and may start with `-`;
+passing it as a separate word can make argparse report a missing value.
 
 ### Revocation and registry reuse (REG-01, REG-02)
 

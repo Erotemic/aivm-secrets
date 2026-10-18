@@ -827,7 +827,7 @@ guest, remove ``client.key``, ``client.csr``, ``client.rotate.key`` and
 ``identity_enroll``, which generates a fresh key.
 
 ``identity enroll --replace`` accepts an optional compare-and-swap,
-``--expected-epoch N --expected-certificate-sha256 T`` (both together), which
+``--expected-epoch N --expected-certificate-sha256=T`` (both together), which
 refuses the replacement if the enrollment changed since it was inspected.
 
 The registry holds at most 128 enrollments, revoked ones included. Two

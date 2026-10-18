@@ -167,10 +167,11 @@ def test_enroll_replace_cli_takes_an_optional_complete_cas(
     base = ['enroll', '--root', root, '--subject', 'vm-a', '--csr', csr,
             '--approve-key-fingerprint', request['key_fingerprint']]
     _, first, _ = cli(capsys, *base)
+    # Thumbprints are base64url and may begin with '-': use one attached argv word.
     stale = ['--expected-epoch', first['epoch'] + 1,
-             '--expected-certificate-sha256', first['certificate_sha256']]
+             f"--expected-certificate-sha256={first['certificate_sha256']}"]
     current = ['--expected-epoch', first['epoch'],
-               '--expected-certificate-sha256', first['certificate_sha256']]
+               f"--expected-certificate-sha256={first['certificate_sha256']}"]
     for refused in (base + ['--replace'] + stale,
                     base + ['--replace', '--expected-epoch', first['epoch']],
                     base + current):
@@ -182,6 +183,25 @@ def test_enroll_replace_cli_takes_an_optional_complete_cas(
     # Plain --replace without a CAS keeps working.
     code, plain, _ = cli(capsys, *base, '--replace')
     assert code == 0 and plain['epoch'] == first['epoch'] + 2
+
+
+def test_enrollment_cas_dash_prefixed_thumbprint_is_an_application_denial(tmp_path, capsys):
+    root, key, csr = tmp_path / 'authority', tmp_path / 'guest.key', tmp_path / 'guest.csr'
+    assert cli(capsys, 'init', '--root', root, '--issuer', 'aivm.test')[0] == 0
+    _, request, _ = cli(capsys, 'request', '--key', key, '--csr', csr)
+    base = ['enroll', '--root', root, '--subject', 'vm-a', '--csr', csr,
+            '--approve-key-fingerprint', request['key_fingerprint']]
+    _, first, _ = cli(capsys, *base)
+    # A valid base64url shape can start with '-'; attach it to the option so
+    # argparse passes the value through to the actual compare-and-swap check.
+    wrong = '-' + 'A' * 42
+    assert first['certificate_sha256'] != wrong
+    code, _, error = cli(capsys, *base, '--replace', '--expected-epoch', first['epoch'],
+                         f'--expected-certificate-sha256={wrong}')
+    assert code == 1 and 'revoked' in error.lower()
+    after = cli(capsys, 'status', '--root', root)[1]['subjects']['vm-a']
+    assert after['epoch'] == first['epoch']
+    assert after['certificate_sha256'] == first['certificate_sha256']
 
 
 def test_forget_and_prune_cli_remove_only_expired_revoked_rows(

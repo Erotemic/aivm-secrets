@@ -313,7 +313,7 @@ def test_bound_certificate_and_token_renew_without_restarting_services(tmp_path)
                     '--subject', 'vm-alpha', '--csr', str(csr),
                     '--approve-key-fingerprint', inspect_csr(csr.read_bytes()),
                     '--expected-epoch', str(old['epoch']),
-                    '--expected-certificate-sha256', old['certificate_sha256'],
+                    f"--expected-certificate-sha256={old['certificate_sha256']}",
                     '--capability-file', str(capfile),
                     '--jwt-output', str(new_jwt),
                 ], capture_output=True, text=True, timeout=20)
