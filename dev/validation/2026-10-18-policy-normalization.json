@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "source_commit": "5ee8022e414d1511b52f1da8564208aec9bf3c58",
+  "source_dirty": false,
+  "scope": "Native parsed-policy identity and durable Python/Rust coordinated fingerprint conformance",
+  "report_path": ".tools/policy-normalization-system-5ee8022/report.json",
+  "report_sha256": "7912984ef3f998438eb6c80da86171f27b7878f25993e1b8d206aa90b14f774c",
+  "input_fingerprint_sha256": "b66ef3bfdfab7aded1edc7a964c112a40787ac328d756e0778be3d6e60976e7a",
+  "full_suite": {
+    "passed": 2365,
+    "skipped": 0
+  },
+  "required_workflows": {
+    "conformance": 156,
+    "normal_release_without_conformance": 156,
+    "skipped": 0
+  },
+  "normal_workflow_report_path": ".tools/policy-normalization-validation-5ee8022/policy-normalization-normal-workflows.json",
+  "normal_workflow_report_sha256": "34ada6a9659a93b10399a0e1c133abaf9b999b40ba89d077d12adb7901c06833",
+  "baseline_failures": {
+    "mixed_python_native_completed_record_fingerprints": 2
+  },
+  "compiler_report_path": ".tools/policy-normalization-calls-5ee8022/report.json",
+  "compiler_report_sha256": "ebe7b78b74cc9bc8e8ef5e27c67bd29eed8f6a2b25f472d718ae82f88bd1a1d9",
+  "compiler_artifacts_sha256": {
+    "capture.json": "21e5f555693e1b0635bf9978ba4c6ddbd7de6a09fe5e5129ec67fd66bed0f0b1",
+    "bridge.ullbc.gz": "52ed7ac17a74a62033d6949bf9a79d89483d3227f04b535c1415eb2a0d857042",
+    "projection.json": "ad8eb0a3775c9b631a6dd21c68d25a9facf8b16069b47414430f92754bf95ae7",
+    "compiler.log": "29c5078f03a33c35d84a018ed6bfd30cf1daca726015bbb85e5565f2e32e4554",
+    "projector.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build.log": "1be3b62bc691dbc432cf76ebc681565f87ae8839726ebd3a00af4feb73f7da79"
+  },
+  "compiler_counts": {
+    "functions": 3387,
+    "calls": 9008,
+    "drops": 5706813,
+    "bodies": {
+      "Unstructured": 1395,
+      "Opaque": 1992
+    }
+  },
+  "direct_request_root_nodes": 994,
+  "opaque_request_root_boundaries": 780,
+  "complete_mediation": false,
+  "evidence_log_sha256": {
+    "policy-normalization-archive.log": "88f898466ccbbced127e612974dced99904a614b28d4a580f780e189399f1a58",
+    "policy-normalization-baseline.log": "9558dd8e0cdb3ed6c2c28c0b510eb59cad638a7f3f925d9a129b42f88f3fa9b1",
+    "policy-normalization-boundary.log": "b110d982e811d38bd713094951989f185099fc5f15873869850c3046b2c620ab",
+    "policy-normalization-build.log": "3b275c32cb26c368c5ad6334a2f8ba124b995782a3506b02b7a84bf1b82fd456",
+    "policy-normalization-clippy.log": "980455a9c01ef6f1b2026ce0e0b5b83e4da8e25a7165148d8292048a19ee801e",
+    "policy-normalization-focused.log": "10a070e81faaffb9567990bdb22866b19c400228e87076f60d3c4acdafcc98db",
+    "policy-normalization-garrett-record.log": "76ef85bcc4dd9a857d8f1c9beddd5c2519ff7f5d1fd3a434a931a500c5335ea6",
+    "policy-normalization-normal-build.log": "b6d19c83ee39e1f4f91213d23d32259eae2571ff238a4f3747f24b3f68062e23",
+    "policy-normalization-normal-workflows.json": "34ada6a9659a93b10399a0e1c133abaf9b999b40ba89d077d12adb7901c06833",
+    "policy-normalization-normal-workflows.log": "815a528c35d1558951d1a6f7350e4e2e7279343456f96aae9db702bea42d4615",
+    "policy-normalization-normal-workflows.xml": "eee73109b120770722a71ae60942635d14ae597cfb243061473a7e497c77f61e",
+    "policy-normalization-package.log": "fd689c6ae059cc05d86ae998763b6d4da9eb193778c8570dccb42d1bb44c0a97",
+    "policy-normalization-system.log": "1f7529afe53459dc543bbede6f7b615e0160f639a117e82704bee569a30b2979",
+    "policy-normalization-w4-w5.log": "db00e4091d44a0b16c69811a716ac52921971c2b134e79432d50d1714005d5ad"
+  },
+  "checked_scope": [
+    "Canonical documents and SHA-256 identities compared independently with Python on eleven policy groups, 132 equivalent spelling variants, idempotence, meaningful differences and invalid input/frame cases.",
+    "Six real mixed Python/native dispatch orders and policy-spelling scenarios compare completed SQLite coordinator records, provider headers and duplicate denial.",
+    "389 selected Garrett/native tests, 21 native unit cases, 55 boundary/catalogue/tool regressions, strict native lint in both feature modes, source/wheel builds and archive coverage.",
+    "239 named Garrett axiom checks, focused W4/W5 compilation and unchanged regenerated decision code. No new normalization theorem.",
+    "Both intended native callback paths regenerated from normal-feature bridge with bounded full capture; W0/W3/W4/W5/W6 gates pass."
+  ],
+  "limits": [
+    "Finite normalization and hashing adapter conformance, not all-input Python/Rust equivalence or completion of CORE-05/07/08/09.",
+    "Original native effective-grant/configuration document is preserved; only new coordinated request fingerprints use normalized policy identity. Existing reservations stay spent.",
+    "Nonempty native CLI policy tables remain unsupported; command-source normalization does not add a native credential command resolver.",
+    "Native coordinator serving, complete native I/O refinement, independent security review and live provider/VM/TPM deployment validation remain open.",
+    "The 107-mutation Rust campaign belongs to 8ef98e7; current extracted decision sources remain byte-identical, without a newly claimed full campaign.",
+    "Selected, required and full-suite counts overlap and are not additive.",
+    "Call paths show selected compiled bindings, not an executable trace or admission dominance.",
+    "Opaque dependencies and their callbacks remain contracts, not traversed implementations.",
+    "Implicit drops and unwind effects remain unresolved; counts are static compiler sites.",
+    "No credential/data-flow or native byte-trace correspondence is proved.",
+    "Normal compiled target only; other targets and feature combinations need separate evidence."
+  ]
+}
