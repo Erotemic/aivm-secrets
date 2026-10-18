@@ -1,0 +1,389 @@
+{
+  "schema": 1,
+  "source_commit": "37d32fdd81300bef45aa2e18b3cd91a21c51985c",
+  "source_dirty": false,
+  "scope": "Complete extracted native provider HTTP request framing and admission; finite Python/native provider parity",
+  "report_path": ".tools/http-wire-37d32fd-system/report.json",
+  "report_sha256": "d63b62799d473461b0ca2efb9a48aea1bfbf175e17a4f1fb609436936fdb0910",
+  "input_fingerprint_sha256": "f82c02e77930e56305212cd41954b8ef1d05e3e9dddbf3b1478e4907ac83ba77",
+  "full_suite": {
+    "passed": 2489,
+    "skipped": 0
+  },
+  "required_workflows": {
+    "conformance": 264,
+    "normal_release_without_conformance": 264,
+    "skipped": 0
+  },
+  "normal_workflow_report_path": ".tools/http-wire-37d32fd-validation/normal-report.json",
+  "normal_workflow_report_sha256": "a458b9ee317a0107d6691a75ab6f17a5dc77c291293a26b122b1dfd2730a8e46",
+  "proof_audit": {
+    "named_obligations": 351,
+    "new_obligations": 52,
+    "allowed_axioms": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+    ],
+    "checked_contracts": [
+      "exact successful request bytes under explicit Vec capacity bound",
+      "unchanged buffer on input refusal",
+      "success requires all validators",
+      "accepted field grammar and case-insensitive reserved/duplicate rejection",
+      "concrete decimal port/body length and exact opaque body bytes"
+    ]
+  },
+  "http_wire_mutations": {
+    "source_commit": "4b86a211b27a3f42759770823bbfe01027eea0e3",
+    "reused_with_identical_rust_proof_and_mutator_inputs": true,
+    "rejected": 13,
+    "mutation_filter": "^http wire ",
+    "process_exit_code": 0,
+    "full_historical_campaign": false,
+    "names": [
+      "http wire right operand not folded (GarrettHttpWireHeaders)",
+      "http wire case folding altered (GarrettHttpWireHeaders)",
+      "http wire reserved header admitted (GarrettHttpWireValidation)",
+      "http wire duplicate name admitted (GarrettHttpWireValidation)",
+      "http wire credential validation omitted (GarrettHttpWire)",
+      "http wire start validation omitted (GarrettHttpWire)",
+      "http wire body validation omitted (GarrettHttpWire)",
+      "http wire header validation omitted (GarrettHttpWire)",
+      "http wire decimal digit changed (GarrettHttpWireDecimal)",
+      "http wire destination port substituted (GarrettHttpWire)",
+      "http wire body length overstated (GarrettHttpWire)",
+      "http wire body discarded (GarrettHttpWire)",
+      "http wire credential copied outside authentication (GarrettHttpWire)"
+    ],
+    "log_path": ".tools/http-wire-37d32fd-validation/mutations.log",
+    "log_sha256": "666a1b364f1e2d67961a44973971c80af43d5a466b7213cc1286e8b65680d818"
+  },
+  "full_frame_runtime": {
+    "pytest_cases": 8,
+    "implementations": [
+      "rust",
+      "python"
+    ],
+    "authentication": [
+      "bearer",
+      "api-key"
+    ],
+    "methods": [
+      "POST",
+      "PATCH"
+    ],
+    "cases": [
+      "full ordered header multiplicity and exact serialized body length",
+      "Unicode and CRLF-looking body text",
+      "NUL arguments refused before provider HTTP"
+    ]
+  },
+  "compiler_profiles": {
+    "bridge": {
+      "report_path": ".tools/http-wire-37d32fd-bridge-calls/report.json",
+      "report_sha256": "cde0ec9851d88e6b0536690ed4428dcc05e2a5ee783fe7c587696d51a786b09d",
+      "counts": {
+        "functions": 3407,
+        "calls": 9041,
+        "drops": 5709031,
+        "bodies": {
+          "Unstructured": 1411,
+          "Opaque": 1996
+        }
+      },
+      "direct_handler_nodes": 1017,
+      "opaque_handler_boundaries": 779,
+      "witnesses": {
+        "account-controller-executor": [
+          767,
+          1067,
+          1384,
+          1766,
+          2162,
+          2393,
+          2618
+        ],
+        "coordinated-manifest-executor": [
+          767,
+          1067,
+          1385,
+          1772,
+          2181,
+          2406,
+          2175,
+          2399
+        ],
+        "account-authentication-bytes": [
+          767,
+          1067,
+          1384,
+          1766,
+          2162,
+          2393,
+          2618,
+          2913,
+          2956,
+          3214,
+          3321,
+          1627
+        ],
+        "manifest-authentication-bytes": [
+          767,
+          1067,
+          1385,
+          1772,
+          2181,
+          2406,
+          2175,
+          2399,
+          2633,
+          2956,
+          3214,
+          3321,
+          1627
+        ],
+        "account-request-line": [
+          767,
+          1067,
+          1384,
+          1766,
+          2162,
+          2393,
+          2618,
+          2913,
+          2956,
+          3214,
+          3315,
+          3355
+        ],
+        "manifest-request-line": [
+          767,
+          1067,
+          1385,
+          1772,
+          2181,
+          2406,
+          2175,
+          2399,
+          2633,
+          2956,
+          3214,
+          3315,
+          3355
+        ],
+        "account-complete-header-admission": [
+          767,
+          1067,
+          1384,
+          1766,
+          2162,
+          2393,
+          2618,
+          2913,
+          2956,
+          3214,
+          3314,
+          3357,
+          3387,
+          3401,
+          3389
+        ],
+        "manifest-complete-header-admission": [
+          767,
+          1067,
+          1385,
+          1772,
+          2181,
+          2406,
+          2175,
+          2399,
+          2633,
+          2956,
+          3214,
+          3314,
+          3357,
+          3387,
+          3401,
+          3389
+        ]
+      },
+      "complete_mediation": false,
+      "artifact_sha256": {
+        "aivm_secrets_garrett.ullbc": "5f06a3998ab1180aed2e753b7352c62111d2203c1adf483c452ebee10ed1cfd4",
+        "build.log": "92e06e4842c2fa9a2139c34892b15d58451290c4ed4fe3a60c23f8f551bc9ec1",
+        "capture.json": "404e4e8dd8d620db4c1f0f48e2f5a538ab5a07e897fa0a45eeb8f4ed7bcd82e8",
+        "compiler.log": "2f65c8ef3639c98308d15a0bb3e1d4f8f7d46284ee324e6b9e05623e2654eebd",
+        "compiler.ullbc.gz": "0d628144a45bd883055c884eac9b8552e12e77f813476ba2edcf0755799a45c6",
+        "projection.json": "ca9bffbb8c7532d70945441bd979265cda1f04b19d879a4851ff7c30ee9f2fcb",
+        "projector.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "report.json": "cde0ec9851d88e6b0536690ed4428dcc05e2a5ee783fe7c587696d51a786b09d"
+      }
+    },
+    "coordinator": {
+      "report_path": ".tools/http-wire-37d32fd-coordinator-calls/report.json",
+      "report_sha256": "db54091af921e890c992bc73e13614648662c3213b9c6e66704f2e71e378d0c4",
+      "counts": {
+        "functions": 945,
+        "calls": 1434,
+        "drops": 249313,
+        "bodies": {
+          "Unstructured": 264,
+          "Opaque": 681
+        }
+      },
+      "direct_handler_nodes": 351,
+      "opaque_handler_boundaries": 310,
+      "witnesses": {
+        "coordinator-operator-admission": [
+          329,
+          522,
+          665,
+          759,
+          838
+        ],
+        "coordinator-member-admission": [
+          329,
+          522,
+          688,
+          786,
+          838
+        ],
+        "coordinator-activate": [
+          329,
+          522,
+          698
+        ],
+        "coordinator-revoke": [
+          329,
+          522,
+          690
+        ],
+        "coordinator-reserve": [
+          329,
+          522,
+          708
+        ],
+        "coordinator-finish": [
+          329,
+          522,
+          709
+        ]
+      },
+      "complete_mediation": false,
+      "artifact_sha256": {
+        "aivm_secrets_garrett.ullbc": "7cdb17d65caf96ecc3112072f10651785a961921e65f4f36d45f74f1ad80e6a2",
+        "build.log": "3997fc6790b8063b86c119e91f87ac7395ac6cf26135da637dcb229006bc32dc",
+        "capture.json": "0ef498e3140eaa726e0a2bf0d1b6313b2af436c57b468f84770d89fc590e06b4",
+        "compiler.log": "25544b8fc481de14afe998d889f1ca6f1266ebd972d73b77cc9a2476ae9c4b6f",
+        "compiler.ullbc.gz": "1c560f4e92d314017d4166e87e4367d76dbf7cd23c8865967958ecc5b4f7fc7a",
+        "projection.json": "b36e479535712fabce64d66e05f469bf02bcdce8ec2075e5b8252a5a2d6a6d0b",
+        "projector.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "report.json": "db54091af921e890c992bc73e13614648662c3213b9c6e66704f2e71e378d0c4"
+      }
+    }
+  },
+  "selected_garrett_runtime_tests": 475,
+  "initial_portable_attempt": {
+    "source_commit": "4b86a211b27a3f42759770823bbfe01027eea0e3",
+    "passed": 2487,
+    "failed": 1,
+    "report_path": ".tools/http-wire-37d32fd-validation/first-system-report.json",
+    "report_sha256": "422b39f582719e355be355d636fbfa05c01046ffef1db3685e5a06e4eba5481f",
+    "cause": "detached base64url certificate thumbprint may be parsed as an option",
+    "correction": "attached --expected-certificate-sha256=value in test invocations and documentation",
+    "deterministic_native_regression_cases": 25,
+    "production_semantics_changed": false
+  },
+  "package_artifact_sha256": {
+    ".tools/http-wire-dist/aivm_secrets-0.2.0-py3-none-any.whl": "881a6cff6aa6bc75f6b2b1ca60b165d551e86483d153c50ca7c5b7e3362205ac",
+    ".tools/http-wire-dist/aivm_secrets-0.2.0.tar.gz": "fa279c6328ec0f590254f5eb68f953f6ce91eac27e024afd1d00709a454adfd2"
+  },
+  "freshness_primitive_runtime_tests": 26,
+  "input_sha256": {
+    "rust/crates/aivm-secrets-garrett-core/src/http_wire.rs": "5a3815e4a99632e99c2c99d97f763a37bcc9e77623aed6714875e7e4ec583461",
+    "rust/crates/aivm-secrets-garrett-core/src/lib.rs": "2c3997778d0b27c55ee11f288292a47b2336587c1970656a19ff7b77477aa10f",
+    "rust/crates/aivm-secrets-garrett/src/custody.rs": "7f7deb06e214bba1991bafddb839f1b1a54e78474ff8f3a7553ad5252e8c6888",
+    "rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs": "c086dec3a4c60fabfb70e78eafe9618d65cc5e3392ed18c5550effcc510ef91e",
+    "proofs/generated/AivmSecretsGarrettCore.lean": "4b6f36e5d6f2e8fbec4d069ba99f8d3bccb1546f1634a0f7b5339216d847de07",
+    "proofs/GarrettCheck.lean": "b5d6e9754fa4131f135536607031956cf3408cc95e3f5193f34b35777fe34d4f",
+    "proofs/garrett-manifest.json": "183c1059448719d7be29d6eed08160a1ffd3d3890910abe3a2471bfb46941e29",
+    "proofs/manifest.json": "f4fcf6c432e34b81f3d67ba71e831c45b915279583d7a1af1a24505ae16da64a",
+    "tests/test_rust_http_wire.py": "0f5883ee8d28635aa59399e180e6eb4f25755ca4d9866757caaf5e20e373edc8",
+    "tests/secrets_helpers.py": "3ea44d9992d258bd9ceabbbf0ec1ae421e9c95f71600cd81d3b8a2e2f1ee78c6",
+    "tests/test_secrets_identity_operator.py": "5d63e75c2f1ec9b54e077cdffc3f08ce943beda921086931e7ed29c7169b6ac5",
+    "tests/test_secrets_core_extensions.py": "c8dec6a4e5d1fe4ffdf1b7b56b10efff6b581404c6c4b1c04d8e4a4a0ffdf3af",
+    "dev/verification/garrett.py": "110a20857221d3aff3087ff924e0b56230f4886c0dbd6d7126255458330df390",
+    "dev/verification/system.py": "9536ce4b57e67188b0e1598f9991330a26e4c0ba360ce49e61d7ac9139bbf0f3",
+    "dev/verification/w3_effect_boundary.py": "cb1f73ccc4e23b8899594240d28b2024b83385dfd339b90e1ad1a3185335b86d",
+    "dev/verification/w6_adapter.py": "ed5e6bf8aba02c7541ff642fcca18ff41a578a337f9bdeb647604efdfa96680f",
+    "dev/verification/specialized_calls.py": "ee48c66f31f09550cb7245eb2f6da1e05506b27e21dd22166a6e865dd81073a6",
+    "tests/test_specialized_calls.py": "01b2c92c6145960e93f96a2a0b5573d8d81604de9fab336c5b1f04de92d65a55",
+    "proofs/GarrettHttpWire.lean": "ff07e3cad080257e1f2d32d3fb8d36d4f1f5e90b2a32f24b9ceccc63240964b4",
+    "proofs/GarrettHttpWireDecimal.lean": "687c5076f62122da1a1f7053a78d16d64335bd840dd79fe06887d0bb327df235",
+    "proofs/GarrettHttpWireFormatting.lean": "ee6dfc3fe1baea9be4ea114d515cd54263ca87617aebd71509c82aa5cfc31e26",
+    "proofs/GarrettHttpWireHeaders.lean": "3e405c1c53ea0cc954aabd28d6fba380d5ca83f65b0a5cb8a2288757fc2cb95b",
+    "proofs/GarrettHttpWireValidation.lean": "e0f45d0fad6ed1c56ee56765d888e8ee34066537a86f6b17abb059cf060e43aa"
+  },
+  "validation_artifact_sha256": {
+    "cas-regression.log": "888b54c5ccd40c0680bfc9e991551dd889cbd55f3e3b05cf0fc781f8563a3b06",
+    "first-full-python-native.log": "798767a31b82c2ef2534ab0a50ec01eb5a038e4f48f457d515dad9c3783dfb59",
+    "first-system-report.json": "422b39f582719e355be355d636fbfa05c01046ffef1db3685e5a06e4eba5481f",
+    "http-wire-accounting.log": "15baae0de193d71dced25361763f0b27d3479c1cc3e9ff4cc6b5a1b7ba1db3db",
+    "http-wire-evidence.py": "14310f28013fe039a875bc71166eeefbeb7496d28d9bc1a596c6b5cac9e361ed",
+    "http-wire-extract.log": "1993883db7a3665f00a86b5c5552299a9b9c1d7601b873773339bddbddbf236f",
+    "http-wire-final-build.log": "0c8376adc9c32f2a3ab835cd9069b5531c396b17470368f07665d2503ed08927",
+    "http-wire-focused-registry.log": "fc11f48e2ae30bb4cca56d25ae358773277ac28f2d8716f5f6de8bf1236aa597",
+    "http-wire-freshness-record.log": "3853adbaf312865df054f01ad4522dfe8310003a25d723b9f9ba26aa63376f36",
+    "http-wire-full-frame-runtime.log": "c8f5d75d68e078bfc129bd98f0cf4c2c8d8c4a1cbd42dd084bb43cf575ae0a0e",
+    "http-wire-garrett-record.log": "64a7e7e521dfb991c67f6919aeefc79bbc3d80be6c2d4ba64dcb4a0bbaf47f64",
+    "http-wire-native-unit.log": "5efe6e0c3a69f23b65b0cae20046783a8c473e1f3bfbcd0661df60e2c166a03b",
+    "http-wire-package.log": "952c8493c451fc56963bb3d31c2c49796108dfabd3440787fa25d8bc12542d38",
+    "http-wire-runtime.log": "aa2f0eb867d87db5b3ffcfa7a959c5d7a39dc64906ef5e30d70fd95d61f0bb56",
+    "http-wire-system.log": "216e34a1832358d98e0113e61c594c1a8ee7e6c232548b10814f9bfdf7a991ad",
+    "http-wire-unit.log": "e7324dd7a07a65185a72db58cf4c70cbb923534387fff1df71f0ae6b92f17449",
+    "mutations.log": "666a1b364f1e2d67961a44973971c80af43d5a466b7213cc1286e8b65680d818",
+    "normal-build.log": "7a7bb64a28cdda9b91e6e27f41be455104d929b5d7ad6dd5beca75fc5a47f1f4",
+    "normal-report.json": "a458b9ee317a0107d6691a75ab6f17a5dc77c291293a26b122b1dfd2730a8e46",
+    "normal-workflows.log": "d23b69e79bdea58c1324ad10192bf6c991323a2cdc039e5b0bff02c195a81e78",
+    "normal-workflows.xml": "6b90c363abba50cd8e30da92ff548ce17997e50aa4887a7b062308c7a677d2bc",
+    "http-wire-restore-debug.log": "2fa7788396d0163ba3a3a0f070c88464511157b76c97a18cb9b30854f661b31d",
+    "http-wire-restore-release.log": "0b7f7c77bee2b935e0fb8ec354a1a519792cfb8756bf54971a95273f5ea9488f",
+    "http-wire-restore-coordinator-debug.log": "42434cdd472b52bc58295dc4a61042a1ba4976596cca8da5006c9054ebf7876f",
+    "http-wire-restore-coordinator-release.log": "df63af3d529f9dba6c55bac056bb86a86da7bee913b7d8f27142dc5b425321f1",
+    "http-wire-restored-help.log": "5778db245cc8e3c3786c5b38a8a44e222e2bbc8355998aa28e348bf1c0199541",
+    "http-wire-accounting-final.log": "15baae0de193d71dced25361763f0b27d3479c1cc3e9ff4cc6b5a1b7ba1db3db"
+  },
+  "open_obligations": [
+    "route/effect field conversion and destination authorization",
+    "canonical JSON and provider response parsing",
+    "TLS/crypto/OS and provider assumptions",
+    "complete native I/O mediation and implementation-to-trace refinement",
+    "memory erasure and broad all-input Python/Rust parity",
+    "independent maintainer security review and live deployment"
+  ],
+  "live_vm_or_provider_credentials_used": false,
+  "restored_builds": {
+    "conformance": false,
+    "broker_profiles": [
+      "debug",
+      "release"
+    ],
+    "optional_coordinator_profiles": [
+      "debug",
+      "release"
+    ],
+    "help_checks": [
+      "garrett-bridge",
+      "garrett-client",
+      "garrett-coordinator"
+    ],
+    "artifact_paths": [
+      ".tools/http-wire-37d32fd-validation/http-wire-restore-debug.log",
+      ".tools/http-wire-37d32fd-validation/http-wire-restore-release.log",
+      ".tools/http-wire-37d32fd-validation/http-wire-restore-coordinator-debug.log",
+      ".tools/http-wire-37d32fd-validation/http-wire-restore-coordinator-release.log",
+      ".tools/http-wire-37d32fd-validation/http-wire-restored-help.log",
+      ".tools/http-wire-37d32fd-validation/http-wire-accounting-final.log"
+    ]
+  }
+}

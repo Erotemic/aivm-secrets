@@ -1,8 +1,8 @@
 # Active work: useful broker workflows and conditional credential confinement
 
 Status: **work plan, not a completed assurance claim**, reconciled 2026-10-18
-against frozen runtime/proof implementation `078ef2d` and its
-[coordinator authorization validation record](../../dev/validation/2026-10-18-coordinator-dispatch.json). This is the authoritative **priority and task queue**
+against frozen runtime/proof implementation `37d32fd` and its
+[complete request encoding validation record](../../dev/validation/2026-10-18-http-wire.json). This is the authoritative **priority and task queue**
 for new agents. Existing P0-P5, M0-M6, and G0-G5 stages remain useful design,
 implementation history, and prerequisite inventories; they are **not three
 competing current schedules**. Revisit this queue after each accepted milestone.
@@ -99,6 +99,13 @@ and unchanged buffers on rejection. The extracted byte contract applies to the
 native provider paths with either software or TPM-backed client identity;
 it does not strengthen key custody. Route/effect conversion, canonical JSON,
 TLS, response parsing and complete native I/O correspondence remain open.
+
+The frozen encoder validation passes 2,489 portable tests with zero skips,
+264 required workflows in both build configurations, the 351-name Garrett
+audit and all 13 new encoder mutations. Compiler profiles retain eight bridge
+paths and six coordinator paths. These are scoped byte/admission and call-path
+results; broad core parity, transitive mediation, atomic guest delivery,
+independent review and live deployment remain open.
 
 The [parsed-policy identity increment](../verified-policy-normalization.md) closes
 the known raw-document fingerprint difference in coordinated manifest writes.

@@ -8,7 +8,7 @@ synthetic process workflows now run on the pinned local toolchain; this does
 not close the whole-service correspondence obligations.
 
 **Status: locally tested native adapters; full native trace refinement remains
-open.** Frozen [policy-normalization validation](../dev/validation/2026-10-18-policy-normalization.json)
+open.** Frozen [complete request encoding validation](../dev/validation/2026-10-18-http-wire.json)
 records the runnable native suite. The [authentication-line follow-up](verified-http-auth.md)
 adds an extracted, kernel-checked byte leaf used by both provider writers.
 The [request-line refinement](verified-http-request.md) additionally checks exact

@@ -1,9 +1,11 @@
 # Complete native provider request encoding
 
-Status: complete extracted encoder and component/composition proofs compile;
-the 351-obligation Garrett audit and 475 selected runtime/parity tests pass.
-Full frozen runtime/compiler and filtered mutation validation are next; the last
-frozen validation remains the coordinator authorization checkpoint.
+Status: the [frozen validation record](../dev/validation/2026-10-18-http-wire.json)
+binds implementation `37d32fd` to 2,489 portable tests without skips, all
+264 required workflows in conformance and ordinary-release builds, 351 audited
+Garrett obligations and 13 rejected encoder mutations. The 52 new obligations
+include supporting lemmas; this is a scoped encoder result, not whole-service
+secrecy or all-input Python/Rust equivalence.
 
 Both native provider paths now use `http_wire::append_request` from the extracted
 Rust core. The account and manifest adapters supply public method/target/host,
@@ -73,5 +75,10 @@ python dev/verification/system.py --proofs --full-tests --call-linkage
 
 Use focused compilation of the changed Lean module during development. The
 filtered mutation command is not a replay of the historical full campaign.
+The 13 encoder mutations ran on `4b86a21`. The validated `37d32fd` adds only
+CLI-test argv/documentation corrections; the Rust, proof and mutator inputs are
+identical. The validation record retains the first failed portable attempt and
+the deterministic leading-dash certificate-thumbprint regression.
+
 Providers, keys and credentials in ordinary tests are synthetic; no VM, TPM or
 live provider credential is needed.
