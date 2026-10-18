@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "source_commit": "b41cdaf6d2ed6d3e3813914cd67442005b710a8c",
+  "source_dirty": false,
+  "scope": "candidate direct-call ledger, not mediation evidence",
+  "report_path": ".tools/native-calls-b41cdaf/report.json",
+  "report_sha256": "8149b7ea65a40844cd6e1e4575e32789b5352f5f008d386a4ec79b0e40840538",
+  "extraction_sha256": "febb904c7c4a4e93fd865ec3f13c6dbaea034801f75a7aa5e67a424f1f561804",
+  "counts": {
+    "owned_functions": 1908,
+    "calls": 13317,
+    "call_kinds": {
+      "dependency-boundary": 11409,
+      "owned-direct": 1840,
+      "unresolved-trait": 68
+    },
+    "drops": 80816
+  },
+  "direct_root_functions": 116,
+  "direct_traversal_incomplete": true,
+  "embedded_native_sources": 27,
+  "dependency_core_sources_without_embedded_text": 15,
+  "tests": {
+    "parser_cases": 11,
+    "selected_with_source_archive_and_W3_catalogue": 41
+  },
+  "compiler_probe": {
+    "added_unused_helper_retained": true,
+    "network_boundary_retained_outside_root": true,
+    "executed": false,
+    "source_restored": true,
+    "log_sha256": "ea6ed2ed6b79aab513d0502df9451c7430dff658cbdd0d5251705b7da849cf18"
+  },
+  "limits": [
+    "Direct edges underapproximate reachability; absence of a path proves nothing.",
+    "Trait, closure, function-pointer and generic callback dispatch is unresolved.",
+    "Drops and unwind paths are counted, not resolved into destructor calls.",
+    "Dependency bodies, including higher-order library calls, are not traversed.",
+    "Only the default-feature native library is extracted; binary startup is excluded.",
+    "No data-flow, temporal admission, concurrency or concrete I/O refinement is proved."
+  ]
+}
