@@ -1,5 +1,15 @@
 # W3: native Rust manifest effect-boundary review
 
+This document preserves the initial review snapshot below. Later native builds,
+workflows and extracted-controller results are recorded in
+[dispatch freshness](verified-dispatch-freshness.md),
+[coordination](verified-coordination.md) and
+[identity rebinding](verified-identity-rebinding.md). The current machine-readable
+inventory is authoritative for source counts. The optional
+[compiler call-site ledger](native-call-ledger.md) now supplies structured
+candidate paths, with callbacks, dependencies and drop/unwind still unresolved.
+It does not close the exhaustiveness obligation described below.
+
 **Status:** Initial source audit and narrow refactor authored. Not a
 complete-mediation proof, a verified whole-service call graph, a Lean theorem,
 or an I/O adapter correctness result. The changed Rust sources need a successful

@@ -64,6 +64,12 @@ server. The [same-key identity increment](../verified-identity-rebinding.md) als
 the existing grant through certificate/JWT renewal without restarting the broker.
 Broader core differential coverage, atomic guest delivery and a native coordinator server remain open.
 
+The [compiler-derived native call-site ledger](../native-call-ledger.md) is a
+reproducible W3/W6 investigation aid. It preserves all extracted owned bodies
+and explicitly leaves callbacks, dependency behavior, drops and unwind open;
+its direct-root traversal underapproximates reachability. It supplies no
+complete-mediation status or additional service-level theorem.
+
 ## Product question and security objective
 
 A hostile agent should be able to perform a *real, specifically authorized*
