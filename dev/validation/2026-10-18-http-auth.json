@@ -1,0 +1,115 @@
+{
+  "schema": 1,
+  "source_commit": "93cee2db2e9980137cb51a989b680307bb8ebefa",
+  "source_dirty": false,
+  "scope": "Extracted native authentication-header bytes, rejection and independent runtime conformance",
+  "integration_commit": "6fa89af84baaac9901356ed823e8d9f3b9570d3f",
+  "tool_correction": {
+    "source_commit": "6fa89af84baaac9901356ed823e8d9f3b9570d3f",
+    "changed_paths": [
+      "dev/journals/codex.md",
+      "dev/verification/garrett.py",
+      "proofs/garrett-manifest.json"
+    ],
+    "scope": "One mutation selector narrowed to the complete production match arm, plus tool hash and journal; all code outside mutate unchanged",
+    "production_and_lean_sources_unchanged": true,
+    "proof_coordinate_change": "Only dev/verification/garrett.py source hash"
+  },
+  "report_path": ".tools/http-auth-system-93cee2d/report.json",
+  "report_sha256": "8532d540592108e73aabe6ca412ac1020183d2d24b868b37fafbe620ab0ebb18",
+  "input_fingerprint_sha256": "f8b6ab5977c551bec15e5ee3def84fe4fdfcad4c56b160980d4be4b621353aed",
+  "full_suite": {
+    "passed": 2380,
+    "skipped": 0
+  },
+  "required_workflows": {
+    "conformance": 169,
+    "normal_release_without_conformance": 169,
+    "skipped": 0
+  },
+  "normal_workflow_report_path": ".tools/http-auth-validation-93cee2d/http-auth-normal-workflows.json",
+  "normal_workflow_report_sha256": "f1437ae5b7d646bdb8cf53851b0514428ac9764cd943f04ba0d5556ffe3971f4",
+  "header_mutations": {
+    "source_commit": "6fa89af84baaac9901356ed823e8d9f3b9570d3f",
+    "rejected": 8,
+    "full_historical_campaign": false,
+    "report_path": ".tools/http-auth-validation-93cee2d/http-auth-mutations-fixed.json",
+    "report_sha256": "ba59e61981efe2284be75b9b4f72cd148dce0e470172956b9b3d421ff2cd0ae7"
+  },
+  "compiler_report_path": ".tools/http-auth-calls-93cee2d/report.json",
+  "compiler_report_sha256": "ba7e0a9fe25d13c83283634b6e848d498de7b742d7540afaade3f40d54fb5b68",
+  "compiler_artifacts_sha256": {
+    "capture.json": "3d5cc5dc01e74582b147f04188e66ed8ca83103e1943b43319aa74ee56037c85",
+    "bridge.ullbc.gz": "cd0ac223ff714b6c5f1d0c5c5ae7f5c136497bba43ed9dfc844fe8d0480bb38c",
+    "projection.json": "0f36d91ef19a52ef01248f7f187d678ce7e9d3b193ee089a051ad342ee97fdd0",
+    "compiler.log": "6107c54f6a0a65fdf5a00b228a355c178f18b1be8b124975affb623a4cad209e",
+    "projector.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build.log": "343c13e7f6f2d320993b573f830525e33b59b3c32656ef426e015b1e30f3fdc2"
+  },
+  "compiler_counts": {
+    "functions": 3394,
+    "calls": 9018,
+    "drops": 5709259,
+    "bodies": {
+      "Unstructured": 1398,
+      "Opaque": 1996
+    }
+  },
+  "direct_request_root_nodes": 1000,
+  "opaque_request_root_boundaries": 783,
+  "witness_names": [
+    "account-controller-executor",
+    "coordinated-manifest-executor",
+    "account-authentication-bytes",
+    "manifest-authentication-bytes"
+  ],
+  "complete_mediation": false,
+  "proof_and_source_sha256": {
+    "rust/crates/aivm-secrets-garrett-core/src/http_auth.rs": "8408655a5d883ebed465afa63b4c6930f222cb4b4ce8727589ff0b00c15f96cf",
+    "proofs/GarrettHttpAuth.lean": "dcfd4159d5becf4b2ecd6cff234756ac3692b1f7a6cd30699a763e6322c90030",
+    "proofs/generated/AivmSecretsGarrettCore.lean": "4cafa85699cdc83bb8572baa859644a9ffd4dc24cc6aba9544d31d7c35197bca"
+  },
+  "evidence_log_sha256": {
+    "http-auth-archive-before-fix.log": "32186132650f95f45a857d193a6002110baeeeb00c8631d5a7c1560eb11396af",
+    "http-auth-archive.log": "4c26c72e87dd3191ec40fcfbdba332e794c7ceeb81792cead9a500ec5a38e6e9",
+    "http-auth-boundary-final.log": "b78c87a42d1001e3240483ed2c3798a02b29a11debf8c7b7dd4a42b624c1ba1d",
+    "http-auth-build.log": "d37eef4b866211c86f760e47cbe7cae0cfcd9b497e0ed155c3ccc828363cd6d8",
+    "http-auth-dependencies.log": "cdf64bde0cf7e19d9a2db2f63c1c5a422999866c4ccd0a213eb3abef9679c6ae",
+    "http-auth-freshness-record.log": "4d7d1ebe6c6d5336bf396462eac0d477fa2b2fc72077e431aaa4d711f2257392",
+    "http-auth-garrett-record.log": "31a9d6f3e2353c83de02c08bdd51541b1d5b9f45168a2b3748af6624f2a4243d",
+    "http-auth-mutations-fixed.json": "ba59e61981efe2284be75b9b4f72cd148dce0e470172956b9b3d421ff2cd0ae7",
+    "http-auth-mutations-fixed.log": "8ccc7fe662d625dec82eb9e580acfb5a3a54ed3da0cacc97b0b4272d2091b55f",
+    "http-auth-mutations.log": "6b0d777def72a4c0f19ff6cd94ffe14e196b4ba311b939028409b7fed2417311",
+    "http-auth-normal-build.log": "122e8b3527eaff38b017ff467130533d440f273216625a8dcc972d1040a3e424",
+    "http-auth-normal-workflows.json": "f1437ae5b7d646bdb8cf53851b0514428ac9764cd943f04ba0d5556ffe3971f4",
+    "http-auth-normal-workflows.log": "fd34a0956eb115cb3b27cb6836998776447c348c4f2b7b0c7935d7a9bd0e7c52",
+    "http-auth-normal-workflows.xml": "bcaf983c7d46b938ff7e693b47a94ccb3775aa91e1b87d8339a1e30d0431c3b8",
+    "http-auth-package.log": "606108da24662a5b7458c31277d7551aa9ddcfe09109f49538b99885152e0801",
+    "http-auth-process.log": "235164d300c8a1b2773b4cc07a67f7dd392dcba27a2b1767b44f0ebcdcc673e5",
+    "http-auth-proof.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "http-auth-system.log": "23a122d3f6968c746da0b1c48b915067da70da4344ef3da0810c9ec29e332e72",
+    "http-auth-unit.log": "b11f60d67428f31fed0c04e57cefaecc848dccceb9885ea03abd1f685e2169de",
+    "http-auth-w4-w5.log": "db00e4091d44a0b16c69811a716ac52921971c2b134e79432d50d1714005d5ad"
+  },
+  "checked_scope": [
+    "Actual extracted helper: validated ASCII credential bytes, invalid return preserves every existing buffer byte, exact selected-prefix/credential/CRLF construction, success implies validity, one appended line and positive witnesses for both modes.",
+    "Both native provider writers call the helper; account request assembly precedes TCP; final freshness admission remains after TLS preparation.",
+    "Eight real native/Python provider-observation scenarios across account/manifest, bearer/API-key and punctuation/4096-byte credentials; guest/audit literal credentials absent.",
+    "397 selected Garrett tests, 23 native units plus two core units; 26 primitive/freshness and 68 boundary/catalogue/tool cases; strict lint, source/wheel builds and archive coverage.",
+    "251 named Garrett obligations audited; focused W4/W5 compile without changed theorem statements.",
+    "All four compiler call paths including both header builder/validator links regenerated from frozen normal-feature bridge."
+  ],
+  "limits": [
+    "The exact accepted-byte total-correctness theorem uses the documented standard-model buffer bound. Real allocation, compiler/std-model correspondence and physical memory erasure remain boundaries.",
+    "Authentication-line refinement does not prove full request/destination selection, parser/render behavior, all-output mediation, TLS delivery or whole-service confidentiality.",
+    "Initial mutation attempt rejected seven cases and stopped on an ambiguous selector; corrected clean 6fa89af replay rejects all eight. Runtime/full reports remain attributed to 93cee2d.",
+    "The old 107-mutation campaign belongs to 8ef98e7; this is an eight-case increment, not a new full 115-case campaign.",
+    "Selected, required and full-suite counts overlap and are not additive.",
+    "Broader Python/Rust core parity, independent review and live provider/VM/physical TPM deployment validation remain open.",
+    "Call paths show selected compiled bindings, not an executable trace or admission dominance.",
+    "Opaque dependencies and their callbacks remain contracts, not traversed implementations.",
+    "Implicit drops and unwind effects remain unresolved; counts are static compiler sites.",
+    "No credential/data-flow or native byte-trace correspondence is proved.",
+    "Normal compiled target only; other targets and feature combinations need separate evidence."
+  ]
+}
