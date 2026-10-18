@@ -24,7 +24,7 @@ A line that is not a bounded JSON object of that shape -- longer than
 naming no listed primitive -- is answered ``invalid_request``. An oversized
 line is discarded as it is read, never held in memory whole.
 
-No clock, file, credential or randomness is read. The future Rust runner,
+No clock, file, credential or randomness is read. The independent Rust runner,
 selected by ``AIVM_SECRETS_RUST_PRIMITIVES_RUNNER`` in the parity tests, must
 implement this contract from its own code. The runner sits beside the pure
 ``primitives`` package rather than inside it because it owns process streams.

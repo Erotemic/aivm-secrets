@@ -2,11 +2,11 @@
 
 ``tests/secrets_vectors/primitives/*-v1.jsonl`` state, primitive by
 primitive, what is accepted and with which fixed code the rest is refused.
-The Python reference runner always replays them. The Rust runner is NOT
-implemented yet: set AIVM_SECRETS_RUST_PRIMITIVES_RUNNER to an independently
-built executable and this suite then requires it to agree with both the
-corpora and Python, rather than falling back. Until then that test is a
-reported skip, never a parity result.
+The Python reference runner always replays them. Build the independent Rust
+``primitives-conformance`` executable and select it with
+``AIVM_SECRETS_RUST_PRIMITIVES_RUNNER``. The usable-system gate selects it
+explicitly and rejects skips. An ordinary unconfigured pytest invocation
+reports a skip rather than substituting Python.
 
 Replies are compared as canonical JSON (``typed``), never with Python's
 ``==``: ``True == 1 == 1.0``, so ``==`` would certify a runner that answers
@@ -18,6 +18,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import os
+import random
 import sys
 from pathlib import Path
 from typing import Any
@@ -379,9 +380,53 @@ def test_the_runner_dispatches_only_through_its_closed_table() -> None:
                      'args': {}}) == INVALID
 
 
-def test_rust_runner_matches_python_and_frozen_vectors_when_built() -> None:
+@pytest.fixture(scope='session')
+def primitives_runner() -> list[str]:
     rust = os.environ.get('AIVM_SECRETS_RUST_PRIMITIVES_RUNNER')
     if not rust:
-        pytest.skip('Rust primitives runner is pending; no parity is claimed')
+        pytest.skip('set AIVM_SECRETS_RUST_PRIMITIVES_RUNNER to the independent Rust binary')
     assert Path(rust).is_file(), 'configured Rust primitives runner is absent'
-    check_runner([rust])
+    return [rust]
+
+
+def test_rust_runner_matches_python_and_frozen_vectors_when_built(primitives_runner) -> None:
+    check_runner(primitives_runner)
+
+
+def test_rust_digest_unicode_order_and_recursive_domain(primitives_runner) -> None:
+    rng = random.Random(0xC0DEC)
+    text = ['', '\x00\b\f\n\r\t', '"\\/', '\x7f', 'é', 'e\u0301',
+            '\ue000', '\U00010000', '\U0010ffff', '\U0001f600']
+    scalar = [None, True, False, -(2**63), 2**63-1, 0, 1, *text]
+
+    def tree(depth):
+        if depth == 0 or rng.randrange(3) == 0:
+            return rng.choice(scalar)
+        if rng.randrange(2):
+            return [tree(depth-1) for _ in range(rng.randrange(5))]
+        return {key: tree(depth-1) for key in rng.sample(text, rng.randrange(6))}
+
+    values = [tree(4) for _ in range(250)]
+    values += [{'\U00010000': 1, '\ue000': 2}, [1.0], [2**63], [-(2**63)-1],
+               {'deep': [{'fraction': -0.0}]}]
+    payload = b''.join(line('codec.digest', value=value) for value in values)
+    assert typed_replies(primitives_runner, payload) == typed_replies(PYTHON, payload)
+
+
+def test_rust_wire_preserves_payload_types_and_large_integers(primitives_runner) -> None:
+    values = [None, True, False, 0, -0.0, 1.0, 1e100, 2**63, 10**4299,
+              {'unicode': '\U0001f600', 'nested': [False, 1.5, 10**100]},
+              {'$serde_json::private::Number': '1'},
+              {'$serde_json::private::Number': 'not a number'},
+              {'$serde_json::private::RawValue': '[1,2]'},
+              {'nested': [{'$serde_json::private::RawValue': 'not JSON'}]}]
+    payload = b''.join(line('wire.parse_frame', frame={
+        'version': 1, 'capability': 'synthetic', verb: value})
+        for verb in ['request', 'delegate', 'describe', 'renounce'] for value in values)
+    assert typed_replies(primitives_runner, payload) == typed_replies(PYTHON, payload)
+
+
+def test_rust_full_runner_does_not_accept_the_freshness_extension(primitives_runner) -> None:
+    payload = line('freshness.require_fresh', actual=0, expected=0,
+                   now=1, not_before=0, expires_at=2)
+    assert typed_replies(primitives_runner, payload) == [typed(INVALID)]

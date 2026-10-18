@@ -49,6 +49,8 @@ def mutate(repo, filename, before, after):
 
 
 @pytest.mark.parametrize('file,old,new', [
+    (RUST + 'json.rs', 'decode(&raw, 0)',
+     'serde_json::from_slice(bytes).map_err(|_| Error::InvalidCapability)'),
     (RUST + 'authority/rebinding.rs',
      'let now = clock()?;', 'let now = 0;'),
     (RUST + 'authority/rebinding.rs',

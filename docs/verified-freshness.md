@@ -29,8 +29,10 @@ an oversize refusal, with one flushed reply per input line.
 
 The runner supports `epochs.advance`, `epochs.require_current`,
 `validity.require_active`, and `freshness.require_fresh`. It is a development
-conformance executable. The existing complete
-`AIVM_SECRETS_RUST_PRIMITIVES_RUNNER` gate remains pending.
+conformance executable. The separate complete-table
+[`primitives-conformance` runner](primitive-conformance.md) now exercises the
+existing `AIVM_SECRETS_RUST_PRIMITIVES_RUNNER` gate. Its binding/digest/frame
+adapters are runtime-tested, not additions to this proof scope.
 
 ## What is proved
 

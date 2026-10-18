@@ -28,7 +28,9 @@ impl<'de> Deserialize<'de> for Distinct {
         d.deserialize_map(Fields)
     }
 }
-fn validate(raw: &RawValue, depth: usize) -> Outcome<()> {
+// Build objects explicitly. Value's generic deserializer recognizes Serde's
+// private Number/RawValue marker keys; guest/provider JSON must preserve them.
+fn decode(raw: &RawValue, depth: usize) -> Outcome<Value> {
     let text = raw.get();
     match text.as_bytes()[0] {
         b'{' => {
@@ -37,9 +39,13 @@ fn validate(raw: &RawValue, depth: usize) -> Outcome<()> {
             }
             let fields: Distinct =
                 serde_json::from_str(text).map_err(|_| Error::InvalidCapability)?;
-            for value in fields.0.values() {
-                validate(value, depth + 1)?;
-            }
+            Ok(Value::Object(
+                fields
+                    .0
+                    .into_iter()
+                    .map(|(key, value)| Ok((key, decode(&value, depth + 1)?)))
+                    .collect::<Outcome<_>>()?,
+            ))
         }
         b'[' => {
             if depth >= 64 {
@@ -47,13 +53,16 @@ fn validate(raw: &RawValue, depth: usize) -> Outcome<()> {
             }
             let values: Vec<Box<RawValue>> =
                 serde_json::from_str(text).map_err(|_| Error::InvalidCapability)?;
-            for value in &values {
-                validate(value, depth + 1)?;
-            }
+            Ok(Value::Array(
+                values
+                    .iter()
+                    .map(|value| decode(value, depth + 1))
+                    .collect::<Outcome<_>>()?,
+            ))
         }
-        b'"' => {
-            let _: String = serde_json::from_str(text).map_err(|_| Error::InvalidCapability)?;
-        }
+        b'"' => Ok(Value::String(
+            serde_json::from_str(text).map_err(|_| Error::InvalidCapability)?,
+        )),
         b'-' | b'0'..=b'9' => {
             if text.contains(['.', 'e', 'E']) {
                 let number: f64 = text.parse().map_err(|_| Error::InvalidCapability)?;
@@ -63,18 +72,22 @@ fn validate(raw: &RawValue, depth: usize) -> Outcome<()> {
             } else if text.trim_start_matches('-').len() > 4300 {
                 return Err(Error::InvalidCapability);
             }
+            Ok(Value::Number(
+                serde_json::from_str(text).map_err(|_| Error::InvalidCapability)?,
+            ))
         }
-        _ => {}
+        b't' => Ok(Value::Bool(true)),
+        b'f' => Ok(Value::Bool(false)),
+        b'n' => Ok(Value::Null),
+        _ => Err(Error::InvalidCapability),
     }
-    Ok(())
 }
 pub fn parse(bytes: &[u8], limit: usize) -> Outcome<Value> {
     if bytes.len() > limit {
         return Err(Error::InvalidCapability);
     }
     let raw: Box<RawValue> = serde_json::from_slice(bytes).map_err(|_| Error::InvalidCapability)?;
-    validate(&raw, 0)?;
-    serde_json::from_slice(bytes).map_err(|_| Error::InvalidCapability)
+    decode(&raw, 0)
 }
 fn string(out: &mut String, value: &str) {
     use std::fmt::Write;
@@ -139,6 +152,7 @@ pub fn canonical(value: &Value) -> Vec<u8> {
     encode(&mut out, value);
     out.into_bytes()
 }
+
 pub fn keys<'a>(
     value: &'a Value,
     required: &[&str],
@@ -195,4 +209,28 @@ pub fn thumbprint(value: &Value) -> Outcome<String> {
         return Err(Error::InvalidCapability);
     }
     Ok(s.to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn input_objects_cannot_impersonate_serde_number_tokens() {
+        for content in ["1", "not a number"] {
+            let value = json!({"$serde_json::private::Number":content});
+            let raw = serde_json::to_vec(&value).unwrap();
+            assert_eq!(parse(&raw, 65536).unwrap(), value);
+        }
+    }
+
+    #[test]
+    fn raw_value_markers_preserve_objects_and_uninterpreted_text() {
+        for content in ["[1,2]", "{\"duplicate\":1,\"duplicate\":2}", "not JSON"] {
+            let value = json!({"nested":[{"$serde_json::private::RawValue":content}]});
+            let raw = serde_json::to_vec(&value).unwrap();
+            assert_eq!(parse(&raw, 65536).unwrap(), value);
+        }
+    }
 }

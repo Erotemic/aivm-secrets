@@ -30,6 +30,7 @@ WORKFLOW_TESTS = [
     'tests/test_rust_oauth_current_session.py',
     'tests/test_rust_coordination.py',
     'tests/test_rust_bound_renewal.py',
+    'tests/test_secrets_primitives_parity.py',
     'tests/test_rust_garrett_authority.py::test_tpm_requirement_rejects_software_before_credential_custody',
 ]
 
@@ -113,7 +114,8 @@ def main() -> int:
         # Import only the existing runner registry; do not substitute a Python
         # implementation when a binary is absent or an operation is refused.
         from garrett import RUNNERS
-        runners = dict(RUNNERS, AIVM_SECRETS_FRESHNESS_RUNNER='freshness-conformance')
+        runners = dict(RUNNERS, AIVM_SECRETS_FRESHNESS_RUNNER='freshness-conformance',
+                       AIVM_SECRETS_RUST_PRIMITIVES_RUNNER='primitives-conformance')
         for variable, binary in runners.items():
             path = ROOT / 'rust/target/debug' / binary
             if not path.is_file() or not os.access(path, os.X_OK):

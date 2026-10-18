@@ -189,3 +189,28 @@ def test_w6_native_credential_reflection_keeps_denial_public_and_audit_private(t
                              effects(p, 'pr.diff', arguments(), PULL), successful=False)
             assert reply['error']['code'] == 'upstream_response'
             assert TOKEN not in (tmp_path / 'provider-audit.jsonl').read_text()
+
+
+@pytest.mark.parametrize('marker', ['$serde_json::private::Number', '$serde_json::private::RawValue'])
+def test_w6_json_marker_object_is_not_a_guest_integer(tmp_path, marker):
+    with TLSService(provider_directory(tmp_path), host='api.example.org') as server:
+        server.routes[('GET', '/v1/tickets/7')] = {'id': 7}
+        with ManifestCase(tmp_path, server) as case:
+            reply = case.invoke(operation='ticket.view', arguments={'ticket': {marker: '7'}})
+            assert reply['ok'] is False, reply
+            assert reply['error']['code'] in {'denied', 'invalid_request'}
+            assert server.seen() == []
+
+
+@pytest.mark.parametrize('marker', ['$serde_json::private::Number', '$serde_json::private::RawValue'])
+def test_w6_json_marker_object_cannot_satisfy_integer_disclosure(tmp_path, marker):
+    with TLSService(provider_directory(tmp_path), host='api.example.org') as server:
+        server.routes[('GET', '/v1/tickets/7')] = {'id': {marker: '7'}, 'secret': TOKEN}
+        p = ticket_policy(tmp_path, server)
+        with ManifestCase(tmp_path, server, p) as case:
+            reply = trace_of(case, tmp_path, server, 'ticket.view', {'ticket': 7},
+                             effects(p, 'ticket.view', {'ticket': 7}, None), successful=False)
+            assert reply['error']['code'] == 'upstream_response'
+            assert 'result' not in reply
+            assert len(server.seen()) == 1
+            assert TOKEN not in json.dumps(reply)

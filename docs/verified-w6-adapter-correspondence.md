@@ -1,5 +1,12 @@
 # W6: native manifest adapter / concrete event correspondence
 
+The initial report below predates the local native validation recorded in
+[dispatch freshness](verified-dispatch-freshness.md),
+[coordination](verified-coordination.md) and
+[identity rebinding](verified-identity-rebinding.md). Native binaries and
+synthetic process workflows now run on the pinned local toolchain; this does
+not close the whole-service correspondence obligations.
+
 **Status: candidate implementation and test oracle. Not whole-service formal
 refinement.** Rust unit tests and native subprocess tests require a successful
 pinned-toolchain run on the maintainer's host. The Python source guard, oracle
@@ -123,3 +130,35 @@ python -m pytest -q -ra \
 
 Review failures before claiming a completed W6 acceptance gate. No AIVM VM,
 real provider credential or external service is needed for the local tests.
+
+## JSON object preservation follow-up (2026-10-18)
+
+The independent primitive corpus exposed a concrete adapter mismatch with
+Serde's enabled `arbitrary_precision` / `raw_value` features. Generic `Value`
+deserialization recognizes internal marker keys. A guest object such as
+`{"$serde_json::private::Number":"7"}` could become the integer `7`; the analogous
+RawValue marker could reinterpret a string as another JSON value. Checking
+syntax, duplicates and depth before a generic second decode did not preserve
+the already-checked JSON types.
+
+The native decoder now constructs object and array values explicitly while
+retaining duplicate, Unicode, finite-number, depth, byte and integer-digit
+checks. Scalar strings/numbers use their typed deserializers; marker keys are
+ordinary data. The independent primitive adapter preserves frame payloads the
+same way. This is a codec implementation change, not a change to accepted
+policy types or authorized destinations.
+
+Two native unit regressions and four real process regressions reproduced the
+old behavior. Against the preceding normal release binaries, marker objects
+were accepted as guest ticket arguments and as provider integer disclosure
+fields. With the fix, malformed typed guest arguments cause zero provider
+requests, and object-valued provider fields cannot satisfy integer disclosure.
+Both marker spellings are exercised. The combined W6/primitive/freshness native
+selection passes 40 tests. A W3 deliberate bypass edit also restores the unsafe
+generic decoder after updating its source fingerprint; the structural guard
+must still refuse it. That guard is a targeted regression check, not a parser
+proof or an exhaustive ban on all alternative decoders.
+
+No claim of credential theft, whole-service noninterference or full parser
+refinement follows from these cases. The production byte parser remains a
+concrete adapter obligation; the extracted Lean controllers are unchanged.

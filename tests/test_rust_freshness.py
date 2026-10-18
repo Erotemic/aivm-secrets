@@ -49,6 +49,16 @@ def test_frozen_freshness_vectors(freshness_runner: list[str], name: str) -> Non
     assert typed_replies(PYTHON, payload) == expected
 
 
+def test_scoped_runner_keeps_the_full_primitive_table_separate(freshness_runner):
+    payload = b''.join([
+        line('binding.require_match', actual='same', expected='same'),
+        line('codec.digest', value={'value': 1}),
+        line('wire.parse_frame', frame={'version': 1, 'capability': 'x', 'describe': True}),
+    ])
+    assert typed_replies(freshness_runner, payload) == [
+        typed({'ok': False, 'code': 'invalid_request'})] * 3
+
+
 def test_epoch_boundaries_and_invalid_types(freshness_runner: list[str]) -> None:
     values = [-2**63, -1, 0, 1, 2, 2**31-2, 2**31-1, 2**31,
               2**63-2, 2**63-1, 2**63, 2**64, 10**400,

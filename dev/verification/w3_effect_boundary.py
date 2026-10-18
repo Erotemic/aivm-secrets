@@ -68,6 +68,10 @@ def same_order(source: str, *markers: str) -> bool:
 
 
 def review_semantics(contents: dict[str, str]) -> None:
+    decoded = contents[RUST + 'json.rs']
+    parse = part(decoded, 'pub fn parse(', '\nfn string(')
+    require('decode(&raw, 0)' in parse and 'Ok(Value::Object(' in decoded,
+            'JSON objects can bypass explicit structure-preserving decoding')
     # The sole native manifest call to the credential-bearing HTTP adapter is
     # after policy compilation, durable audit and current grant revalidation.
     m = contents[RUST + 'custody/manifest_session.rs']

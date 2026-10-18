@@ -70,6 +70,12 @@ and explicitly leaves callbacks, dependency behavior, drops and unwind open;
 its direct-root traversal underapproximates reachability. It supplies no
 complete-mediation status or additional service-level theorem.
 
+The [independent Rust primitive runner](../primitive-conformance.md) now supplies
+the formerly pending complete-table corpus backend. The usable-system gate
+selects it explicitly and rejects skips. Binding/digest/frame adapters are
+tested, while the extracted freshness theorem scope remains unchanged; this
+does not promote broad broker CORE-01 parity.
+
 ## Product question and security objective
 
 A hostile agent should be able to perform a *real, specifically authorized*

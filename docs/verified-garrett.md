@@ -200,7 +200,9 @@ to succeed before recording hashes; editing a manifest alone is insufficient.
 The initial identity-path checkpoint's Python suite passed with **1,887 tests
 and one skip** in
 280.05 seconds, with all implemented Rust runners selected. The remaining
-skip is the unimplemented full primitive runner, not a Garrett gate. The
+skip at that historical checkpoint was the then-unimplemented full primitive
+runner, not a Garrett gate. The [independent runner](primitive-conformance.md)
+now supplies that separate backend. The
 selected Garrett gate passed 50 tests. All ten integration tests also passed
 using client/bridge executables built without the conformance feature.
 Lean checked all 23 named obligations and every permitted axiom dependency;

@@ -69,6 +69,12 @@ The Python implementation remains independently useful before parity; the
 missing Rust features are a specific future implementation queue, not
 something this Python overlay claims to have completed.
 
+The [independent primitive runner](primitive-conformance.md) now replays the
+six-entry pure value corpus, including binding/digest/frame contracts and stream
+framing. This closes the previously pending runner backend. It does not establish
+native broker integration or all-input CORE-01 parity; the new adapters remain
+runtime-conformance evidence alongside the unchanged freshness proofs.
+
 The [native coordinator increment](verified-coordination.md) tests both live
 Python and Rust brokers against one mTLS/SQLite authority. The global retry-key
 derivation interoperates; native request fingerprints currently hash the

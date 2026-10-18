@@ -42,13 +42,22 @@ SOURCE_FILES = [
     'rust/crates/aivm-secrets-primitives/src/lib.rs',
     'rust/crates/freshness-conformance/Cargo.toml',
     'rust/crates/freshness-conformance/src/main.rs',
+    'rust/crates/freshness-conformance/src/lib.rs',
+    'rust/crates/freshness-conformance/src/primitives_main.rs',
+    'rust/crates/freshness-conformance/src/value_primitives.rs',
     'proofs/lean-toolchain', 'proofs/lakefile.lean', 'proofs/lake-manifest.json',
     'proofs/generated/AivmSecretsPrimitives.lean', 'proofs/Freshness.lean', 'proofs/Check.lean',
     'dev/verification/freshness.py', 'tests/test_rust_freshness.py',
+    'tests/test_secrets_primitives_parity.py', 'aivm_secrets/primitives_runner.py',
+    'aivm_secrets/primitives/binding.py', 'aivm_secrets/primitives/codec.py',
+    'aivm_secrets/primitives/wire.py', 'aivm_secrets/primitives/grammar.py',
     'aivm_secrets/primitives/epochs.py', 'aivm_secrets/primitives/validity.py',
     'tests/secrets_vectors/primitives/epochs-v1.jsonl',
     'tests/secrets_vectors/primitives/validity-v1.jsonl',
     'tests/secrets_vectors/primitives/runner-v1.jsonl',
+    'tests/secrets_vectors/primitives/binding-v1.jsonl',
+    'tests/secrets_vectors/primitives/digest-v1.jsonl',
+    'tests/secrets_vectors/primitives/wire-v1.jsonl',
 ]
 
 
@@ -157,10 +166,13 @@ def prove() -> None:
 
 def parity() -> None:
     run([executable('cargo'), '+' + RUST, 'build', '--locked', '--release',
-         '-p', 'freshness-conformance'], cwd=ROOT / 'rust')
+         '-p', 'freshness-conformance', '--bins'], cwd=ROOT / 'rust')
     env = dict(os.environ, AIVM_SECRETS_FRESHNESS_RUNNER=str(
-        ROOT / 'rust/target/release/freshness-conformance'))
-    run([sys.executable, '-m', 'pytest', '-q', 'tests/test_rust_freshness.py'], env=env)
+        ROOT / 'rust/target/release/freshness-conformance'),
+        AIVM_SECRETS_RUST_PRIMITIVES_RUNNER=str(
+            ROOT / 'rust/target/release/primitives-conformance'))
+    run([sys.executable, '-m', 'pytest', '-q', 'tests/test_rust_freshness.py',
+         'tests/test_secrets_primitives_parity.py'], env=env)
 
 
 def model_digest() -> str:
@@ -220,7 +232,7 @@ def record() -> None:
             'Epoch/time arguments are supplied by authenticated, appropriately synchronized adapters.',
             'Clock correctness and durable epoch rollback prevention are outside these pure functions.',
         ],
-        'exclusions': ['Python formal verification', 'full primitive runner', 'TLS and cryptography',
+        'exclusions': ['Python formal verification', 'binding/digest/wire adapters (runtime conformance only)', 'TLS and cryptography',
                        'credential custody and egress', 'concurrency and durable storage', 'side channels'],
         'aeneas_lean_sources_sha256': model_digest(),
         'tool_sha256': {name: sha256(TOOLS / name) for name in ['aeneas', 'charon', 'charon-driver']},

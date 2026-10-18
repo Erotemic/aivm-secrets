@@ -343,6 +343,7 @@ TESTS = [
     "tests/test_rust_garrett_dispatch.py",
     "tests/test_rust_coordination.py",
     "tests/test_rust_bound_renewal.py",
+    "tests/test_rust_w6_adapter.py",
     "tests/test_secrets_coordination.py",
     "tests/test_secrets_garrett_modularity.py",
     "tests/test_secrets_identity_parity.py",
