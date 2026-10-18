@@ -1,0 +1,130 @@
+{
+  "schema": 1,
+  "source_commit": "1ce2bbb208ede0def997292805becb3811e343ee",
+  "source_dirty": false,
+  "scope": "Opt-in native exact-write approval: separate private host control, extracted issuance/consumption, finite Python admission parity and synthetic native provider effects",
+  "status": "locally validated; independent security review pending",
+  "report": {
+    "path": ".tools/system-_wnswqkd/report.json",
+    "sha256": "c199f3479d0450c1f9865b5b018aa6bc206dee644beb6f5a0440aedbd2169579"
+  },
+  "normal_report": {
+    "path": ".tools/approval-normal-validation/report.json",
+    "sha256": "a8f3b4a7ca2d76d2a6bd2a8c092f79e433fa9e63f7ea74270c1354d2b0f53e76"
+  },
+  "full_suite": {
+    "passed": 2721,
+    "skipped": 0
+  },
+  "required_workflows": {
+    "conformance": 467,
+    "normal_release_without_conformance": 467,
+    "skipped": 0
+  },
+  "selected_core_parity": {
+    "passed": 689,
+    "skipped": 0,
+    "log": {
+      "path": ".tools/approval-1ce2bbb-validation/approval-garrett.log",
+      "sha256": "8e8c58c04a71bbc5d47e8bb4fe53e81ca6dda491618a7e7b8dfe5bddf67e6bc1"
+    }
+  },
+  "focused_runtime": {
+    "passed": 25,
+    "skipped": 0,
+    "reference_admission_rows": 90,
+    "reference_recomputed_at_test_time": true,
+    "contracts": [
+      "exact normalized policy/root-grant/request digest matches Python",
+      "one-use write with no provider call before approval",
+      "strict expiry and explicit replacement approval",
+      "no refund after failed provider/write/preflight",
+      "concurrent write attempts yield one provider action",
+      "host revocation responsive during provider response wait and fences reply",
+      "semantic GET write needs approval; reads preserve it",
+      "strict TTL and unsafe endpoint denial",
+      "guest cannot invoke host commands",
+      "existing Python operator CLI discovers and controls native listener"
+    ]
+  },
+  "proof_audit": {
+    "named_obligations": 400,
+    "new_obligations": 9,
+    "allowed_axioms": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+    ],
+    "checked_contracts": [
+      "actual issue deadline and admission conditions",
+      "approved write accepted iff matching unexpired slot exists",
+      "accepted write consumes slot; consumed slot cannot be reused",
+      "refusal preserves supplied slot",
+      "reads/allow preserve slots; deny refuses writes"
+    ]
+  },
+  "approval_mutations": {
+    "rejected": 8,
+    "registered_total": 188,
+    "mutation_filter": "^approval ",
+    "full_historical_campaign": false,
+    "names": [
+      "approval expired slot accepted",
+      "approval missing slot accepted",
+      "approval expiry boundary extended",
+      "approval mismatched request accepted",
+      "approval read requires approval",
+      "approval issuance extends permitted ttl",
+      "approval deny mode admits write",
+      "approval successful write refunded"
+    ],
+    "log": {
+      "path": ".tools/approval-1ce2bbb-validation/approval-mutations.log",
+      "sha256": "573a65a8f1619b51a5050cdcaedac5eac024bf59003dec5989e8649fbb873abf"
+    }
+  },
+  "packaging": {
+    "wheel": {
+      "path": ".tools/approval-1ce2bbb-validation/aivm_secrets-0.2.0-py3-none-any.whl",
+      "sha256": "f7c0d4b085fb5ecd991d9473469278fedf5926491e71d2278413586132a25807"
+    },
+    "source_distribution": {
+      "path": ".tools/approval-1ce2bbb-validation/aivm_secrets-0.2.0.tar.gz",
+      "sha256": "77a3afd3681c8e5bcbc3c9a1177f8928383c5db61b807a650358a8594d5297ff"
+    },
+    "pinned_archive_inputs": 246,
+    "all_pinned_archive_inputs_match": true,
+    "log": {
+      "path": ".tools/approval-1ce2bbb-validation/approval-package.log",
+      "sha256": "96911afd81ffb8216c9c74459ae67e2895b424a3c67ea92d6a23c3e3fd920599"
+    }
+  },
+  "boundaries": {
+    "reviewed_rust_build_sources": 91,
+    "effect_classes": 15,
+    "w0_sinks": 14,
+    "w0_release_rules": 16,
+    "w6_channels": 14,
+    "host_sink": "S-WRITE-APPROVAL-CONTROL",
+    "guest_approval_digest_release": "R-APPROVAL-DIGEST",
+    "configuration": "writes=approve is an explicit extension; writes=allow remains unbounded",
+    "w4_w5_approval_variant_modeled": false,
+    "complete_mediation": false
+  },
+  "model_recompilation": {
+    "w4_w5": {
+      "path": ".tools/approval-1ce2bbb-validation/approval-w4-w5.log",
+      "sha256": "db00e4091d44a0b16c69811a716ac52921971c2b134e79432d50d1714005d5ad"
+    },
+    "scope": "unchanged existing trace models recompiled; no approval extension refinement"
+  },
+  "limitations": [
+    "No full Python/Rust core parity, delegation or budget implementation",
+    "Host status describes local root authority, not a fresh global coordinator acknowledgement",
+    "No whole-service confidentiality, transitive I/O mediation or approval W4/W5 trace proof",
+    "Kernel UID/private directory/no control forwarding, normalized hashing, clock/slot-store/audit/socket semantics remain adapter premises",
+    "Approval TTL is an admission window; already admitted provider effects cannot be cancelled",
+    "Native audit format differs from Python audit chain; no general host CLI/audit/prune compatibility claim",
+    "No live VM/provider/hardware validation or refreshed compiler call profiles; independent review pending"
+  ]
+}

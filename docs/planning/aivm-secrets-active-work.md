@@ -1,8 +1,8 @@
 # Active work: useful broker workflows and conditional credential confinement
 
 Status: **work plan, not a completed assurance claim**, reconciled 2026-10-18
-against frozen runtime/proof implementation `b620a09` and its
-[coordinator operator validation record](../../dev/validation/2026-10-18-coordinator-operator.json). This is the authoritative **priority and task queue**
+against frozen runtime/proof implementation `1ce2bbb` and its
+[native exact-write approval validation record](../../dev/validation/2026-10-18-native-write-approval.json). This is the authoritative **priority and task queue**
 for new agents. Existing P0-P5, M0-M6, and G0-G5 stages remain useful design,
 implementation history, and prerequisite inventories; they are **not three
 competing current schedules**. Revisit this queue after each accepted milestone.
@@ -163,6 +163,22 @@ successful pure revocation. Frozen validation passes 2,691 portable tests, 443
 required workflows in both builds, the 391-name audit and six new receipt
 mutations. The new host-only sink is separated from member admission. JSON/TLS,
 transport placement, remote commit/durability and broad parity remain open.
+
+The optional [native exact-write approval](../native-write-approval.md) port adds
+owner-only host control, matching unexpired one-use admission before preflight
+and no refund after failure. Allow mode stays unbounded; approval is an explicit
+operator choice. A frozen 90-row corpus is re-evaluated against Python admission,
+and native process tests cover provider/preflight failure, concurrent reuse,
+revocation during blocked provider I/O and existing Python operator CLI use.
+Frozen validation passes 2,721 portable tests, 689 selected parity tests, 467
+required workflows in both builds, the 400-name audit and eight new approval
+mutations; all 246 pinned package inputs match. The actual issue/consume leaves
+have nine checked contracts. The approve configuration, host socket and public
+approval digest remain outside the current W4/W5 whole-trace model. Kernel
+owner credentials, no guest forwarding, hashing/normalization, clock/slot-store
+linearization, audits and concrete I/O remain adapter premises. Already admitted
+remote effects cannot be cancelled. Delegation/budgets, broad parity, complete
+mediation, live deployment and independent security review remain open.
 
 The [parsed-policy identity increment](../verified-policy-normalization.md) closes
 the known raw-document fingerprint difference in coordinated manifest writes.
