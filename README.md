@@ -32,6 +32,16 @@ Start with the [operator guide](docs/source/secrets.rst),
 AIVM-specific commands in the operator guide require the separate AIVM checkout
 and its existing experimental opt-in adapters.
 
+Python Garrett now also has opt-in [durable cross-host coordination,
+rolling OAuth/bound-identity credentials and keyed-write reservations](docs/garrett-python-core-extensions.md).
+These are experimental, fail-closed features requiring an explicitly
+provisioned trusted coordinator and host TLS credentials. The
+[core versus non-core Python API inventory](docs/garrett-python-core-parity.md)
+identifies which security contracts Rust must eventually match and which
+interfaces (such as CLI aliases) do not require byte-identical ports. Rust
+parity, physical cross-host deployment, rollback protection and production
+provider validation remain open.
+
 The [extraction record](docs/extraction.md) explains the preserved authorship,
 source commit, commit map, independent checks, and remaining integration work.
 Original author and co-author attribution is retained in Git history:

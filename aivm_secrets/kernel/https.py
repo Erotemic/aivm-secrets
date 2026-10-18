@@ -379,6 +379,7 @@ class HTTPOperation:
     graphql_document: str = ''
     graphql_operation: str = ''
     graphql_variables: tuple[tuple[str, str], ...] = ()
+    idempotency_header: str = ''
 
     @classmethod
     def parse(cls, value: Any, checks: tuple[Check, ...]) -> HTTPOperation:
@@ -400,6 +401,7 @@ class HTTPOperation:
                     'fold',
                     'page',
                     'graphql',
+                    'idempotency_header',
                 }
             ),
             code=_CODE,
@@ -409,6 +411,12 @@ class HTTPOperation:
         if type(effect) is not str or effect not in EFFECTS:
             raise SecretsError(_CODE)
         write = effect == 'write'
+        idem_header = value.get('idempotency_header', '')
+        # Explicit provider contract. We never infer idempotency from an
+        # HTTP method or quietly invent an unsupported provider header.
+        if idem_header not in ('', 'Idempotency-Key') or (
+                idem_header and not write):
+            raise SecretsError(_CODE)
 
         check = None
         requires = ''
@@ -607,6 +615,7 @@ class HTTPOperation:
             graphql_document,
             graphql_operation,
             graphql_variables,
+            idem_header,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -614,6 +623,8 @@ class HTTPOperation:
             'name': self.name,
             'effect': 'write' if self.write else 'read',
         }
+        if self.idempotency_header:
+            result['idempotency_header'] = self.idempotency_header
         if self.requires:
             result['requires'] = self.requires
         if self.returns_check:

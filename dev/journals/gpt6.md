@@ -261,3 +261,40 @@ structural checks alone do not prove W4. Exact model variant unavailable.
   provider-controlled declassification semantics and VM isolation remain
   separate assumptions or downstream obligations. Recheck Rust compilation
   and any behavior differences on the pinned nightly before merging.
+
+## 2026-10-17 20:55:00 -0400 - Python operational core, revocation and write retries
+
+Implemented an opt-in cross-host coordination authority for the existing Python
+Garrett broker: one locally durable SQLite WAL/FULL ledger and a strict,
+authenticated mTLS interface with operator/member certificate fingerprints.
+The new principal registry has irreversible tombstones and atomic write
+reservation keys shared across hosts and broker restarts. Broker and bound
+identity bridge admit new guest calls only after uncached coordinator checks;
+coordinated writes require durable keys and fail closed on replay, mismatched
+requests, or a missing authority. A per-operation policy opt-in forwards a
+host-derived Idempotency-Key header to providers that support it. No provider
+request is sent on a duplicate reservation.
+
+A running OAuth-backed broker now resolves the current vault credential inside
+a locked lease rather than pinning an obsolete access token at session setup;
+refresh preserves the current epoch and capability, while local revocation or
+replacement remains final for that broker session. The `renew-bound` operator
+workflow performs certificate renewal plus new bound JWT issuance using the
+existing broker capability; already-running bridge and broker reread identity
+expectations so guest cert/JWT renewal needs no server restart.
+
+Added an exhaustive classification of all current Python modules into core
+security behavior and non-core entry points, plus eleven normative core
+contracts and conservative, unverified Rust parity statuses. Tests cover
+storage restart, TLS host separation, coordinator outage, authenticated
+revocation, broker/bridge refusal, concurrent writes, same-key replay,
+ambiguous write failure, provider header integrity, and live credential
+rollover. Older historical milestones are preserved.
+
+Open: no external anti-rollback witness for SQLite backups, no actual
+separate-machine coordinator deployment, no network-fault-tolerant consensus
+or upstream credential vault replication, no provider-specific guarantee from
+Idempotency-Key, no automatic guest-side cert/JWT swap, incomplete Rust core
+parity, and no formal proof of Python runtime safety. Python coordination is
+strictly opt-in; a host running without it is outside cross-host confinement.
+Tests used synthetic certificates and tokens and localhost transports only.

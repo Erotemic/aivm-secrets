@@ -34,6 +34,23 @@ whole-service implementation-to-trace correspondence, mediation or secrecy. Focu
 standalone broker workflow and conditional, implementation-linked credential
 confinement; do not advertise formal VM isolation or whole-service secrecy.
 
+- Python's normative core (including new durable coordinator decisions,
+  same-session OAuth credential leases, and keyed write retries) is catalogued
+  in `docs/planning/aivm-secrets-python-core-api.json`, with explanatory
+  boundaries in `docs/garrett-python-core-parity.md`. Classify any new Python
+  module as core/non-core, and test the exact contract before declaring Rust
+  parity. CLI/alias/UI spelling is non-core; its effects and error semantics
+  must obey the core. Current Rust parity is **not** complete for these new
+  coordination/idempotency contracts.
+- The Python coordinator is an opt-in, single durable SQLite writer reached
+  over mTLS, not distributed consensus, replicated credential custody, or an
+  anti-rollback ledger. Never turn an unavailable coordinator into a cached
+  authorization. All coordinated writes require a durable key and one
+  reservation before egress; a retry after uncertainty is never automatic.
+- Keep the two in-place renewal flows separate: OAuth access-token refresh
+  updates the current lease in a running broker; bound certificate renewal
+  replaces the guest cert/JWT under CAS but keeps the broker and bridge live.
+  Neither silently reverses terminal global revocation.
 - Keep runtime dependencies in root `pyproject.toml`. Do not import or depend
   on AIVM internals, libvirt, or a VM manager to install, import, or test this
   package. Existing AIVM adapters and VM integration tests remain in AIVM.

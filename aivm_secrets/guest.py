@@ -92,6 +92,11 @@ def parser() -> argparse.ArgumentParser:
         help='JSON argument object from a file, or - for stdin',
     )
     invoke.add_argument(
+        '--idempotency-key',
+        help='Stable caller-chosen key (8..128 ASCII letters/digits/-/_). '
+             'A retry is never dispatched twice by a configured coordinator.',
+    )
+    invoke.add_argument(
         '--result-only',
         action='store_true',
         help='Print only the result (text results are printed raw)',
@@ -156,7 +161,10 @@ def frame_from_args(args: argparse.Namespace) -> tuple[str, Any]:
     """Translate a command line into one ``(verb, payload)`` pair."""
     if args.group == 'invoke':
         arguments = json_object(args.arguments, args.arguments_file)
-        return 'request', {'operation': args.operation, 'arguments': arguments}
+        request = {'operation': args.operation, 'arguments': arguments}
+        if args.idempotency_key is not None:
+            request['idempotency_key'] = args.idempotency_key
+        return 'request', request
     if args.group == 'operations':
         return 'describe', True
     if args.group == 'renounce':

@@ -101,6 +101,9 @@ def _parser() -> argparse.ArgumentParser:
     )
     serve.add_argument('--oauth-provider-config', type=Path)
     serve.add_argument('--oauth-subject', default='')
+    serve.add_argument('--coordination-config', type=Path,
+                       help='Host-owned mTLS coordination configuration; '
+                            'no local fallback on outage')
     serve.add_argument('--access-identity', default='')
     serve.add_argument('--vm', default='')
     serve.add_argument(
@@ -224,7 +227,14 @@ def _serve(args: argparse.Namespace) -> int:
     # Reject a guest-writable XDG_RUNTIME_DIR before credential acquisition.
     # In particular, a rejected session must never resolve a host token.
     runtime_root(untrusted)
+    coordination = None
+    if args.coordination_config is not None:
+        from .identity.coordination import CoordinationClient, CoordinationConfig
+        coordination = CoordinationClient(CoordinationConfig.load(
+            args.coordination_config, untrusted=untrusted))
+        coordination.check()  # fail before accepting any guest calls
     credential_guard = None
+    credential_context = None
     if args.oauth_vault is not None:
         from .identity.oauth_provider import load_provider
         from .identity.oauth_vault import OAuthVault
@@ -234,9 +244,17 @@ def _serve(args: argparse.Namespace) -> int:
         vault = OAuthVault(args.oauth_vault, untrusted=untrusted)
         snapshot = vault.session_snapshot(
             provider, args.oauth_subject, resource_host=spec.egress.host)
-        credential = snapshot.credential
-        credential_guard = lambda: vault.active_lease(
-            provider, args.oauth_subject, snapshot)
+        # The sealed capability is a scoped opaque session handle; it does
+        # NOT contain an old OAuth access token. The token stays in the vault
+        # and is selected freshly under its lock for each request.
+        credential = 'oauth-host-managed-session'
+        # Do not retain the old bearer in the closure after the snapshot has
+        # been checked. Only an epoch survives; each call reads the new token.
+        expected_epoch = snapshot.epoch
+        del snapshot
+        credential_context = lambda: vault.current_lease(
+            provider, args.oauth_subject, resource_host=spec.egress.host,
+            expected_epoch=expected_epoch)
     elif args.token_file is not None:
         credential = credential_from_file(
             args.token_file.expanduser(), untrusted=untrusted
@@ -268,6 +286,8 @@ def _serve(args: argparse.Namespace) -> int:
             writes=args.writes,
             untrusted=untrusted,
             credential_guard=credential_guard,
+            credential_context=credential_context,
+            coordination=coordination,
         )
         del credential
         for number in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):

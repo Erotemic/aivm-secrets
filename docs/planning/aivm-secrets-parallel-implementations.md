@@ -1,5 +1,14 @@
 # AIVM Secrets: two independent implementations, one security contract
 
+**Python core parity update (2026-10-17):** The canonical classifier and
+per-feature Rust coverage status are in
+[aivm-secrets-python-core-api.json](aivm-secrets-python-core-api.json) and
+[the parity review](../garrett-python-core-parity.md). New Python coordinator
+revocation, live credential rollover and durable write-key semantics are
+normative core behaviors **not yet ported to Rust**. Python CLI presentation,
+aliases and implementation structure are not themselves parity requirements.
+
+
 **2026-10-17 implementation update:** the independent Rust service now
 has selected implementation-linked freshness, Garrett controller, history and
 typed disclosure Lean proofs (see

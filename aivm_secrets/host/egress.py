@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from ..errors import SecretsError
-from ..kernel import codec
+from ..kernel import codec, grammar
 from ..kernel.machine import AuthorizedEffect
 from ..kernel.model import Egress, check_effect
 from ..kernel.wire import MAX_RESPONSE
@@ -145,7 +145,8 @@ class HTTPSExecutor:
             headers['Content-Type'] = 'application/json'
         return headers
 
-    def execute(self, authorized: AuthorizedEffect, credential: str) -> Any:
+    def execute(self, authorized: AuthorizedEffect, credential: str, *,
+                idempotency_key: str | None = None) -> Any:
         if type(authorized) is not AuthorizedEffect:
             raise SecretsError('denied')
         effect = check_effect(authorized.effect)
@@ -154,6 +155,12 @@ class HTTPSExecutor:
         write = authorized.write
         if (effect.is_write and not write) or (write and not authorized.final):
             raise SecretsError('denied')
+        if idempotency_key is not None:
+            # Supplied only by the broker after durable reservation, never
+            # by a guest header. An incorrectly typed value fails closed.
+            if not write or not authorized.final:
+                raise SecretsError('denied')
+            grammar.hex_string(idempotency_key, 64, code='denied')
         body = None
         if effect.graphql:
             fields = dict(effect.body or ())
@@ -165,6 +172,8 @@ class HTTPSExecutor:
         elif effect.body is not None:
             body = codec.dumps(dict(effect.body))
         headers = self._headers(authorized, credential)
+        if idempotency_key is not None:
+            headers['Idempotency-Key'] = idempotency_key
         connection = _Connection(self.egress, self._context)
         watchdog = threading.Timer(TOTAL_DEADLINE, connection.abort)
         watchdog.daemon = True

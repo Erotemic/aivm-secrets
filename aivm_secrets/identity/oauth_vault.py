@@ -491,6 +491,28 @@ class OAuthVault:
             require_active(grant, now=int(time.time()), leeway=0)
             yield
 
+    @contextmanager
+    def current_lease(self, provider: OAuthProvider, subject: str, *,
+                      resource_host: str, expected_epoch: int) -> Iterator[str]:
+        """Resolve the CURRENT credential for an existing broker session.
+
+        Explicit ``oauth-refresh`` may replace the access token/generation
+        without restarting the broker. A revoke or re-enrollment advances
+        the epoch and permanently fences the old session. No refresh is
+        performed here: no network I/O while serving a guest request.
+        The vault lock spans BOTH preflight and final credentialed effects.
+        """
+        if resource_host != provider.resource_host or type(expected_epoch) is not int:
+            raise SecretsError('invalid_policy')
+        with self._locked():
+            row = self._read(provider, subject)
+            if (not row['active'] or row['epoch'] != expected_epoch or
+                    row['grant'] is None):
+                raise SecretsError('revoked')
+            _require_settled(row)
+            grant = parse_grant(row['grant'])
+            yield require_active(grant, now=int(time.time()), leeway=0)
+
     def credential_for_session(self, provider: OAuthProvider, subject: str,
                                *, resource_host: str, now: int | None = None,
                                transport: Any = None,

@@ -166,7 +166,8 @@ class UnixIdentityService:
                  idle_seconds: int = 900, subject: str | None = None,
                  reply_deadline: float = BROKER_REPLY_DEADLINE,
                  stop_drain: float = STOP_DRAIN_SECONDS,
-                 wall_clock: Callable[[], float] = time.time):
+                 wall_clock: Callable[[], float] = time.time,
+                 coordination: Any = None):
         if ((max_connections is not None and (
                 type(max_connections) is not int or
                 not 1 <= max_connections <= MAX_CONNECTIONS)) or
@@ -199,13 +200,22 @@ class UnixIdentityService:
         # static verifier expectation is intentionally not an enrolled VM.
         expected = IdentityExpectation(authority.issuer, authority.audience,
                                        'init', 0)
+        if coordination is not None:
+            coordination.check()  # no startup if globally revoked/offline
+
+        def current_expectation(cert_der: bytes, now: int):
+            local = authority.expectation_for_peer(cert_der, now)
+            if coordination is not None:
+                coordination.check()
+            return local
+
         self.bridge = IdentityTLSBridge(
             context=server_context(certificate=certificate, private_key=key,
                                    client_ca=ca),
             verifier=authority.token_verifier(expected),
             broker=self.broker,
             wall_clock=wall_clock,
-            expected_for_peer=authority.expectation_for_peer,
+            expected_for_peer=current_expectation,
             subject=subject,
         )
         self.max_connections = max_connections

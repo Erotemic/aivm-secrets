@@ -70,12 +70,23 @@ class Broker:
         wall_clock: Callable[[], float] = time.time,
         monotonic_clock: Callable[[], float] = time.monotonic,
         credential_guard: Callable[[], ContextManager[None]] | None = None,
+        credential_context: Callable[[], ContextManager[str]] | None = None,
+        coordination: Any = None,
     ):
         self.spec = reparse(spec)
         self.binding = Binding.parse(binding.to_dict())
         self._wall_clock = wall_clock
         self._monotonic_clock = monotonic_clock
+        if credential_guard is not None and credential_context is not None:
+            raise SecretsError('invalid_policy')
         self._credential_guard = credential_guard
+        self._credential_context = credential_context
+        self._coordination = coordination
+        if credential_context is not None:
+            # Never seal a caller-supplied stale bearer if the host supplies
+            # a fresh leased credential on every request. The capability is
+            # only an authenticated session handle in this mode.
+            credential = 'oauth-host-managed-session'
         self._codec: EnvelopeCodec | None = EnvelopeCodec()
         self._state, claims = machine.open_session(
             self.spec,
@@ -190,6 +201,11 @@ class Broker:
         frame = wire.parse_frame(codec.loads(raw))
         opened = envelope.open(frame.capability)
         claims = opened.claims
+        # Global revocation also fences describe/delegate/renounce, not only
+        # credentialed provider calls. Do not mint child authority from an
+        # already revoked principal when the coordinator is unavailable.
+        if self._coordination is not None:
+            self._coordination.check()
         if frame.verb == 'request':
             return self._request(frame.payload, opened, request_id, trace)
         if frame.verb == 'describe':
@@ -228,13 +244,18 @@ class Broker:
         request_id: str,
         trace: _Trace,
     ) -> dict[str, Any]:
-        # A host-selected credential source can require a durable revocation
-        # lease. No guest protocol field or authorization decision selects it.
-        # This covers preflight and final effects under one linearization lock.
+        # Operator-selected OAuth sources resolve the current token *inside*
+        # the vault lock on every request. A refresh changes the generation
+        # but not the session's enrolled epoch; revocation still fences it.
+        if self._credential_context is not None:
+            with self._credential_context() as credential:
+                return self._request_under_guard(
+                    payload, opened, request_id, trace, credential)
         guard = (self._credential_guard() if self._credential_guard is not None
                  else nullcontext())
         with guard:
-            return self._request_under_guard(payload, opened, request_id, trace)
+            return self._request_under_guard(
+                payload, opened, request_id, trace, opened.credential)
 
     def _request_under_guard(
         self,
@@ -242,9 +263,32 @@ class Broker:
         opened: OpenedCapability,
         request_id: str,
         trace: _Trace,
+        credential: str,
     ) -> dict[str, Any]:
+        # The retry key is *not* an effect parameter; it cannot select a URL,
+        # request target, operation or authorization scope. The pure kernel
+        # receives exactly the original canonical request.
+        idempotency_key = None
+        if type(payload) is dict and 'idempotency_key' in payload:
+            idempotency_key = payload['idempotency_key']
+            if (type(idempotency_key) is not str or
+                    not 8 <= len(idempotency_key) <= 128 or
+                    not all(ch in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_' for ch in idempotency_key)):
+                raise SecretsError('invalid_request')
+            payload = {key: value for key, value in payload.items()
+                       if key != 'idempotency_key'}
         request = self.spec.parse_request(payload)
         trace.operation = request.operation
+        operation = self.spec._operation(request)
+        # A key on a read is meaningless. In coordinated sessions ALL writes
+        # require a durable key, even when the provider does not support an
+        # idempotency header; there is no silent unkeyed retry bypass.
+        if idempotency_key is not None and (not operation.write or
+                                             self._coordination is None):
+            raise SecretsError('invalid_request')
+        if operation.write and (self._coordination is not None or
+                                operation.idempotency_header) and idempotency_key is None:
+            raise SecretsError('invalid_request')
         try:
             self._step(
                 machine.admit,
@@ -265,7 +309,9 @@ class Broker:
             machine.emit_preflight, self.spec, request, self._clock()
         )
         if preflight is not None:
-            facts = self._executor.execute(preflight, opened.credential)
+            if self._coordination is not None:
+                self._coordination.check()
+            facts = self._executor.execute(preflight, credential)
         # Computed here only to learn whether a dispatch follows, so that
         # its intent can be made durable first. The kernel recomputes the
         # effect itself; this value is never sent anywhere.
@@ -277,14 +323,41 @@ class Broker:
         if final is None:
             result = facts
         else:
+            # A remote revocation committed before this check forbids this
+            # effect. A revocation racing *after* the check cannot unsend an
+            # in-flight effect (see coordination's explicit linearization).
+            if self._coordination is not None:
+                self._coordination.check()
+            provider_key = None
+            if idempotency_key is not None:
+                # The caller-selected retry name is scoped by the operator's
+                # global principal, not by the ephemeral session/grant ID.
+                # Thus a broker restart or a different trusted host cannot
+                # dispatch a second write with the same key. The separate
+                # request fingerprint detects key reuse for another payload.
+                provider_key = codec.digest({
+                    'schema': 1, 'principal': self._coordination.config.principal,
+                    'client_key': idempotency_key,
+                })
+                request_fingerprint = codec.digest({
+                    'policy': self.spec.digest, 'request': request.to_dict(),
+                })
+                self._coordination.reserve(provider_key, request_fingerprint)
             trace.wrote = final.write
-            result = self._executor.execute(final, opened.credential)
+            if provider_key is not None and operation.idempotency_header:
+                result = self._executor.execute(final, credential,
+                                                idempotency_key=provider_key)
+            else:
+                result = self._executor.execute(final, credential)
+            if provider_key is not None:
+                # Failure to record completion is ambiguous, not success.
+                self._coordination.finish(provider_key, request_fingerprint)
         reply = wire.success(
             result=result, **(self.spec.reply_meta(request, result) or {})
         )
         encoded = codec.dumps(reply, code='upstream_response')
         # Reflection tripwire, not a general information-flow proof.
-        needle = codec.dumps(opened.credential)[1:-1]
+        needle = codec.dumps(credential)[1:-1]
         if len(encoded) >= wire.MAX_REPLY or needle in encoded:
             raise SecretsError('upstream_response')
         self._record('completed', request_id, trace)

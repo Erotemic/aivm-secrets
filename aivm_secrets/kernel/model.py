@@ -29,6 +29,8 @@ RESERVED_HEADERS = frozenset(
         'accept',
         'accept-encoding',
         'authorization',
+        'idempotency-key',
+        'x-idempotency-key',
         'connection',
         'content-encoding',
         'content-length',

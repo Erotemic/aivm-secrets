@@ -66,6 +66,8 @@ def add_parser(subs):
 
     revoke = common('revoke')
     revoke.add_argument('--subject', required=True)
+    revoke.add_argument('--coordination-config', type=Path,
+                        help='Commit cross-host revocation before local revocation')
     guarded_revoke = common('revoke-if-current')
     guarded_revoke.add_argument('--subject', required=True)
     guarded_revoke.add_argument('--expected-epoch', type=int, required=True)
@@ -77,6 +79,16 @@ def add_parser(subs):
     renew_client.add_argument('--approve-key-fingerprint', required=True)
     renew_client.add_argument('--expected-epoch', required=True, type=int)
     renew_client.add_argument('--expected-certificate-sha256', required=True)
+
+    renew_bound = common('renew-bound')
+    renew_bound.add_argument('--subject', required=True)
+    renew_bound.add_argument('--csr', type=Path, required=True)
+    renew_bound.add_argument('--approve-key-fingerprint', required=True)
+    renew_bound.add_argument('--expected-epoch', type=int, required=True)
+    renew_bound.add_argument('--expected-certificate-sha256', required=True)
+    renew_bound.add_argument('--capability-file', type=Path, required=True)
+    renew_bound.add_argument('--jwt-output', type=Path, required=True)
+    renew_bound.add_argument('--lifetime', type=int, default=900)
 
     rekey = common('rotate-client-key')
     rekey.add_argument('--subject', required=True)
@@ -131,6 +143,9 @@ def add_parser(subs):
                 '--timeout', type=int, default=180,
                 help='Seconds (1..600) the authorization stays valid and '
                      'the callback is awaited')
+        if name == 'oauth-revoke':
+            oauth.add_argument('--coordination-config', type=Path,
+                               help='Revoke the global principal first')
         if name == 'oauth-refresh':
             oauth.add_argument(
                 '--retry-in-doubt', action='store_true',
@@ -144,11 +159,33 @@ def add_parser(subs):
                         help='Exit after this many connections (default: '
                              'no cap; the idle timeout and stdin lease end it)')
     bridge.add_argument('--idle-seconds', type=int, default=900)
+    bridge.add_argument('--coordination-config', type=Path,
+                        help='Mandatory authenticated remote revocation '
+                             'check on every bound call (fail closed)')
     bridge.add_argument('--subject', default=None,
                         help='Serve only this enrolled subject; any other '
                              'certificate is refused before the broker')
     bridge.add_argument('--exit-on-stdin-eof', action='store_true',
                         help='Keep the bridge alive only while its parent holds stdin')
+
+    # A *single* trusted coordinator runs the durable SQLite ledger locally.
+    # Bridge/broker clients may run on other hosts, using mTLS only. Its
+    # operator is separately pinned by certificate fingerprint.
+    ci = common('coord-init', authority=False)
+    ci.add_argument('--directory', type=Path, required=True)
+    cs = common('coord-serve', authority=False)
+    cs.add_argument('--directory', type=Path, required=True)
+    cs.add_argument('--host', required=True)
+    cs.add_argument('--port', type=int, required=True)
+    cs.add_argument('--server-certificate', type=Path, required=True)
+    cs.add_argument('--server-key', type=Path, required=True)
+    cs.add_argument('--client-ca', type=Path, required=True)
+    cs.add_argument('--operator-fingerprint', action='append', required=True)
+    for name in ('coord-activate', 'coord-revoke', 'coord-status'):
+        co = common(name, authority=False)
+        co.add_argument('--config', type=Path, required=True)
+        if name == 'coord-activate':
+            co.add_argument('--member-fingerprint', action='append', required=True)
 
 
 def _csr_data(path: Path) -> bytes:
@@ -211,6 +248,10 @@ def oauth_command(args: argparse.Namespace, roots: tuple[Path, ...], *,
     if args.identity_action == 'oauth-status':
         return vault.status(provider, args.subject)
     if args.identity_action == 'oauth-revoke':
+        if args.coordination_config is not None:
+            from .coordination import CoordinationClient, CoordinationConfig
+            CoordinationClient(CoordinationConfig.load(
+                args.coordination_config, untrusted=roots)).revoke()
         return vault.revoke(provider, args.subject)
     if args.identity_action == 'oauth-refresh':
         # Explicit refresh; the returned token stays in this host process.
@@ -278,6 +319,47 @@ def run(args: argparse.Namespace) -> int:
         print(codec.dumps(result).decode('ascii'))
         return 0 if result.get('ok') is True else 1
 
+    if args.identity_action.startswith('coord-'):
+        if not sys.flags.isolated:
+            raise SecretsError('unsafe_file', detail='coordination commands require python -I')
+        from ..host.hardening import harden_process, verify_runtime
+        from .coordination import (CoordinationClient, CoordinationConfig,
+                                   CoordinationLedger, CoordinationServer)
+        roots = tuple(args.untrusted_root)
+        harden_process()
+        verify_runtime(roots)
+        if args.identity_action == 'coord-init':
+            CoordinationLedger.initialize(args.directory)
+            print(codec.dumps({'initialized': True}).decode())
+            return 0
+        if args.identity_action == 'coord-serve':
+            ledger = CoordinationLedger(args.directory)
+            with CoordinationServer(
+                (args.host, args.port), ledger=ledger,
+                server_cert=args.server_certificate, server_key=args.server_key,
+                client_ca=args.client_ca,
+                operator_fingerprints=args.operator_fingerprint,
+            ) as server:
+                print(codec.dumps({'listening': True,
+                                   'port': server.server_address[1]}).decode(),
+                      flush=True)
+                server.serve_forever(poll_interval=0.25)
+            return 0
+        client = CoordinationClient(CoordinationConfig.load(
+            args.config, untrusted=roots))
+        if args.identity_action == 'coord-activate':
+            client.activate(args.member_fingerprint)
+            result = client.status()
+        elif args.identity_action == 'coord-revoke':
+            client.revoke()
+            result = client.status()
+        elif args.identity_action == 'coord-status':
+            result = client.status()
+        else:
+            raise SecretsError('invalid_request')
+        print(codec.dumps(result).decode())
+        return 0
+
     # The OAuth layer is independently usable; no enrollment CA, VM or
     # provider credential is initialized by merely importing this CLI.
     if args.identity_action.startswith('oauth-'):
@@ -318,6 +400,10 @@ def run(args: argparse.Namespace) -> int:
             expected_thumbprint=args.expected_certificate_sha256,
         )
     elif args.identity_action == 'revoke':
+        if args.coordination_config is not None:
+            from .coordination import CoordinationClient, CoordinationConfig
+            CoordinationClient(CoordinationConfig.load(
+                args.coordination_config, untrusted=untrusted)).revoke()
         result = authority.revoke(args.subject)
     elif args.identity_action == 'revoke-if-current':
         result = authority.revoke_if_current(
@@ -331,6 +417,30 @@ def run(args: argparse.Namespace) -> int:
             expected_epoch=args.expected_epoch,
             expected_thumbprint=args.expected_certificate_sha256,
         )
+    elif args.identity_action == 'renew-bound':
+        # Prepare one new host-owned JWT and certificate for installation
+        # into an EXISTING bound guest session. The running broker and bridge
+        # are reused; both reload peer material on each new connection.
+        # A failed second stage leaves the old epoch revoked, NEVER falls
+        # back to the old token. Issue can be rerun after fixing the error.
+        dest = args.jwt_output.expanduser().absolute()
+        private_directory(dest.parent, untrusted)
+        if os.path.lexists(dest):
+            raise SecretsError('unsafe_file', detail='JWT destination already exists')
+        capability = read_owned(args.capability_file.expanduser().absolute(),
+                                private=True, untrusted=untrusted,
+                                what='local broker capability').decode('ascii').strip()
+        renewed = authority.renew_client(
+            subject=args.subject, csr=_csr_data(args.csr),
+            approve_fingerprint=args.approve_key_fingerprint,
+            expected_epoch=args.expected_epoch,
+            expected_thumbprint=args.expected_certificate_sha256,
+        )
+        issued = authority.issue(subject=args.subject,
+                                 broker_capability=capability, output=dest,
+                                 lifetime=args.lifetime)
+        result = {**renewed, 'jwt_output': issued['output'],
+                  'jwt_expires_at': issued['expires_at']}
     elif args.identity_action == 'rotate-client-key':
         result = authority.rotate_client_key(
             subject=args.subject, csr=_csr_data(args.csr),
@@ -363,10 +473,17 @@ def run(args: argparse.Namespace) -> int:
             output=args.output, lifetime=args.lifetime,
         )
     elif args.identity_action == 'bridge':
+        coordination = None
+        if args.coordination_config is not None:
+            from .coordination import CoordinationClient, CoordinationConfig
+            coordination = CoordinationClient(CoordinationConfig.load(
+                args.coordination_config, untrusted=untrusted))
+            coordination.check()
         with UnixIdentityService(
             authority=authority, broker_socket=args.broker_socket,
             listen=args.listen, max_connections=args.max_connections,
             idle_seconds=args.idle_seconds, subject=args.subject,
+            coordination=coordination,
         ) as bridge:
             print(codec.dumps({'listening': str(bridge.listen),
                                'max_connections': bridge.max_connections,

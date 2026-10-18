@@ -156,6 +156,25 @@ W4 + W5 + W6 ──> conditional service-level assurance review
 - Do not alter working Python policy/wire behavior incidentally to match Rust.
   Record intentional differences and migrate via versioned, reviewed changes.
 
+## Python Garrett follow-on: operational core and Rust parity
+
+This is an **independent Python implementation workstream**, not a claim that
+Rust W4–W6 proofs now cover Python. See the [Python core API inventory](aivm-secrets-python-core-api.json)
+and [new functionality and trust boundaries](../garrett-python-core-extensions.md).
+
+| ID | Python deliverable and status | Rust parity/operational gate |
+| --- | --- | --- |
+| **P-CORE-07** | Durable terminal cross-host principal revocation using one local SQLite coordinator, mTLS member/operator pins, check at every broker and bound-bridge request; tests use synthetic same-host distinct member certificates | Rust global revocation missing; real separate-host deployment, rollback witness and operational failover unvalidated |
+| **P-CORE-06** | Running OAuth broker leases the vault's current access token at each request, preserving capability and enrolled epoch; identity `renew-bound` issues fresh cert/JWT without broker/bridge restart | Rust same-session token rollover and bound identity workflow incomplete; guest material delivery remains manual |
+| **P-CORE-08/09** | Durable per-principal idempotency reservations before any coordinated write; guest ASCII retry keys, optional explicit upstream `Idempotency-Key`, strict no-replay even after ambiguous result | Rust journal/wire contract missing; production provider header semantics unverified |
+| **P-PARITY** | All Python modules classified core vs non-core, 11 normative security contracts with Rust status and acceptance criteria | Implement independent Rust behavior and bidirectional negative/positive trace tests before marking any contract parity-complete |
+
+A previous approved operation may still finish if global revocation commits
+after its last authorization check. A coordinator outage fails closed. Neither
+SQLite backup rollback nor shared cross-host OAuth vault state is solved by
+this implementation. Local-only Python sessions continue working without a
+coordination config; that is not a distributed security guarantee.
+
 ## Retained, deferred and removed from the active critical path
 
 **Retained:** existing Garrett identity, certificate binding, OAuth custody,
