@@ -79,3 +79,9 @@ exact activation receipt, and composition with successful extracted revocation.
 trusted remote-state premises. The proof does not establish remote SQL commit,
 durability, rollback protection, whole-service mediation or confidentiality.
 No live account, physical TPM, VM or cross-machine deployment is tested here.
+
+The [frozen validation record](../dev/validation/2026-10-18-coordinator-operator.json)
+reports 2,691 portable tests, 664 selected parity tests and 443 required workflows
+in each build mode, all without skips. The combined audit checks 391 named
+obligations; six targeted receipt mutations are rejected. These counts describe
+the scoped evidence above, without promoting broader core or service claims.

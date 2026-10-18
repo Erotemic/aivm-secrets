@@ -1821,3 +1821,21 @@ checks the actual receipt gate and joins successful extracted revocation to it,
 while JSON/TLS/transport placement and remote storage remain explicit adapters.
 The distinction between absent status and a permanent tombstone seems a useful
 condition to make precise. Broad parity and complete mediation are still open.
+
+## 2026-10-18 14:30:06 -0400
+
+The coordinator operator increment is accepted locally at `b620a09`:
+2,691 portable tests, 664 selected parity tests and 443 required workflows in
+both configurations pass without skips. The 391-name audit uses the existing
+logical axioms; six receipt mutations are rejected, and all 240 package inputs
+match. Both clients now preserve a possibly committed operator mutation as
+uncertain, and a missing principal is visibly different from a tombstone.
+
+I feel this moves the standalone Rust workflow forward in a practical way:
+operators can manage either authority without the Python client, while the
+reference implementation gains a reproduced uncertainty fix rather than an
+incidental behavior change to fit Rust. The source inventory retains separate
+host and guest scopes. My confidence remains bounded: JSON/TLS phase placement,
+remote commit, durability, rollback prevention and complete mediation are not
+proved by the new receipt theorem. Broad parity, live deployment and independent
+security review remain in the active queue; the overall goal is still open.

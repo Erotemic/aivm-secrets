@@ -1,0 +1,141 @@
+{
+  "schema": 1,
+  "source_commit": "b620a092b565378fe04a2de6f70ab9fa603680d2",
+  "source_dirty": false,
+  "scope": "Native host coordinator activation/revocation/status, Python committed-but-unanswered correction, exact typed native receipt validation and successful extracted revocation composition",
+  "report": {
+    "path": ".tools/system-ec945q9n/report.json",
+    "sha256": "55ec143d4f7caca88aa1cdecf72bed6c8d8fab60b27fbecc045fac602173f120"
+  },
+  "full_suite": {
+    "passed": 2691,
+    "skipped": 0
+  },
+  "required_workflows": {
+    "conformance": 443,
+    "normal_release_without_conformance": 443,
+    "skipped": 0
+  },
+  "normal_report": {
+    "path": ".tools/operator-normal-validation/report.json",
+    "sha256": "6c49081d672142d9eab2473bdd52e1d6c714c2df667bd94d22346916f7bbd737"
+  },
+  "selected_core_parity": {
+    "passed": 664,
+    "skipped": 0,
+    "log": {
+      "path": ".tools/operator-b620a09-validation/operator-garrett.log",
+      "sha256": "fb600149ca33482f313ec6435c13fea4eb22f0a7345b3e6e8baa9aff1c362b60"
+    }
+  },
+  "focused_runtime": {
+    "new_cases": 33,
+    "frozen_reply_rows": 78,
+    "reply_client_implementations": 2,
+    "authority_implementations": 2,
+    "commit_then_drop_cases": 4,
+    "combined_operator_reference_cases": 39,
+    "package_boundary_catalogue_selection": 101
+  },
+  "baseline_python_bug": {
+    "source_commit": "a130a9b8435950ee842d88d512435fd359e2a733",
+    "expected_failures": 2,
+    "observed": "Real mTLS handler authorized and committed activate/revoke, then dropped the reply; prior client returned revoked instead of outcome_unknown",
+    "log": {
+      "path": ".tools/operator-b620a09-validation/operator-baseline.log",
+      "sha256": "d56cf4ebb33bf22ea1e674765d7b229c65b32914f8ff3d105133c9e25ab0f87f"
+    }
+  },
+  "proof_audit": {
+    "named_obligations": 391,
+    "new_obligations": 7,
+    "allowed_axioms": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+    ],
+    "checked_contracts": [
+      "exact operator receipt admission over typed action/bool/optional-I64 inputs",
+      "accepted revocation has inactive state and a present positive revision",
+      "missing principal or active state cannot confirm revocation",
+      "absent inactive status is admitted as status",
+      "activation acknowledgement requires active state and initial revision one",
+      "successful actual extracted revocation produces an admitted receipt"
+    ]
+  },
+  "operator_receipt_mutations": {
+    "rejected": 6,
+    "registered_total": 180,
+    "mutation_filter": "^operator receipt ",
+    "full_historical_campaign": false,
+    "process_exit_code": 0,
+    "names": [
+      "operator receipt absence confirms revocation (GarrettCoordinatorReply)",
+      "operator receipt active state confirms revocation (GarrettCoordinatorReply)",
+      "operator receipt nonpositive revision confirms revocation (GarrettCoordinatorReply)",
+      "operator receipt activation ignores initial revision (GarrettCoordinatorReply)",
+      "operator receipt active absence admitted (GarrettCoordinatorReply)",
+      "operator receipt member action admitted (GarrettCoordinatorReply)"
+    ],
+    "log": {
+      "path": ".tools/operator-b620a09-validation/operator-mutations.log",
+      "sha256": "9b236963da81630faee4fb07ed81bd1e62a70e8b15420934e97a806eb8d3b276"
+    }
+  },
+  "packaging": {
+    "wheel": {
+      "path": ".tools/operator-b620a09-validation/aivm_secrets-0.2.0-py3-none-any.whl",
+      "sha256": "54986fe38da62d02d98d7b92bd8c024c3c3435089e1d4bffe989a20a19004d91"
+    },
+    "source_distribution": {
+      "path": ".tools/operator-b620a09-validation/aivm_secrets-0.2.0.tar.gz",
+      "sha256": "7f71d063245c721cf8ded1d060ab900e1e2570eb57ea445ff46911088a6043f1"
+    },
+    "pinned_archive_inputs": 240,
+    "all_pinned_archive_inputs_match": true,
+    "log": {
+      "path": ".tools/operator-b620a09-validation/operator-package.log",
+      "sha256": "d27dd51edcf7c0d33f4e67d37406950a8f48b37fad267ea9d294b5bc915ccc1b"
+    }
+  },
+  "boundaries": {
+    "reviewed_rust_build_sources": 88,
+    "effect_classes": 14,
+    "w0_sinks": 13,
+    "w6_channels": 13,
+    "operator_sink": "S-COORDINATOR-ADMIN",
+    "guest_operator_actions": false,
+    "complete_mediation": false
+  },
+  "model_recompilation": {
+    "w4": {
+      "path": ".tools/operator-b620a09-validation/operator-w4.log",
+      "sha256": "dd21b7e28cd2f3a2d9b371ff21c771c0cda73c53fdad4d757a41fbaca8c5981e"
+    },
+    "w5": {
+      "path": ".tools/operator-b620a09-validation/operator-w5.log",
+      "sha256": "db00e4091d44a0b16c69811a716ac52921971c2b134e79432d50d1714005d5ad"
+    },
+    "scope": "Unchanged W4/W5 models recompiled and combined-extraction provenance refreshed; operator observations remain outside the guest trace"
+  },
+  "compiler_call_linkage": {
+    "rerun": false,
+    "note": "No new transitive reachability, admission dominance or complete mediation claim"
+  },
+  "commands": [
+    ".venv/bin/python dev/verification/freshness.py record",
+    ".venv/bin/python dev/verification/garrett.py record",
+    ".venv/bin/python dev/verification/garrett.py mutate --mutation-filter \"^operator receipt \"",
+    ".venv/bin/python dev/verification/w4_trace.py prove",
+    ".venv/bin/python dev/verification/w5_noninterference.py prove",
+    ".venv/bin/python dev/verification/system.py --proofs --full-tests",
+    ".venv/bin/python -m build"
+  ],
+  "limitations": [
+    "The proof concerns the actual extracted typed receipt validator and pure revoke transition; JSON conversion, transport phase placement, TLS and remote commit/SQL/durability remain explicit adapters under COORD-OPERATOR-RUST-01.",
+    "A lying or rolled-back coordinator can misreport state. Receipt validation is not remote attestation, transaction identity, anti-rollback protection or distributed consensus.",
+    "Operator transport failures after possible mutation submission are outcome_unknown; status is diagnostic and never triggers an automatic replay. Member transport failures retain revoked; positive member acknowledgements are now complete and typed in Python as in Rust.",
+    "The new operator client is host-only and does not make operator credentials or actions available to guest protocol handlers. The experimental AIVM integration and co-located copy are unchanged.",
+    "No broad Python/Rust parity, whole-service confidentiality, complete native I/O mediation, live provider, VM or physical TPM result is established."
+  ]
+}
