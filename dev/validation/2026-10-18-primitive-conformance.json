@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "source_commit": "592929db46c1d67b398841079519b076a6824ffb",
+  "source_dirty": false,
+  "scope": "Frozen full primitive-conformance and native JSON object-preservation checkpoint",
+  "report_path": ".tools/primitives-system-592929d/report.json",
+  "report_sha256": "6571077d662728135b39ffc6ad6cf3592acc8fce4afc713fe25141352239f071",
+  "input_fingerprint_sha256": "f3054c545aa0615d14413a6a8e51dcc871495a6098c12977eda983b615376676",
+  "full_suite": {
+    "passed": 2328,
+    "skipped": 0
+  },
+  "required_workflows": {
+    "conformance": 120,
+    "normal_release_without_conformance": 120,
+    "skipped": 0
+  },
+  "normal_workflow_report_path": ".tools/primitives-validation-592929d/primitives-normal-workflows.json",
+  "normal_workflow_report_sha256": "07b58961386cf6f22dfb271cd22d3da49f36e35ba73656fb37dfc8274de7454c",
+  "normal_build_command": [
+    "cargo",
+    "+nightly-2026-09-17",
+    "build",
+    "--manifest-path",
+    "rust/Cargo.toml",
+    "--release",
+    "--bins",
+    "--locked",
+    "--no-default-features"
+  ],
+  "baseline_failures": {
+    "scoped_runner_cannot_replace_full_table": 1,
+    "native_marker_unit_cases": 2,
+    "native_marker_guest_provider_process_cases": 4,
+    "primitive_marker_payload_case": 1
+  },
+  "evidence_log_sha256": {
+    "json-marker-baseline.log": "8a26df0a1902d6c9ae200c622c85b12d936db35a0d034e3daab974a2540a0662",
+    "json-marker-fixed-process.log": "37ac0a871d9f76a25e85f9cbf27fbf0d1d5a89bbe3c35f992f6402432feb29ff",
+    "json-marker-native-baseline.log": "add85cfb889f88aa9b26e6862b1467b966d679391dd510ba166606a8923625f3",
+    "primitives-baseline.log": "ec6f58c20c7ddcd1fa47ce5ef735908036f0f751e8eda23048186e4cb4e3e6be",
+    "primitives-boundary-final.log": "bbfe0eded7f6fdfa889c1ea5f31277c7161629f134662d586ce5630c598f0dbb",
+    "primitives-clippy-final.log": "3df10e8a8e2703c39fa02b014998c2d3d173e713414be50da9d41b09f48ab085",
+    "primitives-freshness-record.log": "7c1dbf30f37302c41a0b350cbb934673b23a58cb8a418f56c880136b127e24e2",
+    "primitives-garrett-record.log": "a4bca2d22c7966124098e1ee9c66c4008f26b697563e33959aa2c18d3f235d63",
+    "primitives-marker-baseline.log": "e988df829ee13ab4ba42c4e46f7d14c060131ed6165c1daac01e047089ab04d2",
+    "primitives-normal-build.log": "2f07ef06cb9c33e172ded2aba8aa255c7c926117ca9ee6b6982124354f33fbb7",
+    "primitives-normal-workflows.json": "07b58961386cf6f22dfb271cd22d3da49f36e35ba73656fb37dfc8274de7454c",
+    "primitives-normal-workflows.log": "2b9f5beb5d525f13b39cda6e6cdb4ba38c692f03a0ac62bb040b24c23fc82c44",
+    "primitives-normal-workflows.xml": "41ee66d9fe52539857637af98d304d913fdf0af31a6d0014af1a03dff6a5b5a9",
+    "primitives-package.log": "8fb85e59915a897f087c8e9a2142643fe69ff20e07b6256d47cfb44966d89409",
+    "primitives-w4-w5.log": "db00e4091d44a0b16c69811a716ac52921971c2b134e79432d50d1714005d5ad"
+  },
+  "checked_scope": [
+    "Independent six-entry Rust primitive adapter against 157 frozen rows, raw stream framing and deterministic Unicode/numeric differential cases",
+    "Explicitly separate full-table and scoped freshness dispatch profiles",
+    "Native JSON marker objects preserve their structure instead of satisfying integer argument/disclosure contracts",
+    "26 optimized primitive/freshness tests; 372 selected Garrett tests; 21 native unit cases",
+    "239 named Garrett and ten freshness axiom checks; unchanged regenerated Lean decision artifacts",
+    "W0/W3/W4/W5/W6 gates, strict native lint in both modes, separate primitive adapter lint and source/wheel builds"
+  ],
+  "limits": [
+    "Finite conformance evidence, not all-input Python/Rust equivalence or proof that the native broker uses the development runner",
+    "JSON conversion remains a tested adapter; no new codec or parser-refinement theorem",
+    "Whole-service I/O reachability and native trace refinement remain open",
+    "Existing 107-mutation campaign was run at 8ef98e7; current pure extracted sources are unchanged, not a newly rerun campaign",
+    "No live provider, physical TPM or live libvirt VM validation"
+  ]
+}
