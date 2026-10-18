@@ -61,3 +61,9 @@ name. The existing dispatch and coordinator-history proofs remain separate.
 This does not prove the CLI, JSON conversion, hashing, SQL durability, native I/O
 mediation, exactly-once provider effects, broad Python/Rust parity or whole-service
 confidentiality. No live provider or TPM is required for these synthetic tests.
+
+The [frozen validation record](../dev/validation/2026-10-18-native-invoke.json)
+reports 2,656 portable tests and 410 required workflows in each build mode, all
+with zero skips. The combined audit covers 384 named obligations; five targeted
+retry-validator mutations are rejected. This is the stated local synthetic and
+source-proof evidence, with the limits above retained.

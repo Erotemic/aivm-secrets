@@ -1,8 +1,8 @@
 # Active work: useful broker workflows and conditional credential confinement
 
 Status: **work plan, not a completed assurance claim**, reconciled 2026-10-18
-against frozen runtime/proof implementation `f123fcd` and its
-[decoded JSON reflection validation record](../../dev/validation/2026-10-18-json-reflection.json). This is the authoritative **priority and task queue**
+against frozen runtime/proof implementation `98cf77d` and its
+[native invocation validation record](../../dev/validation/2026-10-18-native-invoke.json). This is the authoritative **priority and task queue**
 for new agents. Existing P0-P5, M0-M6, and G0-G5 stages remain useful design,
 implementation history, and prerequisite inventories; they are **not three
 competing current schedules**. Revisit this queue after each accepted milestone.
@@ -140,6 +140,19 @@ the 378-name audit and five new traversal mutations. JSON conversion, rendering,
 call-site mediation, alternate encodings, semantic leakage and the observable
 reflection-denial oracle remain explicit limitations.
 
+The [native named-operation client](../native-operation-client.md) now submits
+bounded JSON and host-authorized keyed writes through the existing identity and
+broker protocol, with full public errors and conservative post-send uncertainty.
+Both identity inputs and both coordinator backends pass allow/deny, spent-name,
+provider-failure and terminal-revocation cases. The host/client share an extracted
+exact ASCII retry-name validator. Frozen validation passes 2,656 portable tests,
+410 required workflows in both build modes, the 384-name audit and five new retry
+mutations. Native coordinator shutdown is additionally bounded and half-closed
+after an observed malformed-reply truncation; the interrupted run and lack of
+deterministic reproduction are retained. The unchanged W4/W5 models were
+recompiled and their combined-extraction provenance refreshed after the initial gate rejected stale pins. CLI/I/O, SQL,
+whole-service mediation and broad parity remain separate obligations.
+
 The [parsed-policy identity increment](../verified-policy-normalization.md) closes
 the known raw-document fingerprint difference in coordinated manifest writes.
 Finite differential and durable-record tests are the evidence; normalization
@@ -234,8 +247,8 @@ counts substitute for the obligations above.
 
 Statuses below reflect the checked implementation, with remaining acceptance
 conditions kept explicit. The older milestone plans retain historical detail.
-The [frozen validation record](../../dev/validation/2026-10-18-json-reflection.json)
-reports 2,606 portable tests with zero skips and all 365 required workflow tests in
+The [frozen validation record](../../dev/validation/2026-10-18-native-invoke.json)
+reports 2,656 portable tests with zero skips and all 410 required workflow tests in
 both conformance and ordinary release modes. These tests do not discharge
 unproved native I/O correspondence or independent security review.
 

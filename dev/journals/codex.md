@@ -1779,3 +1779,23 @@ new cases pass on the hardened native process; a unit test checks EOF and exact
 discard bounds, and a source mutant protects the call site. This is adapter
 hardening, not a new formal transport guarantee. I will rerun the main parity,
 ordinary workflows, packaging and clean full gate before accepting the increment.
+
+## 2026-10-18 13:45:52 -0400
+
+The native invocation increment is now accepted locally at frozen source
+`98cf77d`: 2,656 portable tests, 631 selected parity tests and 410 required
+workflows in both conformance and ordinary release modes pass without skips.
+Five grammar mutations are rejected, the 384-name audit uses only the existing
+logical axioms, and all 235 pinned package inputs match. The initial stale W4
+provenance failure and its reviewed/recompiled correction remain in the record.
+The interrupted malformed coordinator reply failure, bounded shutdown hardening,
+and lack of deterministic reproduction are also explicit; the new clean full
+run does not turn that diagnosis into a formal transport claim.
+
+I am satisfied that this is a useful review checkpoint: routine operations and
+keyed writes no longer require hand-crafted frames, and uncertainty remains
+visible rather than prompting automatic replay. I remain cautious about the
+larger claim: client behavior is tested, the new proof is only a shared syntax
+leaf, and neither SQL/native I/O refinement nor service-level confidentiality
+has been established. No live account, VM or physical TPM was involved. The
+active queue still records broad core parity and complete mediation as open.

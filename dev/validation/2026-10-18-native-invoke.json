@@ -1,0 +1,173 @@
+{
+  "schema": 1,
+  "source_commit": "98cf77d4d4179aec9201979bd98efc5d83935029",
+  "invocation_implementation_commit": "8d4dec096d90e70a9272a27fb46982f3cf7dac09",
+  "source_dirty": false,
+  "scope": "Native named-operation invocation through existing broker authority, keyed-write/reply process tests, extracted exact retry-name grammar, and bounded coordinator response shutdown",
+  "report": {
+    "path": ".tools/system-zpuxuiqu/report.json",
+    "sha256": "86f1c83ed235e441cc9ca4821ad6bb7a9fa363daefe97271c2b1aa3ab0a2ee53"
+  },
+  "full_suite": {
+    "passed": 2656,
+    "skipped": 0
+  },
+  "required_workflows": {
+    "conformance": 410,
+    "normal_release_without_conformance": 410,
+    "skipped": 0
+  },
+  "normal_report": {
+    "path": ".tools/invoke-close-normal-validation/report.json",
+    "sha256": "9851e409215543547c34fdcbda1ce26317c204c67a49eea6f3adb242101011ed"
+  },
+  "selected_core_parity": {
+    "passed": 631,
+    "skipped": 0,
+    "log": {
+      "path": ".tools/invoke-98cf77d-validation/invoke-garrett.log",
+      "sha256": "d9048572dd4d53411bbe99ebf8137b04f773b236b778520179b17633e2f3c9bb"
+    }
+  },
+  "focused_runtime": {
+    "pytest_cases": 43,
+    "normal_build_process_cases": 42,
+    "differential_rows": 2391,
+    "coordinator_backends": 2,
+    "identity_input_modes": [
+      "legacy-certificate-and-capability-file",
+      "atomic-certificate-jwt-bundle"
+    ],
+    "combined_source_archive_boundary_catalogue_tests": 97
+  },
+  "proof_audit": {
+    "named_obligations": 384,
+    "new_obligations": 6,
+    "allowed_axioms": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+    ],
+    "checked_contracts": [
+      "exact ASCII alphabet and every byte visited",
+      "all and only length 8 through 128 with admitted bytes",
+      "accepted names exclude CR and LF at every position",
+      "every grammar-valid name is accepted"
+    ]
+  },
+  "retry_key_mutations": {
+    "rejected": 5,
+    "registered_total": 174,
+    "mutation_filter": "^retry key ",
+    "process_exit_code": 0,
+    "full_historical_campaign": false,
+    "names": [
+      "retry key invalid byte admitted (GarrettRetryKey)",
+      "retry key short admitted (GarrettRetryKey)",
+      "retry key valid underscore refused (GarrettRetryKey)",
+      "retry key long admitted (GarrettRetryKey)",
+      "retry key final byte skipped (GarrettRetryKey)"
+    ],
+    "log": {
+      "path": ".tools/invoke-98cf77d-validation/invoke-mutations.log",
+      "sha256": "7c368903595716261af5982b26e8e564718b48af2e5ddb268da53a5a2cb47fcc"
+    }
+  },
+  "packaging": {
+    "wheel": {
+      "path": ".tools/invoke-98cf77d-validation/aivm_secrets-0.2.0-py3-none-any.whl",
+      "sha256": "3cbc49e9bac2d97da0c8d168e64a288f978b7bf42ba08bb6504d3a7ca67967d5"
+    },
+    "source_distribution": {
+      "path": ".tools/invoke-98cf77d-validation/aivm_secrets-0.2.0.tar.gz",
+      "sha256": "4e7255298ec4d75aafc487e9c4cec55c4cb74a817765835d670e7e8644e8dd76"
+    },
+    "pinned_archive_inputs": 235,
+    "all_pinned_archive_inputs_match": true,
+    "log": {
+      "path": ".tools/invoke-98cf77d-validation/invoke-package.log",
+      "sha256": "aab9e3e3674245c0b7a6e8e202fa5756bb6ce8ec0654349ae0b74de86e553cde"
+    }
+  },
+  "w3": {
+    "reviewed_rust_build_sources": 86,
+    "effect_classes": 13,
+    "complete_mediation": false
+  },
+  "model_recompilation": {
+    "w4": {
+      "path": ".tools/invoke-98cf77d-validation/invoke-w4.log",
+      "sha256": "eb3228522096112935c0fb90778d249bb21fd6fcdf4fe477c3b0330adecff49c"
+    },
+    "w5": {
+      "path": ".tools/invoke-98cf77d-validation/invoke-w5.log",
+      "sha256": "db00e4091d44a0b16c69811a716ac52921971c2b134e79432d50d1714005d5ad"
+    },
+    "scope": "Unchanged models recompiled against regenerated core; no new native trace-refinement claim"
+  },
+  "initial_attempt": {
+    "report": {
+      "path": ".tools/system-vcwklgjd/report.json",
+      "sha256": "10e7f409765ba1e5a16084f123fcd15cfa07e2e939e659b7b189b7e958d909fb"
+    },
+    "status": "failed",
+    "reason": "W4 refused stale combined-generated-file provenance; refreshed W4/W5 pins after recompilation, then reran clean gate"
+  },
+  "compiler_call_linkage": {
+    "rerun": false,
+    "note": "No new transitive call-ledger or dominance claim"
+  },
+  "commands": [
+    ".venv/bin/python dev/verification/freshness.py record",
+    ".venv/bin/python dev/verification/garrett.py record",
+    ".venv/bin/python dev/verification/garrett.py mutate --mutation-filter \"^retry key \"",
+    ".venv/bin/python dev/verification/w4_trace.py prove",
+    ".venv/bin/python dev/verification/w5_noninterference.py prove",
+    ".venv/bin/python dev/verification/system.py --proofs --full-tests",
+    ".venv/bin/python -m build"
+  ],
+  "limitations": [
+    "The new proof concerns the shared actual Rust retry-name validator. CLI, request translation, JSON/TLS, hashing, reservations, SQL and filesystem durability remain tested or assumed adapters.",
+    "Write authority, principal derivation and durable reservation remain broker/coordinator decisions; syntax acceptance does not authorize a write or guarantee exactly-once provider effects.",
+    "Existing raw-frame and gh exit conventions are preserved; the new invoke interface reports full broker errors and exits one on denial or uncertainty.",
+    "No broader Python/Rust parity, complete mediation, whole-service confidentiality, hardware TPM, live VM or live provider validation is established.",
+    "An intermittent malformed coordinator reply truncation motivated bounded shutdown hardening. The original failure and incomplete run are retained; deterministic reproduction remains unestablished."
+  ],
+  "interrupted_full_attempt": {
+    "report": {
+      "path": ".tools/system-ctlzm998/report.json",
+      "sha256": "1d18d8b54c50bc959e38f57c0027929d67a3613437b2e1b3435e0f0ae58b4d3c"
+    },
+    "passed_before_interruption": 847,
+    "failed": 1,
+    "completed": false,
+    "reason": "Interrupted an already-failing suite to collect IncompleteRead(0 bytes, 37 expected) from malformed coordinator HTTP rejection"
+  },
+  "shutdown_hardening": {
+    "native_authority_cases": 36,
+    "delayed_body_cases": 3,
+    "baseline_delayed_body_passed": 3,
+    "baseline_isolated_repetitions_passed": 100,
+    "deterministic_reproduction": false,
+    "new_unit_tests": 1,
+    "boundary_cases": 52,
+    "scope": "Flush TLS close-notify, half-close output and bounded raw input discard under the existing deadline; no parser/dispatch or ledger change",
+    "limitation": "The original intermittent truncation was observed in the full suite but not deterministically reproduced in focused cases",
+    "focused_log": {
+      "path": ".tools/invoke-98cf77d-validation/invoke-close-focused.log",
+      "sha256": "3f29fe65578789eb996d9eff425551bff51fadc932e27e759d2ae0f55440356a"
+    },
+    "boundary_log": {
+      "path": ".tools/invoke-98cf77d-validation/invoke-close-boundary.log",
+      "sha256": "d8465b37b79df893f9ed32378fcb013692747dfc3b89aec218adaceb1a6cc952"
+    },
+    "baseline_delayed_body_log": {
+      "path": ".tools/invoke-98cf77d-validation/invoke-close-baseline.log",
+      "sha256": "e29583202aeca76366e3fdf7747cd8656b4d35e05d6b904ee8db1c9128063962"
+    },
+    "baseline_repetitions_log": {
+      "path": ".tools/invoke-98cf77d-validation/invoke-coordinator-repro.log",
+      "sha256": "8de308ee66a95253e74fe720504eda8db7b2c6d18bb0ed728c4706cf456d1b15"
+    }
+  }
+}
