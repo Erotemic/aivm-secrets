@@ -114,6 +114,11 @@ certificate. Tests carry that CSR through fresh attestation enrollment and a
 TPM-signed provider call under isolated emulation; hardware provenance remains
 a deployment assumption.
 
+The [native named-operation client](docs/native-operation-client.md) submits
+bounded JSON requests and host-authorized keyed writes using the same identity
+configuration. It preserves structured broker errors and uncertain outcomes;
+the broker retains all authorization and reservation decisions.
+
 ## Reproducible synthetic system check
 
 After provisioning the pinned Rust and optional Lean/Aeneas tools, run

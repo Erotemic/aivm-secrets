@@ -60,6 +60,11 @@ retry name. Existing reservations, including completed or uncertain writes,
 are never replayed. A changed body cannot reuse the name. Use a new name only
 for a new intended action; reconcile uncertain effects with the provider.
 
+The [native `invoke` command](native-operation-client.md) constructs this same
+request without a hand-written frame. Client and host share the extracted
+8–128-byte ASCII retry-name validator, checked in `GarrettRetryKey.lean`; this
+syntax proof is separate from reservation durability and dispatch ordering.
+
 Operations may explicitly declare `"idempotency_header": "Idempotency-Key"`.
 Only then does the native broker send the derived 64-character reservation key
 to the approved provider. It does not send a guest-selected header. An explicit

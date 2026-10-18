@@ -21,6 +21,14 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_TESTS = [
+    'tests/test_rust_invoke.py::test_named_read_preserves_python_request_and_provider_effect',
+    'tests/test_rust_invoke.py::test_named_read_with_no_arguments',
+    'tests/test_rust_invoke.py::test_named_write_keeps_broker_permission_gate',
+    'tests/test_rust_invoke.py::test_named_write_reservation_replay_and_terminal_revocation',
+    'tests/test_rust_invoke.py::test_malformed_invocation_refused_before_config_or_transport',
+    'tests/test_rust_invoke.py::test_argument_file_is_bounded_untrusted_data',
+    'tests/test_rust_invoke.py::test_invoke_retains_public_errors_and_invalid_replies_stay_uncertain',
+
     'tests/test_secrets_w1_github_workflow.py',
     'tests/test_rust_w2_github_workflow.py',
     'tests/test_rust_w5_noninterference.py',
@@ -148,7 +156,7 @@ def main() -> int:
             run('lean-w4-w5', [python, 'dev/verification/w5_noninterference.py', 'prove'])
             run('lean-profile-emission-oauth', ['lake', '-d', 'proofs', 'build',
                                                '+GarrettProfiles', '+GarrettEmission',
-                                               '+GarrettOAuth', '+GarrettCoordination', '+GarrettRebinding', '+GarrettHttpAuth', '+GarrettHttpRequest', '+GarrettHttpWire', '+GarrettLineFrame', '+GarrettBundle', '+GarrettJsonReflection', '+GarrettCoordinatorAuthority'])
+                                               '+GarrettOAuth', '+GarrettCoordination', '+GarrettRetryKey', '+GarrettRebinding', '+GarrettHttpAuth', '+GarrettHttpRequest', '+GarrettHttpWire', '+GarrettLineFrame', '+GarrettBundle', '+GarrettJsonReflection', '+GarrettCoordinatorAuthority'])
         if args.full_tests:
             with tempfile.TemporaryDirectory(prefix='as-full-', dir='/tmp') as temporary:
                 run('full-python-native', [python, '-m', 'pytest', '-q', '-ra',

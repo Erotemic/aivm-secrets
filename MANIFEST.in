@@ -20,6 +20,7 @@ include proofs/GarrettManifest.lean
 include proofs/GarrettDisclosure.lean
 include proofs/GarrettReflection.lean
 include proofs/GarrettJsonReflection.lean
+include proofs/GarrettRetryKey.lean
 include proofs/GarrettClientMaterial.lean
 include proofs/GarrettBundle.lean
 include proofs/GarrettEmission.lean proofs/GarrettCoordination.lean proofs/GarrettRebinding.lean

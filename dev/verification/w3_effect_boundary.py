@@ -257,6 +257,23 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'value[flag] != json!(true)' in coordinate
             and 'fn outcome_unknown(&self) -> Error' in coordinate,
             'coordinator admission caches or accepts an untyped acknowledgement')
+    require('if !aivm_secrets_garrett_core::coordination::valid_retry_key(key.as_bytes())' in request,
+            'host retry-name admission bypasses the shared extracted validator')
+    invoke = contents[RUST + 'client_invoke.rs']
+    require('if !valid_retry_key(key.as_bytes())' in invoke
+            and 'json::parse(&bytes, MAX_ARGUMENTS)' in invoke
+            and 'if !arguments.is_object()' in invoke
+            and 'OFlags::NONBLOCK' in invoke
+            and '.is_file()' in invoke
+            and '"idempotency_key".into()' in invoke,
+            'guest invoke lost bounded object input or retry-name validation')
+    guest_call = part(contents[RUST + 'client_main.rs'], 'fn invoke_action(', 'fn encoded_reply(')
+    require(same_order(guest_call, 'client_invoke::Invoke::parse(words)?',
+                       'let config = configure(config)?', 'config.select_capability(',
+                       'config.exchange(frame)?')
+            and guest_call.count('configure(config)?') == 1
+            and 'return Err(Error::OutcomeUnknown)' in guest_call,
+            'guest invoke changed snapshot selection or post-send uncertainty')
     # Host renewal may carry only the source certificate's verified key
     # identity; substituting the current fingerprint would defeat continuity.
     rebinding = contents[RUST + 'authority/rebinding.rs']

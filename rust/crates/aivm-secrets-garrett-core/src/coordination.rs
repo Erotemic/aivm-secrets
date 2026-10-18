@@ -33,3 +33,26 @@ pub fn dispatch<D: Dispatch>(ops: &D, keyed_write: bool) -> Result<D::Output, D:
     }
     Ok(result)
 }
+
+/// Guest retry names are opaque transport metadata. Only this closed ASCII
+/// alphabet enters the principal-scoped reservation-key derivation.
+pub fn retry_byte(byte: u8) -> bool {
+    (byte >= b'A' && byte <= b'Z')
+        || (byte >= b'a' && byte <= b'z')
+        || (byte >= b'0' && byte <= b'9')
+        || byte == b'-'
+        || byte == b'_'
+}
+pub fn valid_retry_key(key: &[u8]) -> bool {
+    if key.len() < 8 || key.len() > 128 {
+        return false;
+    }
+    let mut i = 0;
+    while i < key.len() {
+        if !retry_byte(key[i]) {
+            return false;
+        }
+        i += 1;
+    }
+    true
+}

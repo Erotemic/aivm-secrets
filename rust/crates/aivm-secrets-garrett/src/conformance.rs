@@ -67,6 +67,12 @@ pub(crate) fn verify_attestation_fixture(
     Ok(verified)
 }
 pub fn evaluate(v: &Value) -> Outcome<Value> {
+    if v.get("action").and_then(Value::as_str) == Some("retry-key") {
+        let m = json::keys(v, &["action", "key_hex"], &[])?;
+        return Ok(
+            json!({"ok":true,"valid":aivm_secrets_garrett_core::coordination::valid_retry_key(&bytes(&m["key_hex"])?)}),
+        );
+    }
     if v.get("action").and_then(Value::as_str) == Some("json-reflection") {
         let m = json::keys(v, &["action", "value", "secret_hex", "fuel"], &[])?;
         let secret = bytes(&m["secret_hex"])?;

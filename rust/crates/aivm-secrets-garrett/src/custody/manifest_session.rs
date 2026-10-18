@@ -195,11 +195,7 @@ impl Session {
             .as_ref()
             .map(|v| {
                 let key = v.as_str().ok_or(Error::InvalidRequest)?;
-                if !(8..=128).contains(&key.len())
-                    || !key
-                        .bytes()
-                        .all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b))
-                {
+                if !aivm_secrets_garrett_core::coordination::valid_retry_key(key.as_bytes()) {
                     return Err(Error::InvalidRequest);
                 }
                 Ok(key)

@@ -40,7 +40,7 @@ or OS/VM isolation.
 ## Narrow guest-side CLI
 
 `garrett-client` supports these explicit *read-only* conveniences in addition
-to its existing stdin-frame interface:
+to its existing stdin-frame interface and [named operation invocation](native-operation-client.md):
 
 ```bash
 rust/target/debug/garrett-client --config guest-client.json --capability-file guest-capability gh pr view 13861 --repo TauCetiProject/TauCeti --json number,title,headRefOid
@@ -94,9 +94,10 @@ without starting the bridge. A bridge startup failure reporting
 
 ## Remaining differences from Python W1
 
-- No generic schema-2 `cli` manifest alias interpreter; just three explicitly
-  wired guest-side read commands. No write, `gh api`, Git remote discovery or
-  arbitrary GitHub CLI parity.
+- No generic schema-2 `cli` manifest alias interpreter; the `gh` aliases cover
+  three explicitly wired read commands. Generic `invoke` can submit host-defined
+  operations, including authorized keyed writes; it adds no `gh api`, Git remote
+  discovery or arbitrary GitHub CLI parity.
 - Native `request_limit: "unbounded"`; W1 Python request budgets and one-shot
   write approval are **not** inherited. The Rust `writes: deny` gate protects
   this read-only scenario.

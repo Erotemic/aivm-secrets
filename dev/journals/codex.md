@@ -1728,3 +1728,23 @@ contracts, concrete mediation, encoded or semantic provider leakage and an
 observable rejection oracle. Existing W4/W5 claims stay scoped, and no hardware,
 VM or live provider evidence is inferred. Complete service assurance remains
 an open objective, not the meaning of this checkpoint.
+
+## 2026-10-18 13:05:50 -0400
+
+I am closing a practical gap in the native workflow: named operations and keyed
+writes still needed hand-built frames. The new `invoke` path uses the existing
+identity snapshot and broker protocol, preserves structured denial/uncertainty,
+and leaves all provider and reservation authority in the host. I chose ordinary
+readable argument files because request data is untrusted guest input; requiring
+private credential-directory rules there would impede routine use without
+protecting a host secret. Credential and config inputs retain their private-file
+rules. The old raw-frame and gh exit conventions are retained deliberately.
+
+I feel more confident about the intended operator workflow after seeing both
+coordinator backends spend a name once, retain it after a provider error, and
+fence a new action after revocation. That confidence is bounded by synthetic
+process tests: no live provider, remote delivery, hardware or complete mediation
+has been established. The shared retry validator is small enough for an exact
+extracted Rust/Lean contract, avoiding a second handwritten policy in the client.
+Its proof does not establish SQL durability or CLI correctness. Broader gates,
+package provenance and adversarial proof mutations remain before acceptance.

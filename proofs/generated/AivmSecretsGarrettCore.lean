@@ -320,6 +320,100 @@ def coordination.dispatch
       | core.result.Result.Err _ => ok r1
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
+/-- [aivm_secrets_garrett_core::coordination::retry_byte]:
+    Source: 'crates/aivm-secrets-garrett-core/src/coordination.rs', lines 39:0-45:1
+    Visibility: public -/
+def coordination.retry_byte (byte : Std.U8) : Result Bool := do
+  if byte >= 65#u8
+  then
+    if byte <= 90#u8
+    then ok true
+    else
+      if byte >= 97#u8
+      then
+        if byte <= 122#u8
+        then ok true
+        else
+          if byte >= 48#u8
+          then
+            if byte <= 57#u8
+            then ok true
+            else if byte = 45#u8
+                 then ok true
+                 else ok (byte = 95#u8)
+          else if byte = 45#u8
+               then ok true
+               else ok (byte = 95#u8)
+      else
+        if byte >= 48#u8
+        then
+          if byte <= 57#u8
+          then ok true
+          else if byte = 45#u8
+               then ok true
+               else ok (byte = 95#u8)
+        else if byte = 45#u8
+             then ok true
+             else ok (byte = 95#u8)
+  else
+    if byte >= 97#u8
+    then
+      if byte <= 122#u8
+      then ok true
+      else
+        if byte >= 48#u8
+        then
+          if byte <= 57#u8
+          then ok true
+          else if byte = 45#u8
+               then ok true
+               else ok (byte = 95#u8)
+        else if byte = 45#u8
+             then ok true
+             else ok (byte = 95#u8)
+    else
+      if byte >= 48#u8
+      then
+        if byte <= 57#u8
+        then ok true
+        else if byte = 45#u8
+             then ok true
+             else ok (byte = 95#u8)
+      else if byte = 45#u8
+           then ok true
+           else ok (byte = 95#u8)
+
+/-- [aivm_secrets_garrett_core::coordination::valid_retry_key]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/coordination.rs', lines 51:4-58:1
+    Visibility: public -/
+@[rust_loop]
+def coordination.valid_retry_key_loop
+  (key : Slice Std.U8) (i : Std.Usize) : Result Bool := do
+  let i1 := Slice.len key
+  if i < i1
+  then
+    let i2 ← Slice.index_usize key i
+    let b ← coordination.retry_byte i2
+    if b
+    then let i3 ← i + 1#usize
+         coordination.valid_retry_key_loop key i3
+    else ok false
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::coordination::valid_retry_key]:
+    Source: 'crates/aivm-secrets-garrett-core/src/coordination.rs', lines 46:0-58:1
+    Visibility: public -/
+def coordination.valid_retry_key (key : Slice Std.U8) : Result Bool := do
+  let i := Slice.len key
+  if i < 8#usize
+  then ok false
+  else
+    let i1 := Slice.len key
+    if i1 > 128#usize
+    then ok false
+    else coordination.valid_retry_key_loop key 0#usize
+
 /-- [aivm_secrets_garrett_core::coordinator_authority::Action]
     Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 7:0-14:1
     Visibility: public -/

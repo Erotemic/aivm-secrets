@@ -35,6 +35,13 @@ PROFILES = [
     "native-coordinator-authority-v1",
 ]
 THEOREMS = [
+    'aivm_secrets_garrett_core.coordination.KeyProofs.retry_byte_contract',
+    'aivm_secrets_garrett_core.coordination.KeyProofs.bytes_step',
+    'aivm_secrets_garrett_core.coordination.KeyProofs.retry_key_loop_contract',
+    'aivm_secrets_garrett_core.coordination.KeyProofs.valid_retry_key_contract',
+    'aivm_secrets_garrett_core.coordination.KeyProofs.accepted_key_has_no_line_breaks',
+    'aivm_secrets_garrett_core.coordination.KeyProofs.valid_key_is_accepted',
+
     'aivm_secrets_garrett_core.json_reflection.Proofs.index_exact',
     'aivm_secrets_garrett_core.json_reflection.Proofs.array_loop_contract',
     'aivm_secrets_garrett_core.json_reflection.Proofs.object_loop_contract',
@@ -501,6 +508,7 @@ TESTS = [
     "tests/test_rust_line_framing.py",
     "tests/test_rust_garrett_reflection.py",
     "tests/test_rust_json_reflection.py",
+    "tests/test_rust_invoke.py",
     "tests/test_rust_garrett_client_material.py",
     "tests/test_identity_bundle.py",
     "tests/test_rust_garrett_tpm_request.py",
@@ -569,6 +577,7 @@ def inputs() -> list[str]:
         "proofs/GarrettBundle.lean",
         "proofs/GarrettEmission.lean",
         "proofs/GarrettCoordination.lean",
+        "proofs/GarrettRetryKey.lean",
         "proofs/GarrettRebinding.lean",
         "proofs/GarrettHttpAuth.lean",
         "proofs/GarrettHttpRequest.lean",
@@ -760,7 +769,7 @@ def assurance_coordinates() -> dict:
         "aeneas_release": base.RELEASE,
         "theorems": THEOREMS,
         "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
-        "implementation_linked": "Aeneas-generated optional coordinator dispatch continuation and issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission, and concrete authentication-header credential validation/exact byte appending and request-line method/target validation/exact single-line construction used by both native provider writers, exact bounded newline frame admission shared by bridge ingress, forwarded broker replies and the guest client, including empty observed suffix and post-send uncertainty mapping as a tested native adapter, and extended to complete request framing with Host/Accept, exact custom-header ordering, case-insensitive reserved/duplicate refusal, concrete decimal port/body length and exact opaque body bytes; optional coordinator authority exact peer/operator admission, absent-only activation, revocation/reservation/completion decisions and modeled terminal committed-decision histories",
+        "implementation_linked": "Aeneas-generated optional coordinator dispatch continuation and issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission, and concrete authentication-header credential validation/exact byte appending and request-line method/target validation/exact single-line construction used by both native provider writers, exact bounded newline frame admission shared by bridge ingress, forwarded broker replies and the guest client, including empty observed suffix and post-send uncertainty mapping as a tested native adapter, and extended to complete request framing with Host/Accept, exact custom-header ordering, case-insensitive reserved/duplicate refusal, concrete decimal port/body length and exact opaque body bytes; exact bounded ASCII retry-name admission shared by the native host and named-operation client; optional coordinator authority exact peer/operator admission, absent-only activation, revocation/reservation/completion decisions and modeled terminal committed-decision histories",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
@@ -1419,6 +1428,14 @@ def mutate(pattern: str | None = None) -> None:
         (bundle_source, "bundle publish failure reported successful", "Err(_) => Err(InstallFailure::OutcomeUnknown),", "Err(_) => Ok(()),"),
         (bundle_source, "bundle publish uncertainty erased", "Err(_) => Err(InstallFailure::OutcomeUnknown),", "Err(_) => Err(InstallFailure::Unpublished),"),
     ]
+    retry_source = source.with_name("coordination.rs")
+    mutations += [
+        (retry_source, "retry key short admitted", "key.len() < 8 || key.len() > 128", "key.len() > 128"),
+        (retry_source, "retry key long admitted", "key.len() < 8 || key.len() > 128", "key.len() < 8"),
+        (retry_source, "retry key invalid byte admitted", "if !retry_byte(key[i]) {", "if false {"),
+        (retry_source, "retry key valid underscore refused", "|| byte == b'_'", "|| byte == b'!'"),
+        (retry_source, "retry key final byte skipped", "while i < key.len() {", "while i + 1 < key.len() {"),
+    ]
     json_reflection_source = source.with_name("json_reflection.rs")
     mutations += [
         (json_reflection_source, "json reflection text skipped", "Json::Text(text) => !contains(text, secret),", "Json::Text(_text) => true,"),
@@ -1613,6 +1630,7 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettBundle",
                 "GarrettEmission",
                 "GarrettCoordination",
+                "GarrettRetryKey",
                 "GarrettRebinding",
                 "GarrettHttpAuth",
                 "GarrettHttpRequest",
@@ -1638,7 +1656,7 @@ def mutate(pattern: str | None = None) -> None:
                 "client_material.rs": "GarrettClientMaterial",
                 "bundle.rs": "GarrettBundle",
                 "emission.rs": "GarrettEmission",
-                "coordination.rs": "GarrettCoordination",
+                "coordination.rs": "GarrettRetryKey",
                 "rebinding.rs": "GarrettRebinding",
                 "http_auth.rs": "GarrettHttpAuth",
                 "http_request.rs": "GarrettHttpRequest",

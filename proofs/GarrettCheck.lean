@@ -4,6 +4,7 @@ import GarrettCoordinatorAuthority
 import GarrettHttpRequest
 import GarrettHttpAuth
 import GarrettRebinding
+import GarrettRetryKey
 import GarrettCoordination
 import GarrettEmission
 import GarrettClientMaterial
@@ -424,3 +425,10 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.json_reflection.Proofs.reflected_json_is_refused
 #print axioms aivm_secrets_garrett_core.json_reflection.Proofs.exhausted_is_refused
 #print axioms aivm_secrets_garrett_core.json_reflection.Proofs.empty_object_positive_witness
+
+#print axioms aivm_secrets_garrett_core.coordination.KeyProofs.retry_byte_contract
+#print axioms aivm_secrets_garrett_core.coordination.KeyProofs.bytes_step
+#print axioms aivm_secrets_garrett_core.coordination.KeyProofs.retry_key_loop_contract
+#print axioms aivm_secrets_garrett_core.coordination.KeyProofs.valid_retry_key_contract
+#print axioms aivm_secrets_garrett_core.coordination.KeyProofs.accepted_key_has_no_line_breaks
+#print axioms aivm_secrets_garrett_core.coordination.KeyProofs.valid_key_is_accepted
