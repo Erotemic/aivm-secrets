@@ -98,9 +98,10 @@ without starting the bridge. A bridge startup failure reporting
   three explicitly wired read commands. Generic `invoke` can submit host-defined
   operations, including authorized keyed writes; it adds no `gh api`, Git remote
   discovery or arbitrary GitHub CLI parity.
-- Native `request_limit: "unbounded"`; W1 Python request budgets and one-shot
-  write approval are **not** inherited. The Rust `writes: deny` gate protects
-  this read-only scenario.
+- Native `request_limit: "unbounded"`; W1 Python request budgets are not
+  inherited. Optional [exact-write approval](native-write-approval.md) uses
+  `writes: approve` and a separate private host socket. This read-only scenario
+  continues to select `writes: deny`.
 - Different approved response projection and pagination framing (`meta`).
   Compare authorized intent, provider effects and approved disclosure rather
   than require identical Python/Rust response bytes.

@@ -253,7 +253,7 @@ impl Audit {
 struct Executor {
     tls: Arc<ClientConfig>,
     address: IpAddr,
-    audit: Audit,
+    audit: Arc<Audit>,
 }
 struct PendingEmission<C, E> {
     check: C,
@@ -700,7 +700,7 @@ impl AccountSession {
         let executor = Executor {
             tls: Arc::new(tls),
             address,
-            audit: Audit::new(Path::new(text(config, "audit_file")?), &c)?,
+            audit: Arc::new(Audit::new(Path::new(text(config, "audit_file")?), &c)?),
         };
         if profile == "account-status-v1" {
             executor.audit.record("session_open")?;
@@ -762,7 +762,7 @@ impl AccountSession {
             return Err(Error::InvalidCapability);
         }
         issuer.issue_observed(
-            &self.executor.audit,
+            self.executor.audit.as_ref(),
             registry,
             issuer_name,
             audience,
@@ -832,7 +832,7 @@ impl AccountSession {
         let result = protocol::perform(
             verifier,
             &opener,
-            &self.executor.audit,
+            self.executor.audit.as_ref(),
             &current_executor,
             &token.as_bytes().to_vec(),
             &self.grant,
@@ -1092,6 +1092,7 @@ mod tests {
     }
 }
 
+pub(crate) mod approval;
 mod manifest_session;
 enum Backend {
     Account(Box<AccountSession>),
@@ -1108,6 +1109,12 @@ impl ProviderSession {
             Ok(Self(Backend::Account(Box::new(AccountSession::start(
                 config, binding, now, lifetime,
             )?))))
+        }
+    }
+    pub fn host_control(&self) -> Option<crate::host_control::Control> {
+        match &self.0 {
+            Backend::Manifest(s) => s.host_control(),
+            Backend::Account(_) => None,
         }
     }
     pub fn profile(&self) -> &'static str {

@@ -97,7 +97,9 @@ operations with typed parameters, checked facts, bodies, pagination and fixed
 GraphQL reads. Its [extracted recursive filter](docs/verified-disclosure.md) has
 conditional Lean selection and noninterference proofs. It requires an explicit
 typed response disclosure contract and uses extracted parameter and
-operation/write guards. Client aliases, command resolvers, approvals/delegation,
+operation/write guards. Optional [exact-write approval](docs/native-write-approval.md)
+uses a separate private host control socket and extracted one-use/expiry decisions.
+Client aliases, command resolvers, delegation/budgets,
 JSON/I/O adapter refinement and whole-service verification remain open.
 
 The optional [native coordination authority](docs/native-coordinator-authority.md)

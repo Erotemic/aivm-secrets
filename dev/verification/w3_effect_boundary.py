@@ -68,6 +68,25 @@ def same_order(source: str, *markers: str) -> bool:
 
 
 def review_semantics(contents: dict[str, str]) -> None:
+    approval = contents[RUST + 'custody/approval.rs']
+    admission = part(approval, 'pub(super) fn admit(', 'pub(super) fn remember(')
+    require(same_order(admission, 'self.state.lock()', 'let now = host_time()?;',
+                       'self.require_active(now)?;', 'state.approvals.remove(wanted)',
+                       'core::consume(Mode::Approve, write,', 'if let Some(slot) = remaining'),
+            'approval consumption bypasses current clock, unique slot or extracted decision')
+    require('state.approvals.insert(wanted.into(), slot)' in admission
+            and approval.count('core::issue(') == 1,
+            'approval slot can be refunded or issued through an unreviewed path')
+    host_control = contents[RUST + 'host_control.rs']
+    serve_control = part(host_control, 'fn serve(', 'impl Drop for Running')
+    require(same_order(serve_control, 'socket_peercred(&socket)',
+                       'if peer.uid != rustix::process::geteuid()',
+                       'tls::frame(&mut socket, 65536)', 'state.execute(&value)'),
+            'host control bypasses kernel peer credentials or bounded framing')
+    revoke = part(approval, 'Some("revoke") =>', '_ => Err(Error::InvalidRequest)')
+    require(same_order(revoke, 'self.revoke();', 'self.record(')
+            and 'self.active.store(false, Ordering::Release)' in approval,
+            'host revocation waits for audit before withdrawing authority')
     decoded = contents[RUST + 'json.rs']
     parse = part(decoded, 'pub fn parse(', '\nfn string(')
     require('decode(&raw, 0)' in parse and 'Ok(Value::Object(' in decoded,
@@ -76,6 +95,15 @@ def review_semantics(contents: dict[str, str]) -> None:
     # after policy compilation, durable audit and current grant revalidation.
     m = contents[RUST + 'custody/manifest_session.rs']
     request = part(m, 'pub(super) fn request(', 'pub(super) fn control(')
+    require(same_order(request, 'control.state.admit(&approval_digest, op.write)?',
+                       'Decision::Required =>', 'fresh()?;',
+                       '.remember(&approval_digest, &canonical_request)?;',
+                       'let dispatch = |prepared: PreparedDispatch', 'self.policy.preflight('),
+            'approval is not enforced before credentialed preflight/final effects')
+    require('self.policy.digest()' in request and '"grant":self.base.executor.audit.grant' in request
+            and 'self.require_control_active(current)?;' in request
+            and 'self.require_control_active(host_time()?)?;' in request,
+            'approval identity or late revocation fencing bypassed')
     control = part(m, 'pub(super) fn control(', '\nfn manifest_request_bytes(')
     dispatch = part(request, 'let dispatch = |prepared: PreparedDispatch', 'let facts = if let Some(effect)')
     release = part(request, 'let release = (|| -> Outcome<Value> {', 'if sent_write {')
@@ -448,7 +476,7 @@ def check(root: Path) -> dict:
         'provider-preflight', 'provider-final', 'guest-reply', 'guest-denial',
         'host-audit', 'host-announcement', 'legacy-forward', 'oauth-startup',
         'host-private', 'host-control', 'guest-close', 'authority-coordinate',
-        'coordination-authority', 'operator-coordinate',
+        'coordination-authority', 'operator-coordinate', 'write-approval-control',
     }, 'missing effect class or newly unreviewed channel')
     sinks = json.loads((root / 'docs/planning/aivm-secrets-w0-boundaries.json').read_text())
     w0_ids = {row['id'] for row in sinks['sinks']}

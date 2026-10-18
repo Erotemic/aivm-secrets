@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_w3_current_reviewed_effect_boundary():
     assert check(ROOT) == {
-        'sources': len(EXPECTED_SOURCES), 'effects': 14, 'scope': 'native-manifest-https-v1',
+        'sources': len(EXPECTED_SOURCES), 'effects': 15, 'scope': 'native-manifest-https-v1',
     }
 
 
@@ -49,6 +49,12 @@ def mutate(repo, filename, before, after):
 
 
 @pytest.mark.parametrize('file,old,new', [
+    ('rust/crates/aivm-secrets-garrett/src/host_control.rs', 'if peer.uid != rustix::process::geteuid() {', 'if false {'),
+    ('rust/crates/aivm-secrets-garrett/src/custody/approval.rs', 'let now = host_time()?;', 'let now = 0;'),
+    ('rust/crates/aivm-secrets-garrett/src/custody/approval.rs', 'self.active.store(false, Ordering::Release)', 'self.active.store(true, Ordering::Release)'),
+    ('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs', 'control.state.admit(&approval_digest, op.write)?', 'aivm_secrets_garrett_core::approval::Decision::Allowed'),
+    ('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs', 'self.require_control_active(host_time()?)?;', ''),
+
     (RUST + 'coordination.rs', 'self.exchange(&value, Error::Unreachable, bad)?',
      'self.exchange(&value, Error::Unreachable, Error::Revoked)?'),
     (RUST + 'coordination.rs', 'if !aivm_secrets_garrett_core::coordinator_authority::operator_acknowledged(',

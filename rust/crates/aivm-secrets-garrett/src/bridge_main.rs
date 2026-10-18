@@ -193,6 +193,13 @@ fn serve(path: &Path, maximum: Option<usize>) -> Outcome<()> {
     let bridge = Arc::new(bridge);
     let listen = PathBuf::from(config["listen"].as_str().ok_or(Error::InvalidCapability)?);
     files::private_directory(listen.parent().ok_or(Error::UnsafeFile)?)?;
+    let control = bridge.host_control()?;
+    if let Some(control) = &control {
+        if control.path() == listen {
+            return Err(Error::InvalidPolicy);
+        }
+    }
+    let _control = control.map(|c| c.listen()).transpose()?;
     let listener = UnixListener::bind(&listen).map_err(|_| Error::UnsafeFile)?;
     let info = fs::symlink_metadata(&listen).map_err(|_| Error::UnsafeFile)?;
     let _cleanup = ListenerPath {

@@ -67,6 +67,47 @@ pub(crate) fn verify_attestation_fixture(
     Ok(verified)
 }
 pub fn evaluate(v: &Value) -> Outcome<Value> {
+    if v.get("action").and_then(Value::as_str) == Some("approval-consume") {
+        use aivm_secrets_garrett_core::approval::{self as gate, Approval, Decision, Mode};
+        let m = json::keys(
+            v,
+            &["action", "mode", "write", "wanted", "now", "approval"],
+            &[],
+        )?;
+        let mode = match m["mode"].as_str() {
+            Some("allow") => Mode::Allow,
+            Some("deny") => Mode::Deny,
+            Some("approve") => Mode::Approve,
+            _ => return Err(Error::InvalidRequest),
+        };
+        let wanted = json::hex(&m["wanted"], 64)?.into_bytes();
+        let now = json::integer(&m["now"], i64::MIN, i64::MAX)?;
+        let prior = if m["approval"].is_null() {
+            None
+        } else {
+            let p = json::keys(&m["approval"], &["digest", "expires_at"], &[])?;
+            Some(Approval {
+                digest: json::hex(&p["digest"], 64)?.into_bytes(),
+                expires_at: json::integer(&p["expires_at"], i64::MIN, i64::MAX)?,
+            })
+        };
+        let (decision, remaining) = gate::consume(
+            mode,
+            m["write"].as_bool().ok_or(Error::InvalidRequest)?,
+            &wanted,
+            now,
+            prior,
+        );
+        let decision = match decision {
+            Decision::Allowed => "allowed",
+            Decision::Denied => "denied",
+            Decision::Required => "required",
+        };
+        let remaining = remaining.map(
+            |p| json!({"digest":String::from_utf8_lossy(&p.digest),"expires_at":p.expires_at}),
+        );
+        return Ok(json!({"ok":true,"decision":decision,"remaining":remaining}));
+    }
     if v.get("action").and_then(Value::as_str) == Some("retry-key") {
         let m = json::keys(v, &["action", "key_hex"], &[])?;
         return Ok(

@@ -6,6 +6,7 @@
 // Explicit Result matches preserve the small control-flow shape of the proofs.
 #![allow(clippy::question_mark)]
 
+pub mod approval;
 pub mod authority;
 pub mod coordination;
 pub mod coordinator_authority;

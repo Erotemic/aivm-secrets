@@ -278,6 +278,15 @@ impl Bridge {
             &self.audience,
         )
     }
+    pub fn host_control(&self) -> Outcome<Option<crate::host_control::Control>> {
+        match &self.backend {
+            Backend::Provider(provider) => Ok(provider
+                .lock()
+                .map_err(|_| Error::InternalError)?
+                .host_control()),
+            Backend::Socket(_) => Ok(None),
+        }
+    }
     pub fn revoke(&self, subject: &str) -> Outcome<()> {
         if self.registry_file.is_some() || self.authority.is_some() {
             return Err(Error::InvalidRequest);

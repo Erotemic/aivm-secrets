@@ -45,7 +45,8 @@ pub(crate) struct Session {
     base: AccountSession,
     policy: Policy,
     disclosure: Disclosure,
-    writes: bool,
+    writes: aivm_secrets_garrett_core::approval::Mode,
+    control: Option<crate::host_control::Control>,
 }
 impl Session {
     pub(super) fn start(config: &Value, binding: &Value, now: i64, lifetime: i64) -> Outcome<Self> {
@@ -69,14 +70,16 @@ impl Session {
                 "oauth",
                 "source_override",
                 "coordination_file",
+                "control_socket",
             ],
         )?;
         if m["request_limit"] != "unbounded" {
             return Err(Error::InvalidPolicy);
         }
         let writes = match m["writes"].as_str() {
-            Some("allow") => true,
-            Some("deny") => false,
+            Some("allow") => aivm_secrets_garrett_core::approval::Mode::Allow,
+            Some("deny") => aivm_secrets_garrett_core::approval::Mode::Deny,
+            Some("approve") => aivm_secrets_garrett_core::approval::Mode::Approve,
             _ => return Err(Error::InvalidPolicy),
         };
         let policy = Policy::from_file(Path::new(text(config, "policy_file")?))?;
@@ -120,6 +123,7 @@ impl Session {
             "writes",
             "request_limit",
             "source_override",
+            "control_socket",
         ] {
             fields.remove(key);
         }
@@ -133,12 +137,54 @@ impl Session {
             lifetime.min(policy.lifetime),
             "manifest-https-v1",
         )?;
+        let control = if matches!(writes, aivm_secrets_garrett_core::approval::Mode::Approve) {
+            if binding["owner_uid"].as_u64() != Some(rustix::process::geteuid().as_raw() as u64) {
+                return Err(Error::InvalidPolicy);
+            }
+            let path = Path::new(text(config, "control_socket")?).to_path_buf();
+            if path.file_name() != Some(std::ffi::OsStr::new("control.sock")) {
+                return Err(Error::InvalidPolicy);
+            }
+            files::private_directory(path.parent().ok_or(Error::UnsafeFile)?)?;
+            let state = Arc::new(super::approval::Shared::new(
+                super::approval::Metadata {
+                    binding: binding.clone(),
+                    service: policy.normalized_document()["service"]
+                        .as_str()
+                        .ok_or(Error::InvalidPolicy)?
+                        .into(),
+                    operations: policy.operations(),
+                    policy: policy.digest().into(),
+                    expires_at: base.grant.claims.expires_at,
+                    audit_path: text(config, "audit_file")?.into(),
+                },
+                base.executor.audit.clone(),
+            ));
+            Some(crate::host_control::Control { path, state })
+        } else {
+            if m.contains_key("control_socket") {
+                return Err(Error::InvalidPolicy);
+            }
+            None
+        };
         Ok(Self {
             base,
             policy,
             disclosure,
             writes,
+            control,
         })
+    }
+    pub(super) fn host_control(&self) -> Option<crate::host_control::Control> {
+        self.control.clone()
+    }
+    fn writes_allowed(&self) -> bool {
+        !matches!(self.writes, aivm_secrets_garrett_core::approval::Mode::Deny)
+    }
+    fn require_control_active(&self, now: i64) -> Outcome<()> {
+        self.control
+            .as_ref()
+            .map_or(Ok(()), |c| c.state.require_active(now))
     }
     #[allow(clippy::too_many_arguments)]
     pub(super) fn issue(
@@ -171,6 +217,7 @@ impl Session {
             .transpose()?;
         self.base.check_coordination()?;
         let now = host_time()?;
+        self.require_control_active(now)?;
         let outer = open_surrogate(
             verifier,
             &token.as_bytes().to_vec(),
@@ -239,7 +286,7 @@ impl Session {
                 .to_vec(),
             &op.name.as_bytes().to_vec(),
             op.write,
-            self.writes,
+            self.writes_allowed(),
             now,
             self.base.elapsed()?,
         )
@@ -252,6 +299,7 @@ impl Session {
         let fresh = || -> Outcome<()> {
             self.base.check_coordination()?;
             let current = host_time()?;
+            self.require_control_active(current)?;
             if let Some(lease) = &_vault {
                 lease.require_current(current)?;
             }
@@ -268,13 +316,43 @@ impl Session {
                 &op.name.as_bytes().to_vec(),
                 &op.name.as_bytes().to_vec(),
                 op.write,
-                self.writes,
+                self.writes_allowed(),
                 current,
                 self.base.elapsed()?,
             )
             .map_err(use_error)?;
             Ok(())
         };
+        let canonical_request = json!({"operation":op.name,"arguments":args});
+        let approval_digest = hex(digest::digest(&digest::SHA256, &json::canonical(
+            &json!({"policy":self.policy.digest(),"grant":self.base.executor.audit.grant,"request":canonical_request}))).as_ref());
+        let decision = if let Some(control) = &self.control {
+            control.state.admit(&approval_digest, op.write)?
+        } else {
+            aivm_secrets_garrett_core::approval::consume(
+                self.writes,
+                op.write,
+                &approval_digest.as_bytes().to_vec(),
+                now,
+                None,
+            )
+            .0
+        };
+        match decision {
+            aivm_secrets_garrett_core::approval::Decision::Allowed => (),
+            aivm_secrets_garrett_core::approval::Decision::Denied => return Err(Error::Denied),
+            aivm_secrets_garrett_core::approval::Decision::Required => {
+                fresh()?;
+                let reply = json!({"version":1,"ok":false,"error":{"code":"approval_required", "message":"Exact write needs host approval."},"approval":{"digest":approval_digest}});
+                crate::manifest::disclosure::ensure_safe(&reply, &secret.0)?;
+                self.control
+                    .as_ref()
+                    .ok_or(Error::InternalError)?
+                    .state
+                    .remember(&approval_digest, &canonical_request)?;
+                return Ok(reply);
+            }
+        }
         // Single admission-to-I/O boundary for preflight and final effects.
         // Neither raw facts nor a guest-provided URL is a PreparedDispatch.
         let dispatch = |prepared: PreparedDispatch<'_>| -> Outcome<Value> {
@@ -340,6 +418,7 @@ impl Session {
             facts
         };
         let release = (|| -> Outcome<Value> {
+            self.require_control_active(host_time()?)?;
             let meta = self.policy.pagination(op, &args, &raw)?;
             let result = self.disclosure.project(&op.name, &raw, &secret.0)?;
             let mut reply = json!({"version":1,"ok":true,"result":result});
@@ -372,6 +451,7 @@ impl Session {
             .transpose()?;
         self.base.check_coordination()?;
         let now = host_time()?;
+        self.require_control_active(now)?;
         if let Some(lease) = &_vault {
             lease.require_current(now)?;
         }
@@ -383,6 +463,10 @@ impl Session {
         core::require_use_current(&claims, &self.base.grant, now, self.base.elapsed()?)
             .map_err(use_error)?;
         if verb == "renounce" {
+            if let Some(control) = &self.control {
+                control.state.revoke();
+            }
+
             self.base.executor.audit.write_record(&json!({"schema":1,"event":"revoked","grant":self.base.executor.audit.grant,"policy":self.base.executor.audit.policy}))?;
             self.base.grant.active = false;
             return Ok(json!({"version":1,"ok":true,"renounced":true}));
@@ -391,7 +475,7 @@ impl Session {
             return Err(Error::Denied);
         }
         Ok(
-            json!({"version":1,"ok":true,"description":{"profile":"manifest-https-v1","operations":self.policy.operations(),"writes":if self.writes{"allow"}else{"deny"},"request_limit":"unbounded"}}),
+            json!({"version":1,"ok":true,"description":{"profile":"manifest-https-v1","operations":self.policy.operations(),"writes":match self.writes { aivm_secrets_garrett_core::approval::Mode::Allow=>"allow", aivm_secrets_garrett_core::approval::Mode::Deny=>"deny", aivm_secrets_garrett_core::approval::Mode::Approve=>"approve" },"request_limit":"unbounded"}}),
         )
     }
 }

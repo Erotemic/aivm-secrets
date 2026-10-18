@@ -14,6 +14,7 @@ mod custody;
 pub mod identity_bundle;
 pub use custody::ProviderSession;
 pub mod files;
+pub mod host_control;
 pub mod json;
 pub mod lifecycle;
 pub mod manifest;

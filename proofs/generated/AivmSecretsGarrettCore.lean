@@ -32,6 +32,125 @@ impl_def Slice.Insts.CoreCmpPartialEqSlice {T : Type _} {U : Type _}
     cmpPartialEqInst)
 }
 
+/-- [aivm_secrets_garrett_core::approval::Mode]
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 5:0-9:1
+    Visibility: public -/
+@[discriminant isize]
+inductive approval.Mode where
+| Deny : approval.Mode
+| Approve : approval.Mode
+| Allow : approval.Mode
+
+/-- [aivm_secrets_garrett_core::approval::{impl core::clone::Clone for aivm_secrets_garrett_core::approval::Mode}::clone]:
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 4:9-4:14
+    Visibility: public -/
+def approval.Mode.Insts.CoreCloneClone.clone
+  (self : approval.Mode) : Result approval.Mode := do
+  ok self
+
+/-- Trait implementation: [aivm_secrets_garrett_core::approval::{impl core::clone::Clone for aivm_secrets_garrett_core::approval::Mode}]
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 4:9-4:14 -/
+@[reducible]
+def approval.Mode.Insts.CoreCloneClone : core.clone.Clone approval.Mode := {
+  clone := approval.Mode.Insts.CoreCloneClone.clone
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::approval::{impl core::marker::Copy for aivm_secrets_garrett_core::approval::Mode}]
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 4:16-4:20 -/
+@[reducible]
+def approval.Mode.Insts.CoreMarkerCopy : core.marker.Copy approval.Mode := {
+  cloneInst := approval.Mode.Insts.CoreCloneClone
+}
+
+/-- [aivm_secrets_garrett_core::approval::Approval]
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 10:0-13:1
+    Visibility: public -/
+structure approval.Approval where
+  digest : alloc.vec.Vec Std.U8
+  expires_at : Std.I64
+
+/-- [aivm_secrets_garrett_core::approval::Decision]
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 15:0-19:1
+    Visibility: public -/
+@[discriminant isize]
+inductive approval.Decision where
+| Allowed : approval.Decision
+| Denied : approval.Decision
+| Required : approval.Decision
+
+/-- [aivm_secrets_garrett_core::approval::{impl core::clone::Clone for aivm_secrets_garrett_core::approval::Decision}::clone]:
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 14:9-14:14
+    Visibility: public -/
+def approval.Decision.Insts.CoreCloneClone.clone
+  (self : approval.Decision) : Result approval.Decision := do
+  ok self
+
+/-- Trait implementation: [aivm_secrets_garrett_core::approval::{impl core::clone::Clone for aivm_secrets_garrett_core::approval::Decision}]
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 14:9-14:14 -/
+@[reducible]
+def approval.Decision.Insts.CoreCloneClone : core.clone.Clone approval.Decision
+  := {
+  clone := approval.Decision.Insts.CoreCloneClone.clone
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::approval::{impl core::marker::Copy for aivm_secrets_garrett_core::approval::Decision}]
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 14:16-14:20 -/
+@[reducible]
+def approval.Decision.Insts.CoreMarkerCopy : core.marker.Copy approval.Decision
+  := {
+  cloneInst := approval.Decision.Insts.CoreCloneClone
+}
+
+/-- [aivm_secrets_garrett_core::approval::issue]:
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 21:0-32:1
+    Visibility: public -/
+def approval.issue
+  (digest : alloc.vec.Vec Std.U8) (now : Std.I64) (ttl : Std.I64) :
+  Result (Option approval.Approval)
+  := do
+  if now < 0#i64
+  then ok none
+  else
+    if ttl < 1#i64
+    then ok none
+    else
+      if ttl > 900#i64
+      then ok none
+      else
+        let i ← core.num.I64.MAX - ttl
+        if now > i
+        then ok none
+        else let i1 ← now + ttl
+             ok (some { digest, expires_at := i1 })
+
+/-- [aivm_secrets_garrett_core::approval::consume]:
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 36:0-59:1
+    Visibility: public -/
+def approval.consume
+  (mode : approval.Mode) (write : Bool) (wanted : alloc.vec.Vec Std.U8)
+  (now : Std.I64) (prior : Option approval.Approval) :
+  Result (approval.Decision × (Option approval.Approval))
+  := do
+  if write
+  then
+    match mode with
+    | approval.Mode.Deny => ok (approval.Decision.Denied, prior)
+    | approval.Mode.Approve =>
+      match prior with
+      | none => ok (approval.Decision.Required, none)
+      | some slot =>
+        let b ←
+          alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8 slot.digest
+            wanted
+        if b
+        then ok (approval.Decision.Required, prior)
+        else
+          if now >= slot.expires_at
+          then ok (approval.Decision.Required, prior)
+          else ok (approval.Decision.Allowed, none)
+    | approval.Mode.Allow => ok (approval.Decision.Allowed, prior)
+  else ok (approval.Decision.Allowed, prior)
+
 /-- [aivm_secrets_garrett_core::authority::AuthorityDenial]
     Source: 'crates/aivm-secrets-garrett-core/src/authority.rs', lines 3:0-7:1
     Visibility: public -/
@@ -2958,14 +3077,14 @@ partial_fixpoint
 end
 
 /-- [aivm_secrets_garrett_core::Denial]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 21:0-23:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 22:0-24:1
     Visibility: public -/
 @[discriminant isize]
 inductive Denial where
 | InvalidCapability : Denial
 
 /-- [aivm_secrets_garrett_core::Claims]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 25:0-34:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 26:0-35:1
     Visibility: public -/
 structure Claims where
   issuer : alloc.vec.Vec Std.U8
@@ -2978,7 +3097,7 @@ structure Claims where
   certificate : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::Expectation]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 36:0-41:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 37:0-42:1
     Visibility: public -/
 structure Expectation where
   issuer : alloc.vec.Vec Std.U8
@@ -2987,7 +3106,7 @@ structure Expectation where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::IssueWindow]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 43:0-47:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 44:0-48:1
     Visibility: public -/
 structure IssueWindow where
   issued_at : Std.I64
@@ -2995,7 +3114,7 @@ structure IssueWindow where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::issue_window]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 50:0-77:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 51:0-78:1
     Visibility: public -/
 def issue_window
   (active : Bool) (epoch : Std.I64) (not_after : Std.I64) (now : Std.I64)
@@ -3039,7 +3158,7 @@ def issue_window
   else ok (core.result.Result.Err Denial.InvalidCapability)
 
 /-- [aivm_secrets_garrett_core::present]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 81:0-108:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 82:0-109:1
     Visibility: public -/
 def present
   (claims : Claims) (expected : Expectation) (peer : alloc.vec.Vec Std.U8)
@@ -3103,21 +3222,21 @@ def present
                           else ok (core.result.Result.Ok ())
 
 /-- [aivm_secrets_garrett_core::AuthenticatedEnvelope]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 112:0-115:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 113:0-116:1
     Visibility: public -/
 structure AuthenticatedEnvelope where
   claims : Claims
   encrypted : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::OpenedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 117:0-120:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 118:0-121:1
     Visibility: public -/
 structure OpenedSurrogate (S : Type _) where
   claims : Claims
   secret : S
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeVerifier]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 123:0-127:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 124:0-128:1
     Visibility: public -/
 structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
   verify : Self → alloc.vec.Vec Std.U8 → Result (core.result.Result
@@ -3126,7 +3245,7 @@ structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
     Self_Secret Denial)
 
 /-- [aivm_secrets_garrett_core::open_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 132:0-154:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 133:0-155:1
     Visibility: public -/
 def open_surrogate
   {V : Type _} {Clause0_Secret : Type _} (EnvelopeVerifierInst :
@@ -3150,7 +3269,7 @@ def open_surrogate
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssueInputs]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 156:0-165:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 157:0-166:1
     Visibility: public -/
 structure IssueInputs where
   issuer : alloc.vec.Vec Std.U8
@@ -3163,7 +3282,7 @@ structure IssueInputs where
   not_after : Std.I64
 
 /-- [aivm_secrets_garrett_core::prepare_issue]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 168:0-183:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 169:0-184:1
     Visibility: public -/
 def prepare_issue
   (input : IssueInputs) (now : Std.I64) (lifetime : Std.I64) :
@@ -3186,21 +3305,21 @@ def prepare_issue
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssuedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 185:0-188:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 186:0-189:1
     Visibility: public -/
 structure IssuedSurrogate where
   claims : Claims
   token : alloc.vec.Vec Std.U8
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeIssuer]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 190:0-193:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 191:0-194:1
     Visibility: public -/
 structure EnvelopeIssuer (Self : Type _) (Self_Secret : Type _) where
   «seal» : Self → Claims → Self_Secret → Result (core.result.Result
     (alloc.vec.Vec Std.U8) Denial)
 
 /-- [aivm_secrets_garrett_core::issue_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 195:0-211:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 196:0-212:1
     Visibility: public -/
 def issue_surrogate
   {I : Type _} {Clause0_Secret : Type _} (EnvelopeIssuerInst : EnvelopeIssuer I

@@ -33,8 +33,19 @@ PROFILES = [
     "native-coordination-client-v1",
     "native-same-key-rebinding-v1",
     "native-coordinator-authority-v1",
+    "native-exact-write-approval-v1",
 ]
 THEOREMS = [
+    'aivm_secrets_garrett_core.approval.Proofs.issue_contract',
+    'aivm_secrets_garrett_core.approval.Proofs.approved_write_contract',
+    'aivm_secrets_garrett_core.approval.Proofs.reads_preserve_approval',
+    'aivm_secrets_garrett_core.approval.Proofs.allow_mode_preserves_approval',
+    'aivm_secrets_garrett_core.approval.Proofs.deny_mode_refuses_write',
+    'aivm_secrets_garrett_core.approval.Proofs.missing_approval_refuses_write',
+    'aivm_secrets_garrett_core.approval.Proofs.admitted_approval_is_consumed',
+    'aivm_secrets_garrett_core.approval.Proofs.refused_approval_is_preserved',
+    'aivm_secrets_garrett_core.approval.Proofs.consumed_approval_cannot_be_reused',
+
     'aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.operator_receipt_contract',
     'aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.confirmed_revocation_is_tombstone',
     'aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.absence_cannot_confirm_revocation',
@@ -498,6 +509,7 @@ THEOREMS += [
 ]
 
 TESTS = [
+    "tests/test_rust_approval.py",
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
     "tests/test_rust_garrett_provider.py",
@@ -599,6 +611,8 @@ def inputs() -> list[str]:
         "proofs/GarrettLineFrame.lean",
         "proofs/GarrettCoordinatorAuthority.lean",
         "proofs/GarrettCoordinatorReply.lean",
+        "proofs/GarrettApproval.lean",
+        "tests/secrets_vectors/approval/kernel-v1.jsonl",
         "tests/secrets_vectors/coordination/authority-v1.jsonl",
         "tests/secrets_vectors/coordination/operator-replies-v1.jsonl",
         "proofs/GarrettProfiles.lean",
@@ -781,7 +795,7 @@ def assurance_coordinates() -> dict:
         "aeneas_release": base.RELEASE,
         "theorems": THEOREMS,
         "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
-        "implementation_linked": "Aeneas-generated optional coordinator dispatch continuation and issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission, and concrete authentication-header credential validation/exact byte appending and request-line method/target validation/exact single-line construction used by both native provider writers, exact bounded newline frame admission shared by bridge ingress, forwarded broker replies and the guest client, including empty observed suffix and post-send uncertainty mapping as a tested native adapter, and extended to complete request framing with Host/Accept, exact custom-header ordering, case-insensitive reserved/duplicate refusal, concrete decimal port/body length and exact opaque body bytes; exact bounded ASCII retry-name admission shared by the native host and named-operation client; optional coordinator authority exact peer/operator admission, absent-only activation, revocation/reservation/completion decisions and modeled terminal committed-decision histories; exact operator receipt admission distinguishing absent status from a terminal revocation, composed with successful extracted revocation",
+        "implementation_linked": "Aeneas-generated optional coordinator dispatch continuation and issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission, and concrete authentication-header credential validation/exact byte appending and request-line method/target validation/exact single-line construction used by both native provider writers, exact bounded newline frame admission shared by bridge ingress, forwarded broker replies and the guest client, including empty observed suffix and post-send uncertainty mapping as a tested native adapter, and extended to complete request framing with Host/Accept, exact custom-header ordering, case-insensitive reserved/duplicate refusal, concrete decimal port/body length and exact opaque body bytes; exact bounded ASCII retry-name admission shared by the native host and named-operation client; optional coordinator authority exact peer/operator admission, absent-only activation, revocation/reservation/completion decisions and modeled terminal committed-decision histories; exact operator receipt admission distinguishing absent status from a terminal revocation, composed with successful extracted revocation; optional exact-write approval issuance/deadline and matching, unexpired, single-use consumption",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
@@ -804,6 +818,7 @@ def assurance_coordinates() -> dict:
             "Native OAuth sessions seal an opaque vault/provider/subject/epoch-bound marker and select the current ready token under a held vault lock. Explicit refresh may change its generation without changing the grant deadline. HMAC/entropy, lock participation, concrete opener correspondence and clock sampling remain adapter contracts; this is not a whole-service or concurrent filesystem proof.",
             "The optional native coordinator authority retains Python's SQLite schema and mTLS endpoint. Exact operator/member matching and terminal principal/reservation decision histories are extracted and proved; HTTP parsing, authenticated DER-to-hex conversion, row conversion, SQL bindings, commit-before-reply placement, SQLite WAL/FULL durability, concurrency and complete native I/O refinement remain separate library/environment or project-owned adapter obligations. There is no replica, live inode replacement or rollback witness, and no positive admission cache or automatic retry.",
             "Explicit host coordinator operator calls trust protected operator configuration, concrete pre-send/post-send placement, JSON bool/integer/null conversion, authenticated server identity and truthful committed-state replies. The actual extracted receipt validator distinguishes absent status from a terminal revocation and composes with successful extracted revocation; these facts prove neither remote SQL commit/durability nor JSON/TLS/native I/O refinement. Possible submission without a complete receipt is uncertainty and never triggers an automatic retry.",
+            "Native exact-write approval trusts a host-only private Unix control socket with kernel owner peer credentials and no guest forwarding, canonical normalized policy/grant/request SHA256, a unique mutex-protected slot store and a clock sampled after its lock. Actual issuance and consumption are extracted; slot linearization, audit/socket adapters, no-refund call-site placement and atomic revocation checks remain reviewed/tested premises. Approval is spent before preflight, TTL covers admission and cannot cancel already admitted remote effects. The approve configuration and approval_required digest are not represented in the current W4/W5 whole-trace model. Allow mode stays unbounded.",
             "Native coordinated account/manifest sessions trust the separately authenticated SQLite coordinator for terminal membership decisions and durable globally unique reservations. The extracted dispatch controller requires admission/reservation acknowledgements before invoking a provider and maps failed post-send completion to uncertainty. TLS/HTTP, server durability/rollback, last-check linearization and concrete callback placement remain adapter premises. Native coordinated request fingerprints hash a canonical document rebuilt from parsed policy, with independent Python differential and real durable-record tests. Policy normalization, JSON encoding and SHA-256 remain concrete adapters; finite tests do not establish all-input digest equivalence or broad core parity.",
             "Privileged same-key rebinding carries the identical opened opaque broker capability to the existing issuer. Source signature/AEAD, current-CA historical certificate fingerprints, protected owner-only inputs, shared authority lease participation and no-replace publication remain adapter contracts. This is an explicit host authorization, not acceptance of an expired guest JWT; the broker grant and terminal coordinator checks still apply.",
             "The extracted newline validator characterizes the supplied frame and observed buffered suffix exactly. The held BufReader/read_until adapter, read segmentation, JSON decoding, TLS, deadlines and caller error mapping are tested and source-guarded; they are not a proof that arbitrary later-arriving stream bytes are absent or that native I/O is fully mediated.",
@@ -821,7 +836,7 @@ def assurance_coordinates() -> dict:
             "Formal refinement of JSON, TLS, X.509, crypto, TPM evidence, HTTP and filesystem adapter implementations",
             "Physical TPM provenance, EK activation, PCR/firmware policy and anti-rollback deployment",
             "Provider non-disclosure, host compromise, snapshot rollback and side channels",
-            "Complete Rust policy/credential administration, client aliases, command resolvers, approvals/delegation, TPM material provisioning and concrete storage/concurrent-history refinement",
+            "Complete Rust policy/credential administration, client aliases, command resolvers, delegation/budgets, full approval host/audit/trace refinement, TPM material provisioning and concrete storage/concurrent-history refinement",
         ],
     }
 
@@ -1449,6 +1464,17 @@ def mutate(pattern: str | None = None) -> None:
         (retry_source, "retry key valid underscore refused", "|| byte == b'_'", "|| byte == b'!'"),
         (retry_source, "retry key final byte skipped", "while i < key.len() {", "while i + 1 < key.len() {"),
     ]
+    approval_source = source.with_name("approval.rs")
+    mutations += [
+        (approval_source, "approval missing slot accepted", "None => (Decision::Required, None),", "None => (Decision::Allowed, None),"),
+        (approval_source, "approval mismatched request accepted", "slot.digest != *wanted || now >= slot.expires_at", "now >= slot.expires_at"),
+        (approval_source, "approval expired slot accepted", "slot.digest != *wanted || now >= slot.expires_at", "slot.digest != *wanted"),
+        (approval_source, "approval expiry boundary extended", "now >= slot.expires_at", "now > slot.expires_at"),
+        (approval_source, "approval successful write refunded", "(Decision::Allowed, None)", "(Decision::Allowed, Some(slot))"),
+        (approval_source, "approval deny mode admits write", "Mode::Deny => (Decision::Denied, prior),", "Mode::Deny => (Decision::Allowed, prior),"),
+        (approval_source, "approval read requires approval", "if !write {", "if false {"),
+        (approval_source, "approval issuance extends permitted ttl", "ttl > 900", "ttl > 901"),
+    ]
     operator_source = source.with_name("coordinator_authority.rs")
     mutations += [
         (operator_source, "operator receipt absence confirms revocation",
@@ -1666,11 +1692,13 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettLineFrame",
                 "GarrettCoordinatorAuthority",
                 "GarrettCoordinatorReply",
+                "GarrettApproval",
             ]
             # These leaves import the extracted crate plus generic standard-
             # model facts. Check the affected leaf first; keep full fallback
             # coverage and dependency order for all other protocol modules.
             preferred = {
+                "approval.rs": "GarrettApproval",
                 "enrollment.rs": "GarrettEnrollment",
                 "authority.rs": "GarrettAuthority",
                 "trust.rs": "GarrettTrust",

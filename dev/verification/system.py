@@ -21,6 +21,19 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_TESTS = [
+    'tests/test_rust_approval.py::test_existing_python_operator_cli_controls_native_approval',
+    'tests/test_rust_approval.py::test_native_exact_write_approval_is_bound_and_one_shot',
+    'tests/test_rust_approval.py::test_native_expired_approval_denied_and_new_explicit_approval_works',
+    'tests/test_rust_approval.py::test_native_host_revocation_fences_approved_writes_and_guest_control',
+    'tests/test_rust_approval.py::test_native_failed_approved_write_never_refunds_authority',
+    'tests/test_rust_approval.py::test_native_concurrent_writes_spend_one_approval_once',
+    'tests/test_rust_approval.py::test_native_host_revoke_is_responsive_during_provider_io_and_fences_release',
+    'tests/test_rust_approval.py::test_native_semantic_write_get_needs_approval_and_reads_preserve_it',
+    'tests/test_rust_approval.py::test_native_invalid_host_approval_cannot_authorize',
+    'tests/test_rust_approval.py::test_native_guest_cannot_reach_operator_commands_or_create_approval',
+    'tests/test_rust_approval.py::test_native_approval_precedes_preflight_and_is_spent_on_failed_preflight',
+    'tests/test_rust_approval.py::test_native_approval_requires_separate_private_host_endpoint',
+
     'tests/test_coordinator_operator.py',
     'tests/test_rust_invoke.py::test_named_read_preserves_python_request_and_provider_effect',
     'tests/test_rust_invoke.py::test_named_read_with_no_arguments',
@@ -157,7 +170,7 @@ def main() -> int:
             run('lean-w4-w5', [python, 'dev/verification/w5_noninterference.py', 'prove'])
             run('lean-profile-emission-oauth', ['lake', '-d', 'proofs', 'build',
                                                '+GarrettProfiles', '+GarrettEmission',
-                                               '+GarrettOAuth', '+GarrettCoordination', '+GarrettRetryKey', '+GarrettRebinding', '+GarrettHttpAuth', '+GarrettHttpRequest', '+GarrettHttpWire', '+GarrettLineFrame', '+GarrettBundle', '+GarrettJsonReflection', '+GarrettCoordinatorAuthority', '+GarrettCoordinatorReply'])
+                                               '+GarrettOAuth', '+GarrettCoordination', '+GarrettRetryKey', '+GarrettRebinding', '+GarrettHttpAuth', '+GarrettHttpRequest', '+GarrettHttpWire', '+GarrettLineFrame', '+GarrettBundle', '+GarrettJsonReflection', '+GarrettCoordinatorAuthority', '+GarrettCoordinatorReply', '+GarrettApproval'])
         if args.full_tests:
             with tempfile.TemporaryDirectory(prefix='as-full-', dir='/tmp') as temporary:
                 run('full-python-native', [python, '-m', 'pytest', '-q', '-ra',

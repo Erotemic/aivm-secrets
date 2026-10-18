@@ -1,3 +1,4 @@
+import GarrettApproval
 import GarrettLineFrame
 import GarrettHttpWire
 import GarrettCoordinatorReply
@@ -441,3 +442,13 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.absent_status_is_admitted
 #print axioms aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.activation_receipt_exact
 #print axioms aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs.successful_revocation_has_receipt
+
+#print axioms aivm_secrets_garrett_core.approval.Proofs.issue_contract
+#print axioms aivm_secrets_garrett_core.approval.Proofs.approved_write_contract
+#print axioms aivm_secrets_garrett_core.approval.Proofs.reads_preserve_approval
+#print axioms aivm_secrets_garrett_core.approval.Proofs.allow_mode_preserves_approval
+#print axioms aivm_secrets_garrett_core.approval.Proofs.deny_mode_refuses_write
+#print axioms aivm_secrets_garrett_core.approval.Proofs.missing_approval_refuses_write
+#print axioms aivm_secrets_garrett_core.approval.Proofs.admitted_approval_is_consumed
+#print axioms aivm_secrets_garrett_core.approval.Proofs.refused_approval_is_preserved
+#print axioms aivm_secrets_garrett_core.approval.Proofs.consumed_approval_cannot_be_reused
