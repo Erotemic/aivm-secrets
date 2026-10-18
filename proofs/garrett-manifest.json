@@ -435,7 +435,7 @@
   ],
   "sha256": {
     ".github/workflows/garrett.yml": "ba1d9879b3825ea5cb9bfd21e954257c3ef54702e84319c93546fead73f5e628",
-    "MANIFEST.in": "3656fda48ba33f21bfdc6c6b3220435df301a7c1701dcee321a0a92d5b0fd0b4",
+    "MANIFEST.in": "8632c2733ae3b0017132a950046610fb4543071f276dca5acafe46864f09e71f",
     "aivm_secrets/__init__.py": "7e75a2a994fb23187847f0021d3b00a0c30884828660f155425f6c436b037309",
     "aivm_secrets/__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
     "aivm_secrets/cli.py": "383eebd07c48546463caf759e7ed5bcd313ad2b328e75e0a777605a43b2f1064",
