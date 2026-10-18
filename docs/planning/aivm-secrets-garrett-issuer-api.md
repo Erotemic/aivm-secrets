@@ -1,8 +1,9 @@
 # Garrett identity: issuer API authorization
 
-**Status (2026-10-13): the verb classification below is decided.
-Enforcement in AIVM is partial (see "Current AIVM call sites"). No socket,
-network or multi-tenant issuer exists.** Items are marked
+**Status (2026-10-17): verb classification updated for the standalone
+coordinator and in-place bound renewal.** AIVM enforcement remains partial
+(see "Current AIVM call sites"). The opt-in coordinator exposes an mTLS
+decision service; it is not a general network issuer API. Items are marked
 **implemented** (true of the code now), **decided** (settled, implementation
 pending) or **option** (not scheduled). The open obligation is ISSUER-API-01
 in [the assumption ledger](aivm-secrets-assumptions.json).
@@ -13,7 +14,7 @@ longer parses all fail the test.
 
 ## How the issuer is reached today
 
-- **Only as a child process** (**implemented**): `python -I -m aivm_secrets
+- **Authority/vault operations are process commands** (**implemented**): `python -I -m aivm_secrets
   identity <verb>` with fixed arguments, which prints one JSON object. Every
   host verb that opens an authority or a vault refuses to run unless the
   interpreter is isolated (`-I`), then runs `harden_process` and
@@ -26,7 +27,7 @@ longer parses all fail the test.
     authority directory. An operator who runs it directly must do the same.
     The guest-side verbs (`request`, `call`) skip the check too; they hold
     no issuer authority.
-- **Authorization is the filesystem** (**implemented**). The authority
+- **Local authority authorization is the filesystem** (**implemented**). The authority
   directory is owned by the principal and has mode 0700. Every read goes
   through `read_owned` and `private_directory`, which refuse guest-writable
   and foreign-owned paths. Being able to run a verb against an authority
@@ -38,8 +39,8 @@ longer parses all fail the test.
   `--untrusted-root` for every attachment path in the machine store. AIVM may
   import only `aivm_secrets.errors`.
 - **The bridge is not an issuer API** (**implemented**). Apart from the
-  bridge's own Unix socket, the only listening socket any identity verb
-  opens is `oauth-login`'s temporary loopback listener, which waits for one
+  bridge's own Unix socket, the ordinary authority verbs have no issuer socket.
+  `oauth-login` opens a temporary loopback listener, which waits for one
   browser redirect. (Outbound connections are separate: `call` connects to a
   bridge socket, the bridge to its broker socket, and `oauth-login` and
   `oauth-refresh` to the provider over HTTPS.) `identity bridge` serves
@@ -47,6 +48,15 @@ longer parses all fail the test.
   client certificate and a bound JWT, and refuses `delegate`. It exposes no
   issuer verb. It is also the only identity endpoint ever forwarded into a
   guest.
+
+The optional standalone coordinator is a separate decision boundary. The
+operator initializes one local SQLite ledger and starts `coord-serve` with
+explicit TLS material and operator-certificate pins. Remote member decisions
+are authenticated by mTLS and principal/member registrations; CA membership
+alone does not grant operator authority. `coord-status` observes that ledger,
+while activation and terminal revocation require an operator pin. A coordinator
+outage fails closed. This introduces neither distributed consensus nor a
+rollback-proof ledger. See [Python core extensions](../garrett-python-core-extensions.md).
 
 ## Classes
 
@@ -102,6 +112,7 @@ without it name an invocation that no longer parses, and the test fails.
 | `enroll --replace` | operator-only | implemented | `identity_enroll --replace` | displaces an active enrollment without a CAS |
 | `enroll --replace --expected-epoch --expected-certificate-sha256` | operator-only | implemented | none (`identity_enroll --replace` does not pass the CAS yet) | the CAS removes the race, but this still replaces the key a VM is enrolled with |
 | `renew-client` | automation-safe | implemented | `identity_renew` | CAS-guarded; same subject; a new seven-day certificate |
+| `renew-bound` | automation-safe | implemented | none | CAS renewal of the same enrolled key and a new JWT for the existing broker capability; failed issuance leaves the old epoch revoked |
 | `rotate-client-key` | automation-safe | implemented | `identity_rotate_key` | CAS-guarded; requires a different key |
 | `revoke-if-current` | automation-safe | implemented | compensation after a failed certificate delivery | CAS-guarded; never revokes a newer enrollment |
 | `revoke` | operator-only | implemented | none | unconditional; can revoke an enrollment another writer just made |
@@ -122,6 +133,11 @@ without it name an invocation that no longer parses, and the test fails.
 | `oauth-status` | read-only | implemented | none | changes nothing |
 | `oauth-refresh` | operator-only | implemented | none | rotates the refresh token; an ambiguous failure can force reauthorization |
 | `oauth-revoke` | operator-only | implemented | none | unconditional |
+| `coord-init` | operator-only | implemented | none | creates a durable coordination ledger |
+| `coord-serve` | operator-only | implemented | none | exposes the explicitly configured mTLS decision service with operator pins |
+| `coord-activate` | operator-only | implemented | none | registers member certificates for a principal; cannot reverse terminal revocation |
+| `coord-revoke` | operator-only | implemented | none | terminal global principal revocation |
+| `coord-status` | read-only | implemented | none | observes coordination state without changing the ledger |
 
 ## How AIVM must run each class
 
@@ -138,7 +154,7 @@ regenerated. **Every verb that writes the registry runs as
 
 **Automation-safe** verbs:
 
-- The registry writes (`renew-client`, `rotate-client-key`,
+- The registry writes (`renew-client`, `renew-bound`, `rotate-client-key`,
   `revoke-if-current`) run as `role='modify'`, `ownership='user'`, and only
   inside a workflow the user invoked for that same identity. The workflow
   asks once, before its first write. That confirmation names the VM and the

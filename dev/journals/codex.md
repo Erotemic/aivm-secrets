@@ -1279,3 +1279,29 @@ command resolvers, approvals/delegation and general primitive-runner parity
 also remain open. The broader goal remains active; connecting actual dispatch
 leases and administrative writers to a finite service-history theorem is the
 next assurance priority, alongside the remaining native administration surface.
+
+## 2026-10-17 23:25:00 -0400
+
+Resumed the user's standalone usable-system goal after committing AIVM's
+optional device lifecycle separately. The new Rust overlays compile on the
+pinned toolchain; 20 W1/W2/W5/W6 Python/native process tests pass without skips,
+Rust workspace unit tests pass, and the W4/W5 Lean dependency chain compiles.
+A first full native-enabled run found three stale guards in the pulled work:
+the issuer table omitted the coordinator/renew-bound verbs; SQL execute calls
+looked like provider dispatch; and the coordinator was missing from the network
+adapter inventory. The run had 2,197 passes and eight skips (seven from the
+missing freshness environment variable, one explicitly pending primitive
+runner). None of those results establishes complete native refinement.
+
+I reconciled the actual coordinator boundary rather than exempting its module
+from scrutiny. Only its named connection's literal SQL statements are excluded
+from the provider-execution tripwire; adversarial non-SQL/dynamic statements
+still count as potential provider paths. The broker's three explicit call
+sites are preflight plus the two final branches differing in the host-derived
+idempotency header. All three consume the kernel emission and credential.
+The coordinator is a third explicit host dialer, with separate mTLS/operator
+pins; the documentation no longer says that no network decision service exists.
+The 155 source-boundary/operator tests pass. I'm confident these are accurate
+inventories, while remaining aware that string/AST checks are tripwires and
+not sound transitive Python call-graph or TLS proofs. Rust coordinator parity
+is still explicitly missing.

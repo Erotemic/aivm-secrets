@@ -159,18 +159,48 @@ def test_only_the_kernel_can_mint_an_authorization():
     assert set(constructions('Grant')) == {'kernel/machine.py'}
 
 
+def provider_execute_calls(relative: str, source: str) -> list[ast.Call]:
+    """Separate the coordinator's literal SQL statements from provider effects.
+
+    This is a structural tripwire, not Python type or call-graph verification.
+    Never exempt every execute() in the coordinator: a provider bypass there
+    must still fail this gate.
+    """
+    found = []
+    for node in ast.walk(ast.parse(source)):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == 'execute'):
+            continue
+        receiver = node.func.value
+        sql = (node.args[0].value if node.args and isinstance(node.args[0], ast.Constant)
+               and isinstance(node.args[0].value, str) else '')
+        if (relative == 'identity/coordination.py' and isinstance(receiver, ast.Name)
+                and receiver.id == 'conn' and sql.split() and sql.split()[0] in {
+                    'PRAGMA', 'BEGIN', 'INSERT', 'COMMIT', 'ROLLBACK', 'SELECT', 'UPDATE'}):
+            continue
+        found.append(node)
+    return found
+
+
 def test_the_executor_is_reached_only_through_the_broker():
     callers = {
         str(path.relative_to(PACKAGE))
         for path in ALL
-        if '.execute(' in path.read_text(encoding='utf-8')
+        if provider_execute_calls(str(path.relative_to(PACKAGE)), path.read_text(encoding='utf-8'))
     }
     assert callers == {'host/broker.py'}
     broker = (PACKAGE / 'host' / 'broker.py').read_text(encoding='utf-8')
-    # Each call passes a value a kernel emission returned, never an Effect.
-    assert broker.count('self._executor.execute(') == 2
-    assert 'self._executor.execute(preflight, ' in broker
-    assert 'self._executor.execute(final, ' in broker
+    # The two final branches differ only in the reviewed, host-derived retry
+    # header; they still consume exactly the kernel's final authorization.
+    calls = provider_execute_calls('host/broker.py', broker)
+    signatures = [([ast.unparse(arg) for arg in call.args],
+                   {kw.arg: ast.unparse(kw.value) for kw in call.keywords})
+                  for call in calls]
+    assert signatures == [
+        (['preflight', 'credential'], {}),
+        (['final', 'credential'], {'idempotency_key': 'provider_key'}),
+        (['final', 'credential'], {}),
+    ]
 
 
 def test_provider_knowledge_is_data_in_one_module():
@@ -206,19 +236,20 @@ def test_provider_knowledge_is_data_in_one_module():
     assert preset == {'__future__', 'typing', 'errors', '', 'model'}
 
 
-def test_only_two_explicit_host_adapters_can_open_network_connections():
-    """The OAuth acquisition client is a second deliberately trusted dialer.
+def test_only_reviewed_host_adapters_can_open_network_connections():
+    """Provider effects, OAuth acquisition and coordination have distinct sinks.
 
-    Pure URL parsing (urllib.parse in oauth_provider.py) is not egress. Both
-    permitted connection owners must remain explicit and narrowly scoped:
-    provider-token acquisition and authorized service API execution.
+    Coordination sends mTLS decisions/reservations to a trusted host config,
+    never a provider credential or guest-selected destination. Its third dialer
+    is explicit; this source inventory does not prove transitive reachability.
     """
     openers = set()
     for path in ALL:
         source = path.read_text(encoding='utf-8')
         if 'create_connection' in source or 'http.client' in source:
             openers.add(str(path.relative_to(PACKAGE)))
-    assert openers == {'host/egress.py', 'identity/oauth_transport.py'}
+    assert openers == {'host/egress.py', 'identity/oauth_transport.py',
+                       'identity/coordination.py'}
 
 
 def test_only_one_module_runs_a_program_and_never_through_a_shell():
@@ -394,3 +425,18 @@ def test_garrett_policies_are_linked_and_their_obligations_recorded() -> None:
             assert obligation in ledger, f'{obligation} has no ledger entry'
             cited = ledger[obligation]['assumption']
             assert f'docs/planning/{name}' in cited, (obligation, name)
+
+
+@pytest.mark.parametrize('source', [
+    'executor.execute(effect, credential)',
+    'conn.execute(effect, credential)',
+    'conn.execute(sql_supplied_at_runtime)',
+])
+def test_sql_exception_does_not_hide_a_coordinator_provider_bypass(source):
+    assert provider_execute_calls('identity/coordination.py', source)
+
+
+def test_literal_sql_exception_is_confined_to_the_reviewed_module():
+    source = "conn.execute('SELECT revision FROM principals WHERE name=?', (name,))"
+    assert not provider_execute_calls('identity/coordination.py', source)
+    assert provider_execute_calls('host/other.py', source)
