@@ -76,6 +76,11 @@ extraction and streaming projector retain unresolved dependency/drop obligations
 presence of the intended callback links is not admission dominance or native
 trace refinement. Continue W3/W6 through those remaining obligations.
 
+The [parsed-policy identity increment](../verified-policy-normalization.md) closes
+the known raw-document fingerprint difference in coordinated manifest writes.
+Finite differential and durable-record tests are the evidence; normalization
+and hashing remain concrete adapters, not new Lean proofs or broad parity.
+
 The [independent Rust primitive runner](../primitive-conformance.md) now supplies
 the formerly pending complete-table corpus backend. The usable-system gate
 selects it explicitly and rejects skips. Binding/digest/frame adapters are
@@ -218,7 +223,7 @@ and [new functionality and trust boundaries](../garrett-python-core-extensions.m
 | --- | --- | --- |
 | **P-CORE-07** | Durable terminal cross-host principal revocation using one local SQLite coordinator, mTLS member/operator pins, check at every broker and bound-bridge request; tests use synthetic same-host distinct member certificates | Native account/manifest client tested against Python coordinator; native server, real separate-host deployment, rollback witness and operational failover unvalidated |
 | **P-CORE-06** | Running OAuth broker leases the vault's current access token at each request, preserving capability and enrolled epoch; identity `renew-bound` issues fresh cert/JWT without broker/bridge restart | Rust same-session token rollover implemented and locally tested; same-key native renew/rebind tested without broker restart; broader differential gate incomplete and guest material delivery remains manual |
-| **P-CORE-08/09** | Durable per-principal idempotency reservations before any coordinated write; guest ASCII retry keys, optional explicit upstream `Idempotency-Key`, strict no-replay even after ambiguous result | Native keyed manifest dispatch and shared retry names tested; normalized policy fingerprint parity and production provider header semantics unverified |
+| **P-CORE-08/09** | Durable per-principal idempotency reservations before any coordinated write; guest ASCII retry keys, optional explicit upstream `Idempotency-Key`, strict no-replay even after ambiguous result | Native keyed manifest dispatch and shared retry names tested; normalized policy fingerprints checked against Python and durable records; all-input parity and production provider header semantics unverified |
 | **P-PARITY** | All Python modules classified core vs non-core, 11 normative security contracts with Rust status and acceptance criteria | Implement independent Rust behavior and bidirectional negative/positive trace tests before marking any contract parity-complete |
 
 A previous approved operation may still finish if global revocation commits

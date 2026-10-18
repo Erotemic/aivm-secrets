@@ -8,6 +8,7 @@ use std::{
     path::Path,
 };
 pub mod disclosure;
+mod normalization;
 
 const MAX_INT: i64 = 2147483647;
 const MAX_TEXT: usize = 16384;
@@ -934,6 +935,8 @@ pub struct Policy {
     operations: BTreeMap<String, Operation>,
     checks: BTreeMap<String, Check>,
     document: Value,
+    normalized: Value,
+    digest: String,
 }
 impl Policy {
     pub fn from_file(path: &Path) -> Outcome<Self> {
@@ -1087,6 +1090,9 @@ impl Policy {
             1,
             MAX_TEXT as i64,
         )? as usize;
+        let normalized =
+            normalization::document(m, &operations, &checks, &headers, lifetime, maximum_body)?;
+        let digest = normalization::digest(&normalized);
         Ok(Self {
             host: host.into(),
             authentication: authentication.into(),
@@ -1096,10 +1102,18 @@ impl Policy {
             operations,
             checks,
             document: value.clone(),
+            normalized,
+            digest,
         })
     }
     pub fn document(&self) -> &Value {
         &self.document
+    }
+    pub fn normalized_document(&self) -> &Value {
+        &self.normalized
+    }
+    pub fn digest(&self) -> &str {
+        &self.digest
     }
     pub fn operations(&self) -> Vec<String> {
         self.operations.keys().cloned().collect()
@@ -1196,9 +1210,17 @@ impl Policy {
 }
 
 pub fn evaluate(v: &Value) -> Outcome<Value> {
-    let m = json::keys(v, &["version", "policy", "request"], &["facts"])?;
+    let m = json::keys(v, &["version", "policy"], &["request", "facts"])?;
     json::integer(&m["version"], 1, 1)?;
     let policy = Policy::parse(&m["policy"])?;
+    if !m.contains_key("request") {
+        if m.contains_key("facts") {
+            return Err(Error::InvalidRequest);
+        }
+        return Ok(
+            json!({"ok":true,"policy":policy.normalized_document(),"digest":policy.digest()}),
+        );
+    }
     let result = policy.inspect(&m["request"], m.get("facts").unwrap_or(&Value::Null))?;
     Ok(json!({"ok":true,"result":result}))
 }

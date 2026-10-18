@@ -226,10 +226,9 @@ impl Session {
             let coordinator = self.base.coordinator.as_ref().ok_or(Error::InvalidRequest)?;
             let provider_key = hex(digest::digest(&digest::SHA256,
                 &json::canonical(&json!({"schema":1,"principal":coordinator.principal(),"client_key":key}))).as_ref());
-            // The policy document hash is native evidence, not a claim that
-            // Python's normalized policy digest has been implemented here.
-            let policy_hash = hex(digest::digest(&digest::SHA256,
-                &json::canonical(self.policy.document())).as_ref());
+            // Reuse the identity of parsed policy meaning: omitted defaults
+            // and reordered set members must match the reference broker.
+            let policy_hash = self.policy.digest();
             let fingerprint = hex(digest::digest(&digest::SHA256,
                 &json::canonical(&json!({"policy":policy_hash,"request":{"operation":op.name,"arguments":args}}))).as_ref());
             Ok((provider_key,fingerprint))

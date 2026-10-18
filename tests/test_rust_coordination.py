@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 from contextlib import ExitStack
+import copy
 from pathlib import Path
+import sqlite3
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
@@ -275,7 +277,9 @@ def test_file_loaded_coordinator_config_supports_only_explicit_localhost_excepti
 
 
 @pytest.mark.parametrize('first_backend', ['python', 'rust'])
-def test_python_and_native_brokers_share_global_retry_names(tmp_path, first_backend):
+@pytest.mark.parametrize('native_spelling', ['input', 'normalized', 'reordered'])
+def test_python_and_native_brokers_share_global_retry_names(tmp_path, first_backend,
+                                                           native_spelling):
     """Both live backends act, and neither replays the other's reserved key."""
     from aivm_secrets.host.egress import HTTPSExecutor
     from aivm_secrets.kernel.service import parse_policy
@@ -295,8 +299,17 @@ def test_python_and_native_brokers_share_global_retry_names(tmp_path, first_back
         reference = Harness(reference_dir, policy=p, writes='allow',
                             executor=HTTPSExecutor(spec.egress))
         reference.broker._coordination = coord.client(coord.members[1])
+        native_policy = copy.deepcopy(p)
+        if native_spelling == 'normalized':
+            native_policy = spec.to_dict()
+        elif native_spelling == 'reordered':
+            native_policy['operations'].reverse()
+            for operation in native_policy['operations']:
+                for values in operation.get('parameters', {}).values():
+                    if isinstance(values, list):
+                        values.reverse()
         try:
-            with ManifestCase(native_dir, provider, p, writes='allow',
+            with ManifestCase(native_dir, provider, native_policy, writes='allow',
                               coordination_file=str(coord.member_file())) as native:
                 def call(backend, key):
                     if backend == 'rust':
@@ -322,6 +335,14 @@ def test_python_and_native_brokers_share_global_retry_names(tmp_path, first_back
                 assert all(r['headers']['authorization'] == 'Bearer ' + TOKEN
                            for r in provider.seen())
                 assert TOKEN not in codec.dumps([allowed, denied]).decode()
+                # Inspect the real durable records, not just duplicate denial:
+                # that denial deliberately hides fingerprint differences.
+                expected = codec.digest(dict(policy=spec.digest, request=dict(
+                    operation='ticket.edit', arguments={'ticket': 7, 'text': 'hello'})))
+                with sqlite3.connect(coord.ledger.path) as db:
+                    records = db.execute('SELECT digest,state FROM writes').fetchall()
+                assert len(records) == 2
+                assert records == [(expected, 'completed')] * 2
         finally:
             reference.broker.close()
 

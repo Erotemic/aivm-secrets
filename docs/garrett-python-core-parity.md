@@ -77,10 +77,11 @@ runtime-conformance evidence alongside the unchanged freshness proofs.
 
 The [native coordinator increment](verified-coordination.md) tests both live
 Python and Rust brokers against one mTLS/SQLite authority. The global retry-key
-derivation interoperates; native request fingerprints currently hash the
-validated native policy document, whereas Python hashes normalized policy
-serialization. Duplicate keys are refused regardless of digest, so this does
-not permit replay; it remains an explicit opaque-fingerprint parity gap.
+derivation interoperates. Native request fingerprints now use a normalized
+document rebuilt from parsed policy, with [finite differential and durable-record
+evidence](verified-policy-normalization.md). Duplicate keys remain refused
+regardless of digest. All-input normalization equivalence, native coordinator
+server behavior and broader core parity remain open.
 
 The [same-key identity rebinding increment](verified-identity-rebinding.md)
 composes native CAS certificate renewal with a host-only rewrap of the identical

@@ -103,10 +103,10 @@ with the independent Python reference. Rust units check typed acknowledgements,
 HTTP framing and callback ordering/no retry.
 
 CORE-07/08/09 remain **partial**, rather than missing or parity-complete. The
-server is Python. Native request fingerprints hash the validated native policy
-document; Python fingerprints hash normalized policy serialization. Duplicate
-keys are refused regardless of fingerprint, so the tested no-replay behavior
-interoperates, but normalized fingerprint equality remains open. Legacy socket
+server is Python. The [policy identity follow-up](verified-policy-normalization.md)
+now rebuilds normalized policy before fingerprinting and compares it with Python,
+including actual durable coordinator records. Duplicate keys remain refused
+regardless of fingerprint; all-input normalization equivalence is unproved. Legacy socket
 forwarding, a native coordinator server, broader core equivalence and deployment
 on genuinely separate hosts remain unvalidated.
 

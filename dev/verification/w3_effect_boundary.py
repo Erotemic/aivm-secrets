@@ -103,6 +103,9 @@ def review_semantics(contents: dict[str, str]) -> None:
             and '.as_object_mut()' in request and '.remove("idempotency_key")' in request
             and 'self.base.coordinator.is_some() || op.idempotency_header' in request,
             'coordinator control/request admission or keyed-write requirement bypassed')
+    reservation = part(request, 'let reservation = retry.map(', 'guards::authorize(')
+    require('let policy_hash = self.policy.digest();' in reservation,
+            'coordinated request no longer uses normalized policy identity')
     require(same_order(release, 'self.disclosure.project(', 'ensure_safe(&reply',
                        'audit.write_record(', 'Ok(reply)'),
             'guest release bypasses selected disclosure/reflection/audit')

@@ -32,6 +32,7 @@ WORKFLOW_TESTS = [
     'tests/test_rust_bound_renewal.py',
     'tests/test_secrets_primitives_parity.py',
     'tests/test_specialized_calls.py',
+    'tests/test_rust_policy_normalization.py',
     'tests/test_rust_garrett_authority.py::test_tpm_requirement_rejects_software_before_credential_custody',
 ]
 

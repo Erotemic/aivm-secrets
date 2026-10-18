@@ -68,6 +68,9 @@ def mutate(repo, filename, before, after):
      'reserve: || reservation_call(false),', 'reserve: || Ok(()),'),
     (RUST + 'custody/manifest_session.rs',
      'finish: || reservation_call(true),', 'finish: || Ok(()),'),
+    (RUST + 'custody/manifest_session.rs',
+     'let policy_hash = self.policy.digest();',
+     'let policy_hash = "raw-policy-digest";'),
     (RUST + 'coordination.rs',
      'value.get("ok") != Some(&json!(true))', 'false'),
 
