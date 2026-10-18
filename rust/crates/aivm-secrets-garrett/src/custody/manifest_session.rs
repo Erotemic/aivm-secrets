@@ -292,6 +292,88 @@ impl Session {
     }
 }
 
+// W6 concrete provider-wire boundary. Policy construction normally checks
+// these fields already, but the adapter must not trust that its caller has
+// preserved those checks. In particular OAuthSource can construct Credential
+// directly rather than calling credential_at_least. Reject CR/LF in the final
+// bytes, before a single provider write, to prevent HTTP request injection.
+fn manifest_request_bytes(
+    route: &core::Route,
+    secret: &Credential,
+    effect: &Effect,
+    headers: &BTreeMap<String, String>,
+) -> Outcome<Zeroizing<Vec<u8>>> {
+    let host = std::str::from_utf8(&route.host).map_err(|_| Error::InvalidPolicy)?;
+    if host.is_empty() || host.len() > 253
+        || !host.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-')
+    {
+        return Err(Error::InvalidPolicy);
+    }
+    let port = u16::try_from(route.port).map_err(|_| Error::InvalidPolicy)?;
+    if port == 0 || !matches!(effect.method.as_str(), "GET" | "POST" | "PATCH")
+        || !effect.target.starts_with('/') || effect.target.starts_with("//")
+        || effect.target.len() > 8192 || effect.target.bytes().any(|b| !(33..=126).contains(&b) || b == b'#')
+        || effect.accept.is_empty() || effect.accept.len() > 96
+        || !effect.accept.bytes().all(|b| (33..=126).contains(&b))
+    {
+        return Err(Error::InvalidPolicy);
+    }
+    if secret.0.is_empty() || secret.0.len() > 4096
+        || !secret.0.iter().all(|b| (b'!'..=b'~').contains(b))
+    {
+        return Err(Error::CredentialSource);
+    }
+    let body = effect.body.as_ref().map(|value| Zeroizing::new(json::canonical(value)));
+    if body.as_ref().is_some_and(|value| value.len() > MAX_BODY) {
+        return Err(Error::InvalidPolicy);
+    }
+    let mut request = Zeroizing::new(
+        format!(
+            "{} {} HTTP/1.1\r\nHost: {host}:{port}\r\nAccept: {}\r\nAccept-Encoding: identity\r\nUser-Agent: aivm-secrets/1\r\nConnection: close\r\n",
+            effect.method, effect.target, effect.accept,
+        ).into_bytes(),
+    );
+    if headers.len() > 8 {
+        return Err(Error::InvalidPolicy);
+    }
+    let mut seen_headers = std::collections::BTreeSet::new();
+    for (name, value) in headers {
+        let lower = name.to_ascii_lowercase();
+        if name.is_empty() || name.len() > 64 || !seen_headers.insert(lower.clone())
+            || !name.bytes().enumerate().all(|(index, b)| b.is_ascii_alphanumeric() || index > 0 && b == b'-')
+            || value.is_empty() || value.len() > 256
+            || !value.bytes().all(|b| (32..=126).contains(&b))
+            || value.starts_with(' ') || value.ends_with(' ')
+            || ["accept", "accept-encoding", "authorization", "connection", "content-encoding",
+                "content-length", "content-type", "cookie", "expect", "forwarded", "host",
+                "keep-alive", "proxy-authorization", "proxy-connection", "te", "trailer",
+                "transfer-encoding", "upgrade", "user-agent", "via", "x-api-key"]
+                .contains(&lower.as_str())
+            || lower.starts_with("proxy-") || lower.starts_with("sec-")
+            || lower.starts_with("x-forwarded-")
+        {
+            return Err(Error::InvalidPolicy);
+        }
+        request.extend_from_slice(format!("{name}: {value}\r\n").as_bytes());
+    }
+    request.extend_from_slice(match route.authentication {
+        core::Authentication::Bearer => b"Authorization: Bearer ",
+        core::Authentication::ApiKey => b"X-API-Key: ",
+    });
+    request.extend_from_slice(&secret.0);
+    request.extend_from_slice(b"\r\n");
+    if let Some(body) = &body {
+        request.extend_from_slice(
+            format!("Content-Type: application/json\r\nContent-Length: {}\r\n", body.len()).as_bytes(),
+        );
+    }
+    request.extend_from_slice(b"\r\n");
+    if let Some(body) = &body {
+        request.extend_from_slice(body);
+    }
+    Ok(request)
+}
+
 impl Executor {
     fn exchange_manifest(
         &self,
@@ -300,6 +382,9 @@ impl Executor {
         effect: &Effect,
         headers: &BTreeMap<String, String>,
     ) -> Outcome<Value> {
+        // Validate all outbound bytes before connecting to any provider.
+        // A malformed OAuth-issued credential must not reach a socket at all.
+        let request = manifest_request_bytes(route, secret, effect, headers)?;
         let host = std::str::from_utf8(&route.host).map_err(|_| Error::InvalidPolicy)?;
         let mut socket = TcpStream::connect_timeout(
             &SocketAddr::new(
@@ -329,33 +414,9 @@ impl Executor {
         }
         let mut stream = StreamOwned::new(conn, socket);
         let exchange = || -> Outcome<Value> {
-            let body = effect
-                .body
-                .as_ref()
-                .map(|v| Zeroizing::new(json::canonical(v)));
-            let mut request=Zeroizing::new(format!("{} {} HTTP/1.1\r\nHost: {host}:{}\r\nAccept: {}\r\nAccept-Encoding: identity\r\nUser-Agent: aivm-secrets/1\r\nConnection: close\r\n",effect.method,effect.target,route.port,effect.accept).into_bytes());
-            for (n, v) in headers {
-                request.extend_from_slice(format!("{n}: {v}\r\n").as_bytes());
-            }
-            request.extend_from_slice(match route.authentication {
-                core::Authentication::Bearer => b"Authorization: Bearer ",
-                core::Authentication::ApiKey => b"X-API-Key: ",
-            });
-            request.extend_from_slice(&secret.0);
-            request.extend_from_slice(b"\r\n");
-            if let Some(body) = &body {
-                request.extend_from_slice(
-                    format!(
-                        "Content-Type: application/json\r\nContent-Length: {}\r\n",
-                        body.len()
-                    )
-                    .as_bytes(),
-                );
-            }
-            request.extend_from_slice(b"\r\n");
-            if let Some(body) = &body {
-                request.extend_from_slice(body);
-            }
+            // The exact bytes handed to TLS are generated by one pure,
+            // independently testable encoder. Never serialize a credential
+            // through a public JSON or diagnostic interface.
             stream
                 .write_all(&request)
                 .and_then(|_| stream.flush())
@@ -408,6 +469,12 @@ fn manifest_response(mut reader: impl BufRead, format: &str) -> Outcome<Vec<u8>>
     }
     if !(200..300).contains(&status) {
         return Err(Error::UpstreamError);
+    }
+    // A partial representation cannot be treated as a complete policy-
+    // selected JSON/text result. Range/partial-content semantics are not
+    // part of the native manifest contract.
+    if status == 206 {
+        return Err(Error::UpstreamResponse);
     }
     let mut headers = BTreeMap::new();
     let mut size = 0;
@@ -511,4 +578,110 @@ fn manifest_response(mut reader: impl BufRead, format: &str) -> Outcome<Vec<u8>>
         return Err(Error::UpstreamResponse);
     }
     Ok(body)
+}
+
+#[cfg(test)]
+mod wire_tests {
+    use super::*;
+
+    fn route() -> core::Route {
+        core::Route {
+            host: b"api.example.org".to_vec(),
+            port: 443,
+            path: b"/".to_vec(),
+            authentication: core::Authentication::Bearer,
+        }
+    }
+    fn effect() -> Effect {
+        Effect {
+            method: "GET".into(), target: "/v1/pull/7?state=open".into(),
+            accept: "application/json".into(), response: "json".into(),
+            body: None, write: false,
+        }
+    }
+    fn secret(bytes: &[u8]) -> Credential {
+        Credential(Zeroizing::new(bytes.to_vec()))
+    }
+    #[test]
+    fn manifest_wire_is_one_origin_form_request_without_proxy_routing() {
+        let mut headers = BTreeMap::new();
+        headers.insert("X-GitHub-Api-Version".into(), "2026-03-10".into());
+        let request = manifest_request_bytes(&route(), &secret(b"SYNTHETIC_TOKEN_123456"), &effect(), &headers).unwrap();
+        let wire = String::from_utf8(request.to_vec()).unwrap();
+        assert!(wire.starts_with("GET /v1/pull/7?state=open HTTP/1.1\r\nHost: api.example.org:443\r\n"));
+        assert!(wire.contains("\r\nAuthorization: Bearer SYNTHETIC_TOKEN_123456\r\n"));
+        assert!(wire.contains("\r\nX-GitHub-Api-Version: 2026-03-10\r\n"));
+        assert!(wire.ends_with("\r\n\r\n"));
+        assert_eq!(wire.matches("Authorization:").count(), 1);
+        assert!(!wire.contains("Proxy-Authorization:"));
+    }
+    #[test]
+    fn manifest_wire_api_key_uses_only_the_host_chosen_auth_header() {
+        let mut api_route = route();
+        api_route.authentication = core::Authentication::ApiKey;
+        let request = manifest_request_bytes(
+            &api_route, &secret(b"SYNTHETIC_TOKEN_123456"), &effect(), &BTreeMap::new(),
+        ).unwrap();
+        let wire = String::from_utf8(request.to_vec()).unwrap();
+        assert!(wire.contains("\r\nX-API-Key: SYNTHETIC_TOKEN_123456\r\n"));
+        assert!(!wire.contains("Authorization:"));
+        assert_eq!(wire.matches("SYNTHETIC_TOKEN_123456").count(), 1);
+    }
+    #[test]
+    fn manifest_wire_rejects_injected_credential_or_header() {
+        for value in [b"TOKEN\r\nHost: attacker.test".as_slice(), b"TOKEN\nX-Other: evil", b"", b"TOKEN "] {
+            assert!(matches!(manifest_request_bytes(&route(), &secret(value), &effect(), &BTreeMap::new()), Err(Error::CredentialSource)));
+        }
+        let mut headers = BTreeMap::new();
+        headers.insert("Authorization".into(), "Bearer attacker".into());
+        assert!(matches!(manifest_request_bytes(&route(), &secret(b"GOOD_TOKEN_123456"), &effect(), &headers), Err(Error::InvalidPolicy)));
+        headers.clear();
+        headers.insert("X-Allowed".into(), "ok\r\nHost: attacker".into());
+        assert!(matches!(manifest_request_bytes(&route(), &secret(b"GOOD_TOKEN_123456"), &effect(), &headers), Err(Error::InvalidPolicy)));
+        headers.clear();
+        headers.insert("X-Scope".into(), "a".into());
+        headers.insert("x-scope".into(), "b".into());
+        assert!(matches!(manifest_request_bytes(&route(), &secret(b"GOOD_TOKEN_123456"), &effect(), &headers), Err(Error::InvalidPolicy)));
+    }
+    #[test]
+    fn manifest_wire_rejects_unreviewed_target_and_renders_bounded_body() {
+        let mut bad = effect();
+        for path in ["//attacker.test/", "/ok\r\nX-Injected: yes", "/unsafe#fragment"] {
+            bad.target = path.into();
+            assert!(matches!(manifest_request_bytes(&route(), &secret(b"GOOD_TOKEN_123456"), &bad, &BTreeMap::new()), Err(Error::InvalidPolicy)));
+        }
+        let mut post = effect();
+        post.method = "POST".into();
+        post.target = "/graphql".into();
+        post.body = Some(json!({"operationName":"Pull","variables":{"pr":7}}));
+        let bytes = manifest_request_bytes(&route(), &secret(b"GOOD_TOKEN_123456"), &post, &BTreeMap::new()).unwrap();
+        let wire = String::from_utf8(bytes.to_vec()).unwrap();
+        let (head, body) = wire.split_once("\r\n\r\n").unwrap();
+        assert!(head.contains(&format!("Content-Length: {}", body.len())));
+        assert_eq!(serde_json::from_str::<Value>(body).unwrap(), post.body.unwrap());
+    }
+    #[test]
+    fn manifest_response_rejects_redirect_partial_and_ambiguous_framing() {
+        use std::io::Cursor;
+        let bad = [
+            b"HTTP/1.1 302 Found\r\nLocation: https://evil.example/\r\nContent-Length: 0\r\n\r\n".as_slice(),
+            b"HTTP/1.1 206 Partial Content\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}",
+            b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\nContent-Length: 2\r\n\r\n{}",
+            b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\nTransfer-Encoding: chunked\r\n\r\n{}",
+            b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Encoding: gzip\r\nContent-Length: 2\r\n\r\n{}",
+            b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 2\r\n\r\n{}",
+        ];
+        for response in bad {
+            assert!(manifest_response(Cursor::new(response), "json").is_err());
+        }
+    }
+    #[test]
+    fn manifest_response_accepts_only_bounded_complete_representation() {
+        use std::io::Cursor;
+        let bytes = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 8\r\n\r\n{\"ok\":1}";
+        assert_eq!(manifest_response(Cursor::new(bytes), "json").unwrap(), b"{\"ok\":1}");
+        let chunked = b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nTransfer-Encoding: chunked\r\n\r\n4\r\nDATA\r\n0\r\n\r\n";
+        assert_eq!(manifest_response(Cursor::new(chunked), "text").unwrap(), b"DATA");
+    }
+
 }

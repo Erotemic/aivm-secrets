@@ -110,3 +110,13 @@ update `docs/planning/aivm-secrets-w3-reachability.json` source hashes only
 after review, add an adversarial test for changed authority or release
 semantics, then execute the checker. The hash list is a **review checkpoint**,
 not a claim of formal provenance.
+
+## W6 refinement checkpoint (2026-10-17)
+
+The reviewed `manifest_session.rs` source now routes actual outgoing HTTPS
+bytes through `manifest_request_bytes`, a zeroizing pure encoder executed
+before socket creation. Additional defenses reject malformed OAuth credential
+bytes, ambiguous injected headers, unsafe request targets, and unmodeled 206
+partial responses. The W3 source inventory has been deliberately refreshed.
+See [W6 adapter review](verified-w6-adapter-correspondence.md) for concrete
+unit tests, finite runtime-trace checks and still-unproved assumptions.

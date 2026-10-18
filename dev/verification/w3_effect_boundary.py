@@ -98,6 +98,18 @@ def review_semantics(contents: dict[str, str]) -> None:
     require('let sent_write = effect.as_ref().is_some_and(|e| e.write);' in request
             and 'release.map_err(|_| Error::OutcomeUnknown)' in request,
             'write uncertainty boundary altered')
+    # W6: the exact provider bytes are validated by a pure encoder BEFORE any
+    # TCP/TLS effect. This also covers OAuthSource-created Credential values.
+    require(m.count('fn manifest_request_bytes(') == 1
+            and m.count('let request = manifest_request_bytes(route, secret, effect, headers)?;') == 1
+            and m.index('let request = manifest_request_bytes(') < m.index('TcpStream::connect_timeout('),
+            'provider socket opened before outbound wire validation')
+    wire = part(m, 'fn manifest_request_bytes(', 'impl Executor {')
+    require("secret.0.iter().all(" in wire and "Error::CredentialSource" in wire
+            and 'effect.target.starts_with("//")' in wire
+            and '"authorization"' in wire and '"content-length"' in wire,
+            'provider wire encoder lost injection / reserved-header refusal')
+    require('if status == 206 {' in m, 'unreviewed partial response release')
     require(m.count('TcpStream::connect_timeout(') == 1 and m.count('.write_all(&request)') == 1,
             'native module added a credentialed socket or HTTP writer')
     require(m.count('exchange_manifest(') == 2,

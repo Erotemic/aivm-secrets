@@ -236,3 +236,28 @@ structural checks alone do not prove W4. Exact model variant unavailable.
 - Removed W5 `#print axioms` declarations and their output parser/tests; retain explicit source-level prohibition of `sorry`/`admit`/`axiom` in the optional structural `check`.
 - Repaired the reported W5 binder/typeclass errors using a local classical `Decidable` instance for `Gate.accepted`, fully qualified the extracted result constructors, and simplified the two witness proofs.
 - Note: the repaired Lean file has not been compiled with the pinned toolchain in this environment.
+
+## 2026-10-17 20:35:00 -0400 - W6 native adapter correspondence pass
+
+- Implemented the *actual* native manifest HTTP byte encoder as a pure,
+  zeroizing function used by `Executor::exchange_manifest` before TCP connects.
+  Validates credential bytes even if produced by OAuth rather than the file
+  credential constructor; rejects CR/LF, reserved and duplicate headers,
+  malformed targets, and oversized bodies. The adapter rejects HTTP 206 as a
+  partial representation outside the declared manifest response contract.
+- Added Rust unit tests of this production encoder and response parser; added
+  native bridge/client/TLS provider/audit trace tests and an independent
+  mutation-sensitive Python observation oracle. `W6` explicitly includes
+  preflight provider sends, checked-fact-only results and denied/error paths.
+- Classified ten W0 sinks with source, trusted adapter assumptions and tests;
+  added W6 structural/negative guards and refreshed W3 source provenance after
+  review. Existing authorization/disclosure theorems are not changed.
+- Validation here: W0/W3/W4/W5/W6 checkers and 50 focused Python tests pass;
+  native Rust integration tests skipped because compiled Garrett binaries are
+  unavailable. Rust unit tests and end-to-end native acceptance remain **open**.
+  No claim of formal whole-service I/O refinement or complete reachability.
+- Main risks: adapter testing is observational, not a verified bisimulation;
+  TLS/crypto, host `sync_all`, dependencies, error/closure metadata, timing,
+  provider-controlled declassification semantics and VM isolation remain
+  separate assumptions or downstream obligations. Recheck Rust compilation
+  and any behavior differences on the pinned nightly before merging.
