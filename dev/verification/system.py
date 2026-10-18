@@ -31,6 +31,7 @@ WORKFLOW_TESTS = [
     'tests/test_rust_coordination.py',
     'tests/test_rust_bound_renewal.py',
     'tests/test_secrets_primitives_parity.py',
+    'tests/test_specialized_calls.py',
     'tests/test_rust_garrett_authority.py::test_tpm_requirement_rejects_software_before_credential_custody',
 ]
 
@@ -67,6 +68,8 @@ def main() -> int:
                         help='Also compile the pinned W4/W5 Lean dependency chain.')
     parser.add_argument('--full-tests', action='store_true',
                         help='Also run the full portable suite with native conformance runners.')
+    parser.add_argument('--call-linkage', action='store_true',
+                        help='Also inspect compiler-specialized native callback links (not mediation).')
     args = parser.parse_args()
     # Every invocation retains its logs; parallel checkouts cannot reuse a report.
     (ROOT / '.tools').mkdir(exist_ok=True)
@@ -78,6 +81,7 @@ def main() -> int:
                         ['git', 'status', '--porcelain'], cwd=ROOT)),
                     scope='synthetic usable workflow; not full protocol parity',
                     proofs_requested=args.proofs, full_tests_requested=args.full_tests,
+                    call_linkage_requested=args.call_linkage,
                     input_sha256=source_fingerprint())
     report = output / 'report.json'
     env = dict(os.environ)
@@ -141,6 +145,10 @@ def main() -> int:
             with tempfile.TemporaryDirectory(prefix='as-full-', dir='/tmp') as temporary:
                 run('full-python-native', [python, '-m', 'pytest', '-q', '-ra',
                                           '--basetemp', str(Path(temporary) / 'tests')])
+        # Do this last: Charon inspects the normal-feature target, after all
+        # conformance-backed process tests have finished using their binaries.
+        if args.call_linkage:
+            run('compiler-callback-links', [python, 'dev/verification/specialized_calls.py'])
         if source_fingerprint() != manifest['input_sha256']:
             raise RuntimeError('Source changed during validation; rerun on a stable snapshot')
         manifest['status'] = 'passed'

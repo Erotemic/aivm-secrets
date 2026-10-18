@@ -75,3 +75,9 @@ and the W6 byte adapters, with adversarial compiler/runtime checks for omitted
 paths. This ledger deliberately supplies no “complete” status that could hide
 those obligations. The existing extracted Lean controller proofs and native
 workflow evidence retain their separate scopes.
+
+The [specialized compiler ledger](specialized-call-ledger.md) now checks
+concrete account/manifest controller-to-executor paths in the compiled bridge.
+It retains the unpruned full extraction with bounded compression and a streaming
+Rust projector. Dependency callbacks, drop/unwind behavior and control/data-flow
+refinement remain explicit gaps; the named paths do not establish mediation.

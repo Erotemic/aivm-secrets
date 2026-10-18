@@ -19,7 +19,10 @@ and source guard are in `docs/verified-w3-effect-boundary.md` and
 `dev/verification/w3_effect_boundary.py`; they do not prove transitive I/O
 reachability. The optional [compiler call-site ledger](docs/native-call-ledger.md)
 retains unresolved callbacks, dependencies and drop/unwind obligations; it is
-also not a mediation gate. Run both W0/W3 checkers after Rust boundary changes. W4 has a source-linked trace model at `proofs/GarrettConfinement.lean`,
+also not a mediation gate. The optional [specialized ledger](docs/specialized-call-ledger.md)
+checks concrete compiled controller-to-executor paths with bounded capture;
+it establishes neither dominance nor whole-service I/O refinement. Run both
+W0/W3 checkers after Rust boundary changes. W4 has a source-linked trace model at `proofs/GarrettConfinement.lean`,
 reported to compile on the maintainer's pinned Lean toolchain; it is not a
 proof of native I/O correspondence. W5 extends that model with explicit
 status/reflection/metadata declassification and an adaptive two-run theorem

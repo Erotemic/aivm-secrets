@@ -53,8 +53,8 @@
   },
   "sha256": {
     ".github/workflows/freshness.yml": "09dfff9df37b9f28c4564f506903f7973aa61b1260924f4794dbd07f4e940ba3",
-    "rust/Cargo.toml": "f86061d77911afb975705bece0e5023bef9f7ddf62a3634adc4113e2d5ede790",
-    "rust/Cargo.lock": "59b85c3f38af614eeb74f123b2fdc9fa426d3443c76e85e0aa47b53638722d5f",
+    "rust/Cargo.toml": "7905846eac8bd4288ff6f6cc360dba8f45c7eb4122ff1711d4e3b63f97fb0cf2",
+    "rust/Cargo.lock": "d3146b445d6e5a589930dafa504e4172a774ed3c5262f209f01fded15ffbd43e",
     "rust/rust-toolchain.toml": "bc44e09ccb1e23aad0002adbb53312c6a2f577d26a209a7287635811377271ae",
     "rust/crates/aivm-secrets-primitives/Cargo.toml": "24d45b02df6e63b145eeb892b7edaf129841f559c1f1071de880945c153cb422",
     "rust/crates/aivm-secrets-primitives/src/lib.rs": "30da6c35b9f4e054caa6decad959c9e93e41d0c416b0bdf5361c0e3fb17397b8",

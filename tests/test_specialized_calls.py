@@ -1,0 +1,164 @@
+"""Compiler-ledger orchestration and linkage witnesses, not secrecy proofs."""
+from copy import deepcopy
+import gzip
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+import pytest
+
+from dev.verification.specialized_calls import (
+    LedgerError, Limits, capture_process, explain, project_archive, select,
+)
+
+
+def projection():
+    def function(i, names, direct=(), kind='Unstructured', unresolved=None):
+        return dict(def_id=i, generics=dict(types=0), item_meta=dict(
+            name=[*names, '<Instantiated>'], has_errors=False,
+            span=dict(Untagged=dict(data=dict(file_id=0, beg=dict(line=i+1, col=0),
+                                             end=dict(line=i+1, col=1))))),
+            body=dict(kind=kind, blocks=dict(count=1, calls=len(direct), drops=1,
+                      direct=list(direct), unresolved=unresolved or {}, sites=[])))
+    return dict(projection_schema=1, charon_version='0.1.291', has_errors=False,
+                translated=dict(crate_name='garrett_bridge',
+                    options=dict(monomorphize=True, ullbc=True),
+                    files=[dict(id=0, name={'Local':'src/main.rs'})], fun_decls=[
+        function(0, ['aivm_secrets_garrett','tls','<Impl>','answer'], [1,4]),
+        function(1, ['aivm_secrets_garrett_core','protocol','perform'], [2]),
+        function(2, ['aivm_secrets_garrett','custody','<Impl>','execute'], [3]),
+        function(3, ['aivm_secrets_garrett','custody','<Impl>','exchange'], [6]),
+        function(4, ['aivm_secrets_garrett_core','coordination','dispatch'], [5]),
+        function(5, ['aivm_secrets_garrett','custody','manifest_session','<Impl>',
+                     'exchange_manifest'], [6]),
+        function(6, ['std','io','Write','write_all'], kind='Opaque'),
+        function(7, ['rustls_pki_types','pem','reader'], unresolved={'Trait':2}),
+    ]))
+
+
+def test_compiled_paths_keep_external_and_dynamic_obligations_explicit():
+    result = explain(projection())
+    assert result['witnesses'] == {'account-controller-executor':[0,1,2,3],
+                                   'coordinated-manifest-executor':[0,4,5]}
+    assert result['opaque_boundaries'] == [6]
+    assert result['unresolved_calls'] == {7:{'Trait':2}}
+    assert result['unresolved_in_root'] == {}
+    assert result['complete_mediation'] is False
+    assert result['witness_details']['account-controller-executor'][-1]['source'][
+        'begin']['line'] == 4
+
+
+@pytest.mark.parametrize('victim', [0,1,2,4])
+def test_missing_callback_link_cannot_be_rebaselined_as_a_passing_witness(victim):
+    data = projection()
+    data['translated']['fun_decls'][victim]['body']['blocks']['direct'] = []
+    with pytest.raises(LedgerError, match='callback link missing'):
+        explain(data)
+
+
+def test_compiler_generated_helper_is_not_an_extra_method_root():
+    data = projection()
+    helper = deepcopy(data['translated']['fun_decls'][0])
+    helper['def_id'] = 8
+    helper['item_meta']['name'].insert(-1, '<Builtin>')
+    data['translated']['fun_decls'].append(helper)
+    nodes = {f['def_id']:f for f in data['translated']['fun_decls']}
+    assert select(nodes, ('aivm_secrets_garrett','tls','answer')) == {0}
+
+
+@pytest.mark.parametrize('bad', ['header','opaque','generic'])
+def test_incomplete_or_unspecialized_declaration_is_refused(bad):
+    data = projection()
+    if bad == 'header':
+        data['has_errors'] = True
+    elif bad == 'opaque':
+        data['translated']['fun_decls'][1]['body']['kind'] = 'Opaque'
+    else:
+        data['translated']['fun_decls'][1]['generics']['types'] = 1
+    with pytest.raises(LedgerError):
+        explain(data)
+
+
+def writer(out, payload, code=0):
+    # Synthetic compiler for stream supervision tests only, not binding evidence.
+    return [sys.executable, '-c',
+            'import sys; open(sys.argv[1],"wb").write(bytes.fromhex(sys.argv[2])); '
+            'raise SystemExit(int(sys.argv[3]))',
+            str(out/'garrett_bridge.ullbc'), payload.hex(), str(code)]
+
+
+def test_capture_roundtrip_hash_and_fifo_cleanup(tmp_path):
+    raw = b'fixture compiler output'*200
+    result = capture_process(writer(tmp_path,raw),tmp_path,tmp_path,
+                             Limits(plain=10000, compressed=10000, compiler_seconds=5))
+    assert result['status'] == 'captured'
+    assert result['plain_bytes'] == len(raw)
+    assert result['plain_sha256'] == hashlib.sha256(raw).hexdigest()
+    assert gzip.decompress((tmp_path/'bridge.ullbc.gz').read_bytes()) == raw
+    assert not (tmp_path/'garrett_bridge.ullbc').exists()
+
+
+@pytest.mark.parametrize('failure', ['plain','compressed','exit','empty'])
+def test_capture_resource_and_process_failures_cannot_pass(tmp_path, failure):
+    raw = b'x'*4096 if failure != 'empty' else b''
+    limits = Limits(plain=100 if failure=='plain' else 10000,
+                    compressed=16 if failure=='compressed' else 10000,
+                    compiler_seconds=5)
+    with pytest.raises(LedgerError):
+        capture_process(writer(tmp_path,raw,7 if failure=='exit' else 0),
+                        tmp_path,tmp_path,limits)
+    result = json.loads((tmp_path/'capture.json').read_text())
+    assert result['status'] == 'failed'
+    assert not (tmp_path/'garrett_bridge.ullbc').exists()
+    assert (tmp_path/'bridge.ullbc.gz').stat().st_size <= limits.compressed
+
+
+def test_capture_deadline_stops_compiler_before_any_output(tmp_path):
+    with pytest.raises(LedgerError, match='deadline'):
+        capture_process([sys.executable,'-c','import time; time.sleep(30)'],
+                        tmp_path,tmp_path,Limits(compiler_seconds=.1))
+    result = json.loads((tmp_path/'capture.json').read_text())
+    assert result['exit_code'] != 0 and result['status'] == 'failed'
+
+
+def test_missing_compiler_has_no_dangling_fifo(tmp_path):
+    with pytest.raises(LedgerError, match='could not start'):
+        capture_process([str(tmp_path/'missing-command')], tmp_path, tmp_path)
+    assert json.loads((tmp_path/'capture.json').read_text())['status'] == 'failed'
+    assert not (tmp_path/'garrett_bridge.ullbc').exists()
+
+
+def test_invalid_deadlines_are_refused():
+    for value in [float('nan'), float('inf'), -1]:
+        with pytest.raises(LedgerError):
+            Limits(compiler_seconds=value)
+
+
+def projector_script(tmp_path, body):
+    script = tmp_path/'projector'
+    script.write_text('#!'+sys.executable+'\n'+body)
+    script.chmod(0o700)
+    return script
+
+
+def test_gzip_crc_failure_is_not_a_valid_projection(tmp_path):
+    raw = bytearray(gzip.compress(b'{}'))
+    raw[-8] ^= 1
+    archive = tmp_path/'input.gz'
+    archive.write_bytes(raw)
+    child = projector_script(tmp_path, 'import sys; sys.stdin.buffer.read(); '
+                             'sys.stdout.write('+repr(json.dumps(projection()))+')\n')
+    with pytest.raises(LedgerError, match='corrupt'):
+        project_archive(archive, child, tmp_path)
+    assert not (tmp_path/'projection.json').exists()
+
+
+def test_projector_timeout_never_publishes_a_report(tmp_path):
+    archive = tmp_path/'input.gz'
+    archive.write_bytes(gzip.compress(b'{}'))
+    child = projector_script(tmp_path,'import time; time.sleep(30)\n')
+    with pytest.raises(subprocess.TimeoutExpired):
+        project_archive(archive,child,tmp_path,Limits(projector_seconds=.1))
+    assert not (tmp_path/'projection.json').exists()
