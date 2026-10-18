@@ -1,8 +1,8 @@
 # Active work: useful broker workflows and conditional credential confinement
 
 Status: **work plan, not a completed assurance claim**, reconciled 2026-10-18
-against frozen runtime/proof implementation `93cee2d`, mutation-selector correction
-`6fa89af`, and their [validation record](../../dev/validation/2026-10-18-http-auth.json). This is the authoritative **priority and task queue**
+against frozen runtime/proof implementation `cf53f25` and its
+[request-line validation record](../../dev/validation/2026-10-18-http-request.json). This is the authoritative **priority and task queue**
 for new agents. Existing P0-P5, M0-M6, and G0-G5 stages remain useful design,
 implementation history, and prerequisite inventories; they are **not three
 competing current schedules**. Revisit this queue after each accepted milestone.
@@ -178,8 +178,8 @@ counts substitute for the obligations above.
 
 Statuses below reflect the checked implementation, with remaining acceptance
 conditions kept explicit. The older milestone plans retain historical detail.
-The [frozen validation record](../../dev/validation/2026-10-18-http-auth.json)
-reports 2,380 portable tests with zero skips and all 169 required workflows in
+The [frozen validation record](../../dev/validation/2026-10-18-http-request.json)
+reports 2,390 portable tests with zero skips and all 176 required workflows in
 both conformance and ordinary release modes. These tests do not discharge
 unproved native I/O correspondence or independent security review.
 

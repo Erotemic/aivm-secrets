@@ -1,0 +1,100 @@
+{
+  "schema": 1,
+  "source_commit": "cf53f25b1c470a0bafa766cf5121df1e12db1122",
+  "source_dirty": false,
+  "scope": "Extracted native request-line validation, exact selected bytes, unchanged-buffer refusal and finite Python/provider conformance",
+  "report_path": ".tools/http-request-system-cf53f25/report.json",
+  "report_sha256": "44e3b885399dfc9570747d9fa936668a9ce7161ce70c34ef33fce15dd5f1f883",
+  "input_fingerprint_sha256": "0d8322343835e1f08d85eabd86d016728d7a7cde814458056200735a2924f75d",
+  "full_suite": {
+    "passed": 2390,
+    "skipped": 0
+  },
+  "required_workflows": {
+    "conformance": 176,
+    "normal_release_without_conformance": 176,
+    "skipped": 0
+  },
+  "normal_workflow_report_path": ".tools/http-request-validation-cf53f25/normal-report.json",
+  "normal_workflow_report_sha256": "894a7a6b70c3d11946c0d02486fd17534224706cd032696a32e592e6d33b3ef2",
+  "request_line_mutations": {
+    "source_commit": "cf53f25b1c470a0bafa766cf5121df1e12db1122",
+    "rejected": 11,
+    "full_historical_campaign": false,
+    "report_path": ".tools/http-request-validation-cf53f25/mutations.json",
+    "report_sha256": "803dcaf7078240bbce883cc038f450bbd386849d4b14c721ba0c40635c63c5d0"
+  },
+  "compiler_report_path": ".tools/http-request-calls-cf53f25/report.json",
+  "compiler_report_sha256": "5e9f7989060f98b06d2295dca9d7ae18e1060c8113f5aed74159dee74cb4edc5",
+  "compiler_artifacts_sha256": {
+    "capture.json": "eeeb83c3c9a2f3d62608f4647360f504bbca7b74dd26bb863c043ad81ddba57e",
+    "bridge.ullbc.gz": "4c854fa6c5915670d904ddc85ea3afb2bddd41e07baa19ec1cdc76bdc58cac87",
+    "projection.json": "eaee312758e3c4e583797465cb35183a189e72a677680b323aa61a51876c2dc1",
+    "compiler.log": "ffaa19dd20a133faeefb3e575da4aec14576da415d21432d3e3ffd82080afd28",
+    "projector.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build.log": "343c13e7f6f2d320993b573f830525e33b59b3c32656ef426e015b1e30f3fdc2"
+  },
+  "compiler_counts": {
+    "functions": 3399,
+    "calls": 9034,
+    "drops": 5709238,
+    "bodies": {
+      "Unstructured": 1401,
+      "Opaque": 1998
+    }
+  },
+  "direct_request_root_nodes": 1005,
+  "opaque_request_root_boundaries": 785,
+  "witness_names": [
+    "account-controller-executor",
+    "coordinated-manifest-executor",
+    "account-authentication-bytes",
+    "manifest-authentication-bytes",
+    "account-request-line",
+    "manifest-request-line"
+  ],
+  "complete_mediation": false,
+  "proof_and_source_sha256": {
+    "rust/crates/aivm-secrets-garrett-core/src/http_request.rs": "e854be3ecf22db96e76a647f4615c67111d3a32097365ecaca3d011834c8ef1d",
+    "proofs/GarrettHttpRequest.lean": "edd1aa54bd81ac15a86d4d9628f41958db08a5d09933da5994cf0b5828f8ffce",
+    "proofs/generated/AivmSecretsGarrettCore.lean": "faab1f33232ebfb3a44abfdc19f28cb5484924bbc5907a56f398814dfbe7c0f1",
+    "rust/crates/aivm-secrets-garrett/src/custody.rs": "90ac76624add0d7e55d81f493bc130648dae7f1034807af4891384f733ad1297",
+    "rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs": "204542b5dca6c8f3ba7fba4788df625914d62b88025e6337f78d5cba19cbf3a3"
+  },
+  "evidence_log_sha256": {
+    "http-request-boundaries.log": "f59c7e12417462610c06d5249722a61c65ded42c9e6da32a173942a77c285dd5",
+    "http-request-build-package.log": "8ddaf451c4d57fdceb10cc8f96d94e8cc1a605dd05726269b648fd7d7b34de38",
+    "http-request-clippy-normal.log": "0cdb2c2bac82e17eadbf680fbd0c42e2729ae3c35d06e397bab84dfe27a52bc0",
+    "http-request-clippy.log": "edcd197be38336b36a1320180f3bd473ee3330efe5696fe7e7221845f3a59405",
+    "http-request-extract-final.log": "f994e4d2ae38dcb26a34de28eb69afa0db65f634194b194970cdeb6fb6d6b91f",
+    "http-request-freshness-record.log": "317db87b214099952730013fbfeba96da2d5da4f08e203c8026efc35a1f52325",
+    "http-request-garrett-record.log": "f529a76fd3434b1e8eb748479a8e5718ca04357ddb307432df6ed84b7cafc27a",
+    "http-request-package-gates.log": "0bc46b655e15b6ea2ed5450045ff44940336bbca7315bccd6fbc106fa8b1bfaa",
+    "http-request-proof-6.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "http-request-runtime.log": "5a9b3cdce04883631f2f96a022ca6410c8223e7956980ae4072ec01dffb163f0",
+    "http-request-system.log": "45a93cb1b0e939bfd96f993544842e874f85da84ee584564d0d42bc9db39e3de",
+    "http-request-w4-w5.log": "db00e4091d44a0b16c69811a716ac52921971c2b134e79432d50d1714005d5ad",
+    "mutations.json": "803dcaf7078240bbce883cc038f450bbd386849d4b14c721ba0c40635c63c5d0",
+    "mutations.log": "726837f8dbb5747ab611edad2abb888471faca9e11ac0a5d767a71d18a6cb6a9",
+    "normal-build.log": "fd01cc5eac6fcd81978cbcee7392584addabb4eac4ccac239299f30c4826c261",
+    "normal-report.json": "894a7a6b70c3d11946c0d02486fd17534224706cd032696a32e592e6d33b3ef2",
+    "normal-workflows.log": "3a8e0c85c5d511e2d6f19e61cfbcf9ecc3e4565b5ac5e911340e6d425161c29f",
+    "normal-workflows.xml": "1a4ac19f67f079eb3193d4fc42e127bc868931c74b4309a2b0b95917a7fa16f0",
+    "http-request-ordinary-debug.log": "a102464fec169a3af0e49b62615ff0669b263bdda71fd4e20547a02e7bbe6a86",
+    "http-request-ordinary-release.log": "e8b0b487c9f26e3d5131477fc2ace50d5a1c1f5471c9cac86254d12dd8002524"
+  },
+  "checked_scope": [
+    "Actual extracted Rust helper: exact GET/POST/PATCH and 1..8192-byte framing grammar, unchanged buffer on rejection, exact method/SP/target/version/CRLF bytes under the standard-model buffer bound; actual success requires validation without that bound.",
+    "Only fixed delimiters in the appended segment, existing buffer prefix preserved, and a successful root-target witness.",
+    "Independent provider-observed native/Python GET/POST/PATCH queries and escaped write bodies; existing account/manifest authentication cases retained.",
+    "266 named Garrett obligations use only the allowed standard logical axioms; W4/W5 compile unchanged. New filtered campaign rejects eleven re-extracted Rust mutations, not a new full historical campaign.",
+    "All six intended compiler paths present, including both builders to request-line and authentication validators. Paths are not feasible traces or dominance proofs."
+  ],
+  "remaining": [
+    "Whole request Host/port/Accept/custom headers/body/Content-Length, destination selection, response parsing and typed JSON rendering correspondence.",
+    "W3 transitive I/O mediation, opaque callbacks/dependencies/drops/unwind, native trace refinement and whole-service noninterference.",
+    "Broad Python/Rust core parity, native coordinator server, atomic renewed-identity guest delivery, independent review, live provider and VM/TPM deployment evidence.",
+    "Pinned compiler/extraction/standard models and OS/TLS/storage assumptions; physical erasure and allocation failure outside this byte-helper result."
+  ],
+  "ordinary_local_builds": "Debug and release binaries rebuilt without conformance features after the frozen gates passed; implementation/proof sources unchanged."
+}
