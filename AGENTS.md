@@ -50,6 +50,11 @@ through Host, standard/custom headers, decimal content length and body bytes.
 Use the five focused `GarrettHttpWire*.lean` modules during development. Its
 byte/admission contracts retain explicit buffer bounds; route conversion, JSON,
 TLS, parsers and complete native I/O correspondence remain separate obligations.
+The [newline framing contract](docs/verified-line-framing.md) checks the actual
+bounded terminal-newline/observed-buffer validator shared by the native client
+and bridge. Missing/trailing reply bytes stay post-send uncertainty. Use focused
+`GarrettLineFrame.lean` compilation; JSON/TLS/read-segmentation and whole-service
+mediation remain separate obligations.
 The optional [native coordinator authority](docs/native-coordinator-authority.md)
 uses the existing mTLS/SQLite protocol and Python schema. Its extracted
 exhaustive typed action/role authorization and terminal decision/history proofs are separate from SQL,

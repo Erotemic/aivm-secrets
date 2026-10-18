@@ -2,13 +2,7 @@
 use crate::{json, tls::Deadline, Error, Outcome};
 use rustls::{ClientConfig, ClientConnection, RootCertStore, StreamOwned};
 use serde_json::Value;
-use std::{
-    io::{BufRead, BufReader, Read, Write},
-    os::unix::net::UnixStream,
-    path::Path,
-    sync::Arc,
-    time::Duration,
-};
+use std::{io::Write, os::unix::net::UnixStream, path::Path, sync::Arc, time::Duration};
 
 pub struct AuthenticatedClientConfig(Arc<ClientConfig>);
 fn roots(pem: &[u8]) -> Outcome<RootCertStore> {
@@ -99,12 +93,10 @@ pub fn exchange_unix(
         .and_then(|_| stream.write_all(b"\n"))
         .and_then(|_| stream.flush())
         .map_err(|_| Error::OutcomeUnknown)?;
-    let mut reply = Vec::new();
     let limit = 2 * 1024 * 1024 + 65536;
-    BufReader::new(&mut stream)
-        .take((limit + 1) as u64)
-        .read_until(b'\n', &mut reply)
-        .map_err(|_| Error::OutcomeUnknown)?;
+    // A sent request with an incomplete/ambiguous reply is never a definite
+    // non-dispatch. The same bounded frame admission guards bridge ingress.
+    let reply = crate::tls::frame(&mut stream, limit).map_err(|_| Error::OutcomeUnknown)?;
     let result = json::parse(&reply, limit).map_err(|_| Error::OutcomeUnknown)?;
     if !result.is_object() {
         return Err(Error::OutcomeUnknown);

@@ -131,17 +131,21 @@ pub fn server_config(
     config.max_early_data_size = 0;
     Ok(AuthenticatedServerConfig(Arc::new(config)))
 }
-fn frame(stream: impl Read, limit: usize) -> Outcome<Vec<u8>> {
+pub(crate) fn frame(stream: impl Read, limit: usize) -> Outcome<Vec<u8>> {
+    let bound = limit.checked_add(1).ok_or(Error::InvalidRequest)?;
+    let mut reader = BufReader::with_capacity(16384, stream.take(bound as u64));
     let mut data = Vec::new();
-    BufReader::new(stream)
-        .take((limit + 1) as u64)
+    reader
         .read_until(b'\n', &mut data)
         .map_err(|_| Error::InvalidRequest)?;
-    if data.is_empty() || data.len() > limit {
+    // Keep the reader alive: read_until alone hides an already buffered second
+    // frame, and a clean EOF is not a substitute for the terminal newline.
+    if !aivm_secrets_garrett_core::line_frame::complete(&data, reader.buffer(), limit) {
         return Err(Error::InvalidRequest);
     }
     Ok(data)
 }
+
 fn failure(error: Error) -> Value {
     let message = match error {
         Error::InvalidCapability => "Capability authentication failed.",
@@ -443,5 +447,30 @@ impl Bridge {
             return Err(Error::OutcomeUnknown);
         }
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod frame_tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn complete_frames_and_observed_trailing_bytes() {
+        assert_eq!(frame(Cursor::new(b"{}\n"), 3).unwrap(), b"{}\n");
+        for (bytes, limit) in [
+            (b"{}".as_slice(), 3),
+            (b"{}\nextra".as_slice(), 64),
+            (b"{}\n{}\n".as_slice(), 64),
+            (b"{}\nextra".as_slice(), 3),
+            (b"{}\n".as_slice(), 2),
+            (b"".as_slice(), 64),
+        ] {
+            assert_eq!(frame(Cursor::new(bytes), limit), Err(Error::InvalidRequest));
+        }
+        assert_eq!(
+            frame(Cursor::new(b"{}\n"), usize::MAX),
+            Err(Error::InvalidRequest)
+        );
     }
 }

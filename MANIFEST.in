@@ -30,6 +30,7 @@ include proofs/GarrettHttpWireHeaders.lean
 include proofs/GarrettHttpWireFormatting.lean
 include proofs/GarrettHttpWireValidation.lean
 include proofs/GarrettHttpWire.lean
+include proofs/GarrettLineFrame.lean
 include proofs/GarrettCoordinatorAuthority.lean
 recursive-include proofs/generated *.lean
 prune rust/target

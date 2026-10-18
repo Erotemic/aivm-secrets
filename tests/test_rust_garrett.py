@@ -254,11 +254,14 @@ def test_runner_raw_json_bounds_recovery_and_flush(runner):
 
 
 class BoundBridge:
-    def __init__(self, directory, runner, bridge, certificate_factory=certificates):
+    def __init__(self, directory, runner, bridge, certificate_factory=certificates,
+                 server_factory=LocalServer, python_issuer=False):
         self.directory = Path(directory)
         self.runner = runner
         self.bridge_program = bridge
         self.certificate_factory = certificate_factory
+        self.server_factory = server_factory
+        self.python_issuer = python_issuer
 
     def __enter__(self):
         p = self.directory
@@ -267,7 +270,7 @@ class BoundBridge:
         for item in p.iterdir():
             if item.is_file():
                 item.chmod(0o600)
-        self.server = LocalServer(self.harness.broker, p / "broker")
+        self.server = self.server_factory(self.harness.broker, p / "broker")
         self.server.__enter__()
         now = int(time.time())
         cert = certificate_thumbprint(self.certs["client1"][2])
@@ -291,7 +294,15 @@ class BoundBridge:
             claims=self.claims,
             inner_capability=self.harness.capability,
         )
-        (answer,) = run(self.runner, [issue], crypto=True)
+        if self.python_issuer:
+            signing = Ed25519PrivateKey.from_private_bytes(self.seed)
+            issuer = IdentityTokenIssuer(signing, self.key, key_id='test-1')
+            answer = dict(ok=True,
+                token=issuer.issue(IdentityClaims.parse(self.claims), self.harness.capability),
+                public_key_hex=signing.public_key().public_bytes(
+                    serialization.Encoding.Raw, serialization.PublicFormat.Raw).hex())
+        else:
+            (answer,) = run(self.runner, [issue], crypto=True)
         assert answer["ok"]
         self.token = answer["token"]
         registry = {

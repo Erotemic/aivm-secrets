@@ -17,6 +17,11 @@ moves Host, standard/custom headers, decimal lengths and body bytes into the sam
 extracted core. Public-field conversion, JSON, parsers, TLS and native call-site
 correspondence remain open.
 
+The [newline framing follow-up](verified-line-framing.md) fixes native acceptance
+of clean EOF without a terminal newline and hidden coalesced suffixes, sharing an
+extracted validator across guest ingress, broker replies and the guest client.
+Its stream/JSON/TLS and caller-placement boundaries remain explicit.
+
 This milestone follows W4's finite source-controller trace and W5's conditional
 information-flow relation. Both concern **modeled** events. W6 now checks
 selected **concrete** TLS-provider sends, durable audit records, and guest

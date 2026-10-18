@@ -201,8 +201,8 @@ counts substitute for the obligations above.
 
 Statuses below reflect the checked implementation, with remaining acceptance
 conditions kept explicit. The older milestone plans retain historical detail.
-The [frozen validation record](../../dev/validation/2026-10-18-coordinator-dispatch.json)
-reports 2,472 portable tests with zero skips and all 250 required workflow tests in
+The [frozen validation record](../../dev/validation/2026-10-18-http-wire.json)
+reports 2,489 portable tests with zero skips and all 264 required workflow tests in
 both conformance and ordinary release modes. These tests do not discharge
 unproved native I/O correspondence or independent security review.
 

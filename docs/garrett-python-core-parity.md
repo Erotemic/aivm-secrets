@@ -42,6 +42,11 @@ work, not a requirement to reproduce Python's host package structure in Rust.
 | CORE-10 | Audits, effect/write ambiguity, guest output | Partial |
 | CORE-11 | Trusted paths, TLS authorization and no proxy/redirect | Extracted framing/admission; route, TLS, parser and whole-service correspondence open |
 
+The [native newline framing increment](verified-line-framing.md) checks the
+complete-frame/observed-suffix subset of CORE-01/10 with real Python/native
+peers and an extracted validator. It leaves JSON, handshake/deadline differences,
+all-input cross-language behavior and complete I/O correspondence open.
+
 `implemented subset` is *not* whole-contract parity. Rust already has several
 independently source-linked Lean proofs for its own models; those do not prove
 Python functionality. A newly introduced Python policy field is not accepted

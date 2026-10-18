@@ -450,6 +450,18 @@ THEOREMS += [
     'aivm_secrets_garrett_core.http_wire.Proofs.accepted_request_exact',
 ]
 
+THEOREMS += [
+    'aivm_secrets_garrett_core.line_frame.Proofs.complete_line_nil',
+    'aivm_secrets_garrett_core.line_frame.Proofs.complete_line_cons',
+    'aivm_secrets_garrett_core.line_frame.Proofs.index_exact',
+    'aivm_secrets_garrett_core.line_frame.Proofs.complete_loop_contract',
+    'aivm_secrets_garrett_core.line_frame.Proofs.complete_contract',
+    'aivm_secrets_garrett_core.line_frame.Proofs.accepted_exact',
+    'aivm_secrets_garrett_core.line_frame.Proofs.rejected_buffered_suffix',
+    'aivm_secrets_garrett_core.line_frame.Proofs.rejected_without_newline',
+    'aivm_secrets_garrett_core.line_frame.Proofs.accepted_positive_witness',
+]
+
 TESTS = [
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
@@ -466,6 +478,7 @@ TESTS = [
     "tests/test_rust_http_auth.py",
     "tests/test_rust_http_request.py",
     "tests/test_rust_http_wire.py",
+    "tests/test_rust_line_framing.py",
     "tests/test_rust_garrett_reflection.py",
     "tests/test_rust_garrett_client_material.py",
     "tests/test_rust_garrett_tpm_request.py",
@@ -540,6 +553,7 @@ def inputs() -> list[str]:
         "proofs/GarrettHttpWireFormatting.lean",
         "proofs/GarrettHttpWireValidation.lean",
         "proofs/GarrettHttpWire.lean",
+        "proofs/GarrettLineFrame.lean",
         "proofs/GarrettCoordinatorAuthority.lean",
         "tests/secrets_vectors/coordination/authority-v1.jsonl",
         "proofs/GarrettProfiles.lean",
@@ -722,7 +736,7 @@ def assurance_coordinates() -> dict:
         "aeneas_release": base.RELEASE,
         "theorems": THEOREMS,
         "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
-        "implementation_linked": "Aeneas-generated optional coordinator dispatch continuation and issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission, and concrete authentication-header credential validation/exact byte appending and request-line method/target validation/exact single-line construction used by both native provider writers, extended to complete request framing with Host/Accept, exact custom-header ordering, case-insensitive reserved/duplicate refusal, concrete decimal port/body length and exact opaque body bytes; optional coordinator authority exact peer/operator admission, absent-only activation, revocation/reservation/completion decisions and modeled terminal committed-decision histories",
+        "implementation_linked": "Aeneas-generated optional coordinator dispatch continuation and issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission, and concrete authentication-header credential validation/exact byte appending and request-line method/target validation/exact single-line construction used by both native provider writers, exact bounded newline frame admission shared by bridge ingress, forwarded broker replies and the guest client, including empty observed suffix and post-send uncertainty mapping as a tested native adapter, and extended to complete request framing with Host/Accept, exact custom-header ordering, case-insensitive reserved/duplicate refusal, concrete decimal port/body length and exact opaque body bytes; optional coordinator authority exact peer/operator admission, absent-only activation, revocation/reservation/completion decisions and modeled terminal committed-decision histories",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
@@ -746,6 +760,7 @@ def assurance_coordinates() -> dict:
             "The optional native coordinator authority retains Python's SQLite schema and mTLS endpoint. Exact operator/member matching and terminal principal/reservation decision histories are extracted and proved; HTTP parsing, authenticated DER-to-hex conversion, row conversion, SQL bindings, commit-before-reply placement, SQLite WAL/FULL durability, concurrency and complete native I/O refinement remain separate library/environment or project-owned adapter obligations. There is no replica, live inode replacement or rollback witness, and no positive admission cache or automatic retry.",
             "Native coordinated account/manifest sessions trust the separately authenticated SQLite coordinator for terminal membership decisions and durable globally unique reservations. The extracted dispatch controller requires admission/reservation acknowledgements before invoking a provider and maps failed post-send completion to uncertainty. TLS/HTTP, server durability/rollback, last-check linearization and concrete callback placement remain adapter premises. Native coordinated request fingerprints hash a canonical document rebuilt from parsed policy, with independent Python differential and real durable-record tests. Policy normalization, JSON encoding and SHA-256 remain concrete adapters; finite tests do not establish all-input digest equivalence or broad core parity.",
             "Privileged same-key rebinding carries the identical opened opaque broker capability to the existing issuer. Source signature/AEAD, current-CA historical certificate fingerprints, protected owner-only inputs, shared authority lease participation and no-replace publication remain adapter contracts. This is an explicit host authorization, not acceptance of an expired guest JWT; the broker grant and terminal coordinator checks still apply.",
+            "The extracted newline validator characterizes the supplied frame and observed buffered suffix exactly. The held BufReader/read_until adapter, read segmentation, JSON decoding, TLS, deadlines and caller error mapping are tested and source-guarded; they are not a proof that arbitrary later-arriving stream bytes are absent or that native I/O is fully mediated.",
             "The extracted complete HTTP request encoder checks public field grammar, reserved/duplicate headers and credential/body admission before changing the buffer, with exact successful bytes under an explicit modeled capacity premise. The production caller supplies route/effect fields and canonical JSON in a zeroizing buffer. Their mapping/serialization, destination selection, TLS, response parsing, memory erasure, provider behavior and whole-service I/O mediation remain separate obligations.",
             "The manifest HTTPS backend trusts the policy/check/template/GraphQL parsers, JSON-to-typed-tree conversion and selected-tree rendering, reflection traversal/call sites and concrete HTTP/audit ordering. Exact borrowed-byte literal search is extracted and proved. The extracted recursive filter matches an independent selection specification and has exact two-run noninterference under recursive schema agreement; unselected typed-tree fields are unconstrained. These contracts do not refine the remaining adapters or establish arbitrary provider non-disclosure or whole-service trace equivalence. Native configuration explicitly selects unbounded requests and a file source or explicit OAuth override.",
             "Native provider emission rechecks authority and current OAuth token expiry after audit, TLS setup and request construction. The extracted continuation refuses emission on a failed recheck; setup placement, trusted clock sampling, live lease stability and concrete socket writes remain tested adapter contracts. Control admission follows the credential lease wait and checks the outer as well as inner lifetime.",
@@ -1194,6 +1209,15 @@ def mutate(pattern: str | None = None) -> None:
          'output.extend_from_slice(b" HTTP/1.1\\r\\n");',
          'output.extend_from_slice(b" HTTP/1.1\\n");'),
     ]
+    frame_source = source.with_name("line_frame.rs")
+    mutations += [
+        (frame_source, "line framing size bound ignored", "data.len() > limit", "false"),
+        (frame_source, "line framing buffered suffix ignored", "buffered.len() != 0", "false"),
+        (frame_source, "line framing carriage return accepted", "data[i] == b'\\n'", "data[i] == b'\\r'"),
+        (frame_source, "line framing first newline accepted with suffix", "return i + 1 == data.len();", "return true;"),
+        (frame_source, "line framing unterminated frame accepted", "    false\n}\n", "    true\n}\n"),
+        (frame_source, "line framing all complete frames refused", "if data.len() > limit || buffered.len() != 0 {", "if true {"),
+    ]
     wire_source = source.with_name("http_wire.rs")
     mutations += [
         (wire_source, "http wire case folding altered", "byte + 32", "byte + 31"),
@@ -1554,6 +1578,7 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettHttpWireFormatting",
                 "GarrettHttpWireValidation",
                 "GarrettHttpWire",
+                "GarrettLineFrame",
                 "GarrettCoordinatorAuthority",
             ]
             # These leaves import the extracted crate plus generic standard-
@@ -1573,6 +1598,7 @@ def mutate(pattern: str | None = None) -> None:
                 "http_auth.rs": "GarrettHttpAuth",
                 "http_request.rs": "GarrettHttpRequest",
                 "http_wire.rs": "GarrettHttpWireDecimal",
+                "line_frame.rs": "GarrettLineFrame",
                 "coordinator_authority.rs": "GarrettCoordinatorAuthority",
             }.get(source.name)
             if preferred:

@@ -2893,6 +2893,41 @@ def issue_surrogate
     | core.result.Result.Err error => ok (core.result.Result.Err error)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
+/-- [aivm_secrets_garrett_core::line_frame::complete]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/line_frame.rs', lines 9:4-16:1
+    Visibility: public -/
+@[rust_loop]
+def line_frame.complete_loop
+  (data : Slice Std.U8) (i : Std.Usize) : Result Bool := do
+  let i1 := Slice.len data
+  if i < i1
+  then
+    let i2 ← Slice.index_usize data i
+    if i2 = 10#u8
+    then let i3 ← i + 1#usize
+         let i4 := Slice.len data
+         ok (i3 = i4)
+    else let i3 ← i + 1#usize
+         line_frame.complete_loop data i3
+  else ok false
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::line_frame::complete]:
+    Source: 'crates/aivm-secrets-garrett-core/src/line_frame.rs', lines 4:0-16:1
+    Visibility: public -/
+def line_frame.complete
+  (data : Slice Std.U8) (buffered : Slice Std.U8) (limit : Std.Usize) :
+  Result Bool
+  := do
+  let i := Slice.len data
+  if i > limit
+  then ok false
+  else
+    let i1 := Slice.len buffered
+    if i1 != 0#usize
+    then ok false
+    else line_frame.complete_loop data 0#usize
+
 /-- [aivm_secrets_garrett_core::manifest::Scalar]
     Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 5:0-8:1
     Visibility: public -/

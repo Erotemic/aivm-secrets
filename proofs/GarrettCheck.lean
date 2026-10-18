@@ -1,3 +1,4 @@
+import GarrettLineFrame
 import GarrettHttpWire
 import GarrettCoordinatorAuthority
 import GarrettHttpRequest
@@ -391,3 +392,13 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.http_wire.Proofs.rejected_request_preserves_buffer
 #print axioms aivm_secrets_garrett_core.http_wire.Proofs.successful_request_requires_admission
 #print axioms aivm_secrets_garrett_core.http_wire.Proofs.accepted_request_exact
+
+#print axioms aivm_secrets_garrett_core.line_frame.Proofs.complete_line_nil
+#print axioms aivm_secrets_garrett_core.line_frame.Proofs.complete_line_cons
+#print axioms aivm_secrets_garrett_core.line_frame.Proofs.index_exact
+#print axioms aivm_secrets_garrett_core.line_frame.Proofs.complete_loop_contract
+#print axioms aivm_secrets_garrett_core.line_frame.Proofs.complete_contract
+#print axioms aivm_secrets_garrett_core.line_frame.Proofs.accepted_exact
+#print axioms aivm_secrets_garrett_core.line_frame.Proofs.rejected_buffered_suffix
+#print axioms aivm_secrets_garrett_core.line_frame.Proofs.rejected_without_newline
+#print axioms aivm_secrets_garrett_core.line_frame.Proofs.accepted_positive_witness

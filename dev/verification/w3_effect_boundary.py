@@ -290,6 +290,29 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'reply.get("result")' in a,
             'guest-owned alias broadened or lost selected-result handling')
 
+    # The shared reader keeps the buffer that read_until may fill beyond LF.
+    # Request errors are pre-dispatch; reply errors remain post-send uncertainty.
+    transport = contents[RUST + 'tls.rs']
+    framed = part(transport, 'pub(crate) fn frame(', '\nfn failure(')
+    require('limit.checked_add(1)' in framed
+            and 'BufReader::with_capacity(16384, stream.take(bound as u64))' in framed
+            and same_order(framed, '.read_until(',
+                'if !aivm_secrets_garrett_core::line_frame::complete(&data, reader.buffer(), limit)',
+                'Ok(data)'), 'framed transport lost bounded terminal/trailing admission')
+    core_frame = contents['rust/crates/aivm-secrets-garrett-core/src/line_frame.rs'].split('#[cfg(test)]', 1)[0]
+    require('if data.len() > limit || buffered.len() != 0 {' in core_frame
+            and "if data[i] == b'\\n'" in core_frame
+            and 'return i + 1 == data.len();' in core_frame
+            and core_frame.rstrip().endswith('false\n}'),
+            'core framing lost size, buffered suffix, terminal LF or EOF refusal')
+    client = contents[RUST + 'client.rs']
+    require(client.count('crate::tls::frame(&mut stream, limit).map_err(|_| Error::OutcomeUnknown)?') == 1
+            and 'read_until(' not in client,
+            'client reply bypasses shared framing or loses post-send uncertainty')
+    require('let answer = frame(&mut stream, MAX_FRAME)' in transport
+            and 'let raw = frame(&mut socket, MAX_REPLY).map_err(|_| Error::OutcomeUnknown)?;' in transport,
+            'bridge ingress/reply no longer share frame admission with phase-correct errors')
+
     authority = contents[RUST + 'coordinator_authority/ledger.rs']
     handler = part(authority, '    pub(super) fn handle(', '\nfn principal_name(')
     require('peer.certificate_sha256_hex().as_bytes().to_vec()' in handler
