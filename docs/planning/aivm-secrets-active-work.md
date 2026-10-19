@@ -185,6 +185,15 @@ the known raw-document fingerprint difference in coordinated manifest writes.
 Finite differential and durable-record tests are the evidence; normalization
 and hashing remain concrete adapters, not new Lean proofs or broad parity.
 
+The [offline HTTP/disclosure adapter increment](../garrett-offline-adapter-assault.md)
+closes Python and native Rust HTTP response-acceptance gaps:
+ambiguous or close-delimited success, partial representations, incompatible
+response media, and forbidden body framing on 204 now fail closed. A stricter native W6 observation oracle and raw TLS fixture
+are added, with positive-response witnesses and deliberate negative oracle
+mutants. Native Rust process scenarios need a pinned-toolchain run before they
+count as tested. Complete I/O reachability/refinement and whole-service
+noninterference remain open.
+
 The [independent Rust primitive runner](../primitive-conformance.md) now supplies
 the formerly pending complete-table corpus backend. The usable-system gate
 selects it explicitly and rejects skips. Binding/digest/frame adapters are

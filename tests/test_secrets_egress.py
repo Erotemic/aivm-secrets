@@ -27,6 +27,7 @@ from tests.secrets_helpers import (
     SERVICE_TOKEN,
     TLS_HOST,
     TLSService,
+    RawHTTPResponse,
     github_policy,
     make_certificates,
     metadata,
@@ -110,7 +111,7 @@ def test_api_key_scheme_static_headers_and_canonical_body(service):
 
 def test_text_responses_and_custom_accept(service):
     diff = b'diff --git a/x b/x\n+caf\xc3\xa9\n'
-    service.routes[('GET', '/v1/raw')] = respond(200, diff)
+    service.routes[('GET', '/v1/raw')] = respond(200, diff, **{'Content-Type': 'text/plain'})
     effect = Effect(
         'GET', '/v1/raw', accept='application/vnd.github.diff', response='text'
     )
@@ -122,7 +123,7 @@ def test_text_responses_and_custom_accept(service):
         service.requests[0]['headers']['accept']
         == 'application/vnd.github.diff'
     )
-    service.routes[('GET', '/v1/raw')] = respond(200, b'\xff\xfe')
+    service.routes[('GET', '/v1/raw')] = respond(200, b'\xff\xfe', **{'Content-Type': 'text/plain'})
     assert failed(
         executor(service).execute, authorized(effect), SERVICE_TOKEN
     ).code == ('upstream_response')
@@ -384,7 +385,7 @@ def test_a_trickling_peer_cannot_outlive_the_total_deadline(
     monkeypatch.setattr(egress_module, 'TOTAL_DEADLINE', 1.0)
 
     def trickle(peer):
-        peer.sendall(b'HTTP/1.1 200 OK\r\nContent-Length: 1000000\r\n\r\n')
+        peer.sendall(b'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 1000000\r\n\r\n')
         for _ in range(100):
             peer.sendall(b' ')
             time.sleep(0.2)
@@ -465,3 +466,121 @@ def test_tls_context_is_strict(service):
     assert pinned.check_hostname and pinned.verify_mode == ssl.CERT_REQUIRED
     # A pinned anchor replaces the system roots; it does not add to them.
     assert len(pinned.get_ca_certs()) == 1
+
+
+@pytest.mark.parametrize('status', [206])
+def test_a_partial_success_is_not_a_complete_read_or_write(service, status):
+    """A parseable 206 fragment cannot become a successful selected reply."""
+    fragment = respond(status, b'{"ok":1}', **{
+        'Content-Range': 'bytes 0-7/16',
+    })
+    service.routes[('GET', '/v1/issues/23?page=2')] = fragment
+    service.routes[('GET', '/v1/issues/23/close')] = fragment
+    read = failed(executor(service).execute, authorized(READ), SERVICE_TOKEN)
+    write = failed(
+        executor(service).execute,
+        authorized(TOGGLE, write=True), SERVICE_TOKEN,
+    )
+    assert read.code == 'upstream_response'
+    assert write.code == 'outcome_unknown'
+    assert len(service.seen()) == 2
+
+
+@pytest.mark.parametrize('framing', [
+    b'Connection: close\r\n',  # close-delimited successful JSON
+    b'Content-Length: 8\r\nContent-Length: 8\r\n',
+    b'Content-Length: 8\r\nTransfer-Encoding: chunked\r\n',
+    b'Transfer-Encoding: gzip\r\n',
+], ids=['unframed', 'duplicate-length', 'length-and-chunked', 'unsupported-transfer'])
+def test_a_parseable_ambiguous_http_response_cannot_be_released(tmp_path, framing):
+    """Exercise the real TLS/HTTP parser, not a mocked response object."""
+    chunked = b'Transfer-Encoding: chunked' in framing
+    data = b'8\r\n{"ok":1}\r\n0\r\n\r\n' if chunked else b'{"ok":1}'
+    wire = b'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n' + framing + b'\r\n' + data
+
+    def provider(peer):
+        peer.sendall(wire)
+
+    with RawTLSPeer(tmp_path, provider) as runner:
+        read = failed(runner.execute, authorized(READ), SERVICE_TOKEN)
+        write = failed(runner.execute, authorized(TOGGLE, write=True), SERVICE_TOKEN)
+    assert read.code == 'upstream_response'
+    assert write.code == 'outcome_unknown'
+
+
+def test_a_well_framed_chunked_answer_still_succeeds(tmp_path):
+    """Fail-closed framing does not turn every HTTP chunked reply into denial."""
+    body = b'{"ok":true}'
+    wire = (b'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n'
+            b'Transfer-Encoding: chunked\r\n\r\n'
+            + format(len(body), 'x').encode() + b'\r\n' + body + b'\r\n0\r\n\r\n')
+
+    def provider(peer):
+        peer.sendall(wire)
+
+    with RawTLSPeer(tmp_path, provider) as runner:
+        assert runner.execute(authorized(READ), SERVICE_TOKEN) == {'ok': True}
+
+
+def test_recording_provider_can_send_duplicate_raw_headers_over_tls(service):
+    """The shared W6 provider fixture emits *exact* malformed reply bytes."""
+    body = b'{"id":23}'
+    wire = (b'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n'
+            b'Content-Length: 9\r\nContent-Length: 9\r\n\r\n' + body)
+    service.routes[('GET', '/v1/issues/23?page=2')] = RawHTTPResponse(wire)
+    denied = failed(executor(service).execute, authorized(READ), SERVICE_TOKEN)
+    assert denied.code == 'upstream_response'
+    assert len(service.seen()) == 1
+    assert service.seen()[0]['headers']['authorization'] == 'Bearer ' + SERVICE_TOKEN
+
+
+@pytest.mark.parametrize('kind,media,data', [
+    ('json', 'text/html', b'{"ok":true}'),
+    ('json', 'text/plain', b'{"ok":true}'),
+    ('text', 'application/json', b'printable text'),
+])
+def test_a_parseable_response_must_have_host_selected_media_type(
+    service, kind, media, data,
+):
+    """A valid body is insufficient if the upstream media contract disagrees."""
+    effect = replace(READ, response=kind)
+    service.routes[('GET', '/v1/issues/23?page=2')] = respond(
+        200, data, **{'Content-Type': media}
+    )
+    assert failed(executor(service).execute, authorized(effect), SERVICE_TOKEN).code == (
+        'upstream_response'
+    )
+
+
+def test_a_declared_json_response_accepts_charset_parameter(service):
+    service.routes[('GET', '/v1/issues/23?page=2')] = respond(
+        200, b'{"ok":true}', **{'Content-Type': 'application/json; charset=utf-8'}
+    )
+    assert executor(service).execute(authorized(READ), SERVICE_TOKEN) == {'ok': True}
+
+
+def test_bodyless_204_is_supported_only_for_declared_text(tmp_path):
+    """RFC-compliant 204 is an empty representation, not close-delimited JSON."""
+    wire = b'HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n'
+    def provider(peer):
+        peer.sendall(wire)
+
+    text_effect = replace(READ, response='text')
+    with RawTLSPeer(tmp_path, provider) as runner:
+        assert runner.execute(authorized(text_effect), SERVICE_TOKEN) == ''
+        assert failed(runner.execute, authorized(READ), SERVICE_TOKEN).code == 'upstream_response'
+
+
+@pytest.mark.parametrize('framing', [
+    b'Content-Length: 0\r\n', b'Transfer-Encoding: chunked\r\n',
+])
+def test_204_with_forbidden_body_framing_is_denied(tmp_path, framing):
+    wire = b'HTTP/1.1 204 No Content\r\n' + framing + b'\r\n'
+    def provider(peer):
+        peer.sendall(wire)
+
+    text_effect = replace(READ, response='text')
+    with RawTLSPeer(tmp_path, provider) as runner:
+        assert failed(runner.execute, authorized(text_effect), SERVICE_TOKEN).code == (
+            'upstream_response'
+        )

@@ -298,3 +298,15 @@ Idempotency-Key, no automatic guest-side cert/JWT swap, incomplete Rust core
 parity, and no formal proof of Python runtime safety. Python coordination is
 strictly opt-in; a host running without it is outside cross-host confinement.
 Tests used synthetic certificates and tokens and localhost transports only.
+
+
+## 2026-10-19 10:46:53 -0400 - Offline native HTTP/W6 test-oracle hardening
+
+- Scope: security-boundary hardening entirely with synthetic credentials and local TLS, without any external provider account, real secret, VM installation, or TPM. The source snapshot was commit 7120838.
+- Python egress now refuses HTTP 206, ambiguous or unsupported 2xx framing, unbounded/mismatched Content-Length, and a response media type incompatible with the host-selected effect. A standards-compliant bodyless 204 works for text but not JSON; forbidden 204 framing is rejected. Compatibility consequence: formerly accepted close-delimited/no-Content-Type replies now fail closed.
+- Native Rust manifest parser now also rejects unframed non-204 2xx responses; 204 remains bodyless and refuses forbidden framing fields. Native Rust unit and real-process synthetic TLS regressions are authored, **not built or executed here** because cargo/rustc and the pinned toolchain are absent. No new Lean theorems were authored.
+- Improved finite native W6 oracle: all expected provider headers must derive from host policy, raw wire header pairs detect case-insensitive duplicates, typed JSON comparison refuses duplicate keys and bool/integer confusion, audit identifiers and selected guest outputs are independently checked. Raw synthetic HTTPS response fixture exercises the production adapters. Added positive chunked and selected-release witnesses and adversarial mutations. This is a runtime oracle, not W3 reachability completeness or I/O refinement.
+- Updated the W3 reviewed Rust source SHA-256 after inspecting the manifest parser's updated match branch and 204 status guard; added a W6 structural guard and recorded the trust/assurance limitations. This review does not establish Rust compilation or full dependency reachability.
+- Validation executed: Python structural W0/W3/W6 checkers passed; 135 targeted Python tests passed, including W3 guard mutation tests, egress cases, and the W6 oracle. Python compileall completed. A prior loopback W1 workflow reported three passing tests but pytest process shutdown did not terminate within the outer shell time limit. No network service other than local test TLS endpoints was contacted by those tests.
+- Environment limitation: `python -m build` failed because the Python `build` module is not installed, and cargo/rustc/lean are unavailable. Authoritative `python dev/verification/system.py --proofs --full-tests` must be run on a provisioned maintainer machine; full native acceptance is pending.
+- Confidence: high in the exercised Python behavior and portable guards, moderate in the source-reviewed Rust edit pending compile/tests, low for any broader confinement, noninterference or runtime isolation claim. No source-level guarantee about unobserved guest I/O is asserted.

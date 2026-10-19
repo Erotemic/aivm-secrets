@@ -667,6 +667,14 @@ fn manifest_response(mut reader: impl BufRead, format: &str) -> Outcome<Vec<u8>>
     {
         return Err(Error::UpstreamResponse);
     }
+    // RFC 9110: a 204 response ends at the header terminator. Neither a
+    // Content-Length nor Transfer-Encoding field is permitted, even if it
+    // declares a zero-length body.
+    if status == 204
+        && (headers.contains_key("content-length") || headers.contains_key("transfer-encoding"))
+    {
+        return Err(Error::UpstreamResponse);
+    }
     let mut body = Vec::new();
     match (
         headers.get("content-length"),
@@ -713,15 +721,19 @@ fn manifest_response(mut reader: impl BufRead, format: &str) -> Outcome<Vec<u8>>
                 return Err(Error::UpstreamResponse);
             }
         },
-        (None, None) => {
+        // A successful representation must have an explicit, unambiguous
+        // length or chunk framing. HTTP 204 has no representation by
+        // definition; a bodyless 204 remains valid for a text operation.
+        (None, None) if status == 204 => {
             reader
-                .take((MAX_BODY + 1) as u64)
+                .take(1)
                 .read_to_end(&mut body)
                 .map_err(|_| Error::UpstreamResponse)?;
-            if body.len() > MAX_BODY {
+            if !body.is_empty() {
                 return Err(Error::UpstreamResponse);
             }
         }
+        (None, None) => return Err(Error::UpstreamResponse),
         _ => return Err(Error::UpstreamResponse),
     }
     if status == 204 && !body.is_empty() || format == "json" && body.is_empty() {
@@ -869,6 +881,7 @@ mod wire_tests {
         let bad = [
             b"HTTP/1.1 302 Found\r\nLocation: https://evil.example/\r\nContent-Length: 0\r\n\r\n".as_slice(),
             b"HTTP/1.1 206 Partial Content\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}",
+            b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{}",
             b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\nContent-Length: 2\r\n\r\n{}",
             b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\nTransfer-Encoding: chunked\r\n\r\n{}",
             b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Encoding: gzip\r\nContent-Length: 2\r\n\r\n{}",
@@ -891,5 +904,12 @@ mod wire_tests {
             manifest_response(Cursor::new(chunked), "text").unwrap(),
             b"DATA"
         );
+        let no_content = b"HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n";
+        assert_eq!(manifest_response(Cursor::new(no_content), "text").unwrap(), b"");
+        assert!(manifest_response(Cursor::new(no_content), "json").is_err());
+        let illegal_204_length = b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n";
+        assert!(manifest_response(Cursor::new(illegal_204_length), "text").is_err());
+        let illegal_204_transfer = b"HTTP/1.1 204 No Content\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n";
+        assert!(manifest_response(Cursor::new(illegal_204_transfer), "text").is_err());
     }
 }

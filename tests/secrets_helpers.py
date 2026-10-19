@@ -573,11 +573,25 @@ def make_certificates(directory: Path, host: str = TLS_HOST) -> dict[str, Path]:
 Route = Callable[[dict[str, Any]], tuple[int, dict[str, str], bytes]]
 
 
+class RawHTTPResponse:
+    """An exact synthetic HTTPS response, including intentionally bad headers.
+
+    Only the local test provider accepts this fixture. The broker is still
+    exercised over a real TLS socket; unlike the normal response helper this
+    can send duplicate length fields and conflicting transfer framing.
+    """
+
+    def __init__(self, wire: bytes):
+        assert wire.startswith(b'HTTP/1.')
+        self.wire = wire
+
+
 class TLSService:
     """A recording HTTPS service with operator-defined routes.
 
-    ``routes`` maps ``(method, target)`` to a JSON-able value (served as 200)
-    or to a callable returning ``(status, headers, body)``. Every request is
+    ``routes`` maps ``(method, target)`` to a JSON-able value (served as 200),
+    a callable returning ``(status, headers, body)``, or a RawHTTPResponse
+    whose bytes are emitted directly over TLS. Every request is
     appended to ``requests`` with its method, target, headers and body, so a
     test can assert on exactly what reached "the provider".
     """
@@ -610,6 +624,14 @@ class TLSService:
                 with service._lock:
                     service.requests.append(seen)
                 route = service.routes.get((self.command, self.path))
+                if isinstance(route, RawHTTPResponse):
+                    try:
+                        self.wfile.write(route.wire)
+                        self.wfile.flush()
+                    except OSError:
+                        pass
+                    self.close_connection = True
+                    return
                 if route is None:
                     status, headers, data = 404, {}, b'{"message":"Not Found"}'
                 elif callable(route):

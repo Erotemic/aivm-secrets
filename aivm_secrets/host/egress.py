@@ -122,6 +122,45 @@ class _Connection(http.client.HTTPSConnection):
             killer.close()
 
 
+def _check_success_framing(response: http.client.HTTPResponse) -> None:
+    """Require one unambiguous, bounded HTTP success-body framing mode.
+
+    ``http.client`` accepts close-delimited bodies, repeated Content-Length,
+    and a simultaneous Transfer-Encoding/Content-Length in some cases. Those
+    may produce valid JSON despite disagreeing about the authenticated reply
+    boundary. This broker accepts only one explicit length or chunked framing.
+    The library remains responsible for decoding chunked bytes; the adapter
+    checks the declared mode before allowing a result to leave custody.
+    """
+    # HTTP 206 is a successful *partial representation*, not a complete
+    # answer. Provider-controlled Content-Range cannot authorize disclosure.
+    if response.status == 206:
+        raise SecretsError('upstream_response')
+    lengths = response.msg.get_all('Content-Length', [])
+    transfers = response.msg.get_all('Transfer-Encoding', [])
+    # 204 is terminated by its header section; RFC 9110 forbids both a
+    # payload and Content-Length. ``http.client`` intentionally hides any
+    # body/framing it might have received for this status.
+    if response.status == 204:
+        if lengths or transfers:
+            raise SecretsError('upstream_response')
+        return
+    if len(lengths) + len(transfers) != 1:
+        raise SecretsError('upstream_response')
+    if lengths:
+        length = lengths[0]
+        # Bound decimal parsing before conversion (Python itself limits very
+        # long integer strings, but that must not choose our public error).
+        if (not length or len(length) > 20 or not length.isascii()
+                or not length.isdecimal() or response.chunked):
+            raise SecretsError('upstream_response')
+        value = int(length)
+        if value > MAX_RESPONSE or response.length != value:
+            raise SecretsError('upstream_response')
+    elif transfers != ['chunked'] or not response.chunked:
+        raise SecretsError('upstream_response')
+
+
 class HTTPSExecutor:
     def __init__(self, egress: Egress, untrusted: Roots = ()):
         self.egress = egress
@@ -197,6 +236,12 @@ class HTTPSExecutor:
                 raise SecretsError('upstream_rejected', status=status)
             if not 200 <= status < 300:
                 raise SecretsError('upstream_error', status=status)
+            _check_success_framing(response)
+            if status != 204:
+                media = response.msg.get_all('Content-Type', [])
+                expected_media = 'text/plain' if effect.response == 'text' else 'application/json'
+                if len(media) != 1 or media[0].split(';', 1)[0].strip() != expected_media:
+                    raise SecretsError('upstream_response')
             if response.getheader('Content-Encoding', 'identity') != 'identity':
                 raise SecretsError('upstream_response')
             data = response.read(MAX_RESPONSE + 1)

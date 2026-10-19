@@ -28,6 +28,15 @@ selected **concrete** TLS-provider sends, durable audit records, and guest
 frames against the expected manifest effect for one request. These finite
 observations are not a proof that all possible Rust executions refine W4.
 
+The [2026-10-19 offline adapter increment](garrett-offline-adapter-assault.md)
+adds Python and native Rust HTTP response framing checks, Python response-media
+checks, raw local HTTPS reply fixtures, an exact-header/typed-body and
+selected-result observer, and native negative/positive parser scenarios. The Python and pure-oracle tests have been
+run locally. The newly authored native process scenarios still require a
+pinned Rust build and have not been executed in that environment. These
+changes do not strengthen the claims about whole-service reachability or
+Rust-to-Lean I/O refinement below.
+
 ## Actual native boundary (the same executable used by the agent)
 
 1. `Bridge::serve` receives a bounded JSON request over authenticated TLS;

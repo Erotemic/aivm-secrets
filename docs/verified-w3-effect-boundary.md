@@ -143,3 +143,17 @@ inventory/review is not a transitive call-graph or complete mediation proof.
 See [operator control](native-coordinator-control.md) for concrete tests and the
 separate extracted receipt theorem; remote commit and transport refinement stay
 explicit obligations.
+
+## Offline HTTP parser review checkpoint (2026-10-19)
+
+The reviewed `custody/manifest_session.rs` manifest response parser rejects
+close-delimited non-204 2xx successes and forbids Content-Length /
+Transfer-Encoding on 204. A bodyless 204 still produces empty text but
+not JSON. These checks happen after the selected credentialed provider send
+and before parsing, disclosure or guest release. There are no new outbound
+effect constructors, destination choices, credential-bearing request writers
+or guest serialization sites. The exact-source SHA-256 fingerprint in the W3
+inventory has been refreshed after this focused review; the W6 checker also
+pins the relevant framing guards. Neither structural check proves reachability
+completeness or the correctness of Rust code generation. The new Rust source
+and tests have **not** been built on a pinned toolchain in this environment.
