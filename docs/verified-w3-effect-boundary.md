@@ -157,3 +157,26 @@ inventory has been refreshed after this focused review; the W6 checker also
 pins the relevant framing guards. Neither structural check proves reachability
 completeness or the correctness of Rust code generation. The new Rust source
 and tests have **not** been built on a pinned toolchain in this environment.
+
+## Follow-up: 204 cannot depend on TLS EOF (2026-10-19)
+
+The 204 text path previously read one byte through `read_to_end` after the
+HTTP header terminator to check for a stray body. That makes a successful,
+header-terminated 204 depend on a clean TLS EOF; a peer may keep the connection
+open or close without TLS `close_notify`. The full native integration run on
+2026-10-19 reached 2,750 passing tests but failed the text/204 write case.
+
+The native parser now returns empty text directly after validating the 204
+headers. It still refuses `Content-Length` and `Transfer-Encoding` on 204,
+refuses close-delimited non-204 success, and refuses empty JSON. Any bytes
+following a 204 header terminator are not interpreted or released as text;
+the provider TLS connection is not reused for another request. Requiring EOF
+to reject such extra bytes is incompatible with 204 framing and cannot be a
+reliable discriminator across network segmentations.
+
+The W3 manifest source fingerprint was refreshed after this bounded change;
+the W6 structural guard now explicitly refuses reintroducing an EOF read to
+the 204 branch. The new native unit regression simulates a provider that
+never signals EOF. This is a source-reviewed repair, not a proof of upstream
+TLS semantics or full native-to-Lean refinement; rerun the Rust integration
+test and full gate on the maintainer toolchain.

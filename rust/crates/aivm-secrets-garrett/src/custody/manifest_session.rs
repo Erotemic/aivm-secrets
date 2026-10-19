@@ -725,13 +725,10 @@ fn manifest_response(mut reader: impl BufRead, format: &str) -> Outcome<Vec<u8>>
         // length or chunk framing. HTTP 204 has no representation by
         // definition; a bodyless 204 remains valid for a text operation.
         (None, None) if status == 204 => {
-            reader
-                .take(1)
-                .read_to_end(&mut body)
-                .map_err(|_| Error::UpstreamResponse)?;
-            if !body.is_empty() {
-                return Err(Error::UpstreamResponse);
-            }
+            // HTTP 204 ends at the blank line after the headers. Do not
+            // read for EOF: the peer may keep the TLS connection open or
+            // close without a TLS close_notify, and neither changes the
+            // empty response's framing. No extra upstream bytes are released.
         }
         (None, None) => return Err(Error::UpstreamResponse),
         _ => return Err(Error::UpstreamResponse),
@@ -907,9 +904,34 @@ mod wire_tests {
         let no_content = b"HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n";
         assert_eq!(manifest_response(Cursor::new(no_content), "text").unwrap(), b"");
         assert!(manifest_response(Cursor::new(no_content), "json").is_err());
+        // Any stray upstream bytes after a 204 header are not part of the
+        // representation and must never appear in the selected guest text.
+        let invalid_extra = b"HTTP/1.1 204 No Content\r\n\r\nDO-NOT-RELEASE";
+        assert_eq!(manifest_response(Cursor::new(invalid_extra), "text").unwrap(), b"");
         let illegal_204_length = b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n";
         assert!(manifest_response(Cursor::new(illegal_204_length), "text").is_err());
         let illegal_204_transfer = b"HTTP/1.1 204 No Content\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n";
         assert!(manifest_response(Cursor::new(illegal_204_transfer), "text").is_err());
+    }
+
+    #[test]
+    fn manifest_204_text_does_not_wait_for_transport_eof() {
+        use std::io::{self, BufReader, Cursor, Read};
+
+        // A valid HTTP/1.1 204 need not close its underlying connection.
+        // Simulate a TLS peer that delivers all headers but never delivers
+        // clean EOF: any read after the header terminator fails immediately.
+        struct OpenConnection(Cursor<&'static [u8]>);
+        impl Read for OpenConnection {
+            fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+                if self.0.position() == self.0.get_ref().len() as u64 {
+                    return Err(io::Error::new(io::ErrorKind::WouldBlock, "no EOF"));
+                }
+                self.0.read(buf)
+            }
+        }
+        let wire: &'static [u8] = b"HTTP/1.1 204 No Content\r\nConnection: keep-alive\r\n\r\n";
+        let response = BufReader::new(OpenConnection(Cursor::new(wire)));
+        assert_eq!(manifest_response(response, "text").unwrap(), b"");
     }
 }

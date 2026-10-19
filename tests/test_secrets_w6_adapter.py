@@ -95,3 +95,15 @@ def test_w6_request_line_bypass_is_rejected(tmp_path):
     path.write_text(original.replace('http_request::append_line(', 'unchecked_line(', 1))
     with pytest.raises(ContractError, match='origin-form'):
         check(checkout)
+
+
+def test_w6_204_cannot_wait_for_transport_eof(tmp_path):
+    checkout = fixture_checkout(tmp_path)
+    path = checkout / SOURCE
+    original = path.read_text()
+    marker = '        (None, None) if status == 204 => {\n'
+    assert original.count(marker) == 1
+    path.write_text(original.replace(
+        marker, marker + '            reader.take(1).read_to_end(&mut body)?;\n', 1))
+    with pytest.raises(ContractError, match='waits for EOF after 204'):
+        check(checkout)

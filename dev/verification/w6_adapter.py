@@ -79,11 +79,14 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            'origin-form request/header override or body-length restrictions removed')
     ensure('if status == 206 {' in source, 'partial response is no longer refused')
     parser = source.split('fn manifest_response(', 1)[1].split('#[cfg(test)]', 1)[0]
-    ensure('(None, None) if status == 204 =>' in parser
+    branch = parser.split('(None, None) if status == 204 => {', 1)
+    ensure(len(branch) == 2
+           and not any(effect in branch[1].split('}', 1)[0]
+                       for effect in ('reader.', 'read_to_end(', 'fill_buf('))
            and '(None, None) => return Err(Error::UpstreamResponse)' in parser
            and 'headers.contains_key("content-length")' in parser
            and 'headers.contains_key("transfer-encoding")' in parser,
-           'native HTTP parser accepts unframed success or framed 204')
+           'native HTTP parser accepts unframed success, framed 204, or waits for EOF after 204')
     ensure('self.disclosure.project(&op.name, &raw, &secret.0)?' in source
            and 'ensure_safe(&reply, &secret.0)?' in source,
            'raw provider body may be returned without projection')

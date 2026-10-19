@@ -363,3 +363,25 @@ machine, so actively reject attempts to import AIVM rather than requiring
 its global absence. No Rust/Lean source, protocol, policy, or production code
 changed. Full native tests and pinned Lean proofs still require execution on
 the maintainer's provisioned environment; no production credential used.
+
+## 2026-10-19 13:41:59 -0400
+
+Follow-up to the maintainer's complete native/full-Python run: 2,750 tests
+passed, with one remaining failure in text/204 manifest writes. The full
+Rust/Lean gate reached full-python-native with no remaining TPM skips.
+
+Root cause from source review: the native manifest parser's 204 branch used
+`read_to_end` to reject extra bytes after the response headers, though
+204 messages terminate at the blank line and TLS may not send clean EOF.
+Removed that read, preserving forbidden 204 framing rejection and empty-JSON
+rejection, so only empty text is projected. The upstream TLS connection is not
+reused; any trailing bytes cannot be consumed as another response. Added a
+native no-EOF reader regression, an explicit no-release trailing-bytes test,
+and a W6 mutation test that refuses reintroduction of extra reads after 204.
+Reviewed and updated the W3 exact-source checksum and documented the
+remaining unproved protocol/TLS assumptions.
+
+Validation: W0, W3, W6 checks passed; 67 portable W3/W6 and TLS-fixture tests
+passed. Cargo, rustc and Lean are unavailable here; native unit/integration
+behavior remains to be reproduced by the maintainer, and the full gate must
+be rerun. No real provider, hardware TPM, service account or credential used.

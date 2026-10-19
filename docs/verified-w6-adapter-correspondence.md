@@ -192,3 +192,23 @@ fencing of running native brokers. The extracted receipt gate does not refine
 JSON/TLS, pre-send/post-send placement or remote SQL commit. Those premises are
 named by `COORD-OPERATOR-RUST-01`; the W4/W5 guest trace excludes these privileged
 observations. No complete mediation or whole-service correspondence follows.
+
+## 204 end-of-headers correction (2026-10-19)
+
+After the prior HTTP-framing hardening and correction of the synthetic 204
+server, the maintainer's full native suite still failed
+`test_empty_write_reply_obeys_explicit_response_type[text]` (2,750 passed,
+one failed). The production Rust `manifest_response` read for transport EOF
+*after* the 204 header terminator. HTTP 204 has no response body and ends at
+that terminator; TLS EOF/`close_notify` is not a valid prerequisite to accept
+an otherwise well-framed 204. The parser now leaves the body empty without
+further reads. Text operations release the projected empty string; JSON
+operations reject the empty body. Framing-field rejections stay in place.
+
+Added a native unit reader that delivers a complete 204 over a connection
+that never returns EOF, plus an explicit check that any trailing data is not
+released as guest text. The W6 source guard mutation test detects restoring
+an extra read in this branch. This changes acceptance of 204 replies that
+lack clean connection shutdown but does not broaden credential-bearing
+outbound effects. These additions remain unexecuted as native tests in this
+environment; the maintainer's next Rust/full-system run is required.
