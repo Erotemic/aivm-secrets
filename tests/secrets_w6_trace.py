@@ -111,6 +111,9 @@ def assert_native_effect_trace(
     audit_at_provider: list[list[dict[str, Any]]] | None = None,
     guest_frame: bytes | None = None,
     expected_request_digest: str | None = None,
+    expected_error_code: str | None = None,
+    strict_audit_schema: bool = False,
+    expected_operation: str | None = None,
 ) -> None:
     """Check a complete observed prefix for one guest request.
 
@@ -124,9 +127,53 @@ def assert_native_effect_trace(
     merely because the observations agree.
     """
     approved_headers = _checked_policy_headers(policy_headers or {})
+    require(all(type(row) is dict for row in audit),
+            'native audit must contain JSON objects only')
     require(authentication in {'bearer', 'x-api-key'}, 'unknown authentication mode')
     dispatches = [row for row in audit if row.get('event') == 'dispatch']
     completions = [row for row in audit if row.get('event') == 'completed']
+    if strict_audit_schema:
+        require(type(expected_operation) is str and bool(expected_operation),
+                'strict audit comparison requires a host-selected operation')
+        seen_identity = None
+        seen_grant = None
+        seen_policy = None
+        for row in audit:
+            expected_keys = ({'schema', 'event', 'phase', 'grant', 'policy',
+                              'identity', 'operation', 'request_digest', 'route'}
+                             if row.get('event') == 'dispatch' else
+                             {'schema', 'event', 'operation', 'grant', 'policy',
+                              'request_digest'})
+            require(set(row) == expected_keys and row.get('schema') == 1,
+                    'native audit contains extra/missing fields or wrong schema')
+            require(row['operation'] == expected_operation,
+                    'audit names a different host operation')
+            for field, length in (('grant', 32), ('policy', 64)):
+                val = row[field]
+                require(type(val) is str and len(val) == length and
+                        all(c in '0123456789abcdef' for c in val),
+                        'invalid grant/policy identity in native audit')
+            if seen_grant is not None:
+                require(row['grant'] == seen_grant and row['policy'] == seen_policy,
+                        'one request mixed two grant/policy identities')
+            seen_grant, seen_policy = row['grant'], row['policy']
+            if row['event'] == 'dispatch':
+                identity = row['identity']
+                require(type(identity) is dict and set(identity) ==
+                        {'iss', 'aud', 'sub', 'jti', 'iat', 'exp', 'epoch', 'cnf'} and
+                        type(identity['cnf']) is dict and
+                        set(identity['cnf']) == {'x5t#S256'},
+                        'malformed or extended native audit identity')
+                require(all(type(identity[name]) is str for name in
+                            ('iss', 'aud', 'sub', 'jti')) and
+                        type(identity['cnf']['x5t#S256']) is str and
+                        all(type(identity[name]) is int for name in
+                            ('iat', 'exp', 'epoch')),
+                        'malformed native audit identity types')
+                if seen_identity is not None:
+                    require(codec.dumps(identity) == codec.dumps(seen_identity),
+                            'one request mixed two bound client identities')
+                seen_identity = identity
     require(len(provider) == len(planned), 'unexpected/missing credentialed provider send')
     require(len(dispatches) == len(planned), 'provider dispatch/audit mismatch')
     require(len(completions) == int(expect_success), 'completion audit/guest release mismatch')
@@ -162,6 +209,8 @@ def assert_native_effect_trace(
     require(reply.get('version') == 1, 'invalid guest version')
     require(reply.get('ok') is expect_success, 'guest reply success/denial mismatch')
     if expect_success:
+        require(expected_error_code is None,
+                'expected_error_code is only valid for denied replies')
         require(set(reply) in ({'version', 'ok', 'result'},
                                {'version', 'ok', 'result', 'meta'}),
                 'unexpected public success fields')
@@ -176,6 +225,9 @@ def assert_native_effect_trace(
         require(type(reply['error']) is dict and set(reply['error']) == {'code', 'message'},
                 'unreviewed error fields')
         error = reply['error']
+        if expected_error_code is not None:
+            require(error['code'] == expected_error_code,
+                    'guest denied with a different code from the host failure contract')
         require(type(error['code']) is str and
                 error['message'] == _DENIAL_MESSAGES.get(error['code']),
                 'unreviewed guest error code or provider-derived diagnostics')

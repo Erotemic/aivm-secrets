@@ -405,3 +405,19 @@ are pending on the maintainer's VM. Existing W4 `IO-REFINE` and W5 concrete
 correspondence obligations remain open. Prefer
 `python dev/verification/quick_w6_read.py [--lean] [--native]` over a heavy
 full compiler-linkage capture for this source-unmodified increment.
+
+### Read failure W4/W5/W6 observation slice (2026-10-19)
+
+See [`garrett-read-failure-trace-refinement.md`](../garrett-read-failure-trace-refinement.md).
+The finite native read witness now covers the denial side of three previously
+modeled paths: final-only, checked-only, and preflight-then-final. A synthetic
+provider changes private 4xx/5xx diagnostics or malformed success bodies while
+the oracle independently fixes the expected public error class and effect
+prefix. Paired raw guest TLS frames must remain identical; completion records,
+extra provider sends, request identity changes and unreviewed audit fields are
+rejected. A portable reviewed-source guard pins the native error/JSONL leaf.
+**Only portable checks were executed when authored**; selected native process
+cases must run with `quick_w6_read.py --failure-only --native`. No additional
+Lean claims were introduced. Audit-but-no-send, error/close timing, complete
+Rust-to-Lean I/O correspondence and transitive compiler reachability remain
+explicitly open. Prefer the focused gate over Charon for this test-only slice.

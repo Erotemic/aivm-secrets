@@ -38,6 +38,16 @@ NATIVE = [
     'tests/test_rust_w6_adapter.py::test_w6_two_run_checked_only_private_fact_mutation_is_invisible',
     'tests/test_rust_w6_adapter.py::test_w6_two_run_two_phase_private_preflight_mutation_is_invisible',
 ]
+FAILURE_PORTABLE = [
+    'tests/test_w6_failure_oracle.py',
+    'tests/test_w6_error_boundary.py',
+]
+FAILURE_NATIVE = [
+    'tests/test_rust_w6_adapter.py::test_w6_failed_final_read_private_diagnostics_are_invisible',
+    'tests/test_rust_w6_adapter.py::test_w6_failed_final_read_malformed_private_representation_is_invisible',
+    'tests/test_rust_w6_adapter.py::test_w6_failed_preflight_only_diagnostics_are_invisible',
+    'tests/test_rust_w6_adapter.py::test_w6_failed_two_phase_final_response_diagnostics_are_invisible',
+]
 # All of these launch real independent Rust processes. No Python-only broker
 # substitution can satisfy this profile.
 BINARIES = {
@@ -87,6 +97,8 @@ def require_no_native_skips(report: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--native', action='store_true', help='Run selected mTLS/Rust process cases')
+    parser.add_argument('--failure-only', action='store_true',
+                        help='Run only the new W4/W5 failed-read observations')
     parser.add_argument('--lean', action='store_true',
                         help='Compile/axiom-audit only new read-path Lean proofs and imports')
     parser.add_argument('--build', action='store_true',
@@ -102,6 +114,8 @@ def main() -> int:
     try:
         for name in ('w0_contract', 'w3_effect_boundary', 'w6_adapter'):
             checked_run(name, [sys.executable, f'dev/verification/{name}.py', 'check'], env)
+        checked_run('w6-public-error-source', [sys.executable,
+                    'dev/verification/w6_error_boundary.py', 'check'], env)
         checked_run('w4-w5-read-shape-source', [sys.executable,
                     'dev/verification/read_paths.py', 'check'], env)
         if args.lean:
@@ -114,11 +128,13 @@ def main() -> int:
             ], env)
         if args.native:
             require_native_paths(env)
+        portable = FAILURE_PORTABLE if args.failure_only else PORTABLE + FAILURE_PORTABLE
+        native = FAILURE_NATIVE if args.failure_only else NATIVE + FAILURE_NATIVE
         with tempfile.TemporaryDirectory(prefix='garrett-quick-w6-') as tmp:
             report = Path(tmp) / 'cases.xml'
             checked_run('w6-release-observations', [
                 sys.executable, '-m', 'pytest', '-q', '-ra', '--junitxml', str(report),
-                *PORTABLE, *(NATIVE if args.native else []),
+                *portable, *(native if args.native else []),
             ], env)
             if args.native:
                 require_no_native_skips(report)

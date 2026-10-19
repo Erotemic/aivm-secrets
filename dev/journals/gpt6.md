@@ -429,3 +429,23 @@ provisioned toolchain. Charon/full-suite checks intentionally not re-run; no
 real account, TPM, credential or external service used. Confidence: high in
 the portable tests and source inventory; provisional in the new Lean tactics
 and native case integration until their focused acceptance gates run.
+
+## 2026-10-19 19:13:53 -0400
+
+Advanced W4/W5/W6 native-read finite refinement to public failures while
+keeping all production Rust and existing Lean proof sources unchanged. Added
+host-specified failure contracts for provider 4xx/5xx, invalid representations
+and disclosure veto; modeled audited preflight/final provider prefixes and
+fixed canonical guest denials. New paired native-process scenarios use only
+invented credentials and local TLS to detect private error/header disclosure,
+unexpected sends/completions and differing guest frames. Strengthened real
+read observations with closed-form audit key, grant/policy and bound-client
+consistency checks, and added a review guard for the actual Rust guest-error
+serialization leaf. Kept pre-egress errors, authority races, timing, TLS close,
+write paths, universal I/O refinement and complete reachability open.
+
+Portable quick gate and mutation cases executed here, without Rust, Lean or
+Charon. Native subprocess acceptance must run separately on the maintainer's
+provisioned toolchain; previous passing validation cannot be transferred to
+new native tests. Confidence: high in the reviewed Python oracles and their
+portable counterexamples; native-case compatibility provisional until run.

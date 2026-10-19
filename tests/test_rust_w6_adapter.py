@@ -21,6 +21,7 @@ from aivm_secrets.kernel.service import parse_policy
 from aivm_secrets.primitives import codec as strict_codec
 from tests.secrets_w6_release import ReleaseMismatch, release as approved_release
 from tests.secrets_w6_history import ReadObservation, assert_publicly_equivalent
+from tests.secrets_w6_failure import FailureContract, assert_failed_reads_publicly_equivalent
 from tests.secrets_helpers import TOKEN, RawHTTPResponse, TLSService
 from tests.secrets_w6_trace import (
     TraceMismatch, assert_native_effect_trace, records, audit_since,
@@ -92,13 +93,17 @@ _EXPECTED_META_NOT_PROVIDED = object()
 def trace_of(case, tmp_path, server, operation, args, planned, *, successful=True,
              expected_result=None, expected_meta=_EXPECTED_META_NOT_PROVIDED,
              provider_arrivals=None, raw_guest=False, check_digest=False,
-             capture_observation=False):
-    if capture_observation:
+             capture_observation=False, expected_error_code=None):
+    if capture_observation and successful:
         # Paired information-flow tests must declare the release expected from
         # independent host inputs, rather than silently assuming no metadata.
         assert expected_result is not None, 'paired trace requires expected_result'
         assert expected_meta is not _EXPECTED_META_NOT_PROVIDED, (
             'paired trace requires expected_meta (use None when no metadata is approved)'
+        )
+    if capture_observation and not successful:
+        assert expected_error_code is not None, (
+            'paired failure observation requires an independently declared error code'
         )
     requests_before, audit_before = snapshot(tmp_path, server)
     if raw_guest:
@@ -112,6 +117,8 @@ def trace_of(case, tmp_path, server, operation, args, planned, *, successful=Tru
         expected['expected_result'] = expected_result
     if expected_meta is not _EXPECTED_META_NOT_PROVIDED:
         expected['expected_meta'] = expected_meta
+    if expected_error_code is not None:
+        expected['expected_error_code'] = expected_error_code
     if check_digest and planned:
         parsed = parse_policy(json.loads(case.policy_file.read_text()))
         normalized = parsed.parse_request({'operation': operation, 'arguments': args})
@@ -130,6 +137,7 @@ def trace_of(case, tmp_path, server, operation, args, planned, *, successful=Tru
         expect_success=successful,
         policy_headers=json.loads(case.policy_file.read_text()).get('headers', {}),
         sensitive=(case.token,),
+        strict_audit_schema=raw_guest, expected_operation=operation if raw_guest else None,
         **expected,
     )
     if capture_observation:
@@ -820,3 +828,180 @@ def test_w6_two_run_two_phase_private_preflight_mutation_is_invisible(tmp_path):
             for canary in ('CANARY_FIRST_NOT_RELEASED', 'CANARY_SECOND_NOT_RELEASED'):
                 assert canary.encode() not in first.frame + second.frame
                 assert canary not in json.dumps(first.audit + second.audit)
+
+# W4/W5 failed-read trace-refinement experiments. The synthetic server fixes
+# the public failure class before either real Rust guest request begins; the
+# two provider diagnostics are intentionally different and must not be
+# converted into a guest result, audit detail, or an additional provider send.
+@pytest.mark.parametrize('first_status,second_status,cause', [
+    (401, 422, 'http-4xx'),
+    (500, 503, 'http-other'),
+])
+def test_w6_failed_final_read_private_diagnostics_are_invisible(
+    tmp_path, first_status, second_status, cause,
+):
+    arrivals = []
+    audit_path = tmp_path / 'provider-audit.jsonl'
+    with TLSService(provider_directory(tmp_path), host='api.example.org',
+                    wire_headers=True,
+                    on_request=lambda _: arrivals.append(records(audit_path))) as server:
+        p = ticket_policy(tmp_path, server)
+        args = {'ticket': 7}
+        plan = effects(p, 'ticket.view', args, None)
+        assert [phase for phase, _ in plan] == ['final']
+        route = ('GET', '/v1/tickets/7')
+        first_secret = 'PRIVATE_UPSTREAM_DIAGNOSTIC_FIRST'
+        second_secret = 'PRIVATE_UPSTREAM_DIAGNOSTIC_SECOND'
+        with ManifestCase(tmp_path, server, p, ticket_disclosure(), writes='deny') as case:
+            server.routes[route] = lambda _: (
+                first_status, {'X-Private-Diagnostic': first_secret},
+                codec.dumps({'message': first_secret, 'token': TOKEN}),
+            )
+            first = trace_of(
+                case, tmp_path, server, 'ticket.view', args, plan,
+                successful=False, expected_error_code=FailureContract(cause, ('final',)).error_code,
+                raw_guest=True, provider_arrivals=arrivals, capture_observation=True,
+            )
+            server.routes[route] = lambda _: (
+                second_status, {'X-Private-Diagnostic': second_secret},
+                codec.dumps({'message': second_secret, 'token': TOKEN}),
+            )
+            second = trace_of(
+                case, tmp_path, server, 'ticket.view', args, plan,
+                successful=False, expected_error_code=FailureContract(cause, ('final',)).error_code,
+                raw_guest=True, provider_arrivals=arrivals, capture_observation=True,
+            )
+            assert_failed_reads_publicly_equivalent(
+                left=first, right=second,
+                left_contract=FailureContract(cause, ('final',)),
+                right_contract=FailureContract(cause, ('final',)),
+                policy=p, operation='ticket.view', normalized_arguments=args,
+                credential=TOKEN, host=server.host, port=server.port,
+                sensitive=(case.token,),
+                hidden_canaries=(first_secret, second_secret),
+            )
+
+
+def test_w6_failed_final_read_malformed_private_representation_is_invisible(tmp_path):
+    arrivals = []
+    audit_path = tmp_path / 'provider-audit.jsonl'
+    with TLSService(provider_directory(tmp_path), host='api.example.org',
+                    wire_headers=True,
+                    on_request=lambda _: arrivals.append(records(audit_path))) as server:
+        p = ticket_policy(tmp_path, server)
+        args = {'ticket': 7}
+        plan = effects(p, 'ticket.view', args, None)
+        cause = FailureContract('bad-representation', ('final',))
+        with ManifestCase(tmp_path, server, p, ticket_disclosure(), writes='deny') as case:
+            server.routes[('GET', '/v1/tickets/7')] = lambda _: (
+                200, {'Content-Type': 'application/json'}, b'{"private":"FIRST"',
+            )
+            first = trace_of(
+                case, tmp_path, server, 'ticket.view', args, plan,
+                successful=False, expected_error_code=cause.error_code,
+                raw_guest=True, provider_arrivals=arrivals, capture_observation=True,
+            )
+            server.routes[('GET', '/v1/tickets/7')] = lambda _: (
+                200, {'Content-Type': 'application/json'}, b'{"private":"SECOND",',
+            )
+            second = trace_of(
+                case, tmp_path, server, 'ticket.view', args, plan,
+                successful=False, expected_error_code=cause.error_code,
+                raw_guest=True, provider_arrivals=arrivals, capture_observation=True,
+            )
+            assert_failed_reads_publicly_equivalent(
+                left=first, right=second, left_contract=cause, right_contract=cause,
+                policy=p, operation='ticket.view', normalized_arguments=args,
+                credential=TOKEN, host=server.host, port=server.port,
+                sensitive=(case.token,), hidden_canaries=('FIRST', 'SECOND'),
+            )
+
+
+def test_w6_failed_preflight_only_diagnostics_are_invisible(tmp_path):
+    arrivals = []
+    audit_path = tmp_path / 'provider-audit.jsonl'
+    with TLSService(provider_directory(tmp_path), host='api.example.org',
+                    wire_headers=True,
+                    on_request=lambda _: arrivals.append(records(audit_path))) as server:
+        p = checked(ticket_policy(tmp_path, server))
+        releases = {
+            'revision.view': {'id': {'at': ['id'], 'type': 'integer'}},
+            'ticket.check': {'id': {'at': ['id'], 'type': 'integer'}},
+        }
+        args = {'ticket': 7}
+        plan = effects(p, 'ticket.check', args, {
+            'owner': 'alice', 'revision': 'a' * 40, 'id': 7,
+        })
+        assert [phase for phase, _ in plan] == ['preflight']
+        cause = FailureContract('http-4xx', ('preflight',))
+        first_secret, second_secret = 'PRIVATE_PREFLIGHT_FIRST', 'PRIVATE_PREFLIGHT_SECOND'
+        with ManifestCase(tmp_path, server, p, releases, writes='deny') as case:
+            server.routes[('GET', '/v1/tickets/7')] = lambda _: (
+                401, {}, codec.dumps({'message': first_secret, 'token': TOKEN}),
+            )
+            first = trace_of(
+                case, tmp_path, server, 'ticket.check', args, plan,
+                successful=False, expected_error_code=cause.error_code,
+                raw_guest=True, provider_arrivals=arrivals, capture_observation=True,
+            )
+            server.routes[('GET', '/v1/tickets/7')] = lambda _: (
+                403, {}, codec.dumps({'message': second_secret, 'token': TOKEN}),
+            )
+            second = trace_of(
+                case, tmp_path, server, 'ticket.check', args, plan,
+                successful=False, expected_error_code=cause.error_code,
+                raw_guest=True, provider_arrivals=arrivals, capture_observation=True,
+            )
+            assert_failed_reads_publicly_equivalent(
+                left=first, right=second, left_contract=cause, right_contract=cause,
+                policy=p, operation='ticket.check', normalized_arguments=args,
+                credential=TOKEN, host=server.host, port=server.port,
+                sensitive=(case.token,), hidden_canaries=(first_secret, second_secret),
+            )
+
+
+def test_w6_failed_two_phase_final_response_diagnostics_are_invisible(tmp_path):
+    arrivals = []
+    audit_path = tmp_path / 'provider-audit.jsonl'
+    with TLSService(provider_directory(tmp_path), wire_headers=True,
+                    on_request=lambda _: arrivals.append(records(audit_path))) as server:
+        install_github_routes(server)
+        p = native_policy(tmp_path, server)
+        args = arguments()
+        plan = effects(p, 'pr.diff', args, PULL)
+        assert [phase for phase, _ in plan] == ['preflight', 'final']
+        original = server.routes[('GET', PULL_PATH)]
+        cause = FailureContract('http-other', ('preflight', 'final'))
+        first_secret, second_secret = 'PRIVATE_FINAL_FIRST', 'PRIVATE_FINAL_SECOND'
+
+        def response(status, private):
+            def answer(request):
+                if request['headers']['accept'] == GITHUB_JSON:
+                    return original(request)
+                assert request['headers']['accept'] == GITHUB_DIFF
+                return status, {'Content-Type': 'text/plain'}, private.encode() + TOKEN.encode()
+            return answer
+
+        with ManifestCase(tmp_path, server, p, native_disclosure(), writes='deny') as case:
+            server.routes[('GET', PULL_PATH)] = response(500, first_secret)
+            first = trace_of(
+                case, tmp_path, server, 'pr.diff', args, plan,
+                successful=False, expected_error_code=cause.error_code,
+                raw_guest=True, provider_arrivals=arrivals, capture_observation=True,
+            )
+            server.routes[('GET', PULL_PATH)] = response(503, second_secret)
+            second = trace_of(
+                case, tmp_path, server, 'pr.diff', args, plan,
+                successful=False, expected_error_code=cause.error_code,
+                raw_guest=True, provider_arrivals=arrivals, capture_observation=True,
+            )
+            witnesses = assert_failed_reads_publicly_equivalent(
+                left=first, right=second, left_contract=cause, right_contract=cause,
+                policy=p, operation='pr.diff', normalized_arguments=args,
+                credential=TOKEN, host=server.host, port=server.port,
+                sensitive=(case.token,), hidden_canaries=(first_secret, second_secret),
+            )
+            assert witnesses[0].observed_events == (
+                'audit:preflight', 'provider-send:preflight',
+                'audit:final', 'provider-send:final', 'guest-denied:upstream_error',
+            )
