@@ -7,12 +7,15 @@ from __future__ import annotations
 
 import copy
 import json
+import socket
+import ssl
 
 import pytest
 
 from tests.secrets_github_scenario import (
     ALLOWED_PR, CHECKS, CHECKS_PATH, DIFF, HEAD_SHA, PULL, PULL_PATH, install_github_routes,
 )
+from aivm_secrets.kernel import codec
 from tests.secrets_helpers import TOKEN, RawHTTPResponse, TLSService
 from tests.secrets_w6_trace import (
     TraceMismatch, assert_native_effect_trace, records, audit_since,
@@ -24,6 +27,43 @@ from tests.test_rust_garrett_manifest import (
 from tests.test_rust_w2_github_workflow import (
     arguments, native_disclosure, native_policy,
 )
+
+
+def native_guest_frame(case, *, operation, arguments):
+    """Read the actual bridge TLS bytes, not the native CLI's parsed stdout.
+
+    This client only submits a normal bound request using the synthetic client
+    certificate. The bridge and provider remain real Rust/local TLS processes.
+    """
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.minimum_version = ssl.TLSVersion.TLSv1_3
+    context.maximum_version = ssl.TLSVersion.TLSv1_3
+    context.check_hostname = True
+    context.verify_mode = ssl.CERT_REQUIRED
+    context.load_verify_locations(cafile=str(case.certs['ca']))
+    context.load_cert_chain(str(case.certs['client1'][0]), str(case.certs['client1'][1]))
+    request = codec.dumps({
+        'version': 1, 'capability': case.token,
+        'request': {'operation': operation, 'arguments': arguments},
+    }) + b'\n'
+    with socket.socket(socket.AF_UNIX) as raw:
+        raw.settimeout(15)
+        raw.connect(str(case.directory / 'identity.sock'))
+        with context.wrap_socket(raw, server_hostname='localhost') as channel:
+            channel.sendall(request)
+            received = bytearray()
+            while True:
+                chunk = channel.recv(65536)
+                if not chunk:
+                    break
+                received.extend(chunk)
+                assert len(received) <= 65536, 'unbounded guest output'
+    wire = bytes(received)
+    assert wire.endswith(b'\n') and wire.count(b'\n') == 1, 'missing/extra guest frame'
+    reply = codec.loads(wire[:-1])
+    assert wire == codec.dumps(reply) + b'\n', 'guest response is not canonical JSONL'
+    assert TOKEN.encode() not in wire and case.token.encode() not in wire
+    return reply, wire
 
 
 def snapshot(tmp_path, provider):
@@ -42,14 +82,24 @@ def effects(policy, operation, args, facts):
 
 
 def trace_of(case, tmp_path, server, operation, args, planned, *, successful=True,
-             expected_result=None, expected_meta=None):
+             expected_result=None, expected_meta=None, provider_arrivals=None,
+             raw_guest=False):
     requests_before, audit_before = snapshot(tmp_path, server)
-    reply = case.invoke(operation=operation, arguments=args)
+    if raw_guest:
+        reply, wire = native_guest_frame(case, operation=operation, arguments=args)
+    else:
+        reply, wire = case.invoke(operation=operation, arguments=args), None
     expected = {}
+    if wire is not None:
+        expected['guest_frame'] = wire
     if expected_result is not None:
         expected['expected_result'] = expected_result
     if expected_meta is not None:
         expected['expected_meta'] = expected_meta
+    if provider_arrivals is not None:
+        expected['audit_at_provider'] = [
+            rows[audit_before:] for rows in provider_arrivals[requests_before:]
+        ]
     assert_native_effect_trace(
         provider=server.seen()[requests_before:],
         audit=audit_since(tmp_path / 'provider-audit.jsonl', audit_before),
@@ -208,6 +258,75 @@ def test_w6_native_checked_request_trace_matches_policy_audit_and_tls(tmp_path, 
             assert server.seen() == before
         saved = (tmp_path / 'provider-audit.jsonl').read_text()
         assert case.token not in saved and TOKEN not in saved
+
+
+def test_w6_audit_is_present_when_each_read_reaches_real_https_provider(tmp_path):
+    """Native TLS process witness for audit-before-send, not fsync durability."""
+    arrivals = []
+    audit_file = tmp_path / 'provider-audit.jsonl'
+    def capture(_request):
+        arrivals.append(records(audit_file))
+
+    with TLSService(provider_directory(tmp_path), wire_headers=True,
+                    on_request=capture) as server:
+        install_github_routes(server)
+        p = native_policy(tmp_path, server)
+        with ManifestCase(tmp_path, server, p, native_disclosure(), writes='deny') as case:
+            # A useful read whose checked-fact lookup and final HTTP request
+            # are two independently audited credential-bearing effects.
+            reply = trace_of(case, tmp_path, server, 'pr.diff', arguments(),
+                             effects(p, 'pr.diff', arguments(), PULL),
+                             expected_result={'diff': DIFF},
+                             provider_arrivals=arrivals, raw_guest=True)
+            assert reply['result'] == {'diff': DIFF}
+            # Malicious resource mismatch may spend a preflight, but cannot
+            # authorize the final provider request or release any result.
+            wrong = dict(PULL)
+            wrong['head'] = dict(PULL['head'], repo={'full_name': 'attacker/repository'})
+            server.routes[('GET', PULL_PATH)] = wrong
+            failed = trace_of(case, tmp_path, server, 'pr.diff', arguments(),
+                              [('preflight', effects(p, 'pr.diff', arguments(), PULL)[0][1])],
+                              successful=False, provider_arrivals=arrivals,
+                              raw_guest=True)
+            assert failed['error']['code'] == 'resource_mismatch'
+            # No provider or dispatch audit is allowed for unsupported and
+            # post-renunciation guest requests.
+            trace_of(case, tmp_path, server, 'fetch.url', {'url': 'https://evil.invalid'},
+                     [], successful=False, provider_arrivals=arrivals,
+                     raw_guest=True)
+            assert case.invoke(verb='renounce')['renounced'] is True
+            trace_of(case, tmp_path, server, 'pr.diff', arguments(),
+                     [], successful=False, provider_arrivals=arrivals,
+                     raw_guest=True)
+
+
+def test_w6_arrival_oracle_rejects_reordered_or_postdated_dispatch_audit():
+    """Fail on temporal mutants even if the final provider/audit sets agree."""
+    declared = dict(method='GET', target='/v1/allowed', accept='application/json', body=None)
+    dispatch = dict(event='dispatch', phase='final', request_digest='d' * 64,
+                    route={'host':'api.example.org', 'port':443,
+                           'method':'GET', 'path':'/v1/allowed'})
+    completion = dict(event='completed', request_digest='d' * 64)
+    provider = [dict(method='GET', target='/v1/allowed', body='', headers={
+        'host': 'api.example.org:443', 'accept': 'application/json',
+        'accept-encoding': 'identity', 'connection': 'close',
+        'user-agent': 'aivm-secrets/1',
+        'authorization': 'Bearer TEST_CREDENTIAL_123456',
+    })]
+    kwargs = dict(provider=provider, audit=[dispatch, completion],
+                  reply={'version': 1, 'ok': True, 'result': {'id': 7}},
+                  planned=[('final', declared)], host='api.example.org', port=443,
+                  credential='TEST_CREDENTIAL_123456', expect_success=True)
+    frame = codec.dumps(kwargs['reply']) + b'\n'
+    assert_native_effect_trace(**kwargs, audit_at_provider=[[dispatch]], guest_frame=frame)
+    for bad_frame in [frame[:-1], frame + frame, frame + b'garbage',
+                      codec.dumps({'version': 1, 'ok': True, 'result': {'id': 8}}) + b'\n']:
+        with pytest.raises(TraceMismatch):
+            assert_native_effect_trace(**kwargs, audit_at_provider=[[dispatch]], guest_frame=bad_frame)
+    for bad in [[], [[completion, dispatch]], [[completion]], [[dispatch, completion]],
+                [[dict(dispatch, phase='preflight')]], [[dict(dispatch, request_digest='0' * 64)]]]:
+        with pytest.raises(TraceMismatch):
+            assert_native_effect_trace(**kwargs, audit_at_provider=bad)
 
 
 def test_w6_checked_fact_refusal_emits_preflight_only(tmp_path):

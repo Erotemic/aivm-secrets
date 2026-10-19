@@ -55,7 +55,25 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
     ensure(source.count('fn manifest_request_bytes(') == 1
            and source.count('let request = manifest_request_bytes(route, secret, effect, headers)?;') == 1,
            'native manifest adapter has additional unreviewed encoder')
+    # The real credential-bearing executor only accepts the type constructed
+    # after durable audit. This checks the reviewed source topology; it cannot
+    # prove what a compiler or an external dependency ultimately executes.
+    constructor = source.split("impl<'a> PreparedDispatch<'a> {", 1)[1].split('pub(crate) struct Session {', 1)[0]
+    entry = source.split('pub(super) fn request(', 1)[1].split('pub(super) fn control(', 1)[0]
+    ensure(source.count('AuditedDispatch {') == 1
+           and 'audit.write_record(' in constructor
+           and constructor.index('audit.write_record(') < constructor.index('Ok(AuditedDispatch {')
+           and 'let recorded = prepared.audit(' in entry
+           and 'exchange_manifest(' in entry
+           and '&recorded,' in entry
+           and 'Ok(AuditedDispatch { phase: self.phase, effect: self.effect })' in constructor
+           and 'if effect.write && !admitted_write {' in constructor
+           and 'if effect.write {' in constructor,
+           'provider effect not typed as audited/phase-authorized before dispatch')
     provider_interpreter = source.split('impl Executor {', 1)[1].split('fn manifest_response(', 1)[0]
+    ensure('audited: &AuditedDispatch<' in provider_interpreter
+           and 'let effect = audited.effect;' in provider_interpreter,
+           'provider executor accepts an unaudited policy effect')
     ensure(provider_interpreter.count('.write_all(') == 1
            and provider_interpreter.count('.write_all(&request)') == 1
            and provider_interpreter.count('TcpStream::connect_timeout(') == 1,

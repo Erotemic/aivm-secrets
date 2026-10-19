@@ -112,6 +112,17 @@ def mutate(repo, filename, before, after):
     (RUST + 'custody/manifest_session.rs',
      'finish: || reservation_call(true),', 'finish: || Ok(()),'),
     (RUST + 'custody/manifest_session.rs',
+     'if effect.write && !admitted_write {', 'if false {'),
+    (RUST + 'custody/manifest_session.rs',
+     'if effect.write {', 'if false {'),
+    (RUST + 'custody/manifest_session.rs',
+     'audit.write_record(&json!({', 'let _ = audit; // bypass\n        unchecked_record(&json!({'),
+    (RUST + 'custody/manifest_session.rs',
+     'Ok(AuditedDispatch { phase: self.phase, effect: self.effect })',
+     'Ok(AuditedDispatch { phase: DispatchPhase::Final, effect: self.effect })'),
+    (RUST + 'custody/manifest_session.rs',
+     "audited: &AuditedDispatch<'_>", 'audited: &Effect'),
+    (RUST + 'custody/manifest_session.rs',
      'let policy_hash = self.policy.digest();',
      'let policy_hash = "raw-policy-digest";'),
     (RUST + 'coordination.rs',
@@ -149,7 +160,7 @@ def mutate(repo, filename, before, after):
     ),
     (
         RUST + 'custody/manifest_session.rs',
-        'dispatch(PreparedDispatch::final_effect(&effect))?',
+        'dispatch(PreparedDispatch::final_effect(&effect, op.write)?)?',
         'self.base.executor.exchange_manifest(&self.base.grant.route, &secret, &effect, &self.policy.headers)?',
     ),
     (
@@ -164,8 +175,8 @@ def mutate(repo, filename, before, after):
     ),
     (
         RUST + 'custody/manifest_session.rs',
-        '            self.base.executor.audit.write_record(&json!({"schema":1,"event":"dispatch"',
-        '            println!("{:?}", &secret.0);\n            self.base.executor.audit.write_record(&json!({"schema":1,"event":"dispatch"',
+        '        audit.write_record(&json!({',
+        '        println!("{:?}", &secret.0);\n        audit.write_record(&json!({',
     ),
     (
         RUST + 'tls.rs',

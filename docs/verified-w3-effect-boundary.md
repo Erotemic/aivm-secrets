@@ -180,3 +180,25 @@ the 204 branch. The new native unit regression simulates a provider that
 never signals EOF. This is a source-reviewed repair, not a proof of upstream
 TLS semantics or full native-to-Lean refinement; rerun the Rust integration
 test and full gate on the maintainer toolchain.
+
+## Offline audited-dispatch transition, 2026-10-19
+
+The current `b91748b` follow-up introduces a **private `AuditedDispatch`**
+produced by consuming `PreparedDispatch` only after target reflection checks
+and `Audit::write_record` returns successfully (which calls `sync_all`). The
+native manifest executor's `exchange_manifest` signature now requires
+`&AuditedDispatch` rather than a raw `&Effect`. The preflight constructor
+rejects any write effect. The final constructor rejects a write selected from
+an admitted read operation. Freshness checks still happen at the existing
+late TLS-to-provider emission boundary: the audited type is **not** a
+long-lived authorization or freshness certificate.
+
+W3 source guards demand the reviewed constructor, the single interpreter
+callsite and the unchanged effect/phase identity; bypass-mutant tests rebaseline
+the SHA-256 file hash before trying to evade these checks. These are targeted
+source restrictions, not a proof of transitive mediation across Rust
+callbacks, dependencies, panics, or alternative native profiles. In
+particular, private fields are visible to other code in the same Rust module,
+so a compiler-visible arbitrary-constructor prohibition is not established
+solely by Rust type visibility. See
+[the offline read slice](garrett-native-read-refinement-slice.md).

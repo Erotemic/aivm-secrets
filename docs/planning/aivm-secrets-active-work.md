@@ -200,6 +200,19 @@ selects it explicitly and rejects skips. Binding/digest/frame adapters are
 tested, while the extracted freshness theorem scope remains unchanged; this
 does not promote broad broker CORE-01 parity.
 
+## Audited native read slice, 2026-10-19 (partial W3/W6)
+
+The [offline native read slice](../garrett-native-read-refinement-slice.md)
+restricts the native executor to a private audited-dispatch value and checks
+read-only operation phase/write invariants. Local HTTPS process tests now
+observe the durable-audit **file contents at provider request arrival** and
+the exact TLS guest JSONL reply, in addition to final provider and audit
+traces. The read-slice mutation tests preserve the original W3/W6 assumptions.
+This is a useful implementation/observation increment only: the Rust and Lean
+full gate must run on the maintainer's pinned toolchain, W4/W5 still specify
+abstract events, and whole-service implementation-to-proof refinement remains
+open. It does not close W3 transitive I/O reachability or W8 guest isolation.
+
 ## Product question and security objective
 
 A hostile agent should be able to perform a *real, specifically authorized*

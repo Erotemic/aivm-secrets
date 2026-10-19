@@ -596,8 +596,13 @@ class TLSService:
     test can assert on exactly what reached "the provider".
     """
 
-    def __init__(self, directory: Path, host: str = TLS_HOST, *, wire_headers: bool = False) -> None:
+    def __init__(self, directory: Path, host: str = TLS_HOST, *,
+                 wire_headers: bool = False,
+                 on_request: Callable[[dict[str, Any]], None] | None = None) -> None:
         self.host = host
+        # Called in the provider thread *after* receiving the request but
+        # *before* sending any HTTP response. Used only by causal test oracles.
+        self.on_request = on_request
         self.files = make_certificates(directory, host)
         self.routes: dict[tuple[str, str], Any] = {}
         self.requests: list[dict[str, Any]] = []
@@ -623,6 +628,8 @@ class TLSService:
                     seen['request_version'] = self.request_version
                 with service._lock:
                     service.requests.append(seen)
+                if service.on_request is not None:
+                    service.on_request(seen)
                 route = service.routes.get((self.command, self.path))
                 if isinstance(route, RawHTTPResponse):
                     try:

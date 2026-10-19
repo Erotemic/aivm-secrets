@@ -212,3 +212,36 @@ an extra read in this branch. This changes acceptance of 204 replies that
 lack clean connection shutdown but does not broaden credential-bearing
 outbound effects. These additions remain unexecuted as native tests in this
 environment; the maintainer's next Rust/full-system run is required.
+
+## Native read causal-observation increment, 2026-10-19
+
+The read-only `manifest-https-v1` synthetic provider now captures a snapshot
+of the **actual host audit log upon receiving each HTTP request, before the
+provider sends a reply**. The independent W6 oracle requires the matching
+preflight/final dispatch record to be present in that snapshot, confirms its
+phase/route and equality with the final audit, disallows premature completion,
+and checks the exact provider request against host-compiled effects. This
+eliminates a false-positive class in which an implementation writes the
+correct audit *after* sending the credentialed request; the previous final-log
+comparison could not distinguish those histories.
+
+A second native test path speaks mTLS directly to the production Rust bridge
+using a throwaway client certificate and collects raw TLS application reply
+bytes, not just the Rust CLI's decoded response. It checks a single
+newline-terminated canonical JSON frame for both success and refusal, with no
+literal synthetic credential/surrogate content. Local mutations of arrival
+audit order, phase, digest, missing/extra reply frames and changed disclosures
+must fail the observer. The same read profile includes a successful
+preflight+final case, a fact mismatch causing preflight-only emission,
+unauthorized operation denial, and post-renunciation denial.
+
+**Scope:** This is an empirical causal witness in a single sequential,
+read-only, synthetic native-process scenario. Reading the audit file at
+arrival witnesses visibility, not persistence through power loss or the
+absence of other native I/O. The oracle still uses the independent Python
+policy compiler and cannot establish all-input Rust/Python equivalence,
+complete call-graph reachability or a Lean abstraction theorem. TLS,
+read/write segmentation, timing/closure leakage and host isolation remain
+explicit premises. The existing W4/W5 Lean theorems are unchanged and are
+not represented as proofs of the added runtime observations. See
+[the offline read slice](garrett-native-read-refinement-slice.md).

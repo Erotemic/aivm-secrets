@@ -107,21 +107,34 @@ def review_semantics(contents: dict[str, str]) -> None:
     control = part(m, 'pub(super) fn control(', '\nfn manifest_request_bytes(')
     dispatch = part(request, 'let dispatch = |prepared: PreparedDispatch', 'let facts = if let Some(effect)')
     release = part(request, 'let release = (|| -> Outcome<Value> {', 'if sent_write {')
-    require('struct PreparedDispatch<' in m and 'enum DispatchPhase {' in m,
-            'native dispatch has no typed phase boundary')
+    reviewed = part(m, "impl<'a> PreparedDispatch<'a> {", 'pub(crate) struct Session {')
+    require('struct PreparedDispatch<' in m and 'enum DispatchPhase {' in m
+            and 'struct AuditedDispatch<' in m and m.count('AuditedDispatch {') == 1,
+            'native executor permit can be manufactured outside the audit transition')
+    require(same_order(reviewed, "fn preflight(effect: &'a Effect) -> Outcome<Self>",
+                       'if effect.write {',
+                       "fn final_effect(effect: &'a Effect, admitted_write: bool) -> Outcome<Self>",
+                       'if effect.write && !admitted_write {',
+                       'fn audit(', 'ensure_safe(', 'audit.write_record(',
+                       'Ok(AuditedDispatch {'),
+            'dispatch phase can escalate to write or produce permit without durable audit')
+    require('Ok(AuditedDispatch { phase: self.phase, effect: self.effect })' in reviewed,
+            'audited permit lost selected phase/effect identity')
     require(request.count('exchange_manifest(') == 1,
             'unexpected direct manifest HTTP dispatch outside the sole gated closure')
-    require(request.count('PreparedDispatch::preflight(&effect)') == 1
-            and request.count('PreparedDispatch::final_effect(&effect)') == 1,
-            'preflight/final not constrained to the reviewed dispatch constructor')
+    require(request.count('PreparedDispatch::preflight(&effect)?') == 1
+            and request.count('PreparedDispatch::final_effect(&effect, op.write)?') == 1,
+            'preflight/final not constrained to the reviewed write gate')
     require(same_order(dispatch,
-                       'ensure_safe(&json!({"target":effect.target})',
-                       'audit.write_record(', 'let pending = crate::coordination::PendingDispatch',
+                       'let recorded = prepared.audit(', 'let effect = recorded.effect;',
+                       'let pending = crate::coordination::PendingDispatch',
                        'executor.exchange_manifest(', 'coordination::dispatch(&pending, keyed_write)'),
-            'provider dispatch bypasses reflection, durable audit, or fresh authorization')
+            'provider dispatch bypasses durable audit or fresh authorization')
+    require('&recorded,' in dispatch and 'matches!(recorded.phase, DispatchPhase::Final)' in dispatch,
+            'executor is not passed the reviewed audited dispatch permit')
     require('check: &fresh,' in dispatch and 'reserve: || reservation_call(false),' in dispatch
             and 'finish: || reservation_call(true),' in dispatch
-            and 'matches!(prepared.phase, DispatchPhase::Final)' in dispatch
+            and 'matches!(recorded.phase, DispatchPhase::Final)' in dispatch
             and '&& effect.write' in dispatch and '&& self.base.coordinator.is_some()' in dispatch,
             'coordinated final write bypasses check/reserve/finish or phase classification')
     require('self.base.check_coordination()?;' in request
@@ -191,7 +204,11 @@ def review_semantics(contents: dict[str, str]) -> None:
     require(m.count('exchange_manifest(') == 2,
             'extra native manifest executor call site')
     transport = part(m, '    fn exchange_manifest(', '\nfn manifest_response(')
-    require(same_order(transport, 'let request = manifest_request_bytes(',
+    require('audited: &AuditedDispatch<' in transport
+            and 'let effect = audited.effect;' in transport,
+            'manifest provider executor accepts a raw, unaudited policy effect')
+    require(same_order(transport, 'let effect = audited.effect;',
+                       'let request = manifest_request_bytes(',
                        'TcpStream::connect_timeout(', 'while conn.is_handshaking()',
                        'let exchange = || -> Outcome<Value>', 'emit_current(fresh, || {'),
             'final authority admission does not follow provider TLS setup')
@@ -202,6 +219,14 @@ def review_semantics(contents: dict[str, str]) -> None:
     require('self.address,' in m and 'route.authentication' in m
             and 'ClientConnection::new(self.tls.clone(), name)' in m,
             'provider request no longer uses the reviewed host route / TLS identity')
+    # Prevent a trivially different low-level send/reconnect method from
+    # escaping the sole reviewed writer after a source digest is refreshed.
+    # This is deliberately a narrow known-sink check, not a complete Rust
+    # effect analysis or dependency/callback reachability result.
+    for bypass in ('.write(', '.write_vectored(', '.send(', '.send_to(',
+                   'TcpStream::connect(', 'UnixStream::connect('):
+        require(bypass not in transport,
+                'manifest provider added an alternate socket send/connect: ' + bypass)
     for forbidden in ('println!(', 'eprintln!(', 'std::fs::write(', 'std::net::TcpStream::connect('):
         require(forbidden not in m, 'unreviewed output path in manifest custody: ' + forbidden)
 

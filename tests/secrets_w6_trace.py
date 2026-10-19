@@ -91,6 +91,8 @@ def assert_native_effect_trace(
     sensitive: tuple[str, ...] = (),
     expected_result: Any = _UNSPECIFIED,
     expected_meta: Any = None,
+    audit_at_provider: list[list[dict[str, Any]]] | None = None,
+    guest_frame: bytes | None = None,
 ) -> None:
     """Check a complete observed prefix for one guest request.
 
@@ -110,6 +112,30 @@ def assert_native_effect_trace(
     require(len(provider) == len(planned), 'unexpected/missing credentialed provider send')
     require(len(dispatches) == len(planned), 'provider dispatch/audit mismatch')
     require(len(completions) == int(expect_success), 'completion audit/guest release mismatch')
+    if audit_at_provider is not None:
+        # Each snapshot is read by the local HTTPS server on arrival, before
+        # its response. Unlike the final log comparison this detects a broker
+        # which only writes the dispatch audit *after* sending credentials.
+        require(len(audit_at_provider) == len(provider), 'missing provider-arrival audit snapshot')
+        for index, (arrival, (phase, declared)) in enumerate(zip(audit_at_provider, planned)):
+            arrived_dispatch = [row for row in arrival if row.get('event') == 'dispatch']
+            require(len(arrived_dispatch) == index + 1,
+                    'dispatch audit was not present when provider received request')
+            require(not any(row.get('event') == 'completed' for row in arrival),
+                    'completion was audited before the provider replied')
+            require(arrived_dispatch[-1].get('phase') == phase and
+                    arrived_dispatch[-1].get('route') == {
+                        'host': host, 'port': port,
+                        'method': declared['method'], 'path': declared['target'],
+                    }, 'provider arrived before the matching selected-effect audit')
+            require(arrived_dispatch[-1] == dispatches[index],
+                    'provider-arrival dispatch record differs from final audit')
+    if guest_frame is not None:
+        require(type(guest_frame) is bytes and guest_frame.endswith(b'\n')
+                and guest_frame.count(b'\n') == 1,
+                'guest transport emitted an incomplete or additional frame')
+        require(guest_frame == codec.dumps(reply) + b'\n',
+                'guest transport bytes differ from canonical selected reply')
     require(reply.get('version') == 1, 'invalid guest version')
     require(reply.get('ok') is expect_success, 'guest reply success/denial mismatch')
     if expect_success:

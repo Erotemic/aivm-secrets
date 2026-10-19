@@ -4,11 +4,11 @@ use super::*;
 use crate::manifest::{disclosure::Disclosure, Effect, Policy};
 use aivm_secrets_garrett_core::{manifest as guards, open_surrogate};
 
-// W3 dispatch vocabulary: these two effects are the only credentialed HTTPS
-// phases exposed by the native manifest guest-request path. A PreparedDispatch
-// is constructed only after the policy compiler selects an Effect. It is not a
-// proof witness by itself; the enclosing request checks admission, fresh grant,
-// durable audit and selected route before the interpreter runs.
+// W3 dispatch vocabulary. A policy-compiled effect is not enough to invoke
+// credential-bearing I/O. The native executor takes an AuditedDispatch, which
+// can only be constructed by recording the selected phase, request identity and
+// route in the private host audit. This is a source-level boundary, not a
+// substitute for the late authority check or a proof of compiler reachability.
 #[derive(Clone, Copy)]
 enum DispatchPhase {
     Preflight,
@@ -26,18 +26,69 @@ struct PreparedDispatch<'a> {
     phase: DispatchPhase,
     effect: &'a Effect,
 }
+// Deliberately non-Copy and with private fields. Neither guest arguments nor
+// the manifest compiler can manufacture this type: only the private audited
+// transition below constructs it. The separate fresh check still runs after
+// provider TLS setup, immediately before credential-bearing network I/O.
+struct AuditedDispatch<'a> {
+    phase: DispatchPhase,
+    effect: &'a Effect,
+}
 impl<'a> PreparedDispatch<'a> {
-    fn preflight(effect: &'a Effect) -> Self {
-        Self {
+    fn preflight(effect: &'a Effect) -> Outcome<Self> {
+        // Preflight exists to check host facts, never to perform a write.
+        if effect.write {
+            return Err(Error::InvalidPolicy);
+        }
+        Ok(Self {
             phase: DispatchPhase::Preflight,
             effect,
-        }
+        })
     }
-    fn final_effect(effect: &'a Effect) -> Self {
-        Self {
+    fn final_effect(effect: &'a Effect, admitted_write: bool) -> Outcome<Self> {
+        // A read-only authorized operation cannot introduce a write while
+        // expanding a checked fact into its final effect.
+        if effect.write && !admitted_write {
+            return Err(Error::InvalidPolicy);
+        }
+        Ok(Self {
             phase: DispatchPhase::Final,
             effect,
-        }
+        })
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn audit(
+        self,
+        audit: &Audit,
+        policy: &Policy,
+        route: &core::Route,
+        identity: &Value,
+        operation: &str,
+        request_digest: &str,
+        secret: &Credential,
+    ) -> Outcome<AuditedDispatch<'a>> {
+        // A hostile provider fact cannot turn a credential into a route or
+        // an audit field. The body is intentionally absent from this record.
+        crate::manifest::disclosure::ensure_safe(
+            &json!({"target":self.effect.target}), &secret.0,
+        )?;
+        audit.write_record(&json!({
+            "schema":1,
+            "event":"dispatch",
+            "phase":self.phase.as_str(),
+            "grant":audit.grant,
+            "policy":audit.policy,
+            "identity":identity,
+            "operation":operation,
+            "request_digest":request_digest,
+            "route":{
+                "host":policy.host,
+                "port":route.port,
+                "method":self.effect.method,
+                "path":self.effect.target,
+            }
+        }))?;
+        Ok(AuditedDispatch { phase: self.phase, effect: self.effect })
     }
 }
 
@@ -356,16 +407,19 @@ impl Session {
         // Single admission-to-I/O boundary for preflight and final effects.
         // Neither raw facts nor a guest-provided URL is a PreparedDispatch.
         let dispatch = |prepared: PreparedDispatch<'_>| -> Outcome<Value> {
-            let effect = prepared.effect;
-            // A hostile fact must never turn a captured secret into a public
-            // route/audit coordinate. Request bodies stay off the audit sink.
-            crate::manifest::disclosure::ensure_safe(&json!({"target":effect.target}), &secret.0)?;
-            self.base.executor.audit.write_record(&json!({"schema":1,"event":"dispatch","phase":prepared.phase.as_str(),"grant":self.base.executor.audit.grant,"policy":self.base.executor.audit.policy,
-                "identity":crate::model::claims_json(&outer.claims)?,"operation":op.name,"request_digest":request_hash,
-                "route":{"host":self.policy.host,"port":self.base.grant.route.port,"method":effect.method,"path":effect.target}}))?;
+            let recorded = prepared.audit(
+                &self.base.executor.audit,
+                &self.policy,
+                &self.base.grant.route,
+                &crate::model::claims_json(&outer.claims)?,
+                &op.name,
+                &request_hash,
+                &secret,
+            )?;
+            let effect = recorded.effect;
             // Durable audit and a fresh grant both precede credentialed I/O.
             // Waiting for either must not extend identity or grant lifetime.
-            let keyed_write = matches!(prepared.phase, DispatchPhase::Final)
+            let keyed_write = matches!(recorded.phase, DispatchPhase::Final)
                 && effect.write
                 && self.base.coordinator.is_some();
             let mut headers = self.policy.headers.clone();
@@ -393,7 +447,7 @@ impl Session {
                     self.base.executor.exchange_manifest(
                         &self.base.grant.route,
                         &secret,
-                        effect,
+                        &recorded,
                         &headers,
                         &fresh,
                     )
@@ -403,7 +457,7 @@ impl Session {
             aivm_secrets_garrett_core::coordination::dispatch(&pending, keyed_write)
         };
         let facts = if let Some(effect) = self.policy.preflight(op, &args)? {
-            dispatch(PreparedDispatch::preflight(&effect))?
+            dispatch(PreparedDispatch::preflight(&effect)?)?
         } else {
             Value::Null
         };
@@ -413,7 +467,7 @@ impl Session {
         fresh()?;
         let sent_write = effect.as_ref().is_some_and(|e| e.write);
         let raw = if let Some(effect) = effect {
-            dispatch(PreparedDispatch::final_effect(&effect))?
+            dispatch(PreparedDispatch::final_effect(&effect, op.write)?)?
         } else {
             facts
         };
@@ -524,10 +578,11 @@ impl Executor {
         &self,
         route: &core::Route,
         secret: &Credential,
-        effect: &Effect,
+        audited: &AuditedDispatch<'_>,
         headers: &BTreeMap<String, String>,
         fresh: &impl Fn() -> Outcome<()>,
     ) -> Outcome<Value> {
+        let effect = audited.effect;
         // Validate all outbound bytes before connecting to any provider.
         // A malformed OAuth-issued credential must not reach a socket at all.
         let request = manifest_request_bytes(route, secret, effect, headers)?;
@@ -764,6 +819,18 @@ mod wire_tests {
     fn secret(bytes: &[u8]) -> Credential {
         Credential(Zeroizing::new(bytes.to_vec()))
     }
+    #[test]
+    fn unapproved_read_or_preflight_cannot_become_write_dispatch() {
+        let read = effect();
+        assert!(PreparedDispatch::preflight(&read).is_ok());
+        assert!(PreparedDispatch::final_effect(&read, false).is_ok());
+        let mut write = effect();
+        write.write = true;
+        assert!(matches!(PreparedDispatch::preflight(&write), Err(Error::InvalidPolicy)));
+        assert!(matches!(PreparedDispatch::final_effect(&write, false), Err(Error::InvalidPolicy)));
+        assert!(PreparedDispatch::final_effect(&write, true).is_ok());
+    }
+
     #[test]
     fn manifest_wire_is_one_origin_form_request_without_proxy_routing() {
         let mut headers = BTreeMap::new();

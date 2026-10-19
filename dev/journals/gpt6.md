@@ -385,3 +385,15 @@ Validation: W0, W3, W6 checks passed; 67 portable W3/W6 and TLS-fixture tests
 passed. Cargo, rustc and Lean are unavailable here; native unit/integration
 behavior remains to be reproduced by the maintainer, and the full gate must
 be rerun. No real provider, hardware TPM, service account or credential used.
+
+## 2026-10-19 15:08:00 -0400
+
+Native manifest read-only W3/W6 slice on b91748b. Chose an audited-effect
+handoff instead of a new protocol or broad feature work. Added preflight/write
+and read/write mismatch guards, with the existing final current-grant checks
+left intact. Added causal provider-arrival audit snapshots and actual guest
+frame capture over local mTLS; source/oracle mutant tests. Tradeoff: the audit
+receipt does not prove that the code complied at every reachable I/O sink,
+that sync_all survives power loss, or that the Lean abstract trace refines
+native behavior. Rust/Lean unavailable in the overlay authoring container;
+full toolchain validation remains required. No real credentials or services.
