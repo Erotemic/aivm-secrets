@@ -52,10 +52,13 @@ aivm-secrets identity call --socket /absolute/guest/identity.sock \
 ```
 
 The Python `identity.client.bound_call` API also accepts `identity_bundle` in
-place of `certificate` and `jwt_file`. Its TLS loader uses an anonymous Linux
-memfd containing only the snapshot's public certificate. The self-contained
-`aivm_secrets/guest.py` launcher still uses its existing separate-file interface;
-this increment adds no AIVM adapter.
+place of `certificate` and `jwt_file`. Its TLS loader reads the public
+certificate from an anonymous Linux temporary-file descriptor exposed through
+`/proc/self/fd`; `tempfile.TemporaryFile` does not require Python to expose
+`os.memfd_create`. No JWT or private key is staged. On a system lacking a
+usable anonymous temporary file or `/proc`, bundle-based TLS loading fails
+closed. The self-contained `aivm_secrets/guest.py` launcher still uses its
+existing separate-file interface; this increment adds no AIVM adapter.
 
 Native client configuration selects `identity_bundle` **instead of**
 `certificate`. Keep the existing explicit `software` or `tpm2` key configuration.
@@ -113,3 +116,14 @@ This does not prove whole-service secrecy or atomic filesystem semantics.
 Use `lake env lean -DwarningAsError=true GarrettBundle.lean` from `proofs/`
 for focused compilation, and the existing usable-system gate for the required
 Python/native scenarios. Tests use synthetic credentials only.
+
+## Verify the source actually exercised by isolated subprocesses
+
+The full system gate runs some identity commands with `python -I` to avoid
+importing code from the caller's current directory or PYTHONPATH. A regular
+source-tree import can therefore be current while those commands import an
+older installed version. `dev/verification/system.py` now checks the isolated
+import location before the Rust build. When it detects an outdated install,
+refresh the active environment with `uv pip install -e . --no-deps` from this
+checkout, then rerun the gate. Do not change those tests to non-isolated
+subprocesses as a workaround.

@@ -347,6 +347,53 @@ def test_native_gh_uses_bundle_and_rejects_ambiguous_inputs(tmp_path):
             assert len(provider.seen()) == 1
 
 
+def test_isolated_python_cli_installs_current_bundle(material, tmp_path):
+    """The installed -I entrypoint must support the checkout's bundle verb."""
+    import sys
+    certs, first, _ = material
+    target = tmp_path / 'identity.json'
+    command = [sys.executable, '-I', '-m', 'aivm_secrets', 'identity',
+               'install-bundle', '--certificate', str(certs['client1'][0]),
+               '--jwt-file', str(first), '--output', str(target)]
+    result = subprocess.run(command, capture_output=True, timeout=15)
+    assert result.returncode == 0 and not result.stderr, result
+    observed = codec.loads(result.stdout)
+    assert observed['digest'] == hashlib.sha256(target.read_bytes()).hexdigest()
+    assert bundle.load(target).capability == first.read_text()
+    assert first.read_bytes().strip() not in result.stdout
+
+
+def test_python_bundle_tls_works_without_memfd_create(material, tmp_path, monkeypatch):
+    """Python builds lacking memfd_create must still use the loaded pair."""
+    from aivm_secrets.identity.client import bound_call
+    from tests.test_rust_line_framing import ReplyPeer, LINE, REPLY, REQUEST
+    certs, first, _ = material
+    target = tmp_path / 'identity.json'
+    invoke('python', certs['client1'][0], first, target)
+    monkeypatch.delattr(os, 'memfd_create', raising=False)
+    with ReplyPeer(tmp_path, certs, [LINE], token=first.read_text()) as peer:
+        assert bound_call(socket_path=peer.path, ca=certs['ca'],
+            private_key=certs['client1'][1], identity_bundle=target,
+            request=REQUEST) == REPLY
+    assert peer.seen[0]['capability'] == first.read_text()
+
+
+def test_python_bundle_tls_fails_closed_without_anonymous_file(material, tmp_path, monkeypatch):
+    from aivm_secrets.identity import client
+    certs, first, _ = material
+    target = tmp_path / 'identity.json'
+    invoke('python', certs['client1'][0], first, target)
+
+    def unavailable(*args, **kwargs):
+        raise OSError('synthetic anonymous temporary-file denial')
+
+    monkeypatch.setattr(client.tempfile, 'TemporaryFile', unavailable)
+    with pytest.raises(SecretsError) as caught:
+        client.bound_call(socket_path=tmp_path / 'absent.sock', ca=certs['ca'],
+            private_key=certs['client1'][1], identity_bundle=target, request={})
+    assert caught.value.code == 'invalid_capability'
+
+
 def test_python_call_keeps_loaded_pair_when_bundle_changes_before_tls(material, tmp_path, monkeypatch):
     from aivm_secrets.identity.client import bound_call
     from tests.test_rust_line_framing import ReplyPeer, LINE, REPLY, REQUEST

@@ -70,6 +70,7 @@ WORKFLOW_TESTS = [
     'tests/test_rust_http_wire.py',
     'tests/test_rust_line_framing.py',
     'tests/test_rust_json_reflection.py::test_actual_manifest_checks_selected_decoded_text_before_release',
+    'tests/test_system_package_isolation.py',
     'tests/test_identity_bundle.py',
     'tests/test_rust_garrett_authority.py::test_tpm_requirement_rejects_software_before_credential_custody',
 ]
@@ -90,6 +91,33 @@ def require_no_skips(report: Path) -> int:
     if not cases:
         raise RuntimeError('Workflow gate collected no tests')
     return len(cases)
+
+
+def require_isolated_checkout(python: str, env: dict[str, str]) -> Path:
+    """Refuse workflow evidence from an outdated `python -I` installation.
+
+    Some identity/authority tests intentionally use `-I`, which ignores the
+    runner's PYTHONPATH. A stale wheel can otherwise be tested alongside the
+    current checkout and cause false successes or unrelated CLI failures.
+    """
+    expected = (ROOT / 'aivm_secrets/identity/cli.py').resolve()
+    probe = subprocess.run(
+        [python, '-I', '-c',
+         'from aivm_secrets.identity import cli; print(cli.__file__)'],
+        cwd=ROOT, env=env, capture_output=True, text=True, timeout=15,
+    )
+    observed = probe.stdout.strip()
+    if probe.returncode != 0 or not observed or Path(observed).resolve() != expected:
+        where = observed if probe.returncode == 0 and observed else 'not importable'
+        raise RuntimeError(
+            'Isolated Python uses aivm_secrets.identity.cli from '
+            f'{where}, not the current checkout {expected}. '
+            'The -I flag ignores PYTHONPATH. Reinstall this checkout in the '
+            'active environment (uv pip install --python "$(command -v python)" '
+            '--no-deps -e .), then rerun '
+            'the gate. Do not count mixed installed/source tests as evidence.'
+        )
+    return expected
 
 
 def source_fingerprint() -> dict[str, str]:
@@ -152,6 +180,9 @@ def main() -> int:
 
     save()
     try:
+        print('isolated-python-source', flush=True)
+        manifest['isolated_python_cli_source'] = str(require_isolated_checkout(python, env))
+        save()
         run('native-build', ['cargo', 'build', '--locked', '--manifest-path',
                             'rust/Cargo.toml', '--bins', '--features', 'conformance,coordinator-server'])
         # Import only the existing runner registry; do not substitute a Python

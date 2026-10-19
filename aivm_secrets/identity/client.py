@@ -7,8 +7,8 @@ broker. No raw HTTP forwarding, OAuth or fallback to an unbound socket exists.
 from __future__ import annotations
 
 import socket
-import os
 import ssl
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -119,16 +119,18 @@ def bound_call(*, socket_path: Path, ca: Path, certificate: Path | None = None,
     if bundle is None:
         context.load_cert_chain(str(Path(certificate).expanduser()), str(key))
     else:
-        # OpenSSL's Python API takes a path. An anonymous Linux memfd carries
-        # only the public cert from this snapshot; no JWT or key is staged.
-        fd = os.memfd_create('aivm-client-certificate', os.MFD_CLOEXEC)
-        with os.fdopen(fd, 'wb') as stream:
-            stream.write(bundle.certificate)
-            stream.flush()
-            try:
-                context.load_cert_chain(f'/proc/self/fd/{fd}', str(key))
-            except ssl.SSLError:
-                raise SecretsError('invalid_capability') from None
+        # OpenSSL requires a certificate pathname. TemporaryFile provides an
+        # anonymous, already-unlinked descriptor on Linux, including Python
+        # builds without os.memfd_create. Only the public cert from the one
+        # loaded snapshot is copied; the JWT and private key are never staged.
+        # Keep the descriptor open until OpenSSL has consumed the certificate.
+        try:
+            with tempfile.TemporaryFile(mode='w+b') as stream:
+                stream.write(bundle.certificate)
+                stream.flush()
+                context.load_cert_chain(f'/proc/self/fd/{stream.fileno()}', str(key))
+        except OSError:
+            raise SecretsError('invalid_capability') from None
     outgoing = {'version': 1, 'capability': jwt, 'request': request}
     wire.parse_frame(outgoing)
     data = codec.dumps(outgoing) + b'\n'
