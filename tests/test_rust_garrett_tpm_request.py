@@ -3,7 +3,6 @@
 import hashlib
 import os
 import select
-import shutil
 import subprocess
 
 import pytest
@@ -19,20 +18,12 @@ from tests.test_rust_garrett_authority import (
 )
 from tests.test_rust_garrett_certificates import creation_evidence
 from tests.test_rust_garrett_provider import provider_directory
-from tests.test_rust_garrett_tpm import SoftwareTPM
+from tests.test_rust_garrett_tpm import SoftwareTPM, require_software_tpm_tools
 
 
 @pytest.fixture
 def provisioned(tmp_path):
-    missing = [
-        n
-        for n in ["swtpm", "tpm2_sign", "tpm2_readpublic", "tpm2_createprimary"]
-        if not shutil.which(n)
-    ]
-    if missing:
-        if os.getenv("AIVM_SECRETS_REQUIRE_TPM_TESTS") == "1":
-            pytest.fail(f"required TPM tools missing: {missing}")
-        pytest.skip(f"install TPM tools: {missing}")
+    require_software_tpm_tools()
     state, work = tmp_path / "tpm", tmp_path / "work"
     state.mkdir(mode=0o700)
     work.mkdir(mode=0o700)

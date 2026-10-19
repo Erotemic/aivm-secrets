@@ -640,8 +640,16 @@ class TLSService:
                     status, headers = 200, {}
                     data = json.dumps(route).encode()
                 self.send_response(status)
-                headers = {'Content-Type': 'application/json', **headers}
-                headers.setdefault('Content-Length', str(len(data)))
+                # A 204 ends after the header section (RFC 9110). The old
+                # fixture emitted Content-Length: 0, making otherwise valid
+                # text-operation tests fail the hardened production parser.
+                # Explicit caller headers remain untouched so tests can still
+                # deliberately inject forbidden framing as adversarial input.
+                if status == 204:
+                    headers = dict(headers)
+                else:
+                    headers = {'Content-Type': 'application/json', **headers}
+                    headers.setdefault('Content-Length', str(len(data)))
                 headers.setdefault('Connection', 'close')
                 for key, value in headers.items():
                     self.send_header(key, value)

@@ -489,16 +489,11 @@ def test_inner_envelope_bidirectional_reference_interoperability():
 
 
 def test_tpm_client_rust_custody_and_provider_without_python_broker():
-    import shutil
-    import pytest
-    from tests.test_rust_garrett_tpm import SoftwareTPM
+    from tests.test_rust_garrett_tpm import SoftwareTPM, require_software_tpm_tools
 
     executable("AIVM_SECRETS_RUST_GARRETT_BRIDGE")
     executable("AIVM_SECRETS_RUST_GARRETT_CLIENT")
-    if not shutil.which("swtpm"):
-        if os.getenv("AIVM_SECRETS_REQUIRE_TPM_TESTS") == "1":
-            pytest.fail("required swtpm is missing")
-        pytest.skip("install swtpm and tpm2-tools")
+    require_software_tpm_tools()
     with tempfile.TemporaryDirectory(prefix="agpx-") as directory:
         p = Path(directory)
         state = p / "tpm"

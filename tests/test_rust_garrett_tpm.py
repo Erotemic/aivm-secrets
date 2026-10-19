@@ -25,13 +25,40 @@ from tests.secrets_helpers import REPO, TOKEN
 from tests.test_rust_garrett import BoundBridge, executable, run
 
 
+# The shared emulator fixture needs more than the swtpm executable. Check the
+# entire set before starting an optional test so a partial apt installation
+# never produces a late, misleading FileNotFoundError from subprocess.Popen.
+SOFTWARE_TPM_TOOLS = (
+    'swtpm',
+    'tpm2_createprimary',
+    'tpm2_evictcontrol',
+    'tpm2_flushcontext',
+    'tpm2_readpublic',
+    'tpm2_sign',
+    'tpm2_certifycreation',
+)
+
+
+def require_software_tpm_tools() -> None:
+    missing = [name for name in SOFTWARE_TPM_TOOLS if shutil.which(name) is None]
+    if not missing:
+        return
+    message = (
+        f'local software TPM prerequisites missing: {", ".join(missing)}; '
+        'install swtpm and tpm2-tools (Ubuntu: sudo apt install swtpm tpm2-tools)'
+    )
+    if os.getenv('AIVM_SECRETS_REQUIRE_TPM_TESTS') == '1':
+        pytest.fail(message)
+    pytest.skip(message)
+
+
 class SoftwareTPM:
     def __init__(self, directory):
         self.directory = Path(directory)
 
     def tool(self, name, *args):
         return subprocess.run(
-            [f"/usr/bin/tpm2_{name}", "-Q", "-T", self.tcti, *map(str, args)],
+            [f"tpm2_{name}", "-Q", "-T", self.tcti, *map(str, args)],
             capture_output=True,
             timeout=15,
             check=True,
@@ -42,7 +69,7 @@ class SoftwareTPM:
         self.tcti = f"swtpm:path={p}/tpm.sock"
         self.process = subprocess.Popen(
             [
-                "/usr/bin/swtpm",
+                "swtpm",
                 "socket",
                 "--tpm2",
                 "--tpmstate",
@@ -187,15 +214,7 @@ def test_tpm_tls_success_wrong_auth_and_pinned_key_rejection():
     client = executable("AIVM_SECRETS_RUST_GARRETT_CLIENT")
     runner = executable("AIVM_SECRETS_RUST_GARRETT_RUNNER")
     bridge = executable("AIVM_SECRETS_RUST_GARRETT_BRIDGE")
-    missing = [
-        name
-        for name in ["swtpm", "tpm2_sign", "tpm2_createprimary"]
-        if not shutil.which(name)
-    ]
-    if missing:
-        if os.getenv("AIVM_SECRETS_REQUIRE_TPM_TESTS") == "1":
-            pytest.fail(f"required TPM test tools missing: {missing}")
-        pytest.skip(f"install swtpm and tpm2-tools: {missing}")
+    require_software_tpm_tools()
     with tempfile.TemporaryDirectory(prefix="agt-") as directory:
         p = Path(directory)
         state = p / "tpm"
@@ -270,10 +289,7 @@ def test_tpm_tls_success_wrong_auth_and_pinned_key_rejection():
 
 def test_fresh_creation_evidence_under_pinned_attestation_key():
     runner = executable("AIVM_SECRETS_RUST_GARRETT_RUNNER")
-    if not shutil.which("swtpm"):
-        if os.getenv("AIVM_SECRETS_REQUIRE_TPM_TESTS") == "1":
-            pytest.fail("required swtpm is missing")
-        pytest.skip("install swtpm and tpm2-tools")
+    require_software_tpm_tools()
     with tempfile.TemporaryDirectory(prefix="aga-") as directory:
         p = Path(directory)
         with SoftwareTPM(p) as tpm:

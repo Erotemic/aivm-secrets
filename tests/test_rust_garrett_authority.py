@@ -494,12 +494,9 @@ def test_waiting_for_authority_lease_does_not_extend_token_lifetime():
 
 def test_normal_authority_tpm_challenge_enrollment_and_provider_action():
     from tests.test_rust_garrett_certificates import creation_evidence, tpm_csr
-    from tests.test_rust_garrett_tpm import SoftwareTPM
+    from tests.test_rust_garrett_tpm import SoftwareTPM, require_software_tpm_tools
 
-    if not shutil.which("swtpm"):
-        if os.getenv("AIVM_SECRETS_REQUIRE_TPM_TESTS") == "1":
-            pytest.fail("required swtpm is missing")
-        pytest.skip("install swtpm and tpm2-tools")
+    require_software_tpm_tools()
     with tempfile.TemporaryDirectory(prefix="agadmin-") as directory:
         p = Path(directory)
         authority = AuthorityCase(p)

@@ -9,6 +9,7 @@ refuses to do whatever a provider answers (ROUTE-01, COMP-01).
 from __future__ import annotations
 
 import socket
+import ssl
 import threading
 import time
 from dataclasses import replace
@@ -584,3 +585,26 @@ def test_204_with_forbidden_body_framing_is_denied(tmp_path, framing):
         assert failed(runner.execute, authorized(text_effect), SERVICE_TOKEN).code == (
             'upstream_response'
         )
+
+
+def test_synthetic_tls_204_is_bodyless_and_has_no_framing_headers(tmp_path):
+    """Our local fixture must not make valid 204 replies look malicious."""
+    with TLSService(tmp_path) as service:
+        service.routes[('GET', '/empty')] = lambda _: (204, {}, b'')
+        context = ssl.create_default_context(cafile=str(service.files['ca']))
+        with socket.create_connection(('127.0.0.1', service.port), timeout=5) as sock:
+            with context.wrap_socket(sock, server_hostname=service.host) as peer:
+                peer.sendall(
+                    b'GET /empty HTTP/1.1\r\n'
+                    + f'Host: {service.host}\r\n'.encode()
+                    + b'Connection: close\r\n\r\n'
+                )
+                reply = bytearray()
+                while fragment := peer.recv(4096):
+                    reply.extend(fragment)
+    head, separator, body = bytes(reply).partition(b'\r\n\r\n')
+    assert separator == b'\r\n\r\n'
+    assert head.startswith(b'HTTP/1.1 204 ')
+    assert b'content-length:' not in head.lower()
+    assert b'transfer-encoding:' not in head.lower()
+    assert body == b''

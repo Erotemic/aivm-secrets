@@ -310,3 +310,56 @@ Tests used synthetic certificates and tokens and localhost transports only.
 - Validation executed: Python structural W0/W3/W6 checkers passed; 135 targeted Python tests passed, including W3 guard mutation tests, egress cases, and the W6 oracle. Python compileall completed. A prior loopback W1 workflow reported three passing tests but pytest process shutdown did not terminate within the outer shell time limit. No network service other than local test TLS endpoints was contacted by those tests.
 - Environment limitation: `python -m build` failed because the Python `build` module is not installed, and cargo/rustc/lean are unavailable. Authoritative `python dev/verification/system.py --proofs --full-tests` must be run on a provisioned maintainer machine; full native acceptance is pending.
 - Confidence: high in the exercised Python behavior and portable guards, moderate in the source-reviewed Rust edit pending compile/tests, low for any broader confinement, noninterference or runtime isolation claim. No source-level guarantee about unobserved guest I/O is asserted.
+
+## 2026-10-19 11:12:00 -0400
+
+Follow-up to the offline HTTP/W6 overlay after the maintainer's full workflow
+gate reported 479 passes and eight identity-bundle failures. Six exercised
+`os.memfd_create` on a Python build without that attribute; two used a stale
+installed `aivm-secrets` CLI under `python -I`, which ignores the gate's
+`PYTHONPATH`. The current source already contained `install-bundle`.
+
+Replaced the Linux memfd assumption with `tempfile.TemporaryFile` and the
+existing `/proc/self/fd/N` certificate path. This remains an anonymous
+certificate-only snapshot; the JWT and key are never copied. TLS verification,
+identity selection, and wire behavior do not change. Temporary-file or loader
+failures are closed as `invalid_capability`. A new real TLS test removes
+`os.memfd_create`, another injects a temporary-file failure, and the existing
+mid-call bundle-replacement and wrong-private-key tests remain covered.
+
+Added an early system-gate probe using the same isolated interpreter (`-I`)
+that selected tests use. It rejects an installed package from another source
+location with a specific editable-install instruction, before running the
+expensive Rust/Lean build. Added positive and adversarial guard tests and a
+positive real CLI bundle-install subprocess test. Do not bypass `-I`; reinstall
+the current checkout with `uv pip install --python "$(command -v python)" --no-deps -e .` instead.
+
+Validation in a local editable test environment: 9 focused bundle/guard tests,
+22 identity/operator/mTLS tests, and 71 HTTPS-egress/W1 synthetic workflow
+tests passed (102 distinct passing cases); W0, W3, and W6 structural review
+checks passed; `git diff --check` passed. Also reproduced detection of an
+isolated interpreter importing the previous checkout. Cargo and Lean were not
+available in this environment, so those gates remain for the maintainer.
+This is a portability/verification-environment repair, not a new claim about
+whole-service credential confinement or VM isolation.
+
+## 2026-10-19 11:53:00 -0400
+
+Follow-up to maintainer full-system run after the Python identity-bundle
+compatibility overlay: all required workflows and proof stages completed;
+`full-python-native` reported 2,734 passed, six failed, seven skipped. Four
+failures reached optional software-TPM tests with `swtpm` present but missing
+`tpm2_createprimary`. Fixed the partial prerequisite check by centralizing
+all TPM CLI requirements, using PATH resolution, and maintaining explicit
+fail (required) versus skip (optional) semantics. Suggested an opt-in, offline
+`sudo apt install swtpm tpm2-tools` to get real emulator test coverage.
+
+A synthetic HTTPS fixture advertised `Content-Length: 0` on HTTP 204 while
+the hardened production parsers rightly reject this framing. Fixed the
+fixture, retained the deliberate malformed-response injection capability,
+and added a real loopback-TLS wire regression. Also corrected the installed
+CLI independence test: AIVM may be separately installed on a development
+machine, so actively reject attempts to import AIVM rather than requiring
+its global absence. No Rust/Lean source, protocol, policy, or production code
+changed. Full native tests and pinned Lean proofs still require execution on
+the maintainer's provisioned environment; no production credential used.

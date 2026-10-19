@@ -7,7 +7,6 @@ import base64
 import hashlib
 import os
 from pathlib import Path
-import shutil
 import tempfile
 import time
 
@@ -375,14 +374,11 @@ def creation_evidence(tpm):
 
 
 def test_attested_csr_key_is_certified_and_performs_provider_action():
-    from tests.test_rust_garrett_tpm import SoftwareTPM
+    from tests.test_rust_garrett_tpm import SoftwareTPM, require_software_tpm_tools
     from tests.test_rust_garrett_provider import ProviderCase, provider_directory
     from tests.secrets_helpers import TLSService, TOKEN
 
-    if not shutil.which("swtpm"):
-        if os.getenv("AIVM_SECRETS_REQUIRE_TPM_TESTS") == "1":
-            pytest.fail("required swtpm is missing")
-        pytest.skip("install swtpm and tpm2-tools")
+    require_software_tpm_tools()
     with tempfile.TemporaryDirectory(prefix="agcert-") as directory:
         p = Path(directory)
         state, work = p / "tpm", p / "work"

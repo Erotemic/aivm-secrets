@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tarfile
+import textwrap
 import zipfile
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -54,11 +55,30 @@ def test_standalone_wheel_and_sdist(tmp_path: Path) -> None:
 
 
 def test_installed_cli_has_no_vm_manager_dependency(tmp_path: Path) -> None:
+    # This is a development machine: AIVM may be installed independently.
+    # Its mere presence cannot mean aivm-secrets depends on it. Exercise the
+    # installed distribution under -I with an import guard that rejects any
+    # attempt to import AIVM, even when AIVM is importable in site-packages.
+    probe = textwrap.dedent("""\
+        import sys
+
+        assert not any(n == 'aivm' or n.startswith('aivm.') for n in sys.modules)
+        class ForbidAivm:
+            def find_spec(self, fullname, path=None, target=None):
+                if fullname == 'aivm' or fullname.startswith('aivm.'):
+                    raise RuntimeError('aivm-secrets attempted to import AIVM')
+                return None
+
+        sys.meta_path.insert(0, ForbidAivm())
+        from aivm_secrets.cli import main
+        try:
+            main(['--help'])
+        except SystemExit as error:
+            assert error.code in (0, None)
+        assert not any(n == 'aivm' or n.startswith('aivm.') for n in sys.modules)
+    """)
     result = subprocess.run(
-        [sys.executable, '-I', '-c',
-         'import importlib.util; '
-         'assert importlib.util.find_spec("aivm") is None; '
-         'from aivm_secrets.cli import main; main(["--help"])'],
+        [sys.executable, '-I', '-c', probe],
         cwd=tmp_path, check=True, capture_output=True, text=True, timeout=20,
     )
     assert 'aivm-secrets' in result.stdout
