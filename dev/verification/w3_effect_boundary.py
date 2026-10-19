@@ -106,7 +106,7 @@ def review_semantics(contents: dict[str, str]) -> None:
             'approval identity or late revocation fencing bypassed')
     control = part(m, 'pub(super) fn control(', '\nfn manifest_request_bytes(')
     dispatch = part(request, 'let dispatch = |prepared: PreparedDispatch', 'let facts = if let Some(effect)')
-    release = part(request, 'let release = (|| -> Outcome<Value> {', 'if sent_write {')
+    release = part(request, 'let release = (|| -> Outcome<CompletedRelease> {', 'if sent_write {')
     reviewed = part(m, "impl<'a> PreparedDispatch<'a> {", 'pub(crate) struct Session {')
     require('struct PreparedDispatch<' in m and 'enum DispatchPhase {' in m
             and 'struct AuditedDispatch<' in m and m.count('AuditedDispatch {') == 1,
@@ -147,9 +147,17 @@ def review_semantics(contents: dict[str, str]) -> None:
     reservation = part(request, 'let reservation = retry.map(', 'guards::authorize(')
     require('let policy_hash = self.policy.digest();' in reservation,
             'coordinated request no longer uses normalized policy identity')
+    completed = part(m, 'struct CompletedRelease(Value);', 'pub(crate) struct Session {')
+    require(completed.count('Ok(Self(reply))') == 1 and
+            same_order(completed, 'fn after_completion(', 'audit.write_record(',
+                       'Ok(Self(reply))', 'fn into_public('),
+            'completed guest release can be manufactured before the completion audit')
     require(same_order(release, 'self.disclosure.project(', 'ensure_safe(&reply',
-                       'audit.write_record(', 'Ok(reply)'),
-            'guest release bypasses selected disclosure/reflection/audit')
+                       'CompletedRelease::after_completion('),
+            'guest release bypasses selected disclosure/reflection/completion')
+    require('release.map(CompletedRelease::into_public)' in request and
+            'release.map_err(|_| Error::OutcomeUnknown).map(CompletedRelease::into_public)' in request,
+            'guest result bypasses audited release or sent-write uncertainty')
     require('guards::authorize(' in request and 'open_surrogate(' in request
             and 'self.policy.operation(&request)' in request,
             'native request missing authorizing guard / policy compiler')

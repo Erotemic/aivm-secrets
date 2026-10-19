@@ -107,3 +107,21 @@ def test_w6_204_cannot_wait_for_transport_eof(tmp_path):
         marker, marker + '            reader.take(1).read_to_end(&mut body)?;\n', 1))
     with pytest.raises(ContractError, match='waits for EOF after 204'):
         check(checkout)
+
+
+
+def test_w6_completion_audit_is_required_before_native_public_success(tmp_path):
+    checkout = fixture_checkout(tmp_path)
+    path = checkout / SOURCE
+    original = path.read_text()
+    marker = 'CompletedRelease::after_completion('
+    assert marker in original
+    path.write_text(original.replace(marker, 'unchecked_release(', 1))
+    with pytest.raises(ContractError, match='selected/reflection-checked release'):
+        check(checkout)
+    path.write_text(original.replace(
+        '        Ok(Self(reply))', '        Ok(Self(reply)) // missing audit', 1).replace(
+        '        audit.write_record(&json!({\n            "schema":1,\n            "event":"completed",',
+        '        unchecked_record(&json!({\n            "schema":1,\n            "event":"completed",', 1))
+    with pytest.raises(ContractError, match='completion audit'):
+        check(checkout)

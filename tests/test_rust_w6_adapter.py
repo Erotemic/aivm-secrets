@@ -16,13 +16,16 @@ from tests.secrets_github_scenario import (
     ALLOWED_PR, CHECKS, CHECKS_PATH, DIFF, HEAD_SHA, PULL, PULL_PATH, install_github_routes,
 )
 from aivm_secrets.kernel import codec
+from aivm_secrets.kernel.service import parse_policy
+from aivm_secrets.primitives import codec as strict_codec
+from tests.secrets_w6_release import ReleaseMismatch, release as approved_release
 from tests.secrets_helpers import TOKEN, RawHTTPResponse, TLSService
 from tests.secrets_w6_trace import (
     TraceMismatch, assert_native_effect_trace, records, audit_since,
 )
 from tests.test_rust_garrett_manifest import (
     ManifestCase, policy as ticket_policy, disclosure as ticket_disclosure,
-    provider_directory, reference_compile,
+    provider_directory, reference_compile, checked,
 )
 from tests.test_rust_w2_github_workflow import (
     arguments, native_disclosure, native_policy,
@@ -83,7 +86,7 @@ def effects(policy, operation, args, facts):
 
 def trace_of(case, tmp_path, server, operation, args, planned, *, successful=True,
              expected_result=None, expected_meta=None, provider_arrivals=None,
-             raw_guest=False):
+             raw_guest=False, check_digest=False):
     requests_before, audit_before = snapshot(tmp_path, server)
     if raw_guest:
         reply, wire = native_guest_frame(case, operation=operation, arguments=args)
@@ -96,6 +99,10 @@ def trace_of(case, tmp_path, server, operation, args, planned, *, successful=Tru
         expected['expected_result'] = expected_result
     if expected_meta is not None:
         expected['expected_meta'] = expected_meta
+    if check_digest and planned:
+        parsed = parse_policy(json.loads(case.policy_file.read_text()))
+        normalized = parsed.parse_request({'operation': operation, 'arguments': args})
+        expected['expected_request_digest'] = strict_codec.digest(normalized.to_dict())
     if provider_arrivals is not None:
         expected['audit_at_provider'] = [
             rows[audit_before:] for rows in provider_arrivals[requests_before:]
@@ -477,3 +484,122 @@ def test_w6_json_marker_object_cannot_satisfy_integer_disclosure(tmp_path, marke
             assert 'result' not in reply
             assert len(server.seen()) == 1
             assert TOKEN not in json.dumps(reply)
+
+
+
+def test_w6_native_no_preflight_pagination_is_exact_selected_guest_release(tmp_path):
+    """W4 NO-PREFLIGHT/W5 METADATA: finite concrete trace, without Lean claim."""
+    arrivals = []
+    audit_file = tmp_path / 'provider-audit.jsonl'
+    with TLSService(provider_directory(tmp_path), host='api.example.org',
+                    wire_headers=True, on_request=lambda _: arrivals.append(records(audit_file))) as server:
+        p = ticket_policy(tmp_path, server)
+        releases = ticket_disclosure()
+        args = {'page': 2, 'state': 'closed'}
+        route = ('GET', '/v1/tickets?page=2&state=closed')
+        provider_reply = {'rows': [
+            {'id': 7, 'token': TOKEN, 'nested': {'private': 'first'}},
+            {'id': 8, 'token': 'other-private', 'debug': ['ignore']},
+        ]}
+        server.routes[route] = provider_reply
+        compiled = reference_compile(p, {'operation': 'ticket.list', 'arguments': args})
+        assert compiled['ok'] and compiled['result']['preflight'] is None
+        normalized = compiled['result']['request']['arguments']
+        with ManifestCase(tmp_path, server, p, releases, writes='deny') as case:
+            expected_result, expected_meta = approved_release(
+                p, releases, 'ticket.list', normalized, provider_reply, credential=TOKEN)
+            first = trace_of(case, tmp_path, server, 'ticket.list', args,
+                             effects(p, 'ticket.list', args, None),
+                             expected_result=expected_result, expected_meta=expected_meta,
+                             provider_arrivals=arrivals, raw_guest=True, check_digest=True)
+            assert first['result'] == {'rows': [{'id': 7}, {'id': 8}]}
+            assert first['meta']['pagination'] == {
+                'page': 2, 'per_page': 2, 'possibly_more': True,
+            }
+            # Change only unselected provider state. The complete canonical
+            # guest reply, including length and public metadata, is invariant.
+            provider_reply = copy.deepcopy(provider_reply)
+            provider_reply['rows'][0]['token'] = 'another unselected private value'
+            provider_reply['rows'][0]['nested']['private'] = 'second'
+            server.routes[route] = provider_reply
+            result, meta = approved_release(
+                p, releases, 'ticket.list', normalized, provider_reply, credential=TOKEN)
+            second = trace_of(case, tmp_path, server, 'ticket.list', args,
+                              effects(p, 'ticket.list', args, None),
+                              expected_result=result, expected_meta=meta,
+                              provider_arrivals=arrivals, raw_guest=True, check_digest=True)
+            assert strict_codec.dumps(first) == strict_codec.dumps(second)
+            # The public possibly_more bit is allowed to change because the
+            # count of raw provider rows is an explicit W5 declassification.
+            shorter = {'rows': [provider_reply['rows'][0]]}
+            server.routes[route] = shorter
+            result, meta = approved_release(
+                p, releases, 'ticket.list', normalized, shorter, credential=TOKEN)
+            third = trace_of(case, tmp_path, server, 'ticket.list', args,
+                             effects(p, 'ticket.list', args, None),
+                             expected_result=result, expected_meta=meta,
+                             provider_arrivals=arrivals, raw_guest=True, check_digest=True)
+            assert third['meta']['pagination']['possibly_more'] is False
+            # A selected Boolean is not an integer, despite Python True == 1.
+            server.routes[route] = {'rows': [{'id': True}]}
+            with pytest.raises(ReleaseMismatch):
+                approved_release(p, releases, 'ticket.list', normalized,
+                                 {'rows': [{'id': True}]}, credential=TOKEN)
+            denial = trace_of(case, tmp_path, server, 'ticket.list', args,
+                              effects(p, 'ticket.list', args, None),
+                              successful=False, provider_arrivals=arrivals,
+                              raw_guest=True, check_digest=True)
+            assert denial['error']['code'] == 'upstream_response'
+            # Malformed guest arguments do not authorize any provider request.
+            denied = trace_of(case, tmp_path, server, 'ticket.list',
+                              dict(args, url='https://attacker.invalid'), [],
+                              successful=False, provider_arrivals=arrivals,
+                              raw_guest=True)
+            assert denied['error']['code'] == 'invalid_request'
+
+
+def test_w6_native_preflight_only_check_release_has_no_final_send(tmp_path):
+    """Returning a checked fact is a useful operation, not permission for a final send."""
+    arrivals = []
+    audit_file = tmp_path / 'provider-audit.jsonl'
+    with TLSService(provider_directory(tmp_path), host='api.example.org',
+                    wire_headers=True, on_request=lambda _: arrivals.append(records(audit_file))) as server:
+        p = checked(ticket_policy(tmp_path, server))
+        rules = {
+            'revision.view': {'id': {'at': ['id'], 'type': 'integer'}},
+            'ticket.check': {'id': {'at': ['id'], 'type': 'integer'}},
+        }
+        facts = {'owner': 'ALICE', 'revision': 'a' * 40, 'id': 7,
+                 'discarded_provider_secret': TOKEN}
+        server.routes[('GET', '/v1/tickets/7')] = facts
+        args = {'ticket': 7}
+        compiled = reference_compile(p, {'operation': 'ticket.check', 'arguments': args}, facts)
+        assert compiled['ok'] and compiled['result']['effect'] is None
+        planned = [('preflight', compiled['result']['preflight'])]
+        result, meta = approved_release(p, rules, 'ticket.check', args, facts, credential=TOKEN)
+        with ManifestCase(tmp_path, server, p, rules, writes='deny') as case:
+            received = trace_of(case, tmp_path, server, 'ticket.check', args,
+                                planned, expected_result=result, expected_meta=meta,
+                                provider_arrivals=arrivals, raw_guest=True, check_digest=True)
+            assert received['result'] == {'id': 7}
+            assert len(server.seen()) == 1
+
+
+def test_w6_denied_error_messages_are_fixed_public_observations():
+    """A provider-derived error string is an additional guest disclosure."""
+    kwargs = dict(provider=[], audit=[], planned=[],
+                  reply={'version': 1, 'ok': False,
+                         'error': {'code': 'denied',
+                                   'message': 'Operation is outside the granted authority.'}},
+                  host='api.example.org', port=443, credential=TOKEN,
+                  expect_success=False)
+    assert_native_effect_trace(**kwargs)
+    for bad in [
+        {'code': 'denied', 'message': 'provider says Alice has access'},
+        {'code': 'unreviewed_diagnostic', 'message': 'Broker failed closed.'},
+        {'code': 'upstream_response', 'message': 'Provider: private error body'},
+    ]:
+        with pytest.raises(TraceMismatch):
+            assert_native_effect_trace(**(kwargs | {
+                'reply': {'version': 1, 'ok': False, 'error': bad},
+            }))

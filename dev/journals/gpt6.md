@@ -397,3 +397,15 @@ receipt does not prove that the code complied at every reachable I/O sink,
 that sync_all survives power loss, or that the Lean abstract trace refines
 native behavior. Rust/Lean unavailable in the overlay authoring container;
 full toolchain validation remains required. No real credentials or services.
+
+## 2026-10-19 19:00:00 -0400
+
+Advanced the offline native manifest read slice without repeated heavy Charon/Lean
+work. Added a private `CompletedRelease` constructed after selected projection,
+reflection rejection and completion audit; retained conservative write outcome
+classification. Added independent selected-data/pagination oracle, exact denial
+vocabulary and canonical request-audit identity checks, native no-preflight and
+preflight-only fact-return experiments, and a fail-on-skip targeted runtime gate.
+The finite tests and reviewed-source guards are NOT universal I/O refinement;
+Rust binaries and native cases must be rebuilt/run on the maintainer toolchain.
+Kept the W4/W5 open obligations and external trust assumptions explicit.

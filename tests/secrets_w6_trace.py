@@ -22,6 +22,23 @@ class TraceMismatch(AssertionError):
 
 _UNSPECIFIED = object()
 
+# The native bridge's fixed public denial vocabulary. This is intentionally
+# independent of provider error headers/bodies: a future accidental pass-through
+# of diagnostics must fail the W6 guest observation oracle.
+_DENIAL_MESSAGES = {
+    'invalid_capability': 'Capability authentication failed.',
+    'invalid_request': 'Malformed or unsupported request.',
+    'denied': 'Operation is outside the granted authority.',
+    'unsafe_file': 'Host file ownership, permissions, or type is unsafe.',
+    'outcome_unknown': 'A dispatched request may have completed; reconcile before retrying.',
+}
+_GENERIC_DENIALS = {
+    'invalid_policy', 'resource_mismatch', 'unreachable', 'upstream_response',
+    'upstream_rejected', 'upstream_error', 'internal_error', 'exhausted',
+    'revoked', 'credential_source', 'expired',
+}
+_DENIAL_MESSAGES.update({name: 'Broker failed closed.' for name in _GENERIC_DENIALS})
+
 
 def require(condition: bool, message: str) -> None:
     if not condition:
@@ -93,6 +110,7 @@ def assert_native_effect_trace(
     expected_meta: Any = None,
     audit_at_provider: list[list[dict[str, Any]]] | None = None,
     guest_frame: bytes | None = None,
+    expected_request_digest: str | None = None,
 ) -> None:
     """Check a complete observed prefix for one guest request.
 
@@ -112,6 +130,11 @@ def assert_native_effect_trace(
     require(len(provider) == len(planned), 'unexpected/missing credentialed provider send')
     require(len(dispatches) == len(planned), 'provider dispatch/audit mismatch')
     require(len(completions) == int(expect_success), 'completion audit/guest release mismatch')
+    # The scoped native manifest read profile has no other per-request audit
+    # events. The order matters: completion must follow all dispatches.
+    require([r.get('event') for r in audit] ==
+            ['dispatch'] * len(planned) + (['completed'] if expect_success else []),
+            'unreviewed or reordered native read audit event')
     if audit_at_provider is not None:
         # Each snapshot is read by the local HTTPS server on arrival, before
         # its response. Unlike the final log comparison this detects a broker
@@ -152,6 +175,10 @@ def assert_native_effect_trace(
         require(set(reply) == {'version', 'ok', 'error'}, 'unexpected public denial fields')
         require(type(reply['error']) is dict and set(reply['error']) == {'code', 'message'},
                 'unreviewed error fields')
+        error = reply['error']
+        require(type(error['code']) is str and
+                error['message'] == _DENIAL_MESSAGES.get(error['code']),
+                'unreviewed guest error code or provider-derived diagnostics')
     for (phase, declared), record, actual in zip(planned, dispatches, provider):
         require(record.get('phase') == phase, 'wrong dispatch phase')
         require(record.get('event') == 'dispatch', 'missing dispatch audit')
@@ -202,6 +229,9 @@ def assert_native_effect_trace(
                     all(ch in '0123456789abcdef' for ch in value)
                     for value in hashes), 'missing/malformed request identity')
         require(len(set(hashes)) == 1, 'one request produced multiple audit identities')
+        if expected_request_digest is not None:
+            require(hashes[0] == expected_request_digest,
+                    'dispatch audit did not identify the host-normalized guest request')
     for event in completions:
         if hashes:
             require(event.get('request_digest') == hashes[0],

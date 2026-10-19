@@ -245,3 +245,7 @@ read/write segmentation, timing/closure leakage and host isolation remain
 explicit premises. The existing W4/W5 Lean theorems are unchanged and are
 not represented as proofs of the added runtime observations. See
 [the offline read slice](garrett-native-read-refinement-slice.md).
+
+## Independent native read release/metadata observations
+
+The [completed release refinement](garrett-native-read-release-refinement.md) requires a private `CompletedRelease` receipt after projection, reflection checks, and completion audit, with finite native W6 observations for no-preflight reads, preflight-only fact returns, and exact public metadata. The added source guards and portable mutations pass locally. Native Rust compilation and selected process cases remain to run on the maintainer's toolchain. No complete source-to-W4/W5 trace refinement is claimed.

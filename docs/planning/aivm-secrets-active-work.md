@@ -213,6 +213,17 @@ full gate must run on the maintainer's pinned toolchain, W4/W5 still specify
 abstract events, and whole-service implementation-to-proof refinement remains
 open. It does not close W3 transitive I/O reachability or W8 guest isolation.
 
+## Native read release and metadata, 2026-10-19 (partial W3/W6)
+
+The [completed release slice](../garrett-native-read-release-refinement.md)
+adds a private source-level completion-audit receipt after selected projection
+and reflection checks, independent finite read-release/pagination oracles, and
+real native TLS scenarios for no-preflight, returned checked facts, fixed
+errors and raw guest frames. The separate fast gate reuses native executables
+and does **not** run Charon, full tests, or Lean. Native compilation for this
+increment is pending the maintainer's toolchain; the established W4/W5 Lean
+scope and its open NO-PREFLIGHT/METADATA/IO-REFINE obligations are unchanged.
+
 ## Product question and security objective
 
 A hostile agent should be able to perform a *real, specifically authorized*

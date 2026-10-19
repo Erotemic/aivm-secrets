@@ -92,6 +92,33 @@ impl<'a> PreparedDispatch<'a> {
     }
 }
 
+// W5/W6 guest-release boundary for successful manifest requests. A selected
+// result is not a completed public reply until its exact fixed envelope has
+// passed the reflection check (at the call site) and completion has been
+// durably audited. This type does not itself prove response-byte refinement.
+struct CompletedRelease(Value);
+impl CompletedRelease {
+    fn after_completion(
+        reply: Value,
+        audit: &Audit,
+        operation: &str,
+        request_digest: &str,
+    ) -> Outcome<Self> {
+        audit.write_record(&json!({
+            "schema":1,
+            "event":"completed",
+            "operation":operation,
+            "grant":audit.grant,
+            "policy":audit.policy,
+            "request_digest":request_digest,
+        }))?;
+        Ok(Self(reply))
+    }
+    fn into_public(self) -> Value {
+        self.0
+    }
+}
+
 pub(crate) struct Session {
     base: AccountSession,
     policy: Policy,
@@ -471,7 +498,7 @@ impl Session {
         } else {
             facts
         };
-        let release = (|| -> Outcome<Value> {
+        let release = (|| -> Outcome<CompletedRelease> {
             self.require_control_active(host_time()?)?;
             let meta = self.policy.pagination(op, &args, &raw)?;
             let result = self.disclosure.project(&op.name, &raw, &secret.0)?;
@@ -480,13 +507,14 @@ impl Session {
                 reply["meta"] = meta;
             }
             crate::manifest::disclosure::ensure_safe(&reply, &secret.0)?;
-            self.base.executor.audit.write_record(&json!({"schema":1,"event":"completed","operation":op.name,"grant":self.base.executor.audit.grant,"policy":self.base.executor.audit.policy,"request_digest":request_hash}))?;
-            Ok(reply)
+            CompletedRelease::after_completion(
+                reply, &self.base.executor.audit, &op.name, &request_hash,
+            )
         })();
         if sent_write {
-            release.map_err(|_| Error::OutcomeUnknown)
+            release.map_err(|_| Error::OutcomeUnknown).map(CompletedRelease::into_public)
         } else {
-            release
+            release.map(CompletedRelease::into_public)
         }
     }
     pub(super) fn control(
