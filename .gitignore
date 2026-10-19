@@ -114,3 +114,4 @@ aivm-source-*.tar.gz
 /rust/target/
 /rust/*.llbc
 /proofs/.lake/
+*.tar.gz
