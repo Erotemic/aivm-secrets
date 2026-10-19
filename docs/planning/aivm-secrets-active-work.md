@@ -391,3 +391,17 @@ success with proof that the deployed broker has no other output path.
 isolation statement until the scoped traces, I/O-refinement assumptions,
 positive workflow witness and environmental exclusions are reviewable together.
 A formal theorem may be published earlier with its exact narrower statement.
+
+### Incremental read-profile W4/W5 bridge (2026-10-19)
+
+See [`garrett-read-paths-and-two-run-refinement.md`](../garrett-read-paths-and-two-run-refinement.md).
+The new `GarrettReadPaths.lean` candidate distinguishes no-preflight,
+checked-only, and two-phase read event traces and states conditional
+noninterference under explicit selected-release and metadata premises. A
+paired native TLS-provider test oracle checks concrete finite two-run
+observations against independent host-owned inputs. **Portable checks only
+have been run on the authoring machine**; focused Lean and native execution
+are pending on the maintainer's VM. Existing W4 `IO-REFINE` and W5 concrete
+correspondence obligations remain open. Prefer
+`python dev/verification/quick_w6_read.py [--lean] [--native]` over a heavy
+full compiler-linkage capture for this source-unmodified increment.

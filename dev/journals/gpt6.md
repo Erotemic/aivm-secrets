@@ -409,3 +409,23 @@ preflight-only fact-return experiments, and a fail-on-skip targeted runtime gate
 The finite tests and reviewed-source guards are NOT universal I/O refinement;
 Rust binaries and native cases must be rebuilt/run on the maintainer toolchain.
 Kept the W4/W5 open obligations and external trust assumptions explicit.
+
+## 2026-10-19 18:51:26 -0400
+
+Extended the offline native manifest read assurance slice to the final-only,
+preflight-only and two-phase paths without changing production Rust sources.
+Added a separate W4/W5 Lean read-path module, a pinned dependency/source
+manifest and a focused optional kernel+axiom gate. The new theorems are proof
+*candidates* until compiled with Lean v4.35.0: Lean/Aeneas are unavailable in
+this authoring container. Retained existing W4/W5 checksums and all open
+native I/O refinement obligations rather than treating portable checks as a
+proof. Added an independent paired-real-process observation oracle for
+synthetic provider private-field mutations, including exact guest JSONL bytes,
+pagination, host-normalized request identity, causal audits and no-unreviewed
+credential disclosure. Portable counterexamples cover changed selected fields,
+metadata, reflection decisions, hidden audit fields, frame injection, and
+read-to-write promotion. Rust process acceptance is to run on the maintainer's
+provisioned toolchain. Charon/full-suite checks intentionally not re-run; no
+real account, TPM, credential or external service used. Confidence: high in
+the portable tests and source inventory; provisional in the new Lean tactics
+and native case integration until their focused acceptance gates run.
