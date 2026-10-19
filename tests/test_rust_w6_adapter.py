@@ -16,9 +16,11 @@ from tests.secrets_github_scenario import (
     ALLOWED_PR, CHECKS, CHECKS_PATH, DIFF, HEAD_SHA, PULL, PULL_PATH, install_github_routes,
 )
 from aivm_secrets.kernel import codec
+from aivm_secrets.kernel.presets import GITHUB_DIFF, GITHUB_JSON
 from aivm_secrets.kernel.service import parse_policy
 from aivm_secrets.primitives import codec as strict_codec
 from tests.secrets_w6_release import ReleaseMismatch, release as approved_release
+from tests.secrets_w6_history import ReadObservation, assert_publicly_equivalent
 from tests.secrets_helpers import TOKEN, RawHTTPResponse, TLSService
 from tests.secrets_w6_trace import (
     TraceMismatch, assert_native_effect_trace, records, audit_since,
@@ -84,9 +86,20 @@ def effects(policy, operation, args, facts):
     ]
 
 
+_EXPECTED_META_NOT_PROVIDED = object()
+
+
 def trace_of(case, tmp_path, server, operation, args, planned, *, successful=True,
-             expected_result=None, expected_meta=None, provider_arrivals=None,
-             raw_guest=False, check_digest=False):
+             expected_result=None, expected_meta=_EXPECTED_META_NOT_PROVIDED,
+             provider_arrivals=None, raw_guest=False, check_digest=False,
+             capture_observation=False):
+    if capture_observation:
+        # Paired information-flow tests must declare the release expected from
+        # independent host inputs, rather than silently assuming no metadata.
+        assert expected_result is not None, 'paired trace requires expected_result'
+        assert expected_meta is not _EXPECTED_META_NOT_PROVIDED, (
+            'paired trace requires expected_meta (use None when no metadata is approved)'
+        )
     requests_before, audit_before = snapshot(tmp_path, server)
     if raw_guest:
         reply, wire = native_guest_frame(case, operation=operation, arguments=args)
@@ -97,7 +110,7 @@ def trace_of(case, tmp_path, server, operation, args, planned, *, successful=Tru
         expected['guest_frame'] = wire
     if expected_result is not None:
         expected['expected_result'] = expected_result
-    if expected_meta is not None:
+    if expected_meta is not _EXPECTED_META_NOT_PROVIDED:
         expected['expected_meta'] = expected_meta
     if check_digest and planned:
         parsed = parse_policy(json.loads(case.policy_file.read_text()))
@@ -107,9 +120,11 @@ def trace_of(case, tmp_path, server, operation, args, planned, *, successful=Tru
         expected['audit_at_provider'] = [
             rows[audit_before:] for rows in provider_arrivals[requests_before:]
         ]
+    provider_events = server.seen()[requests_before:]
+    audit_events = audit_since(tmp_path / 'provider-audit.jsonl', audit_before)
     assert_native_effect_trace(
-        provider=server.seen()[requests_before:],
-        audit=audit_since(tmp_path / 'provider-audit.jsonl', audit_before),
+        provider=provider_events,
+        audit=audit_events,
         reply=reply, planned=planned,
         host=server.host, port=server.port, credential=TOKEN,
         expect_success=successful,
@@ -117,6 +132,17 @@ def trace_of(case, tmp_path, server, operation, args, planned, *, successful=Tru
         sensitive=(case.token,),
         **expected,
     )
+    if capture_observation:
+        assert wire is not None, 'a paired observation requires the real guest TLS frame'
+        assert provider_arrivals is not None, 'paired observations require provider-arrival audit'
+        return ReadObservation(
+            provider=provider_events,
+            audit=audit_events,
+            reply=reply,
+            frame=wire,
+            plan=planned,
+            provider_arrivals=[rows[audit_before:] for rows in provider_arrivals[requests_before:]],
+        )
     return reply
 
 
@@ -603,3 +629,194 @@ def test_w6_denied_error_messages_are_fixed_public_observations():
             assert_native_effect_trace(**(kwargs | {
                 'reply': {'version': 1, 'ok': False, 'error': bad},
             }))
+
+
+def test_w6_paired_trace_requires_explicit_host_release_and_metadata():
+    """Absent metadata and unchecked metadata must not be conflated."""
+    with pytest.raises(AssertionError, match='requires expected_result'):
+        trace_of(None, None, None, 'ticket.list', {}, [],
+                 capture_observation=True, expected_meta=None)
+    with pytest.raises(AssertionError, match='requires expected_meta'):
+        trace_of(None, None, None, 'ticket.list', {}, [],
+                 capture_observation=True, expected_result={'rows': []})
+
+
+def test_w6_paired_trace_forwards_independent_release_expectations(tmp_path, monkeypatch):
+    """Portable guard: the native trace wrapper forwards metadata, even None."""
+    from types import SimpleNamespace
+
+    policy_file = tmp_path / 'policy.json'
+    policy_file.write_text('{}')
+    case = SimpleNamespace(policy_file=policy_file, token='test-surrogate')
+    server = SimpleNamespace(host='api.example.org', port=443, seen=lambda: [])
+    reply = {'version': 1, 'ok': True, 'result': {'rows': [{'id': 7}]}}
+    observed = []
+    monkeypatch.setattr('tests.test_rust_w6_adapter.native_guest_frame',
+                        lambda *_args, **_kwargs: (reply, codec.dumps(reply) + b'\n'))
+    monkeypatch.setattr('tests.test_rust_w6_adapter.assert_native_effect_trace',
+                        lambda **kwargs: observed.append(kwargs))
+
+    for meta in ({'pagination': {'page': 2, 'per_page': 2,
+                                 'possibly_more': False}}, None):
+        run = trace_of(case, tmp_path, server, 'ticket.list', {}, [],
+                       expected_result=reply['result'], expected_meta=meta,
+                       provider_arrivals=[], raw_guest=True, capture_observation=True)
+        assert run.reply == reply
+        assert observed[-1]['expected_result'] == reply['result']
+        assert observed[-1]['expected_meta'] == meta
+
+
+def test_w6_two_run_no_preflight_private_provider_mutation_is_invisible(tmp_path):
+    """W5 paired native observation: ignore secret fields, preserve pagination."""
+    arrivals = []
+    audit_path = tmp_path / 'provider-audit.jsonl'
+    with TLSService(provider_directory(tmp_path), host='api.example.org',
+                    wire_headers=True,
+                    on_request=lambda _: arrivals.append(records(audit_path))) as server:
+        p = ticket_policy(tmp_path, server)
+        rules = ticket_disclosure()
+        args = {'page': 2, 'state': 'closed'}
+        route = ('GET', '/v1/tickets?page=2&state=closed')
+        before = {'rows': [
+            {'id': 7, 'private': 'CANARY_FIRST_NOT_RELEASED', 'credential': TOKEN},
+            {'id': 8, 'debug': {'internal': 27}},
+        ]}
+        after = {'rows': [
+            {'id': 7, 'private': 'CANARY_SECOND_NOT_RELEASED', 'debug': {'x': [1, 2]}},
+            {'id': 8, 'debug': {'internal': 'other'}, 'token': TOKEN},
+        ]}
+        compiled = reference_compile(p, {'operation': 'ticket.list', 'arguments': args})
+        assert compiled['ok'] and compiled['result']['preflight'] is None
+        plan = effects(p, 'ticket.list', args, None)
+        assert [phase for phase, _ in plan] == ['final']
+        before_result, before_meta = approved_release(
+            p, rules, 'ticket.list', args, before, credential=TOKEN)
+        after_result, after_meta = approved_release(
+            p, rules, 'ticket.list', args, after, credential=TOKEN)
+        with ManifestCase(tmp_path, server, p, rules, writes='deny') as case:
+            server.routes[route] = before
+            first = trace_of(case, tmp_path, server, 'ticket.list', args, plan,
+                             expected_result=before_result, expected_meta=before_meta,
+                             raw_guest=True, provider_arrivals=arrivals,
+                             capture_observation=True)
+            server.routes[route] = after
+            second = trace_of(case, tmp_path, server, 'ticket.list', args, plan,
+                              expected_result=after_result, expected_meta=after_meta,
+                              raw_guest=True, provider_arrivals=arrivals,
+                              capture_observation=True)
+            assert_publicly_equivalent(
+                policy=p, disclosure=rules, operation='ticket.list',
+                normalized_arguments=args, provider_left=before,
+                provider_right=after, left=first, right=second,
+                credential=TOKEN, host=server.host, port=server.port,
+                sensitive=(case.token,),
+                hidden_canaries=('CANARY_FIRST_NOT_RELEASED', 'CANARY_SECOND_NOT_RELEASED'),
+            )
+            assert first.reply['meta'] == {'pagination': {
+                'page': 2, 'per_page': 2, 'possibly_more': True,
+            }}
+
+
+def test_w6_two_run_checked_only_private_fact_mutation_is_invisible(tmp_path):
+    """No final provider call may be introduced by a hidden preflight field."""
+    arrivals = []
+    audit_path = tmp_path / 'provider-audit.jsonl'
+    with TLSService(provider_directory(tmp_path), host='api.example.org',
+                    wire_headers=True,
+                    on_request=lambda _: arrivals.append(records(audit_path))) as server:
+        p = checked(ticket_policy(tmp_path, server))
+        rules = {
+            'revision.view': {'id': {'at': ['id'], 'type': 'integer'}},
+            'ticket.check': {'id': {'at': ['id'], 'type': 'integer'}},
+        }
+        args = {'ticket': 7}
+        before = {'owner': 'ALICE', 'revision': 'a' * 40, 'id': 7,
+                  'private': 'CANARY_FIRST_NOT_RELEASED'}
+        after = {'owner': 'alice', 'revision': 'a' * 40, 'id': 7,
+                 'private': 'CANARY_SECOND_NOT_RELEASED', 'token': TOKEN}
+        # Both host check values must produce the same selected preflight effect.
+        plan = effects(p, 'ticket.check', args, before)
+        assert [phase for phase, _ in plan] == ['preflight']
+        assert effects(p, 'ticket.check', args, after) == plan
+        before_result, before_meta = approved_release(
+            p, rules, 'ticket.check', args, before, credential=TOKEN)
+        after_result, after_meta = approved_release(
+            p, rules, 'ticket.check', args, after, credential=TOKEN)
+        with ManifestCase(tmp_path, server, p, rules, writes='deny') as case:
+            server.routes[('GET', '/v1/tickets/7')] = before
+            first = trace_of(case, tmp_path, server, 'ticket.check', args, plan,
+                             expected_result=before_result, expected_meta=before_meta,
+                             raw_guest=True, provider_arrivals=arrivals,
+                             capture_observation=True)
+            server.routes[('GET', '/v1/tickets/7')] = after
+            second = trace_of(case, tmp_path, server, 'ticket.check', args, plan,
+                              expected_result=after_result, expected_meta=after_meta,
+                              raw_guest=True, provider_arrivals=arrivals,
+                              capture_observation=True)
+            assert_publicly_equivalent(
+                policy=p, disclosure=rules, operation='ticket.check',
+                normalized_arguments=args, provider_left=before,
+                provider_right=after, left=first, right=second,
+                credential=TOKEN, host=server.host, port=server.port,
+                sensitive=(case.token,),
+                hidden_canaries=('CANARY_FIRST_NOT_RELEASED', 'CANARY_SECOND_NOT_RELEASED'),
+            )
+            assert first.reply['result'] == {'id': 7}
+            assert len(first.provider) == len(second.provider) == 1
+
+
+def test_w6_two_run_two_phase_private_preflight_mutation_is_invisible(tmp_path):
+    """W5 observation of a full checked preflight + final read remains fixed."""
+    arrivals = []
+    audit_path = tmp_path / 'provider-audit.jsonl'
+    with TLSService(provider_directory(tmp_path), wire_headers=True,
+                    on_request=lambda _: arrivals.append(records(audit_path))) as server:
+        install_github_routes(server)
+        p = native_policy(tmp_path, server)
+        args = arguments()
+        before = dict(PULL, ignored_private='CANARY_FIRST_NOT_RELEASED')
+        after = dict(PULL, ignored_private='CANARY_SECOND_NOT_RELEASED')
+        plan = effects(p, 'pr.diff', args, before)
+        assert [phase for phase, _ in plan] == ['preflight', 'final']
+        assert effects(p, 'pr.diff', args, after) == plan
+        original_route = server.routes[('GET', PULL_PATH)]
+
+        def preflight_variant(facts):
+            def answer(request):
+                accept = request['headers'].get('accept')
+                if accept == GITHUB_DIFF:
+                    return original_route(request)
+                if accept == GITHUB_JSON:
+                    return 200, {'Content-Type': 'application/json'}, json.dumps(facts).encode()
+                return 406, {}, b'{"message":"unsupported accept"}'
+            return answer
+
+        result, meta = approved_release(
+            p, native_disclosure(), 'pr.diff', args, DIFF, credential=TOKEN)
+        with ManifestCase(tmp_path, server, p, native_disclosure(), writes='deny') as case:
+            server.routes[('GET', PULL_PATH)] = preflight_variant(before)
+            first = trace_of(case, tmp_path, server, 'pr.diff', args, plan,
+                             expected_result=result, expected_meta=meta,
+                             raw_guest=True, provider_arrivals=arrivals,
+                             capture_observation=True)
+            server.routes[('GET', PULL_PATH)] = preflight_variant(after)
+            second = trace_of(case, tmp_path, server, 'pr.diff', args, plan,
+                              expected_result=result, expected_meta=meta,
+                              raw_guest=True, provider_arrivals=arrivals,
+                              capture_observation=True)
+            # The final provider result is the same approved text. Its
+            # preflight input changes only in fields discarded by the policy.
+            assert_publicly_equivalent(
+                policy=p, disclosure=native_disclosure(), operation='pr.diff',
+                normalized_arguments=args, provider_left=DIFF, provider_right=DIFF,
+                left=first, right=second, credential=TOKEN,
+                host=server.host, port=server.port, sensitive=(case.token,),
+                hidden_canaries=('CANARY_FIRST_NOT_RELEASED',
+                                 'CANARY_SECOND_NOT_RELEASED'),
+            )
+            assert first.reply == second.reply == {
+                'version': 1, 'ok': True, 'result': {'diff': DIFF},
+            }
+            for canary in ('CANARY_FIRST_NOT_RELEASED', 'CANARY_SECOND_NOT_RELEASED'):
+                assert canary.encode() not in first.frame + second.frame
+                assert canary not in json.dumps(first.audit + second.audit)

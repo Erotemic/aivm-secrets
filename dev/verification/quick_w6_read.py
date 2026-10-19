@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Fast, explicitly scoped offline native-read W6 acceptance gate.
 
-Default: Python source guards and independent release/oracle tests only.
+Default: Python source guards, proof-shape review and release/oracle tests only.
 --native: reuse already-built native executables for selected real mTLS/HTTPS
           experiments, refusing skips. Does not invoke Lean, Cargo tests, the
-          full Python suite or Charon. Use --build only if binaries need rebuild.
+          full Python suite or Charon. --lean additionally runs only the focused
+read-path Lean proof and its imports. Use --build only if binaries need rebuild.
 """
 from __future__ import annotations
 
@@ -21,15 +22,21 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[2]
 PORTABLE = [
     'tests/test_w6_release_oracle.py',
+    'tests/test_w6_history_oracle.py',
     'tests/test_rust_w6_adapter.py::test_w6_reference_trace_oracle_rejects_bypass_and_leaks',
     'tests/test_rust_w6_adapter.py::test_w6_reference_oracle_rejects_header_smuggling_and_unselected_release',
     'tests/test_rust_w6_adapter.py::test_w6_arrival_oracle_rejects_reordered_or_postdated_dispatch_audit',
     'tests/test_rust_w6_adapter.py::test_w6_denied_error_messages_are_fixed_public_observations',
+    'tests/test_rust_w6_adapter.py::test_w6_paired_trace_requires_explicit_host_release_and_metadata',
+    'tests/test_rust_w6_adapter.py::test_w6_paired_trace_forwards_independent_release_expectations',
 ]
 NATIVE = [
     'tests/test_rust_w6_adapter.py::test_w6_native_no_preflight_pagination_is_exact_selected_guest_release',
     'tests/test_rust_w6_adapter.py::test_w6_native_preflight_only_check_release_has_no_final_send',
     'tests/test_rust_w6_adapter.py::test_w6_audit_is_present_when_each_read_reaches_real_https_provider',
+    'tests/test_rust_w6_adapter.py::test_w6_two_run_no_preflight_private_provider_mutation_is_invisible',
+    'tests/test_rust_w6_adapter.py::test_w6_two_run_checked_only_private_fact_mutation_is_invisible',
+    'tests/test_rust_w6_adapter.py::test_w6_two_run_two_phase_private_preflight_mutation_is_invisible',
 ]
 # All of these launch real independent Rust processes. No Python-only broker
 # substitution can satisfy this profile.
@@ -80,6 +87,8 @@ def require_no_native_skips(report: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--native', action='store_true', help='Run selected mTLS/Rust process cases')
+    parser.add_argument('--lean', action='store_true',
+                        help='Compile/axiom-audit only new read-path Lean proofs and imports')
     parser.add_argument('--build', action='store_true',
                         help='Incrementally rebuild native binaries before --native')
     args = parser.parse_args()
@@ -93,6 +102,11 @@ def main() -> int:
     try:
         for name in ('w0_contract', 'w3_effect_boundary', 'w6_adapter'):
             checked_run(name, [sys.executable, f'dev/verification/{name}.py', 'check'], env)
+        checked_run('w4-w5-read-shape-source', [sys.executable,
+                    'dev/verification/read_paths.py', 'check'], env)
+        if args.lean:
+            checked_run('focused-read-path-Lean', [sys.executable,
+                        'dev/verification/read_paths.py', 'prove'], env)
         if args.build:
             checked_run('incremental-native-build', [
                 'cargo', 'build', '--locked', '--manifest-path', 'rust/Cargo.toml',
@@ -109,7 +123,7 @@ def main() -> int:
             if args.native:
                 require_no_native_skips(report)
         print(f'Quick W6 read gate passed in {time.monotonic() - start:.1f}s.', flush=True)
-        print('Scope: finite read-profile observations, not W4/W5 formal refinement.', flush=True)
+        print('Scope: finite native read evidence; source guards are not proof.', flush=True)
         return 0
     except (OSError, RuntimeError, subprocess.SubprocessError) as error:
         print(f'Quick W6 read gate failed: {error}', file=sys.stderr)
