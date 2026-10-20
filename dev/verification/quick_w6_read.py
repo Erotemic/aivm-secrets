@@ -50,6 +50,7 @@ PENDING_PORTABLE = [
     'tests/test_w6_pending_boundary.py',
 ]
 PENDING_NATIVE = [
+    'tests/test_rust_w6_completion.py',
     'tests/test_rust_w6_pending.py',
 ]
 FAILURE_NATIVE = [
@@ -67,6 +68,14 @@ BINARIES = {
 }
 
 
+# The completion-prefix witness explicitly selects the optional native
+# coordinator. Other native/device helpers keep their existing three binaries.
+COORDINATOR_BINARIES = {
+    'AIVM_SECRETS_RUST_COORDINATOR': 'garrett-coordinator',
+    'AIVM_SECRETS_RUST_COORDINATOR_CTL': 'garrett-coordinatorctl',
+}
+
+
 def checked_run(label: str, command: list[str], env: dict[str, str]) -> None:
     print(label, flush=True)
     start = time.monotonic()
@@ -76,7 +85,7 @@ def checked_run(label: str, command: list[str], env: dict[str, str]) -> None:
     print(f'{label} passed in {time.monotonic() - start:.1f}s', flush=True)
 
 
-def require_native_paths(env: dict[str, str]) -> None:
+def require_native_paths(env: dict[str, str], *, binaries: dict[str, str] | None = None) -> None:
     # Never count last week's Rust executable as today's source observation.
     # Cargo is authoritative for dependency/feature freshness when --build is
     # requested. This local mtime check only catches the common stale-binary
@@ -85,7 +94,7 @@ def require_native_paths(env: dict[str, str]) -> None:
     newest_source = max(
         (ROOT / name).stat().st_mtime_ns for name in rust_sources(ROOT)
     )
-    for variable, binary in BINARIES.items():
+    for variable, binary in (BINARIES if binaries is None else binaries).items():
         path = (ROOT / 'rust' / 'target' / 'debug' / binary).resolve()
         if not path.is_file() or not os.access(path, os.X_OK):
             raise RuntimeError(f'Missing {path}; run with --native --build once')
@@ -147,7 +156,10 @@ def main() -> int:
                 '--bins', '--features', 'conformance,coordinator-server',
             ], env)
         if args.native:
-            require_native_paths(env)
+            selected = BINARIES
+            if not (args.failure_only or args.composition_only):
+                selected = selected | COORDINATOR_BINARIES
+            require_native_paths(env, binaries=selected)
         portable = (['tests/test_w6_composition.py',
                      'tests/test_w6_prefix_proof_scope.py'] if args.composition_only else
                     PENDING_PORTABLE if args.pending_only else

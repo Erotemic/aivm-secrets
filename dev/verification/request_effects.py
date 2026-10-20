@@ -18,6 +18,31 @@ import garrett
 import lean_step
 
 THEOREMS = (
+    'aivm_secrets_garrett_core.request_effects.Simulation.facts_returned_steps',
+    'aivm_secrets_garrett_core.request_effects.Simulation.final_completion_returned_steps',
+    'aivm_secrets_garrett_core.request_effects.Simulation.finishing_returned_steps',
+    'aivm_secrets_garrett_core.request_effects.Simulation.request_returned_steps',
+    'aivm_secrets_garrett_core.request_effects.Simulation.returned_request_has_reachable_receipt',
+    'aivm_secrets_garrett_core.request_effects.Simulation.returned_entry_has_reachable_receipt',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.initial_has_empty_prefix',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.step_preserves_prefix',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.steps_preserve_prefix',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.reachable_has_control_prefix',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.delta_is_sound',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.trace_steps_are_actual_steps',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.trace_steps_preserve_soundness',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.dispatch_audit_counts_exactly',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.dispatch_ack_is_silent',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.completion_audit_counts_exactly',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.send_counts_exactly',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.checked_send_establishes_origin',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.callback_contracts_preserve_receipts',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.actual_request_has_trace',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.returned_entry_has_sound_trace',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.delta_keeps_binding',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.trace_steps_keep_binding',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.returned_entry_keeps_captured_binding',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.late_check_keeps_audit_without_reply',
     'aivm_secrets_garrett_core.request_effects.Proofs.audited_unsent_cannot_complete',
     'aivm_secrets_garrett_core.request_effects.Proofs.attempted_cannot_submit_again',
     'aivm_secrets_garrett_core.request_effects.Proofs.completion_ack_is_not_return_permission',
@@ -74,19 +99,19 @@ def main() -> None:
         garrett.regeneration()
     directory = freshness.PROOFS
     lake = freshness.executable('lake')
-    lean_step.run([lake, 'build', '+GarrettReadInvocations', '+GarrettRequestEffects'],
+    lean_step.run([lake, 'build', '+GarrettReadInvocations', '+GarrettRequestPrefix'],
                   directory, 'actual stateful request and receipt dependencies')
-    output = directory / '.lake/build/lib/lean/GarrettRequestSimulation.olean'
+    output = directory / '.lake/build/lib/lean/GarrettRequestTrace.olean'
     lean_step.run([lake, 'env', 'lean', '-DwarningAsError=true', '-o', str(output),
-                   'GarrettRequestSimulation.lean'], directory,
-                  'conditional actual-request receipt simulation')
+                   'GarrettRequestTrace.lean'], directory,
+                  'all-returned request trace projection')
     with tempfile.TemporaryDirectory(prefix='request-effects-', dir=directory / '.lake') as scratch:
         check = Path(scratch) / 'Audit.lean'
-        check.write_text('import GarrettRequestSimulation\n' + ''.join(
+        check.write_text('import GarrettRequestTrace\n' + ''.join(
             f'#print axioms {name}\n' for name in THEOREMS))
         audit(lean_step.run([lake, 'env', 'lean', '-DwarningAsError=true', str(check)],
                             directory, 'named request-effect theorem axiom audit'))
-    print(f'Kernel checked {len(THEOREMS)} request-wide gate/simulation obligations; '
+    print(f'Kernel checked {len(THEOREMS)} request gate/prefix/trace obligations; '
           f'source regeneration {"omitted" if args.no_regenerate else "matched"}. '
           'Native callback contracts, W4/W5 event/history correspondence and transitive I/O remain open.')
 

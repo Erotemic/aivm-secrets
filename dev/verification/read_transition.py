@@ -21,6 +21,10 @@ import lean_step
 
 NAMESPACE = 'aivm_secrets_garrett_core.read_transition.Proofs.'
 THEOREMS = (
+    'request_facts_returned_iff',
+    'finish_request_returned_iff',
+    'request_current_returned_iff',
+    'run_current_returned_iff',
     'prepare_success_iff', 'acknowledge_success_iff',
     'prepared_to_audited_preservation', 'refused_audit_has_no_permit',
     'preflight_write_has_no_prepared', 'unadmitted_final_write_has_no_prepared',

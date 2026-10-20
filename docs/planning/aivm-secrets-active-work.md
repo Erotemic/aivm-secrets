@@ -77,6 +77,16 @@ axiom checks, five selected final-source mutants, both native product modes,
 71 Rust workspace cases, all 263 source-archive pins and six safe installed-vTPM
 cases. See the [request-effect validation record](../../dev/validation/2026-10-20-request-effects.json).
 
+**All-returned prefix update:** the [actual controller's failure-prefix and
+receipt-event composition](../garrett-returned-request-traces.md) now covers all
+returned outcomes. Exact occupied-prefix invariants exclude sticky-bit audit
+replay; source-gate counting, checked-stamp origin and captured binding feed a
+conditional W4 audit/provider/denial projection. Six native fsync/revocation
+cases retain an acknowledged completion audit while denying the actual guest,
+after a prior permitted success. Native callback/primitive instantiation,
+selected-value/framing correspondence, connected adaptive histories and
+NR-3/4/5 remain open.
+
 ## Goal and present assurance level
 
 Garrett should let an untrusted guest perform **useful, explicitly authorized**

@@ -36,6 +36,35 @@ PROFILES = [
     "native-exact-write-approval-v1",
 ]
 THEOREMS = [
+    'aivm_secrets_garrett_core.read_transition.Proofs.request_facts_returned_iff',
+    'aivm_secrets_garrett_core.read_transition.Proofs.finish_request_returned_iff',
+    'aivm_secrets_garrett_core.read_transition.Proofs.request_current_returned_iff',
+    'aivm_secrets_garrett_core.read_transition.Proofs.run_current_returned_iff',
+    'aivm_secrets_garrett_core.request_effects.Simulation.facts_returned_steps',
+    'aivm_secrets_garrett_core.request_effects.Simulation.final_completion_returned_steps',
+    'aivm_secrets_garrett_core.request_effects.Simulation.finishing_returned_steps',
+    'aivm_secrets_garrett_core.request_effects.Simulation.request_returned_steps',
+    'aivm_secrets_garrett_core.request_effects.Simulation.returned_request_has_reachable_receipt',
+    'aivm_secrets_garrett_core.request_effects.Simulation.returned_entry_has_reachable_receipt',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.initial_has_empty_prefix',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.step_preserves_prefix',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.steps_preserve_prefix',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.reachable_has_control_prefix',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.delta_is_sound',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.trace_steps_are_actual_steps',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.trace_steps_preserve_soundness',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.dispatch_audit_counts_exactly',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.dispatch_ack_is_silent',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.completion_audit_counts_exactly',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.send_counts_exactly',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.checked_send_establishes_origin',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.callback_contracts_preserve_receipts',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.actual_request_has_trace',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.returned_entry_has_sound_trace',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.delta_keeps_binding',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.trace_steps_keep_binding',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.returned_entry_keeps_captured_binding',
+    'aivm_secrets_garrett_core.request_effects.TraceRefinement.late_check_keeps_audit_without_reply',
     'aivm_secrets_garrett_core.request_effects.Proofs.audited_unsent_cannot_complete',
     'aivm_secrets_garrett_core.request_effects.Proofs.attempted_cannot_submit_again',
     'aivm_secrets_garrett_core.request_effects.Proofs.completion_ack_is_not_return_permission',
@@ -634,6 +663,7 @@ TESTS = [
     "tests/test_coordinator_operator.py",
     "tests/test_rust_bound_renewal.py",
     "tests/test_rust_w6_adapter.py",
+    "tests/test_rust_w6_completion.py",
     "tests/test_secrets_coordination.py",
     "tests/test_secrets_garrett_modularity.py",
     "tests/test_secrets_identity_parity.py",
@@ -714,8 +744,13 @@ def inputs() -> list[str]:
         "proofs/GarrettReadInvocations.lean",
         "proofs/GarrettProviderExchange.lean",
         "proofs/GarrettRequestEffects.lean",
+        "proofs/GarrettRequestPrefix.lean",
+        "proofs/GarrettRequestTrace.lean",
+        "tests/test_rust_w6_completion.py",
+        "tests/native/completion_fsync_barrier.c",
         "proofs/GarrettRequestSimulation.lean",
         "dev/verification/request_effects.py",
+        "dev/verification/quick_w6_read.py",
         "proofs/GarrettProviderSimulation.lean",
         "proofs/GarrettConfinement.lean",
         "dev/verification/provider_exchange.py",
@@ -906,6 +941,7 @@ def assurance_coordinates() -> dict:
         "implementation_linked": "Aeneas-generated optional coordinator dispatch continuation and issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission, and concrete authentication-header credential validation/exact byte appending and request-line method/target validation/exact single-line construction used by both native provider writers, exact bounded newline frame admission shared by bridge ingress, forwarded broker replies and the guest client, including empty observed suffix and post-send uncertainty mapping as a tested native adapter, and extended to complete request framing with Host/Accept, exact custom-header ordering, case-insensitive reserved/duplicate refusal, concrete decimal port/body length and exact opaque body bytes; exact bounded ASCII retry-name admission shared by the native host and named-operation client; optional coordinator authority exact peer/operator admission, absent-only activation, revocation/reservation/completion decisions and modeled terminal committed-decision histories; exact operator receipt admission distinguishing absent status from a terminal revocation, composed with successful extracted revocation; optional exact-write approval issuance/deadline and matching, unexpired, single-use consumption; production mutable manifest provider setup/current/send/receive driver, sampled admission-stamp origin, native guarded Write state and conditional W4 provider-event extension for every returned read outcome under explicit local primitive contracts",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
+            "All returned mutable request prefixes, including planning/freshness/provider/completion errors and write uncertainty, relate to actual source receipt transitions. Exact occupied prefixes rule out hidden repeated audit/send marks. Their W4 audit/provider/denial projection and captured binding require explicit local callback histories and actual current-constructor origin; native primitive/context instantiation, selected-value and guest-frame correspondence, adaptive session histories and full sink closure remain open. The fsync barrier is Linux-only test instrumentation with synthetic data, not production middleware.",
             "The production request-wide receipt gates actual dispatch/completion audit markers, composite phase/current submission and completed native values. Extracted reachable-state invariants and conditional composition through mutable request callbacks require explicit callback-to-receipt-transition and primitive acknowledgement contracts. Native snapshot copying and completed-value checks are reviewed and tested, not a universal I/O refinement. Recorded stamps do not make revocation atomic with a syscall; complete W4/W5 event/history correspondence, non-returning/drop paths and guest frame emission remain open.",
             "Provider forward simulation composes explicit setup/current/send/receive contracts for a provider-attempt projection of mutable state. The native SendState makes its recorded-attempt projection concrete, but native context/world instantiation, the private std/rustls Write primitive, non-returning/drop effects and absence of other I/O are separate obligations; result/state equalities alone do not prove complete native mediation.",
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
@@ -1075,6 +1111,17 @@ def mutate(pattern: str | None = None) -> None:
          "matches!(self.progress, Progress::ValueReady)", "self.completion.value_ready"),
         (receipts, "request receipt dispatch audit attempt unrecorded",
          "record.audit_attempted = true;", "record.audit_attempted = false;"),
+    ]
+    mutations += [
+        (receipts, "request prefix repeated preflight audit",
+         "(Phase::Preflight, Progress::Entry)\n                | (",
+         "(Phase::Preflight, Progress::Entry | Progress::DispatchReturned(Phase::Preflight))\n                | ("),
+        (receipts, "request prefix repeated final audit",
+         "Progress::Entry | Progress::DispatchReturned(Phase::Preflight)\n                )",
+         "Progress::Entry | Progress::DispatchReturned(Phase::Preflight) | Progress::DispatchReturned(Phase::Final)\n                )"),
+        (receipts, "request prefix repeated completion audit",
+         "if !matches!(self.progress, Progress::BeforeAudit) {",
+         "if !matches!(self.progress, Progress::BeforeAudit | Progress::CompletionAudited) {"),
     ]
     use_source = source.with_name("credential_use.rs")
     mutations += [
@@ -1844,6 +1891,7 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettReadTransition",
                 "GarrettReadInvocations",
                 "GarrettRequestEffects",
+                "GarrettRequestPrefix",
                 "GarrettProviderExchange",
                 "Garrett",
                 "GarrettProtocol",
@@ -1881,7 +1929,7 @@ def mutate(pattern: str | None = None) -> None:
             preferred = {
                 "read_transition.rs": "GarrettReadTransition",
                 "provider_exchange.rs": "GarrettProviderExchange",
-                "request_effects.rs": "GarrettRequestEffects",
+                "request_effects.rs": "GarrettRequestPrefix",
                 "approval.rs": "GarrettApproval",
                 "enrollment.rs": "GarrettEnrollment",
                 "authority.rs": "GarrettAuthority",
@@ -1906,6 +1954,8 @@ def mutate(pattern: str | None = None) -> None:
                 modules.insert(0, preferred)
             if source.name in {"provider_exchange.rs", "manifest.rs", "request_effects.rs"}:
                 dependencies = ["GarrettReadTransition", "GarrettLogin", "Garrett", "GarrettManifest", "GarrettProviderExchange"]
+                if source.name == "request_effects.rs":
+                    dependencies.append("GarrettRequestEffects")
                 for dependency in dependencies:
                     modules.remove(dependency)
                 modules[:0] = dependencies

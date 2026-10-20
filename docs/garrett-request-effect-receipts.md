@@ -10,6 +10,10 @@ This advances the NR-2 callback/effect relation. It does not close native
 primitive correspondence, W4/W5 event/history simulation, NR-3 sink closure,
 NR-4 observation correspondence or NR-5 independent review.
 
+The [all-returned prefix increment](garrett-returned-request-traces.md) extends
+this to failed callbacks, exact occupied prefixes and conditional W4 receipt-event
+composition. The original validation below remains specific to its frozen source.
+
 ## Actual call sites
 
 Each dispatch starts its audit marker immediately before `Audit::write_record`

@@ -106,4 +106,71 @@ theorem successful_entry_has_completed_receipt {P F E O X : Type} (ops : Request
   have reachable : Reachable (observe completed) := ⟨observe pending, start, steps_trans first rest⟩
   exact ⟨completed, reachable, completed_value_requires_selection_checks_and_audit _ reachable ready⟩
 
+/-- Every returned fact prefix, including either denial, carries its actual
+    callback state. Pure planning does not manufacture receipt transitions. -/
+theorem facts_returned_steps {P F E O X : Type} (ops : Request P F E O X)
+    (observe : P → RequestEffects) (world : Contracts ops observe)
+    (pending : P) (out : core.result.Result F X) (after : invocation.Invocation P)
+    (run : FactsRun ops pending out after) : Steps (observe pending) (observe after.adapter) := by
+  cases run with
+  | planDenied error planned => exact .refl
+  | providerDenied effect error state planned sent => exact world.dispatch _ _ _ _ _ sent
+  | produced facts state preflight origin => exact facts_callback_steps ops observe world pending state preflight facts origin
+
+theorem final_completion_returned_steps {P F E O X : Type} (ops : Request P F E O X)
+    (observe : P → RequestEffects) (world : Contracts ops observe)
+    (pending : P) (preflight write : Bool) (raw : F) (out : core.result.Result O X)
+    (after : invocation.Invocation P) (run : FinalCompletionRun ops pending preflight raw write out after) :
+    Steps (observe pending) (observe after.adapter) := by
+  cases run with
+  | read result completed callback => exact world.complete _ _ _ _ callback
+  | writeValue reply completed callback => exact world.complete _ _ _ _ callback
+  | writeUncertain error unknown completed callback code => exact world.complete _ _ _ _ callback
+
+theorem finishing_returned_steps {P F E O X : Type} (ops : Request P F E O X)
+    (observe : P → RequestEffects) (world : Contracts ops observe)
+    (pending : P) (preflight : Bool) (facts : F) (out : core.result.Result O X)
+    (after : invocation.Invocation P) (run : FinishRun ops pending preflight facts out after) :
+    Steps (observe pending) (observe after.adapter) := by
+  cases run with
+  | planDenied error planned => exact .refl
+  | currentDenied selected error state planned current => exact world.recheck _ _ _ current
+  | checkedOnly result checked completed planned current callback =>
+    exact steps_trans (world.recheck _ _ _ current) (world.complete _ _ _ _ callback)
+  | providerDenied effect write checked completed error planned current classified sent =>
+    exact steps_trans (world.recheck _ _ _ current) (world.dispatch _ _ _ _ _ sent)
+  | completed effect write checked dispatched raw result state planned current classified sent last =>
+    exact steps_trans (steps_trans (world.recheck _ _ _ current) (world.dispatch _ _ _ _ _ sent))
+      (final_completion_returned_steps ops observe world dispatched preflight write raw out after last)
+
+/-- No later successful callback is assumed after an error. Each returned
+    prefix relates the very same state that the real controller returns. -/
+theorem request_returned_steps {P F E O X : Type} (ops : Request P F E O X)
+    (observe : P → RequestEffects) (world : Contracts ops observe)
+    (pending : P) (out : core.result.Result O X) (after : invocation.Invocation P)
+    (run : RequestRun ops pending out after) : Steps (observe pending) (observe after.adapter) := by
+  cases run with
+  | factsDenied error state facts => exact facts_returned_steps ops observe world pending (.Err error) after facts
+  | finish facts state preflight result last origin finished =>
+    exact steps_trans (facts_callback_steps ops observe world pending state preflight facts origin)
+      (finishing_returned_steps ops observe world state preflight facts out after finished)
+
+theorem returned_request_has_reachable_receipt {P F E O X : Type} (ops : Request P F E O X)
+    (observe : P → RequestEffects) (world : Contracts ops observe)
+    (pending : P) (out : core.result.Result O X) (after : invocation.Invocation P)
+    (start : RequestEffects.new = Result.ok (observe pending))
+    (returned : request_current ops (initial pending) = Result.ok (out, after)) :
+    Reachable (observe after.adapter) :=
+  ⟨observe pending, start, request_returned_steps ops observe world pending out after
+    ((request_current_returned_iff ops pending out after).mp returned)⟩
+
+theorem returned_entry_has_reachable_receipt {P F E O X : Type} (ops : Request P F E O X)
+    (observe : P → RequestEffects) (world : Contracts ops observe)
+    (pending : P) (out : core.result.Result O X)
+    (start : RequestEffects.new = Result.ok (observe pending))
+    (returned : run_current ops pending = Result.ok out) :
+    ∃ after, RequestRun ops pending out after ∧ Reachable (observe after.adapter) := by
+  obtain ⟨after, run⟩ := (run_current_returned_iff ops pending out).mp returned
+  exact ⟨after, run, observe pending, start, request_returned_steps ops observe world pending out after run⟩
+
 end aivm_secrets_garrett_core.request_effects.Simulation

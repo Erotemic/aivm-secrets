@@ -602,4 +602,328 @@ theorem unfinished_value_is_not_public {P F E O X : Type} (ops : Request P F E O
   simp [Invocation.into_result, atState, constant]
 
 
+/-!
+NR-2 returned-prefix relation for the actual mutable controller. Constructors
+name actual callback equalities and exact wrapper states, including failures.
+This is a relation, not a second executable request interpreter. A callback
+panic, divergence or unhandled effect is not converted into a returned error.
+-/
+inductive FactsRun {P F E O X : Type} (ops : Request P F E O X) (pending : P) :
+    core.result.Result F X → Invocation P → Prop where
+  | planDenied (error : X) (planned : ops.preflight pending = Result.ok (.Err error)) :
+      FactsRun ops pending (.Err error) (atState pending .PreflightPlan .Halted)
+  | providerDenied (effect : E) (error : X) (after : P)
+      (planned : ops.preflight pending = Result.ok (.Ok (some effect)))
+      (sent : ops.dispatch pending .Preflight effect = Result.ok (.Err error, after)) :
+      FactsRun ops pending (.Err error) (atState after .PreflightDispatch .Halted)
+  | produced (facts : F) (state : P) (preflight : Bool)
+      (origin : FactsFrom ops pending preflight facts state) :
+      FactsRun ops pending (.Ok facts) (factsState state preflight)
+
+/-- The actual final-write continuation preserves a successful value, or maps
+    a completion error to the actual uncertainty callback's returned code. -/
+inductive FinalCompletionRun {P F E O X : Type} (ops : Request P F E O X)
+    (pending : P) (preflight : Bool) (raw : F) :
+    Bool → core.result.Result O X → Invocation P → Prop where
+  | read (out : core.result.Result O X) (after : P)
+      (completed : ops.complete pending raw = Result.ok (out, after)) :
+      FinalCompletionRun ops pending preflight raw false out
+        (afterComplete after preflight true false out)
+  | writeValue (reply : O) (after : P)
+      (completed : ops.complete pending raw = Result.ok (.Ok reply, after)) :
+      FinalCompletionRun ops pending preflight raw true (.Ok reply)
+        (finishedState after preflight true)
+  | writeUncertain (error unknown : X) (after : P)
+      (completed : ops.complete pending raw = Result.ok (.Err error, after))
+      (uncertain : ops.outcome_unknown after = Result.ok unknown) :
+      FinalCompletionRun ops pending preflight raw true (.Err unknown)
+        (atState after (.Uncertain preflight) .Halted)
+
+inductive FinishRun {P F E O X : Type} (ops : Request P F E O X) (pending : P)
+    (preflight : Bool) (facts : F) : core.result.Result O X → Invocation P → Prop where
+  | planDenied (error : X)
+      (planned : ops.final_effect pending facts = Result.ok (.Err error)) :
+      FinishRun ops pending preflight facts (.Err error)
+        (atState pending (.FinalPlan preflight) .Halted)
+  | currentDenied (selected : Option E) (error : X) (after : P)
+      (planned : ops.final_effect pending facts = Result.ok (.Ok selected))
+      (current : ops.recheck pending = Result.ok (.Err error, after)) :
+      FinishRun ops pending preflight facts (.Err error)
+        (atState after (.Current preflight) .Halted)
+  | checkedOnly (out : core.result.Result O X) (checked after : P)
+      (planned : ops.final_effect pending facts = Result.ok (.Ok none))
+      (current : ops.recheck pending = Result.ok (.Ok (), checked))
+      (completed : ops.complete checked facts = Result.ok (out, after)) :
+      FinishRun ops pending preflight facts out
+        (afterComplete after preflight false false out)
+  | providerDenied (effect : E) (write : Bool) (checked after : P) (error : X)
+      (planned : ops.final_effect pending facts = Result.ok (.Ok (some effect)))
+      (current : ops.recheck pending = Result.ok (.Ok (), checked))
+      (classified : ops.effect_write checked effect = Result.ok write)
+      (sent : ops.dispatch checked .Final effect = Result.ok (.Err error, after)) :
+      FinishRun ops pending preflight facts (.Err error)
+        (atState after (.FinalDispatch preflight) .Halted)
+  | completed (effect : E) (write : Bool) (checked dispatched : P) (raw : F)
+      (out : core.result.Result O X) (after : Invocation P)
+      (planned : ops.final_effect pending facts = Result.ok (.Ok (some effect)))
+      (current : ops.recheck pending = Result.ok (.Ok (), checked))
+      (classified : ops.effect_write checked effect = Result.ok write)
+      (sent : ops.dispatch checked .Final effect = Result.ok (.Ok raw, dispatched))
+      (last : FinalCompletionRun ops dispatched preflight raw write out after) :
+      FinishRun ops pending preflight facts out after
+
+inductive RequestRun {P F E O X : Type} (ops : Request P F E O X) (pending : P) :
+    core.result.Result O X → Invocation P → Prop where
+  | factsDenied (error : X) (after : Invocation P)
+      (facts : FactsRun ops pending (.Err error) after) :
+      RequestRun ops pending (.Err error) after
+  | finish (facts : F) (state : P) (preflight : Bool)
+      (out : core.result.Result O X) (after : Invocation P)
+      (origin : FactsFrom ops pending preflight facts state)
+      (finished : FinishRun ops state preflight facts out after) :
+      RequestRun ops pending out after
+
+theorem request_facts_returned_iff {P F E O X : Type} (ops : Request P F E O X)
+    (pending : P) (out : core.result.Result F X) (after : Invocation P) :
+    request_facts ops (initial pending) = Result.ok (out, after) ↔ FactsRun ops pending out after := by
+  constructor
+  · intro returned
+    cases out with
+    | Ok facts =>
+      obtain ⟨state, preflight, origin, rfl⟩ := (request_facts_success_iff ops pending facts after).mp returned
+      exact .produced facts state preflight origin
+    | Err error =>
+      unfold request_facts at returned
+      rw [preflight_bind] at returned
+      cases planned : ops.preflight pending using Result.cases with
+      | vis event continuation => simp [planned] at returned
+      | div => simp [planned] at returned
+      | ret selected =>
+        cases selected with
+        | Err code =>
+          simp [planned, afterPreflight] at returned
+          obtain ⟨rfl, rfl⟩ := returned
+          exact .planDenied code planned
+        | Ok selected =>
+          cases selected with
+          | none =>
+            simp [planned, afterPreflight] at returned
+            rw [empty_bind] at returned
+            obtain ⟨facts, _, impossible⟩ := (bind_returns_iff _ _ _).mp returned
+            simp at impossible
+          | some effect =>
+            simp [planned, afterPreflight] at returned
+            rw [preflight_dispatch_bind] at returned
+            obtain ⟨⟨out, state⟩, sent, rest⟩ := (bind_returns_iff _ _ _).mp returned
+            cases out with
+            | Ok facts => simp at rest
+            | Err code =>
+              simp at rest
+              obtain ⟨rfl, rfl⟩ := rest
+              exact .providerDenied effect code state planned sent
+  · intro run
+    cases run with
+    | planDenied error planned => simp [request_facts, preflight_step _ _ _ planned, afterPreflight]
+    | providerDenied effect error state planned sent =>
+      simp [request_facts, preflight_step _ _ _ planned, afterPreflight,
+        preflight_dispatch_step _ _ _ _ _ sent]
+    | produced facts state preflight origin =>
+      exact (request_facts_success_iff ops pending facts _).mpr ⟨state, preflight, origin, rfl⟩
+
+private theorem completion_returned_iff {P F E O X : Type} (ops : Request P F E O X)
+    (pending : P) (preflight finalEffect write : Bool) (raw : F)
+    (out : core.result.Result O X) (after : Invocation P) :
+    Invocation.complete ops (completeState pending preflight finalEffect write) raw = Result.ok (out, after) ↔
+      ∃ completed, ops.complete pending raw = Result.ok (out, completed) ∧
+        after = afterComplete completed preflight finalEffect write out := by
+  rw [complete_bind]
+  constructor
+  · intro returned
+    obtain ⟨⟨actual, completed⟩, callback, rest⟩ := (bind_returns_iff _ _ _).mp returned
+    have same : actual = out ∧ afterComplete completed preflight finalEffect write actual = after := by
+      simpa using rest
+    obtain ⟨rfl, rfl⟩ := same
+    exact ⟨completed, callback, rfl⟩
+  · rintro ⟨completed, callback, rfl⟩
+    simp [callback]
+
+private theorem final_completion_returned_iff {P F E O X : Type} (ops : Request P F E O X)
+    (pending : P) (preflight write : Bool) (raw : F)
+    (out : core.result.Result O X) (after : Invocation P) :
+    (if write then (do
+      let (result, state) ← Invocation.complete ops (completeState pending preflight true write) raw
+      match result with
+      | .Ok _ => Result.ok (result, state)
+      | .Err _ => do
+        let (code, last) ← Invocation.outcome_unknown ops state
+        Result.ok (.Err code, last))
+    else Invocation.complete ops (completeState pending preflight true write) raw) = Result.ok (out, after) ↔
+      FinalCompletionRun ops pending preflight raw write out after := by
+  constructor
+  · intro returned
+    cases write with
+    | false =>
+      obtain ⟨completed, callback, rfl⟩ := (completion_returned_iff ops pending preflight true false raw out after).mp returned
+      exact .read out completed callback
+    | true =>
+      simp only [↓reduceIte] at returned
+      rw [complete_bind] at returned
+      simp at returned
+      obtain ⟨⟨result, completed⟩, callback, rest⟩ := (bind_returns_iff _ _ _).mp returned
+      cases result with
+      | Ok reply =>
+        simp [afterComplete] at rest
+        obtain ⟨rfl, rfl⟩ := rest
+        exact .writeValue reply completed callback
+      | Err error =>
+        simp [afterComplete] at rest
+        rw [uncertain_bind] at rest
+        simp at rest
+        obtain ⟨unknown, code, rest⟩ := (bind_returns_iff _ _ _).mp rest
+        simp at rest
+        obtain ⟨rfl, rfl⟩ := rest
+        exact .writeUncertain error unknown completed callback code
+  · intro run
+    cases run with
+    | read result completed callback =>
+      simp [complete_step _ _ _ _ _ _ _ _ callback]
+    | writeValue reply completed callback =>
+      simp [complete_step _ _ _ _ _ _ _ _ callback, afterComplete, finishedState]
+    | writeUncertain error unknown completed callback code =>
+      simp [complete_step _ _ _ _ _ _ _ _ callback, afterComplete,
+        uncertain_step _ _ _ _ code]
+
+theorem finish_request_returned_iff {P F E O X : Type} (ops : Request P F E O X)
+    (pending : P) (preflight : Bool) (facts : F) (out : core.result.Result O X) (after : Invocation P) :
+    finish_request ops (factsState pending preflight) facts = Result.ok (out, after) ↔
+      FinishRun ops pending preflight facts out after := by
+  constructor
+  · intro returned
+    unfold finish_request at returned
+    rw [final_plan_bind] at returned
+    simp at returned
+    obtain ⟨planned, compiled, rest⟩ := (bind_returns_iff _ _ _).mp returned
+    cases planned with
+    | Err error =>
+      simp [afterFinalPlan] at rest
+      obtain ⟨rfl, rfl⟩ := rest
+      exact .planDenied error compiled
+    | Ok selected =>
+      dsimp only [afterFinalPlan] at rest
+      rw [current_bind] at rest
+      simp at rest
+      obtain ⟨⟨currentResult, state⟩, current, rest⟩ := (bind_returns_iff _ _ _).mp rest
+      cases currentResult with
+      | Err error =>
+        simp at rest
+        obtain ⟨rfl, rfl⟩ := rest
+        exact .currentDenied selected error state compiled current
+      | Ok u =>
+        cases u
+        simp at rest
+        cases selected with
+        | none =>
+          obtain ⟨completed, callback, rfl⟩ := (completion_returned_iff ops state preflight false false facts out after).mp rest
+          exact .checkedOnly out state completed compiled current callback
+        | some effect =>
+          simp at rest
+          rw [write_bind] at rest
+          simp at rest
+          obtain ⟨write, classified, rest⟩ := (bind_returns_iff _ _ _).mp rest
+          rw [final_dispatch_bind] at rest
+          simp at rest
+          obtain ⟨⟨provider, dispatched⟩, sent, rest⟩ := (bind_returns_iff _ _ _).mp rest
+          cases provider with
+          | Err error =>
+            simp at rest
+            obtain ⟨rfl, rfl⟩ := rest
+            exact .providerDenied effect write state dispatched error compiled current classified sent
+          | Ok raw =>
+            simp at rest
+            have last := (final_completion_returned_iff ops dispatched preflight write raw out after).mp (by
+              cases write with
+              | false => simpa using rest
+              | true =>
+                convert rest using 1)
+            exact .completed effect write state dispatched raw out after compiled current classified sent last
+  · intro run
+    cases run with
+    | planDenied error planned =>
+      simp [finish_request, final_plan_step _ _ _ _ _ planned, afterFinalPlan]
+    | currentDenied selected error state planned current =>
+      simp [finish_request, final_plan_step _ _ _ _ _ planned, afterFinalPlan,
+        current_step _ _ _ _ _ _ current]
+    | checkedOnly result checked completed planned current callback =>
+      simp [finish_request, final_plan_step _ _ _ _ _ planned, afterFinalPlan,
+        current_step _ _ _ _ _ _ current, complete_step _ _ _ _ _ _ _ _ callback]
+    | providerDenied effect write checked completed error planned current classified sent =>
+      simp [finish_request, final_plan_step _ _ _ _ _ planned, afterFinalPlan,
+        current_step _ _ _ _ _ _ current, write_step _ _ _ _ _ classified,
+        final_dispatch_step _ _ _ _ _ _ _ sent]
+    | completed effect write checked dispatched raw result state planned current classified sent last =>
+      have returned := (final_completion_returned_iff ops dispatched preflight write raw out after).mpr last
+      cases write with
+      | false =>
+        simpa [finish_request, final_plan_step _ _ _ _ _ planned, afterFinalPlan,
+          current_step _ _ _ _ _ _ current, write_step _ _ _ _ _ classified,
+          final_dispatch_step _ _ _ _ _ _ _ sent] using returned
+      | true =>
+        simp [finish_request, final_plan_step _ _ _ _ _ planned,
+          afterFinalPlan, current_step _ _ _ _ _ _ current,
+          write_step _ _ _ _ _ classified, final_dispatch_step _ _ _ _ _ _ _ sent]
+        simp at returned
+        convert returned using 1
+
+theorem request_current_returned_iff {P F E O X : Type} (ops : Request P F E O X)
+    (pending : P) (out : core.result.Result O X) (after : Invocation P) :
+    request_current ops (initial pending) = Result.ok (out, after) ↔ RequestRun ops pending out after := by
+  constructor
+  · intro returned
+    unfold request_current at returned
+    obtain ⟨⟨factsResult, state⟩, produced, rest⟩ := (bind_returns_iff _ _ _).mp returned
+    cases factsResult with
+    | Err error =>
+      simp at rest
+      obtain ⟨rfl, rfl⟩ := rest
+      exact .factsDenied error state ((request_facts_returned_iff ops pending (.Err error) state).mp produced)
+    | Ok facts =>
+      obtain ⟨pendingAfter, preflight, origin, rfl⟩ := (request_facts_success_iff ops pending facts state).mp produced
+      exact .finish facts pendingAfter preflight out after origin
+        ((finish_request_returned_iff ops pendingAfter preflight facts out after).mp rest)
+  · intro run
+    cases run with
+    | factsDenied error state facts =>
+      simp [request_current, (request_facts_returned_iff ops pending (.Err error) after).mpr facts]
+    | finish facts state preflight result last origin finished =>
+      simp [request_current, facts_return _ _ _ _ _ origin,
+        (finish_request_returned_iff ops state preflight facts out after).mpr finished]
+
+theorem run_current_returned_iff {P F E O X : Type} (ops : Request P F E O X)
+    (pending : P) (out : core.result.Result O X) :
+    run_current ops pending = Result.ok out ↔ ∃ after, RequestRun ops pending out after := by
+  constructor
+  · intro returned
+    unfold run_current at returned
+    simp [constructor_starts_empty] at returned
+    obtain ⟨⟨actual, after⟩, ran, gate⟩ := (bind_returns_iff _ _ _).mp returned
+    cases actual with
+    | Err error =>
+      have same : out = .Err error := by simpa [Invocation.into_result, eq_comm] using gate
+      subst out
+      exact ⟨after, (request_current_returned_iff ops pending (.Err error) after).mp ran⟩
+    | Ok reply =>
+      obtain ⟨state, preflight, finalEffect, rfl⟩ := successful_request_receipt ops pending reply after ran
+      have same : out = .Ok reply := by simpa [Invocation.into_result, finishedState, atState, eq_comm] using gate
+      subst out
+      exact ⟨_, (request_current_returned_iff ops pending (.Ok reply) _).mp ran⟩
+  · rintro ⟨after, run⟩
+    have ran := (request_current_returned_iff ops pending out after).mpr run
+    have gate : Invocation.into_result ops after out = Result.ok out := by
+      cases out with
+      | Err error => simp [Invocation.into_result]
+      | Ok reply =>
+        obtain ⟨state, preflight, finalEffect, rfl⟩ := successful_request_receipt ops pending reply after ran
+        simp [Invocation.into_result, finishedState, atState]
+    simp [run_current, constructor_starts_empty, ran, gate]
+
 end aivm_secrets_garrett_core.read_transition.Proofs

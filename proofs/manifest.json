@@ -64,7 +64,7 @@
     "rust/crates/freshness-conformance/src/primitives_main.rs": "6d4eb11f51ba1dc347b6e776f020e8eb42496f8806af4d74d489ef409dbe825f",
     "rust/crates/freshness-conformance/src/value_primitives.rs": "0eab4829b2f139167890d4268101fc8345fdc9faca5353b0ec5c7f6e4b18c188",
     "proofs/lean-toolchain": "ca5f1f601d34c49079e38d7e7041eb0f2a9c227fbc1df0f404820069a052330c",
-    "proofs/lakefile.lean": "00472e5d441e9871bb7c9a35ac1849b6cfa13c74085ea31de6ab310e45e1f273",
+    "proofs/lakefile.lean": "d6b32ddbf51fab005b0927bbca3e4fdb876e7a20be77bef4f5d214cd9a0d3dfe",
     "proofs/lake-manifest.json": "c7d460c9a3a2b982550c022e66d0bb41901f18a84c14aa6d02ff77f8b7933a4e",
     "proofs/generated/AivmSecretsPrimitives.lean": "b1834c11e6c31f82d1124bd4a55bd7af1d245cd130ff9fd234883d1360f47dfa",
     "proofs/Freshness.lean": "1839b70609de168419aa6c4d4e6afa40a57b9fa6c7a7755dcd4b98e8994d1e22",
