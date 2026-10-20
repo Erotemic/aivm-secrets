@@ -2136,3 +2136,56 @@ not the checked consuming gate. NR-2 through NR-5 and W7/W8 remain open.
 Independent maintainer security review and real deployment/provider checks
 are not replaced by these tests. Confidence remains scoped to the precise
 assumptions and sources in the receipt; no whole-service claim is made.
+
+## 2026-10-20 14:17:53 -0400
+
+Continued NR-2 from `0545302`. Extracted the actual native manifest
+provider continuation into setup/current/send/receive primitives. The
+production driver threads mutable adapter and channel states and retains
+the exact acknowledged phase, sampled stamp and returned stage. Stamp
+construction calls the unchanged manifest authorize decision. The native
+fresh closure still performs coordinator, control, lease, peer and grant
+checks; no cached authorization or retry was added. The native private Write
+helper now uses the extracted SendState gate before write_all/flush. It
+records a checked-to-attempted transition, rejects duplicate submission and
+retains the first attempt even after failure. Deadline ownership, zeroizing
+bytes, parsing/disclosure and public errors are preserved; writing effects
+retain post-attempt OutcomeUnknown, including partial and flush failures.
+
+Important modeling correction: an observation function on a shallow,
+unchanged native adapter record could not witness a growing effect trace.
+Added the actual source-owned SendState to that adapter, and made the local
+send contract require the ready state established by the current check.
+Thus an already-attempted rejected call need not pretend to append a second
+event. The concrete stamp/attempt record supports the projection; mapping
+it to actual std/rustls writes and excluding other effects are still local
+primitive/world obligations. These assumptions are explicit and not a
+whole-controller SoundTrace premise. The resulting simulation is a real
+component result about the production driver, not completion of NR-2.
+
+Thirty named new results compile and pass the permitted-axiom audit after
+exact regeneration: stamp origin; all returned driver outcomes and updated
+channels; write uncertainty; native state admission/no-rearm properties;
+conditional W4 event extension, binding preservation and audited-phase
+linkage. The all-returned-run relation handles failures without requiring
+successful/terminating unused callbacks. Six typed, freshly extracted Rust
+mutants are rejected, including ignored raw sends and setup, pre-check send,
+lost uncertainty, a repeated-send gate and an authorization-free stamp.
+The first name Current collided with the existing Lean Current predicate;
+renamed the new Rust type AdmissionStamp without weakening that predicate.
+A looping simp proof was fixed by reducing the Boolean cases and using the
+final equality symmetry directly, not by raising kernel resource limits.
+
+Current evidence: 26 core and 31 native library tests pass; all 67 workspace
+cases pass. Actual partial/zero-byte/flush failures exercise the production
+guarded Write helper and reject a second submission. The 92 source-boundary
+cases, portable 142-case gate, native 158-case gate and standalone product
+pass. All six installed-device cases preserve the existing public objects
+and dictionary-attack state; only safe positive device paths were used.
+The full proof/native record and full-suite/packaging receipts are being
+completed separately. The new development verifier is non-core and adds no
+Python normative API or runtime dependency. Confidence is high in these
+scoped source/control results and finite observations. Primitive I/O
+instantiation, non-returning/drop prefixes, full request/guest-release and
+connected-history simulation, NR-3/4/5 and W7/W8 remain open. Exact GPT-6
+weights/configuration variant is unavailable.

@@ -416,7 +416,7 @@ impl Session {
             &json::canonical(&json!({"operation":op.name,"arguments":args})),
         )
         .as_ref());
-        let fresh = || -> Outcome<()> {
+        let current = || -> Outcome<guards::AdmissionStamp> {
             self.base.check_coordination()?;
             let current = host_time()?;
             self.require_control_active(current)?;
@@ -430,7 +430,7 @@ impl Session {
                 current,
             )
             .map_err(|_| Error::InvalidCapability)?;
-            guards::authorize(
+            guards::current(
                 &claims,
                 &self.base.grant,
                 &op.name.as_bytes().to_vec(),
@@ -440,9 +440,9 @@ impl Session {
                 current,
                 self.base.elapsed()?,
             )
-            .map_err(use_error)?;
-            Ok(())
+            .map_err(use_error)
         };
+        let fresh = || current().map(|_| ());
         let canonical_request = json!({"operation":op.name,"arguments":args});
         let approval_digest = hex(digest::digest(&digest::SHA256, &json::canonical(
             &json!({"policy":self.policy.digest(),"grant":self.base.executor.audit.grant,"request":canonical_request}))).as_ref());
@@ -518,7 +518,7 @@ impl Session {
                         &secret,
                         &recorded,
                         &headers,
-                        &fresh,
+                        &current,
                     )
                 },
                 finish: || reservation_call(true),
@@ -638,27 +638,53 @@ fn manifest_request_bytes(
     )
 }
 
-impl Executor {
-    fn exchange_manifest(
-        &self,
-        route: &core::Route,
-        secret: &Credential,
-        audited: &AuditedDispatch<'_>,
-        headers: &BTreeMap<String, String>,
-        fresh: &impl Fn() -> Outcome<()>,
-    ) -> Outcome<Value> {
-        let effect = audited.effect;
-        if audited.transition.is_write() != effect.write {
-            return Err(Error::InvalidPolicy);
-        }
-        // Validate all outbound bytes before connecting to any provider.
-        // A malformed OAuth-issued credential must not reach a socket at all.
-        let request = manifest_request_bytes(route, secret, effect, headers)?;
-        let host = std::str::from_utf8(&route.host).map_err(|_| Error::InvalidPolicy)?;
+// The standard Write contract includes partial acceptance before an error.
+// Keep the raw credential-bearing primitive this small and separately tested.
+fn send_manifest_bytes(
+    state: &mut aivm_secrets_garrett_core::provider_exchange::SendState,
+    writer: &mut impl Write,
+    request: &[u8],
+    write: bool,
+) -> Outcome<()> {
+    if !state.begin_send(write) {
+        return Err(Error::InternalError);
+    }
+    writer
+        .write_all(request)
+        .and_then(|_| writer.flush())
+        .map_err(|_| Error::UpstreamResponse)
+}
+
+struct ManifestChannel {
+    stream: StreamOwned<ClientConnection, TcpStream>,
+    request: Zeroizing<Vec<u8>>,
+    _deadline: Deadline,
+}
+struct ManifestProvider<'a, F> {
+    executor: &'a Executor,
+    route: &'a core::Route,
+    secret: &'a Credential,
+    effect: &'a Effect,
+    headers: &'a BTreeMap<String, String>,
+    current: &'a F,
+    send_state: aivm_secrets_garrett_core::provider_exchange::SendState,
+}
+impl<F: Fn() -> Outcome<guards::AdmissionStamp>>
+    aivm_secrets_garrett_core::provider_exchange::Provider for ManifestProvider<'_, F>
+{
+    type Channel = ManifestChannel;
+    type Output = Value;
+    type Error = Error;
+    const INVALID_POLICY: Error = Error::InvalidPolicy;
+    const OUTCOME_UNKNOWN: Error = Error::OutcomeUnknown;
+
+    fn setup(&mut self) -> Outcome<ManifestChannel> {
+        let request = manifest_request_bytes(self.route, self.secret, self.effect, self.headers)?;
+        let host = std::str::from_utf8(&self.route.host).map_err(|_| Error::InvalidPolicy)?;
         let mut socket = TcpStream::connect_timeout(
             &SocketAddr::new(
-                self.address,
-                u16::try_from(route.port).map_err(|_| Error::InvalidPolicy)?,
+                self.executor.address,
+                u16::try_from(self.route.port).map_err(|_| Error::InvalidPolicy)?,
             ),
             Duration::from_secs(5),
         )
@@ -670,58 +696,100 @@ impl Executor {
             .set_write_timeout(Some(Duration::from_secs(15)))
             .map_err(|_| Error::Unreachable)?;
         let killer = socket.try_clone().map_err(|_| Error::Unreachable)?;
-        let _deadline = Deadline::start_for(Duration::from_secs(40), move || {
+        let deadline = Deadline::start_for(Duration::from_secs(40), move || {
             let _ = killer.shutdown(std::net::Shutdown::Both);
         });
         let name = rustls::pki_types::ServerName::try_from(host.to_owned())
             .map_err(|_| Error::InvalidPolicy)?;
-        let mut conn =
-            ClientConnection::new(self.tls.clone(), name).map_err(|_| Error::Unreachable)?;
+        let mut conn = ClientConnection::new(self.executor.tls.clone(), name)
+            .map_err(|_| Error::Unreachable)?;
         while conn.is_handshaking() {
             conn.complete_io(&mut socket)
                 .map_err(|_| Error::Unreachable)?;
         }
-        let mut stream = StreamOwned::new(conn, socket);
-        let exchange = || -> Outcome<Value> {
-            // The exact bytes handed to TLS are generated by one pure,
-            // independently testable encoder. Never serialize a credential
-            // through a public JSON or diagnostic interface.
-            stream
-                .write_all(&request)
-                .and_then(|_| stream.flush())
-                .map_err(|_| Error::UpstreamResponse)?;
-            let body = Zeroizing::new(manifest_response(BufReader::new(stream), &effect.response)?);
-            if effect.response == "text" {
-                Ok(json!(
-                    String::from_utf8(body.to_vec()).map_err(|_| Error::UpstreamResponse)?
-                ))
-            } else {
-                let value = json::parse(&body, MAX_BODY).map_err(|_| Error::UpstreamResponse)?;
-                if effect.method == "POST" && !effect.write {
-                    let errors = value.get("errors").is_some_and(|v| match v {
-                        Value::Null => false,
-                        Value::Bool(b) => *b,
-                        Value::String(s) => !s.is_empty(),
-                        Value::Array(a) => !a.is_empty(),
-                        Value::Object(m) => !m.is_empty(),
-                        Value::Number(n) => n.as_f64().is_none_or(|x| x != 0.0),
-                    });
-                    if errors || !value.get("data").is_some_and(Value::is_object) {
-                        return Err(Error::UpstreamResponse);
-                    }
-                }
-                Ok(value)
-            }
-        };
-        // TLS setup has completed. Sample authority again immediately before
-        // credential-bearing HTTP; a denial here has sent no provider request.
-        emit_current(fresh, || {
-            if effect.write {
-                exchange().map_err(|_| Error::OutcomeUnknown)
-            } else {
-                exchange()
-            }
+        let stream = StreamOwned::new(conn, socket);
+
+        Ok(ManifestChannel {
+            stream,
+            request,
+            _deadline: deadline,
         })
+    }
+    fn recheck(&mut self) -> Outcome<guards::AdmissionStamp> {
+        if !self.send_state.begin_check() {
+            return Err(Error::InternalError);
+        }
+        let stamp = (self.current)()?;
+        if !self.send_state.finish_check(stamp) {
+            return Err(Error::InternalError);
+        }
+        Ok(stamp)
+    }
+    fn send(&mut self, channel: &mut ManifestChannel) -> Outcome<()> {
+        // The only credential-bearing write in this manifest adapter. The
+        // core has already obtained a current stamp after verified TLS setup.
+        send_manifest_bytes(
+            &mut self.send_state,
+            &mut channel.stream,
+            &channel.request,
+            self.effect.write,
+        )
+    }
+    fn receive(&mut self, channel: ManifestChannel) -> Outcome<Value> {
+        let ManifestChannel {
+            stream,
+            request: _request,
+            _deadline,
+        } = channel;
+        let effect = self.effect;
+        let body = Zeroizing::new(manifest_response(BufReader::new(stream), &effect.response)?);
+        if effect.response == "text" {
+            Ok(json!(
+                String::from_utf8(body.to_vec()).map_err(|_| Error::UpstreamResponse)?
+            ))
+        } else {
+            let value = json::parse(&body, MAX_BODY).map_err(|_| Error::UpstreamResponse)?;
+            if effect.method == "POST" && !effect.write {
+                let errors = value.get("errors").is_some_and(|v| match v {
+                    Value::Null => false,
+                    Value::Bool(b) => *b,
+                    Value::String(s) => !s.is_empty(),
+                    Value::Array(a) => !a.is_empty(),
+                    Value::Object(m) => !m.is_empty(),
+                    Value::Number(n) => n.as_f64().is_none_or(|x| x != 0.0),
+                });
+                if errors || !value.get("data").is_some_and(Value::is_object) {
+                    return Err(Error::UpstreamResponse);
+                }
+            }
+            Ok(value)
+        }
+    }
+}
+impl Executor {
+    fn exchange_manifest(
+        &self,
+        route: &core::Route,
+        secret: &Credential,
+        audited: &AuditedDispatch<'_>,
+        headers: &BTreeMap<String, String>,
+        current: &impl Fn() -> Outcome<guards::AdmissionStamp>,
+    ) -> Outcome<Value> {
+        let effect = audited.effect;
+        if audited.transition.is_write() != effect.write {
+            return Err(Error::InvalidPolicy);
+        }
+        let mut provider = ManifestProvider {
+            executor: self,
+            route,
+            secret,
+            effect,
+            headers,
+            current,
+            send_state: aivm_secrets_garrett_core::provider_exchange::SendState::new(),
+        };
+        aivm_secrets_garrett_core::provider_exchange::exchange(&mut provider, &audited.transition)
+            .into_result()
     }
 }
 
@@ -855,6 +923,154 @@ fn manifest_response(mut reader: impl BufRead, format: &str) -> Outcome<Vec<u8>>
 #[cfg(test)]
 mod wire_tests {
     use super::*;
+
+    struct PartialWriter {
+        accepted: std::rc::Rc<std::cell::RefCell<Vec<u8>>>,
+        limit: usize,
+        flush_error: bool,
+    }
+    impl Write for PartialWriter {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            let mut accepted = self.accepted.borrow_mut();
+            if accepted.len() >= self.limit {
+                return Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe));
+            }
+            let count = bytes.len().min(self.limit - accepted.len());
+            accepted.extend_from_slice(&bytes[..count]);
+            Ok(count)
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            if self.flush_error {
+                Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))
+            } else {
+                Ok(())
+            }
+        }
+    }
+    struct FaultProvider {
+        accepted: std::rc::Rc<std::cell::RefCell<Vec<u8>>>,
+        limit: usize,
+        flush_error: bool,
+        current: guards::AdmissionStamp,
+        send_state: aivm_secrets_garrett_core::provider_exchange::SendState,
+        parsed: bool,
+    }
+    impl aivm_secrets_garrett_core::provider_exchange::Provider for FaultProvider {
+        type Channel = PartialWriter;
+        type Output = Value;
+        type Error = Error;
+        const INVALID_POLICY: Error = Error::InvalidPolicy;
+        const OUTCOME_UNKNOWN: Error = Error::OutcomeUnknown;
+        fn setup(&mut self) -> Outcome<PartialWriter> {
+            Ok(PartialWriter {
+                accepted: self.accepted.clone(),
+                limit: self.limit,
+                flush_error: self.flush_error,
+            })
+        }
+        fn recheck(&mut self) -> Outcome<guards::AdmissionStamp> {
+            assert!(self.send_state.begin_check());
+            assert!(self.send_state.finish_check(self.current));
+            Ok(self.current)
+        }
+        fn send(&mut self, writer: &mut PartialWriter) -> Outcome<()> {
+            send_manifest_bytes(
+                &mut self.send_state,
+                writer,
+                b"synthetic-request",
+                self.current.write(),
+            )
+        }
+        fn receive(&mut self, _writer: PartialWriter) -> Outcome<Value> {
+            self.parsed = true;
+            Ok(json!({"selected":true}))
+        }
+    }
+    #[test]
+    fn partial_native_write_and_flush_failures_are_attempts_and_never_parse_or_retry() {
+        use aivm_secrets_garrett_core::{
+            credential_use::{UseClaims, UseGrant},
+            provider_exchange,
+        };
+        let claims = || UseClaims {
+            binding: b"client".to_vec(),
+            policy: b"policy".to_vec(),
+            grant: b"grant".to_vec(),
+            issued_at: 1,
+            expires_at: 100,
+        };
+        let grant = UseGrant {
+            claims: claims(),
+            operation: b"read".to_vec(),
+            route: route(),
+            active: true,
+        };
+        for write in [false, true] {
+            for (limit, flush_error) in [(0, false), (5, false), (usize::MAX, true)] {
+                let current = guards::current(
+                    &claims(),
+                    &grant,
+                    &b"read".to_vec(),
+                    &b"read".to_vec(),
+                    write,
+                    true,
+                    2,
+                    1,
+                )
+                .ok()
+                .unwrap();
+                let audited = read_transition::acknowledge(
+                    read_transition::prepare(DispatchPhase::Final, write, write)
+                        .ok()
+                        .unwrap(),
+                    true,
+                )
+                .ok()
+                .unwrap();
+                let accepted = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+                let mut provider = FaultProvider {
+                    accepted: accepted.clone(),
+                    limit,
+                    flush_error,
+                    current,
+                    send_state: provider_exchange::SendState::new(),
+                    parsed: false,
+                };
+                let report = provider_exchange::exchange(&mut provider, &audited);
+                assert_eq!(report.stage(), provider_exchange::Stage::Send);
+                assert!(report.stage().attempted());
+                assert_eq!(
+                    report.into_result(),
+                    Err(if write {
+                        Error::OutcomeUnknown
+                    } else {
+                        Error::UpstreamResponse
+                    })
+                );
+                assert!(!provider.parsed);
+                let before = accepted.borrow().clone();
+                let mut retry = PartialWriter {
+                    accepted: accepted.clone(),
+                    limit: usize::MAX,
+                    flush_error: false,
+                };
+                assert_eq!(
+                    send_manifest_bytes(
+                        &mut provider.send_state,
+                        &mut retry,
+                        b"synthetic-request",
+                        write
+                    ),
+                    Err(Error::InternalError)
+                );
+                assert_eq!(*accepted.borrow(), before);
+                assert_eq!(
+                    &*accepted.borrow(),
+                    &b"synthetic-request"[..limit.min(b"synthetic-request".len())]
+                );
+            }
+        }
+    }
 
     fn route() -> core::Route {
         core::Route {

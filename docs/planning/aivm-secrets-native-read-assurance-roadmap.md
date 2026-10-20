@@ -143,6 +143,14 @@ authority checks and provider send attempts remain external NR-2/NR-3
 obligations. The new theorem is in `GarrettReadTransition.lean` and checks the
 regenerated production core; it is separate from the older W4/W5 abstract proofs.
 
+The [staged provider continuation](../garrett-provider-exchange-simulation.md)
+now extracts mutable setup/check/send/receive flow and the native writer's
+single-attempt state. Its 30 obligations include returned-run forward simulation
+under explicit primitive contracts, with stamp-origin and binding relations.
+This is the first provider component, not completion of NR-2: contract
+instantiation against the native I/O seam and composition through full requests,
+completion/denial and connected histories remain required.
+
 Focus the next proof work on the extracted controller's callback invocation
 relation and W4/W5 event prefixes, including post-completion-audit
 revocation. Do not create an independently hand-written `read_transition`

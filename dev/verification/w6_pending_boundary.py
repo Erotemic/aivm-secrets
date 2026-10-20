@@ -77,17 +77,21 @@ def check(root: Path = ROOT) -> dict:
             'dispatch(PreparedDispatch::preflight(effect)?)' in request and
             'dispatch(PreparedDispatch::final_effect(effect, op.write)?)' in request,
             'manifest preflight/final no longer share the audited dispatcher')
-    fresh = request.split('let fresh = || -> Outcome<()> {', 1)[-1].split('let canonical_request', 1)[0]
+    fresh = request.split('let current = || -> Outcome<guards::AdmissionStamp> {', 1)[-1].split('let canonical_request', 1)[0]
     for checked in ('self.base.check_coordination()?;',
                     'self.require_control_active(current)?;',
                     'lease.require_current(current)?;',
                     'aivm_secrets_garrett_core::present(',
-                    'guards::authorize('):
+                    'guards::current('):
         require(checked in fresh, f'last-admission closure dropped {checked}')
-    require('let mut stream = StreamOwned::new(conn, socket);' in exchange and
-            'let exchange = || -> Outcome<Value> {' in exchange and
-            '.write_all(&request)' in exchange and
-            'emit_current(fresh, || {' in exchange,
+    primitive = source.split('fn send_manifest_bytes(', 1)[1].split('struct ManifestChannel {', 1)[0]
+    require('let stream = StreamOwned::new(conn, socket);' in source and
+            'writer.write_all(request)' in ''.join(primitive.split()) and
+            'if !state.begin_send(write)' in primitive and
+            'send_manifest_bytes(&mutself.send_state,&mutchannel.stream,&channel.request,self.effect.write,)' in ''.join(source.split()) and
+            'provider_exchange::exchange(&mut provider, &audited.transition)' in exchange and
+            'current: &impl Fn() -> Outcome<guards::AdmissionStamp>' in exchange and
+            'let fresh = || current().map(|_| ());' in fresh and '&current,' in request,
             'native provider may emit credentialed bytes without the last-admission gate')
     require('impl read_transition::Completion for PendingCompletion' in source and
             'read_transition::complete_current(PendingCompletion {' in request,

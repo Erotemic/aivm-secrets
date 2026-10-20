@@ -217,10 +217,10 @@ def review_semantics(contents: dict[str, str]) -> None:
     # W6: the exact provider bytes are validated by a pure encoder BEFORE any
     # TCP/TLS effect. This also covers OAuthSource-created Credential values.
     require(m.count('fn manifest_request_bytes(') == 1
-            and m.count('let request = manifest_request_bytes(route, secret, effect, headers)?;') == 1
+            and m.count('let request = manifest_request_bytes(self.route, self.secret, self.effect, self.headers)?;') == 1
             and m.index('let request = manifest_request_bytes(') < m.index('TcpStream::connect_timeout('),
             'provider socket opened before outbound wire validation')
-    wire = part(m, 'fn manifest_request_bytes(', 'impl Executor {')
+    wire = part(m, 'fn manifest_request_bytes(', '// The standard Write contract')
     require(wire.count('provider_request_bytes(') == 1
             and 'method: effect.method.as_bytes().to_vec()' in wire
             and 'target: effect.target.as_bytes().to_vec()' in wire
@@ -253,37 +253,64 @@ def review_semantics(contents: dict[str, str]) -> None:
                      'proxy-','sec-','x-forwarded-']),
             'complete HTTP encoder lost validation, header separation or body-length framing')
     require('if status == 206 {' in m, 'unreviewed partial response release')
-    require(m.count('TcpStream::connect_timeout(') == 1 and m.count('.write_all(&request)') == 1,
+    runtime = m.split('#[cfg(test)]', 1)[0]
+    require(runtime.count('TcpStream::connect_timeout(') == 1 and
+            runtime.count('.write_all(') == 1 and
+            ''.join(runtime.split()).count('send_manifest_bytes(&mutself.send_state,&mutchannel.stream,&channel.request,self.effect.write,)') == 1,
             'native module added a credentialed socket or HTTP writer')
-    require(m.count('exchange_manifest(') == 2,
+    require(runtime.count('exchange_manifest(') == 2,
             'extra native manifest executor call site')
-    transport = part(m, '    fn exchange_manifest(', '\nfn manifest_response(')
+    transport = part(runtime, '    fn exchange_manifest(', '\nfn manifest_response(')
     require('audited: &AuditedDispatch<' in transport
             and 'let effect = audited.effect;' in transport
             and 'audited.transition.is_write() != effect.write' in transport,
             'manifest provider executor accepts a raw, unaudited policy effect')
-    require(same_order(transport, 'let effect = audited.effect;',
-                       'let request = manifest_request_bytes(',
+    require('provider_exchange::exchange(&mut provider, &audited.transition)' in transport
+            and 'current: &impl Fn() -> Outcome<guards::AdmissionStamp>' in transport
+            and '.into_result()' in transport and '&current,' in dispatch,
+            'manifest provider bypasses the extracted staged continuation')
+    setup = part(runtime, 'fn setup(&mut self)', 'fn recheck(&mut self)')
+    primitive = part(runtime, 'fn send_manifest_bytes(', 'struct ManifestChannel {')
+    sender = part(runtime, 'fn send(&mut self, channel:', 'fn receive(&mut self, channel:')
+    require(same_order(setup, 'let request = manifest_request_bytes(',
                        'TcpStream::connect_timeout(', 'while conn.is_handshaking()',
-                       'let exchange = || -> Outcome<Value>', 'emit_current(fresh, || {'),
-            'final authority admission does not follow provider TLS setup')
-    emit = transport.split('emit_current(fresh, || {', 1)[1]
-    require(transport.count('emit_current(fresh, || {') == 1
-            and transport.count('exchange()') == 2 and emit.count('exchange()') == 2,
-            'manifest provider write bypasses late admission continuation')
-    require('self.address,' in m and 'route.authentication' in m
-            and 'ClientConnection::new(self.tls.clone(), name)' in m,
-            'provider request no longer uses the reviewed host route / TLS identity')
-    # Prevent a trivially different low-level send/reconnect method from
-    # escaping the sole reviewed writer after a source digest is refreshed.
-    # This is deliberately a narrow known-sink check, not a complete Rust
-    # effect analysis or dependency/callback reachability result.
+                       'StreamOwned::new(conn, socket)', 'Ok(ManifestChannel {')
+            and 'self.executor.address,' in setup
+            and 'ClientConnection::new(self.executor.tls.clone(), name)' in setup,
+            'provider setup bypasses wire validation or host route / TLS identity')
+    require('writer.write_all(request)' in ''.join(primitive.split()) and 'writer.flush()' in primitive
+            and same_order(primitive, 'if !state.begin_send(write)', '.write_all(request)')
+            and 'send_manifest_bytes(&mutself.send_state,&mutchannel.stream,&channel.request,self.effect.write,)' in ''.join(sender.split())
+            and same_order(part(runtime, 'fn recheck(&mut self)', 'fn send(&mut self, channel:'),
+                           'self.send_state.begin_check()', '(self.current)()?',
+                           'self.send_state.finish_check(stamp)'),
+            'native credential-bearing primitive or current stamp binding changed')
+    sampled = part(request, 'let current = || -> Outcome<guards::AdmissionStamp>',
+                   'let canonical_request')
+    require('guards::current(' in sampled and 'let fresh = || current().map(|_| ());' in sampled
+            and 'self.base.check_coordination()?;' in sampled
+            and 'aivm_secrets_garrett_core::present(' in sampled
+            and 'lease.require_current(current)?;' in sampled
+            and 'self.require_control_active(current)?;' in sampled,
+            'current stamp bypasses full native late authority checks')
+    provider = contents['rust/crates/aivm-secrets-garrett-core/src/provider_exchange.rs'].split('#[cfg(test)]', 1)[0]
+    require(same_order(provider, 'pub fn exchange<', 'ops.setup()', 'ops.recheck()',
+                       'if write && !current.write()', 'ops.send(&mut channel)', 'ops.receive(channel)')
+            and provider.count('ops.send(&mut channel)') == 1
+            and provider.count('P::OUTCOME_UNKNOWN') == 2,
+            'provider stage order, current stamp or post-attempt uncertainty bypassed')
+    stamp = contents['rust/crates/aivm-secrets-garrett-core/src/manifest.rs']
+    require('pub struct AdmissionStamp {' in stamp and
+            same_order(stamp, 'pub fn current(', 'match authorize(', 'Ok(()) => Ok(AdmissionStamp {'),
+            'native current stamp can be constructed without the extracted authorization')
+    # Review of known alternate primitives remains separate from whole-service
+    # transitive reachability and contracts for std/rustls/drop/timeout effects.
     for bypass in ('.write(', '.write_vectored(', '.send(', '.send_to(',
                    'TcpStream::connect(', 'UnixStream::connect('):
-        require(bypass not in transport,
+        require(bypass not in runtime,
                 'manifest provider added an alternate socket send/connect: ' + bypass)
     for forbidden in ('println!(', 'eprintln!(', 'std::fs::write(', 'std::net::TcpStream::connect('):
-        require(forbidden not in m, 'unreviewed output path in manifest custody: ' + forbidden)
+        require(forbidden not in runtime, 'unreviewed output path in manifest custody: ' + forbidden)
 
     t = contents[RUST + 'tls.rs']
     guest = part(t, 'struct GuestFrame(Value);', 'impl Bridge {')

@@ -36,6 +36,37 @@ PROFILES = [
     "native-exact-write-approval-v1",
 ]
 THEOREMS = [
+    'aivm_secrets_garrett_core.manifest.StampProofs.current_success_iff',
+    'aivm_secrets_garrett_core.manifest.StampProofs.denied_current_preserves_error',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.read_run_iff',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.returned_phase_is_input_phase',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.attempted_read_has_actual_current_origin',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.setup_failure_is_unsent',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.denied_current_is_unsent',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.read_send_failure_is_attempted',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.read_response_failure_is_attempted',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.completed_read_witness',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.read_stamp_cannot_authorize_writing_effect',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.writing_send_failure_is_uncertain',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.writing_response_failure_is_uncertain',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.new_send_state_is_empty',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.checking_is_required_to_record_stamp',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.empty_is_required_to_begin_check',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.successful_send_gate_iff',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.attempted_cannot_check_again',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.attempted_cannot_replace_stamp',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.attempted_cannot_send_again',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.halted_cannot_send',
+    'aivm_secrets_garrett_core.provider_exchange.Proofs.attempted_retains_exact_stamp',
+    'aivm_secrets_garrett_core.provider_exchange.Simulation.issued_snapshot_is_accepted',
+    'aivm_secrets_garrett_core.provider_exchange.Simulation.related_trace_is_sound',
+    'aivm_secrets_garrett_core.provider_exchange.Simulation.related_trace_counts_attempts',
+    'aivm_secrets_garrett_core.provider_exchange.Simulation.read_driver_forward_simulation',
+    'aivm_secrets_garrett_core.provider_exchange.Simulation.extends_sound_observed_prefix',
+    'aivm_secrets_garrett_core.provider_exchange.Simulation.checked_send_state_records_one_attempt',
+    'aivm_secrets_garrett_core.provider_exchange.Simulation.repeated_send_preserves_record',
+    'aivm_secrets_garrett_core.provider_exchange.Simulation.audited_read_driver_simulation',
+
     "aivm_secrets_garrett_core.read_transition.Proofs.constructor_starts_empty",
     "aivm_secrets_garrett_core.read_transition.Proofs.run_current_success_iff",
     "aivm_secrets_garrett_core.read_transition.Proofs.successful_request_receipt",
@@ -652,6 +683,10 @@ def inputs() -> list[str]:
         "proofs/GarrettReadPrefixes.lean",
         "proofs/GarrettReadTransition.lean",
         "proofs/GarrettReadInvocations.lean",
+        "proofs/GarrettProviderExchange.lean",
+        "proofs/GarrettProviderSimulation.lean",
+        "proofs/GarrettConfinement.lean",
+        "dev/verification/provider_exchange.py",
         "dev/verification/read_transition.py",
         "tests/secrets_vectors/approval/kernel-v1.jsonl",
         "tests/secrets_vectors/coordination/authority-v1.jsonl",
@@ -836,9 +871,10 @@ def assurance_coordinates() -> dict:
         "aeneas_release": base.RELEASE,
         "theorems": THEOREMS,
         "allowed_axioms": sorted(base.ALLOWED_AXIOMS),
-        "implementation_linked": "Aeneas-generated optional coordinator dispatch continuation and issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission, and concrete authentication-header credential validation/exact byte appending and request-line method/target validation/exact single-line construction used by both native provider writers, exact bounded newline frame admission shared by bridge ingress, forwarded broker replies and the guest client, including empty observed suffix and post-send uncertainty mapping as a tested native adapter, and extended to complete request framing with Host/Accept, exact custom-header ordering, case-insensitive reserved/duplicate refusal, concrete decimal port/body length and exact opaque body bytes; exact bounded ASCII retry-name admission shared by the native host and named-operation client; optional coordinator authority exact peer/operator admission, absent-only activation, revocation/reservation/completion decisions and modeled terminal committed-decision histories; exact operator receipt admission distinguishing absent status from a terminal revocation, composed with successful extracted revocation; optional exact-write approval issuance/deadline and matching, unexpired, single-use consumption",
+        "implementation_linked": "Aeneas-generated optional coordinator dispatch continuation and issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission, and concrete authentication-header credential validation/exact byte appending and request-line method/target validation/exact single-line construction used by both native provider writers, exact bounded newline frame admission shared by bridge ingress, forwarded broker replies and the guest client, including empty observed suffix and post-send uncertainty mapping as a tested native adapter, and extended to complete request framing with Host/Accept, exact custom-header ordering, case-insensitive reserved/duplicate refusal, concrete decimal port/body length and exact opaque body bytes; exact bounded ASCII retry-name admission shared by the native host and named-operation client; optional coordinator authority exact peer/operator admission, absent-only activation, revocation/reservation/completion decisions and modeled terminal committed-decision histories; exact operator receipt admission distinguishing absent status from a terminal revocation, composed with successful extracted revocation; optional exact-write approval issuance/deadline and matching, unexpired, single-use consumption; production mutable manifest provider setup/current/send/receive driver, sampled admission-stamp origin, native guarded Write state and conditional W4 provider-event extension for every returned read outcome under explicit local primitive contracts",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
+            "Provider forward simulation composes explicit setup/current/send/receive contracts for a provider-attempt projection of mutable state. The native SendState makes its recorded-attempt projection concrete, but native context/world instantiation, the private std/rustls Write primitive, non-returning/drop effects and absence of other I/O are separate obligations; result/state equalities alone do not prove complete native mediation.",
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
             "Signature verification authenticates the exact envelope; sealing/unsealing implement their stated cryptographic contracts.",
             "ring AES-GCM/Ed25519/SHA-256, rustls/webpki, OS entropy and nonce discipline are trusted, not cryptographically re-proved.",
@@ -970,6 +1006,29 @@ def mutate(pattern: str | None = None) -> None:
          "if matches!(self.progress, Progress::Finished) {", "if true {"),
         (invocations, "request invocation preflight receipt omitted",
          "self.trace = Trace::PreflightPlan;", "self.trace = Trace::Empty;"),
+    ]
+    provider = source.with_name("provider_exchange.rs")
+    mutations += [
+        (provider, "provider driver ignored repeated raw setup",
+         "    let mut channel = match ops.setup() {",
+         "    let _ignored = ops.setup();\n    let mut channel = match ops.setup() {"),
+        (provider, "provider driver ignored raw send before current check",
+         "    let current = match ops.recheck() {",
+         "    let _ignored = ops.send(&mut channel);\n    let current = match ops.recheck() {"),
+        (provider, "provider driver ignored repeated raw send",
+         "    match ops.send(&mut channel) {",
+         "    let _ignored = ops.send(&mut channel);\n    match ops.send(&mut channel) {"),
+        (provider, "provider driver lost post-attempt uncertainty",
+         "stage: Stage::Send,\n                current: Some(current),\n                result: Err(if write { P::OUTCOME_UNKNOWN } else { error }),",
+         "stage: Stage::Send,\n                current: Some(current),\n                result: Err(error),"),
+        (provider, "provider native gate permits repeated attempted send",
+         "SendProgress::Attempted(_) => false,\n            _ => {\n                self.progress = SendProgress::Halted;\n                false\n            }\n        }\n    }\n    pub fn stamp",
+         "SendProgress::Attempted(_) => true,\n            _ => {\n                self.progress = SendProgress::Halted;\n                false\n            }\n        }\n    }\n    pub fn stamp"),
+    ]
+    mutations += [
+        (source.with_name("manifest.rs"), "provider current stamp bypassed authorization",
+         "match authorize(\n        claims,\n        grant,\n        requested,\n        selected,\n        write,\n        writes_allowed,\n        now,\n        elapsed,\n    ) {",
+         "match Ok::<(), UseDenial>(()) {"),
     ]
     use_source = source.with_name("credential_use.rs")
     mutations += [
@@ -1738,6 +1797,7 @@ def mutate(pattern: str | None = None) -> None:
             modules = [
                 "GarrettReadTransition",
                 "GarrettReadInvocations",
+                "GarrettProviderExchange",
                 "Garrett",
                 "GarrettProtocol",
                 "GarrettHistory",
@@ -1773,6 +1833,7 @@ def mutate(pattern: str | None = None) -> None:
             # coverage and dependency order for all other protocol modules.
             preferred = {
                 "read_transition.rs": "GarrettReadTransition",
+                "provider_exchange.rs": "GarrettProviderExchange",
                 "approval.rs": "GarrettApproval",
                 "enrollment.rs": "GarrettEnrollment",
                 "authority.rs": "GarrettAuthority",
@@ -1795,15 +1856,16 @@ def mutate(pattern: str | None = None) -> None:
             if preferred:
                 modules.remove(preferred)
                 modules.insert(0, preferred)
+            if source.name in {"provider_exchange.rs", "manifest.rs"}:
+                dependencies = ["GarrettReadTransition", "GarrettLogin", "Garrett", "GarrettManifest", "GarrettProviderExchange"]
+                for dependency in dependencies:
+                    modules.remove(dependency)
+                modules[:0] = dependencies
             if label.startswith("operator receipt "):
                 # Receipt proofs import the authority contracts. Recompile that
                 # dependency against this mutant before checking its consumer.
                 modules.remove("GarrettCoordinatorReply")
                 modules.insert(1, "GarrettCoordinatorReply")
-            if source.name == "manifest.rs":
-                modules.remove("GarrettLogin")
-                modules.remove("GarrettManifest")
-                modules[1:1] = ["GarrettLogin", "GarrettManifest"]
             if source.name == "disclosure.rs":
                 for dependency in [
                     "GarrettLogin",

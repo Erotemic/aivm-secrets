@@ -3077,14 +3077,14 @@ partial_fixpoint
 end
 
 /-- [aivm_secrets_garrett_core::Denial]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 23:0-25:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 24:0-26:1
     Visibility: public -/
 @[discriminant isize]
 inductive Denial where
 | InvalidCapability : Denial
 
 /-- [aivm_secrets_garrett_core::Claims]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 27:0-36:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 28:0-37:1
     Visibility: public -/
 structure Claims where
   issuer : alloc.vec.Vec Std.U8
@@ -3097,7 +3097,7 @@ structure Claims where
   certificate : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::Expectation]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 38:0-43:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 39:0-44:1
     Visibility: public -/
 structure Expectation where
   issuer : alloc.vec.Vec Std.U8
@@ -3106,7 +3106,7 @@ structure Expectation where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::IssueWindow]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 45:0-49:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 46:0-50:1
     Visibility: public -/
 structure IssueWindow where
   issued_at : Std.I64
@@ -3114,7 +3114,7 @@ structure IssueWindow where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::issue_window]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 52:0-79:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 53:0-80:1
     Visibility: public -/
 def issue_window
   (active : Bool) (epoch : Std.I64) (not_after : Std.I64) (now : Std.I64)
@@ -3158,7 +3158,7 @@ def issue_window
   else ok (core.result.Result.Err Denial.InvalidCapability)
 
 /-- [aivm_secrets_garrett_core::present]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 83:0-110:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 84:0-111:1
     Visibility: public -/
 def present
   (claims : Claims) (expected : Expectation) (peer : alloc.vec.Vec Std.U8)
@@ -3222,21 +3222,21 @@ def present
                           else ok (core.result.Result.Ok ())
 
 /-- [aivm_secrets_garrett_core::AuthenticatedEnvelope]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 114:0-117:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 115:0-118:1
     Visibility: public -/
 structure AuthenticatedEnvelope where
   claims : Claims
   encrypted : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::OpenedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 119:0-122:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 120:0-123:1
     Visibility: public -/
 structure OpenedSurrogate (S : Type _) where
   claims : Claims
   secret : S
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeVerifier]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 125:0-129:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 126:0-130:1
     Visibility: public -/
 structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
   verify : Self → alloc.vec.Vec Std.U8 → Result (core.result.Result
@@ -3245,7 +3245,7 @@ structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
     Self_Secret Denial)
 
 /-- [aivm_secrets_garrett_core::open_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 134:0-156:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 135:0-157:1
     Visibility: public -/
 def open_surrogate
   {V : Type _} {Clause0_Secret : Type _} (EnvelopeVerifierInst :
@@ -3269,7 +3269,7 @@ def open_surrogate
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssueInputs]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 158:0-167:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 159:0-168:1
     Visibility: public -/
 structure IssueInputs where
   issuer : alloc.vec.Vec Std.U8
@@ -3282,7 +3282,7 @@ structure IssueInputs where
   not_after : Std.I64
 
 /-- [aivm_secrets_garrett_core::prepare_issue]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 170:0-185:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 171:0-186:1
     Visibility: public -/
 def prepare_issue
   (input : IssueInputs) (now : Std.I64) (lifetime : Std.I64) :
@@ -3305,21 +3305,21 @@ def prepare_issue
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssuedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 187:0-190:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 188:0-191:1
     Visibility: public -/
 structure IssuedSurrogate where
   claims : Claims
   token : alloc.vec.Vec Std.U8
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeIssuer]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 192:0-195:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 193:0-196:1
     Visibility: public -/
 structure EnvelopeIssuer (Self : Type _) (Self_Secret : Type _) where
   «seal» : Self → Claims → Self_Secret → Result (core.result.Result
     (alloc.vec.Vec Std.U8) Denial)
 
 /-- [aivm_secrets_garrett_core::issue_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 197:0-213:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 198:0-214:1
     Visibility: public -/
 def issue_surrogate
   {I : Type _} {Clause0_Secret : Type _} (EnvelopeIssuerInst : EnvelopeIssuer I
@@ -3499,6 +3499,75 @@ structure manifest.ProviderReply where
 def manifest.release
   (reply : manifest.ProviderReply) : Result (alloc.vec.Vec Std.U8) := do
   ok reply.selected
+
+/-- [aivm_secrets_garrett_core::manifest::AdmissionStamp]
+    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 73:0-77:1
+    Visibility: public -/
+structure manifest.AdmissionStamp where
+  now : Std.I64
+  elapsed : Std.I64
+  write : Bool
+
+/-- [aivm_secrets_garrett_core::manifest::{impl core::clone::Clone for aivm_secrets_garrett_core::manifest::AdmissionStamp}::clone]:
+    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 72:9-72:14
+    Visibility: public -/
+def manifest.AdmissionStamp.Insts.CoreCloneClone.clone
+  (self : manifest.AdmissionStamp) : Result manifest.AdmissionStamp := do
+  ok self
+
+/-- Trait implementation: [aivm_secrets_garrett_core::manifest::{impl core::clone::Clone for aivm_secrets_garrett_core::manifest::AdmissionStamp}]
+    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 72:9-72:14 -/
+@[reducible]
+def manifest.AdmissionStamp.Insts.CoreCloneClone : core.clone.Clone
+  manifest.AdmissionStamp := {
+  clone := manifest.AdmissionStamp.Insts.CoreCloneClone.clone
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::manifest::{impl core::marker::Copy for aivm_secrets_garrett_core::manifest::AdmissionStamp}]
+    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 72:16-72:20 -/
+@[reducible]
+def manifest.AdmissionStamp.Insts.CoreMarkerCopy : core.marker.Copy
+  manifest.AdmissionStamp := {
+  cloneInst := manifest.AdmissionStamp.Insts.CoreCloneClone
+}
+
+/-- [aivm_secrets_garrett_core::manifest::{aivm_secrets_garrett_core::manifest::AdmissionStamp}::now]:
+    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 79:4-81:5
+    Visibility: public -/
+def manifest.AdmissionStamp.impl.now
+  (self : manifest.AdmissionStamp) : Result Std.I64 := do
+  ok self.now
+
+/-- [aivm_secrets_garrett_core::manifest::{aivm_secrets_garrett_core::manifest::AdmissionStamp}::elapsed]:
+    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 82:4-84:5
+    Visibility: public -/
+def manifest.AdmissionStamp.impl.elapsed
+  (self : manifest.AdmissionStamp) : Result Std.I64 := do
+  ok self.elapsed
+
+/-- [aivm_secrets_garrett_core::manifest::{aivm_secrets_garrett_core::manifest::AdmissionStamp}::write]:
+    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 85:4-87:5
+    Visibility: public -/
+def manifest.AdmissionStamp.impl.write
+  (self : manifest.AdmissionStamp) : Result Bool := do
+  ok self.write
+
+/-- [aivm_secrets_garrett_core::manifest::current]:
+    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 90:0-117:1
+    Visibility: public -/
+def manifest.current
+  (claims : credential_use.UseClaims) (grant : credential_use.UseGrant)
+  (requested : alloc.vec.Vec Std.U8) (selected : alloc.vec.Vec Std.U8)
+  (write : Bool) (writes_allowed : Bool) (now : Std.I64) (elapsed : Std.I64) :
+  Result (core.result.Result manifest.AdmissionStamp credential_use.UseDenial)
+  := do
+  let r ←
+    manifest.authorize claims grant requested selected write writes_allowed now
+      elapsed
+  match r with
+  | core.result.Result.Ok _ =>
+    ok (core.result.Result.Ok { now, elapsed, write })
+  | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::oauth_login::Stage]
     Source: 'crates/aivm-secrets-garrett-core/src/oauth_login.rs', lines 3:0-10:1
@@ -4107,6 +4176,487 @@ def protocol.perform
     | core.result.Result.Err error => ok (core.result.Result.Err error)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
+/-- Trait declaration: [aivm_secrets_garrett_core::provider_exchange::Provider]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 9:0-20:1
+    Visibility: public -/
+structure provider_exchange.Provider (Self : Type _) (Self_Channel : Type _)
+  (Self_Output : Type _) (Self_Error : Type _) where
+  INVALID_POLICY : Result Self_Error
+  OUTCOME_UNKNOWN : Result Self_Error
+  setup : Self → Result ((core.result.Result Self_Channel Self_Error) ×
+    Self)
+  recheck : Self → Result ((core.result.Result manifest.AdmissionStamp
+    Self_Error) × Self)
+  send : Self → Self_Channel → Result ((core.result.Result Unit Self_Error)
+    × Self × Self_Channel)
+  receive : Self → Self_Channel → Result ((core.result.Result Self_Output
+    Self_Error) × Self)
+
+/-- [aivm_secrets_garrett_core::provider_exchange::Stage]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 23:0-29:1
+    Visibility: public -/
+@[discriminant isize]
+inductive provider_exchange.Stage where
+| Setup : provider_exchange.Stage
+| Admission : provider_exchange.Stage
+| Send : provider_exchange.Stage
+| Response : provider_exchange.Stage
+| Complete : provider_exchange.Stage
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{impl core::clone::Clone for aivm_secrets_garrett_core::provider_exchange::Stage}::clone]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 22:9-22:14
+    Visibility: public -/
+def provider_exchange.Stage.Insts.CoreCloneClone.clone
+  (self : provider_exchange.Stage) : Result provider_exchange.Stage := do
+  ok self
+
+/-- Trait implementation: [aivm_secrets_garrett_core::provider_exchange::{impl core::clone::Clone for aivm_secrets_garrett_core::provider_exchange::Stage}]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 22:9-22:14 -/
+@[reducible]
+def provider_exchange.Stage.Insts.CoreCloneClone : core.clone.Clone
+  provider_exchange.Stage := {
+  clone := provider_exchange.Stage.Insts.CoreCloneClone.clone
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::provider_exchange::{impl core::marker::Copy for aivm_secrets_garrett_core::provider_exchange::Stage}]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 22:16-22:20 -/
+@[reducible]
+def provider_exchange.Stage.Insts.CoreMarkerCopy : core.marker.Copy
+  provider_exchange.Stage := {
+  cloneInst := provider_exchange.Stage.Insts.CoreCloneClone
+}
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{impl core::fmt::Debug for aivm_secrets_garrett_core::provider_exchange::Stage}::fmt]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 22:22-22:27
+    Visibility: public -/
+def provider_exchange.Stage.Insts.CoreFmtDebug.fmt
+  (self : provider_exchange.Stage) (f : core.fmt.Formatter) :
+  Result ((core.result.Result Unit core.fmt.Error) × core.fmt.Formatter)
+  := do
+  match self with
+  | provider_exchange.Stage.Setup =>
+    core.fmt.Formatter.write_str f (toStr "Setup")
+  | provider_exchange.Stage.Admission =>
+    core.fmt.Formatter.write_str f (toStr "Admission")
+  | provider_exchange.Stage.Send =>
+    core.fmt.Formatter.write_str f (toStr "Send")
+  | provider_exchange.Stage.Response =>
+    core.fmt.Formatter.write_str f (toStr "Response")
+  | provider_exchange.Stage.Complete =>
+    core.fmt.Formatter.write_str f (toStr "Complete")
+
+/-- Trait implementation: [aivm_secrets_garrett_core::provider_exchange::{impl core::fmt::Debug for aivm_secrets_garrett_core::provider_exchange::Stage}]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 22:22-22:27 -/
+@[reducible]
+def provider_exchange.Stage.Insts.CoreFmtDebug : core.fmt.Debug
+  provider_exchange.Stage := {
+  fmt := provider_exchange.Stage.Insts.CoreFmtDebug.fmt
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::provider_exchange::{impl core::marker::StructuralPartialEq for aivm_secrets_garrett_core::provider_exchange::Stage}]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 22:29-22:38 -/
+@[reducible]
+def provider_exchange.Stage.Insts.CoreMarkerStructuralPartialEq :
+  core.marker.StructuralPartialEq provider_exchange.Stage := {
+}
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{impl core::cmp::PartialEq<aivm_secrets_garrett_core::provider_exchange::Stage> for aivm_secrets_garrett_core::provider_exchange::Stage}::eq]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 22:29-22:38
+    Visibility: public -/
+def provider_exchange.Stage.Insts.CoreCmpPartialEqStage.eq
+  (self : provider_exchange.Stage) (other : provider_exchange.Stage) :
+  Result Bool
+  := do
+  let self1 := read_discriminant self
+  let other1 := read_discriminant other
+  ok (self1 = other1)
+
+/-- Trait implementation: [aivm_secrets_garrett_core::provider_exchange::{impl core::cmp::PartialEq<aivm_secrets_garrett_core::provider_exchange::Stage> for aivm_secrets_garrett_core::provider_exchange::Stage}]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 22:29-22:38 -/
+@[reducible]
+impl_def provider_exchange.Stage.Insts.CoreCmpPartialEqStage :
+  core.cmp.PartialEq provider_exchange.Stage provider_exchange.Stage := {
+  eq := provider_exchange.Stage.Insts.CoreCmpPartialEqStage.eq
+  ne := core.cmp.PartialEq.ne.trait_default
+    provider_exchange.Stage.Insts.CoreCmpPartialEqStage
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::provider_exchange::{impl core::cmp::Eq for aivm_secrets_garrett_core::provider_exchange::Stage}]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 22:40-22:42 -/
+@[reducible]
+def provider_exchange.Stage.Insts.CoreCmpEq : core.cmp.Eq
+  provider_exchange.Stage := {
+  partialEqInst := provider_exchange.Stage.Insts.CoreCmpPartialEqStage
+}
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::Stage}::attempted]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 31:4-33:5
+    Visibility: public -/
+def provider_exchange.Stage.attempted
+  (self : provider_exchange.Stage) : Result Bool := do
+  match self with
+  | provider_exchange.Stage.Setup => ok false
+  | provider_exchange.Stage.Admission => ok false
+  | provider_exchange.Stage.Send => ok true
+  | provider_exchange.Stage.Response => ok true
+  | provider_exchange.Stage.Complete => ok true
+
+/-- [aivm_secrets_garrett_core::read_transition::Phase]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 16:0-19:1
+    Visibility: public -/
+@[discriminant isize]
+inductive read_transition.Phase where
+| Preflight : read_transition.Phase
+| Final : read_transition.Phase
+
+/-- [aivm_secrets_garrett_core::provider_exchange::Report]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 36:0-41:1
+    Visibility: public -/
+structure provider_exchange.Report (T : Type _) (E : Type _) where
+  phase : read_transition.Phase
+  stage : provider_exchange.Stage
+  current : Option manifest.AdmissionStamp
+  result : core.result.Result T E
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::Report<T, E>}::phase]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 43:4-45:5
+    Visibility: public -/
+def provider_exchange.Report.impl.phase
+  {T : Type _} {E : Type _} (self : provider_exchange.Report T E) :
+  Result read_transition.Phase
+  := do
+  ok self.phase
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::Report<T, E>}::stage]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 46:4-48:5
+    Visibility: public -/
+def provider_exchange.Report.impl.stage
+  {T : Type _} {E : Type _} (self : provider_exchange.Report T E) :
+  Result provider_exchange.Stage
+  := do
+  ok self.stage
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::Report<T, E>}::current]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 49:4-51:5
+    Visibility: public -/
+def provider_exchange.Report.impl.current
+  {T : Type _} {E : Type _} (self : provider_exchange.Report T E) :
+  Result (Option manifest.AdmissionStamp)
+  := do
+  ok self.current
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::Report<T, E>}::into_result]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 52:4-54:5
+    Visibility: public -/
+def provider_exchange.Report.into_result
+  {T : Type _} {E : Type _} (self : provider_exchange.Report T E) :
+  Result (core.result.Result T E)
+  := do
+  ok self.result
+
+/-- [aivm_secrets_garrett_core::read_transition::Audited]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 35:0-38:1
+    Visibility: public -/
+structure read_transition.Audited where
+  phase : read_transition.Phase
+  write : Bool
+
+/-- [aivm_secrets_garrett_core::read_transition::{aivm_secrets_garrett_core::read_transition::Audited}::is_write]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 81:4-83:5
+    Visibility: public -/
+def read_transition.Audited.is_write
+  (self : read_transition.Audited) : Result Bool := do
+  ok self.write
+
+/-- [aivm_secrets_garrett_core::read_transition::{aivm_secrets_garrett_core::read_transition::Audited}::phase]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 77:4-79:5
+    Visibility: public -/
+def read_transition.Audited.impl.phase
+  (self : read_transition.Audited) : Result read_transition.Phase := do
+  ok self.phase
+
+/-- [aivm_secrets_garrett_core::provider_exchange::exchange]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 57:0-116:1
+    Visibility: public -/
+def provider_exchange.exchange
+  {P : Type _} {Clause0_Channel : Type _} {Clause0_Output : Type _}
+  {Clause0_Error : Type _} (ProviderInst : provider_exchange.Provider P
+  Clause0_Channel Clause0_Output Clause0_Error) (ops : P)
+  (audited : read_transition.Audited) :
+  Result ((provider_exchange.Report Clause0_Output Clause0_Error) × P)
+  := do
+  let phase ← read_transition.Audited.impl.phase audited
+  let write ← read_transition.Audited.is_write audited
+  let (r, ops1) ← ProviderInst.setup ops
+  match r with
+  | core.result.Result.Ok channel =>
+    let (r1, ops2) ← ProviderInst.recheck ops1
+    match r1 with
+    | core.result.Result.Ok current =>
+      if write
+      then
+        let b ← manifest.AdmissionStamp.impl.write current
+        if b
+        then
+          let (r2, ops3, channel1) ← ProviderInst.send ops2 channel
+          match r2 with
+          | core.result.Result.Ok _ =>
+            let (r3, ops4) ← ProviderInst.receive ops3 channel1
+            match r3 with
+            | core.result.Result.Ok _ =>
+              ok
+                ({
+                   phase,
+                   stage := provider_exchange.Stage.Complete,
+                   current := (some current),
+                   result := r3
+                 }, ops4)
+            | core.result.Result.Err _ =>
+              if write
+              then
+                let error ← ProviderInst.OUTCOME_UNKNOWN
+                ok
+                  ({
+                     phase,
+                     stage := provider_exchange.Stage.Response,
+                     current := (some current),
+                     result := (core.result.Result.Err error)
+                   }, ops4)
+              else
+                ok
+                  ({
+                     phase,
+                     stage := provider_exchange.Stage.Response,
+                     current := (some current),
+                     result := r3
+                   }, ops4)
+          | core.result.Result.Err error =>
+            if write
+            then
+              let error1 ← ProviderInst.OUTCOME_UNKNOWN
+              ok
+                ({
+                   phase,
+                   stage := provider_exchange.Stage.Send,
+                   current := (some current),
+                   result := (core.result.Result.Err error1)
+                 }, ops3)
+            else
+              ok
+                ({
+                   phase,
+                   stage := provider_exchange.Stage.Send,
+                   current := (some current),
+                   result := (core.result.Result.Err error)
+                 }, ops3)
+        else
+          let t ← ProviderInst.INVALID_POLICY
+          ok
+            ({
+               phase,
+               stage := provider_exchange.Stage.Admission,
+               current := (some current),
+               result := (core.result.Result.Err t)
+             }, ops2)
+      else
+        let (r2, ops3, channel1) ← ProviderInst.send ops2 channel
+        match r2 with
+        | core.result.Result.Ok _ =>
+          let (r3, ops4) ← ProviderInst.receive ops3 channel1
+          match r3 with
+          | core.result.Result.Ok _ =>
+            ok
+              ({
+                 phase,
+                 stage := provider_exchange.Stage.Complete,
+                 current := (some current),
+                 result := r3
+               }, ops4)
+          | core.result.Result.Err _ =>
+            if write
+            then
+              let error ← ProviderInst.OUTCOME_UNKNOWN
+              ok
+                ({
+                   phase,
+                   stage := provider_exchange.Stage.Response,
+                   current := (some current),
+                   result := (core.result.Result.Err error)
+                 }, ops4)
+            else
+              ok
+                ({
+                   phase,
+                   stage := provider_exchange.Stage.Response,
+                   current := (some current),
+                   result := r3
+                 }, ops4)
+        | core.result.Result.Err error =>
+          if write
+          then
+            let error1 ← ProviderInst.OUTCOME_UNKNOWN
+            ok
+              ({
+                 phase,
+                 stage := provider_exchange.Stage.Send,
+                 current := (some current),
+                 result := (core.result.Result.Err error1)
+               }, ops3)
+          else
+            ok
+              ({
+                 phase,
+                 stage := provider_exchange.Stage.Send,
+                 current := (some current),
+                 result := (core.result.Result.Err error)
+               }, ops3)
+    | core.result.Result.Err error =>
+      ok
+        ({
+           phase,
+           stage := provider_exchange.Stage.Admission,
+           current := none,
+           result := (core.result.Result.Err error)
+         }, ops2)
+  | core.result.Result.Err error =>
+    ok
+      ({
+         phase,
+         stage := provider_exchange.Stage.Setup,
+         current := none,
+         result := (core.result.Result.Err error)
+       }, ops1)
+
+/-- [aivm_secrets_garrett_core::provider_exchange::SendProgress]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 120:0-126:1 -/
+@[discriminant isize]
+inductive provider_exchange.SendProgress where
+| Empty : provider_exchange.SendProgress
+| Checking : provider_exchange.SendProgress
+| Halted : provider_exchange.SendProgress
+| Checked : manifest.AdmissionStamp → provider_exchange.SendProgress
+| Attempted : manifest.AdmissionStamp → provider_exchange.SendProgress
+
+/-- [aivm_secrets_garrett_core::provider_exchange::SendState]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 127:0-129:1
+    Visibility: public -/
+structure provider_exchange.SendState where
+  progress : provider_exchange.SendProgress
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::SendState}::new]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 131:4-135:5
+    Visibility: public -/
+def provider_exchange.SendState.new : Result provider_exchange.SendState := do
+  ok { progress := provider_exchange.SendProgress.Empty }
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::SendState}::begin_check]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 136:4-148:5
+    Visibility: public -/
+def provider_exchange.SendState.begin_check
+  (self : provider_exchange.SendState) :
+  Result (Bool × provider_exchange.SendState)
+  := do
+  match self.progress with
+  | provider_exchange.SendProgress.Empty =>
+    ok (true, { progress := provider_exchange.SendProgress.Checking })
+  | provider_exchange.SendProgress.Checking =>
+    ok (false, { progress := provider_exchange.SendProgress.Halted })
+  | provider_exchange.SendProgress.Halted =>
+    ok (false, { progress := provider_exchange.SendProgress.Halted })
+  | provider_exchange.SendProgress.Checked _ =>
+    ok (false, { progress := provider_exchange.SendProgress.Halted })
+  | provider_exchange.SendProgress.Attempted _ =>
+    ok (false, { progress := self.progress })
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::SendState}::finish_check]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 149:4-161:5
+    Visibility: public -/
+def provider_exchange.SendState.finish_check
+  (self : provider_exchange.SendState) (stamp : manifest.AdmissionStamp) :
+  Result (Bool × provider_exchange.SendState)
+  := do
+  match self.progress with
+  | provider_exchange.SendProgress.Empty =>
+    ok (false, { progress := provider_exchange.SendProgress.Halted })
+  | provider_exchange.SendProgress.Checking =>
+    ok (true, { progress := (provider_exchange.SendProgress.Checked stamp) })
+  | provider_exchange.SendProgress.Halted =>
+    ok (false, { progress := provider_exchange.SendProgress.Halted })
+  | provider_exchange.SendProgress.Checked _ =>
+    ok (false, { progress := provider_exchange.SendProgress.Halted })
+  | provider_exchange.SendProgress.Attempted _ =>
+    ok (false, { progress := self.progress })
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::SendState}::begin_send]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 162:4-178:5
+    Visibility: public -/
+def provider_exchange.SendState.begin_send
+  (self : provider_exchange.SendState) (write : Bool) :
+  Result (Bool × provider_exchange.SendState)
+  := do
+  match self.progress with
+  | provider_exchange.SendProgress.Empty =>
+    ok (false, { progress := provider_exchange.SendProgress.Halted })
+  | provider_exchange.SendProgress.Checking =>
+    ok (false, { progress := provider_exchange.SendProgress.Halted })
+  | provider_exchange.SendProgress.Halted =>
+    ok (false, { progress := provider_exchange.SendProgress.Halted })
+  | provider_exchange.SendProgress.Checked stamp =>
+    if write
+    then
+      let b ← manifest.AdmissionStamp.impl.write stamp
+      if b
+      then
+        ok (true,
+          { progress := (provider_exchange.SendProgress.Attempted stamp) })
+      else ok (false, { progress := provider_exchange.SendProgress.Halted })
+    else
+      ok (true,
+        { progress := (provider_exchange.SendProgress.Attempted stamp) })
+  | provider_exchange.SendProgress.Attempted _ =>
+    ok (false, { progress := self.progress })
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::SendState}::stamp]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 179:4-184:5
+    Visibility: public -/
+def provider_exchange.SendState.stamp
+  (self : provider_exchange.SendState) :
+  Result (Option manifest.AdmissionStamp)
+  := do
+  match self.progress with
+  | provider_exchange.SendProgress.Empty => ok none
+  | provider_exchange.SendProgress.Checking => ok none
+  | provider_exchange.SendProgress.Halted => ok none
+  | provider_exchange.SendProgress.Checked stamp => ok (some stamp)
+  | provider_exchange.SendProgress.Attempted stamp => ok (some stamp)
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::SendState}::attempted]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 185:4-187:5
+    Visibility: public -/
+def provider_exchange.SendState.attempted
+  (self : provider_exchange.SendState) : Result Bool := do
+  match self.progress with
+  | provider_exchange.SendProgress.Empty => ok false
+  | provider_exchange.SendProgress.Checking => ok false
+  | provider_exchange.SendProgress.Halted => ok false
+  | provider_exchange.SendProgress.Checked _ => ok false
+  | provider_exchange.SendProgress.Attempted _ => ok true
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{impl core::default::Default for aivm_secrets_garrett_core::provider_exchange::SendState}::default]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 190:4-192:5
+    Visibility: public -/
+def provider_exchange.SendState.Insts.CoreDefaultDefault.default
+  : Result provider_exchange.SendState := do
+  provider_exchange.SendState.new
+
+/-- Trait implementation: [aivm_secrets_garrett_core::provider_exchange::{impl core::default::Default for aivm_secrets_garrett_core::provider_exchange::SendState}]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 189:0-193:1 -/
+@[reducible]
+def provider_exchange.SendState.Insts.CoreDefaultDefault : core.default.Default
+  provider_exchange.SendState := {
+  default := provider_exchange.SendState.Insts.CoreDefaultDefault.default
+}
+
 /-- [aivm_secrets_garrett_core::read_transition::invocation::Trace]
     Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 9:0-20:1
     Visibility: public -/
@@ -4171,14 +4721,6 @@ structure read_transition.invocation.Invocation (R : Type _) where
   adapter : R
   trace : read_transition.invocation.Trace
   progress : read_transition.invocation.Progress
-
-/-- [aivm_secrets_garrett_core::read_transition::Phase]
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 16:0-19:1
-    Visibility: public -/
-@[discriminant isize]
-inductive read_transition.Phase where
-| Preflight : read_transition.Phase
-| Final : read_transition.Phase
 
 /-- Trait declaration: [aivm_secrets_garrett_core::read_transition::Request]
     Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 122:0-137:1
@@ -4968,13 +5510,6 @@ structure read_transition.Prepared where
   phase : read_transition.Phase
   write : Bool
 
-/-- [aivm_secrets_garrett_core::read_transition::Audited]
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 35:0-38:1
-    Visibility: public -/
-structure read_transition.Audited where
-  phase : read_transition.Phase
-  write : Bool
-
 /-- [aivm_secrets_garrett_core::read_transition::prepare]:
     Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 43:0-55:1
     Visibility: public -/
@@ -5016,20 +5551,6 @@ def read_transition.acknowledge
     ok (core.result.Result.Ok
       { phase := prepared.phase, write := prepared.write })
   else ok (core.result.Result.Err Denial.InvalidCapability)
-
-/-- [aivm_secrets_garrett_core::read_transition::{aivm_secrets_garrett_core::read_transition::Audited}::phase]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 77:4-79:5
-    Visibility: public -/
-def read_transition.Audited.impl.phase
-  (self : read_transition.Audited) : Result read_transition.Phase := do
-  ok self.phase
-
-/-- [aivm_secrets_garrett_core::read_transition::{aivm_secrets_garrett_core::read_transition::Audited}::is_write]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 81:4-83:5
-    Visibility: public -/
-def read_transition.Audited.is_write
-  (self : read_transition.Audited) : Result Bool := do
-  ok self.write
 
 /-- [aivm_secrets_garrett_core::read_transition::CompletionPhase]
     Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 89:0-92:1

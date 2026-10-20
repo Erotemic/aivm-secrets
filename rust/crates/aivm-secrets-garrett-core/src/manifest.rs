@@ -65,3 +65,53 @@ pub struct ProviderReply {
 pub fn release(reply: ProviderReply) -> Vec<u8> {
     reply.selected
 }
+
+/// The sampled inputs to a successful native authority check. Construction is
+/// private: callers obtain a stamp only through the same authorize decision.
+/// Identity/policy binding belongs to the invoking host context, not this stamp.
+#[derive(Clone, Copy)]
+pub struct AdmissionStamp {
+    now: i64,
+    elapsed: i64,
+    write: bool,
+}
+impl AdmissionStamp {
+    pub fn now(&self) -> i64 {
+        self.now
+    }
+    pub fn elapsed(&self) -> i64 {
+        self.elapsed
+    }
+    pub fn write(&self) -> bool {
+        self.write
+    }
+}
+#[allow(clippy::too_many_arguments)]
+pub fn current(
+    claims: &UseClaims,
+    grant: &UseGrant,
+    requested: &Vec<u8>,
+    selected: &Vec<u8>,
+    write: bool,
+    writes_allowed: bool,
+    now: i64,
+    elapsed: i64,
+) -> Result<AdmissionStamp, UseDenial> {
+    match authorize(
+        claims,
+        grant,
+        requested,
+        selected,
+        write,
+        writes_allowed,
+        now,
+        elapsed,
+    ) {
+        Ok(()) => Ok(AdmissionStamp {
+            now,
+            elapsed,
+            write,
+        }),
+        Err(error) => Err(error),
+    }
+}

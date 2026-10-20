@@ -49,11 +49,11 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
     ensure(len(contract['remaining_obligations']) >= 5,
            'W6 silently removed outstanding correspondence obligations')
     source = (root / SOURCE).read_text()
-    request = source.index('        let request = manifest_request_bytes(route, secret, effect, headers)?;')
+    request = source.index('        let request = manifest_request_bytes(self.route, self.secret, self.effect, self.headers)?;')
     connect = source.index('TcpStream::connect_timeout(')
     ensure(request < connect, 'TCP effect before request-byte validation')
     ensure(source.count('fn manifest_request_bytes(') == 1
-           and source.count('let request = manifest_request_bytes(route, secret, effect, headers)?;') == 1,
+           and source.count('let request = manifest_request_bytes(self.route, self.secret, self.effect, self.headers)?;') == 1,
            'native manifest adapter has additional unreviewed encoder')
     # The real credential-bearing executor only accepts the type constructed
     # after durable audit. This checks the reviewed source topology; it cannot
@@ -76,11 +76,13 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and 'let effect = audited.effect;' in provider_interpreter
            and 'audited.transition.is_write() != effect.write' in provider_interpreter,
            'provider executor accepts an unaudited policy effect')
-    ensure(provider_interpreter.count('.write_all(') == 1
-           and provider_interpreter.count('.write_all(&request)') == 1
-           and provider_interpreter.count('TcpStream::connect_timeout(') == 1,
+    runtime = source.split('#[cfg(test)]', 1)[0]
+    ensure(runtime.count('.write_all(') == 1
+           and 'writer.write_all(request)' in ''.join(runtime.split())
+           and 'provider_exchange::exchange(&mut provider, &audited.transition)' in provider_interpreter
+           and runtime.count('TcpStream::connect_timeout(') == 1,
            'native manifest adapter has another provider send')
-    encoder = source.split('fn manifest_request_bytes(', 1)[1].split('impl Executor {', 1)[0]
+    encoder = source.split('fn manifest_request_bytes(', 1)[1].split('// The standard Write contract', 1)[0]
     shared = (root / COMMON_ENCODER).read_text().split('fn provider_request_bytes(', 1)[1].split('fn account_request_bytes(', 1)[0]
     core = (root / CORE_ENCODER).read_text().split('#[cfg(test)]', 1)[0]
     ensure('!http_auth::valid_credential(secret)' in core

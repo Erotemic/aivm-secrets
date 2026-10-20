@@ -64,6 +64,10 @@ def mutate(repo, filename, before, after):
      'if false && !aivm_secrets_garrett_core::coordinator_authority::operator_acknowledged('),
     (RUST + 'coordinator_authority/server.rs', 'discard_after_reply(&mut stream.sock);', 'let _ = &stream.sock;'),
     (RUST + 'custody/manifest_session.rs',
+     'if !state.begin_send(write) {', 'if false {'),
+    (RUST + 'custody/manifest_session.rs',
+     'self.send_state.finish_check(stamp)', 'true'),
+    (RUST + 'custody/manifest_session.rs',
      'if !aivm_secrets_garrett_core::coordination::valid_retry_key(key.as_bytes())', 'if false'),
     (RUST + 'client_invoke.rs', 'if !valid_retry_key(key.as_bytes())', 'if false'),
     (RUST + 'client_main.rs', 'let command = client_invoke::Invoke::parse(words)?;',
@@ -161,8 +165,8 @@ def mutate(repo, filename, before, after):
     ),
     (
         RUST + 'custody/manifest_session.rs',
-        'emit_current(fresh, || {',
-        '(|| {',
+        'provider_exchange::exchange(&mut provider, &audited.transition)',
+        'unchecked_exchange(&mut provider)',
     ),
     (
         RUST + 'custody.rs',

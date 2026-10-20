@@ -41,6 +41,8 @@ include proofs/GarrettApproval.lean
 include proofs/GarrettReadPaths.lean proofs/GarrettReadPrefixes.lean
 include proofs/GarrettReadTransition.lean
 include proofs/GarrettReadInvocations.lean
+include proofs/GarrettProviderExchange.lean
+include proofs/GarrettProviderSimulation.lean
 recursive-include proofs/generated *.lean
 prune rust/target
 prune proofs/.lake

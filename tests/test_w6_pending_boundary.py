@@ -27,10 +27,10 @@ def test_pending_source_guard_rejects_unreviewed_boundary_mutation(tmp_path, mut
     source = (ROOT / RUST).read_text()
     scope = json.loads((ROOT / SCOPE).read_text())
     if mutation == 'no-fresh-before-emit':
-        source = source.replace('emit_current(fresh, || {', 'emit_unchecked(|| {')
+        source = source.replace('provider_exchange::exchange(&mut provider, &audited.transition)', 'unchecked_exchange(&mut provider)')
     elif mutation == 'skip-coordinate-check':
-        source = source.replace('let fresh = || -> Outcome<()> {\n            self.base.check_coordination()?;',
-                                'let fresh = || -> Outcome<()> {\n            // no late coordination check')
+        source = source.replace('let current = || -> Outcome<guards::AdmissionStamp> {\n            self.base.check_coordination()?;',
+                                'let current = || -> Outcome<guards::AdmissionStamp> {\n            // no late coordination check')
     elif mutation == 'skip-active-check':
         source = source.replace('self.require_control_active(current)?;', 'Ok(())?;')
     elif mutation == 'skip-lease-check':
@@ -38,7 +38,7 @@ def test_pending_source_guard_rejects_unreviewed_boundary_mutation(tmp_path, mut
     elif mutation == 'skip-current-token-check':
         source = source.replace('aivm_secrets_garrett_core::present(', 'broken_gate(')
     elif mutation == 'skip-authorization':
-        source = source.replace('guards::authorize(', 'unchecked_authorize(')
+        source = source.replace('guards::current(', 'unchecked_authorize(')
     elif mutation == 'skip-audit-construction':
         source = source.replace('let recorded = prepared.audit(', 'let recorded = prepared.unchecked(')
     elif mutation == 'skip-completion-audit':

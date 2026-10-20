@@ -16,6 +16,7 @@ pub mod manifest;
 pub mod oauth_login;
 pub mod oauth_state;
 pub mod protocol;
+pub mod provider_exchange;
 pub mod read_transition;
 pub mod rebinding;
 pub mod trust;
