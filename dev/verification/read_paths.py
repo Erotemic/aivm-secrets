@@ -13,9 +13,9 @@ import hashlib
 import json
 import re
 import shutil
-import subprocess
 from pathlib import Path
 
+import lean_step
 import w4_trace
 import w5_noninterference
 
@@ -91,10 +91,10 @@ def check(root: Path = ROOT) -> dict:
 
 
 def _run(cmd: list[str], cwd: Path, label: str) -> str:
-    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
-    if result.returncode:
-        raise ReviewError(f'{label} failed:\n{result.stdout}\n{result.stderr}')
-    return result.stdout + '\n' + result.stderr
+    try:
+        return lean_step.run(cmd, cwd, label)
+    except lean_step.LeanStepError as error:
+        raise ReviewError(str(error)) from error
 
 
 def prove(root: Path = ROOT) -> None:
@@ -111,8 +111,13 @@ def prove(root: Path = ROOT) -> None:
         _run([lake, 'env', 'lean', '-DwarningAsError=true',
               '-o', str(oleans / f'{name}.olean'), f'{name}.lean'],
              directory, name)
+    # Emit the importable olean during the SAME audited compilation. The
+    # read-prefix verifier reuses this object; recompiling this large module
+    # merely to supply its import wastes time and memory.
     output = _run([lake, 'env', 'lean', '-DwarningAsError=true',
-                   'GarrettReadPaths.lean'], directory, 'read-path Lean kernel compilation')
+                   '-o', str(oleans / 'GarrettReadPaths.olean'),
+                   'GarrettReadPaths.lean'], directory,
+                  'read-path Lean kernel compilation and import object')
     reported: dict[str, set[str]] = {}
     for name, axioms in re.findall(r"'([^']+)' depends on axioms:\s*\[([^\]]*)\]", output):
         reported[name] = {item.strip() for item in axioms.split(',') if item.strip()}
