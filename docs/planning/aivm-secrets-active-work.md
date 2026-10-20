@@ -80,6 +80,12 @@ obligation. A new source fingerprint, test inventory, abstract theorem, or
 synthetic counterexample alone is **supporting evidence**, not a new major
 milestone. Add those only when they directly enable one of the three outcomes.
 
+The standalone [offline operator/guest executable](../offline-native-operator-guest.md)
+now supplies this product witness using real Rust binaries, host-held synthetic
+credential and an operator-driven revocation. It must pass on a native-equipped
+checkout before calling the checkpoint complete. It does not validate OS/VM
+isolation; do not mistake `host/` versus `guest/` folders for access control.
+
 Maintain an **offline product acceptance witness in parallel with NR-1–NR-4**:
 from an independently configured guest, call an allowed GitHub-shaped read
 through a real standalone broker to a local synthetic HTTPS provider; deny an
@@ -102,7 +108,7 @@ to grow source guards.
 | Priority | Work package | Deliverable / acceptance evidence | State |
 | --- | --- | --- | --- |
 | **P0 / NR-0** | Freeze native read profile and evidence baseline | Identify the checked-out commit, exact source/feature profile, full list of guest and provider effects, verified successful/denied synthetic witnesses and reproducible focused gates. Name all excluded configurations. | **Evidence freeze implemented, acceptance pending**; 30 source pins, all W0 sinks, and targeted no-skip native/Lean gate in [NR-0 record](aivm-secrets-native-read-nr0-evidence.md). Actual checkout native and Lean run still required; not a proof |
-| **P0 / guest utility** | Reproduce the actual standalone guest-to-broker workflow offline, beyond internal Rust test fixtures | A documented operator+guest run with a synthetic host-held credential, a permitted selected GitHub-shaped read, denied unapproved operation, visible audit, no guest credential access, and a revocation check; record required setup and missing CLI affordances. | **Open in parallel with NR-1**; not a production/VM-isolation assurance claim |
+| **P0 / guest utility** | Reproduce the actual standalone guest-to-broker workflow offline, beyond internal Rust test fixtures | A documented operator+guest run with a synthetic host-held credential, a permitted selected GitHub-shaped read, broker-denied write, host audit, no credential in the distributed guest files, and a revocation check | **Runnable operator CLI implemented; native acceptance pending**: `python dev/offline_native_guest.py`, [`docs/offline-native-operator-guest.md`](../offline-native-operator-guest.md). Source and portable TLS/policy tests pass; no standalone Rust execution was available in the authoring environment. Same-UID demo is not isolation. |
 | **P0 / NR-1** | Connect real Rust read orchestration to a small extractable transition kernel | Production `Session::request` uses a single checked transition interface with explicit external audit, authority, provider and release outcomes. Extract the *same* Rust decisions to Lean and prove the first preservation/simulation lemma. | **Next major implementation**; no hand-maintained shadow interpreter presented as the implementation |
 | **P0 / NR-2** | Establish admission/audit/send/release forward simulation | Relate extracted steps to `GarrettReadPaths`/`GarrettReadPrefixes` events for successful, failed and audited-but-unsent final-only, checked-only and two-phase reads. Include host-state/identity continuity and an authorized successful witness. | **Open**, depends on NR-1 |
 | **P0 / NR-3** | Close W3/W6 actual-I/O boundary for the restricted native profile | Enumerate guest-reachable effectful call paths (including callback, error, drop and dependency boundaries). Prove source-owned paths or assign explicit external contracts. Relate emitted HTTP/audit/guest frames to modeled events and acknowledge ambiguity of partial sends. | **Open**; develop alongside NR-1/2, final integration depends on both |

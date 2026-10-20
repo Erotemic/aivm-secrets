@@ -43,6 +43,20 @@ contain public material. Broadening their permissions makes the native process
 reject them; changing Rust's private-file validation to accommodate the demo
 would weaken the intended production boundary.
 
+The native manifest session validates its broker configuration against the
+policy file. In particular, `provider.credential_file` must match
+`credential_source.path`; the HTTPS host, pinned address, port, CA and
+authentication type must agree too. The standalone lab already supplies these
+bindings, and its portable tests compare them against the manifest.
+
+The native disclosure parser also requires **exactly one declaration for every
+manifest operation**, even an operation that will be refused by `writes=deny`.
+The lab declares a minimal `pr.comment` response projection, while still
+requiring that any attempted comment is denied before provider I/O. An early
+operator check now rejects incomplete or extra disclosure entries before the
+broker starts; the native Rust parser remains authoritative for projection
+validity and enforcement.
+
 If the native bridge exits before sending a readiness frame, the script reports
 its exit status and a fixed-shape native error code (when one is available).
 It never prints arbitrary native stderr, which might contain sensitive paths

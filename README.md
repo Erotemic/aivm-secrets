@@ -121,6 +121,17 @@ bounded JSON requests and host-authorized keyed writes using the same identity
 configuration. It preserves structured broker errors and uncertain outcomes;
 the broker retains all authorization and reservation decisions.
 
+## Standalone native operator and guest (offline)
+
+The [offline operator/guest demonstration](docs/offline-native-operator-guest.md)
+uses the **real** `garrett-authority`, `garrett-bridge`, and `garrett-client`
+executables against an operator-owned local HTTPS provider. It enrolls a guest,
+performs selected GitHub-shaped reads, checks an actual broker-denied write,
+and revokes the guest. No real account or production credential is used.
+With the native binaries already built, run `python dev/offline_native_guest.py`.
+An `--interactive` option exposes the running broker to manual guest CLI calls.
+The host/guest directories under one Unix account are not an isolation claim.
+
 ## Reproducible synthetic system check
 
 The [native coordinator operator client](docs/native-coordinator-control.md)

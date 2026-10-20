@@ -15,7 +15,8 @@ import pytest
 from dev.offline_native_guest import (
     FAKE_TOKEN, HOSTNAME, PULL_PATH, DemoError, LocalProvider, binaries,
     bridge_config, disclosure, distribute_guest_certificates, guest_config,
-    mkdir, native_error_code, policy, start_bridge, validate_sent, write,
+    mkdir, native_error_code, policy, start_bridge, validate_disclosure_coverage,
+    validate_sent, write,
 )
 from aivm_secrets.kernel.presets import GITHUB_JSON
 from aivm_secrets.kernel.service import parse_policy
@@ -40,10 +41,38 @@ def test_policy_is_a_real_github_preset_pinned_to_local_provider(tmp_path):
         # The production Rust broker opens this through files::read_private.
         assert server.files['ca'].stat().st_mode & 0o777 == 0o600
         assert 'cli' not in p  # native guest CLI, not Python alias interpreter
-        assert bridge_config(host, server)['provider']['writes'] == 'deny'
-        assert bridge_config(host, server)['provider']['profile'] == 'manifest-https-v1'
+        provider_config = bridge_config(host, server)['provider']
+        assert provider_config['writes'] == 'deny'
+        assert provider_config['profile'] == 'manifest-https-v1'
+        # The real native Session::start validates these exact policy-to-I/O
+        # bindings before announcing readiness. The Python policy parser does
+        # not validate the separately constructed native bridge configuration.
+        assert provider_config['credential_file'] == p['credential_source']['path']
+        assert provider_config['authentication'] == p['authentication']
+        assert provider_config['host'] == p['host']
+        assert provider_config['address'] == p['egress']['address']
+        assert provider_config['port'] == p['egress']['port']
+        assert provider_config['server_ca'] == p['egress']['ca_file']
+        rules = disclosure()
+        validate_disclosure_coverage(p, rules)
+        assert set(rules) == {operation.name for operation in parsed.operations}
+        assert rules['pr.comment'] == {'body': {'at': ['body'], 'type': 'text'}}
         assert all(item['at'] != ['private_diagnostic']
-                   for item in disclosure()['pr.view'].values())
+                   for item in rules['pr.view'].values())
+
+
+def test_disclosure_coverage_rejects_missing_or_extra_operations(tmp_path):
+    host = mkdir(tmp_path / 'host')
+    mkdir(host / 'provider')
+    with LocalProvider(host / 'provider') as server:
+        manifest = policy(host, server)
+        rules = disclosure()
+        without_denied_write = {name: value for name, value in rules.items()
+                                if name != 'pr.comment'}
+        with pytest.raises(DemoError, match='operation set'):
+            validate_disclosure_coverage(manifest, without_denied_write)
+        with pytest.raises(DemoError, match='operation set'):
+            validate_disclosure_coverage(manifest, dict(rules, extra={'value': {}}))
 
 
 def test_provider_uses_real_tls_and_exposes_no_local_credentials_in_logs(tmp_path):

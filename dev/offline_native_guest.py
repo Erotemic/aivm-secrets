@@ -205,6 +205,10 @@ def disclosure() -> dict:
             'headRefOid': {'at': ['head', 'sha'], 'type': 'text'},
         },
         'pr.diff': {'diff': {'at': [], 'type': 'text'}},
+        # The native Disclosure::parse requires an exact key for *every*
+        # manifest operation, even a write that writes=deny will refuse.
+        # If writes were enabled, select only the public comment body.
+        'pr.comment': {'body': {'at': ['body'], 'type': 'text'}},
         'pr.checks': {'checks': {
             'at': ['check_runs'], 'type': 'array', 'max_items': 100,
             'items': {'at': [], 'type': 'object', 'fields': {
@@ -214,6 +218,17 @@ def disclosure() -> dict:
             }},
         }},
     }
+
+
+def validate_disclosure_coverage(manifest: dict, rules: dict) -> None:
+    """Preflight native Disclosure::parse's exact operation-set requirement.
+
+    This is only an operator configuration check. The native broker still
+    parses and enforces every projection and its credential-reflection checks.
+    """
+    operations = {operation['name'] for operation in manifest['operations']}
+    if set(rules) != operations:
+        raise DemoError('offline disclosure does not cover the manifest operation set')
 
 
 def policy(host: Path, provider: LocalProvider) -> dict:
@@ -446,8 +461,11 @@ def demonstrate(workspace: Path, bin_dir: Path, *, interactive: bool = False) ->
     mkdir(host / 'provider')
     write(host / 'credential', FAKE_TOKEN)
     with LocalProvider(host / 'provider') as provider:
-        write(host / 'policy.json', policy(host, provider))
-        write(host / 'disclosure.json', disclosure())
+        manifest = policy(host, provider)
+        releases = disclosure()
+        validate_disclosure_coverage(manifest, releases)
+        write(host / 'policy.json', manifest)
+        write(host / 'disclosure.json', releases)
         authority_action(tools['authority'], host, 'init',
                          issuer='aivm.test', audience='aivm-secrets.remote')
         make_client(host, guest, tools['authority'], tools['client'])

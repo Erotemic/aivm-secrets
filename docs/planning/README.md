@@ -1,3 +1,4 @@
+- [Runnable offline native operator/guest workflow](../offline-native-operator-guest.md) — real Rust authority, broker, guest CLI, approved reads, broker-denied write, operator revocation. Native acceptance required; not a VM-isolation claim.
 # Planning index: aivm-secrets / Garrett
 
 - [NR-0 native read evidence freeze](aivm-secrets-native-read-nr0-evidence.md) — pinned source/sink/fixture scope, fast reproducible acceptance, and NR-1 extraction handoff.
