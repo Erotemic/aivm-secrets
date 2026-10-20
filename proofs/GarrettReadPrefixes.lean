@@ -119,12 +119,12 @@ structure CoupledRead where
 theorem coupled_history_noninterference (steps : List CoupledRead) :
     steps.map (fun x => observedRead x.kind x.left) =
     steps.map (fun x => observedRead x.kind x.right) := by
-  induction steps with
-  | nil => rfl
-  | cons head tail ih =>
-    simp only [List.map_cons]
-    rw [read_observation_noninterference head.kind head.left head.right
-      head.agreement, ih]
+  -- Lift the already checked per-step equality without rewriting inside the
+  -- large observation model while constructing the list induction proof.
+  apply List.map_congr_left
+  intro step _
+  exact read_observation_noninterference step.kind step.left step.right
+    step.agreement
 
 end aivm_secrets_garrett_core.confinement.ReadPrefixes
 

@@ -21,6 +21,8 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_TESTS = [
+    'tests/test_rust_http_response.py',
+    'tests/test_rust_w6_pending.py',
     'tests/test_rust_approval.py::test_existing_python_operator_cli_controls_native_approval',
     'tests/test_rust_approval.py::test_native_exact_write_approval_is_bound_and_one_shot',
     'tests/test_rust_approval.py::test_native_expired_approval_denied_and_new_explicit_approval_works',
@@ -198,16 +200,19 @@ def main() -> int:
         run('rust-unit', ['cargo', 'test', '--locked', '--manifest-path',
                           'rust/Cargo.toml', '--workspace', '--features', 'conformance,coordinator-server'])
         for script in ['w0_contract', 'w3_effect_boundary', 'w4_trace',
-                       'w5_noninterference', 'w6_adapter']:
+                       'w5_noninterference', 'w6_adapter', 'read_paths', 'read_prefixes']:
             run(script, [python, f'dev/verification/{script}.py', 'check'])
+        run('native-read-profile', [python, 'dev/verification/native_read_profile.py'])
         with tempfile.TemporaryDirectory(prefix='as-system-', dir='/tmp') as temporary:
             junit = output / 'workflows.xml'
             run('workflows', [python, '-m', 'pytest', '-q', '-ra',
                               '--basetemp', str(Path(temporary) / 'tests'),
                               '--junitxml', str(junit), *WORKFLOW_TESTS])
             manifest['required_workflow_tests'] = require_no_skips(junit)
+        run('offline-native-product', [python, 'dev/offline_native_guest.py'])
         if args.proofs:
             run('lean-w4-w5', [python, 'dev/verification/w5_noninterference.py', 'prove'])
+            run('lean-read-prefixes', [python, 'dev/verification/read_prefixes.py', 'prove'])
             run('lean-profile-emission-oauth', ['lake', '-d', 'proofs', 'build',
                                                '+GarrettProfiles', '+GarrettEmission',
                                                '+GarrettOAuth', '+GarrettCoordination', '+GarrettRetryKey', '+GarrettRebinding', '+GarrettHttpAuth', '+GarrettHttpRequest', '+GarrettHttpWire', '+GarrettLineFrame', '+GarrettBundle', '+GarrettJsonReflection', '+GarrettCoordinatorAuthority', '+GarrettCoordinatorReply', '+GarrettApproval'])

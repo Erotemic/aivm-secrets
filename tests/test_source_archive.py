@@ -20,6 +20,7 @@ def test_source_archive_contains_the_reproducible_proof_and_system_gate(tmp_path
         names = {name.split('/', 1)[1] for name in archive.getnames() if '/' in name}
     expected = {str(p.relative_to(ROOT)) for p in (ROOT / 'proofs').glob('*.lean')}
     expected |= {'dev/verification/system.py', 'dev/verification/w5_noninterference.py',
+                 'dev/offline_native_guest.py',
                  'docs/planning/aivm-secrets-assurance-profiles.json',
                  'docs/assurance-profiles.html'}
     assert expected <= names, 'Missing reproducibility inputs: ' + repr(sorted(expected - names))

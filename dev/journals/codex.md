@@ -1853,3 +1853,32 @@ My confidence is in those local transition and synthetic process observations, n
 The native exact-write approval increment is accepted locally at `1ce2bbb`: 2,721 portable tests, 689 selected parity tests and all 467 required workflows in both build configurations pass without skips. The 400-name audit uses only the existing logical axioms, all eight new approval mutations are rejected, and all 246 pinned source-archive inputs match. The ordinary release workflow confirms the host operator path does not depend on the development conformance feature.
 
 I feel confident in the specific transition and synthetic workflow evidence, especially the no-refund and blocked-provider revocation cases. That is narrower than a full confinement proof. The new host-only endpoint and guest approval digest have explicit inventory entries, and I am intentionally leaving their W4/W5 trace refinement open. The proof does not replace kernel UID isolation, no-forwarding deployment discipline, trusted hashing/clocks, slot-store linearization or audit/filesystem behavior. Native audit-chain interoperability is not claimed. Delegation/budgets, complete mediation, hardware/live-VM validation and maintainer review remain unfinished; this increment preserves optional unbounded allow mode and does not finish the overall goal.
+
+## 2026-10-20 00:32:46 -0400
+
+The maintainer returned after pushing 21 commits on main while the persistent
+goal had continued locally. All previously accepted local work is an ancestor
+of their f15b852; nothing committed was overwritten. I preserved the entire
+unaccepted HTTP response extraction experiment at cc69a4d on
+`codex/response-admission-wip-20261020` before fast-forwarding main. I am relieved
+the histories agree, and want this reconciliation to end with evidence the
+maintainer can review rather than another open-ended implementation campaign.
+
+The new product-first native read priorities remain authoritative. The old
+response rewrite would regress their stricter no-unframed-success and HTTP 204
+behavior, so I am bringing over only the reproduced status-line/ASCII whitespace
+fix and 30 TLS/provider/Python-reference tests. The larger scanner, frozen corpus
+and unfinished Lean prefix proof remain on the checkpoint branch. I found
+unformatted Rust and missing new read proof/demo files in the source archive;
+these are integration repairs, not additional assurance claims. The generated
+core and source inventories must be refreshed for the production-called
+read-transition module before checking the combined tree. Extraction alone does
+not establish its still-pending NR-1 simulation.
+
+SSH fetch is unavailable (publickey rejection); public HTTPS fetch confirmed
+the remote main tip without changing remote configuration. AIVM's optional
+vTPM commit is already on origin/dev/0.6.2; AIVM main is a separate release line
+and is not being merged into casually. Remaining risks are native compile/Lean
+failures in the incoming work, stale evidence coordinates, and unintended
+parser changes. Full native/full-suite, package and ordinary-feature checks are
+required before calling main ready. No push or live provider/VM action is planned.

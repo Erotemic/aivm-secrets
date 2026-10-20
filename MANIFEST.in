@@ -5,6 +5,7 @@ graft docs
 graft tests
 recursive-include dev/port *.json *.txt *.py
 recursive-include dev/verification *.py
+include dev/offline_native_guest.py
 include rust/Cargo.toml rust/Cargo.lock rust/rust-toolchain.toml
 recursive-include rust/crates *.rs *.toml
 include proofs/lean-toolchain proofs/lakefile.lean proofs/lake-manifest.json
@@ -37,6 +38,7 @@ include proofs/GarrettLineFrame.lean
 include proofs/GarrettCoordinatorAuthority.lean
 include proofs/GarrettCoordinatorReply.lean
 include proofs/GarrettApproval.lean
+include proofs/GarrettReadPaths.lean proofs/GarrettReadPrefixes.lean
 recursive-include proofs/generated *.lean
 prune rust/target
 prune proofs/.lake

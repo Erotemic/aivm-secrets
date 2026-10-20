@@ -3077,14 +3077,14 @@ partial_fixpoint
 end
 
 /-- [aivm_secrets_garrett_core::Denial]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 22:0-24:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 23:0-25:1
     Visibility: public -/
 @[discriminant isize]
 inductive Denial where
 | InvalidCapability : Denial
 
 /-- [aivm_secrets_garrett_core::Claims]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 26:0-35:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 27:0-36:1
     Visibility: public -/
 structure Claims where
   issuer : alloc.vec.Vec Std.U8
@@ -3097,7 +3097,7 @@ structure Claims where
   certificate : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::Expectation]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 37:0-42:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 38:0-43:1
     Visibility: public -/
 structure Expectation where
   issuer : alloc.vec.Vec Std.U8
@@ -3106,7 +3106,7 @@ structure Expectation where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::IssueWindow]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 44:0-48:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 45:0-49:1
     Visibility: public -/
 structure IssueWindow where
   issued_at : Std.I64
@@ -3114,7 +3114,7 @@ structure IssueWindow where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::issue_window]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 51:0-78:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 52:0-79:1
     Visibility: public -/
 def issue_window
   (active : Bool) (epoch : Std.I64) (not_after : Std.I64) (now : Std.I64)
@@ -3158,7 +3158,7 @@ def issue_window
   else ok (core.result.Result.Err Denial.InvalidCapability)
 
 /-- [aivm_secrets_garrett_core::present]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 82:0-109:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 83:0-110:1
     Visibility: public -/
 def present
   (claims : Claims) (expected : Expectation) (peer : alloc.vec.Vec Std.U8)
@@ -3222,21 +3222,21 @@ def present
                           else ok (core.result.Result.Ok ())
 
 /-- [aivm_secrets_garrett_core::AuthenticatedEnvelope]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 113:0-116:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 114:0-117:1
     Visibility: public -/
 structure AuthenticatedEnvelope where
   claims : Claims
   encrypted : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::OpenedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 118:0-121:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 119:0-122:1
     Visibility: public -/
 structure OpenedSurrogate (S : Type _) where
   claims : Claims
   secret : S
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeVerifier]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 124:0-128:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 125:0-129:1
     Visibility: public -/
 structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
   verify : Self → alloc.vec.Vec Std.U8 → Result (core.result.Result
@@ -3245,7 +3245,7 @@ structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
     Self_Secret Denial)
 
 /-- [aivm_secrets_garrett_core::open_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 133:0-155:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 134:0-156:1
     Visibility: public -/
 def open_surrogate
   {V : Type _} {Clause0_Secret : Type _} (EnvelopeVerifierInst :
@@ -3269,7 +3269,7 @@ def open_surrogate
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssueInputs]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 157:0-166:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 158:0-167:1
     Visibility: public -/
 structure IssueInputs where
   issuer : alloc.vec.Vec Std.U8
@@ -3282,7 +3282,7 @@ structure IssueInputs where
   not_after : Std.I64
 
 /-- [aivm_secrets_garrett_core::prepare_issue]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 169:0-184:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 170:0-185:1
     Visibility: public -/
 def prepare_issue
   (input : IssueInputs) (now : Std.I64) (lifetime : Std.I64) :
@@ -3305,21 +3305,21 @@ def prepare_issue
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssuedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 186:0-189:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 187:0-190:1
     Visibility: public -/
 structure IssuedSurrogate where
   claims : Claims
   token : alloc.vec.Vec Std.U8
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeIssuer]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 191:0-194:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 192:0-195:1
     Visibility: public -/
 structure EnvelopeIssuer (Self : Type _) (Self_Secret : Type _) where
   «seal» : Self → Claims → Self_Secret → Result (core.result.Result
     (alloc.vec.Vec Std.U8) Denial)
 
 /-- [aivm_secrets_garrett_core::issue_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 196:0-212:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 197:0-213:1
     Visibility: public -/
 def issue_surrogate
   {I : Type _} {Clause0_Secret : Type _} (EnvelopeIssuerInst : EnvelopeIssuer I
@@ -4106,6 +4106,173 @@ def protocol.perform
         ready.credential grant.route
     | core.result.Result.Err error => ok (core.result.Result.Err error)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
+
+/-- [aivm_secrets_garrett_core::read_transition::Phase]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 13:0-16:1
+    Visibility: public -/
+@[discriminant isize]
+inductive read_transition.Phase where
+| Preflight : read_transition.Phase
+| Final : read_transition.Phase
+
+/-- [aivm_secrets_garrett_core::read_transition::{impl core::clone::Clone for aivm_secrets_garrett_core::read_transition::Phase}::clone]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 12:9-12:14
+    Visibility: public -/
+def read_transition.Phase.Insts.CoreCloneClone.clone
+  (self : read_transition.Phase) : Result read_transition.Phase := do
+  ok self
+
+/-- Trait implementation: [aivm_secrets_garrett_core::read_transition::{impl core::clone::Clone for aivm_secrets_garrett_core::read_transition::Phase}]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 12:9-12:14 -/
+@[reducible]
+def read_transition.Phase.Insts.CoreCloneClone : core.clone.Clone
+  read_transition.Phase := {
+  clone := read_transition.Phase.Insts.CoreCloneClone.clone
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::read_transition::{impl core::marker::Copy for aivm_secrets_garrett_core::read_transition::Phase}]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 12:16-12:20 -/
+@[reducible]
+def read_transition.Phase.Insts.CoreMarkerCopy : core.marker.Copy
+  read_transition.Phase := {
+  cloneInst := read_transition.Phase.Insts.CoreCloneClone
+}
+
+/-- [aivm_secrets_garrett_core::read_transition::{impl core::fmt::Debug for aivm_secrets_garrett_core::read_transition::Phase}::fmt]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 12:22-12:27
+    Visibility: public -/
+def read_transition.Phase.Insts.CoreFmtDebug.fmt
+  (self : read_transition.Phase) (f : core.fmt.Formatter) :
+  Result ((core.result.Result Unit core.fmt.Error) × core.fmt.Formatter)
+  := do
+  match self with
+  | read_transition.Phase.Preflight =>
+    core.fmt.Formatter.write_str f (toStr "Preflight")
+  | read_transition.Phase.Final =>
+    core.fmt.Formatter.write_str f (toStr "Final")
+
+/-- Trait implementation: [aivm_secrets_garrett_core::read_transition::{impl core::fmt::Debug for aivm_secrets_garrett_core::read_transition::Phase}]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 12:22-12:27 -/
+@[reducible]
+def read_transition.Phase.Insts.CoreFmtDebug : core.fmt.Debug
+  read_transition.Phase := {
+  fmt := read_transition.Phase.Insts.CoreFmtDebug.fmt
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::read_transition::{impl core::marker::StructuralPartialEq for aivm_secrets_garrett_core::read_transition::Phase}]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 12:29-12:38 -/
+@[reducible]
+def read_transition.Phase.Insts.CoreMarkerStructuralPartialEq :
+  core.marker.StructuralPartialEq read_transition.Phase := {
+}
+
+/-- [aivm_secrets_garrett_core::read_transition::{impl core::cmp::PartialEq<aivm_secrets_garrett_core::read_transition::Phase> for aivm_secrets_garrett_core::read_transition::Phase}::eq]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 12:29-12:38
+    Visibility: public -/
+def read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq
+  (self : read_transition.Phase) (other : read_transition.Phase) :
+  Result Bool
+  := do
+  let self1 := read_discriminant self
+  let other1 := read_discriminant other
+  ok (self1 = other1)
+
+/-- Trait implementation: [aivm_secrets_garrett_core::read_transition::{impl core::cmp::PartialEq<aivm_secrets_garrett_core::read_transition::Phase> for aivm_secrets_garrett_core::read_transition::Phase}]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 12:29-12:38 -/
+@[reducible]
+impl_def read_transition.Phase.Insts.CoreCmpPartialEqPhase : core.cmp.PartialEq
+  read_transition.Phase read_transition.Phase := {
+  eq := read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq
+  ne := core.cmp.PartialEq.ne.trait_default
+    read_transition.Phase.Insts.CoreCmpPartialEqPhase
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::read_transition::{impl core::cmp::Eq for aivm_secrets_garrett_core::read_transition::Phase}]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 12:40-12:42 -/
+@[reducible]
+def read_transition.Phase.Insts.CoreCmpEq : core.cmp.Eq read_transition.Phase
+  := {
+  partialEqInst := read_transition.Phase.Insts.CoreCmpPartialEqPhase
+}
+
+/-- [aivm_secrets_garrett_core::read_transition::{aivm_secrets_garrett_core::read_transition::Phase}::as_str]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 19:4-24:5
+    Visibility: public -/
+def read_transition.Phase.as_str
+  (self : read_transition.Phase) : Result Str := do
+  match self with
+  | read_transition.Phase.Preflight => ok (toStr "preflight")
+  | read_transition.Phase.Final => ok (toStr "final")
+
+/-- [aivm_secrets_garrett_core::read_transition::Prepared]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 27:0-30:1
+    Visibility: public -/
+structure read_transition.Prepared where
+  phase : read_transition.Phase
+  write : Bool
+
+/-- [aivm_secrets_garrett_core::read_transition::Audited]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 32:0-35:1
+    Visibility: public -/
+structure read_transition.Audited where
+  phase : read_transition.Phase
+  write : Bool
+
+/-- [aivm_secrets_garrett_core::read_transition::prepare]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 40:0-52:1
+    Visibility: public -/
+def read_transition.prepare
+  (phase : read_transition.Phase) (admitted_operation_write : Bool)
+  (effect_write : Bool) :
+  Result (core.result.Result read_transition.Prepared Denial)
+  := do
+  if effect_write
+  then
+    let b ←
+      match phase with
+      | read_transition.Phase.Preflight => ok true
+      | read_transition.Phase.Final => ok false
+    if b
+    then ok (core.result.Result.Err Denial.InvalidCapability)
+    else
+      if admitted_operation_write
+      then ok (core.result.Result.Ok { phase, write := effect_write })
+      else ok (core.result.Result.Err Denial.InvalidCapability)
+  else ok (core.result.Result.Ok { phase, write := effect_write })
+
+/-- [aivm_secrets_garrett_core::read_transition::{aivm_secrets_garrett_core::read_transition::Prepared}::phase]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 55:4-57:5
+    Visibility: public -/
+def read_transition.Prepared.impl.phase
+  (self : read_transition.Prepared) : Result read_transition.Phase := do
+  ok self.phase
+
+/-- [aivm_secrets_garrett_core::read_transition::acknowledge]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 63:0-71:1
+    Visibility: public -/
+def read_transition.acknowledge
+  (prepared : read_transition.Prepared) (ack : Bool) :
+  Result (core.result.Result read_transition.Audited Denial)
+  := do
+  if ack
+  then
+    ok (core.result.Result.Ok
+      { phase := prepared.phase, write := prepared.write })
+  else ok (core.result.Result.Err Denial.InvalidCapability)
+
+/-- [aivm_secrets_garrett_core::read_transition::{aivm_secrets_garrett_core::read_transition::Audited}::phase]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 74:4-76:5
+    Visibility: public -/
+def read_transition.Audited.impl.phase
+  (self : read_transition.Audited) : Result read_transition.Phase := do
+  ok self.phase
+
+/-- [aivm_secrets_garrett_core::read_transition::{aivm_secrets_garrett_core::read_transition::Audited}::is_write]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 78:4-80:5
+    Visibility: public -/
+def read_transition.Audited.is_write
+  (self : read_transition.Audited) : Result Bool := do
+  ok self.write
 
 /-- [aivm_secrets_garrett_core::rebinding::Target]
     Source: 'crates/aivm-secrets-garrett-core/src/rebinding.rs', lines 6:0-12:1

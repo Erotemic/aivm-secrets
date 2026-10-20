@@ -66,7 +66,7 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and 'let recorded = prepared.audit(' in entry
            and 'exchange_manifest(' in entry
            and '&recorded,' in entry
-           and 'Ok(AuditedDispatch { effect: self.effect, transition })' in constructor
+           and 'Ok(AuditedDispatch{effect:self.effect,transition,})' in ''.join(constructor.split())
            and 'read_transition::prepare(DispatchPhase::Preflight, false, effect.write)' in constructor
            and 'read_transition::prepare(DispatchPhase::Final, admitted_write, effect.write)' in constructor
            and constructor.index('audit.write_record(') < constructor.index('read_transition::acknowledge(self.transition, true)'),

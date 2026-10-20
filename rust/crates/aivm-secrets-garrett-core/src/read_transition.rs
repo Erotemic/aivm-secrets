@@ -42,9 +42,7 @@ pub fn prepare(
     admitted_operation_write: bool,
     effect_write: bool,
 ) -> Result<Prepared, Denial> {
-    if effect_write
-        && (matches!(phase, Phase::Preflight) || !admitted_operation_write)
-    {
+    if effect_write && (matches!(phase, Phase::Preflight) || !admitted_operation_write) {
         return Err(Denial::InvalidCapability);
     }
     Ok(Prepared {
@@ -89,9 +87,13 @@ mod tests {
     #[test]
     fn read_preflight_and_final_carry_their_actual_phase() {
         for phase in [Phase::Preflight, Phase::Final] {
-            let prepared = prepare(phase, false, false).ok().expect("checked transition");
+            let prepared = prepare(phase, false, false)
+                .ok()
+                .expect("checked transition");
             assert_eq!(prepared.phase(), phase);
-            let audited = acknowledge(prepared, true).ok().expect("checked transition");
+            let audited = acknowledge(prepared, true)
+                .ok()
+                .expect("checked transition");
             assert_eq!(audited.phase(), phase);
             assert!(!audited.is_write());
         }
@@ -106,15 +108,21 @@ mod tests {
     #[test]
     fn final_write_requires_original_write_admission() {
         assert!(prepare(Phase::Final, false, true).is_err());
-        let admitted = prepare(Phase::Final, true, true).ok().expect("checked transition");
-        let audited = acknowledge(admitted, true).ok().expect("checked transition");
+        let admitted = prepare(Phase::Final, true, true)
+            .ok()
+            .expect("checked transition");
+        let audited = acknowledge(admitted, true)
+            .ok()
+            .expect("checked transition");
         assert_eq!(audited.phase(), Phase::Final);
         assert!(audited.is_write());
     }
 
     #[test]
     fn failed_audit_does_not_make_an_executable_permit() {
-        let prepared = prepare(Phase::Final, false, false).ok().expect("checked transition");
+        let prepared = prepare(Phase::Final, false, false)
+            .ok()
+            .expect("checked transition");
         assert!(acknowledge(prepared, false).is_err());
     }
 }

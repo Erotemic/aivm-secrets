@@ -13,10 +13,10 @@ pub mod coordinator_authority;
 pub mod credential_use;
 pub mod enrollment;
 pub mod manifest;
-pub mod read_transition;
 pub mod oauth_login;
 pub mod oauth_state;
 pub mod protocol;
+pub mod read_transition;
 pub mod rebinding;
 pub mod trust;
 

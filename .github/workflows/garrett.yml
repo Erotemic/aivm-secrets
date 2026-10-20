@@ -22,7 +22,8 @@ jobs:
       - name: Install test dependencies
         run: |
           umask 077
-          python -m pip install '.[tests]'
+          # Isolated (-I) identity subprocesses must exercise this checkout.
+          python -m pip install -e '.[tests]'
       - name: Install Lean manager
         run: |
           mkdir -p .tools/elan

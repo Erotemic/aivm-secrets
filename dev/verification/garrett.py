@@ -509,6 +509,7 @@ THEOREMS += [
 ]
 
 TESTS = [
+    "tests/test_rust_http_response.py",
     "tests/test_rust_approval.py",
     "tests/test_rust_garrett.py",
     "tests/test_rust_garrett_tpm.py",
@@ -612,6 +613,8 @@ def inputs() -> list[str]:
         "proofs/GarrettCoordinatorAuthority.lean",
         "proofs/GarrettCoordinatorReply.lean",
         "proofs/GarrettApproval.lean",
+        "proofs/GarrettReadPaths.lean",
+        "proofs/GarrettReadPrefixes.lean",
         "tests/secrets_vectors/approval/kernel-v1.jsonl",
         "tests/secrets_vectors/coordination/authority-v1.jsonl",
         "tests/secrets_vectors/coordination/operator-replies-v1.jsonl",

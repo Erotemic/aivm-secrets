@@ -120,7 +120,7 @@ def review_semantics(contents: dict[str, str]) -> None:
                        'read_transition::acknowledge(self.transition, true)',
                        'Ok(AuditedDispatch {'),
             'native dispatch bypasses extracted phase gate or audit acknowledgment')
-    require('Ok(AuditedDispatch { effect: self.effect, transition })' in reviewed
+    require('Ok(AuditedDispatch{effect:self.effect,transition,})' in ''.join(reviewed.split())
             and reviewed.count('read_transition::acknowledge(self.transition, true)') == 1,
             'audited permit lost the same core transition after host audit')
     require(same_order(transition, 'pub fn prepare(', 'if effect_write',
@@ -168,8 +168,9 @@ def review_semantics(contents: dict[str, str]) -> None:
     require(same_order(release, 'self.disclosure.project(', 'ensure_safe(&reply',
                        'CompletedRelease::after_completion('),
             'guest release bypasses selected disclosure/reflection/completion')
+    compact_request = ''.join(request.split())
     require('release.map(CompletedRelease::into_public)' in request and
-            'release.map_err(|_| Error::OutcomeUnknown).map(CompletedRelease::into_public)' in request,
+            'release.map_err(|_|Error::OutcomeUnknown).map(CompletedRelease::into_public)' in compact_request,
             'guest result bypasses audited release or sent-write uncertainty')
     require('guards::authorize(' in request and 'open_surrogate(' in request
             and 'self.policy.operation(&request)' in request,
@@ -179,7 +180,7 @@ def review_semantics(contents: dict[str, str]) -> None:
     require('self.policy.preflight(op, &args)?' in request,
             'preflight is no longer compiled from host policy')
     require('let sent_write = effect.as_ref().is_some_and(|e| e.write);' in request
-            and 'release.map_err(|_| Error::OutcomeUnknown)' in request,
+            and 'release.map_err(|_|Error::OutcomeUnknown)' in compact_request,
             'write uncertainty boundary altered')
     # W6: the exact provider bytes are validated by a pure encoder BEFORE any
     # TCP/TLS effect. This also covers OAuthSource-created Credential values.

@@ -24,8 +24,9 @@ impl<'a> PreparedDispatch<'a> {
         Ok(Self { effect, transition })
     }
     fn final_effect(effect: &'a Effect, admitted_write: bool) -> Outcome<Self> {
-        let transition = read_transition::prepare(DispatchPhase::Final, admitted_write, effect.write)
-            .map_err(|_| Error::InvalidPolicy)?;
+        let transition =
+            read_transition::prepare(DispatchPhase::Final, admitted_write, effect.write)
+                .map_err(|_| Error::InvalidPolicy)?;
         Ok(Self { effect, transition })
     }
     #[allow(clippy::too_many_arguments)]
@@ -41,9 +42,7 @@ impl<'a> PreparedDispatch<'a> {
     ) -> Outcome<AuditedDispatch<'a>> {
         // A hostile provider fact cannot turn a credential into a route or
         // an audit field. The body is intentionally absent from this record.
-        crate::manifest::disclosure::ensure_safe(
-            &json!({"target":self.effect.target}), &secret.0,
-        )?;
+        crate::manifest::disclosure::ensure_safe(&json!({"target":self.effect.target}), &secret.0)?;
         audit.write_record(&json!({
             "schema":1,
             "event":"dispatch",
@@ -64,7 +63,10 @@ impl<'a> PreparedDispatch<'a> {
         // fsync/IO acknowledgement is an explicit external proof premise.
         let transition = read_transition::acknowledge(self.transition, true)
             .map_err(|_| Error::InternalError)?;
-        Ok(AuditedDispatch { effect: self.effect, transition })
+        Ok(AuditedDispatch {
+            effect: self.effect,
+            transition,
+        })
     }
 }
 
@@ -484,11 +486,16 @@ impl Session {
             }
             crate::manifest::disclosure::ensure_safe(&reply, &secret.0)?;
             CompletedRelease::after_completion(
-                reply, &self.base.executor.audit, &op.name, &request_hash,
+                reply,
+                &self.base.executor.audit,
+                &op.name,
+                &request_hash,
             )
         })();
         if sent_write {
-            release.map_err(|_| Error::OutcomeUnknown).map(CompletedRelease::into_public)
+            release
+                .map_err(|_| Error::OutcomeUnknown)
+                .map(CompletedRelease::into_public)
         } else {
             release.map(CompletedRelease::into_public)
         }
@@ -665,17 +672,7 @@ impl Executor {
 }
 
 fn manifest_response(mut reader: impl BufRead, format: &str) -> Outcome<Vec<u8>> {
-    let status = line(&mut reader, 4096)?;
-    let status = std::str::from_utf8(&status).map_err(|_| Error::UpstreamResponse)?;
-    let mut fields = status.splitn(3, ' ');
-    let version = fields.next();
-    let status = fields
-        .next()
-        .and_then(|s| s.parse::<u16>().ok())
-        .ok_or(Error::UpstreamResponse)?;
-    if !matches!(version, Some("HTTP/1.1" | "HTTP/1.0")) {
-        return Err(Error::UpstreamResponse);
-    }
+    let status = response_status(&line(&mut reader, 4096)?)?;
     if (400..500).contains(&status) {
         return Err(Error::UpstreamRejected);
     }
@@ -707,7 +704,7 @@ fn manifest_response(mut reader: impl BufRead, format: &str) -> Outcome<Vec<u8>>
             return Err(Error::UpstreamResponse);
         }
         if headers
-            .insert(name.to_ascii_lowercase(), value.trim().to_owned())
+            .insert(name.to_ascii_lowercase(), response_ows(value).to_owned())
             .is_some()
         {
             return Err(Error::UpstreamResponse);
@@ -719,7 +716,7 @@ fn manifest_response(mut reader: impl BufRead, format: &str) -> Outcome<Vec<u8>>
     let kind = headers
         .get("content-type")
         .and_then(|s| s.split(';').next())
-        .map(str::trim);
+        .map(response_ows);
     if status != 204
         && (format == "json" && kind != Some("application/json")
             || format == "text" && kind != Some("text/plain"))
@@ -833,8 +830,14 @@ mod wire_tests {
         assert!(PreparedDispatch::final_effect(&read, false).is_ok());
         let mut write = effect();
         write.write = true;
-        assert!(matches!(PreparedDispatch::preflight(&write), Err(Error::InvalidPolicy)));
-        assert!(matches!(PreparedDispatch::final_effect(&write, false), Err(Error::InvalidPolicy)));
+        assert!(matches!(
+            PreparedDispatch::preflight(&write),
+            Err(Error::InvalidPolicy)
+        ));
+        assert!(matches!(
+            PreparedDispatch::final_effect(&write, false),
+            Err(Error::InvalidPolicy)
+        ));
         assert!(PreparedDispatch::final_effect(&write, true).is_ok());
     }
 
@@ -976,15 +979,22 @@ mod wire_tests {
             b"DATA"
         );
         let no_content = b"HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n";
-        assert_eq!(manifest_response(Cursor::new(no_content), "text").unwrap(), b"");
+        assert_eq!(
+            manifest_response(Cursor::new(no_content), "text").unwrap(),
+            b""
+        );
         assert!(manifest_response(Cursor::new(no_content), "json").is_err());
         // Any stray upstream bytes after a 204 header are not part of the
         // representation and must never appear in the selected guest text.
         let invalid_extra = b"HTTP/1.1 204 No Content\r\n\r\nDO-NOT-RELEASE";
-        assert_eq!(manifest_response(Cursor::new(invalid_extra), "text").unwrap(), b"");
+        assert_eq!(
+            manifest_response(Cursor::new(invalid_extra), "text").unwrap(),
+            b""
+        );
         let illegal_204_length = b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n";
         assert!(manifest_response(Cursor::new(illegal_204_length), "text").is_err());
-        let illegal_204_transfer = b"HTTP/1.1 204 No Content\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n";
+        let illegal_204_transfer =
+            b"HTTP/1.1 204 No Content\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n";
         assert!(manifest_response(Cursor::new(illegal_204_transfer), "text").is_err());
     }
 

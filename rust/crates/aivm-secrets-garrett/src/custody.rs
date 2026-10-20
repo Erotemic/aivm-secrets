@@ -402,13 +402,31 @@ fn line(reader: &mut impl BufRead, limit: usize) -> Outcome<Vec<u8>> {
     line.truncate(line.len() - 2);
     Ok(line)
 }
+fn response_status(raw: &[u8]) -> Outcome<u16> {
+    // Keep the native HTTP profile octet-based: integer parsing and Unicode
+    // whitespace must not normalize malformed provider framing into success.
+    if raw.len() < 13
+        || !matches!(&raw[..8], b"HTTP/1.1" | b"HTTP/1.0")
+        || raw[8] != b' '
+        || raw[12] != b' '
+        || !raw[9..12].iter().all(u8::is_ascii_digit)
+        || raw[13..].iter().any(|b| *b < 32 && *b != 9 || *b == 127)
+        || std::str::from_utf8(raw).is_err()
+    {
+        return Err(Error::UpstreamResponse);
+    }
+    Ok(u16::from(raw[9] - b'0') * 100 + u16::from(raw[10] - b'0') * 10 + u16::from(raw[11] - b'0'))
+}
+
+fn response_ows(value: &str) -> &str {
+    value.trim_matches([' ', '\t'])
+}
+
 // One response per connection: ambiguous framing and extra protocol features
 // fail closed, and provider headers/error bodies never become public output.
 fn response(mut reader: impl BufRead) -> Outcome<Vec<u8>> {
-    let status = line(&mut reader, 4096)?;
-    let status = std::str::from_utf8(&status).map_err(|_| Error::UpstreamResponse)?;
-    let mut fields = status.splitn(3, ' ');
-    if !matches!(fields.next(), Some("HTTP/1.1" | "HTTP/1.0")) || fields.next() != Some("200") {
+    let status = response_status(&line(&mut reader, 4096)?)?;
+    if status != 200 {
         return Err(Error::UpstreamResponse);
     }
     let mut headers = BTreeMap::new();
@@ -430,7 +448,7 @@ fn response(mut reader: impl BufRead) -> Outcome<Vec<u8>> {
             return Err(Error::UpstreamResponse);
         }
         if headers
-            .insert(name.to_ascii_lowercase(), value.trim().to_owned())
+            .insert(name.to_ascii_lowercase(), response_ows(value).to_owned())
             .is_some()
         {
             return Err(Error::UpstreamResponse);
@@ -442,7 +460,7 @@ fn response(mut reader: impl BufRead) -> Outcome<Vec<u8>> {
     if headers
         .get("content-type")
         .and_then(|s| s.split(';').next())
-        .map(str::trim)
+        .map(response_ows)
         != Some("application/json")
         || headers
             .get("content-encoding")
