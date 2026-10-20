@@ -2036,3 +2036,30 @@ is high in the scoped extracted decision result and sampled native behavior,
 not in a whole-service mediation/secrecy claim. No new Python runtime module or
 protocol/storage format was introduced; changed Python fixtures/verifiers are
 non-core. All changes will carry the required co-author and accounting commits.
+
+
+## 2026-10-20 12:32:45 -0400
+
+Validated source 64d3caa: all 3,000 full-suite tests pass without skips. The
+consolidated Garrett record passes 761 native/parity cases and all 425 named
+axiom audits. Fresh matching extraction and 25 scoped kernel obligations,
+four new re-extracted Rust mutants, 60 Rust workspace cases, 8 read-path and
+5 read-prefix obligations, both ordinary/conformance native product witnesses
+and both 158-case read gates pass. The installed vTPM now supplies six passing
+selected cases including manifest read/denied-write/revocation, with existing
+public pins and dictionary-attack state unchanged. Sixteen emulator/prerequisite
+cases pass, retaining bad-authentication testing only on disposable swtpm.
+
+The first standalone build overlapped the full suite's source-archive builder
+and failed with a missing staging egg-info path. A serialized unchanged-source
+rerun passes and every pinned Garrett source byte matches the resulting sdist.
+Concurrent staging is the inferred cause; no product workaround was added.
+This reinforces keeping source-mutating packaging stages sequential even when
+other verification can run independently. Exact commands, source/binary/log and
+package hashes, initial fixture/guard findings, and open gates are frozen in
+dev/validation/2026-10-20-request-orchestration.json. Runtime sources remain the
+64d3caa commit; only acceptance receipts change afterward. NR-1's pure kernel
+and preservation exit is now checked. The full goal stays active: invocation/
+effect simulation, transitive I/O, observation correspondence, independent
+review and real-provider/VM evidence remain required. Exact model variant
+remains unavailable; every commit identifies GPT-6 (Codex) as co-author.

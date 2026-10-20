@@ -1,0 +1,134 @@
+{
+  "schema": 1,
+  "status": "passed-for-listed-scopes",
+  "scope": "NR-1 production post-admission request orchestration and exact result/data-flow preservation; native invocation/I/O refinement remains open",
+  "recorded_at": "2026-10-20T12:32:45.415821-04:00",
+  "source_commit": "64d3caa22a7cab9350a1eb5cd1db238bf03c857a",
+  "source_dirty": true,
+  "validation_source_mode": "Working-tree source contents frozen in the recorded commit; subsequent changes are validation/journal/priority receipts only.",
+  "source_sha256": {
+    "rust/crates/aivm-secrets-garrett-core/src/read_transition.rs": "2f67b370c91025f34e754314b30d63d19b8b98a1e731d506ede69ccfdfe30935",
+    "rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs": "964de2d594aaafbe30ccd8ee93142a82334d009691b6f7a51d1ab233f824f2fe",
+    "proofs/generated/AivmSecretsGarrettCore.lean": "b76d4a75a7f853f477d62707c9efbfc2ff8754c85f23a55fbd495f277d0d76cd",
+    "proofs/GarrettReadTransition.lean": "3d4fb7743ded90db1a2172e50118c418577de24e61b604c200e481a6dc918814",
+    "proofs/GarrettCheck.lean": "b4ad0508dafc86045d5e704071c1a6117abf3daf382a0e07ad7f7d0fd12cd8d3",
+    "proofs/garrett-manifest.json": "58c9d70ad261d78c4d21621824f4d15d476c305d08d3e1737a85b418669e9de9",
+    "dev/verification/read_transition.py": "1b5b2300c5c6d75c72985c7925a8aa03d7265546744042ec60ce96a6b1d776eb",
+    "dev/verification/garrett.py": "24bc207d174454dda480c416cfab9c78df0b5201656d02846cc59428b0be2568",
+    "dev/verification/w3_effect_boundary.py": "0d5e59ad9712127de3483129781f399cb939a71da6afcbb7e9989b5abe28df39",
+    "dev/verification/w6_adapter.py": "577c283610b3f31cc137ea776ff9cb2c1ba67942e8f8ca49216863be4fab8f03",
+    "dev/verification/w6_pending_boundary.py": "b44082e88b11d8ed0c840f1e47d65044ef1a1fa3036f7bd20b3736b9563af491",
+    "tests/test_rust_garrett_tpm_request.py": "81ca9df0b37bac0f81206a18248fd509d8a6f2cb81f9117b87b6050d83e07d99",
+    "tests/test_secrets_w3_effect_boundary.py": "0e1d2df2b473a7a189d81a6fed480df4102c173870c14156a4a4c4db678982f9"
+  },
+  "binary_sha256": {
+    "debug/garrett-bridge": "167811ba4a82cb2153306d3d279669bac6f7894e8801d3985856eff84a41f46b",
+    "debug/garrett-client": "409fd6c9304b292a8c9d4f3e60e9044735cdbdd9cde8f9873824aa85855708dd",
+    "debug/garrett-authority": "59b3a431ff1fc16bea6237cdfc200e030d0e34527022f6e3f4b5d0e59dfeb518",
+    "release/garrett-bridge": "4059a4ca3325128bd52924a4d61b96fe58080801758eb452de0ac68e13c0dc33",
+    "release/garrett-client": "1496b9bc518a1561ae84529829ce4d78eb6b19c58e59848833ec40c2369284c9",
+    "release/garrett-authority": "6d230d56832cd684e39c84633e010662e396baaa87ee5646834b9211c78c724c"
+  },
+  "binary_profiles": {
+    "debug": "conformance,coordinator-server",
+    "release": "ordinary coordinator-server; prior release/all-features record ran before this ordinary rebuild"
+  },
+  "commands": {
+    "kernel": ".venv/bin/python dev/verification/read_transition.py",
+    "record": ".venv/bin/python dev/verification/garrett.py record",
+    "targeted-mutants": "PYTHONPATH=dev/verification .venv/bin/python -c \"import garrett; garrett.mutate('request orchestration')\"",
+    "rust": "cargo test --locked --manifest-path rust/Cargo.toml --workspace --features conformance,coordinator-server",
+    "full": ".venv/bin/python -m pytest -q --junitxml=/tmp/garrett-orchestration-full.xml",
+    "read-path-prefix": ".venv/bin/python dev/verification/read_prefixes.py prove",
+    "native-read": ".venv/bin/python dev/verification/quick_w6_read.py --native",
+    "native-product": ".venv/bin/python dev/offline_native_guest.py [--bin-dir rust/target/release]",
+    "ordinary-build": "cargo build --locked --release --manifest-path rust/Cargo.toml --bins --features coordinator-server",
+    "device": "sudo -n .venv/bin/python dev/verification/tpm_device.py --device /dev/tpmrm0",
+    "packaging": ".venv/bin/python -m build"
+  },
+  "environment": {
+    "full-suite": "All garrett.RUNNERS plus freshness/primitives point to debug binaries; AIVM_SECRETS_REQUIRE_TPM_TESTS=1; no device override.",
+    "garrett-record": "Required isolated-emulator TPM negatives with release/all-features runners.",
+    "ordinary": "Three focused native variables select the ordinary release binaries; no Python backend fallback.",
+    "device": "Only explicit device process uses sudo. No ACL, hierarchy authorization or lockout settings changed this increment."
+  },
+  "results": {
+    "full-python-native": {
+      "passed": 3000,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 555.52
+    },
+    "garrett-native-parity-cases": 761,
+    "named-garrett-axiom-audits": 425,
+    "extracted-transition-obligations": 25,
+    "new-orchestration-obligations": 12,
+    "targeted-rust-mutants-rejected": 4,
+    "rust-workspace-cases": 60,
+    "focused-native-regressions": 207,
+    "source-guard-cases": 87,
+    "read-path-obligations": 8,
+    "read-prefix-obligations": 5,
+    "focused-native-read-conformance": 158,
+    "focused-native-read-ordinary": 158,
+    "native-product-both-modes": "passed",
+    "emulator/prerequisite-cases": 16,
+    "installed-device": {
+      "device": "/dev/tpmrm0",
+      "dictionary_attack_state_preserved": true,
+      "existing_public_sha256": {
+        "0x81010001": "be2b11e4ebd8b35f5162b38ca6ad11768b56fefacb35246b557c62a53e037f61",
+        "0x81010016": "406374dd1cbdb93c570e35680917282ca93c414da572a920694c44827642531c"
+      },
+      "fixture_handles_cleaned": true,
+      "persistent_objects_preserved": true,
+      "schema": 1,
+      "scope": "native-tpm-device-synthetic-workflow",
+      "status": "passed",
+      "tests": 6
+    },
+    "packaging": "Sequential build passed; every Garrett manifest source pin has identical bytes in the sdist, including new proof/native/test sources."
+  },
+  "negative-findings": [
+    "Four typed, freshly re-extracted Rust mutations fail the actual proof: removed fresh check, wrong preflight phase, substituted final result, lost write uncertainty.",
+    "The first refactored source guard found another unchanged fresh binding after one binding was bypassed. It now checks completion and request bindings in separate source regions; the bypass is rejected.",
+    "The first TPM manifest fixture used the account helper default hostname, conflicting with the host-owned manifest policy. Startup failed closed. Selecting the matching synthetic provider host fixed the fixture without relaxing policy.",
+    "A standalone build_sdist overlapped the full suite, whose source-archive test also uses the checkout staging directory. It failed on a missing staging egg-info path. A sequential unchanged-source build passed; concurrency is the inferred cause."
+  ],
+  "next-acceptance": "NR-2: relate actual callback invocations/effects and controller outcomes to W4/W5 traces, including acknowledged-completion/denied-release prefixes.",
+  "remaining-obligations": [
+    "A result equality does not count all native I/O invocations or forbid an ignored successful effect.",
+    "NR-2 complete admission/audit/send/release forward simulation and sequential identity/host-state continuity.",
+    "NR-3 transitive project/dependency/callback/drop/error sinks and concrete adapter correspondence.",
+    "NR-4 exact serialized guest observations and adaptive declassification relation.",
+    "NR-5 integrated claim with independently reviewed assumptions and maintainer security sign-off.",
+    "W7 live-provider compatibility; W8 guest/host compartment/lifecycle evidence; physical provenance, EK activation and clone/rollback claims are not supplied by this device witness."
+  ],
+  "unrun": [
+    "Full historical Rust mutation campaign (only four new orchestration mutants rerun).",
+    "Heavyweight compiler-call-linkage capture, deliberately deferred per iterative-work guidance.",
+    "Live provider accounts, separate guest/host isolation validation and independent NR-5 review."
+  ],
+  "log_sha256": {
+    "fresh-extraction-kernel-axioms": "b506fcece7bf7eb0b7578414c9e6e03c8b6db32e80380d07208f9c1ef37d6d13",
+    "rust-workspace": "d3aa006adccb4ac0dd300fd0ad48595a91c036acf891ea10a32766ccb4279bd1",
+    "targeted-native-regressions": "1569e76092d45aade222be2a5c214f0d633160aaebf90dbd67dc9570bb860cf2",
+    "targeted-rust-mutations": "9620927456d318b70f9ed9a66258d70749a5257bc86fa8e3a3eec3b921207c89",
+    "source-guards": "afb72cdfe96b7155d1c0fcc6916c04d327601bda75db7d7e8a9f255eaf5408ac",
+    "garrett-record": "7e3baa02c82146c2bb36828143b2eaa28ac5febffd085611a561bc5a73ea082e",
+    "read-path-prefix-proofs": "ba77d921dcfa6c2b78b476e6c08991e06ddd46b5381b8dbb30a798705561ae62",
+    "full-python-native": "531942676eedb3f97bfe1c9865f0d67fde74e2422064eb4ec3ebda2420138e4e",
+    "native-read-conformance": "22cfe3a5294adb910cf3d835f1bc83b98d5631e86b6bde76a6ba0fc3f5ad0ba1",
+    "native-read-ordinary": "5f4e87105d07c69d3353073699968c2b3380c2b56cb4eb64e59e21f7200b04e4",
+    "native-product-conformance": "07dbbfe5ee30aa500aa129ff377dc47249297e1651502e6612b102e7ead504e1",
+    "native-product-ordinary": "07dbbfe5ee30aa500aa129ff377dc47249297e1651502e6612b102e7ead504e1",
+    "emulator-prerequisites": "922436a228d3b99c9e6f27c1099c0763e2c171eefecb7a166c0b6f426b3903da",
+    "installed-device": "ce983de5726c1c6ce8c40c540e9e1b498ed47effcb65cf8fdbc87ae9ea897296",
+    "packaging-initial-overlap": "be2a4123be0977ecaa70ba91d6cdc6badd2ce50368dbe3640b469880c8b13d9a",
+    "packaging-sequential": "341a643208bba7b741043ae2b2b02d5cd984696029fd2122fa6de4a581198311"
+  },
+  "package_sha256": {
+    "aivm_secrets-0.2.0-py3-none-any.whl": "29a2b58fe9d0eb5e62b9bb17617de67c92aa7f8dd718ba1421768e99ce39436f",
+    "aivm_secrets-0.2.0.tar.gz": "2482fb21f2bb9d570b7d268aa2aef1134cf707b0b18ef8fc0e55ed06af5f6e1d"
+  }
+}

@@ -32,6 +32,10 @@ characterizes successful returned data and failure propagation. This supplies
 the pure orchestration and initial preservation exit of NR-1. The next task
 is NR-2's invocation/event relation; result equality alone does not account for
 all native I/O calls. The NR-3/4/5 and W7/W8 gates remain open.
+Source `64d3caa` passes 3,000 full-suite cases without skips, 425 named axiom
+audits, four new orchestration mutants, both native product modes, packaging
+and six installed-vTPM cases including manifest read/deny/revoke. See the
+[orchestration validation record](../../dev/validation/2026-10-20-request-orchestration.json).
 
 ## Goal and present assurance level
 
