@@ -2063,3 +2063,50 @@ and preservation exit is now checked. The full goal stays active: invocation/
 effect simulation, transitive I/O, observation correspondence, independent
 review and real-provider/VM evidence remain required. Exact model variant
 remains unavailable; every commit identifies GPT-6 (Codex) as co-author.
+
+## 2026-10-20 13:18:00 -0400
+
+Continued the active Garrett request-to-trace campaign from source `7d89b2e`.
+The previous shared-callback result model could not distinguish an ignored
+successful extra invocation. Added a private mutable `Invocation` owned by the
+extracted controller. Only its child module borrows the raw adapter. It gates
+each callback on the current progression, records a bounded wrapper prefix,
+and makes rejection terminal. The production `run_current` constructs this
+state, executes the controller and consumes its receipt; an ignored extra call
+cannot reuse an earlier successful reply. The trace carries no credentials or
+provider/request values and allocates no log. The native adapter maps invalid
+progression to the existing fixed internal error; protocols, authorization,
+write uncertainty and persistence formats are unchanged.
+
+Migrated the twelve orchestration results into `GarrettReadInvocations.lean`
+with exact returned states, retaining the thirteen dispatch/completion leaves.
+Eight additional named results cover construction, the complete production
+entry, successful receipts, terminal dispatch and saved-success rejection.
+The default focused checker regenerated the actual Rust and checked all 33
+obligations and their permitted axioms; the full Garrett audit checked 433.
+The pinned Aeneas generator initially produced a duplicate Lean binder for a
+wrapper returning `Result<Error, Error>` in the write-error path. Changed the
+actual Rust wrapper to return its error value directly; did not patch the
+standard model or generated Lean. Reviewed regeneration then compiled.
+
+The core's 22 tests, the 62 workspace tests, 79 W3/W6 review tests, the portable
+142-case gate and 158-case native read gate pass. The focused W4/W5 read-path
+and prefix compilations pass. The standalone native operator/guest run passes.
+All six selected installed-device TPM cases pass with the two existing public
+objects and dictionary-attack counters preserved. No device ACL, hierarchy,
+lockout configuration, broad flush or shared-device wrong-auth test was used.
+The complete Garrett/native and security mutation runs are still in progress;
+full-suite and packaging receipts will be recorded separately.
+
+This is a concrete enforcement/extraction increment, not completion of NR-2.
+The receipt counts accepted wrapper calls. Raw callbacks still expose an
+extensional extracted Result interface, and effects inside those callbacks or
+inside the wrapper's raw-call seam require a separate relation. In particular,
+ignored duplicate raw callbacks within that seam cannot be ruled out solely
+by result equalities. Source guards review ownership, callback multiplicity
+and gate use, but do not prove transitive I/O coverage. NR-2 needs that actual
+state/effect relation, W4/W5 event correspondence and failure-prefix simulation;
+NR-3/4/5 and W7/W8 remain open. Confidence is high in the checked source-level
+progression and sampled workflows, conditional on the documented extraction,
+compiler and external adapter assumptions; there is no new whole-service or
+VM isolation claim. Exact GPT-6 weights/configuration variant is unavailable.

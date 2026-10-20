@@ -1,5 +1,5 @@
 import GarrettApproval
-import GarrettReadTransition
+import GarrettReadInvocations
 import GarrettLineFrame
 import GarrettHttpWire
 import GarrettCoordinatorReply
@@ -479,3 +479,12 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.read_transition.Proofs.checked_only_continuation
 #print axioms aivm_secrets_garrett_core.read_transition.Proofs.sent_write_completion_failure_is_uncertain
 #print axioms aivm_secrets_garrett_core.read_transition.Proofs.two_phase_read_successful_witness
+
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.constructor_starts_empty
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.run_current_success_iff
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.successful_request_receipt
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.finished_dispatch_is_rejected
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.invalid_progress_rejects_saved_success
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.ignored_extra_dispatch_rejects_saved_reply
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.halted_dispatch_is_rejected
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.unfinished_value_is_not_public

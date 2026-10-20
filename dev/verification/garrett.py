@@ -36,6 +36,15 @@ PROFILES = [
     "native-exact-write-approval-v1",
 ]
 THEOREMS = [
+    "aivm_secrets_garrett_core.read_transition.Proofs.constructor_starts_empty",
+    "aivm_secrets_garrett_core.read_transition.Proofs.run_current_success_iff",
+    "aivm_secrets_garrett_core.read_transition.Proofs.successful_request_receipt",
+    "aivm_secrets_garrett_core.read_transition.Proofs.finished_dispatch_is_rejected",
+    "aivm_secrets_garrett_core.read_transition.Proofs.invalid_progress_rejects_saved_success",
+    "aivm_secrets_garrett_core.read_transition.Proofs.ignored_extra_dispatch_rejects_saved_reply",
+    "aivm_secrets_garrett_core.read_transition.Proofs.halted_dispatch_is_rejected",
+    "aivm_secrets_garrett_core.read_transition.Proofs.unfinished_value_is_not_public",
+
     "aivm_secrets_garrett_core.read_transition.Proofs.request_facts_success_iff",
     "aivm_secrets_garrett_core.read_transition.Proofs.finish_request_success_iff",
     "aivm_secrets_garrett_core.read_transition.Proofs.request_current_success_iff",
@@ -642,6 +651,7 @@ def inputs() -> list[str]:
         "proofs/GarrettReadPaths.lean",
         "proofs/GarrettReadPrefixes.lean",
         "proofs/GarrettReadTransition.lean",
+        "proofs/GarrettReadInvocations.lean",
         "dev/verification/read_transition.py",
         "tests/secrets_vectors/approval/kernel-v1.jsonl",
         "tests/secrets_vectors/coordination/authority-v1.jsonl",
@@ -945,9 +955,21 @@ def mutate(pattern: str | None = None) -> None:
         (transition, "request orchestration wrong preflight phase",
          "ops.dispatch(Phase::Preflight, effect)", "ops.dispatch(Phase::Final, effect)"),
         (transition, "request orchestration substituted final result",
-         "Ok(raw) => (raw, write)", "Ok(_raw) => (ops.empty_facts(), write)"),
+         "Ok(raw) => (raw, write)", "Ok(_raw) => (facts, write)"),
         (transition, "request orchestration lost write uncertainty",
          "Err(_) => Err(ops.outcome_unknown())", "Err(error) => Err(error)"),
+    ]
+    invocations = transition.parent / "read_transition/invocation.rs"
+    mutations += [
+        (transition, "request invocation ignored repeat before planning",
+         "    match ops.preflight() {", "    let _ignored = ops.preflight();\n    match ops.preflight() {"),
+        (transition, "request invocation ignored extra call after completion",
+         "Ok(facts) => finish_request(ops, facts),",
+         "Ok(facts) => { let reply = finish_request(ops, facts); let _ignored = ops.preflight(); reply },"),
+        (invocations, "request invocation unfinished saved reply accepted",
+         "if matches!(self.progress, Progress::Finished) {", "if true {"),
+        (invocations, "request invocation preflight receipt omitted",
+         "self.trace = Trace::PreflightPlan;", "self.trace = Trace::Empty;"),
     ]
     use_source = source.with_name("credential_use.rs")
     mutations += [
@@ -1679,7 +1701,7 @@ def mutate(pattern: str | None = None) -> None:
             temporary = Path(scratch)
             rust = temporary / "rust"
             shutil.copytree(
-                source.parents[1], rust / "crates/aivm-secrets-garrett-core"
+                ROOT / "rust/crates/aivm-secrets-garrett-core", rust / "crates/aivm-secrets-garrett-core"
             )
             shutil.copy2(
                 ROOT / "rust/rust-toolchain.toml", rust / "rust-toolchain.toml"
@@ -1690,7 +1712,8 @@ def mutate(pattern: str | None = None) -> None:
             (rust / "Cargo.lock").write_text(
                 'version = 4\n[[package]]\nname="aivm-secrets-garrett-core"\nversion="0.1.0"\n'
             )
-            target = rust / "crates/aivm-secrets-garrett-core/src" / source.name
+            target = (rust / "crates/aivm-secrets-garrett-core" /
+                      source.relative_to(ROOT / "rust/crates/aivm-secrets-garrett-core"))
             target.write_text(source.read_text().replace(old, new))
             extract(temporary, rust)
             env = dict(os.environ, LEAN_PATH=str(temporary) + os.pathsep + lean_path)
@@ -1714,6 +1737,7 @@ def mutate(pattern: str | None = None) -> None:
             rejected = False
             modules = [
                 "GarrettReadTransition",
+                "GarrettReadInvocations",
                 "Garrett",
                 "GarrettProtocol",
                 "GarrettHistory",

@@ -1,7 +1,8 @@
 # Extracted native manifest request orchestration
 
 This NR-1 increment makes the real post-admission `Session::request` flow call
-`read_transition::request_current`. The Rust core now chooses optional
+`read_transition::run_current`, which constructs a private `Invocation`, runs
+`request_current` and consumes the receipt before returning. The Rust core chooses optional
 preflight, final-effect compilation, fresh admission, optional final dispatch,
 completion input and write-error uncertainty. These decisions are extracted
 from production-called Rust, rather than duplicated in a hand-written Lean
@@ -31,7 +32,12 @@ The private `PendingRequest` adapter supplies the following actual operations:
 | `outcome_unknown` | `Error::OutcomeUnknown` | Conservative error after a sent write's completion failure |
 
 `request_facts` and `finish_request` are private Rust functions actually called
-by `request_current`. There is no second native preflight/final interpreter.
+by `request_current`. Only the private child module
+`read_transition/invocation.rs` owns the raw adapter. The parent controller must
+thread a mutable invocation through every callback. Invalid calls halt that
+invocation without calling the raw adapter. The bounded `Trace` enum records
+accepted wrapper prefixes without allocating a log or retaining request data.
+There is no second native preflight/final interpreter.
 The prepared/audited types, audit contents, provider encoder, HTTP parser,
 coordinated reservation/finish sequence, and last pre-send freshness check are
 retained. `CompletedRelease::into_public` runs only after the kernel returns its
@@ -48,9 +54,10 @@ No retry is added.
 
 ## Exact extracted result
 
-The focused module `proofs/GarrettReadTransition.lean` now checks 25 named
-obligations: the previous thirteen dispatch/completion results plus twelve
-orchestration results. The new success characterization is necessary **and**
+The focused modules `proofs/GarrettReadTransition.lean` and
+`proofs/GarrettReadInvocations.lean` check 33 named obligations: thirteen
+dispatch/completion results, twelve state-threaded orchestration results and
+eight constructor, receipt and consuming-gate results. The new success characterization is necessary **and**
 sufficient for the extracted computation to return a particular successful
 reply. It requires witnesses for:
 
@@ -69,6 +76,11 @@ preflight provider, final compilation, freshness and final provider boundaries.
 Read-continuation equalities also retain completion failure or divergence;
 they do not describe only happy paths. A separate theorem preserves write
 uncertainty, and a two-phase positive witness rules out a deny-only controller.
+Successful request characterization includes the exact returned invocation
+state. `run_current_success_iff` covers the production constructor, controller
+and consuming gate together. `ignored_extra_dispatch_rejects_saved_reply`
+shows that an extra rejected dispatch cannot reuse a previously saved success.
+The wrapper makes invalid progression terminal; it does not retry the adapter.
 
 The installed-device witness now also exercises a TPM-signed native manifest
 read, selected output, a denied write and terminal revocation, in addition to
@@ -83,10 +95,14 @@ boundary. Their recorded callback prefixes check no later callback or retry in
 those finite executions. Native HTTPS/mTLS workflows remain the practical
 authorized-success and denied-effect witnesses.
 
-The four new re-extracted Rust mutations target missing freshness, a wrong
+Four re-extracted Rust mutations target missing freshness, a wrong
 preflight phase, substitution of the final provider return, and loss of write
 uncertainty. Their rejection is a check of these concrete theorem obligations,
-not a complete security mutation campaign.
+not a complete security mutation campaign. Four additional mutations target
+an ignored repeated plan, an ignored extra callback after completion, an
+unfinished saved reply and an omitted receipt transition. The mutation runner
+now retains nested Rust module paths and recompiles the invocation proof after
+its dispatch/completion dependency against each regenerated mutant.
 
 ## What remains for NR-2 and NR-3
 
@@ -98,12 +114,19 @@ external audit/current checks. Their result equalities must be related to
 actual acknowledged effects and typed W4/W5 events under the named W0 adapter
 contracts.
 
-An extensional result equality alone does not count I/O calls. For example, an
-extra successful callback whose result is ignored can leave a result equality
-unchanged. NR-2/NR-3 must establish the invocation/effect relation and inspect
-all reachable sinks, callbacks, errors, drops and dependencies; the present
-theorem must not be promoted into a complete-mediation argument. Native source
-guards and finite callback-prefix tests support that work but do not prove it.
+The stateful wrapper addresses the earlier controller-level counterexample:
+an ignored extra wrapper call changes the invocation to `Halted`, and the
+consuming gate rejects a saved successful result. The exact-state proofs also
+reject the changed controller receipt. This is an enforcement and extraction
+advance, not the full NR-2 effect relation. `Trace` records accepted calls to
+this wrapper; it does not observe all native effects, panic/unwind prefixes or
+calls made *inside* a raw adapter. The wrapper-to-raw-callback step is reviewed
+source, and raw callbacks still have an extensional extracted `Result` contract.
+An ignored duplicate raw callback *inside the wrapper* is not excluded merely
+by those result equalities. The W3 source guard pins the private ownership,
+callback multiplicity and consuming gate, but this is not a semantic proof of
+that multiplicity. NR-2/NR-3 must establish the actual invocation/effect relation
+and inspect reachable sinks, callbacks, errors, drops and dependencies.
 The valid completion-audit-acknowledged/guest-denied prefix from late revocation
 also remains to be represented in the complete forward simulation.
 
@@ -117,7 +140,7 @@ separate gates. vTPM availability does not discharge those obligations.
 
 ```bash
 .venv/bin/python dev/verification/read_transition.py
-.venv/bin/python dev/verification/garrett.py mutate --mutation-filter 'request orchestration'
+.venv/bin/python dev/verification/garrett.py mutate --mutation-filter 'request orchestration|request invocation'
 cargo test --locked --manifest-path rust/Cargo.toml -p aivm-secrets-garrett-core
 .venv/bin/python dev/verification/quick_w6_read.py --native --build
 .venv/bin/python dev/offline_native_guest.py
@@ -127,7 +150,5 @@ During proof editing only, `read_transition.py --no-regenerate` reuses the
 generated source. The default command requires the existing pinned tool/model
 coordinates, matching fresh Charon/Aeneas regeneration, focused kernel
 compilation, and the named axiom audit. W0/W3/W6 inventory checks retain their
-source-review scope. New validation is recorded separately from the historical
-`304b5eb` increment in
-`dev/validation/2026-10-20-request-orchestration.json`; that older record does
-not certify these changed sources.
+source-review scope. The historical `dev/validation/2026-10-20-request-orchestration.json`
+records source `64d3caa`; it does not certify the stateful invocation changes.

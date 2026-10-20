@@ -40,6 +40,7 @@ include proofs/GarrettCoordinatorReply.lean
 include proofs/GarrettApproval.lean
 include proofs/GarrettReadPaths.lean proofs/GarrettReadPrefixes.lean
 include proofs/GarrettReadTransition.lean
+include proofs/GarrettReadInvocations.lean
 recursive-include proofs/generated *.lean
 prune rust/target
 prune proofs/.lake

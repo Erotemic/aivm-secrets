@@ -118,7 +118,7 @@ def mutate(repo, filename, before, after):
      '    fn audit(&self) -> Outcome<()> {\n        self.audit.write_record(&json!({\n            "schema":1,\n            "event":"completed",',
      '    fn audit(&self) -> Outcome<()> {\n        unchecked_release(&json!({\n            "schema":1,\n            "event":"completed",'),
     (RUST + 'custody/manifest_session.rs',
-     'read_transition::request_current(&pending).map(CompletedRelease::into_public)',
+     'read_transition::run_current(pending).map(CompletedRelease::into_public)',
      'unchecked_reply(&pending)'),
     (RUST + 'custody/manifest_session.rs',
      'read_transition::prepare(DispatchPhase::Final, admitted_write, effect.write)',
@@ -269,3 +269,18 @@ def test_nr1_production_called_transition_rejects_core_gate_mutations(tmp_path):
         mutate(checkout, core, before, after)
         with pytest.raises(ContractError, match='extracted core'):
             check(checkout)
+
+
+@pytest.mark.parametrize('filename,before,after', [
+    ('rust/crates/aivm-secrets-garrett-core/src/read_transition.rs',
+     'invocation.into_result(result)', 'result'),
+    ('rust/crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs',
+     'if matches!(self.progress, Progress::Finished)', 'if true'),
+    ('rust/crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs',
+     'self.adapter.preflight()', '{ let _ignored = self.adapter.preflight(); self.adapter.preflight() }'),
+])
+def test_request_invocation_review_guard_rejects_rebaselined_bypasses(tmp_path, filename, before, after):
+    checkout = fake_checkout(tmp_path)
+    mutate(checkout, filename, before, after)
+    with pytest.raises(ContractError, match='invocation'):
+        check(checkout)

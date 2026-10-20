@@ -123,7 +123,7 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            completed[1].split('pub(crate) struct Session {', 1)[0].index('audit.write_record(') <
                completed[1].split('pub(crate) struct Session {', 1)[0].index('Ok(CompletedRelease(self.reply))') and
            'fresh: &fresh,' in release[1] and '(self.fresh)()' in completed[1] and
-           'read_transition::request_current(&pending).map(CompletedRelease::into_public)' in entry,
+           'read_transition::run_current(pending).map(CompletedRelease::into_public)' in entry,
            'native success can reach guest without completion audit')
     return {'channels': len(channels), 'remaining': len(contract['remaining_obligations']),
             'status': 'review guard only; runtime/formal gates are separate'}

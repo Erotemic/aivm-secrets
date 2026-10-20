@@ -9,6 +9,9 @@
 
 use crate::Denial;
 
+mod invocation;
+pub use invocation::{Invocation, Trace};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Phase {
     Preflight,
@@ -121,6 +124,7 @@ pub trait Request {
     type Effect;
     type Output;
     type Error;
+    const INVALID_TRANSITION: Self::Error;
 
     fn preflight(&self) -> Result<Option<Self::Effect>, Self::Error>;
     fn empty_facts(&self) -> Self::Facts;
@@ -132,15 +136,18 @@ pub trait Request {
     fn outcome_unknown(&self) -> Self::Error;
 }
 
-fn request_facts<R: Request>(ops: &R) -> Result<R::Facts, R::Error> {
+fn request_facts<R: Request>(ops: &mut Invocation<R>) -> Result<R::Facts, R::Error> {
     match ops.preflight() {
         Ok(Some(effect)) => ops.dispatch(Phase::Preflight, effect),
-        Ok(None) => Ok(ops.empty_facts()),
+        Ok(None) => ops.empty_facts(),
         Err(error) => Err(error),
     }
 }
 
-fn finish_request<R: Request>(ops: &R, facts: R::Facts) -> Result<R::Output, R::Error> {
+fn finish_request<R: Request>(
+    ops: &mut Invocation<R>,
+    facts: R::Facts,
+) -> Result<R::Output, R::Error> {
     let effect = match ops.final_effect(&facts) {
         Ok(effect) => effect,
         Err(error) => return Err(error),
@@ -152,7 +159,10 @@ fn finish_request<R: Request>(ops: &R, facts: R::Facts) -> Result<R::Output, R::
     }
     let (raw, sent_write) = match effect {
         Some(effect) => {
-            let write = ops.effect_write(&effect);
+            let write = match ops.effect_write(&effect) {
+                Ok(write) => write,
+                Err(error) => return Err(error),
+            };
             match ops.dispatch(Phase::Final, effect) {
                 Ok(raw) => (raw, write),
                 Err(error) => return Err(error),
@@ -170,11 +180,18 @@ fn finish_request<R: Request>(ops: &R, facts: R::Facts) -> Result<R::Output, R::
     }
 }
 
-pub fn request_current<R: Request>(ops: &R) -> Result<R::Output, R::Error> {
+pub fn request_current<R: Request>(ops: &mut Invocation<R>) -> Result<R::Output, R::Error> {
     match request_facts(ops) {
         Ok(facts) => finish_request(ops, facts),
         Err(error) => Err(error),
     }
+}
+
+/// Consume one private adapter and its invocation receipt as one operation.
+pub fn run_current<R: Request>(adapter: R) -> Result<R::Output, R::Error> {
+    let mut invocation = Invocation::new(adapter);
+    let result = request_current(&mut invocation);
+    invocation.into_result(result)
 }
 
 #[cfg(test)]
@@ -182,7 +199,7 @@ mod tests {
     use super::*;
 
     struct TestRequest {
-        trace: std::cell::RefCell<Vec<&'static str>>,
+        trace: std::rc::Rc<std::cell::RefCell<Vec<&'static str>>>,
         preflight: bool,
         final_effect: bool,
         write: bool,
@@ -205,6 +222,7 @@ mod tests {
         type Effect = (u8, bool);
         type Output = u8;
         type Error = &'static str;
+        const INVALID_TRANSITION: Self::Error = "invalid-transition";
 
         fn preflight(&self) -> Result<Option<Self::Effect>, Self::Error> {
             self.step("preflight-plan")?;
@@ -264,15 +282,21 @@ mod tests {
     fn request_shape_uses_exact_facts_effects_and_provider_result() {
         for preflight in [false, true] {
             for final_effect in [false, true] {
+                let trace = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
                 let request = TestRequest {
-                    trace: std::cell::RefCell::new(Vec::new()),
+                    trace: trace.clone(),
                     preflight,
                     final_effect,
                     write: false,
                     fault: None,
                 };
+                let mut invocation = Invocation::new(request);
+                let result = request_current(&mut invocation);
+                assert!(matches!(invocation.trace(), Trace::Complete {
+                    preflight: p, final_effect: f
+                } if p == preflight && f == final_effect));
                 assert_eq!(
-                    request_current(&request),
+                    invocation.into_result(result),
                     Ok(if final_effect {
                         202
                     } else if preflight {
@@ -292,7 +316,7 @@ mod tests {
                     expected.extend(["write-kind", "final-provider"]);
                 }
                 expected.push("complete");
-                assert_eq!(*request.trace.borrow(), expected);
+                assert_eq!(*trace.borrow(), expected);
             }
         }
     }
@@ -313,8 +337,9 @@ mod tests {
                 continue;
             }
             for write in [false, true] {
+                let trace = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
                 let request = TestRequest {
-                    trace: std::cell::RefCell::new(Vec::new()),
+                    trace: trace.clone(),
                     preflight: true,
                     final_effect: true,
                     write,
@@ -322,16 +347,56 @@ mod tests {
                 };
                 let uncertain = write && *stage == "complete";
                 assert_eq!(
-                    request_current(&request),
+                    run_current(request),
                     Err(if uncertain { "outcome-unknown" } else { *stage })
                 );
                 let mut expected = stages[..=index].to_vec();
                 if uncertain {
                     expected.push("uncertain");
                 }
-                assert_eq!(*request.trace.borrow(), expected);
+                assert_eq!(*trace.borrow(), expected);
             }
         }
+    }
+
+    #[test]
+    fn invocation_rejects_provider_before_plan_and_remains_terminal() {
+        let trace = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+        let mut invocation = Invocation::new(TestRequest {
+            trace: trace.clone(),
+            preflight: true,
+            final_effect: true,
+            write: false,
+            fault: None,
+        });
+        assert_eq!(
+            invocation.dispatch(Phase::Final, (0, false)),
+            Err("invalid-transition")
+        );
+        assert_eq!(invocation.preflight(), Err("invalid-transition"));
+        assert_eq!(invocation.into_result(Ok(7)), Err("invalid-transition"));
+        assert!(trace.borrow().is_empty());
+    }
+
+    #[test]
+    fn ignored_extra_call_cannot_reuse_a_successful_reply_or_reach_provider() {
+        let trace = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+        let mut invocation = Invocation::new(TestRequest {
+            trace: trace.clone(),
+            preflight: true,
+            final_effect: true,
+            write: false,
+            fault: None,
+        });
+        let result = request_current(&mut invocation);
+        assert_eq!(result, Ok(202));
+        let before = trace.borrow().clone();
+        assert_eq!(
+            invocation.dispatch(Phase::Final, (101, false)),
+            Err("invalid-transition")
+        );
+        assert_eq!(*trace.borrow(), before);
+        assert_eq!(invocation.into_result(result), Err("invalid-transition"));
     }
 
     #[test]

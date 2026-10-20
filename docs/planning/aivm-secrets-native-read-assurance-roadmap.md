@@ -122,8 +122,11 @@ The paragraphs below describe the original NR-1A seam; their initial missing
 dispatch theorem is discharged by this increment. The [subsequent production
 orchestration extraction](../garrett-native-request-orchestration.md) now
 consumes optional phase and provider/error outcomes through the real
-`request_current`, with exact success/data-flow and failure lemmas. The full
-callback-invocation and orchestration-to-trace relation is still missing.
+`request_current`, with exact success/data-flow and failure lemmas. The production entry now constructs and consumes a private mutable invocation;
+33 focused obligations retain exact receipt states and reject saved success
+after an extra invalid wrapper call. The full raw-callback/effect and
+orchestration-to-W4/W5-trace relation is still missing. The distinction between
+accepted wrapper calls and transitive native I/O is explicit in that scope note.
 
 `rust/crates/aivm-secrets-garrett-core/src/read_transition.rs` implements the
 actual phase/effect admission and audit-acknowledgment transition used by

@@ -4107,23 +4107,780 @@ def protocol.perform
     | core.result.Result.Err error => ok (core.result.Result.Err error)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
+/-- [aivm_secrets_garrett_core::read_transition::invocation::Trace]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 9:0-20:1
+    Visibility: public -/
+@[discriminant isize]
+inductive read_transition.invocation.Trace where
+| Empty : read_transition.invocation.Trace
+| PreflightPlan : read_transition.invocation.Trace
+| EmptyFacts : read_transition.invocation.Trace
+| PreflightDispatch : read_transition.invocation.Trace
+| FinalPlan : Bool → read_transition.invocation.Trace
+| Current : Bool → read_transition.invocation.Trace
+| WriteKind : Bool → read_transition.invocation.Trace
+| FinalDispatch : Bool → read_transition.invocation.Trace
+| Complete : Bool → Bool → read_transition.invocation.Trace
+| Uncertain : Bool → read_transition.invocation.Trace
+
+/-- [aivm_secrets_garrett_core::read_transition::invocation::{impl core::clone::Clone for aivm_secrets_garrett_core::read_transition::invocation::Trace}::clone]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 8:9-8:14
+    Visibility: public -/
+def read_transition.invocation.Trace.Insts.CoreCloneClone.clone
+  (self : read_transition.invocation.Trace) :
+  Result read_transition.invocation.Trace
+  := do
+  ok self
+
+/-- Trait implementation: [aivm_secrets_garrett_core::read_transition::invocation::{impl core::clone::Clone for aivm_secrets_garrett_core::read_transition::invocation::Trace}]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 8:9-8:14 -/
+@[reducible]
+def read_transition.invocation.Trace.Insts.CoreCloneClone : core.clone.Clone
+  read_transition.invocation.Trace := {
+  clone := read_transition.invocation.Trace.Insts.CoreCloneClone.clone
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::read_transition::invocation::{impl core::marker::Copy for aivm_secrets_garrett_core::read_transition::invocation::Trace}]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 8:16-8:20 -/
+@[reducible]
+def read_transition.invocation.Trace.Insts.CoreMarkerCopy : core.marker.Copy
+  read_transition.invocation.Trace := {
+  cloneInst := read_transition.invocation.Trace.Insts.CoreCloneClone
+}
+
+/-- [aivm_secrets_garrett_core::read_transition::invocation::Progress]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 22:0-50:1 -/
+@[discriminant isize]
+inductive read_transition.invocation.Progress where
+| Start : read_transition.invocation.Progress
+| Empty : read_transition.invocation.Progress
+| Preflight : read_transition.invocation.Progress
+| FinalPlan : Bool → read_transition.invocation.Progress
+| Current : Bool → Bool → read_transition.invocation.Progress
+| WriteKind : Bool → read_transition.invocation.Progress
+| FinalDispatch : Bool → Bool → read_transition.invocation.Progress
+| Complete : Bool → Bool → Bool → read_transition.invocation.Progress
+| Uncertain : Bool → read_transition.invocation.Progress
+| Finished : read_transition.invocation.Progress
+| Halted : read_transition.invocation.Progress
+
+/-- [aivm_secrets_garrett_core::read_transition::invocation::Invocation]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 52:0-56:1
+    Visibility: public -/
+structure read_transition.invocation.Invocation (R : Type _) where
+  adapter : R
+  trace : read_transition.invocation.Trace
+  progress : read_transition.invocation.Progress
+
 /-- [aivm_secrets_garrett_core::read_transition::Phase]
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 13:0-16:1
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 16:0-19:1
     Visibility: public -/
 @[discriminant isize]
 inductive read_transition.Phase where
 | Preflight : read_transition.Phase
 | Final : read_transition.Phase
 
+/-- Trait declaration: [aivm_secrets_garrett_core::read_transition::Request]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 122:0-137:1
+    Visibility: public -/
+structure read_transition.Request (Self : Type _) (Self_Facts : Type _)
+  (Self_Effect : Type _) (Self_Output : Type _) (Self_Error : Type _) where
+  INVALID_TRANSITION : Result Self_Error
+  preflight : Self → Result (core.result.Result (Option Self_Effect)
+    Self_Error)
+  empty_facts : Self → Result Self_Facts
+  dispatch : Self → read_transition.Phase → Self_Effect → Result
+    (core.result.Result Self_Facts Self_Error)
+  final_effect : Self → Self_Facts → Result (core.result.Result (Option
+    Self_Effect) Self_Error)
+  recheck : Self → Result (core.result.Result Unit Self_Error)
+  effect_write : Self → Self_Effect → Result Bool
+  complete : Self → Self_Facts → Result (core.result.Result Self_Output
+    Self_Error)
+  outcome_unknown : Self → Result Self_Error
+
+/-- [aivm_secrets_garrett_core::read_transition::invocation::{aivm_secrets_garrett_core::read_transition::invocation::Invocation<R>}::new]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 59:4-65:5
+    Visibility: public -/
+def read_transition.invocation.Invocation.new
+  {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
+  read_transition.Request R Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error) (adapter : R) :
+  Result (read_transition.invocation.Invocation R)
+  := do
+  ok
+    {
+      adapter,
+      trace := read_transition.invocation.Trace.Empty,
+      progress := read_transition.invocation.Progress.Start
+    }
+
+/-- [aivm_secrets_garrett_core::read_transition::invocation::{aivm_secrets_garrett_core::read_transition::invocation::Invocation<R>}::trace]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 67:4-69:5
+    Visibility: public -/
+def read_transition.invocation.Invocation.impl.trace
+  {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
+  read_transition.Request R Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error) (self : read_transition.invocation.Invocation R) :
+  Result read_transition.invocation.Trace
+  := do
+  ok self.trace
+
+/-- [aivm_secrets_garrett_core::read_transition::invocation::{aivm_secrets_garrett_core::read_transition::invocation::Invocation<R>}::reject]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 71:4-74:5 -/
+def read_transition.invocation.Invocation.reject
+  {R : Type _} (T : Type _) {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
+  read_transition.Request R Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error) (self : read_transition.invocation.Invocation R) :
+  Result ((core.result.Result T Clause0_Error) ×
+    (read_transition.invocation.Invocation R))
+  := do
+  let t ← RequestInst.INVALID_TRANSITION
+  ok (core.result.Result.Err t,
+    { self with progress := read_transition.invocation.Progress.Halted })
+
+/-- [aivm_secrets_garrett_core::read_transition::invocation::{aivm_secrets_garrett_core::read_transition::invocation::Invocation<R>}::preflight]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 76:4-93:5 -/
+def read_transition.invocation.Invocation.preflight
+  {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
+  read_transition.Request R Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error) (self : read_transition.invocation.Invocation R) :
+  Result ((core.result.Result (Option Clause0_Effect) Clause0_Error) ×
+    (read_transition.invocation.Invocation R))
+  := do
+  let (p, b) ←
+    match self.progress with
+    | read_transition.invocation.Progress.Start =>
+      ok (read_transition.invocation.Progress.Start, true)
+    | read_transition.invocation.Progress.Empty =>
+      ok (read_transition.invocation.Progress.Empty, false)
+    | read_transition.invocation.Progress.Preflight =>
+      ok (read_transition.invocation.Progress.Preflight, false)
+    | read_transition.invocation.Progress.FinalPlan _ =>
+      ok (self.progress, false)
+    | read_transition.invocation.Progress.Current _ _ =>
+      ok (self.progress, false)
+    | read_transition.invocation.Progress.WriteKind _ =>
+      ok (self.progress, false)
+    | read_transition.invocation.Progress.FinalDispatch _ _ =>
+      ok (self.progress, false)
+    | read_transition.invocation.Progress.Complete _ _ _ =>
+      ok (self.progress, false)
+    | read_transition.invocation.Progress.Uncertain _ =>
+      ok (self.progress, false)
+    | read_transition.invocation.Progress.Finished =>
+      ok (read_transition.invocation.Progress.Finished, false)
+    | read_transition.invocation.Progress.Halted =>
+      ok (read_transition.invocation.Progress.Halted, false)
+  if b
+  then
+    let r ← RequestInst.preflight self.adapter
+    match r with
+    | core.result.Result.Ok o =>
+      match o with
+      | none =>
+        ok (r,
+          {
+            self
+              with
+              trace := read_transition.invocation.Trace.PreflightPlan,
+              progress := read_transition.invocation.Progress.Empty
+          })
+      | some _ =>
+        ok (r,
+          {
+            self
+              with
+              trace := read_transition.invocation.Trace.PreflightPlan,
+              progress := read_transition.invocation.Progress.Preflight
+          })
+    | core.result.Result.Err _ =>
+      ok (r,
+        {
+          self
+            with
+            trace := read_transition.invocation.Trace.PreflightPlan,
+            progress := read_transition.invocation.Progress.Halted
+        })
+  else
+    read_transition.invocation.Invocation.reject (Option Clause0_Effect)
+      RequestInst { self with progress := p }
+
+/-- [aivm_secrets_garrett_core::read_transition::invocation::{aivm_secrets_garrett_core::read_transition::invocation::Invocation<R>}::empty_facts]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 95:4-104:5 -/
+def read_transition.invocation.Invocation.empty_facts
+  {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
+  read_transition.Request R Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error) (self : read_transition.invocation.Invocation R) :
+  Result ((core.result.Result Clause0_Facts Clause0_Error) ×
+    (read_transition.invocation.Invocation R))
+  := do
+  let (p, b) ←
+    match self.progress with
+    | read_transition.invocation.Progress.Start =>
+      ok (read_transition.invocation.Progress.Start, false)
+    | read_transition.invocation.Progress.Empty =>
+      ok (read_transition.invocation.Progress.Empty, true)
+    | read_transition.invocation.Progress.Preflight =>
+      ok (read_transition.invocation.Progress.Preflight, false)
+    | read_transition.invocation.Progress.FinalPlan _ =>
+      ok (self.progress, false)
+    | read_transition.invocation.Progress.Current _ _ =>
+      ok (self.progress, false)
+    | read_transition.invocation.Progress.WriteKind _ =>
+      ok (self.progress, false)
+    | read_transition.invocation.Progress.FinalDispatch _ _ =>
+      ok (self.progress, false)
+    | read_transition.invocation.Progress.Complete _ _ _ =>
+      ok (self.progress, false)
+    | read_transition.invocation.Progress.Uncertain _ =>
+      ok (self.progress, false)
+    | read_transition.invocation.Progress.Finished =>
+      ok (read_transition.invocation.Progress.Finished, false)
+    | read_transition.invocation.Progress.Halted =>
+      ok (read_transition.invocation.Progress.Halted, false)
+  if b
+  then
+    let facts ← RequestInst.empty_facts self.adapter
+    ok (core.result.Result.Ok facts,
+      {
+        self
+          with
+          trace := read_transition.invocation.Trace.EmptyFacts,
+          progress := (read_transition.invocation.Progress.FinalPlan false)
+      })
+  else
+    read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+      { self with progress := p }
+
+/-- [aivm_secrets_garrett_core::read_transition::invocation::{aivm_secrets_garrett_core::read_transition::invocation::Invocation<R>}::dispatch]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 106:4-135:5 -/
+def read_transition.invocation.Invocation.dispatch
+  {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
+  read_transition.Request R Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error) (self : read_transition.invocation.Invocation R)
+  (phase : read_transition.Phase) (effect : Clause0_Effect) :
+  Result ((core.result.Result Clause0_Facts Clause0_Error) ×
+    (read_transition.invocation.Invocation R))
+  := do
+  match phase with
+  | read_transition.Phase.Preflight =>
+    match self.progress with
+    | read_transition.invocation.Progress.Start =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+    | read_transition.invocation.Progress.Empty =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+    | read_transition.invocation.Progress.Preflight =>
+      let t ←
+        match phase with
+        | read_transition.Phase.Preflight =>
+          ok read_transition.invocation.Trace.PreflightDispatch
+        | read_transition.Phase.Final =>
+          ok (read_transition.invocation.Trace.FinalDispatch true)
+      let r ← RequestInst.dispatch self.adapter phase effect
+      match r with
+      | core.result.Result.Ok _ =>
+        match phase with
+        | read_transition.Phase.Preflight =>
+          ok (r,
+            {
+              self
+                with
+                trace := t,
+                progress :=
+                  (read_transition.invocation.Progress.FinalPlan true)
+            })
+        | read_transition.Phase.Final =>
+          ok (r,
+            {
+              self
+                with
+                trace := t,
+                progress :=
+                  (read_transition.invocation.Progress.Complete
+                    true
+                    true
+                    false)
+            })
+      | core.result.Result.Err _ =>
+        ok (r,
+          {
+            self
+              with
+              trace := t,
+              progress := read_transition.invocation.Progress.Halted
+          })
+    | read_transition.invocation.Progress.FinalPlan _ =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+    | read_transition.invocation.Progress.Current _ _ =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+    | read_transition.invocation.Progress.WriteKind _ =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+    | read_transition.invocation.Progress.FinalDispatch _ _ =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+    | read_transition.invocation.Progress.Complete _ _ _ =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+    | read_transition.invocation.Progress.Uncertain _ =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+    | read_transition.invocation.Progress.Finished =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+    | read_transition.invocation.Progress.Halted =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+  | read_transition.Phase.Final =>
+    match self.progress with
+    | read_transition.invocation.Progress.Start =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+    | read_transition.invocation.Progress.Empty =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+    | read_transition.invocation.Progress.Preflight =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+    | read_transition.invocation.Progress.FinalPlan _ =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+    | read_transition.invocation.Progress.Current _ _ =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+    | read_transition.invocation.Progress.WriteKind _ =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+    | read_transition.invocation.Progress.FinalDispatch preflight write =>
+      let t ←
+        match phase with
+        | read_transition.Phase.Preflight =>
+          ok read_transition.invocation.Trace.PreflightDispatch
+        | read_transition.Phase.Final =>
+          ok (read_transition.invocation.Trace.FinalDispatch preflight)
+      let r ← RequestInst.dispatch self.adapter phase effect
+      match r with
+      | core.result.Result.Ok _ =>
+        match phase with
+        | read_transition.Phase.Preflight =>
+          ok (r,
+            {
+              self
+                with
+                trace := t,
+                progress :=
+                  (read_transition.invocation.Progress.FinalPlan true)
+            })
+        | read_transition.Phase.Final =>
+          ok (r,
+            {
+              self
+                with
+                trace := t,
+                progress :=
+                  (read_transition.invocation.Progress.Complete
+                    preflight
+                    true
+                    write)
+            })
+      | core.result.Result.Err _ =>
+        ok (r,
+          {
+            self
+              with
+              trace := t,
+              progress := read_transition.invocation.Progress.Halted
+          })
+    | read_transition.invocation.Progress.Complete _ _ _ =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+    | read_transition.invocation.Progress.Uncertain _ =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+    | read_transition.invocation.Progress.Finished =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+    | read_transition.invocation.Progress.Halted =>
+      read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
+        self
+
+/-- [aivm_secrets_garrett_core::read_transition::invocation::{aivm_secrets_garrett_core::read_transition::invocation::Invocation<R>}::final_effect]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 137:4-161:5 -/
+def read_transition.invocation.Invocation.final_effect
+  {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
+  read_transition.Request R Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error) (self : read_transition.invocation.Invocation R)
+  (facts : Clause0_Facts) :
+  Result ((core.result.Result (Option Clause0_Effect) Clause0_Error) ×
+    (read_transition.invocation.Invocation R))
+  := do
+  match self.progress with
+  | read_transition.invocation.Progress.Start =>
+    read_transition.invocation.Invocation.reject (Option Clause0_Effect)
+      RequestInst self
+  | read_transition.invocation.Progress.Empty =>
+    read_transition.invocation.Invocation.reject (Option Clause0_Effect)
+      RequestInst self
+  | read_transition.invocation.Progress.Preflight =>
+    read_transition.invocation.Invocation.reject (Option Clause0_Effect)
+      RequestInst self
+  | read_transition.invocation.Progress.FinalPlan preflight =>
+    let r ← RequestInst.final_effect self.adapter facts
+    match r with
+    | core.result.Result.Ok o =>
+      match o with
+      | none =>
+        ok (r,
+          {
+            self
+              with
+              trace := (read_transition.invocation.Trace.FinalPlan preflight),
+              progress :=
+                (read_transition.invocation.Progress.Current preflight false)
+          })
+      | some _ =>
+        ok (r,
+          {
+            self
+              with
+              trace := (read_transition.invocation.Trace.FinalPlan preflight),
+              progress :=
+                (read_transition.invocation.Progress.Current preflight true)
+          })
+    | core.result.Result.Err _ =>
+      ok (r,
+        {
+          self
+            with
+            trace := (read_transition.invocation.Trace.FinalPlan preflight),
+            progress := read_transition.invocation.Progress.Halted
+        })
+  | read_transition.invocation.Progress.Current _ _ =>
+    read_transition.invocation.Invocation.reject (Option Clause0_Effect)
+      RequestInst self
+  | read_transition.invocation.Progress.WriteKind _ =>
+    read_transition.invocation.Invocation.reject (Option Clause0_Effect)
+      RequestInst self
+  | read_transition.invocation.Progress.FinalDispatch _ _ =>
+    read_transition.invocation.Invocation.reject (Option Clause0_Effect)
+      RequestInst self
+  | read_transition.invocation.Progress.Complete _ _ _ =>
+    read_transition.invocation.Invocation.reject (Option Clause0_Effect)
+      RequestInst self
+  | read_transition.invocation.Progress.Uncertain _ =>
+    read_transition.invocation.Invocation.reject (Option Clause0_Effect)
+      RequestInst self
+  | read_transition.invocation.Progress.Finished =>
+    read_transition.invocation.Invocation.reject (Option Clause0_Effect)
+      RequestInst self
+  | read_transition.invocation.Progress.Halted =>
+    read_transition.invocation.Invocation.reject (Option Clause0_Effect)
+      RequestInst self
+
+/-- [aivm_secrets_garrett_core::read_transition::invocation::{aivm_secrets_garrett_core::read_transition::invocation::Invocation<R>}::recheck]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 163:4-188:5 -/
+def read_transition.invocation.Invocation.recheck
+  {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
+  read_transition.Request R Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error) (self : read_transition.invocation.Invocation R) :
+  Result ((core.result.Result Unit Clause0_Error) ×
+    (read_transition.invocation.Invocation R))
+  := do
+  match self.progress with
+  | read_transition.invocation.Progress.Start =>
+    read_transition.invocation.Invocation.reject Unit RequestInst self
+  | read_transition.invocation.Progress.Empty =>
+    read_transition.invocation.Invocation.reject Unit RequestInst self
+  | read_transition.invocation.Progress.Preflight =>
+    read_transition.invocation.Invocation.reject Unit RequestInst self
+  | read_transition.invocation.Progress.FinalPlan _ =>
+    read_transition.invocation.Invocation.reject Unit RequestInst self
+  | read_transition.invocation.Progress.Current preflight final_effect =>
+    let r ← RequestInst.recheck self.adapter
+    match r with
+    | core.result.Result.Ok _ =>
+      if final_effect
+      then
+        ok (core.result.Result.Ok (),
+          {
+            self
+              with
+              trace := (read_transition.invocation.Trace.Current preflight),
+              progress :=
+                (read_transition.invocation.Progress.WriteKind preflight)
+          })
+      else
+        ok (core.result.Result.Ok (),
+          {
+            self
+              with
+              trace := (read_transition.invocation.Trace.Current preflight),
+              progress :=
+                (read_transition.invocation.Progress.Complete
+                  preflight
+                  false
+                  false)
+          })
+    | core.result.Result.Err _ =>
+      ok (r,
+        {
+          self
+            with
+            trace := (read_transition.invocation.Trace.Current preflight),
+            progress := read_transition.invocation.Progress.Halted
+        })
+  | read_transition.invocation.Progress.WriteKind _ =>
+    read_transition.invocation.Invocation.reject Unit RequestInst self
+  | read_transition.invocation.Progress.FinalDispatch _ _ =>
+    read_transition.invocation.Invocation.reject Unit RequestInst self
+  | read_transition.invocation.Progress.Complete _ _ _ =>
+    read_transition.invocation.Invocation.reject Unit RequestInst self
+  | read_transition.invocation.Progress.Uncertain _ =>
+    read_transition.invocation.Invocation.reject Unit RequestInst self
+  | read_transition.invocation.Progress.Finished =>
+    read_transition.invocation.Invocation.reject Unit RequestInst self
+  | read_transition.invocation.Progress.Halted =>
+    read_transition.invocation.Invocation.reject Unit RequestInst self
+
+/-- [aivm_secrets_garrett_core::read_transition::invocation::{aivm_secrets_garrett_core::read_transition::invocation::Invocation<R>}::effect_write]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 190:4-200:5 -/
+def read_transition.invocation.Invocation.effect_write
+  {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
+  read_transition.Request R Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error) (self : read_transition.invocation.Invocation R)
+  (effect : Clause0_Effect) :
+  Result ((core.result.Result Bool Clause0_Error) ×
+    (read_transition.invocation.Invocation R))
+  := do
+  match self.progress with
+  | read_transition.invocation.Progress.Start =>
+    read_transition.invocation.Invocation.reject Bool RequestInst self
+  | read_transition.invocation.Progress.Empty =>
+    read_transition.invocation.Invocation.reject Bool RequestInst self
+  | read_transition.invocation.Progress.Preflight =>
+    read_transition.invocation.Invocation.reject Bool RequestInst self
+  | read_transition.invocation.Progress.FinalPlan _ =>
+    read_transition.invocation.Invocation.reject Bool RequestInst self
+  | read_transition.invocation.Progress.Current _ _ =>
+    read_transition.invocation.Invocation.reject Bool RequestInst self
+  | read_transition.invocation.Progress.WriteKind preflight =>
+    let write ← RequestInst.effect_write self.adapter effect
+    ok (core.result.Result.Ok write,
+      {
+        self
+          with
+          trace := (read_transition.invocation.Trace.WriteKind preflight),
+          progress :=
+            (read_transition.invocation.Progress.FinalDispatch preflight write)
+      })
+  | read_transition.invocation.Progress.FinalDispatch _ _ =>
+    read_transition.invocation.Invocation.reject Bool RequestInst self
+  | read_transition.invocation.Progress.Complete _ _ _ =>
+    read_transition.invocation.Invocation.reject Bool RequestInst self
+  | read_transition.invocation.Progress.Uncertain _ =>
+    read_transition.invocation.Invocation.reject Bool RequestInst self
+  | read_transition.invocation.Progress.Finished =>
+    read_transition.invocation.Invocation.reject Bool RequestInst self
+  | read_transition.invocation.Progress.Halted =>
+    read_transition.invocation.Invocation.reject Bool RequestInst self
+
+/-- [aivm_secrets_garrett_core::read_transition::invocation::{aivm_secrets_garrett_core::read_transition::invocation::Invocation<R>}::complete]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 202:4-228:5 -/
+def read_transition.invocation.Invocation.complete
+  {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
+  read_transition.Request R Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error) (self : read_transition.invocation.Invocation R)
+  (raw : Clause0_Facts) :
+  Result ((core.result.Result Clause0_Output Clause0_Error) ×
+    (read_transition.invocation.Invocation R))
+  := do
+  match self.progress with
+  | read_transition.invocation.Progress.Start =>
+    read_transition.invocation.Invocation.reject Clause0_Output RequestInst
+      self
+  | read_transition.invocation.Progress.Empty =>
+    read_transition.invocation.Invocation.reject Clause0_Output RequestInst
+      self
+  | read_transition.invocation.Progress.Preflight =>
+    read_transition.invocation.Invocation.reject Clause0_Output RequestInst
+      self
+  | read_transition.invocation.Progress.FinalPlan _ =>
+    read_transition.invocation.Invocation.reject Clause0_Output RequestInst
+      self
+  | read_transition.invocation.Progress.Current _ _ =>
+    read_transition.invocation.Invocation.reject Clause0_Output RequestInst
+      self
+  | read_transition.invocation.Progress.WriteKind _ =>
+    read_transition.invocation.Invocation.reject Clause0_Output RequestInst
+      self
+  | read_transition.invocation.Progress.FinalDispatch _ _ =>
+    read_transition.invocation.Invocation.reject Clause0_Output RequestInst
+      self
+  | read_transition.invocation.Progress.Complete preflight final_effect write
+    =>
+    let r ← RequestInst.complete self.adapter raw
+    match r with
+    | core.result.Result.Ok _ =>
+      ok (r,
+        {
+          self
+            with
+            trace :=
+              (read_transition.invocation.Trace.Complete
+                preflight
+                final_effect),
+            progress := read_transition.invocation.Progress.Finished
+        })
+    | core.result.Result.Err _ =>
+      if write
+      then
+        ok (r,
+          {
+            self
+              with
+              trace :=
+                (read_transition.invocation.Trace.Complete
+                  preflight
+                  final_effect),
+              progress :=
+                (read_transition.invocation.Progress.Uncertain preflight)
+          })
+      else
+        ok (r,
+          {
+            self
+              with
+              trace :=
+                (read_transition.invocation.Trace.Complete
+                  preflight
+                  final_effect),
+              progress := read_transition.invocation.Progress.Halted
+          })
+  | read_transition.invocation.Progress.Uncertain _ =>
+    read_transition.invocation.Invocation.reject Clause0_Output RequestInst
+      self
+  | read_transition.invocation.Progress.Finished =>
+    read_transition.invocation.Invocation.reject Clause0_Output RequestInst
+      self
+  | read_transition.invocation.Progress.Halted =>
+    read_transition.invocation.Invocation.reject Clause0_Output RequestInst
+      self
+
+/-- [aivm_secrets_garrett_core::read_transition::invocation::{aivm_secrets_garrett_core::read_transition::invocation::Invocation<R>}::outcome_unknown]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 230:4-241:5 -/
+def read_transition.invocation.Invocation.outcome_unknown
+  {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
+  read_transition.Request R Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error) (self : read_transition.invocation.Invocation R) :
+  Result (Clause0_Error × (read_transition.invocation.Invocation R))
+  := do
+  match self.progress with
+  | read_transition.invocation.Progress.Start =>
+    let t ← RequestInst.INVALID_TRANSITION
+    ok (t,
+      { self with progress := read_transition.invocation.Progress.Halted })
+  | read_transition.invocation.Progress.Empty =>
+    let t ← RequestInst.INVALID_TRANSITION
+    ok (t,
+      { self with progress := read_transition.invocation.Progress.Halted })
+  | read_transition.invocation.Progress.Preflight =>
+    let t ← RequestInst.INVALID_TRANSITION
+    ok (t,
+      { self with progress := read_transition.invocation.Progress.Halted })
+  | read_transition.invocation.Progress.FinalPlan _ =>
+    let t ← RequestInst.INVALID_TRANSITION
+    ok (t,
+      { self with progress := read_transition.invocation.Progress.Halted })
+  | read_transition.invocation.Progress.Current _ _ =>
+    let t ← RequestInst.INVALID_TRANSITION
+    ok (t,
+      { self with progress := read_transition.invocation.Progress.Halted })
+  | read_transition.invocation.Progress.WriteKind _ =>
+    let t ← RequestInst.INVALID_TRANSITION
+    ok (t,
+      { self with progress := read_transition.invocation.Progress.Halted })
+  | read_transition.invocation.Progress.FinalDispatch _ _ =>
+    let t ← RequestInst.INVALID_TRANSITION
+    ok (t,
+      { self with progress := read_transition.invocation.Progress.Halted })
+  | read_transition.invocation.Progress.Complete _ _ _ =>
+    let t ← RequestInst.INVALID_TRANSITION
+    ok (t,
+      { self with progress := read_transition.invocation.Progress.Halted })
+  | read_transition.invocation.Progress.Uncertain preflight =>
+    let t ← RequestInst.outcome_unknown self.adapter
+    ok (t,
+      {
+        self
+          with
+          trace := (read_transition.invocation.Trace.Uncertain preflight),
+          progress := read_transition.invocation.Progress.Halted
+      })
+  | read_transition.invocation.Progress.Finished =>
+    let t ← RequestInst.INVALID_TRANSITION
+    ok (t,
+      { self with progress := read_transition.invocation.Progress.Halted })
+  | read_transition.invocation.Progress.Halted =>
+    let t ← RequestInst.INVALID_TRANSITION
+    ok (t, self)
+
+/-- [aivm_secrets_garrett_core::read_transition::invocation::{aivm_secrets_garrett_core::read_transition::invocation::Invocation<R>}::into_result]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 244:4-255:5
+    Visibility: public -/
+def read_transition.invocation.Invocation.into_result
+  {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
+  read_transition.Request R Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error) (self : read_transition.invocation.Invocation R)
+  (result : core.result.Result Clause0_Output Clause0_Error) :
+  Result (core.result.Result Clause0_Output Clause0_Error)
+  := do
+  match result with
+  | core.result.Result.Ok _ =>
+    let b ←
+      match self.progress with
+      | read_transition.invocation.Progress.Start => ok false
+      | read_transition.invocation.Progress.Empty => ok false
+      | read_transition.invocation.Progress.Preflight => ok false
+      | read_transition.invocation.Progress.FinalPlan _ => ok false
+      | read_transition.invocation.Progress.Current _ _ => ok false
+      | read_transition.invocation.Progress.WriteKind _ => ok false
+      | read_transition.invocation.Progress.FinalDispatch _ _ => ok false
+      | read_transition.invocation.Progress.Complete _ _ _ => ok false
+      | read_transition.invocation.Progress.Uncertain _ => ok false
+      | read_transition.invocation.Progress.Finished => ok true
+      | read_transition.invocation.Progress.Halted => ok false
+    if b
+    then ok result
+    else let t ← RequestInst.INVALID_TRANSITION
+         ok (core.result.Result.Err t)
+  | core.result.Result.Err _ => ok result
+
 /-- [aivm_secrets_garrett_core::read_transition::{impl core::clone::Clone for aivm_secrets_garrett_core::read_transition::Phase}::clone]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 12:9-12:14
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 15:9-15:14
     Visibility: public -/
 def read_transition.Phase.Insts.CoreCloneClone.clone
   (self : read_transition.Phase) : Result read_transition.Phase := do
   ok self
 
 /-- Trait implementation: [aivm_secrets_garrett_core::read_transition::{impl core::clone::Clone for aivm_secrets_garrett_core::read_transition::Phase}]
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 12:9-12:14 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 15:9-15:14 -/
 @[reducible]
 def read_transition.Phase.Insts.CoreCloneClone : core.clone.Clone
   read_transition.Phase := {
@@ -4131,7 +4888,7 @@ def read_transition.Phase.Insts.CoreCloneClone : core.clone.Clone
 }
 
 /-- Trait implementation: [aivm_secrets_garrett_core::read_transition::{impl core::marker::Copy for aivm_secrets_garrett_core::read_transition::Phase}]
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 12:16-12:20 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 15:16-15:20 -/
 @[reducible]
 def read_transition.Phase.Insts.CoreMarkerCopy : core.marker.Copy
   read_transition.Phase := {
@@ -4139,7 +4896,7 @@ def read_transition.Phase.Insts.CoreMarkerCopy : core.marker.Copy
 }
 
 /-- [aivm_secrets_garrett_core::read_transition::{impl core::fmt::Debug for aivm_secrets_garrett_core::read_transition::Phase}::fmt]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 12:22-12:27
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 15:22-15:27
     Visibility: public -/
 def read_transition.Phase.Insts.CoreFmtDebug.fmt
   (self : read_transition.Phase) (f : core.fmt.Formatter) :
@@ -4152,7 +4909,7 @@ def read_transition.Phase.Insts.CoreFmtDebug.fmt
     core.fmt.Formatter.write_str f (toStr "Final")
 
 /-- Trait implementation: [aivm_secrets_garrett_core::read_transition::{impl core::fmt::Debug for aivm_secrets_garrett_core::read_transition::Phase}]
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 12:22-12:27 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 15:22-15:27 -/
 @[reducible]
 def read_transition.Phase.Insts.CoreFmtDebug : core.fmt.Debug
   read_transition.Phase := {
@@ -4160,14 +4917,14 @@ def read_transition.Phase.Insts.CoreFmtDebug : core.fmt.Debug
 }
 
 /-- Trait implementation: [aivm_secrets_garrett_core::read_transition::{impl core::marker::StructuralPartialEq for aivm_secrets_garrett_core::read_transition::Phase}]
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 12:29-12:38 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 15:29-15:38 -/
 @[reducible]
 def read_transition.Phase.Insts.CoreMarkerStructuralPartialEq :
   core.marker.StructuralPartialEq read_transition.Phase := {
 }
 
 /-- [aivm_secrets_garrett_core::read_transition::{impl core::cmp::PartialEq<aivm_secrets_garrett_core::read_transition::Phase> for aivm_secrets_garrett_core::read_transition::Phase}::eq]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 12:29-12:38
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 15:29-15:38
     Visibility: public -/
 def read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq
   (self : read_transition.Phase) (other : read_transition.Phase) :
@@ -4178,7 +4935,7 @@ def read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq
   ok (self1 = other1)
 
 /-- Trait implementation: [aivm_secrets_garrett_core::read_transition::{impl core::cmp::PartialEq<aivm_secrets_garrett_core::read_transition::Phase> for aivm_secrets_garrett_core::read_transition::Phase}]
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 12:29-12:38 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 15:29-15:38 -/
 @[reducible]
 impl_def read_transition.Phase.Insts.CoreCmpPartialEqPhase : core.cmp.PartialEq
   read_transition.Phase read_transition.Phase := {
@@ -4188,7 +4945,7 @@ impl_def read_transition.Phase.Insts.CoreCmpPartialEqPhase : core.cmp.PartialEq
 }
 
 /-- Trait implementation: [aivm_secrets_garrett_core::read_transition::{impl core::cmp::Eq for aivm_secrets_garrett_core::read_transition::Phase}]
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 12:40-12:42 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 15:40-15:42 -/
 @[reducible]
 def read_transition.Phase.Insts.CoreCmpEq : core.cmp.Eq read_transition.Phase
   := {
@@ -4196,7 +4953,7 @@ def read_transition.Phase.Insts.CoreCmpEq : core.cmp.Eq read_transition.Phase
 }
 
 /-- [aivm_secrets_garrett_core::read_transition::{aivm_secrets_garrett_core::read_transition::Phase}::as_str]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 19:4-24:5
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 22:4-27:5
     Visibility: public -/
 def read_transition.Phase.as_str
   (self : read_transition.Phase) : Result Str := do
@@ -4205,21 +4962,21 @@ def read_transition.Phase.as_str
   | read_transition.Phase.Final => ok (toStr "final")
 
 /-- [aivm_secrets_garrett_core::read_transition::Prepared]
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 27:0-30:1
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 30:0-33:1
     Visibility: public -/
 structure read_transition.Prepared where
   phase : read_transition.Phase
   write : Bool
 
 /-- [aivm_secrets_garrett_core::read_transition::Audited]
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 32:0-35:1
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 35:0-38:1
     Visibility: public -/
 structure read_transition.Audited where
   phase : read_transition.Phase
   write : Bool
 
 /-- [aivm_secrets_garrett_core::read_transition::prepare]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 40:0-52:1
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 43:0-55:1
     Visibility: public -/
 def read_transition.prepare
   (phase : read_transition.Phase) (admitted_operation_write : Bool)
@@ -4241,14 +4998,14 @@ def read_transition.prepare
   else ok (core.result.Result.Ok { phase, write := effect_write })
 
 /-- [aivm_secrets_garrett_core::read_transition::{aivm_secrets_garrett_core::read_transition::Prepared}::phase]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 55:4-57:5
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 58:4-60:5
     Visibility: public -/
 def read_transition.Prepared.impl.phase
   (self : read_transition.Prepared) : Result read_transition.Phase := do
   ok self.phase
 
 /-- [aivm_secrets_garrett_core::read_transition::acknowledge]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 63:0-71:1
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 66:0-74:1
     Visibility: public -/
 def read_transition.acknowledge
   (prepared : read_transition.Prepared) (ack : Bool) :
@@ -4261,21 +5018,21 @@ def read_transition.acknowledge
   else ok (core.result.Result.Err Denial.InvalidCapability)
 
 /-- [aivm_secrets_garrett_core::read_transition::{aivm_secrets_garrett_core::read_transition::Audited}::phase]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 74:4-76:5
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 77:4-79:5
     Visibility: public -/
 def read_transition.Audited.impl.phase
   (self : read_transition.Audited) : Result read_transition.Phase := do
   ok self.phase
 
 /-- [aivm_secrets_garrett_core::read_transition::{aivm_secrets_garrett_core::read_transition::Audited}::is_write]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 78:4-80:5
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 81:4-83:5
     Visibility: public -/
 def read_transition.Audited.is_write
   (self : read_transition.Audited) : Result Bool := do
   ok self.write
 
 /-- [aivm_secrets_garrett_core::read_transition::CompletionPhase]
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 86:0-89:1
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 89:0-92:1
     Visibility: public -/
 @[discriminant isize]
 inductive read_transition.CompletionPhase where
@@ -4283,7 +5040,7 @@ inductive read_transition.CompletionPhase where
 | BeforeRelease : read_transition.CompletionPhase
 
 /-- Trait declaration: [aivm_secrets_garrett_core::read_transition::Completion]
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 91:0-97:1
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 94:0-100:1
     Visibility: public -/
 structure read_transition.Completion (Self : Type _) (Self_Output : Type _)
   (Self_Error : Type _) where
@@ -4293,7 +5050,7 @@ structure read_transition.Completion (Self : Type _) (Self_Output : Type _)
   release : Self → Result (core.result.Result Self_Output Self_Error)
 
 /-- [aivm_secrets_garrett_core::read_transition::complete_current]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 99:0-113:1
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 102:0-116:1
     Visibility: public -/
 def read_transition.complete_current
   {C : Type _} {Clause0_Output : Type _} {Clause0_Error : Type _}
@@ -4317,94 +5074,116 @@ def read_transition.complete_current
     | core.result.Result.Err error => ok (core.result.Result.Err error)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
-/-- Trait declaration: [aivm_secrets_garrett_core::read_transition::Request]
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 119:0-133:1
-    Visibility: public -/
-structure read_transition.Request (Self : Type _) (Self_Facts : Type _)
-  (Self_Effect : Type _) (Self_Output : Type _) (Self_Error : Type _) where
-  preflight : Self → Result (core.result.Result (Option Self_Effect)
-    Self_Error)
-  empty_facts : Self → Result Self_Facts
-  dispatch : Self → read_transition.Phase → Self_Effect → Result
-    (core.result.Result Self_Facts Self_Error)
-  final_effect : Self → Self_Facts → Result (core.result.Result (Option
-    Self_Effect) Self_Error)
-  recheck : Self → Result (core.result.Result Unit Self_Error)
-  effect_write : Self → Self_Effect → Result Bool
-  complete : Self → Self_Facts → Result (core.result.Result Self_Output
-    Self_Error)
-  outcome_unknown : Self → Result Self_Error
-
 /-- [aivm_secrets_garrett_core::read_transition::request_facts]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 135:0-141:1 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 139:0-145:1 -/
 def read_transition.request_facts
   {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
   {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
   read_transition.Request R Clause0_Facts Clause0_Effect Clause0_Output
-  Clause0_Error) (ops : R) :
-  Result (core.result.Result Clause0_Facts Clause0_Error)
+  Clause0_Error) (ops : read_transition.invocation.Invocation R) :
+  Result ((core.result.Result Clause0_Facts Clause0_Error) ×
+    (read_transition.invocation.Invocation R))
   := do
-  let r ← RequestInst.preflight ops
+  let (r, ops1) ←
+    read_transition.invocation.Invocation.preflight RequestInst ops
   match r with
   | core.result.Result.Ok o =>
     match o with
     | none =>
-      let t ← RequestInst.empty_facts ops
-      ok (core.result.Result.Ok t)
+      read_transition.invocation.Invocation.empty_facts RequestInst ops1
     | some effect =>
-      RequestInst.dispatch ops read_transition.Phase.Preflight effect
-  | core.result.Result.Err error => ok (core.result.Result.Err error)
+      read_transition.invocation.Invocation.dispatch RequestInst ops1
+        read_transition.Phase.Preflight effect
+  | core.result.Result.Err error => ok (core.result.Result.Err error, ops1)
 
 /-- [aivm_secrets_garrett_core::read_transition::finish_request]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 143:0-171:1 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 147:0-181:1 -/
 def read_transition.finish_request
   {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
   {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
   read_transition.Request R Clause0_Facts Clause0_Effect Clause0_Output
-  Clause0_Error) (ops : R) (facts : Clause0_Facts) :
-  Result (core.result.Result Clause0_Output Clause0_Error)
+  Clause0_Error) (ops : read_transition.invocation.Invocation R)
+  (facts : Clause0_Facts) :
+  Result ((core.result.Result Clause0_Output Clause0_Error) ×
+    (read_transition.invocation.Invocation R))
   := do
-  let r ← RequestInst.final_effect ops facts
+  let (r, ops1) ←
+    read_transition.invocation.Invocation.final_effect RequestInst ops facts
   match r with
   | core.result.Result.Ok effect =>
-    let r1 ← RequestInst.recheck ops
+    let (r1, ops2) ←
+      read_transition.invocation.Invocation.recheck RequestInst ops1
     match r1 with
     | core.result.Result.Ok _ =>
       match effect with
-      | none => RequestInst.complete ops facts
+      | none =>
+        read_transition.invocation.Invocation.complete RequestInst ops2 facts
       | some effect1 =>
-        let write ← RequestInst.effect_write ops effect1
-        let r2 ← RequestInst.dispatch ops read_transition.Phase.Final effect1
+        let (r2, ops3) ←
+          read_transition.invocation.Invocation.effect_write RequestInst ops2
+            effect1
         match r2 with
-        | core.result.Result.Ok raw =>
-          if write
-          then
-            let r3 ← RequestInst.complete ops raw
-            match r3 with
-            | core.result.Result.Ok _ => ok r3
-            | core.result.Result.Err _ =>
-              let t ← RequestInst.outcome_unknown ops
-              ok (core.result.Result.Err t)
-          else RequestInst.complete ops raw
-        | core.result.Result.Err error => ok (core.result.Result.Err error)
-    | core.result.Result.Err error => ok (core.result.Result.Err error)
-  | core.result.Result.Err error => ok (core.result.Result.Err error)
+        | core.result.Result.Ok write =>
+          let (r3, ops4) ←
+            read_transition.invocation.Invocation.dispatch RequestInst ops3
+              read_transition.Phase.Final effect1
+          match r3 with
+          | core.result.Result.Ok raw =>
+            if write
+            then
+              let (r4, ops5) ←
+                read_transition.invocation.Invocation.complete RequestInst ops4
+                  raw
+              match r4 with
+              | core.result.Result.Ok _ => ok (r4, ops5)
+              | core.result.Result.Err _ =>
+                let (t, ops6) ←
+                  read_transition.invocation.Invocation.outcome_unknown
+                    RequestInst ops5
+                ok (core.result.Result.Err t, ops6)
+            else
+              read_transition.invocation.Invocation.complete RequestInst ops4
+                raw
+          | core.result.Result.Err error =>
+            ok (core.result.Result.Err error, ops4)
+        | core.result.Result.Err error =>
+          ok (core.result.Result.Err error, ops3)
+    | core.result.Result.Err error => ok (core.result.Result.Err error, ops2)
+  | core.result.Result.Err error => ok (core.result.Result.Err error, ops1)
 
 /-- [aivm_secrets_garrett_core::read_transition::request_current]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 173:0-178:1
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 183:0-188:1
     Visibility: public -/
 def read_transition.request_current
   {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
   {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
   read_transition.Request R Clause0_Facts Clause0_Effect Clause0_Output
-  Clause0_Error) (ops : R) :
-  Result (core.result.Result Clause0_Output Clause0_Error)
+  Clause0_Error) (ops : read_transition.invocation.Invocation R) :
+  Result ((core.result.Result Clause0_Output Clause0_Error) ×
+    (read_transition.invocation.Invocation R))
   := do
-  let r ← read_transition.request_facts RequestInst ops
+  let (r, ops1) ← read_transition.request_facts RequestInst ops
   match r with
   | core.result.Result.Ok facts =>
-    read_transition.finish_request RequestInst ops facts
-  | core.result.Result.Err error => ok (core.result.Result.Err error)
+    read_transition.finish_request RequestInst ops1 facts
+  | core.result.Result.Err error => ok (core.result.Result.Err error, ops1)
+
+/-- [aivm_secrets_garrett_core::read_transition::run_current]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 191:0-195:1
+    Visibility: public -/
+def read_transition.run_current
+  {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
+  read_transition.Request R Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error) (adapter : R) :
+  Result (core.result.Result Clause0_Output Clause0_Error)
+  := do
+  let invocation ←
+    read_transition.invocation.Invocation.new RequestInst adapter
+  let (result, invocation1) ←
+    read_transition.request_current RequestInst invocation
+  read_transition.invocation.Invocation.into_result RequestInst invocation1
+    result
 
 /-- [aivm_secrets_garrett_core::rebinding::Target]
     Source: 'crates/aivm-secrets-garrett-core/src/rebinding.rs', lines 6:0-12:1

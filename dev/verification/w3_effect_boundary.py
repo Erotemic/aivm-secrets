@@ -107,7 +107,7 @@ def review_semantics(contents: dict[str, str]) -> None:
     control = part(m, 'pub(super) fn control(', '\nfn manifest_request_bytes(')
     dispatch = part(request, 'let dispatch = |prepared: PreparedDispatch', 'let release = |raw: Value|')
     release = part(request, 'let release = |raw: Value| -> Outcome<CompletedRelease> {', 'let pending = PendingRequest {')
-    plan = part(request, 'let pending = PendingRequest {', 'read_transition::request_current(&pending)')
+    plan = part(request, 'let pending = PendingRequest {', 'read_transition::run_current(pending)')
     reviewed = part(m, "impl<'a> PreparedDispatch<'a> {", 'pub(crate) struct Session {')
     require('struct PreparedDispatch<' in m and 'Phase as DispatchPhase' in m
             and 'struct AuditedDispatch<' in m and m.count('AuditedDispatch {') == 1,
@@ -176,7 +176,7 @@ def review_semantics(contents: dict[str, str]) -> None:
                        'pending.release()') and
             completion.count('Err(error) => return Err(error)') == 3,
             'completion bypasses current authority, audit or post-audit freshness')
-    require(request.count('read_transition::request_current(&pending).map(CompletedRelease::into_public)') == 1
+    require(request.count('read_transition::run_current(pending).map(CompletedRelease::into_public)') == 1
             and 'complete: release,' in plan and 'fresh: &fresh,' in plan
             and 'fresh: &fresh,' in release,
             'guest result bypasses audited release or sent-write uncertainty')
@@ -196,6 +196,19 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'None => (facts, false)' in orchestration
             and 'Ok(raw) => (raw, write)' in orchestration,
             'extracted request bypasses provider outcomes, fresh admission or exact completion input')
+    invocations = contents['rust/crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs']
+    require('mod invocation;' in transition and 'pub use invocation::{Invocation, Trace};' in transition
+            and same_order(orchestration, 'pub fn run_current<', 'Invocation::new(adapter)',
+                           'request_current(&mut invocation)', 'invocation.into_result(result)')
+            and 'pub adapter:' not in invocations and 'adapter: R,' in invocations,
+            'request invocation receipt or private adapter/consuming gate bypassed')
+    require(invocations.count('self.adapter.') == 8 and
+            all(invocations.count('self.adapter.' + name + '(') == 1 for name in
+                ('preflight', 'empty_facts', 'dispatch', 'final_effect', 'recheck',
+                 'effect_write', 'complete', 'outcome_unknown')) and
+            'self.progress = Progress::Halted;\n        Err(R::INVALID_TRANSITION)' in invocations and
+            'if matches!(self.progress, Progress::Finished)' in invocations,
+            'reviewed invocation wrapper/callback multiplicity or terminal gate changed')
     adapter = part(m, 'impl<P, D, F, C, R> read_transition::Request', 'pub(crate) struct Session {')
     require('fn effect_write(&self, effect: &Effect) -> bool' in adapter
             and 'effect.write' in adapter and 'Error::OutcomeUnknown' in adapter

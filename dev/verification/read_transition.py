@@ -4,7 +4,8 @@
 By default, regenerate the core with pinned Charon/Aeneas and compare the
 entire generated module before compiling the proof. --no-regenerate is useful
 while editing the Lean proof, but does not establish fresh source linkage.
-This is NR-1 decision/data-flow preservation, not native request/I/O simulation.
+Checks decisions, data flow, mutable invocation receipts and the consuming
+entry gate. Raw callback/native I/O simulation remains a separate obligation.
 """
 from __future__ import annotations
 
@@ -33,6 +34,14 @@ THEOREMS = (
     'final_provider_failure_stops_completion', 'final_read_continuation',
     'checked_only_continuation', 'sent_write_completion_failure_is_uncertain',
     'two_phase_read_successful_witness',
+    'constructor_starts_empty',
+    'run_current_success_iff',
+    'successful_request_receipt',
+    'finished_dispatch_is_rejected',
+    'invalid_progress_rejects_saved_success',
+    'ignored_extra_dispatch_rejects_saved_reply',
+    'halted_dispatch_is_rejected',
+    'unfinished_value_is_not_public',
 )
 
 
@@ -67,11 +76,15 @@ def main() -> None:
     lean_step.run([lake, 'env', 'lean', '-DwarningAsError=true', '-o', str(output),
                    'GarrettReadTransition.lean'], directory,
                   'production transition and orchestration preservation')
+    output = directory / '.lake/build/lib/lean/GarrettReadInvocations.olean'
+    lean_step.run([lake, 'env', 'lean', '-DwarningAsError=true', '-o', str(output),
+                   'GarrettReadInvocations.lean'], directory,
+                  'stateful production invocation and consuming reply gate')
     # Keep the axiom report separate from the proof source and normal compiler
     # output. A successful import alone cannot replace the named axiom audit.
     with tempfile.TemporaryDirectory(prefix='read-transition-', dir=directory / '.lake') as scratch:
         check = Path(scratch) / 'Audit.lean'
-        check.write_text('import GarrettReadTransition\n' + ''.join(
+        check.write_text('import GarrettReadInvocations\n' + ''.join(
             f'#print axioms {NAMESPACE}{name}\n' for name in THEOREMS))
         audit(lean_step.run([lake, 'env', 'lean', '-DwarningAsError=true', str(check)],
                             directory, 'named theorem axiom audit'))

@@ -133,6 +133,7 @@ where
     type Effect = Effect;
     type Output = CompletedRelease;
     type Error = Error;
+    const INVALID_TRANSITION: Error = Error::InternalError;
 
     fn preflight(&self) -> Outcome<Option<Effect>> {
         (self.preflight)()
@@ -551,7 +552,7 @@ impl Session {
             complete: release,
             fresh: &fresh,
         };
-        read_transition::request_current(&pending).map(CompletedRelease::into_public)
+        read_transition::run_current(pending).map(CompletedRelease::into_public)
     }
     pub(super) fn control(
         &mut self,
