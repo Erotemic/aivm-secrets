@@ -1,5 +1,12 @@
 # NR-1A: production manifest dispatch-phase transition
 
+**October 20 validation update:** the consolidation at `aeae955` compiled the
+native adapter and re-extracted the actual `prepare`/`acknowledge` definitions.
+The frozen system, ordinary release workflow and offline operator/guest gates
+passed; see [the acceptance record](../../dev/validation/2026-10-20-main-reconciliation.json).
+The next preservation/simulation proof remains pending. The original overlay
+handoff below describes its earlier authoring environment and proposed checks.
+
 ## Implemented in this overlay
 
 - Extractable pure Rust `read_transition::prepare(phase, admitted_operation_write,

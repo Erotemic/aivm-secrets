@@ -11,6 +11,12 @@ The unfinished local response-admission experiment is preserved in commit
 accepted main work. In particular, its old EOF/204 behavior must not replace
 the maintainer's newer explicit-framing and header-terminated 204 repair.
 
+All older worktrees were also clean. The abstract resource-lease experiment
+remains at `10800c5` on `garrett-review-checkpoint`; it is deferred under the
+current implementation-linked priorities. Earlier dispatch source work is
+already carried by main's `323a3e2`; its old fork and review journals remain
+preserved, without merging duplicate code or historical acceptance notes.
+
 The consolidation takes only its reproduced runtime repairs and 30 process
 and reference tests: both native response parsers require exactly three ASCII
 status digits, the reason-phrase separator, valid reason bytes, and ASCII

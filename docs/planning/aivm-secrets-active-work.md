@@ -7,6 +7,13 @@ read [Native read-profile assurance roadmap](aivm-secrets-native-read-assurance-
 [the October 19 history archive](aivm-secrets-active-work-history-2026-10-19.md);
 that archive is not a second current task queue.
 
+**October 20 acceptance update:** source `aeae955` preserves the maintainer's
+21 incoming commits and passes 2,976 full-suite tests, 543 required workflows
+in both build modes, packaging, the offline native product witness and scoped
+Lean checks. See the [frozen validation record](../../dev/validation/2026-10-20-main-reconciliation.json)
+and [consolidation notes](../main-reconciliation-2026-10-20.md). The priority
+order below is unchanged; NR-1 preservation/simulation remains the next task.
+
 ## Goal and present assurance level
 
 Garrett should let an untrusted guest perform **useful, explicitly authorized**
@@ -23,10 +30,9 @@ As of this reconciliation:
 - **Functioning code:** Python and Rust synthetic broker/guest workflows,
   host-side custody, surrogate/certificate binding, native policy-controlled
   manifest requests, audited dispatch, late admission, completed-release gating,
-  selected disclosure and JSONL guest replies exist. Native and full-suite
-  acceptance have been reported passing by the maintainer during this campaign;
-  the latest user checkout, commit and exact pass logs are **not frozen in this
-  document**. New agents must establish them before claiming a fresh baseline.
+  selected disclosure and JSONL guest replies exist. The October 20 record
+  freezes actual native/full-suite acceptance at `aeae955`. It certifies only
+  its recorded source and checks; later revisions require fresh validation.
 - **Finite implementation evidence:** independent W6 oracles and native process
   tests cover successful no-preflight/checked-only/two-phase reads, selected
   result and pagination metadata, provider failures, private diagnostic
@@ -34,9 +40,9 @@ As of this reconciliation:
   history. Some new native cases were rerun during follow-up debugging; a
   passing *portable* check must never substitute for running required native
   cases without skips.
-- **Kernel-checked models:** the maintainer reported that focused
-  `python dev/verification/read_prefixes.py prove` passed after repairing
-  `GarrettReadPaths.lean`. Its W4/W5 prerequisites and the scoped eight
+- **Kernel-checked models:** the frozen October 20 run passed
+  `python dev/verification/read_prefixes.py prove` after repairing a kernel
+  recursion failure in the read-prefix list proof. Its W4/W5 prerequisites and the scoped eight
   read-path and five read-prefix theorem sets are **abstract and conditional**.
   `read_paths.py check` and `read_prefixes.py check` deliberately still say
   "kernel required/pending": those portable actions inspect *source*, do not
@@ -107,12 +113,9 @@ to grow source guards.
 
 | Priority | Work package | Deliverable / acceptance evidence | State |
 | --- | --- | --- | --- |
-| **P0 / NR-0** | Freeze native read profile and evidence baseline | Identify the checked-out commit, exact source/feature profile, full list of guest and provider effects, verified successful/denied synthetic witnesses and reproducible focused gates. Name all excluded configurations. | **Evidence freeze implemented, acceptance pending**; 30 source pins, all W0 sinks, and targeted no-skip native/Lean gate in [NR-0 record](aivm-secrets-native-read-nr0-evidence.md). Actual checkout native and Lean run still required; not a proof |
-| **P0 / guest utility** | Reproduce the actual standalone guest-to-broker workflow offline, beyond internal Rust test fixtures | A documented operator+guest run with a synthetic host-held credential, a permitted selected GitHub-shaped read, broker-denied write, host audit, no credential in the distributed guest files, and a revocation check | **Runnable operator CLI implemented; native acceptance pending**: `python dev/offline_native_guest.py`, [`docs/offline-native-operator-guest.md`](../offline-native-operator-guest.md). Source and portable TLS/policy tests pass; no standalone Rust execution was available in the authoring environment. Same-UID demo is not isolation. |
-| **P0 / NR-1** | Connect real Rust read orchestration to a small extractable transition kernel | Production `Session::request` uses a single checked transition interface with explicit external audit, authority, provider and release outcomes. Extract the *same* Rust decisions to Lean and prove the first preservation/simulation lemma. | **NR-1A source seam implemented, native compile and extraction pending:**
-`read_transition::prepare` and `acknowledge` are called by `PreparedDispatch`
-in the production manifest adapter; phase and write authority are carried through
-an opaque core value. This is not yet a Lean extraction/simulation or complete NR-1. |
+| **P0 / NR-0** | Freeze native read profile and evidence baseline | Identify the checked-out commit, exact source/feature profile, full list of guest and provider effects, verified successful/denied synthetic witnesses and reproducible focused gates. Name all excluded configurations. | **Baseline locally accepted at `aeae955`**: 31 source pins, all W0 sinks, no-skip native workflows and focused Lean checks passed in the October 20 record. Inventory and tests remain evidence, not native I/O refinement |
+| **P0 / guest utility** | Reproduce the actual standalone guest-to-broker workflow offline, beyond internal Rust test fixtures | A documented operator+guest run with a synthetic host-held credential, a permitted selected GitHub-shaped read, broker-denied write, host audit, no credential in the distributed guest files, and a revocation check | **Native witness passed at `aeae955` in both builds**: `python dev/offline_native_guest.py`, [workflow documentation](../offline-native-operator-guest.md). Selected reads, denied write, credential absence in guest files and revocation succeeded. Same-UID demo is not isolation. |
+| **P0 / NR-1** | Connect real Rust read orchestration to a small extractable transition kernel | Production `Session::request` uses a single checked transition interface with explicit external audit, authority, provider and release outcomes. Extract the *same* Rust decisions to Lean and prove the first preservation/simulation lemma. | **NR-1A native seam compiled and extracted at `aeae955`; preservation/simulation pending.** Production `PreparedDispatch` calls the actual `read_transition::prepare` and `acknowledge`; this is not complete NR-1. |
 | **P0 / NR-2** | Establish admission/audit/send/release forward simulation | Relate extracted steps to `GarrettReadPaths`/`GarrettReadPrefixes` events for successful, failed and audited-but-unsent final-only, checked-only and two-phase reads. Include host-state/identity continuity and an authorized successful witness. | **Open**, depends on NR-1 |
 | **P0 / NR-3** | Close W3/W6 actual-I/O boundary for the restricted native profile | Enumerate guest-reachable effectful call paths (including callback, error, drop and dependency boundaries). Prove source-owned paths or assign explicit external contracts. Relate emitted HTTP/audit/guest frames to modeled events and acknowledge ambiguity of partial sends. | **Open**; develop alongside NR-1/2, final integration depends on both |
 | **P1 / NR-4** | Complete W5 guest observation/declassification correspondence | Define exact public response fields, errors, metadata, reflection-denial bit, lengths/close behavior and adaptive sequential input model. Prove only the relational property supported by explicit declassification premises; list excluded channels. | **Open**; depends on NR-2/3 |

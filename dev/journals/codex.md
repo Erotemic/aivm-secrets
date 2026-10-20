@@ -1882,3 +1882,34 @@ and is not being merged into casually. Remaining risks are native compile/Lean
 failures in the incoming work, stale evidence coordinates, and unintended
 parser changes. Full native/full-suite, package and ordinary-feature checks are
 required before calling main ready. No push or live provider/VM action is planned.
+
+## 2026-10-20 00:59:43 -0400
+
+Consolidation reached a reviewable stopping point. The frozen source aeae955
+builds directly on the maintainer's f15b852 and preserves all 21 incoming
+commits. All older worktrees were clean; the abstract resource-lease checkpoint
+10800c5 stays deferred, while earlier dispatch code is already carried by main's
+323a3e2. I am confident nothing was clobbered and that the current implementation
+has substantially better acceptance evidence than either working tree alone.
+
+The combined gate passed 2,976 tests with zero skips, 543 required workflows in
+both conformance and ordinary release builds, and the real native offline
+operator/guest demo in both builds. Packaging contains all 250 pinned inputs
+and the newly included proof/demo files. Regeneration, the 400-name existing
+audit, strict Rust lint, and scoped eight read-path/five read-prefix kernel
+checks passed. The incoming read-prefix list proof originally exceeded kernel
+recursion depth; using the existing per-step theorem through List.map_congr_left
+fixed it without weakening the statement or increasing limits. CI now installs
+the checkout editably to satisfy the incoming isolated-import source check;
+the local environment was corrected too. Full logs and artifact hashes are
+recorded in dev/validation/2026-10-20-main-reconciliation.json.
+
+The response scanner/corpus and unfinished prefix proof remain preserved on
+codex/response-admission-wip-20261020 at cc69a4d, with only the 30-case tested
+status/OWS repair ported. This restraint matters: that old rewrite would undo
+the maintainer's newer HTTP framing and 204 behavior. Compilation/extraction
+of the production read seam is now established, but its preservation/simulation
+lemma, native I/O mediation, whole-service observation correspondence, real
+provider/VM evidence and independent review remain open. Those limits still
+make me cautious about security claims. The current priority queue is retained;
+no new feature campaign or push has been started during reconciliation.
