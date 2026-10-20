@@ -8,6 +8,17 @@ specifies the first campaign's technical scope, dependencies, deliverables and
 exit gates. The earlier running commentary was archived as
 [historical work](aivm-secrets-active-work-history-2026-10-19.md).
 
+**Priority guardrail:** This is a means to the original goal: an agent
+actually uses a host-held credential for narrowly authorized work without
+being given the credential. Keep the independent offline guest-to-broker
+workflow in the [active queue](aivm-secrets-active-work.md) as a parallel
+acceptance witness. Do not postpone all integration and operator usability
+until the final theorem, and do not promote additional inventories, source
+hashes, synthetic traces or unrelated abstract lemmas into new milestones.
+The next substantive assurance change must be **production-called Rust
+extraction**, followed by an implementation-linked simulation proof. NR-0
+is one baseline check, not a continuing evidence-generation campaign.
+
 ## 1. Target result and why it is still missing
 
 We want a **useful** broker: an untrusted native mTLS client can read the
@@ -173,7 +184,18 @@ secrecy conclusion as a premise.**
 
 ## 4. Work packages: owners, deliverables, dependencies, exit gates
 
-### NR-0 — Reproducible profile and evidence freeze (first task)
+### NR-0 — Reproducible profile and evidence freeze (prepared; maintainer replay pending)
+
+The [NR-0 evidence record](aivm-secrets-native-read-nr0-evidence.md),
+[machine-readable profile](aivm-secrets-native-read-nr0.json), and
+`dev/verification/native_read_profile.py` now pin the 30 source/proof/harness
+files, selected native fixture, all 14 W0 sink dispositions and eight native
+test nodes across six witness classes. Portable checks were reproduced on the
+reconstructed archive. **Exit remains open** until `--portable --native --lean`
+passes on the actual checked-out tree with recorded binary digests and zero
+skips; the fixture's ability to override `writes=deny` and remaining alternate
+backend/control channels are explicit boundaries, not proof of isolation.
+
 
 **Owner:** integration/security review. **Dependencies:** none.
 
@@ -385,7 +407,14 @@ close the production-to-model link first.
 
 ## 8. Immediate next-agent assignment
 
-**Issue: NR-0 — freeze and validate one executable native read profile.**
+**Issue: NR-0 acceptance replay, then NR-1 extraction.** The NR-0 source
+freeze and targeted runner now exist; first reproduce the maintainer native and
+Lean acceptance using the [NR-0 instructions](aivm-secrets-native-read-nr0-evidence.md).
+If hashes differ, review the exact change rather than automatically accepting
+new source. Then begin the first production-called Rust transition extraction
+in NR-1; the evidence record names the precise seam.
+
+**Original NR-0 acceptance definition:**
 Before extending any Lean theorem, reconcile the checked-out Rust/Lean
 revision and produce one compact provenance record for the chosen
 `manifest-https-v1`, `writes=deny`, software-identity read configuration.

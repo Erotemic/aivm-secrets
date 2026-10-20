@@ -1,10 +1,12 @@
 # Planning index: aivm-secrets / Garrett
 
+- [NR-0 native read evidence freeze](aivm-secrets-native-read-nr0-evidence.md) — pinned source/sink/fixture scope, fast reproducible acceptance, and NR-1 extraction handoff.
+
 For a new contributor or coding agent, read these in order:
 
 1. [Current priority and acceptance queue](aivm-secrets-active-work.md).
    **Only this file ranks current work.** It names the next NR-0 through NR-5
-   native read-assurance tasks.
+   native read-assurance tasks and a parallel offline guest-utility checkpoint.
 2. [Detailed native read assurance roadmap](aivm-secrets-native-read-assurance-roadmap.md).
    Task owners, Rust/Lean links, dependencies, trust boundaries, evidence types,
    exit criteria, acceptance commands and cross-agent handoffs.
