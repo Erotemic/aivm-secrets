@@ -9,7 +9,8 @@ Lean proofs now exist (see [the proof-scope records](../verified-composition.md)
 and [native disclosure](../verified-disclosure.md)). Whole-service
 information-flow verification, broad client parity, independent real-provider
 smoke tests and deployment/hardware isolation evidence remain open. For active
-priorities, use the [2026-10-17 task queue](aivm-secrets-active-work.md).
+priorities, use the [current task queue](aivm-secrets-active-work.md) and
+[native read assurance roadmap](aivm-secrets-native-read-assurance-roadmap.md).
 The [modular proof architecture](aivm-secrets-modular-proof-architecture.md)
 records the planned primitive package, Garrett protocol decomposition,
 and conditional proof-composition rules.
