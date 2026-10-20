@@ -20,6 +20,10 @@ completion controller. It closes full freshness checks after the last provider
 response and after completion audit. An opt-in installed-vTPM witness now
 exercises native CSR/enrollment/mTLS/provider use. This advances NR-1;
 provider-outcome/orchestration simulation and NR-2–NR-5 remain open.
+Source `304b5eb` passed 2,999 full-suite tests without skips, the 413-name
+Garrett axiom audit, four new re-extracted bypass mutants, scoped read proofs,
+both native product build modes and the five-case installed-vTPM witness.
+See the [increment validation record](../../dev/validation/2026-10-20-read-completion.json).
 
 ## Goal and present assurance level
 

@@ -1,0 +1,131 @@
+{
+  "schema": 1,
+  "status": "passed-for-listed-scopes",
+  "scope": "partial NR-1 dispatch/completion preservation and installed-vTPM witness",
+  "recorded_at": "2026-10-20T11:56:16.736605-04:00",
+  "source_commit": "304b5eb832674772d465fba2304360e723b385c0",
+  "source_dirty": false,
+  "source_sha256": {
+    "rust/crates/aivm-secrets-garrett-core/src/read_transition.rs": "8259237dd01317df2ebd9c6a4ab3c9dd9c8a29182662095e4b685d7b3059e63e",
+    "rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs": "a2d8efc0a301b694f7877f2851bd6e6c2e5b6aa84605fbfe03882d1ba2eb1b05",
+    "proofs/generated/AivmSecretsGarrettCore.lean": "1f5936fe78de82c319cf57fce30e088d0451d8d9228763ff5d145840882e300f",
+    "proofs/GarrettReadTransition.lean": "2216b837d9f03562c99700e16c5466c7aae154704bf24b1ca2aca0244c64a277",
+    "proofs/garrett-manifest.json": "9d7ef449aa5f0df5fc10a561dba04d0be5a2a8f57177f21418b8cd408b9dec7c",
+    "dev/verification/read_transition.py": "fabaef459709d21d24d53e7481261e6c55a701b551492c2ca71f80820d81bfed",
+    "dev/verification/tpm_device.py": "54f4495125b2dd5974ef1ca2afd135ff3d0370efc5659ad23b8965a3a77a4b34",
+    "tests/test_rust_coordination.py": "e8c7c7f6dc0ed31462f161537a79b60995b3105a2b38f1483e52a3876078a42a",
+    "tests/test_rust_garrett_manifest.py": "b166641bcc9f1715e95814ddb154edbf5509ad7927366339ad247fc66fb0ecc4",
+    "tests/test_rust_oauth_current_session.py": "532ade5fd939e1b9ec00b05b57be58b5a26ef9aa3c0c79386bb4266cbbcb4f5b",
+    "tests/test_rust_garrett_tpm.py": "d624314fb808f7f84e3a961add7637157d5231cb27dbc37303e1c758b3466ac1",
+    "tests/test_rust_garrett_tpm_request.py": "83979228258c255d1314580b5ef58aef1bd54892d0e0bf196c9f0c72230d938f"
+  },
+  "binary_sha256": {
+    "debug/garrett-authority": "687f9bc9a801d39a17d3ebdd37b3c728ffbc1df420f32d2f2ab895104559042c",
+    "debug/garrett-bridge": "e42c84d71f3637af6cc795dbeccddb0468d271c1f50970cdd706e459ba55e0b0",
+    "debug/garrett-client": "8db68e0f8da8093cfff91626b359f4afc17ee4400b6f94b3e925e91daa0996eb",
+    "release/garrett-authority": "f78039ea475eaee2dcc5fdcb187540d7fd430f93ecf4abfd2cc995f4110c567f",
+    "release/garrett-bridge": "c7c1acf6fe1e8f39007c0d49d8817f916d8d6a9e8c914ed187edd9e637ed7b82",
+    "release/garrett-client": "5fcd72e9641d43dbfce8aebad0defd77db0fe1187a6ccd27beb1d05a53aea069"
+  },
+  "validation_source_mode": "working-tree checks; source contents frozen in the recorded commit",
+  "commands": {
+    "install": ".venv/bin/python -m pip install -e .[tests]",
+    "freshness": ".venv/bin/python dev/verification/freshness.py record",
+    "rust": "cargo test --locked --manifest-path rust/Cargo.toml --workspace --features conformance,coordinator-server",
+    "extraction-proof": ".venv/bin/python dev/verification/read_transition.py",
+    "paths-prefixes": ".venv/bin/python dev/verification/read_prefixes.py prove",
+    "garrett": ".venv/bin/python dev/verification/garrett.py record",
+    "targeted-mutants": "PYTHONPATH=dev/verification .venv/bin/python -c \"import garrett; garrett.mutate('read transition')\"",
+    "full": ".venv/bin/python -m pytest -q --junitxml=/tmp/garrett-full.xml",
+    "build": ".venv/bin/python -m build",
+    "device": "sudo -n .venv/bin/python dev/verification/tpm_device.py --device /dev/tpmrm0",
+    "ordinary-build": "cargo build --locked --release --manifest-path rust/Cargo.toml --bins --features coordinator-server",
+    "offline": ".venv/bin/python dev/offline_native_guest.py [--bin-dir rust/target/release]",
+    "focused-native": ".venv/bin/python dev/verification/quick_w6_read.py --native"
+  },
+  "environment": {
+    "full_suite": "All garrett.RUNNERS plus freshness/primitives runners resolve to rust/target/debug; REQUIRE_TPM_TESTS=1; no TPM device override.",
+    "garrett_record": "Native release/all-features conformance runners; isolated swtpm negatives required.",
+    "ordinary": "Release binaries rebuilt with coordinator-server and without conformance; focused native variables select release paths.",
+    "tpm": "Only explicit device test process uses sudo. No ACL, hierarchy authorization or lockout-parameter changes."
+  },
+  "results": {
+    "full_python_native": {
+      "passed": 2999,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 556.66
+    },
+    "rust_workspace_tests": 58,
+    "garrett_record_native_cases": 759,
+    "garrett_named_axiom_audits": 413,
+    "new_extracted_obligations": 13,
+    "targeted_reextracted_rust_mutants_rejected": 4,
+    "read_path_obligations": 8,
+    "read_prefix_obligations": 5,
+    "quick_native_conformance": 158,
+    "quick_native_ordinary": 158,
+    "offline_product_witness_both_modes": "passed",
+    "packaging": "wheel/sdist built; sdist contains current checked Garrett manifest and new proof/harnesses",
+    "installed_device": {
+      "device": "/dev/tpmrm0",
+      "dictionary_attack_state_preserved": true,
+      "existing_public_sha256": {
+        "0x81010001": "be2b11e4ebd8b35f5162b38ca6ad11768b56fefacb35246b557c62a53e037f61",
+        "0x81010016": "406374dd1cbdb93c570e35680917282ca93c414da572a920694c44827642531c"
+      },
+      "fixture_handles_cleaned": true,
+      "persistent_objects_preserved": true,
+      "schema": 1,
+      "scope": "native-tpm-device-synthetic-workflow",
+      "status": "passed",
+      "tests": 5
+    }
+  },
+  "negative_findings": [
+    "Baseline response-race test: 8 failed and 4 passed; final-only/two-phase reads released after coordinator revocation/outage. All 12 pass with the repair.",
+    "The first OAuth response-expiry fixture hit startup refresh admission before reaching provider I/O. It was corrected to install a short-lived generation after live session startup; the focused and full regressions pass.",
+    "Device wrong-authorization repetition triggered shared dictionary-attack lockout. Reset with tpm2_dictionarylockout --clear-lockout; existing objects and lockout parameters retained. Those negatives now run only on isolated swtpm; device harness preserves dictionary-attack state.",
+    "getcap -Q suppressed public inventory. Removed quiet mode for capabilities and added an actual-emulator occupied-handle regression before accepting the device record."
+  ],
+  "open_obligations": [
+    "NR-1 remainder: production provider-outcome and full orchestration extraction/relation.",
+    "NR-2: complete forward simulation including completed-audit plus denied-release prefixes.",
+    "NR-3: transitive native I/O mediation and adapter correspondence, including dependency/callback/drop paths.",
+    "NR-4: exact guest-byte/error/close and adaptive observation correspondence.",
+    "NR-5: integrated scoped claim and independent security review.",
+    "W7 live-provider compatibility and W8 VM-compartment/lifecycle evidence; EK activation, physical provenance and clone/rollback claims remain outside this witness."
+  ],
+  "unrun": [
+    "Full historical Rust mutation campaign (four new targeted mutants were checked).",
+    "Heavyweight compiler-call-linkage recapture (deliberately deferred per active-work iteration policy).",
+    "New whole-service proof or independent security review; live provider and separate guest/host isolation tests."
+  ],
+  "log_sha256": {
+    "install-tests": "5380c6504db757a4adcaeb283186d17af2f149fc402b05f116efcba9261b090f",
+    "freshness-record": "b677819a94e6fbe0200b71209c10e37ced2c8ff66061dd16b9b422089902e65c",
+    "rust-workspace": "a45204e1882266335008d5425cd15c6da62059ee7de6ff6386e83d827a3de752",
+    "dispatch-completion-regeneration-proof": "bd5e0c3bab583910adebe07436856bbeb940513b4a01f27c9e61a56623875aa5",
+    "read-path-prefix-proofs": "1e72eead1aac81cd7a697022c8c27607de7e3afa7fd851f661c83efec4e60689",
+    "targeted-rust-mutations": "f11615e296b8b2d52de0148a3a39bf5a969ed6fd6bcf2f715f3b44d4dc55e6dc",
+    "garrett-record": "551557ade817bd99aba78b058dd59f7cd0fec7f00997c98c8d6ebdfc7e1b28f0",
+    "source-guards": "d690a63349676aa52df2406f4edd805fa0282b84af6b686e894a4ef7df32139e",
+    "full-python-native": "bbc936cfff8571d91bbaa786360706b4220686cb2f87d5948ccf0f8bdec21546",
+    "packaging": "d9180d748e8737cc2f7820eb6c31633e03e9524d4b6a14cb3450eb4b899ed5b6",
+    "quick-native-conformance": "fe0536ee85cf7885c2bc5d34c0f182a6ac9c101941e1d6f2594a037634721501",
+    "quick-native-ordinary": "fd4373bf8f69f92d9b058060b8f278be6b72686e5d4bd70796a85f3892fcdf80",
+    "offline-native-conformance": "07dbbfe5ee30aa500aa129ff377dc47249297e1651502e6612b102e7ead504e1",
+    "offline-native-ordinary": "07dbbfe5ee30aa500aa129ff377dc47249297e1651502e6612b102e7ead504e1",
+    "installed-tpm": "65117d5cc346653d95e786660d2432804b4171342baffa5667e74ae975607124",
+    "oauth-response-expiry": "b5a574ccfff522b047e4bbc8868608d4bc62843b2bb058706cb61044d249c695",
+    "post-audit-revocation": "d40f86cec22ce9eff8b5bcb1061ca911ae5ea7854fd90fa8be313cf1e0e05292"
+  },
+  "package_sha256": {
+    "aivm_secrets-0.2.0-py3-none-any.whl": "e2c9a28d072760aa62fd6fccbbddc425f06d7d7197012fdca7ce65afb0daa099",
+    "aivm_secrets-0.2.0.tar.gz": "0d821e7b02dce559e033126a31e0323c723336aec6fc973ba3dab593a9437671"
+  },
+  "binary_sha256_profiles": {
+    "debug": "conformance,coordinator-server",
+    "release": "ordinary coordinator-server, without conformance; the prior release/all-features record was run before this rebuild"
+  }
+}

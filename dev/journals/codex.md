@@ -1957,3 +1957,33 @@ particular completed audit plus guest denial is now a legitimate prefix, which
 the older success/failure trace inventories do not universally represent.
 No Python runtime module, protocol version, stored-state format, AIVM dependency,
 production credential, or live provider account was introduced.
+
+
+## 2026-10-20 11:56:16 -0400
+
+Final validation of source 304b5eb: 2,999 full-suite tests passed with zero
+skips after editable .[tests] installation; wheel/sdist builds pass and include
+the current checked Garrett manifest, new proof and non-core harnesses. The
+Garrett record passed 759 native/parity cases and audited 413 named obligations.
+All 13 new focused extracted obligations were rechecked with exact matching
+regeneration; 8 read-path and 5 read-prefix kernel/axiom obligations also pass.
+The Rust workspace passed 58 tests. All four new re-extracted Rust mutants fail
+the actual proof. Both conformance and ordinary native release profiles pass
+the standalone product witness and 158-case focused read gate. Five actual
+/dev/tpmrm0 cases pass without skips (the deliberate bad-auth case is excluded
+from the device run and retained on isolated swtpm). The two pre-existing public
+object pins and shared dictionary-attack state are unchanged; fixture handles
+are absent. Native post-audit revocation and current-token response expiry both
+have positive regression evidence. Validation details and log/package hashes
+are in dev/validation/2026-10-20-read-completion.json.
+
+The initial new OAuth expiry fixture incorrectly triggered startup-refresh
+admission; installing a short-lived generation after session startup exercises
+the intended last-response boundary. No product workaround was added for that
+fixture mistake. A full historical mutation campaign and multi-gigabyte
+compiler-linkage capture were deliberately not repeated. Neither these passing
+gates nor the scoped preservation theorems close full NR-1 orchestration,
+NR-2/3/4 runtime correspondence, NR-5 independent review, W7 live providers or
+W8 guest/host compartment validation. Source changes are committed with the
+required actual-model co-author; the goal remains incomplete beyond this
+validated increment. Exact model weights/configuration remain unavailable.
