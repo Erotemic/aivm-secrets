@@ -15,6 +15,35 @@ from tests.test_rust_garrett_oauth_vault import VaultCase, SUCCESSOR, response
 from aivm_secrets.errors import SecretsError
 
 
+def test_manifest_last_response_cannot_outlive_current_oauth_token(tmp_path):
+    from tests.secrets_w6_trace import records
+
+    vault = VaultCase(tmp_path)
+    vault.enroll(access_token=TOKEN, expires_at=int(time.time()) + 3600)
+    source = dict(vault_root=str(vault.root), provider_file=str(vault.provider_file),
+                  subject='vm-test')
+    with TLSService(provider_directory(tmp_path), host='api.example.org') as provider:
+        def expires_during_response(_):
+            time.sleep(max(0, expiry - time.time() + 0.05))
+            return 200, {}, b'{"id":7}'
+
+        provider.routes[('GET', '/v1/tickets/7')] = expires_during_response
+        with ManifestCase(tmp_path, provider, oauth=source, credential_file=None,
+                          source_override='oauth', writes='deny') as session:
+            # Avoid the independent startup-refresh margin. The trusted
+            # operator installs a short-lived generation in this live session.
+            expiry = int(time.time()) + 2
+            row = vault.row()
+            row['grant'].update(expires_at=expiry, generation=1)
+            vault.reference._write(vault.provider, 'vm-test', row)
+            assert session.expires_at > expiry
+            reply = session.invoke(operation='ticket.view', arguments={'ticket': 7})
+            assert reply.get('error', {}).get('code') == 'credential_source', reply
+            assert len(provider.seen()) == 1
+            assert not any(row['event'] == 'completed'
+                           for row in records(tmp_path / 'provider-audit.jsonl'))
+
+
 @pytest.mark.parametrize('profile', ['account', 'manifest'])
 def test_explicit_refresh_updates_the_existing_native_session(profile):
     with tempfile.TemporaryDirectory(prefix='as-roll-', dir='/tmp') as directory:

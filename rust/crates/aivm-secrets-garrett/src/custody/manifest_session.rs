@@ -75,23 +75,37 @@ impl<'a> PreparedDispatch<'a> {
 // passed the reflection check (at the call site) and completion has been
 // durably audited. This type does not itself prove response-byte refinement.
 struct CompletedRelease(Value);
-impl CompletedRelease {
-    fn after_completion(
-        reply: Value,
-        audit: &Audit,
-        operation: &str,
-        request_digest: &str,
-    ) -> Outcome<Self> {
-        audit.write_record(&json!({
+struct PendingCompletion<'a> {
+    reply: Value,
+    audit: &'a Audit,
+    operation: &'a str,
+    request_digest: &'a str,
+    fresh: &'a dyn Fn() -> Outcome<()>,
+}
+impl read_transition::Completion for PendingCompletion<'_> {
+    type Output = CompletedRelease;
+    type Error = Error;
+
+    fn recheck(&self, _phase: read_transition::CompletionPhase) -> Outcome<()> {
+        (self.fresh)()
+    }
+
+    fn audit(&self) -> Outcome<()> {
+        self.audit.write_record(&json!({
             "schema":1,
             "event":"completed",
-            "operation":operation,
-            "grant":audit.grant,
-            "policy":audit.policy,
-            "request_digest":request_digest,
-        }))?;
-        Ok(Self(reply))
+            "operation":self.operation,
+            "grant":self.audit.grant,
+            "policy":self.audit.policy,
+            "request_digest":self.request_digest,
+        }))
     }
+
+    fn release(self) -> Outcome<CompletedRelease> {
+        Ok(CompletedRelease(self.reply))
+    }
+}
+impl CompletedRelease {
     fn into_public(self) -> Value {
         self.0
     }
@@ -485,12 +499,13 @@ impl Session {
                 reply["meta"] = meta;
             }
             crate::manifest::disclosure::ensure_safe(&reply, &secret.0)?;
-            CompletedRelease::after_completion(
+            read_transition::complete_current(PendingCompletion {
                 reply,
-                &self.base.executor.audit,
-                &op.name,
-                &request_hash,
-            )
+                audit: &self.base.executor.audit,
+                operation: &op.name,
+                request_digest: &request_hash,
+                fresh: &fresh,
+            })
         })();
         if sent_write {
             release

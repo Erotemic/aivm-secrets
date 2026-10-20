@@ -108,9 +108,85 @@ def test_native_coordinator_revocation_denies_provider_and_control(tmp_path, pro
             assert len(provider.seen()) == 1
 
 
+@pytest.mark.parametrize('shape', ['final-only', 'checked-only', 'two-phase'])
+@pytest.mark.parametrize('boundary', ['revoke', 'outage'])
+def test_manifest_last_provider_response_cannot_outlive_coordinator(
+    tmp_path, shape, boundary, coordinator_case
+):
+    from tests.test_rust_garrett_manifest import checked, disclosure
+    from tests.secrets_w6_trace import records
+
+    with coordinator_case(tmp_path / 'coord') as coord, \
+            TLSService(provider_directory(tmp_path), host='api.example.org') as provider:
+        coord.operator.activate([coord.members[0][2]])
+        p = policy(tmp_path, provider)
+        rules = disclosure()
+        if shape == 'final-only':
+            operation, target = 'ticket.view', '/v1/tickets/7'
+            expected_phases = ['final']
+        else:
+            p = checked(p)
+            rules = {name: {'id': {'at': ['id'], 'type': 'integer'}}
+                     for name in ('ticket.check', 'revision.view')}
+            provider.routes[('GET', '/v1/tickets/7')] = {
+                'owner': 'ALICE', 'revision': 'a' * 40, 'id': 7}
+            operation = 'ticket.check' if shape == 'checked-only' else 'revision.view'
+            target = '/v1/tickets/7' if shape == 'checked-only' else '/v1/revisions/' + 'a' * 40
+            expected_phases = ['preflight'] if shape == 'checked-only' else ['preflight', 'final']
+
+        def last_response(_):
+            if boundary == 'revoke':
+                coord.operator.revoke()
+            else:
+                coord.stop()
+            return 200, {}, b'{"owner":"ALICE","revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","id":7}'
+
+        provider.routes[('GET', target)] = last_response
+        with ManifestCase(tmp_path, provider, p, rules, writes='deny',
+                          coordination_file=str(coord.member_file())) as session:
+            reply = session.invoke(operation=operation, arguments={'ticket': 7})
+            assert reply.get('error', {}).get('code') == 'revoked', reply
+            audit = records(tmp_path / 'provider-audit.jsonl')
+            assert [row['phase'] for row in audit if row['event'] == 'dispatch'] == expected_phases
+            assert not any(row['event'] == 'completed' for row in audit)
+            assert len(provider.seen()) == len(expected_phases)
+
+
 def write_request(key, text='hello'):
     return dict(operation='ticket.edit', arguments={'ticket': 7, 'text': text},
                 request_fields={'idempotency_key': key})
+
+
+def test_manifest_revocation_after_completion_audit_still_fences_guest_release(tmp_path):
+    from tests.secrets_w6_trace import records
+
+    with CoordinatorCase(tmp_path / 'coord') as coord, \
+            TLSService(provider_directory(tmp_path), host='api.example.org') as provider:
+        coord.operator.activate([coord.members[0][2]])
+        provider.routes[('GET', '/v1/tickets/7')] = dict(id=7)
+        audit_file = tmp_path / 'provider-audit.jsonl'
+        check = coord.ledger.check
+        revoked = []
+
+        def revoke_on_post_audit_check(name, peer):
+            rows = records(audit_file) if audit_file.exists() else []
+            if not revoked and any(row['event'] == 'completed' for row in rows):
+                # Commit a real operator tombstone on the separately serviced
+                # mTLS channel before answering the broker's final check.
+                coord.operator.revoke()
+                revoked.append(True)
+            return check(name, peer)
+
+        coord.ledger.check = revoke_on_post_audit_check
+        with ManifestCase(tmp_path, provider, writes='deny',
+                          coordination_file=str(coord.member_file())) as session:
+            reply = session.invoke(operation='ticket.view', arguments={'ticket': 7})
+            assert reply.get('error', {}).get('code') == 'revoked', reply
+            assert revoked == [True]
+            assert len(provider.seen()) == 1
+            # Completion acknowledgment and guest release are distinct events.
+            assert sum(row['event'] == 'completed' for row in records(audit_file)) == 1
+            assert session.invoke(verb='describe')['error']['code'] == 'revoked'
 
 
 @pytest.mark.parametrize('upstream_header', [False, True])

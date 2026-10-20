@@ -89,8 +89,8 @@ def check(root: Path = ROOT) -> dict:
             '.write_all(&request)' in exchange and
             'emit_current(fresh, || {' in exchange,
             'native provider may emit credentialed bytes without the last-admission gate')
-    require('fn after_completion(' in source and
-            'CompletedRelease::after_completion(' in request,
+    require('impl read_transition::Completion for PendingCompletion' in source and
+            'read_transition::complete_current(PendingCompletion {' in request,
             'guest completion no longer requires the host audit boundary')
     return {'scope': manifest['scope'], 'profiles': len(EXPECTED_PROFILES),
             'excluded': len(EXPECTED_EXCLUSIONS),

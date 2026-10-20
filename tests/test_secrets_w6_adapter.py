@@ -114,14 +114,13 @@ def test_w6_completion_audit_is_required_before_native_public_success(tmp_path):
     checkout = fixture_checkout(tmp_path)
     path = checkout / SOURCE
     original = path.read_text()
-    marker = 'CompletedRelease::after_completion('
+    marker = 'read_transition::complete_current(PendingCompletion {'
     assert marker in original
     path.write_text(original.replace(marker, 'unchecked_release(', 1))
     with pytest.raises(ContractError, match='selected/reflection-checked release'):
         check(checkout)
     path.write_text(original.replace(
-        '        Ok(Self(reply))', '        Ok(Self(reply)) // missing audit', 1).replace(
-        '        audit.write_record(&json!({\n            "schema":1,\n            "event":"completed",',
+        '        self.audit.write_record(&json!({\n            "schema":1,\n            "event":"completed",',
         '        unchecked_record(&json!({\n            "schema":1,\n            "event":"completed",', 1))
     with pytest.raises(ContractError, match='completion audit'):
         check(checkout)

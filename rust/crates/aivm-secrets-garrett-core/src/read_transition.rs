@@ -80,6 +80,38 @@ impl Audited {
     }
 }
 
+/// Completion audit and current authority are external adapter outcomes.
+/// The selected reply remains private until both have succeeded. Rechecking
+/// after the audit prevents a blocking append from extending its authority.
+pub enum CompletionPhase {
+    BeforeAudit,
+    BeforeRelease,
+}
+
+pub trait Completion {
+    type Output;
+    type Error;
+    fn recheck(&self, phase: CompletionPhase) -> Result<(), Self::Error>;
+    fn audit(&self) -> Result<(), Self::Error>;
+    fn release(self) -> Result<Self::Output, Self::Error>;
+}
+
+pub fn complete_current<C: Completion>(pending: C) -> Result<C::Output, C::Error> {
+    match pending.recheck(CompletionPhase::BeforeAudit) {
+        Ok(()) => (),
+        Err(error) => return Err(error),
+    }
+    match pending.audit() {
+        Ok(()) => (),
+        Err(error) => return Err(error),
+    }
+    match pending.recheck(CompletionPhase::BeforeRelease) {
+        Ok(()) => (),
+        Err(error) => return Err(error),
+    }
+    pending.release()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -124,5 +156,65 @@ mod tests {
             .ok()
             .expect("checked transition");
         assert!(acknowledge(prepared, false).is_err());
+    }
+
+    struct TestCompletion<'a> {
+        trace: &'a std::cell::RefCell<Vec<&'static str>>,
+        fault: Option<&'static str>,
+    }
+
+    impl TestCompletion<'_> {
+        fn step(&self, name: &'static str) -> Result<(), &'static str> {
+            self.trace.borrow_mut().push(name);
+            if self.fault == Some(name) {
+                Err(name)
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    impl Completion for TestCompletion<'_> {
+        type Output = &'static str;
+        type Error = &'static str;
+
+        fn recheck(&self, phase: CompletionPhase) -> Result<(), Self::Error> {
+            self.step(match phase {
+                CompletionPhase::BeforeAudit => "before-audit",
+                CompletionPhase::BeforeRelease => "before-release",
+            })
+        }
+
+        fn audit(&self) -> Result<(), Self::Error> {
+            self.step("audit")
+        }
+
+        fn release(self) -> Result<Self::Output, Self::Error> {
+            self.step("release")?;
+            Ok("selected-reply")
+        }
+    }
+
+    #[test]
+    fn completion_checks_surround_audit_and_each_failure_stops_its_continuation() {
+        let stages = ["before-audit", "audit", "before-release", "release"];
+        for (index, stage) in stages.iter().enumerate() {
+            let trace = std::cell::RefCell::new(Vec::new());
+            let pending = TestCompletion {
+                trace: &trace,
+                fault: Some(stage),
+            };
+            assert_eq!(complete_current(pending), Err(*stage));
+            assert_eq!(*trace.borrow(), stages[..=index]);
+        }
+        let trace = std::cell::RefCell::new(Vec::new());
+        assert_eq!(
+            complete_current(TestCompletion {
+                trace: &trace,
+                fault: None
+            }),
+            Ok("selected-reply")
+        );
+        assert_eq!(*trace.borrow(), stages);
     }
 }

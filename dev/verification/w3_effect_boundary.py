@@ -102,7 +102,7 @@ def review_semantics(contents: dict[str, str]) -> None:
             'approval is not enforced before credentialed preflight/final effects')
     require('self.policy.digest()' in request and '"grant":self.base.executor.audit.grant' in request
             and 'self.require_control_active(current)?;' in request
-            and 'self.require_control_active(host_time()?)?;' in request,
+            and 'fresh: &fresh,' in request,
             'approval identity or late revocation fencing bypassed')
     control = part(m, 'pub(super) fn control(', '\nfn manifest_request_bytes(')
     dispatch = part(request, 'let dispatch = |prepared: PreparedDispatch', 'let facts = if let Some(effect)')
@@ -161,13 +161,20 @@ def review_semantics(contents: dict[str, str]) -> None:
     require('let policy_hash = self.policy.digest();' in reservation,
             'coordinated request no longer uses normalized policy identity')
     completed = part(m, 'struct CompletedRelease(Value);', 'pub(crate) struct Session {')
-    require(completed.count('Ok(Self(reply))') == 1 and
-            same_order(completed, 'fn after_completion(', 'audit.write_record(',
-                       'Ok(Self(reply))', 'fn into_public('),
+    require(completed.count('Ok(CompletedRelease(self.reply))') == 1 and
+            same_order(completed, 'fn recheck(', '(self.fresh)()', 'fn audit(',
+                       'self.audit.write_record(', 'fn release(',
+                       'Ok(CompletedRelease(self.reply))', 'fn into_public('),
             'completed guest release can be manufactured before the completion audit')
     require(same_order(release, 'self.disclosure.project(', 'ensure_safe(&reply',
-                       'CompletedRelease::after_completion('),
+                       'read_transition::complete_current(PendingCompletion {'),
             'guest release bypasses selected disclosure/reflection/completion')
+    completion = part(transition, 'pub fn complete_current<', '#[cfg(test)]')
+    require(same_order(completion, 'pending.recheck(CompletionPhase::BeforeAudit)',
+                       'pending.audit()', 'pending.recheck(CompletionPhase::BeforeRelease)',
+                       'pending.release()') and
+            completion.count('Err(error) => return Err(error)') == 3,
+            'completion bypasses current authority, audit or post-audit freshness')
     compact_request = ''.join(request.split())
     require('release.map(CompletedRelease::into_public)' in request and
             'release.map_err(|_|Error::OutcomeUnknown).map(CompletedRelease::into_public)' in compact_request,

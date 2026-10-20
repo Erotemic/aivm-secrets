@@ -1,5 +1,12 @@
 # Garrett identity: vTPM key policy
 
+**October 20 standalone update:** the historical AIVM design below is retained
+for its VM lifecycle and trust policy. The independent Rust package now has
+native TPM CSR/signing/enrollment support and an [installed-vTPM device
+witness](../garrett-read-completion-preservation.md#installed-vtpm-witness).
+Passing that witness does not discharge the libvirt snapshot/clone/delete,
+EK-activation, or VM-compartment prerequisites described below.
+
 **Status (2026-10-13): design only. No VM has a TPM, and no claim in this
 document may be made until it is implemented and validated on real libvirt
 with swtpm.** AIVM creates every VM with `virt-install --tpm none`

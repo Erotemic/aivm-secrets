@@ -18,16 +18,18 @@ from tests.test_rust_garrett_authority import (
 )
 from tests.test_rust_garrett_certificates import creation_evidence
 from tests.test_rust_garrett_provider import provider_directory
-from tests.test_rust_garrett_tpm import SoftwareTPM, require_software_tpm_tools
+from tests.test_rust_garrett_tpm import DeviceTPM, SoftwareTPM, require_software_tpm_tools
 
 
 @pytest.fixture
 def provisioned(tmp_path):
-    require_software_tpm_tools()
+    device = os.getenv('AIVM_SECRETS_TEST_TPM_DEVICE')
+    require_software_tpm_tools(emulator=device is None)
     state, work = tmp_path / "tpm", tmp_path / "work"
     state.mkdir(mode=0o700)
     work.mkdir(mode=0o700)
-    with SoftwareTPM(state) as tpm:
+    backend = DeviceTPM(state, device) if device else SoftwareTPM(state)
+    with backend as tpm:
         config = dict(
             schema=1,
             tcti=tpm.tcti,
@@ -92,6 +94,8 @@ def test_native_tpm_request_uses_the_pinned_public_key(tmp_path, provisioned):
 )
 def test_failed_tpm_request_never_publishes_or_falls_back(tmp_path, provisioned, fault):
     tpm, config = provisioned
+    if fault == 'authorization' and isinstance(tpm, DeviceTPM):
+        pytest.skip('wrong authorization is tested only on isolated swtpm; device DA counters are shared')
     if fault == "authorization":
         config["authorization_file"] = str(
             private(tmp_path / "wrong-auth", os.urandom(32))

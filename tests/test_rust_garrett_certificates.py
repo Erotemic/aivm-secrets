@@ -326,7 +326,7 @@ def creation_evidence(tpm):
         p / "ak.ctx",
     )
     tpm.tool("evictcontrol", "-C", "o", "-c", p / "ak.ctx", "0x81010012")
-    tpm.tool("flushcontext", "-t")
+    tpm.flush_transients()
     tpm.tool(
         "readpublic",
         "-c",

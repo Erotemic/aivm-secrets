@@ -112,7 +112,15 @@ here. In particular, a credential sent **to its authorized provider** is an
 expected authorized release, not a violation; another provider/destination
 or the guest is not authorized to receive it.
 
-### NR-1A handoff (production-called seam; proof pending)
+### NR-1 handoff (dispatch/completion preservation; orchestration pending)
+
+**October 20 update:** the exact extracted `prepare`/`acknowledge` seam now has
+a checked preservation lemma. The same core also supplies production-called
+`complete_current`, with distinct current-authority checkpoints before the
+completion audit and before release. See [the increment's scope and commands](../garrett-read-completion-preservation.md).
+The paragraphs below describe the original NR-1A seam; their initial missing
+dispatch theorem is discharged by this increment. The full provider-outcome
+and orchestration-to-trace relation is still missing.
 
 `rust/crates/aivm-secrets-garrett-core/src/read_transition.rs` implements the
 actual phase/effect admission and audit-acknowledgment transition used by
@@ -126,15 +134,14 @@ For this first seam, `read_transition::acknowledge(prepared, true)` is invoked
 responsible for the correctness of that acknowledgment; neither the Rust
 value nor a future extracted Lean theorem proves fsync/OS durability. Late
 authority checks and provider send attempts remain external NR-2/NR-3
-obligations. There is no extracted Lean theorem for this new transition until
-Charon/Aeneas regenerate the pinned sources and the resulting kernel proof
-passes. Existing W4/W5 abstract proofs cannot be rebranded as that result.
+obligations. The new theorem is in `GarrettReadTransition.lean` and checks the
+regenerated production core; it is separate from the older W4/W5 abstract proofs.
 
-Focus the next proof work on extracting **this exact production-called
-function**, comparing its emitted Lean signature with the Rust inputs/outputs,
-and proving an initial `Prepared -> Audited` preservation lemma. Do not create
-an independently hand-written `read_transition` model. Preserve an authorized
-success witness from the standalone offline workflow in parallel.
+Focus the next proof work on extracted provider/failure outcomes and the
+concrete relation to W4/W5 event prefixes, including post-completion-audit
+revocation. Do not create an independently hand-written `read_transition`
+model. Preserve an authorized success witness from the standalone offline
+workflow in parallel.
 
 ## 3. Concrete trust and transition boundary
 

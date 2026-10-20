@@ -39,6 +39,7 @@ include proofs/GarrettCoordinatorAuthority.lean
 include proofs/GarrettCoordinatorReply.lean
 include proofs/GarrettApproval.lean
 include proofs/GarrettReadPaths.lean proofs/GarrettReadPrefixes.lean
+include proofs/GarrettReadTransition.lean
 recursive-include proofs/generated *.lean
 prune rust/target
 prune proofs/.lake

@@ -211,6 +211,7 @@ def main() -> int:
             manifest['required_workflow_tests'] = require_no_skips(junit)
         run('offline-native-product', [python, 'dev/offline_native_guest.py'])
         if args.proofs:
+            run('lean-read-transition', [python, 'dev/verification/read_transition.py'])
             run('lean-w4-w5', [python, 'dev/verification/w5_noninterference.py', 'prove'])
             run('lean-read-prefixes', [python, 'dev/verification/read_prefixes.py', 'prove'])
             run('lean-profile-emission-oauth', ['lake', '-d', 'proofs', 'build',

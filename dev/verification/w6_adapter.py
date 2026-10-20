@@ -111,7 +111,7 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
     ensure(len(release) == 2, 'native read must have a typed public-release boundary')
     selected = 'self.disclosure.project(&op.name, &raw, &secret.0)?'
     checked = 'ensure_safe(&reply, &secret.0)?'
-    finished = 'CompletedRelease::after_completion('
+    finished = 'read_transition::complete_current(PendingCompletion {'
     ensure(all(marker in release[1] for marker in (selected, checked, finished)) and
            release[1].index(selected) < release[1].index(checked) <
            release[1].index(finished),
@@ -120,7 +120,8 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
     ensure(len(completed) == 2 and
            'audit.write_record(' in completed[1].split('pub(crate) struct Session {', 1)[0] and
            completed[1].split('pub(crate) struct Session {', 1)[0].index('audit.write_record(') <
-               completed[1].split('pub(crate) struct Session {', 1)[0].index('Ok(Self(reply))') and
+               completed[1].split('pub(crate) struct Session {', 1)[0].index('Ok(CompletedRelease(self.reply))') and
+           'fresh: &fresh,' in release[1] and '(self.fresh)()' in completed[1] and
            'release.map(CompletedRelease::into_public)' in entry,
            'native success can reach guest without completion audit')
     return {'channels': len(channels), 'remaining': len(contract['remaining_obligations']),

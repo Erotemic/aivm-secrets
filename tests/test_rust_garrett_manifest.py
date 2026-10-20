@@ -654,6 +654,41 @@ def test_waiting_for_facts_cannot_extend_identity_or_grant_lifetime(tmp_path):
             assert len(server.requests) == 1
 
 
+@pytest.mark.parametrize('shape', ['final-only', 'two-phase'])
+def test_last_provider_response_cannot_extend_identity_or_grant_lifetime(tmp_path, shape):
+    import time
+    from tests.secrets_w6_trace import records
+
+    with TLSService(provider_directory(tmp_path), host='api.example.org') as server:
+        cutoff = []
+
+        def expires_during_final(_):
+            time.sleep(max(0, cutoff[0] - time.time() + 0.05))
+            return 200, {}, codec.dumps(dict(id=7))
+
+        p = policy(tmp_path, server)
+        if shape == 'final-only':
+            rules = disclosure()
+            operation, target = 'ticket.view', '/v1/tickets/7'
+            phases = ['final']
+        else:
+            p = checked(p)
+            rules = {name: {'id': {'at': ['id'], 'type': 'integer'}}
+                     for name in ('revision.view', 'ticket.check')}
+            server.routes[('GET', '/v1/tickets/7')] = dict(owner='ALICE', revision='a' * 40)
+            operation, target = 'revision.view', '/v1/revisions/' + 'a' * 40
+            phases = ['preflight', 'final']
+        server.routes[('GET', target)] = expires_during_final
+        with ManifestCase(tmp_path, server, p, rules, writes='deny', lifetime=3) as session:
+            cutoff.append(session.expires_at)
+            reply = session.invoke(operation=operation, arguments={'ticket': 7})
+            assert reply.get('error', {}).get('code') == 'invalid_capability', reply
+            audit = records(tmp_path / 'provider-audit.jsonl')
+            assert [row['phase'] for row in audit if row['event'] == 'dispatch'] == phases
+            assert not any(row['event'] == 'completed' for row in audit)
+            assert len(server.requests) == len(phases)
+
+
 @pytest.mark.parametrize(
     "arguments", [True, {"ticket": True}, {"Bad": 1}, {"ticket": -1}, {"ticket": ""}]
 )

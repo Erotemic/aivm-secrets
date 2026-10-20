@@ -36,6 +36,20 @@ PROFILES = [
     "native-exact-write-approval-v1",
 ]
 THEOREMS = [
+    "aivm_secrets_garrett_core.read_transition.Proofs.prepare_success_iff",
+    "aivm_secrets_garrett_core.read_transition.Proofs.acknowledge_success_iff",
+    "aivm_secrets_garrett_core.read_transition.Proofs.prepared_to_audited_preservation",
+    "aivm_secrets_garrett_core.read_transition.Proofs.refused_audit_has_no_permit",
+    "aivm_secrets_garrett_core.read_transition.Proofs.preflight_write_has_no_prepared",
+    "aivm_secrets_garrett_core.read_transition.Proofs.unadmitted_final_write_has_no_prepared",
+    "aivm_secrets_garrett_core.read_transition.Proofs.authorized_read_witness",
+    "aivm_secrets_garrett_core.read_transition.Proofs.denied_before_completion",
+    "aivm_secrets_garrett_core.read_transition.Proofs.completion_audit_refusal",
+    "aivm_secrets_garrett_core.read_transition.Proofs.revoked_after_completion_audit",
+    "aivm_secrets_garrett_core.read_transition.Proofs.current_completion_continuation",
+    "aivm_secrets_garrett_core.read_transition.Proofs.completion_preservation",
+    "aivm_secrets_garrett_core.read_transition.Proofs.authorized_completion_witness",
+
     'aivm_secrets_garrett_core.approval.Proofs.issue_contract',
     'aivm_secrets_garrett_core.approval.Proofs.approved_write_contract',
     'aivm_secrets_garrett_core.approval.Proofs.reads_preserve_approval',
@@ -615,6 +629,8 @@ def inputs() -> list[str]:
         "proofs/GarrettApproval.lean",
         "proofs/GarrettReadPaths.lean",
         "proofs/GarrettReadPrefixes.lean",
+        "proofs/GarrettReadTransition.lean",
+        "dev/verification/read_transition.py",
         "tests/secrets_vectors/approval/kernel-v1.jsonl",
         "tests/secrets_vectors/coordination/authority-v1.jsonl",
         "tests/secrets_vectors/coordination/operator-replies-v1.jsonl",
@@ -903,6 +919,16 @@ def mutate(pattern: str | None = None) -> None:
         ),
     ]
     mutations = [(source, *change) for change in changes]
+    transition = source.with_name("read_transition.rs")
+    mutations += [
+        (transition, "read transition missing audit acknowledgement", "if !ack {", "if false {"),
+        (transition, "read transition admitted preflight write",
+         "matches!(phase, Phase::Preflight)", "false"),
+        (transition, "read transition missing post-audit freshness",
+         "pending.recheck(CompletionPhase::BeforeRelease)", "Ok::<(), C::Error>(())"),
+        (transition, "read transition completion audit bypass",
+         "pending.audit()", "Ok::<(), C::Error>(())"),
+    ]
     use_source = source.with_name("credential_use.rs")
     mutations += [
         (
@@ -1667,6 +1693,7 @@ def mutate(pattern: str | None = None) -> None:
             )
             rejected = False
             modules = [
+                "GarrettReadTransition",
                 "Garrett",
                 "GarrettProtocol",
                 "GarrettHistory",
@@ -1701,6 +1728,7 @@ def mutate(pattern: str | None = None) -> None:
             # model facts. Check the affected leaf first; keep full fallback
             # coverage and dependency order for all other protocol modules.
             preferred = {
+                "read_transition.rs": "GarrettReadTransition",
                 "approval.rs": "GarrettApproval",
                 "enrollment.rs": "GarrettEnrollment",
                 "authority.rs": "GarrettAuthority",

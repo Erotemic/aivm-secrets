@@ -4274,6 +4274,49 @@ def read_transition.Audited.is_write
   (self : read_transition.Audited) : Result Bool := do
   ok self.write
 
+/-- [aivm_secrets_garrett_core::read_transition::CompletionPhase]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 86:0-89:1
+    Visibility: public -/
+@[discriminant isize]
+inductive read_transition.CompletionPhase where
+| BeforeAudit : read_transition.CompletionPhase
+| BeforeRelease : read_transition.CompletionPhase
+
+/-- Trait declaration: [aivm_secrets_garrett_core::read_transition::Completion]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 91:0-97:1
+    Visibility: public -/
+structure read_transition.Completion (Self : Type _) (Self_Output : Type _)
+  (Self_Error : Type _) where
+  recheck : Self → read_transition.CompletionPhase → Result
+    (core.result.Result Unit Self_Error)
+  audit : Self → Result (core.result.Result Unit Self_Error)
+  release : Self → Result (core.result.Result Self_Output Self_Error)
+
+/-- [aivm_secrets_garrett_core::read_transition::complete_current]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 99:0-113:1
+    Visibility: public -/
+def read_transition.complete_current
+  {C : Type _} {Clause0_Output : Type _} {Clause0_Error : Type _}
+  (CompletionInst : read_transition.Completion C Clause0_Output Clause0_Error)
+  (pending : C) :
+  Result (core.result.Result Clause0_Output Clause0_Error)
+  := do
+  let r ←
+    CompletionInst.recheck pending read_transition.CompletionPhase.BeforeAudit
+  match r with
+  | core.result.Result.Ok _ =>
+    let r1 ← CompletionInst.audit pending
+    match r1 with
+    | core.result.Result.Ok _ =>
+      let r2 ←
+        CompletionInst.recheck pending
+          read_transition.CompletionPhase.BeforeRelease
+      match r2 with
+      | core.result.Result.Ok _ => CompletionInst.release pending
+      | core.result.Result.Err error => ok (core.result.Result.Err error)
+    | core.result.Result.Err error => ok (core.result.Result.Err error)
+  | core.result.Result.Err error => ok (core.result.Result.Err error)
+
 /-- [aivm_secrets_garrett_core::rebinding::Target]
     Source: 'crates/aivm-secrets-garrett-core/src/rebinding.rs', lines 6:0-12:1
     Visibility: public -/

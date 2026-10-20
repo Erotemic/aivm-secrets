@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -39,14 +40,15 @@ SOFTWARE_TPM_TOOLS = (
 )
 
 
-def require_software_tpm_tools() -> None:
-    missing = [name for name in SOFTWARE_TPM_TOOLS if shutil.which(name) is None]
+def require_software_tpm_tools(*, emulator: bool = True) -> None:
+    required = SOFTWARE_TPM_TOOLS if emulator else SOFTWARE_TPM_TOOLS[1:]
+    missing = [name for name in required if shutil.which(name) is None]
     if not missing:
         return
-    message = (
-        f'local software TPM prerequisites missing: {", ".join(missing)}; '
-        'install swtpm and tpm2-tools (Ubuntu: sudo apt install swtpm tpm2-tools)'
-    )
+    packages = 'swtpm tpm2-tools' if emulator else 'tpm2-tools'
+    message = (f'local {"software" if emulator else "device"} TPM prerequisites missing: '
+               f'{", ".join(missing)}; install {packages} '
+               f'(Ubuntu: sudo apt install {packages})')
     if os.getenv('AIVM_SECRETS_REQUIRE_TPM_TESTS') == '1':
         pytest.fail(message)
     pytest.skip(message)
@@ -58,11 +60,16 @@ class SoftwareTPM:
 
     def tool(self, name, *args):
         return subprocess.run(
-            [f"tpm2_{name}", "-Q", "-T", self.tcti, *map(str, args)],
+            [f"tpm2_{name}", *([] if name == 'getcap' else ['-Q']),
+             "-T", self.tcti, *map(str, args)],
             capture_output=True,
             timeout=15,
             check=True,
         )
+
+    def flush_transients(self):
+        # This instance owns an isolated emulator, including all its objects.
+        self.tool("flushcontext", "-t")
 
     def __enter__(self):
         p = self.directory
@@ -112,7 +119,7 @@ class SoftwareTPM:
                 p / "creation.ticket",
             )
             self.tool("evictcontrol", "-C", "o", "-c", p / "key.ctx", "0x81010011")
-            self.tool("flushcontext", "-t")
+            self.flush_transients()
             self.tool(
                 "readpublic", "-c", "0x81010011", "-f", "tpmt", "-o", p / "public.tpmt"
             )
@@ -208,6 +215,90 @@ class SoftwareTPM:
             )
         assert not result["client1"][1].exists()
         return result
+
+
+class DeviceTPM(SoftwareTPM):
+    """Explicit device witness, never the default test backend.
+
+    The resource manager closes each tool's transient objects. Never issue a
+    global flush/clear against a shared TPM. The two fixture handles must be
+    unused at entry; existing objects are neither adopted nor replaced.
+    """
+
+    HANDLES = (0x81010011, 0x81010012)
+
+    def __init__(self, directory, device):
+        super().__init__(directory)
+        if str(device) != '/dev/tpmrm0' or not Path(device).is_char_device():
+            raise ValueError('native device tests require the /dev/tpmrm0 resource manager')
+        self.tcti = f'device:{device}'
+        self.owned = {}
+
+    def flush_transients(self):
+        # Resource-manager lifetime is per tool connection. A shared-device
+        # flush would affect objects belonging to unrelated applications.
+        pass
+
+    def tool(self, name, *args):
+        # Register only successful persistence of our freshly created context.
+        # An occupied-handle race fails inside TPM2_EvictControl, never overwrites.
+        if name == 'flushcontext':
+            raise RuntimeError('shared TPM device fixtures must not flush other objects')
+        if name == 'evictcontrol' and str(args[-1]).startswith('0x'):
+            if int(args[-1], 16) not in self.HANDLES:
+                raise RuntimeError('refusing to persist outside the fixture handles')
+        result = super().tool(name, *args)
+        if name == 'evictcontrol' and str(args[-1]).startswith('0x'):
+            handle = int(args[-1], 16)
+            assert handle in self.HANDLES
+            # If reading the public area fails, report the residual handle;
+            # do not silently claim cleanup or evict an unpinned replacement.
+            self.owned[handle] = None
+            pin = self.directory / f'owned-{handle:x}.tpmt'
+            super().tool('readpublic', '-c', hex(handle), '-f', 'tpmt', '-o', pin)
+            self.owned[handle] = pin.read_bytes()
+        return result
+
+    def __enter__(self):
+        existing = self.tool('getcap', 'handles-persistent').stdout.decode()
+        occupied = {int(value, 16) for value in re.findall(r'0x[0-9a-fA-F]+', existing)}
+        if occupied.intersection(self.HANDLES):
+            raise RuntimeError('device TPM fixture handles are occupied; refusing to replace them')
+        p = self.directory
+        try:
+            (p / 'auth').write_bytes(os.urandom(32))
+            (p / 'auth').chmod(0o600)
+            self.tool('createprimary', '-C', 'o', '-G', 'ecc256:ecdsa-sha256',
+                      '-g', 'sha256', '-a',
+                      'fixedtpm|fixedparent|sensitivedataorigin|userwithauth|sign',
+                      '-p', f'file:{p}/auth', '-c', p / 'key.ctx',
+                      '-d', p / 'creation.hash', '-t', p / 'creation.ticket')
+            self.tool('evictcontrol', '-C', 'o', '-c', p / 'key.ctx', hex(self.HANDLES[0]))
+            self.tool('readpublic', '-c', hex(self.HANDLES[0]), '-f', 'tpmt', '-o', p / 'public.tpmt')
+            self.tool('readpublic', '-c', hex(self.HANDLES[0]), '-f', 'der', '-o', p / 'public.der')
+            for item in p.iterdir():
+                if item.is_file():
+                    item.chmod(0o600)
+            return self
+        except BaseException:
+            self.__exit__(None, None, None)
+            raise
+
+    def __exit__(self, *exc):
+        errors = []
+        for handle, expected in reversed(list(self.owned.items())):
+            try:
+                if expected is None:
+                    raise RuntimeError('public pin unavailable; manual fixture cleanup required')
+                public = self.directory / f'cleanup-{handle:x}.tpmt'
+                super().tool('readpublic', '-c', hex(handle), '-f', 'tpmt', '-o', public)
+                if public.read_bytes() != expected:
+                    raise RuntimeError('fixture object changed; refusing to evict a different key')
+                super().tool('evictcontrol', '-C', 'o', '-c', hex(handle))
+            except Exception as error:
+                errors.append(f'{handle:#x}: {error}')
+        if errors:
+            raise RuntimeError('device TPM cleanup failed: ' + '; '.join(errors))
 
 
 def test_tpm_tls_success_wrong_auth_and_pinned_key_rejection():

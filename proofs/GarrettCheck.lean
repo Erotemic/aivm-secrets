@@ -1,4 +1,5 @@
 import GarrettApproval
+import GarrettReadTransition
 import GarrettLineFrame
 import GarrettHttpWire
 import GarrettCoordinatorReply
@@ -452,3 +453,17 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.approval.Proofs.admitted_approval_is_consumed
 #print axioms aivm_secrets_garrett_core.approval.Proofs.refused_approval_is_preserved
 #print axioms aivm_secrets_garrett_core.approval.Proofs.consumed_approval_cannot_be_reused
+
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.prepare_success_iff
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.acknowledge_success_iff
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.prepared_to_audited_preservation
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.refused_audit_has_no_permit
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.preflight_write_has_no_prepared
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.unadmitted_final_write_has_no_prepared
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.authorized_read_witness
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.denied_before_completion
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.completion_audit_refusal
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.revoked_after_completion_audit
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.current_completion_continuation
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.completion_preservation
+#print axioms aivm_secrets_garrett_core.read_transition.Proofs.authorized_completion_witness

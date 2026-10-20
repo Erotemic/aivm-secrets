@@ -1913,3 +1913,47 @@ lemma, native I/O mediation, whole-service observation correspondence, real
 provider/VM evidence and independent review remain open. Those limits still
 make me cautious about security claims. The current priority queue is retained;
 no new feature campaign or push has been started during reconciliation.
+
+
+## 2026-10-20 11:44:40 -0400
+
+Model: OpenAI Codex, based on GPT-6; exact weights/configuration variant unavailable.
+User requested the remaining Garrett work in this VM and explicitly required
+commits with this model as co-author. I retained the active NR queue rather
+than reviving historical milestone assignments. I proved the actual extracted
+prepare/acknowledge preservation seam and added the production-called
+complete_current controller. Inspection found missing full freshness after the
+last provider response. Eight of twelve coordinator response-race cases
+reproduced unauthorized release before the repair; all twelve passed afterward.
+Separate native expiry and post-audit revocation regressions cover release
+without extending the prior admission point. Thirteen extracted obligations
+compile with the established axiom policy; all four targeted re-extracted Rust
+bypass mutations fail the actual proof. W0/W3/W6 guards pass. A focused 200-case
+native run, packaging and the freshness proof/26 parity cases passed. The final
+Garrett record and existing read-prefix proofs are still running at this entry;
+full-suite integration remains to be recorded separately.
+
+The installed IBM software TPM is accessible through sudo but not the agent's
+ordinary account. Added an explicit non-core device witness without changing
+ACLs or assuming VM isolation. It refuses occupied fixture handles, pins cleanup
+objects, never globally flushes/clears the TPM, and validates the pre-existing
+persistent public areas. Five device cases now pass, including native CSR,
+pinned-AK creation enrollment and actual TLS/provider use. Bad-authorization
+negatives remain emulator-only: three development repetitions triggered the
+shared dictionary-attack lockout. I reset that counter with the empty configured
+lockout authorization, retained the existing objects/lockout parameters, and
+added explicit unchanged-counter checks. I also corrected getcap's -Q suppression
+before accepting the object inventory. The corrected device run verifies both
+original persistent pins and zero residual fixture handles. These mistakes
+show why a device fixture cannot simply reuse an emulator's destructive cleanup
+or negative-authentication assumptions.
+
+Confidence is high in the concrete repaired release paths and scoped extracted
+preservation; limited in end-to-end security. The external audit/authority/TLS
+contracts, full provider-outcome/orchestration simulation, all reachable native
+I/O, exact guest-channel correspondence, real-provider compatibility, VM
+compartment tests, EK activation and independent review remain open. In
+particular completed audit plus guest denial is now a legitimate prefix, which
+the older success/failure trace inventories do not universally represent.
+No Python runtime module, protocol version, stored-state format, AIVM dependency,
+production credential, or live provider account was introduced.

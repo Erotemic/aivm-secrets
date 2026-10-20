@@ -53,7 +53,10 @@ def mutate(repo, filename, before, after):
     ('rust/crates/aivm-secrets-garrett/src/custody/approval.rs', 'let now = host_time()?;', 'let now = 0;'),
     ('rust/crates/aivm-secrets-garrett/src/custody/approval.rs', 'self.active.store(false, Ordering::Release)', 'self.active.store(true, Ordering::Release)'),
     ('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs', 'control.state.admit(&approval_digest, op.write)?', 'aivm_secrets_garrett_core::approval::Decision::Allowed'),
-    ('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs', 'self.require_control_active(host_time()?)?;', ''),
+    ('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs', 'fresh: &fresh,', 'fresh: &|| Ok(()),'),
+
+    ('rust/crates/aivm-secrets-garrett-core/src/read_transition.rs',
+     'pending.recheck(CompletionPhase::BeforeRelease)', 'Ok::<(), C::Error>(())'),
 
     (RUST + 'coordination.rs', 'self.exchange(&value, Error::Unreachable, bad)?',
      'self.exchange(&value, Error::Unreachable, Error::Revoked)?'),
@@ -112,8 +115,8 @@ def mutate(repo, filename, before, after):
     (RUST + 'custody/manifest_session.rs',
      'finish: || reservation_call(true),', 'finish: || Ok(()),'),
     (RUST + 'custody/manifest_session.rs',
-     '    ) -> Outcome<Self> {\n        audit.write_record(&json!({\n            "schema":1,\n            "event":"completed",',
-     '    ) -> Outcome<Self> {\n        unchecked_release(&json!({\n            "schema":1,\n            "event":"completed",'),
+     '    fn audit(&self) -> Outcome<()> {\n        self.audit.write_record(&json!({\n            "schema":1,\n            "event":"completed",',
+     '    fn audit(&self) -> Outcome<()> {\n        unchecked_release(&json!({\n            "schema":1,\n            "event":"completed",'),
     (RUST + 'custody/manifest_session.rs',
      'release.map(CompletedRelease::into_public)',
      'release.map(|r| r.0)'),
