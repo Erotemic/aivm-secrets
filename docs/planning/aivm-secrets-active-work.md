@@ -114,8 +114,13 @@ extracted code. Twenty obligations include exact returned error state, native
 report/outcome linkage and integration with the actual request entry; the prior
 whole-completion Steps/success-gate premises are derived under that linkage.
 Native link/primitive instantiation, dispatch, selected JSON/frame observations,
-connected adaptive histories and NR-2–NR-5 remain open. Final native acceptance
-is recorded separately from these scoped proofs.
+connected adaptive histories and NR-2–NR-5 remain open.
+
+Source `259d8d3` passes 3,031 full-suite cases with zero skips, 550 named
+axiom checks, 767 release parity cases, 76 Rust workspace cases, eight selected
+source-extracted mutants, both 164-case native build-mode gates and standalone
+product workflows, all 273 archive pins and six safe installed-vTPM cases. See
+the [owned-completion validation record](../../dev/validation/2026-10-20-owned-completion.json).
 
 ## Goal and present assurance level
 

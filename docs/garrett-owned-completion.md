@@ -106,3 +106,11 @@ audit failure, success and post-audit revocation; native process tests exercise
 all three read shapes and both coordinators with real completion fsync barriers.
 All peers and credentials are synthetic. An installed TPM is optional and is
 used only by the separate safe device workflow.
+
+The [frozen acceptance](../dev/validation/2026-10-20-owned-completion.json) pins
+source `259d8d3`: 3,031 full cases without skips, 550 named axiom audits,
+767 release parity cases, 76 Rust workspace cases, all eight selected typed and
+re-extracted mutations, both 164-case native build-mode gates and product
+workflows, six safe installed-vTPM cases and packaging with all 273 source pins
+and the embedded Garrett manifest byte-identical. Proof/mutation jobs finished
+before the full suite. These results retain the scoped/open boundaries above.
