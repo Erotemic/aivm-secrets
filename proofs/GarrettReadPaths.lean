@@ -90,29 +90,44 @@ theorem final_only_sound (r : RequestCase) : SoundTrace (finalOnly r) := by
   exact after_final_sound r.final r.finalAudit r.finalProviderOK
     r.completedAuditOK r.raw r.schema r.fuel r.budget
 
-theorem check_only_sound (r : RequestCase) : SoundTrace (checkOnly r) := by
+-- Reuse the already verified dispatch rule for either preflight outcome.
+-- Separating this lemma avoids reasoning about the nested Boolean branch
+-- while the admitted provider-send decision is still in scope.
+private theorem after_preflight_sound (pre : Gate)
+    (auditOK providerOK : Bool) (continuation : List Event)
+    (h : SoundTrace continuation) :
+    SoundTrace (afterPreflight pre auditOK providerOK continuation) := by
   classical
-  unfold checkOnly afterPreflight
+  unfold afterPreflight
   dsimp
-  by_cases sent : Event.providerSend .preflight r.pre r.preAudit ∈
-      dispatch .preflight r.pre r.preAudit
+  by_cases sent : Event.providerSend .preflight pre auditOK ∈
+      dispatch .preflight pre auditOK
   · simp only [sent, ↓reduceIte]
-    cases r.preflightOK with
-    | false => exact append_sound _ _
-        (dispatch_sound .preflight r.pre r.preAudit) denied_sound
-    | true => exact append_sound _ _
-        (dispatch_sound .preflight r.pre r.preAudit) (check_release_sound r)
+    cases providerOK with
+    | false =>
+      simpa using
+        (append_sound _ _ (dispatch_sound .preflight pre auditOK) denied_sound)
+    | true =>
+      simpa using
+        (append_sound _ _ (dispatch_sound .preflight pre auditOK) h)
   · simpa only [sent, ↓reduceIte] using
-      dispatch_sound .preflight r.pre r.preAudit
+      (dispatch_sound .preflight pre auditOK)
+
+theorem check_only_sound (r : RequestCase) : SoundTrace (checkOnly r) := by
+  unfold checkOnly
+  exact (after_preflight_sound r.pre r.preAudit r.preflightOK _
+    (check_release_sound r))
 
 theorem read_trace_sound (kind : ReadPath) (r : RequestCase) :
     SoundTrace (readTrace kind r) := by
   cases kind with
   | noPreflight => exact final_only_sound r
   | checkedOnly => exact check_only_sound r
-  | twoPhase => exact request_trace_sound r.pre r.final r.preAudit
-      r.finalAudit r.preflightOK r.finalProviderOK r.completedAuditOK
-      r.raw r.schema r.fuel r.budget
+  | twoPhase =>
+    simpa only [readTrace, caseTrace] using
+      (request_trace_sound r.pre r.final r.preAudit r.finalAudit
+        r.preflightOK r.finalProviderOK r.completedAuditOK
+        r.raw r.schema r.fuel r.budget)
 
 /-- The no-preflight release still derives its selected fields from the
     extracted disclosure controller, with admission from the current gate. -/
@@ -149,7 +164,20 @@ theorem observe_check_only (r : RequestCase) :
         else [.denied]
       else [.denied] := by
   classical
-  simp [checkOnly, observe_after_preflight, observeTrace, observeEvent]
+  -- The completion audit is erased from the guest observation in both
+  -- branches. A failed completion audit releases only the fixed denial.
+  have release_observation :
+      observeTrace (if r.completedAuditOK then
+        [Event.auditAttempt .completed] ++
+          disclose r.raw r.schema r.fuel r.budget
+      else [Event.auditAttempt .completed, Event.guestDenied]) =
+      if r.completedAuditOK then
+        observeTrace (disclose r.raw r.schema r.fuel r.budget)
+      else [.denied] := by
+    cases r.completedAuditOK <;> rfl
+  unfold checkOnly
+  rw [observe_after_preflight]
+  rw [release_observation]
 
 theorem check_only_noninterference (a b : RequestCase)
     (agree : DeclassificationAgreement a b) :
