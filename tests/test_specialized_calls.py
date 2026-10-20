@@ -30,9 +30,9 @@ def projection():
         function(1, ['aivm_secrets_garrett_core','protocol','perform'], [2]),
         function(2, ['aivm_secrets_garrett','custody','<Impl>','execute'], [3]),
         function(3, ['aivm_secrets_garrett','custody','<Impl>','exchange'], [6,8]),
-        function(4, ['aivm_secrets_garrett_core','coordination','dispatch'], [5]),
+        function(4, ['aivm_secrets_garrett_core','dispatch','dispatch'], [22]),
         function(5, ['aivm_secrets_garrett','custody','manifest_session','<Impl>',
-                     'exchange_manifest'], [6,9]),
+                     'send_manifest_bytes'], [6]),
         function(6, ['std','io','Write','write_all'], kind='Opaque'),
         function(7, ['rustls_pki_types','pem','reader'], unresolved={'Trait':2}),
         function(8, ['aivm_secrets_garrett','custody','account_request_bytes'], [14]),
@@ -49,19 +49,20 @@ def projection():
         function(18, ['aivm_secrets_garrett_core','http_wire','valid_name'], [19]),
         function(19, ['aivm_secrets_garrett_core','http_wire','reserved_name'], [20]),
         function(20, ['aivm_secrets_garrett_core','http_wire','ascii_equal']),
+        function(22, ['aivm_secrets_garrett_core','provider_exchange','exchange'], [5,9]),
     ]))
 
 
 def test_compiled_paths_keep_external_and_dynamic_obligations_explicit():
     result = explain(projection())
     assert result['witnesses'] == {'account-controller-executor':[0,1,2,3],
-        'coordinated-manifest-executor':[0,4,5],
+        'coordinated-manifest-executor':[0,4,22,5],
         'account-authentication-bytes':[0,1,2,3,8,14,15,10,11],
-        'manifest-authentication-bytes':[0,4,5,9,14,15,10,11],
+        'manifest-authentication-bytes':[0,4,22,9,14,15,10,11],
         'account-request-line':[0,1,2,3,8,14,15,12,13],
-        'manifest-request-line':[0,4,5,9,14,15,12,13],
+        'manifest-request-line':[0,4,22,9,14,15,12,13],
         'account-complete-header-admission':[0,1,2,3,8,14,15,16,17,18,19,20],
-        'manifest-complete-header-admission':[0,4,5,9,14,15,16,17,18,19,20]}
+        'manifest-complete-header-admission':[0,4,22,9,14,15,16,17,18,19,20]}
     assert result['opaque_boundaries'] == [6]
     assert result['unresolved_calls'] == {7:{'Trait':2}}
     assert result['unresolved_in_root'] == {}
@@ -70,7 +71,7 @@ def test_compiled_paths_keep_external_and_dynamic_obligations_explicit():
         'begin']['line'] == 4
 
 
-@pytest.mark.parametrize('victim', [0,1,2,3,4,5,8,9,10,12,14,15,16,17,18,19])
+@pytest.mark.parametrize('victim', [0,1,2,3,4,8,9,10,12,14,15,16,17,18,19,21])
 def test_missing_callback_link_cannot_be_rebaselined_as_a_passing_witness(victim):
     data = projection()
     data['translated']['fun_decls'][victim]['body']['blocks']['direct'] = []

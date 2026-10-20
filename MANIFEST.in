@@ -52,3 +52,4 @@ recursive-include tests/native *.c
 include proofs/GarrettRequestPrefix.lean proofs/GarrettRequestTrace.lean
 
 include proofs/GarrettCompletion.lean proofs/GarrettCompletionSimulation.lean
+include proofs/GarrettDispatch.lean proofs/GarrettDispatchSimulation.lean

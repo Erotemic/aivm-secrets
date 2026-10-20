@@ -14,69 +14,29 @@ type EffectsCell = Rc<RefCell<RequestEffects>>;
 
 struct PreparedDispatch<'a> {
     effect: &'a Effect,
-    transition: read_transition::Prepared,
-}
-struct AuditedDispatch<'a> {
-    effect: &'a Effect,
-    transition: read_transition::Audited,
+    transition: Outcome<read_transition::Prepared>,
+    phase: DispatchPhase,
 }
 impl<'a> PreparedDispatch<'a> {
-    fn preflight(effect: &'a Effect) -> Outcome<Self> {
-        let transition = read_transition::prepare(DispatchPhase::Preflight, false, effect.write)
-            .map_err(|_| Error::InvalidPolicy)?;
-        Ok(Self { effect, transition })
-    }
-    fn final_effect(effect: &'a Effect, admitted_write: bool) -> Outcome<Self> {
-        let transition =
-            read_transition::prepare(DispatchPhase::Final, admitted_write, effect.write)
-                .map_err(|_| Error::InvalidPolicy)?;
-        Ok(Self { effect, transition })
-    }
-    #[allow(clippy::too_many_arguments)]
-    fn audit(
-        self,
-        audit: &Audit,
-        policy: &Policy,
-        route: &core::Route,
-        identity: &Value,
-        operation: &str,
-        request_digest: &str,
-        secret: &Credential,
-        effects: &EffectsCell,
-    ) -> Outcome<AuditedDispatch<'a>> {
-        // A hostile provider fact cannot turn a credential into a route or
-        // an audit field. The body is intentionally absent from this record.
-        crate::manifest::disclosure::ensure_safe(&json!({"target":self.effect.target}), &secret.0)?;
-        if !effects.borrow_mut().begin_dispatch_audit(&self.transition) {
-            return Err(Error::InternalError);
+    fn preflight(effect: &'a Effect) -> Self {
+        Self {
+            effect,
+            phase: DispatchPhase::Preflight,
+            transition: read_transition::prepare(DispatchPhase::Preflight, false, effect.write)
+                .map_err(|_| Error::InvalidPolicy),
         }
-        audit.write_record(&json!({
-            "schema":1,
-            "event":"dispatch",
-            "phase":self.transition.phase().as_str(),
-            "grant":audit.grant,
-            "policy":audit.policy,
-            "identity":identity,
-            "operation":operation,
-            "request_digest":request_digest,
-            "route":{
-                "host":policy.host,
-                "port":route.port,
-                "method":self.effect.method,
-                "path":self.effect.target,
-            }
-        }))?;
-        // The adapter can assert success only after write_record returns.
-        // fsync/IO acknowledgement is an explicit external proof premise.
-        let transition = read_transition::acknowledge(self.transition, true)
-            .map_err(|_| Error::InternalError)?;
-        if !effects.borrow_mut().acknowledge_dispatch(&transition) {
-            return Err(Error::InternalError);
+    }
+    fn final_effect(effect: &'a Effect, admitted_write: bool) -> Self {
+        Self {
+            effect,
+            phase: DispatchPhase::Final,
+            transition: read_transition::prepare(
+                DispatchPhase::Final,
+                admitted_write,
+                effect.write,
+            )
+            .map_err(|_| Error::InvalidPolicy),
         }
-        Ok(AuditedDispatch {
-            effect: self.effect,
-            transition,
-        })
     }
 }
 
@@ -512,64 +472,39 @@ impl Session {
         // Neither raw facts nor a guest-provided URL is a PreparedDispatch.
         let effects = Rc::new(RefCell::new(RequestEffects::new()));
         let dispatch = |prepared: PreparedDispatch<'_>| -> Outcome<Value> {
-            let recorded = prepared.audit(
-                &self.base.executor.audit,
-                &self.policy,
-                &self.base.grant.route,
-                &crate::model::claims_json(&outer.claims)?,
-                &op.name,
-                &request_hash,
-                &secret,
-                &effects,
-            )?;
-            let effect = recorded.effect;
-            // Durable audit and a fresh grant both precede credentialed I/O.
-            // Waiting for either must not extend identity or grant lifetime.
-            let keyed_write = matches!(recorded.transition.phase(), DispatchPhase::Final)
-                && effect.write
+            let keyed_write = matches!(prepared.phase, DispatchPhase::Final)
+                && prepared.effect.write
                 && self.base.coordinator.is_some();
-            let mut headers = self.policy.headers.clone();
-            if keyed_write && op.idempotency_header {
-                let (key, _) = reservation.as_ref().ok_or(Error::InvalidRequest)?;
-                headers.insert("Idempotency-Key".into(), key.clone());
-            }
-            let reservation_call = |finish: bool| -> Outcome<()> {
-                let (key, fingerprint) = reservation.as_ref().ok_or(Error::InvalidRequest)?;
-                let coordinator = self
-                    .base
-                    .coordinator
-                    .as_ref()
-                    .ok_or(Error::InvalidRequest)?;
-                if finish {
-                    coordinator.finish(key, fingerprint)
-                } else {
-                    coordinator.reserve(key, fingerprint)
-                }
-            };
-            let pending = crate::coordination::PendingDispatch {
-                check: &fresh,
-                reserve: || reservation_call(false),
-                emit: || {
-                    self.base.executor.exchange_manifest(
-                        &self.base.grant.route,
-                        &secret,
-                        &recorded,
-                        &headers,
-                        &current,
-                        &effects,
-                    )
+            let work = ManifestProvider {
+                executor: &self.base.executor,
+                route: &self.base.grant.route,
+                secret: &secret,
+                effect: prepared.effect,
+                headers: BTreeMap::new(),
+                current: &current,
+                dispatch: ManifestDispatch {
+                    policy: &self.policy,
+                    identity: None,
+                    claims: &outer.claims,
+                    operation: &op.name,
+                    request_digest: &request_hash,
+                    fresh: &fresh,
+                    coordinator: self.base.coordinator.as_ref(),
+                    reservation: reservation
+                        .as_ref()
+                        .map(|(key, fingerprint)| (key.as_str(), fingerprint.as_str())),
+                    idempotency_header: op.idempotency_header,
                 },
-                finish: || reservation_call(true),
             };
-            let out = aivm_secrets_garrett_core::coordination::dispatch(&pending, keyed_write);
-            if out.is_ok()
-                && !effects
-                    .borrow_mut()
-                    .finish_dispatch(recorded.transition.phase())
-            {
-                return Err(Error::InternalError);
-            }
-            out
+            let before = *effects.borrow();
+            let report = aivm_secrets_garrett_core::dispatch::dispatch(
+                work,
+                prepared.transition,
+                before,
+                keyed_write,
+            );
+            *effects.borrow_mut() = report.effects;
+            report.outcome
         };
         let release = |raw: Value| -> Outcome<CompletedRelease> {
             let select = || {
@@ -598,8 +533,8 @@ impl Session {
             preflight: || self.policy.preflight(op, &args),
             final_effect: |facts: &Value| self.policy.final_effect(op, &args, facts),
             dispatch: |phase, effect: &Effect| match phase {
-                DispatchPhase::Preflight => dispatch(PreparedDispatch::preflight(effect)?),
-                DispatchPhase::Final => dispatch(PreparedDispatch::final_effect(effect, op.write)?),
+                DispatchPhase::Preflight => dispatch(PreparedDispatch::preflight(effect)),
+                DispatchPhase::Final => dispatch(PreparedDispatch::final_effect(effect, op.write)),
             },
             complete: release,
             fresh: &fresh,
@@ -694,17 +629,7 @@ fn manifest_request_bytes(
 
 // The standard Write contract includes partial acceptance before an error.
 // Keep the raw credential-bearing primitive this small and separately tested.
-fn send_manifest_bytes(
-    state: &mut aivm_secrets_garrett_core::provider_exchange::SendState,
-    writer: &mut impl Write,
-    request: &[u8],
-    write: bool,
-    effects: &EffectsCell,
-    phase: DispatchPhase,
-) -> Outcome<()> {
-    if !effects.borrow_mut().begin_send(phase, state, write) {
-        return Err(Error::InternalError);
-    }
+fn send_manifest_bytes(writer: &mut impl Write, request: &[u8]) -> Outcome<()> {
     writer
         .write_all(request)
         .and_then(|_| writer.flush())
@@ -716,16 +641,84 @@ struct ManifestChannel {
     request: Zeroizing<Vec<u8>>,
     _deadline: Deadline,
 }
+struct ManifestDispatch<'a> {
+    policy: &'a Policy,
+    identity: Option<Value>,
+    claims: &'a aivm_secrets_garrett_core::Claims,
+    operation: &'a str,
+    request_digest: &'a str,
+    fresh: &'a dyn Fn() -> Outcome<()>,
+    coordinator: Option<&'a crate::coordination::Coordinator>,
+    reservation: Option<(&'a str, &'a str)>,
+    idempotency_header: bool,
+}
 struct ManifestProvider<'a, F> {
     executor: &'a Executor,
     route: &'a core::Route,
     secret: &'a Credential,
     effect: &'a Effect,
-    headers: &'a BTreeMap<String, String>,
+    headers: BTreeMap<String, String>,
     current: &'a F,
-    send_state: aivm_secrets_garrett_core::provider_exchange::SendState,
-    effects: EffectsCell,
-    phase: DispatchPhase,
+    dispatch: ManifestDispatch<'a>,
+}
+impl<F: Fn() -> Outcome<guards::AdmissionStamp>> aivm_secrets_garrett_core::dispatch::Work
+    for ManifestProvider<'_, F>
+{
+    const INVALID_TRANSITION: Error = Error::InternalError;
+    fn effect_write(&self) -> bool {
+        self.effect.write
+    }
+    fn prepare(&mut self) -> Outcome<()> {
+        self.dispatch.identity = Some(crate::model::claims_json(self.dispatch.claims)?);
+        crate::manifest::disclosure::ensure_safe(
+            &json!({"target":self.effect.target}),
+            &self.secret.0,
+        )
+    }
+    fn audit(&mut self, phase: DispatchPhase) -> Outcome<()> {
+        let audit = &self.executor.audit;
+        audit.write_record(&json!({
+            "schema":1,
+            "event":"dispatch",
+            "phase":phase.as_str(),
+            "grant":audit.grant,
+            "policy":audit.policy,
+            "identity":self.dispatch.identity.as_ref().ok_or(Error::InternalError)?,
+            "operation":self.dispatch.operation,
+            "request_digest":self.dispatch.request_digest,
+            "route":{
+                "host":self.dispatch.policy.host,
+                "port":self.route.port,
+                "method":self.effect.method,
+                "path":self.effect.target,
+            }
+        }))
+    }
+    fn configure(&mut self, keyed_write: bool) -> Outcome<()> {
+        self.headers = self.dispatch.policy.headers.clone();
+        if keyed_write && self.dispatch.idempotency_header {
+            let (key, _) = self.dispatch.reservation.ok_or(Error::InvalidRequest)?;
+            self.headers.insert("Idempotency-Key".into(), key.into());
+        }
+        Ok(())
+    }
+    fn check(&mut self) -> Outcome<()> {
+        (self.dispatch.fresh)()
+    }
+    fn reserve(&mut self) -> Outcome<()> {
+        let (key, fingerprint) = self.dispatch.reservation.ok_or(Error::InvalidRequest)?;
+        self.dispatch
+            .coordinator
+            .ok_or(Error::InvalidRequest)?
+            .reserve(key, fingerprint)
+    }
+    fn finish(&mut self) -> Outcome<()> {
+        let (key, fingerprint) = self.dispatch.reservation.ok_or(Error::InvalidRequest)?;
+        self.dispatch
+            .coordinator
+            .ok_or(Error::InvalidRequest)?
+            .finish(key, fingerprint)
+    }
 }
 impl<F: Fn() -> Outcome<guards::AdmissionStamp>>
     aivm_secrets_garrett_core::provider_exchange::Provider for ManifestProvider<'_, F>
@@ -737,7 +730,7 @@ impl<F: Fn() -> Outcome<guards::AdmissionStamp>>
     const OUTCOME_UNKNOWN: Error = Error::OutcomeUnknown;
 
     fn setup(&mut self) -> Outcome<ManifestChannel> {
-        let request = manifest_request_bytes(self.route, self.secret, self.effect, self.headers)?;
+        let request = manifest_request_bytes(self.route, self.secret, self.effect, &self.headers)?;
         let host = std::str::from_utf8(&self.route.host).map_err(|_| Error::InvalidPolicy)?;
         let mut socket = TcpStream::connect_timeout(
             &SocketAddr::new(
@@ -774,26 +767,11 @@ impl<F: Fn() -> Outcome<guards::AdmissionStamp>>
         })
     }
     fn recheck(&mut self) -> Outcome<guards::AdmissionStamp> {
-        if !self.send_state.begin_check() {
-            return Err(Error::InternalError);
-        }
-        let stamp = (self.current)()?;
-        if !self.send_state.finish_check(stamp) {
-            return Err(Error::InternalError);
-        }
-        Ok(stamp)
+        (self.current)()
     }
     fn send(&mut self, channel: &mut ManifestChannel) -> Outcome<()> {
-        // The only credential-bearing write in this manifest adapter. The
-        // core has already obtained a current stamp after verified TLS setup.
-        send_manifest_bytes(
-            &mut self.send_state,
-            &mut channel.stream,
-            &channel.request,
-            self.effect.write,
-            &self.effects,
-            self.phase,
-        )
+        // Core dispatch owns the composite receipt/current attempt gate.
+        send_manifest_bytes(&mut channel.stream, &channel.request)
     }
     fn receive(&mut self, channel: ManifestChannel) -> Outcome<Value> {
         let ManifestChannel {
@@ -826,49 +804,6 @@ impl<F: Fn() -> Outcome<guards::AdmissionStamp>>
         }
     }
 }
-impl Executor {
-    fn exchange_manifest(
-        &self,
-        route: &core::Route,
-        secret: &Credential,
-        audited: &AuditedDispatch<'_>,
-        headers: &BTreeMap<String, String>,
-        current: &impl Fn() -> Outcome<guards::AdmissionStamp>,
-        effects: &EffectsCell,
-    ) -> Outcome<Value> {
-        let effect = audited.effect;
-        if audited.transition.is_write() != effect.write {
-            return Err(Error::InvalidPolicy);
-        }
-        if !effects.borrow_mut().begin_provider(&audited.transition) {
-            return Err(Error::InternalError);
-        }
-        let mut provider = ManifestProvider {
-            executor: self,
-            route,
-            secret,
-            effect,
-            headers,
-            current,
-            send_state: aivm_secrets_garrett_core::provider_exchange::SendState::new(),
-            effects: effects.clone(),
-            phase: audited.transition.phase(),
-        };
-        let report = aivm_secrets_garrett_core::provider_exchange::exchange(
-            &mut provider,
-            &audited.transition,
-        );
-        if report.stage() == aivm_secrets_garrett_core::provider_exchange::Stage::Complete
-            && !effects
-                .borrow_mut()
-                .provider_completed(audited.transition.phase())
-        {
-            return Err(Error::InternalError);
-        }
-        report.into_result()
-    }
-}
-
 fn manifest_response(mut reader: impl BufRead, format: &str) -> Outcome<Vec<u8>> {
     let status = response_status(&line(&mut reader, 4096)?)?;
     if (400..500).contains(&status) {
@@ -1146,8 +1081,6 @@ mod wire_tests {
         limit: usize,
         flush_error: bool,
         current: guards::AdmissionStamp,
-        send_state: aivm_secrets_garrett_core::provider_exchange::SendState,
-        effects: EffectsCell,
         parsed: bool,
     }
     impl aivm_secrets_garrett_core::provider_exchange::Provider for FaultProvider {
@@ -1164,23 +1097,38 @@ mod wire_tests {
             })
         }
         fn recheck(&mut self) -> Outcome<guards::AdmissionStamp> {
-            assert!(self.send_state.begin_check());
-            assert!(self.send_state.finish_check(self.current));
             Ok(self.current)
         }
         fn send(&mut self, writer: &mut PartialWriter) -> Outcome<()> {
-            send_manifest_bytes(
-                &mut self.send_state,
-                writer,
-                b"synthetic-request",
-                self.current.write(),
-                &self.effects,
-                DispatchPhase::Final,
-            )
+            send_manifest_bytes(writer, b"synthetic-request")
         }
         fn receive(&mut self, _writer: PartialWriter) -> Outcome<Value> {
             self.parsed = true;
             Ok(json!({"selected":true}))
+        }
+    }
+    impl aivm_secrets_garrett_core::dispatch::Work for FaultProvider {
+        const INVALID_TRANSITION: Error = Error::InternalError;
+        fn effect_write(&self) -> bool {
+            self.current.write()
+        }
+        fn prepare(&mut self) -> Outcome<()> {
+            Ok(())
+        }
+        fn audit(&mut self, _: DispatchPhase) -> Outcome<()> {
+            Ok(())
+        }
+        fn configure(&mut self, _: bool) -> Outcome<()> {
+            Ok(())
+        }
+        fn check(&mut self) -> Outcome<()> {
+            Ok(())
+        }
+        fn reserve(&mut self) -> Outcome<()> {
+            Ok(())
+        }
+        fn finish(&mut self) -> Outcome<()> {
+            Ok(())
         }
     }
     #[test]
@@ -1219,50 +1167,44 @@ mod wire_tests {
                 let prepared = read_transition::prepare(DispatchPhase::Final, write, write)
                     .ok()
                     .unwrap();
-                let effects = Rc::new(RefCell::new(RequestEffects::new()));
-                assert!(effects.borrow_mut().begin_dispatch_audit(&prepared));
-                let audited = read_transition::acknowledge(prepared, true).ok().unwrap();
-                assert!(effects.borrow_mut().acknowledge_dispatch(&audited));
-                assert!(effects.borrow_mut().begin_provider(&audited));
                 let accepted = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-                let mut provider = FaultProvider {
+                let provider = FaultProvider {
                     accepted: accepted.clone(),
                     limit,
                     flush_error,
                     current,
-                    send_state: provider_exchange::SendState::new(),
-                    effects: effects.clone(),
                     parsed: false,
                 };
-                let report = provider_exchange::exchange(&mut provider, &audited);
-                assert_eq!(report.stage(), provider_exchange::Stage::Send);
-                assert!(report.stage().attempted());
+                let report = aivm_secrets_garrett_core::dispatch::dispatch(
+                    provider,
+                    Ok(prepared),
+                    RequestEffects::new(),
+                    false,
+                );
+                assert_eq!(report.provider_stage, Some(provider_exchange::Stage::Send));
+                assert!(report.local.attempted());
+                assert!(report
+                    .effects
+                    .phase(DispatchPhase::Final)
+                    .provider_attempted());
                 assert_eq!(
-                    report.into_result(),
+                    report.outcome,
                     Err(if write {
                         Error::OutcomeUnknown
                     } else {
                         Error::UpstreamResponse
                     })
                 );
-                assert!(!provider.parsed);
+                assert!(!report.work.parsed);
                 let before = accepted.borrow().clone();
-                let mut retry = PartialWriter {
-                    accepted: accepted.clone(),
-                    limit: usize::MAX,
-                    flush_error: false,
-                };
-                assert_eq!(
-                    send_manifest_bytes(
-                        &mut provider.send_state,
-                        &mut retry,
-                        b"synthetic-request",
-                        write,
-                        &effects,
-                        DispatchPhase::Final,
-                    ),
-                    Err(Error::InternalError)
+                let repeat = aivm_secrets_garrett_core::dispatch::dispatch(
+                    report.work,
+                    read_transition::prepare(DispatchPhase::Final, write, write)
+                        .map_err(|_| Error::InvalidPolicy),
+                    report.effects,
+                    false,
                 );
+                assert_eq!(repeat.outcome, Err(Error::InternalError));
                 assert_eq!(*accepted.borrow(), before);
                 assert_eq!(
                     &*accepted.borrow(),
@@ -1296,19 +1238,23 @@ mod wire_tests {
     #[test]
     fn unapproved_read_or_preflight_cannot_become_write_dispatch() {
         let read = effect();
-        assert!(PreparedDispatch::preflight(&read).is_ok());
-        assert!(PreparedDispatch::final_effect(&read, false).is_ok());
+        assert!(PreparedDispatch::preflight(&read).transition.is_ok());
+        assert!(PreparedDispatch::final_effect(&read, false)
+            .transition
+            .is_ok());
         let mut write = effect();
         write.write = true;
         assert!(matches!(
-            PreparedDispatch::preflight(&write),
+            PreparedDispatch::preflight(&write).transition,
             Err(Error::InvalidPolicy)
         ));
         assert!(matches!(
-            PreparedDispatch::final_effect(&write, false),
+            PreparedDispatch::final_effect(&write, false).transition,
             Err(Error::InvalidPolicy)
         ));
-        assert!(PreparedDispatch::final_effect(&write, true).is_ok());
+        assert!(PreparedDispatch::final_effect(&write, true)
+            .transition
+            .is_ok());
     }
 
     #[test]

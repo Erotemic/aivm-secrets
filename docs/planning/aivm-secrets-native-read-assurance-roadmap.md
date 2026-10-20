@@ -497,3 +497,16 @@ completion receipt and success-gate contracts from actual extracted code under
 an explicit native report/copy-back/outcome link. Native instantiation of that
 link, dispatch/outer-check primitives, JSON/wire/history and complete sink closure
 remain required NR-2/3/4/5 work.
+
+### Owned dispatch increment
+
+The [production-owned dispatch](../garrett-owned-dispatch.md) and completion
+controllers now derive both complete-callback receipt premises under explicit
+native report/copy/outcome links. Dispatch owns its receipt and local send state
+across native primitive calls and retains exact error post-state. New extracted
+results include audit denial, freshness/reservation refusal, rejected/partial
+send, coordinator finish uncertainty and a positive read in each dispatch phase.
+This advances NR-2's controller composition and NR-3's owned send gate; native
+links, primitive/context instantiation and transitive I/O/drop/callback closure
+remain open. Receipt reachability alone is not native history correspondence,
+whole-service mediation or an NR-2/3/4/5 exit.

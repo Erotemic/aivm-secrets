@@ -14,6 +14,7 @@ CONTRACT = 'docs/planning/aivm-secrets-w6-adapters.json'
 SOURCE = 'rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs'
 TESTS = 'tests/test_rust_w6_adapter.py'
 CORE_ENCODER = 'rust/crates/aivm-secrets-garrett-core/src/http_wire.rs'
+CORE_DISPATCH = 'rust/crates/aivm-secrets-garrett-core/src/dispatch.rs'
 COMMON_ENCODER = 'rust/crates/aivm-secrets-garrett/src/custody.rs'
 
 
@@ -49,37 +50,34 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
     ensure(len(contract['remaining_obligations']) >= 5,
            'W6 silently removed outstanding correspondence obligations')
     source = (root / SOURCE).read_text()
-    request = source.index('        let request = manifest_request_bytes(self.route, self.secret, self.effect, self.headers)?;')
+    request = source.index('        let request = manifest_request_bytes(self.route, self.secret, self.effect, &self.headers)?;')
     connect = source.index('TcpStream::connect_timeout(')
     ensure(request < connect, 'TCP effect before request-byte validation')
     ensure(source.count('fn manifest_request_bytes(') == 1
-           and source.count('let request = manifest_request_bytes(self.route, self.secret, self.effect, self.headers)?;') == 1,
+           and source.count('let request = manifest_request_bytes(self.route, self.secret, self.effect, &self.headers)?;') == 1,
            'native manifest adapter has additional unreviewed encoder')
     # The real credential-bearing executor only accepts the type constructed
     # after durable audit. This checks the reviewed source topology; it cannot
     # prove what a compiler or an external dependency ultimately executes.
     constructor = source.split("impl<'a> PreparedDispatch<'a> {", 1)[1].split('pub(crate) struct Session {', 1)[0]
     entry = source.split('pub(super) fn request(', 1)[1].split('pub(super) fn control(', 1)[0]
-    ensure(source.count('AuditedDispatch {') == 1
-           and 'audit.write_record(' in constructor
-           and constructor.index('audit.write_record(') < constructor.index('Ok(AuditedDispatch {')
-           and 'let recorded = prepared.audit(' in entry
-           and 'exchange_manifest(' in entry
-           and '&recorded,' in entry
-           and 'Ok(AuditedDispatch{effect:self.effect,transition,})' in ''.join(constructor.split())
+    dispatch_core = (root / CORE_DISPATCH).read_text().split('#[cfg(test)]', 1)[0]
+    ensure('transition: Outcome<read_transition::Prepared>' in source
            and 'read_transition::prepare(DispatchPhase::Preflight, false, effect.write)' in constructor
-           and 'read_transition::prepare(DispatchPhase::Final, admitted_write, effect.write)' in constructor
-           and constructor.index('audit.write_record(') < constructor.index('read_transition::acknowledge(self.transition, true)'),
+           and 'read_transition::prepare(DispatchPhase::Final,admitted_write,effect.write,)' in ''.join(constructor.split())
+           and 'dispatch::dispatch(' in entry and '*effects.borrow_mut() = report.effects;' in entry
+           and 'pending.work.audit(prepared.phase())' in dispatch_core
+           and 'read_transition::acknowledge(prepared, true)' in dispatch_core
+           and dispatch_core.index('pending.work.audit(prepared.phase())') < dispatch_core.index('read_transition::acknowledge(prepared, true)'),
            'provider effect not typed as audited/phase-authorized before dispatch')
-    provider_interpreter = source.split('impl Executor {', 1)[1].split('fn manifest_response(', 1)[0]
-    ensure('audited: &AuditedDispatch<' in provider_interpreter
-           and 'let effect = audited.effect;' in provider_interpreter
-           and 'audited.transition.is_write() != effect.write' in provider_interpreter,
+    ensure('audited: &read_transition::Audited' in dispatch_core
+           and 'audited.is_write() != pending.work.effect_write()' in dispatch_core
+           and 'begin_provider(audited)' in dispatch_core,
            'provider executor accepts an unaudited policy effect')
     runtime = source.split('#[cfg(test)]', 1)[0]
-    ensure(runtime.count('.write_all(') == 1
-           and 'writer.write_all(request)' in ''.join(runtime.split())
-           and 'provider_exchange::exchange(&mutprovider,&audited.transition,)' in ''.join(provider_interpreter.split())
+    ensure(runtime.count('.write_all(') == 1 and 'writer.write_all(request)' in ''.join(runtime.split())
+           and 'provider_exchange::exchange(pending, audited)' in dispatch_core
+           and 'self.work.send(channel)' in dispatch_core and '.begin_send(self.phase, &mut self.local, self.write)' in dispatch_core
            and runtime.count('TcpStream::connect_timeout(') == 1,
            'native manifest adapter has another provider send')
     encoder = source.split('fn manifest_request_bytes(', 1)[1].split('// The standard Write contract', 1)[0]

@@ -2379,6 +2379,1228 @@ partial_fixpoint
 
 end
 
+/-- Trait declaration: [aivm_secrets_garrett_core::provider_exchange::Provider]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 9:0-20:1
+    Visibility: public -/
+structure provider_exchange.Provider (Self : Type _) (Self_Channel : Type _)
+  (Self_Output : Type _) (Self_Error : Type _) where
+  INVALID_POLICY : Result Self_Error
+  OUTCOME_UNKNOWN : Result Self_Error
+  setup : Self → Result ((core.result.Result Self_Channel Self_Error) ×
+    Self)
+  recheck : Self → Result ((core.result.Result manifest.AdmissionStamp
+    Self_Error) × Self)
+  send : Self → Self_Channel → Result ((core.result.Result Unit Self_Error)
+    × Self × Self_Channel)
+  receive : Self → Self_Channel → Result ((core.result.Result Self_Output
+    Self_Error) × Self)
+
+/-- Trait declaration: [aivm_secrets_garrett_core::dispatch::Work]
+    Source: 'crates/aivm-secrets-garrett-core/src/dispatch.rs', lines 12:0-21:1
+    Visibility: public -/
+structure dispatch.Work (Self : Type _) (Self_Clause0_Channel : Type _)
+  (Self_Clause0_Output : Type _) (Self_Clause0_Error : Type _) where
+  INVALID_TRANSITION : Result Self_Clause0_Error
+  provider_exchangeProviderInst : provider_exchange.Provider Self
+    Self_Clause0_Channel Self_Clause0_Output Self_Clause0_Error
+  effect_write : Self → Result Bool
+  prepare : Self → Result ((core.result.Result Unit Self_Clause0_Error) ×
+    Self)
+  audit : Self → read_transition.Phase → Result ((core.result.Result Unit
+    Self_Clause0_Error) × Self)
+  configure : Self → Bool → Result ((core.result.Result Unit
+    Self_Clause0_Error) × Self)
+  check : Self → Result ((core.result.Result Unit Self_Clause0_Error) ×
+    Self)
+  reserve : Self → Result ((core.result.Result Unit Self_Clause0_Error) ×
+    Self)
+  finish : Self → Result ((core.result.Result Unit Self_Clause0_Error) ×
+    Self)
+
+/-- [aivm_secrets_garrett_core::provider_exchange::SendProgress]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 120:0-126:1 -/
+@[discriminant isize]
+inductive provider_exchange.SendProgress where
+| Empty : provider_exchange.SendProgress
+| Checking : provider_exchange.SendProgress
+| Halted : provider_exchange.SendProgress
+| Checked : manifest.AdmissionStamp → provider_exchange.SendProgress
+| Attempted : manifest.AdmissionStamp → provider_exchange.SendProgress
+
+/-- [aivm_secrets_garrett_core::provider_exchange::SendState]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 127:0-129:1
+    Visibility: public -/
+structure provider_exchange.SendState where
+  progress : provider_exchange.SendProgress
+
+/-- [aivm_secrets_garrett_core::provider_exchange::Stage]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 23:0-29:1
+    Visibility: public -/
+@[discriminant isize]
+inductive provider_exchange.Stage where
+| Setup : provider_exchange.Stage
+| Admission : provider_exchange.Stage
+| Send : provider_exchange.Stage
+| Response : provider_exchange.Stage
+| Complete : provider_exchange.Stage
+
+/-- [aivm_secrets_garrett_core::dispatch::Report]
+    Source: 'crates/aivm-secrets-garrett-core/src/dispatch.rs', lines 23:0-30:1
+    Visibility: public -/
+structure dispatch.Report (W : Type _) (Clause0_Clause0_Channel : Type _)
+  (Clause0_Clause0_Output : Type _) (Clause0_Clause0_Error : Type _) where
+  outcome : core.result.Result Clause0_Clause0_Output Clause0_Clause0_Error
+  work : W
+  effects : request_effects.RequestEffects
+  «local» : provider_exchange.SendState
+  provider_stage : Option provider_exchange.Stage
+  current : Option manifest.AdmissionStamp
+
+/-- [aivm_secrets_garrett_core::dispatch::Pending]
+    Source: 'crates/aivm-secrets-garrett-core/src/dispatch.rs', lines 32:0-40:1 -/
+structure dispatch.Pending (W : Type _) (Clause0_Clause0_Channel : Type _)
+  (Clause0_Clause0_Output : Type _) (Clause0_Clause0_Error : Type _) where
+  work : W
+  effects : request_effects.RequestEffects
+  «local» : provider_exchange.SendState
+  phase : read_transition.Phase
+  write : Bool
+  provider_stage : Option provider_exchange.Stage
+  current : Option manifest.AdmissionStamp
+
+/-- [aivm_secrets_garrett_core::dispatch::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::dispatch::Pending<W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::receive]:
+    Source: 'crates/aivm-secrets-garrett-core/src/dispatch.rs', lines 73:4-75:5
+    Visibility: public -/
+def
+  dispatch.Pending.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.receive
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (WorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (self : dispatch.Pending W Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) (channel : Clause0_Clause0_Channel) :
+  Result ((core.result.Result Clause0_Clause0_Output Clause0_Clause0_Error) ×
+    (dispatch.Pending W Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ←
+    WorkInst.provider_exchangeProviderInst.receive self.work channel
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::set_phase]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 139:4-144:5 -/
+def request_effects.RequestEffects.set_phase
+  (self : request_effects.RequestEffects) (phase : read_transition.Phase)
+  (record : request_effects.DispatchRecord) :
+  Result request_effects.RequestEffects
+  := do
+  match phase with
+  | read_transition.Phase.Preflight => ok { self with preflight := record }
+  | read_transition.Phase.Final => ok { self with final_effect := record }
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::phase]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 133:4-138:5
+    Visibility: public -/
+def request_effects.RequestEffects.phase
+  (self : request_effects.RequestEffects) (phase : read_transition.Phase) :
+  Result request_effects.DispatchRecord
+  := do
+  match phase with
+  | read_transition.Phase.Preflight => ok self.preflight
+  | read_transition.Phase.Final => ok self.final_effect
+
+/-- [aivm_secrets_garrett_core::read_transition::{impl core::cmp::PartialEq<aivm_secrets_garrett_core::read_transition::Phase> for aivm_secrets_garrett_core::read_transition::Phase}::eq]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 15:29-15:38
+    Visibility: public -/
+def read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq
+  (self : read_transition.Phase) (other : read_transition.Phase) :
+  Result Bool
+  := do
+  let self1 := read_discriminant self
+  let other1 := read_discriminant other
+  ok (self1 = other1)
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::SendState}::stamp]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 179:4-184:5
+    Visibility: public -/
+def provider_exchange.SendState.stamp
+  (self : provider_exchange.SendState) :
+  Result (Option manifest.AdmissionStamp)
+  := do
+  match self.progress with
+  | provider_exchange.SendProgress.Empty => ok none
+  | provider_exchange.SendProgress.Checking => ok none
+  | provider_exchange.SendProgress.Halted => ok none
+  | provider_exchange.SendProgress.Checked stamp => ok (some stamp)
+  | provider_exchange.SendProgress.Attempted stamp => ok (some stamp)
+
+/-- [aivm_secrets_garrett_core::manifest::{aivm_secrets_garrett_core::manifest::AdmissionStamp}::write]:
+    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 85:4-87:5
+    Visibility: public -/
+def manifest.AdmissionStamp.impl.write
+  (self : manifest.AdmissionStamp) : Result Bool := do
+  ok self.write
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::SendState}::begin_send]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 162:4-178:5
+    Visibility: public -/
+def provider_exchange.SendState.begin_send
+  (self : provider_exchange.SendState) (write : Bool) :
+  Result (Bool × provider_exchange.SendState)
+  := do
+  match self.progress with
+  | provider_exchange.SendProgress.Empty =>
+    ok (false, { progress := provider_exchange.SendProgress.Halted })
+  | provider_exchange.SendProgress.Checking =>
+    ok (false, { progress := provider_exchange.SendProgress.Halted })
+  | provider_exchange.SendProgress.Halted =>
+    ok (false, { progress := provider_exchange.SendProgress.Halted })
+  | provider_exchange.SendProgress.Checked stamp =>
+    if write
+    then
+      let b ← manifest.AdmissionStamp.impl.write stamp
+      if b
+      then
+        ok (true,
+          { progress := (provider_exchange.SendProgress.Attempted stamp) })
+      else ok (false, { progress := provider_exchange.SendProgress.Halted })
+    else
+      ok (true,
+        { progress := (provider_exchange.SendProgress.Attempted stamp) })
+  | provider_exchange.SendProgress.Attempted _ =>
+    ok (false, { progress := self.progress })
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::begin_send]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 196:4-210:5
+    Visibility: public -/
+def request_effects.RequestEffects.begin_send
+  (self : request_effects.RequestEffects) (phase : read_transition.Phase)
+  («local» : provider_exchange.SendState) (write : Bool) :
+  Result (Bool × request_effects.RequestEffects ×
+    provider_exchange.SendState)
+  := do
+  match self.progress with
+  | request_effects.Progress.Entry =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.DispatchAudit _ =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.Audited _ =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.ProviderReady recorded =>
+    let b ←
+      read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq recorded phase
+    if b
+    then
+      let (b1, local1) ←
+        provider_exchange.SendState.begin_send «local» write
+      if b1
+      then
+        let record ← request_effects.RequestEffects.phase self phase
+        let o ← provider_exchange.SendState.stamp local1
+        let self1 ←
+          request_effects.RequestEffects.set_phase self phase
+            { record with current := o, provider_attempted := true }
+        ok (true,
+          {
+            self1
+              with
+              progress := (request_effects.Progress.ProviderAttempted phase)
+          }, local1)
+      else
+        let (b2, self1) ← request_effects.RequestEffects.reject self
+        ok (b2, self1, local1)
+    else
+      let (b1, self1) ← request_effects.RequestEffects.reject self
+      ok (b1, self1, «local»)
+  | request_effects.Progress.ProviderAttempted _ =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.ProviderCompleted _ =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.DispatchReturned _ =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.Selecting =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.Selected =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.CheckingBefore =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.BeforeAudit =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.CompletionAudit =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.CompletionAudited =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.CheckingAfter =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.AfterAudit =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.ValueReady =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.Halted =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+
+/-- [aivm_secrets_garrett_core::dispatch::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::dispatch::Pending<W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::send]:
+    Source: 'crates/aivm-secrets-garrett-core/src/dispatch.rs', lines 64:4-72:5
+    Visibility: public -/
+def
+  dispatch.Pending.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.send
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (WorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (self : dispatch.Pending W Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) (channel : Clause0_Clause0_Channel) :
+  Result ((core.result.Result Unit Clause0_Clause0_Error) × (dispatch.Pending
+    W Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error) ×
+    Clause0_Clause0_Channel)
+  := do
+  let (b, re, ss) ←
+    request_effects.RequestEffects.begin_send self.effects self.phase
+      self.local self.write
+  if b
+  then
+    let (r, t, channel1) ←
+      WorkInst.provider_exchangeProviderInst.send self.work channel
+    ok (r, { self with work := t, effects := re, «local» := ss }, channel1)
+  else
+    let t ← WorkInst.INVALID_TRANSITION
+    ok (core.result.Result.Err t, { self with effects := re, «local» := ss },
+      channel)
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::SendState}::finish_check]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 149:4-161:5
+    Visibility: public -/
+def provider_exchange.SendState.finish_check
+  (self : provider_exchange.SendState) (stamp : manifest.AdmissionStamp) :
+  Result (Bool × provider_exchange.SendState)
+  := do
+  match self.progress with
+  | provider_exchange.SendProgress.Empty =>
+    ok (false, { progress := provider_exchange.SendProgress.Halted })
+  | provider_exchange.SendProgress.Checking =>
+    ok (true, { progress := (provider_exchange.SendProgress.Checked stamp) })
+  | provider_exchange.SendProgress.Halted =>
+    ok (false, { progress := provider_exchange.SendProgress.Halted })
+  | provider_exchange.SendProgress.Checked _ =>
+    ok (false, { progress := provider_exchange.SendProgress.Halted })
+  | provider_exchange.SendProgress.Attempted _ =>
+    ok (false, { progress := self.progress })
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::SendState}::begin_check]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 136:4-148:5
+    Visibility: public -/
+def provider_exchange.SendState.begin_check
+  (self : provider_exchange.SendState) :
+  Result (Bool × provider_exchange.SendState)
+  := do
+  match self.progress with
+  | provider_exchange.SendProgress.Empty =>
+    ok (true, { progress := provider_exchange.SendProgress.Checking })
+  | provider_exchange.SendProgress.Checking =>
+    ok (false, { progress := provider_exchange.SendProgress.Halted })
+  | provider_exchange.SendProgress.Halted =>
+    ok (false, { progress := provider_exchange.SendProgress.Halted })
+  | provider_exchange.SendProgress.Checked _ =>
+    ok (false, { progress := provider_exchange.SendProgress.Halted })
+  | provider_exchange.SendProgress.Attempted _ =>
+    ok (false, { progress := self.progress })
+
+/-- [aivm_secrets_garrett_core::dispatch::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::dispatch::Pending<W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::recheck]:
+    Source: 'crates/aivm-secrets-garrett-core/src/dispatch.rs', lines 51:4-63:5
+    Visibility: public -/
+def
+  dispatch.Pending.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.recheck
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (WorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (self : dispatch.Pending W Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) :
+  Result ((core.result.Result manifest.AdmissionStamp Clause0_Clause0_Error) ×
+    (dispatch.Pending W Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (b, ss) ← provider_exchange.SendState.begin_check self.local
+  if b
+  then
+    let (r, t) ← WorkInst.provider_exchangeProviderInst.recheck self.work
+    match r with
+    | core.result.Result.Ok stamp =>
+      let (b1, ss1) ← provider_exchange.SendState.finish_check ss stamp
+      if b1
+      then ok (r, { self with work := t, «local» := ss1 })
+      else
+        let t1 ← WorkInst.INVALID_TRANSITION
+        ok (core.result.Result.Err t1,
+          { self with work := t, «local» := ss1 })
+    | core.result.Result.Err _ =>
+      ok (r, { self with work := t, «local» := ss })
+  else
+    let t ← WorkInst.INVALID_TRANSITION
+    ok (core.result.Result.Err t, { self with «local» := ss })
+
+/-- [aivm_secrets_garrett_core::dispatch::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::dispatch::Pending<W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::setup]:
+    Source: 'crates/aivm-secrets-garrett-core/src/dispatch.rs', lines 48:4-50:5
+    Visibility: public -/
+def
+  dispatch.Pending.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.setup
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (WorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (self : dispatch.Pending W Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) :
+  Result ((core.result.Result Clause0_Clause0_Channel Clause0_Clause0_Error) ×
+    (dispatch.Pending W Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ← WorkInst.provider_exchangeProviderInst.setup self.work
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::dispatch::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::dispatch::Pending<W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::OUTCOME_UNKNOWN]
+    Source: 'crates/aivm-secrets-garrett-core/src/dispatch.rs', lines 46:4-46:60
+    Visibility: public -/
+@[global_simps, irreducible]
+def
+  dispatch.Pending.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.OUTCOME_UNKNOWN
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (WorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  : Result Clause0_Clause0_Error :=
+  WorkInst.provider_exchangeProviderInst.OUTCOME_UNKNOWN
+
+/-- [aivm_secrets_garrett_core::dispatch::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::dispatch::Pending<W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::INVALID_POLICY]
+    Source: 'crates/aivm-secrets-garrett-core/src/dispatch.rs', lines 45:4-45:58
+    Visibility: public -/
+@[global_simps, irreducible]
+def
+  dispatch.Pending.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.INVALID_POLICY
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (WorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  : Result Clause0_Clause0_Error :=
+  WorkInst.provider_exchangeProviderInst.INVALID_POLICY
+
+/-- Trait implementation: [aivm_secrets_garrett_core::dispatch::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::dispatch::Pending<W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}]
+    Source: 'crates/aivm-secrets-garrett-core/src/dispatch.rs', lines 41:0-76:1 -/
+@[reducible]
+def dispatch.Pending.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (WorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error) :
+  provider_exchange.Provider (dispatch.Pending W Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error := {
+  INVALID_POLICY :=
+    dispatch.Pending.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.INVALID_POLICY
+    WorkInst
+  OUTCOME_UNKNOWN :=
+    dispatch.Pending.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.OUTCOME_UNKNOWN
+    WorkInst
+  setup :=
+    dispatch.Pending.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.setup
+    WorkInst
+  recheck :=
+    dispatch.Pending.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.recheck
+    WorkInst
+  send :=
+    dispatch.Pending.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.send
+    WorkInst
+  receive :=
+    dispatch.Pending.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.receive
+    WorkInst
+}
+
+/-- [aivm_secrets_garrett_core::read_transition::Audited]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 35:0-38:1
+    Visibility: public -/
+structure read_transition.Audited where
+  phase : read_transition.Phase
+  write : Bool
+
+/-- [aivm_secrets_garrett_core::read_transition::{aivm_secrets_garrett_core::read_transition::Audited}::phase]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 77:4-79:5
+    Visibility: public -/
+def read_transition.Audited.impl.phase
+  (self : read_transition.Audited) : Result read_transition.Phase := do
+  ok self.phase
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::acknowledge_dispatch]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 170:4-181:5
+    Visibility: public -/
+def request_effects.RequestEffects.acknowledge_dispatch
+  (self : request_effects.RequestEffects) (audited : read_transition.Audited) :
+  Result (Bool × request_effects.RequestEffects)
+  := do
+  let phase ← read_transition.Audited.impl.phase audited
+  match self.progress with
+  | request_effects.Progress.Entry =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.DispatchAudit recorded =>
+    let b ←
+      read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq recorded phase
+    if b
+    then
+      let record ← request_effects.RequestEffects.phase self phase
+      let self1 ←
+        request_effects.RequestEffects.set_phase self phase
+          { record with audit_acknowledged := true }
+      ok (true,
+        { self1 with progress := (request_effects.Progress.Audited phase) })
+    else request_effects.RequestEffects.reject self
+  | request_effects.Progress.Audited _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderReady _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderAttempted _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderCompleted _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.DispatchReturned _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Selecting =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Selected =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CheckingBefore =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.BeforeAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CompletionAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CompletionAudited =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CheckingAfter =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.AfterAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ValueReady =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Halted =>
+    request_effects.RequestEffects.reject self
+
+/-- [aivm_secrets_garrett_core::read_transition::Prepared]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 30:0-33:1
+    Visibility: public -/
+structure read_transition.Prepared where
+  phase : read_transition.Phase
+  write : Bool
+
+/-- [aivm_secrets_garrett_core::read_transition::{aivm_secrets_garrett_core::read_transition::Prepared}::phase]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 58:4-60:5
+    Visibility: public -/
+def read_transition.Prepared.impl.phase
+  (self : read_transition.Prepared) : Result read_transition.Phase := do
+  ok self.phase
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::begin_dispatch_audit]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 151:4-169:5
+    Visibility: public -/
+def request_effects.RequestEffects.begin_dispatch_audit
+  (self : request_effects.RequestEffects) (prepared : read_transition.Prepared)
+  :
+  Result (Bool × request_effects.RequestEffects)
+  := do
+  let phase ← read_transition.Prepared.impl.phase prepared
+  let allowed ←
+    match phase with
+    | read_transition.Phase.Preflight =>
+      match self.progress with
+      | request_effects.Progress.Entry => ok true
+      | request_effects.Progress.DispatchAudit _ => ok false
+      | request_effects.Progress.Audited _ => ok false
+      | request_effects.Progress.ProviderReady _ => ok false
+      | request_effects.Progress.ProviderAttempted _ => ok false
+      | request_effects.Progress.ProviderCompleted _ => ok false
+      | request_effects.Progress.DispatchReturned _ => ok false
+      | request_effects.Progress.Selecting => ok false
+      | request_effects.Progress.Selected => ok false
+      | request_effects.Progress.CheckingBefore => ok false
+      | request_effects.Progress.BeforeAudit => ok false
+      | request_effects.Progress.CompletionAudit => ok false
+      | request_effects.Progress.CompletionAudited => ok false
+      | request_effects.Progress.CheckingAfter => ok false
+      | request_effects.Progress.AfterAudit => ok false
+      | request_effects.Progress.ValueReady => ok false
+      | request_effects.Progress.Halted => ok false
+    | read_transition.Phase.Final =>
+      match self.progress with
+      | request_effects.Progress.Entry => ok true
+      | request_effects.Progress.DispatchAudit _ => ok false
+      | request_effects.Progress.Audited _ => ok false
+      | request_effects.Progress.ProviderReady _ => ok false
+      | request_effects.Progress.ProviderAttempted _ => ok false
+      | request_effects.Progress.ProviderCompleted _ => ok false
+      | request_effects.Progress.DispatchReturned p =>
+        match p with
+        | read_transition.Phase.Preflight => ok true
+        | read_transition.Phase.Final => ok false
+      | request_effects.Progress.Selecting => ok false
+      | request_effects.Progress.Selected => ok false
+      | request_effects.Progress.CheckingBefore => ok false
+      | request_effects.Progress.BeforeAudit => ok false
+      | request_effects.Progress.CompletionAudit => ok false
+      | request_effects.Progress.CompletionAudited => ok false
+      | request_effects.Progress.CheckingAfter => ok false
+      | request_effects.Progress.AfterAudit => ok false
+      | request_effects.Progress.ValueReady => ok false
+      | request_effects.Progress.Halted => ok false
+  if allowed
+  then
+    let record ← request_effects.RequestEffects.phase self phase
+    let self1 ←
+      request_effects.RequestEffects.set_phase self phase
+        { record with audit_attempted := true }
+    ok (true,
+      { self1 with progress := (request_effects.Progress.DispatchAudit phase) })
+  else request_effects.RequestEffects.reject self
+
+/-- [aivm_secrets_garrett_core::Denial]
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 25:0-27:1
+    Visibility: public -/
+@[discriminant isize]
+inductive Denial where
+| InvalidCapability : Denial
+
+/-- [aivm_secrets_garrett_core::read_transition::acknowledge]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 66:0-74:1
+    Visibility: public -/
+def read_transition.acknowledge
+  (prepared : read_transition.Prepared) (ack : Bool) :
+  Result (core.result.Result read_transition.Audited Denial)
+  := do
+  if ack
+  then
+    ok (core.result.Result.Ok
+      { phase := prepared.phase, write := prepared.write })
+  else ok (core.result.Result.Err Denial.InvalidCapability)
+
+/-- [aivm_secrets_garrett_core::dispatch::audit]:
+    Source: 'crates/aivm-secrets-garrett-core/src/dispatch.rs', lines 78:0-101:1 -/
+def dispatch.audit
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (WorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (pending : dispatch.Pending W Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) (prepared : read_transition.Prepared) :
+  Result ((core.result.Result read_transition.Audited Clause0_Clause0_Error) ×
+    (dispatch.Pending W Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ← WorkInst.prepare pending.work
+  match r with
+  | core.result.Result.Ok _ =>
+    let (b, re) ←
+      request_effects.RequestEffects.begin_dispatch_audit pending.effects
+        prepared
+    if b
+    then
+      let p ← read_transition.Prepared.impl.phase prepared
+      let (r1, t1) ← WorkInst.audit t p
+      match r1 with
+      | core.result.Result.Ok _ =>
+        let r2 ← read_transition.acknowledge prepared true
+        match r2 with
+        | core.result.Result.Ok audited =>
+          let (b1, re1) ←
+            request_effects.RequestEffects.acknowledge_dispatch re audited
+          if b1
+          then
+            ok (core.result.Result.Ok audited,
+              { pending with work := t1, effects := re1 })
+          else
+            let t2 ← WorkInst.INVALID_TRANSITION
+            ok (core.result.Result.Err t2,
+              { pending with work := t1, effects := re1 })
+        | core.result.Result.Err _ =>
+          let t2 ← WorkInst.INVALID_TRANSITION
+          ok (core.result.Result.Err t2,
+            { pending with work := t1, effects := re })
+      | core.result.Result.Err error =>
+        ok (core.result.Result.Err error,
+          { pending with work := t1, effects := re })
+    else
+      let t1 ← WorkInst.INVALID_TRANSITION
+      ok (core.result.Result.Err t1, { pending with work := t, effects := re })
+  | core.result.Result.Err error =>
+    ok (core.result.Result.Err error, { pending with work := t })
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::provider_completed]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 211:4-221:5
+    Visibility: public -/
+def request_effects.RequestEffects.provider_completed
+  (self : request_effects.RequestEffects) (phase : read_transition.Phase) :
+  Result (Bool × request_effects.RequestEffects)
+  := do
+  match self.progress with
+  | request_effects.Progress.Entry =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.DispatchAudit _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Audited _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderReady _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderAttempted recorded =>
+    let b ←
+      read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq recorded phase
+    if b
+    then
+      let record ← request_effects.RequestEffects.phase self phase
+      let self1 ←
+        request_effects.RequestEffects.set_phase self phase
+          { record with provider_completed := true }
+      ok (true,
+        {
+          self1
+            with
+            progress := (request_effects.Progress.ProviderCompleted phase)
+        })
+    else request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderCompleted _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.DispatchReturned _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Selecting =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Selected =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CheckingBefore =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.BeforeAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CompletionAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CompletionAudited =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CheckingAfter =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.AfterAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ValueReady =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Halted =>
+    request_effects.RequestEffects.reject self
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::begin_provider]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 182:4-193:5
+    Visibility: public -/
+def request_effects.RequestEffects.begin_provider
+  (self : request_effects.RequestEffects) (audited : read_transition.Audited) :
+  Result (Bool × request_effects.RequestEffects)
+  := do
+  let phase ← read_transition.Audited.impl.phase audited
+  match self.progress with
+  | request_effects.Progress.Entry =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.DispatchAudit _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Audited recorded =>
+    let b ←
+      read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq recorded phase
+    if b
+    then
+      let record ← request_effects.RequestEffects.phase self phase
+      let self1 ←
+        request_effects.RequestEffects.set_phase self phase
+          { record with provider_ready := true }
+      ok (true,
+        { self1 with progress := (request_effects.Progress.ProviderReady phase)
+        })
+    else request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderReady _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderAttempted _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderCompleted _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.DispatchReturned _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Selecting =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Selected =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CheckingBefore =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.BeforeAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CompletionAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CompletionAudited =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CheckingAfter =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.AfterAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ValueReady =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Halted =>
+    request_effects.RequestEffects.reject self
+
+/-- [aivm_secrets_garrett_core::read_transition::{aivm_secrets_garrett_core::read_transition::Audited}::is_write]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 81:4-83:5
+    Visibility: public -/
+def read_transition.Audited.is_write
+  (self : read_transition.Audited) : Result Bool := do
+  ok self.write
+
+/-- [aivm_secrets_garrett_core::provider_exchange::Report]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 36:0-41:1
+    Visibility: public -/
+structure provider_exchange.Report (T : Type _) (E : Type _) where
+  phase : read_transition.Phase
+  stage : provider_exchange.Stage
+  current : Option manifest.AdmissionStamp
+  result : core.result.Result T E
+
+/-- [aivm_secrets_garrett_core::provider_exchange::exchange]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 57:0-116:1
+    Visibility: public -/
+def provider_exchange.exchange
+  {P : Type _} {Clause0_Channel : Type _} {Clause0_Output : Type _}
+  {Clause0_Error : Type _} (ProviderInst : provider_exchange.Provider P
+  Clause0_Channel Clause0_Output Clause0_Error) (ops : P)
+  (audited : read_transition.Audited) :
+  Result ((provider_exchange.Report Clause0_Output Clause0_Error) × P)
+  := do
+  let phase ← read_transition.Audited.impl.phase audited
+  let write ← read_transition.Audited.is_write audited
+  let (r, ops1) ← ProviderInst.setup ops
+  match r with
+  | core.result.Result.Ok channel =>
+    let (r1, ops2) ← ProviderInst.recheck ops1
+    match r1 with
+    | core.result.Result.Ok current =>
+      if write
+      then
+        let b ← manifest.AdmissionStamp.impl.write current
+        if b
+        then
+          let (r2, ops3, channel1) ← ProviderInst.send ops2 channel
+          match r2 with
+          | core.result.Result.Ok _ =>
+            let (r3, ops4) ← ProviderInst.receive ops3 channel1
+            match r3 with
+            | core.result.Result.Ok _ =>
+              ok
+                ({
+                   phase,
+                   stage := provider_exchange.Stage.Complete,
+                   current := (some current),
+                   result := r3
+                 }, ops4)
+            | core.result.Result.Err _ =>
+              if write
+              then
+                let error ← ProviderInst.OUTCOME_UNKNOWN
+                ok
+                  ({
+                     phase,
+                     stage := provider_exchange.Stage.Response,
+                     current := (some current),
+                     result := (core.result.Result.Err error)
+                   }, ops4)
+              else
+                ok
+                  ({
+                     phase,
+                     stage := provider_exchange.Stage.Response,
+                     current := (some current),
+                     result := r3
+                   }, ops4)
+          | core.result.Result.Err error =>
+            if write
+            then
+              let error1 ← ProviderInst.OUTCOME_UNKNOWN
+              ok
+                ({
+                   phase,
+                   stage := provider_exchange.Stage.Send,
+                   current := (some current),
+                   result := (core.result.Result.Err error1)
+                 }, ops3)
+            else
+              ok
+                ({
+                   phase,
+                   stage := provider_exchange.Stage.Send,
+                   current := (some current),
+                   result := (core.result.Result.Err error)
+                 }, ops3)
+        else
+          let t ← ProviderInst.INVALID_POLICY
+          ok
+            ({
+               phase,
+               stage := provider_exchange.Stage.Admission,
+               current := (some current),
+               result := (core.result.Result.Err t)
+             }, ops2)
+      else
+        let (r2, ops3, channel1) ← ProviderInst.send ops2 channel
+        match r2 with
+        | core.result.Result.Ok _ =>
+          let (r3, ops4) ← ProviderInst.receive ops3 channel1
+          match r3 with
+          | core.result.Result.Ok _ =>
+            ok
+              ({
+                 phase,
+                 stage := provider_exchange.Stage.Complete,
+                 current := (some current),
+                 result := r3
+               }, ops4)
+          | core.result.Result.Err _ =>
+            if write
+            then
+              let error ← ProviderInst.OUTCOME_UNKNOWN
+              ok
+                ({
+                   phase,
+                   stage := provider_exchange.Stage.Response,
+                   current := (some current),
+                   result := (core.result.Result.Err error)
+                 }, ops4)
+            else
+              ok
+                ({
+                   phase,
+                   stage := provider_exchange.Stage.Response,
+                   current := (some current),
+                   result := r3
+                 }, ops4)
+        | core.result.Result.Err error =>
+          if write
+          then
+            let error1 ← ProviderInst.OUTCOME_UNKNOWN
+            ok
+              ({
+                 phase,
+                 stage := provider_exchange.Stage.Send,
+                 current := (some current),
+                 result := (core.result.Result.Err error1)
+               }, ops3)
+          else
+            ok
+              ({
+                 phase,
+                 stage := provider_exchange.Stage.Send,
+                 current := (some current),
+                 result := (core.result.Result.Err error)
+               }, ops3)
+    | core.result.Result.Err error =>
+      ok
+        ({
+           phase,
+           stage := provider_exchange.Stage.Admission,
+           current := none,
+           result := (core.result.Result.Err error)
+         }, ops2)
+  | core.result.Result.Err error =>
+    ok
+      ({
+         phase,
+         stage := provider_exchange.Stage.Setup,
+         current := none,
+         result := (core.result.Result.Err error)
+       }, ops1)
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::Report<T, E>}::into_result]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 52:4-54:5
+    Visibility: public -/
+def provider_exchange.Report.into_result
+  {T : Type _} {E : Type _} (self : provider_exchange.Report T E) :
+  Result (core.result.Result T E)
+  := do
+  ok self.result
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::Report<T, E>}::current]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 49:4-51:5
+    Visibility: public -/
+def provider_exchange.Report.impl.current
+  {T : Type _} {E : Type _} (self : provider_exchange.Report T E) :
+  Result (Option manifest.AdmissionStamp)
+  := do
+  ok self.current
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::Report<T, E>}::stage]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 46:4-48:5
+    Visibility: public -/
+def provider_exchange.Report.impl.stage
+  {T : Type _} {E : Type _} (self : provider_exchange.Report T E) :
+  Result provider_exchange.Stage
+  := do
+  ok self.stage
+
+/-- [aivm_secrets_garrett_core::dispatch::exchange]:
+    Source: 'crates/aivm-secrets-garrett-core/src/dispatch.rs', lines 102:0-125:1 -/
+def dispatch.exchange
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (WorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (pending : dispatch.Pending W Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) (audited : read_transition.Audited) :
+  Result ((core.result.Result Clause0_Clause0_Output Clause0_Clause0_Error) ×
+    (dispatch.Pending W Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let b ← read_transition.Audited.is_write audited
+  let b1 ← WorkInst.effect_write pending.work
+  if b != b1
+  then
+    let t ← WorkInst.provider_exchangeProviderInst.INVALID_POLICY
+    ok (core.result.Result.Err t, pending)
+  else
+    let (b2, re) ←
+      request_effects.RequestEffects.begin_provider pending.effects audited
+    if b2
+    then
+      let p ← read_transition.Audited.impl.phase audited
+      let (report, pending1) ←
+        provider_exchange.exchange
+          (dispatch.Pending.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider
+          WorkInst) { pending with effects := re, phase := p, write := b }
+          audited
+      let s ← provider_exchange.Report.impl.stage report
+      let o ← provider_exchange.Report.impl.current report
+      let r ← provider_exchange.Report.into_result report
+      match r with
+      | core.result.Result.Ok _ =>
+        let (b3, re1) ←
+          request_effects.RequestEffects.provider_completed pending1.effects
+            pending1.phase
+        if b3
+        then
+          ok (r,
+            {
+              pending1
+                with
+                effects := re1, provider_stage := (some s), current := o
+            })
+        else
+          let t ← WorkInst.INVALID_TRANSITION
+          ok (core.result.Result.Err t,
+            {
+              pending1
+                with
+                effects := re1, provider_stage := (some s), current := o
+            })
+      | core.result.Result.Err _ =>
+        ok (r, { pending1 with provider_stage := (some s), current := o })
+    else
+      let t ← WorkInst.INVALID_TRANSITION
+      ok (core.result.Result.Err t, { pending with effects := re })
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::finish_dispatch]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 222:4-232:5
+    Visibility: public -/
+def request_effects.RequestEffects.finish_dispatch
+  (self : request_effects.RequestEffects) (phase : read_transition.Phase) :
+  Result (Bool × request_effects.RequestEffects)
+  := do
+  match self.progress with
+  | request_effects.Progress.Entry =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.DispatchAudit _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Audited _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderReady _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderAttempted _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderCompleted recorded =>
+    let b ←
+      read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq recorded phase
+    if b
+    then
+      let record ← request_effects.RequestEffects.phase self phase
+      let self1 ←
+        request_effects.RequestEffects.set_phase self phase
+          { record with dispatch_succeeded := true }
+      ok (true,
+        {
+          self1
+            with
+            progress := (request_effects.Progress.DispatchReturned phase)
+        })
+    else request_effects.RequestEffects.reject self
+  | request_effects.Progress.DispatchReturned _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Selecting =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Selected =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CheckingBefore =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.BeforeAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CompletionAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CompletionAudited =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CheckingAfter =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.AfterAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ValueReady =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Halted =>
+    request_effects.RequestEffects.reject self
+
+/-- [aivm_secrets_garrett_core::dispatch::finish]:
+    Source: 'crates/aivm-secrets-garrett-core/src/dispatch.rs', lines 126:0-140:1 -/
+def dispatch.finish
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (WorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (pending : dispatch.Pending W Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) (keyed_write : Bool) :
+  Result ((core.result.Result Unit Clause0_Clause0_Error) × (dispatch.Pending
+    W Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error))
+  := do
+  let (pending1, finished) ←
+    if keyed_write
+    then
+      do
+      let (finished1, t) ← WorkInst.finish pending.work
+      ok ({ pending with work := t }, finished1)
+    else ok (pending, core.result.Result.Ok ())
+  match finished with
+  | core.result.Result.Ok _ =>
+    let (b, re) ←
+      request_effects.RequestEffects.finish_dispatch pending1.effects
+        pending1.phase
+    if b
+    then ok (core.result.Result.Ok (), { pending1 with effects := re })
+    else
+      let t ← WorkInst.INVALID_TRANSITION
+      ok (core.result.Result.Err t, { pending1 with effects := re })
+  | core.result.Result.Err _ =>
+    let t ← WorkInst.provider_exchangeProviderInst.OUTCOME_UNKNOWN
+    ok (core.result.Result.Err t, pending1)
+
+/-- [aivm_secrets_garrett_core::dispatch::run]:
+    Source: 'crates/aivm-secrets-garrett-core/src/dispatch.rs', lines 141:0-176:1 -/
+def dispatch.run
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (WorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (pending : dispatch.Pending W Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) (prepared : read_transition.Prepared)
+  (keyed_write : Bool) :
+  Result ((core.result.Result Clause0_Clause0_Output Clause0_Clause0_Error) ×
+    (dispatch.Pending W Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, pending1) ← dispatch.audit WorkInst pending prepared
+  match r with
+  | core.result.Result.Ok audited =>
+    let (r1, t) ← WorkInst.configure pending1.work keyed_write
+    match r1 with
+    | core.result.Result.Ok _ =>
+      let (r2, t1) ← WorkInst.check t
+      match r2 with
+      | core.result.Result.Ok _ =>
+        let (t2, reserved) ←
+          if keyed_write
+          then
+            do
+            let (reserved1, t3) ← WorkInst.reserve t1
+            ok (t3, reserved1)
+          else ok (t1, core.result.Result.Ok ())
+        match reserved with
+        | core.result.Result.Ok _ =>
+          let (r3, pending2) ←
+            dispatch.exchange WorkInst { pending1 with work := t2 } audited
+          match r3 with
+          | core.result.Result.Ok _ =>
+            let (r4, pending3) ←
+              dispatch.finish WorkInst pending2 keyed_write
+            match r4 with
+            | core.result.Result.Ok _ => ok (r3, pending3)
+            | core.result.Result.Err error =>
+              ok (core.result.Result.Err error, pending3)
+          | core.result.Result.Err _ => ok (r3, pending2)
+        | core.result.Result.Err error =>
+          ok (core.result.Result.Err error, { pending1 with work := t2 })
+      | core.result.Result.Err error =>
+        ok (core.result.Result.Err error, { pending1 with work := t1 })
+    | core.result.Result.Err error =>
+      ok (core.result.Result.Err error, { pending1 with work := t })
+  | core.result.Result.Err error => ok (core.result.Result.Err error, pending1)
+
+/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::SendState}::new]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 131:4-135:5
+    Visibility: public -/
+def provider_exchange.SendState.new : Result provider_exchange.SendState := do
+  ok { progress := provider_exchange.SendProgress.Empty }
+
+/-- [aivm_secrets_garrett_core::dispatch::dispatch]:
+    Source: 'crates/aivm-secrets-garrett-core/src/dispatch.rs', lines 178:0-209:1
+    Visibility: public -/
+def dispatch.dispatch
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (WorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (work : W)
+  (prepared : core.result.Result read_transition.Prepared
+  Clause0_Clause0_Error) (effects : request_effects.RequestEffects)
+  (keyed_write : Bool) :
+  Result (dispatch.Report W Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error)
+  := do
+  let phase ←
+    match prepared with
+    | core.result.Result.Ok prepared1 =>
+      read_transition.Prepared.impl.phase prepared1
+    | core.result.Result.Err _ => ok read_transition.Phase.Final
+  let ss ← provider_exchange.SendState.new
+  match prepared with
+  | core.result.Result.Ok prepared1 =>
+    let (outcome, pending) ←
+      dispatch.run WorkInst
+        {
+          work,
+          effects,
+          «local» := ss,
+          phase,
+          write := false,
+          provider_stage := none,
+          current := none
+        } prepared1 keyed_write
+    ok
+      {
+        outcome,
+        work := pending.work,
+        effects := pending.effects,
+        «local» := pending.local,
+        provider_stage := pending.provider_stage,
+        current := pending.current
+      }
+  | core.result.Result.Err error =>
+    ok
+      {
+        outcome := (core.result.Result.Err error),
+        work,
+        effects,
+        «local» := ss,
+        provider_stage := none,
+        current := none
+      }
+
 /-- Trait declaration: [aivm_secrets_garrett_core::emission::PendingEmission]
     Source: 'crates/aivm-secrets-garrett-core/src/emission.rs', lines 5:0-10:1
     Visibility: public -/
@@ -3913,13 +5135,6 @@ partial_fixpoint
 
 end
 
-/-- [aivm_secrets_garrett_core::Denial]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 25:0-27:1
-    Visibility: public -/
-@[discriminant isize]
-inductive Denial where
-| InvalidCapability : Denial
-
 /-- [aivm_secrets_garrett_core::Claims]
     Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 29:0-38:1
     Visibility: public -/
@@ -4338,13 +5553,6 @@ def manifest.AdmissionStamp.impl.now
 def manifest.AdmissionStamp.impl.elapsed
   (self : manifest.AdmissionStamp) : Result Std.I64 := do
   ok self.elapsed
-
-/-- [aivm_secrets_garrett_core::manifest::{aivm_secrets_garrett_core::manifest::AdmissionStamp}::write]:
-    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 85:4-87:5
-    Visibility: public -/
-def manifest.AdmissionStamp.impl.write
-  (self : manifest.AdmissionStamp) : Result Bool := do
-  ok self.write
 
 /-- [aivm_secrets_garrett_core::manifest::current]:
     Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 90:0-117:1
@@ -4970,33 +6178,6 @@ def protocol.perform
     | core.result.Result.Err error => ok (core.result.Result.Err error)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
-/-- Trait declaration: [aivm_secrets_garrett_core::provider_exchange::Provider]
-    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 9:0-20:1
-    Visibility: public -/
-structure provider_exchange.Provider (Self : Type _) (Self_Channel : Type _)
-  (Self_Output : Type _) (Self_Error : Type _) where
-  INVALID_POLICY : Result Self_Error
-  OUTCOME_UNKNOWN : Result Self_Error
-  setup : Self → Result ((core.result.Result Self_Channel Self_Error) ×
-    Self)
-  recheck : Self → Result ((core.result.Result manifest.AdmissionStamp
-    Self_Error) × Self)
-  send : Self → Self_Channel → Result ((core.result.Result Unit Self_Error)
-    × Self × Self_Channel)
-  receive : Self → Self_Channel → Result ((core.result.Result Self_Output
-    Self_Error) × Self)
-
-/-- [aivm_secrets_garrett_core::provider_exchange::Stage]
-    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 23:0-29:1
-    Visibility: public -/
-@[discriminant isize]
-inductive provider_exchange.Stage where
-| Setup : provider_exchange.Stage
-| Admission : provider_exchange.Stage
-| Send : provider_exchange.Stage
-| Response : provider_exchange.Stage
-| Complete : provider_exchange.Stage
-
 /-- [aivm_secrets_garrett_core::provider_exchange::{impl core::clone::Clone for aivm_secrets_garrett_core::provider_exchange::Stage}::clone]:
     Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 22:9-22:14
     Visibility: public -/
@@ -5095,15 +6276,6 @@ def provider_exchange.Stage.attempted
   | provider_exchange.Stage.Response => ok true
   | provider_exchange.Stage.Complete => ok true
 
-/-- [aivm_secrets_garrett_core::provider_exchange::Report]
-    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 36:0-41:1
-    Visibility: public -/
-structure provider_exchange.Report (T : Type _) (E : Type _) where
-  phase : read_transition.Phase
-  stage : provider_exchange.Stage
-  current : Option manifest.AdmissionStamp
-  result : core.result.Result T E
-
 /-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::Report<T, E>}::phase]:
     Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 43:4-45:5
     Visibility: public -/
@@ -5112,309 +6284,6 @@ def provider_exchange.Report.impl.phase
   Result read_transition.Phase
   := do
   ok self.phase
-
-/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::Report<T, E>}::stage]:
-    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 46:4-48:5
-    Visibility: public -/
-def provider_exchange.Report.impl.stage
-  {T : Type _} {E : Type _} (self : provider_exchange.Report T E) :
-  Result provider_exchange.Stage
-  := do
-  ok self.stage
-
-/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::Report<T, E>}::current]:
-    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 49:4-51:5
-    Visibility: public -/
-def provider_exchange.Report.impl.current
-  {T : Type _} {E : Type _} (self : provider_exchange.Report T E) :
-  Result (Option manifest.AdmissionStamp)
-  := do
-  ok self.current
-
-/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::Report<T, E>}::into_result]:
-    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 52:4-54:5
-    Visibility: public -/
-def provider_exchange.Report.into_result
-  {T : Type _} {E : Type _} (self : provider_exchange.Report T E) :
-  Result (core.result.Result T E)
-  := do
-  ok self.result
-
-/-- [aivm_secrets_garrett_core::read_transition::Audited]
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 35:0-38:1
-    Visibility: public -/
-structure read_transition.Audited where
-  phase : read_transition.Phase
-  write : Bool
-
-/-- [aivm_secrets_garrett_core::read_transition::{aivm_secrets_garrett_core::read_transition::Audited}::is_write]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 81:4-83:5
-    Visibility: public -/
-def read_transition.Audited.is_write
-  (self : read_transition.Audited) : Result Bool := do
-  ok self.write
-
-/-- [aivm_secrets_garrett_core::read_transition::{aivm_secrets_garrett_core::read_transition::Audited}::phase]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 77:4-79:5
-    Visibility: public -/
-def read_transition.Audited.impl.phase
-  (self : read_transition.Audited) : Result read_transition.Phase := do
-  ok self.phase
-
-/-- [aivm_secrets_garrett_core::provider_exchange::exchange]:
-    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 57:0-116:1
-    Visibility: public -/
-def provider_exchange.exchange
-  {P : Type _} {Clause0_Channel : Type _} {Clause0_Output : Type _}
-  {Clause0_Error : Type _} (ProviderInst : provider_exchange.Provider P
-  Clause0_Channel Clause0_Output Clause0_Error) (ops : P)
-  (audited : read_transition.Audited) :
-  Result ((provider_exchange.Report Clause0_Output Clause0_Error) × P)
-  := do
-  let phase ← read_transition.Audited.impl.phase audited
-  let write ← read_transition.Audited.is_write audited
-  let (r, ops1) ← ProviderInst.setup ops
-  match r with
-  | core.result.Result.Ok channel =>
-    let (r1, ops2) ← ProviderInst.recheck ops1
-    match r1 with
-    | core.result.Result.Ok current =>
-      if write
-      then
-        let b ← manifest.AdmissionStamp.impl.write current
-        if b
-        then
-          let (r2, ops3, channel1) ← ProviderInst.send ops2 channel
-          match r2 with
-          | core.result.Result.Ok _ =>
-            let (r3, ops4) ← ProviderInst.receive ops3 channel1
-            match r3 with
-            | core.result.Result.Ok _ =>
-              ok
-                ({
-                   phase,
-                   stage := provider_exchange.Stage.Complete,
-                   current := (some current),
-                   result := r3
-                 }, ops4)
-            | core.result.Result.Err _ =>
-              if write
-              then
-                let error ← ProviderInst.OUTCOME_UNKNOWN
-                ok
-                  ({
-                     phase,
-                     stage := provider_exchange.Stage.Response,
-                     current := (some current),
-                     result := (core.result.Result.Err error)
-                   }, ops4)
-              else
-                ok
-                  ({
-                     phase,
-                     stage := provider_exchange.Stage.Response,
-                     current := (some current),
-                     result := r3
-                   }, ops4)
-          | core.result.Result.Err error =>
-            if write
-            then
-              let error1 ← ProviderInst.OUTCOME_UNKNOWN
-              ok
-                ({
-                   phase,
-                   stage := provider_exchange.Stage.Send,
-                   current := (some current),
-                   result := (core.result.Result.Err error1)
-                 }, ops3)
-            else
-              ok
-                ({
-                   phase,
-                   stage := provider_exchange.Stage.Send,
-                   current := (some current),
-                   result := (core.result.Result.Err error)
-                 }, ops3)
-        else
-          let t ← ProviderInst.INVALID_POLICY
-          ok
-            ({
-               phase,
-               stage := provider_exchange.Stage.Admission,
-               current := (some current),
-               result := (core.result.Result.Err t)
-             }, ops2)
-      else
-        let (r2, ops3, channel1) ← ProviderInst.send ops2 channel
-        match r2 with
-        | core.result.Result.Ok _ =>
-          let (r3, ops4) ← ProviderInst.receive ops3 channel1
-          match r3 with
-          | core.result.Result.Ok _ =>
-            ok
-              ({
-                 phase,
-                 stage := provider_exchange.Stage.Complete,
-                 current := (some current),
-                 result := r3
-               }, ops4)
-          | core.result.Result.Err _ =>
-            if write
-            then
-              let error ← ProviderInst.OUTCOME_UNKNOWN
-              ok
-                ({
-                   phase,
-                   stage := provider_exchange.Stage.Response,
-                   current := (some current),
-                   result := (core.result.Result.Err error)
-                 }, ops4)
-            else
-              ok
-                ({
-                   phase,
-                   stage := provider_exchange.Stage.Response,
-                   current := (some current),
-                   result := r3
-                 }, ops4)
-        | core.result.Result.Err error =>
-          if write
-          then
-            let error1 ← ProviderInst.OUTCOME_UNKNOWN
-            ok
-              ({
-                 phase,
-                 stage := provider_exchange.Stage.Send,
-                 current := (some current),
-                 result := (core.result.Result.Err error1)
-               }, ops3)
-          else
-            ok
-              ({
-                 phase,
-                 stage := provider_exchange.Stage.Send,
-                 current := (some current),
-                 result := (core.result.Result.Err error)
-               }, ops3)
-    | core.result.Result.Err error =>
-      ok
-        ({
-           phase,
-           stage := provider_exchange.Stage.Admission,
-           current := none,
-           result := (core.result.Result.Err error)
-         }, ops2)
-  | core.result.Result.Err error =>
-    ok
-      ({
-         phase,
-         stage := provider_exchange.Stage.Setup,
-         current := none,
-         result := (core.result.Result.Err error)
-       }, ops1)
-
-/-- [aivm_secrets_garrett_core::provider_exchange::SendProgress]
-    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 120:0-126:1 -/
-@[discriminant isize]
-inductive provider_exchange.SendProgress where
-| Empty : provider_exchange.SendProgress
-| Checking : provider_exchange.SendProgress
-| Halted : provider_exchange.SendProgress
-| Checked : manifest.AdmissionStamp → provider_exchange.SendProgress
-| Attempted : manifest.AdmissionStamp → provider_exchange.SendProgress
-
-/-- [aivm_secrets_garrett_core::provider_exchange::SendState]
-    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 127:0-129:1
-    Visibility: public -/
-structure provider_exchange.SendState where
-  progress : provider_exchange.SendProgress
-
-/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::SendState}::new]:
-    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 131:4-135:5
-    Visibility: public -/
-def provider_exchange.SendState.new : Result provider_exchange.SendState := do
-  ok { progress := provider_exchange.SendProgress.Empty }
-
-/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::SendState}::begin_check]:
-    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 136:4-148:5
-    Visibility: public -/
-def provider_exchange.SendState.begin_check
-  (self : provider_exchange.SendState) :
-  Result (Bool × provider_exchange.SendState)
-  := do
-  match self.progress with
-  | provider_exchange.SendProgress.Empty =>
-    ok (true, { progress := provider_exchange.SendProgress.Checking })
-  | provider_exchange.SendProgress.Checking =>
-    ok (false, { progress := provider_exchange.SendProgress.Halted })
-  | provider_exchange.SendProgress.Halted =>
-    ok (false, { progress := provider_exchange.SendProgress.Halted })
-  | provider_exchange.SendProgress.Checked _ =>
-    ok (false, { progress := provider_exchange.SendProgress.Halted })
-  | provider_exchange.SendProgress.Attempted _ =>
-    ok (false, { progress := self.progress })
-
-/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::SendState}::finish_check]:
-    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 149:4-161:5
-    Visibility: public -/
-def provider_exchange.SendState.finish_check
-  (self : provider_exchange.SendState) (stamp : manifest.AdmissionStamp) :
-  Result (Bool × provider_exchange.SendState)
-  := do
-  match self.progress with
-  | provider_exchange.SendProgress.Empty =>
-    ok (false, { progress := provider_exchange.SendProgress.Halted })
-  | provider_exchange.SendProgress.Checking =>
-    ok (true, { progress := (provider_exchange.SendProgress.Checked stamp) })
-  | provider_exchange.SendProgress.Halted =>
-    ok (false, { progress := provider_exchange.SendProgress.Halted })
-  | provider_exchange.SendProgress.Checked _ =>
-    ok (false, { progress := provider_exchange.SendProgress.Halted })
-  | provider_exchange.SendProgress.Attempted _ =>
-    ok (false, { progress := self.progress })
-
-/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::SendState}::begin_send]:
-    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 162:4-178:5
-    Visibility: public -/
-def provider_exchange.SendState.begin_send
-  (self : provider_exchange.SendState) (write : Bool) :
-  Result (Bool × provider_exchange.SendState)
-  := do
-  match self.progress with
-  | provider_exchange.SendProgress.Empty =>
-    ok (false, { progress := provider_exchange.SendProgress.Halted })
-  | provider_exchange.SendProgress.Checking =>
-    ok (false, { progress := provider_exchange.SendProgress.Halted })
-  | provider_exchange.SendProgress.Halted =>
-    ok (false, { progress := provider_exchange.SendProgress.Halted })
-  | provider_exchange.SendProgress.Checked stamp =>
-    if write
-    then
-      let b ← manifest.AdmissionStamp.impl.write stamp
-      if b
-      then
-        ok (true,
-          { progress := (provider_exchange.SendProgress.Attempted stamp) })
-      else ok (false, { progress := provider_exchange.SendProgress.Halted })
-    else
-      ok (true,
-        { progress := (provider_exchange.SendProgress.Attempted stamp) })
-  | provider_exchange.SendProgress.Attempted _ =>
-    ok (false, { progress := self.progress })
-
-/-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::SendState}::stamp]:
-    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 179:4-184:5
-    Visibility: public -/
-def provider_exchange.SendState.stamp
-  (self : provider_exchange.SendState) :
-  Result (Option manifest.AdmissionStamp)
-  := do
-  match self.progress with
-  | provider_exchange.SendProgress.Empty => ok none
-  | provider_exchange.SendProgress.Checking => ok none
-  | provider_exchange.SendProgress.Halted => ok none
-  | provider_exchange.SendProgress.Checked stamp => ok (some stamp)
-  | provider_exchange.SendProgress.Attempted stamp => ok (some stamp)
 
 /-- [aivm_secrets_garrett_core::provider_exchange::{aivm_secrets_garrett_core::provider_exchange::SendState}::attempted]:
     Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 185:4-187:5
@@ -6232,17 +7101,6 @@ def read_transition.Phase.Insts.CoreMarkerStructuralPartialEq :
   core.marker.StructuralPartialEq read_transition.Phase := {
 }
 
-/-- [aivm_secrets_garrett_core::read_transition::{impl core::cmp::PartialEq<aivm_secrets_garrett_core::read_transition::Phase> for aivm_secrets_garrett_core::read_transition::Phase}::eq]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 15:29-15:38
-    Visibility: public -/
-def read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq
-  (self : read_transition.Phase) (other : read_transition.Phase) :
-  Result Bool
-  := do
-  let self1 := read_discriminant self
-  let other1 := read_discriminant other
-  ok (self1 = other1)
-
 /-- Trait implementation: [aivm_secrets_garrett_core::read_transition::{impl core::cmp::PartialEq<aivm_secrets_garrett_core::read_transition::Phase> for aivm_secrets_garrett_core::read_transition::Phase}]
     Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 15:29-15:38 -/
 @[reducible]
@@ -6270,13 +7128,6 @@ def read_transition.Phase.as_str
   | read_transition.Phase.Preflight => ok (toStr "preflight")
   | read_transition.Phase.Final => ok (toStr "final")
 
-/-- [aivm_secrets_garrett_core::read_transition::Prepared]
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 30:0-33:1
-    Visibility: public -/
-structure read_transition.Prepared where
-  phase : read_transition.Phase
-  write : Bool
-
 /-- [aivm_secrets_garrett_core::read_transition::prepare]:
     Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 43:0-55:1
     Visibility: public -/
@@ -6298,26 +7149,6 @@ def read_transition.prepare
       then ok (core.result.Result.Ok { phase, write := effect_write })
       else ok (core.result.Result.Err Denial.InvalidCapability)
   else ok (core.result.Result.Ok { phase, write := effect_write })
-
-/-- [aivm_secrets_garrett_core::read_transition::{aivm_secrets_garrett_core::read_transition::Prepared}::phase]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 58:4-60:5
-    Visibility: public -/
-def read_transition.Prepared.impl.phase
-  (self : read_transition.Prepared) : Result read_transition.Phase := do
-  ok self.phase
-
-/-- [aivm_secrets_garrett_core::read_transition::acknowledge]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 66:0-74:1
-    Visibility: public -/
-def read_transition.acknowledge
-  (prepared : read_transition.Prepared) (ack : Bool) :
-  Result (core.result.Result read_transition.Audited Denial)
-  := do
-  if ack
-  then
-    ok (core.result.Result.Ok
-      { phase := prepared.phase, write := prepared.write })
-  else ok (core.result.Result.Err Denial.InvalidCapability)
 
 /-- [aivm_secrets_garrett_core::read_transition::{impl core::clone::Clone for aivm_secrets_garrett_core::read_transition::CompletionPhase}::clone]:
     Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 89:9-89:14
@@ -6786,28 +7617,6 @@ def request_effects.RequestEffects.new
       progress := request_effects.Progress.Entry
     }
 
-/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::phase]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 133:4-138:5
-    Visibility: public -/
-def request_effects.RequestEffects.phase
-  (self : request_effects.RequestEffects) (phase : read_transition.Phase) :
-  Result request_effects.DispatchRecord
-  := do
-  match phase with
-  | read_transition.Phase.Preflight => ok self.preflight
-  | read_transition.Phase.Final => ok self.final_effect
-
-/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::set_phase]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 139:4-144:5 -/
-def request_effects.RequestEffects.set_phase
-  (self : request_effects.RequestEffects) (phase : read_transition.Phase)
-  (record : request_effects.DispatchRecord) :
-  Result request_effects.RequestEffects
-  := do
-  match phase with
-  | read_transition.Phase.Preflight => ok { self with preflight := record }
-  | read_transition.Phase.Final => ok { self with final_effect := record }
-
 /-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::completion]:
     Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 145:4-147:5
     Visibility: public -/
@@ -6840,376 +7649,6 @@ def request_effects.RequestEffects.can_return_value
   | request_effects.Progress.AfterAudit => ok false
   | request_effects.Progress.ValueReady => ok true
   | request_effects.Progress.Halted => ok false
-
-/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::begin_dispatch_audit]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 151:4-169:5
-    Visibility: public -/
-def request_effects.RequestEffects.begin_dispatch_audit
-  (self : request_effects.RequestEffects) (prepared : read_transition.Prepared)
-  :
-  Result (Bool × request_effects.RequestEffects)
-  := do
-  let phase ← read_transition.Prepared.impl.phase prepared
-  let allowed ←
-    match phase with
-    | read_transition.Phase.Preflight =>
-      match self.progress with
-      | request_effects.Progress.Entry => ok true
-      | request_effects.Progress.DispatchAudit _ => ok false
-      | request_effects.Progress.Audited _ => ok false
-      | request_effects.Progress.ProviderReady _ => ok false
-      | request_effects.Progress.ProviderAttempted _ => ok false
-      | request_effects.Progress.ProviderCompleted _ => ok false
-      | request_effects.Progress.DispatchReturned _ => ok false
-      | request_effects.Progress.Selecting => ok false
-      | request_effects.Progress.Selected => ok false
-      | request_effects.Progress.CheckingBefore => ok false
-      | request_effects.Progress.BeforeAudit => ok false
-      | request_effects.Progress.CompletionAudit => ok false
-      | request_effects.Progress.CompletionAudited => ok false
-      | request_effects.Progress.CheckingAfter => ok false
-      | request_effects.Progress.AfterAudit => ok false
-      | request_effects.Progress.ValueReady => ok false
-      | request_effects.Progress.Halted => ok false
-    | read_transition.Phase.Final =>
-      match self.progress with
-      | request_effects.Progress.Entry => ok true
-      | request_effects.Progress.DispatchAudit _ => ok false
-      | request_effects.Progress.Audited _ => ok false
-      | request_effects.Progress.ProviderReady _ => ok false
-      | request_effects.Progress.ProviderAttempted _ => ok false
-      | request_effects.Progress.ProviderCompleted _ => ok false
-      | request_effects.Progress.DispatchReturned p =>
-        match p with
-        | read_transition.Phase.Preflight => ok true
-        | read_transition.Phase.Final => ok false
-      | request_effects.Progress.Selecting => ok false
-      | request_effects.Progress.Selected => ok false
-      | request_effects.Progress.CheckingBefore => ok false
-      | request_effects.Progress.BeforeAudit => ok false
-      | request_effects.Progress.CompletionAudit => ok false
-      | request_effects.Progress.CompletionAudited => ok false
-      | request_effects.Progress.CheckingAfter => ok false
-      | request_effects.Progress.AfterAudit => ok false
-      | request_effects.Progress.ValueReady => ok false
-      | request_effects.Progress.Halted => ok false
-  if allowed
-  then
-    let record ← request_effects.RequestEffects.phase self phase
-    let self1 ←
-      request_effects.RequestEffects.set_phase self phase
-        { record with audit_attempted := true }
-    ok (true,
-      { self1 with progress := (request_effects.Progress.DispatchAudit phase) })
-  else request_effects.RequestEffects.reject self
-
-/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::acknowledge_dispatch]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 170:4-181:5
-    Visibility: public -/
-def request_effects.RequestEffects.acknowledge_dispatch
-  (self : request_effects.RequestEffects) (audited : read_transition.Audited) :
-  Result (Bool × request_effects.RequestEffects)
-  := do
-  let phase ← read_transition.Audited.impl.phase audited
-  match self.progress with
-  | request_effects.Progress.Entry =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.DispatchAudit recorded =>
-    let b ←
-      read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq recorded phase
-    if b
-    then
-      let record ← request_effects.RequestEffects.phase self phase
-      let self1 ←
-        request_effects.RequestEffects.set_phase self phase
-          { record with audit_acknowledged := true }
-      ok (true,
-        { self1 with progress := (request_effects.Progress.Audited phase) })
-    else request_effects.RequestEffects.reject self
-  | request_effects.Progress.Audited _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.ProviderReady _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.ProviderAttempted _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.ProviderCompleted _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.DispatchReturned _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.Selecting =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.Selected =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.CheckingBefore =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.BeforeAudit =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.CompletionAudit =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.CompletionAudited =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.CheckingAfter =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.AfterAudit =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.ValueReady =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.Halted =>
-    request_effects.RequestEffects.reject self
-
-/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::begin_provider]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 182:4-193:5
-    Visibility: public -/
-def request_effects.RequestEffects.begin_provider
-  (self : request_effects.RequestEffects) (audited : read_transition.Audited) :
-  Result (Bool × request_effects.RequestEffects)
-  := do
-  let phase ← read_transition.Audited.impl.phase audited
-  match self.progress with
-  | request_effects.Progress.Entry =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.DispatchAudit _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.Audited recorded =>
-    let b ←
-      read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq recorded phase
-    if b
-    then
-      let record ← request_effects.RequestEffects.phase self phase
-      let self1 ←
-        request_effects.RequestEffects.set_phase self phase
-          { record with provider_ready := true }
-      ok (true,
-        { self1 with progress := (request_effects.Progress.ProviderReady phase)
-        })
-    else request_effects.RequestEffects.reject self
-  | request_effects.Progress.ProviderReady _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.ProviderAttempted _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.ProviderCompleted _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.DispatchReturned _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.Selecting =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.Selected =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.CheckingBefore =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.BeforeAudit =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.CompletionAudit =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.CompletionAudited =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.CheckingAfter =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.AfterAudit =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.ValueReady =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.Halted =>
-    request_effects.RequestEffects.reject self
-
-/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::begin_send]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 196:4-210:5
-    Visibility: public -/
-def request_effects.RequestEffects.begin_send
-  (self : request_effects.RequestEffects) (phase : read_transition.Phase)
-  («local» : provider_exchange.SendState) (write : Bool) :
-  Result (Bool × request_effects.RequestEffects ×
-    provider_exchange.SendState)
-  := do
-  match self.progress with
-  | request_effects.Progress.Entry =>
-    let (b, self1) ← request_effects.RequestEffects.reject self
-    ok (b, self1, «local»)
-  | request_effects.Progress.DispatchAudit _ =>
-    let (b, self1) ← request_effects.RequestEffects.reject self
-    ok (b, self1, «local»)
-  | request_effects.Progress.Audited _ =>
-    let (b, self1) ← request_effects.RequestEffects.reject self
-    ok (b, self1, «local»)
-  | request_effects.Progress.ProviderReady recorded =>
-    let b ←
-      read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq recorded phase
-    if b
-    then
-      let (b1, local1) ←
-        provider_exchange.SendState.begin_send «local» write
-      if b1
-      then
-        let record ← request_effects.RequestEffects.phase self phase
-        let o ← provider_exchange.SendState.stamp local1
-        let self1 ←
-          request_effects.RequestEffects.set_phase self phase
-            { record with current := o, provider_attempted := true }
-        ok (true,
-          {
-            self1
-              with
-              progress := (request_effects.Progress.ProviderAttempted phase)
-          }, local1)
-      else
-        let (b2, self1) ← request_effects.RequestEffects.reject self
-        ok (b2, self1, local1)
-    else
-      let (b1, self1) ← request_effects.RequestEffects.reject self
-      ok (b1, self1, «local»)
-  | request_effects.Progress.ProviderAttempted _ =>
-    let (b, self1) ← request_effects.RequestEffects.reject self
-    ok (b, self1, «local»)
-  | request_effects.Progress.ProviderCompleted _ =>
-    let (b, self1) ← request_effects.RequestEffects.reject self
-    ok (b, self1, «local»)
-  | request_effects.Progress.DispatchReturned _ =>
-    let (b, self1) ← request_effects.RequestEffects.reject self
-    ok (b, self1, «local»)
-  | request_effects.Progress.Selecting =>
-    let (b, self1) ← request_effects.RequestEffects.reject self
-    ok (b, self1, «local»)
-  | request_effects.Progress.Selected =>
-    let (b, self1) ← request_effects.RequestEffects.reject self
-    ok (b, self1, «local»)
-  | request_effects.Progress.CheckingBefore =>
-    let (b, self1) ← request_effects.RequestEffects.reject self
-    ok (b, self1, «local»)
-  | request_effects.Progress.BeforeAudit =>
-    let (b, self1) ← request_effects.RequestEffects.reject self
-    ok (b, self1, «local»)
-  | request_effects.Progress.CompletionAudit =>
-    let (b, self1) ← request_effects.RequestEffects.reject self
-    ok (b, self1, «local»)
-  | request_effects.Progress.CompletionAudited =>
-    let (b, self1) ← request_effects.RequestEffects.reject self
-    ok (b, self1, «local»)
-  | request_effects.Progress.CheckingAfter =>
-    let (b, self1) ← request_effects.RequestEffects.reject self
-    ok (b, self1, «local»)
-  | request_effects.Progress.AfterAudit =>
-    let (b, self1) ← request_effects.RequestEffects.reject self
-    ok (b, self1, «local»)
-  | request_effects.Progress.ValueReady =>
-    let (b, self1) ← request_effects.RequestEffects.reject self
-    ok (b, self1, «local»)
-  | request_effects.Progress.Halted =>
-    let (b, self1) ← request_effects.RequestEffects.reject self
-    ok (b, self1, «local»)
-
-/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::provider_completed]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 211:4-221:5
-    Visibility: public -/
-def request_effects.RequestEffects.provider_completed
-  (self : request_effects.RequestEffects) (phase : read_transition.Phase) :
-  Result (Bool × request_effects.RequestEffects)
-  := do
-  match self.progress with
-  | request_effects.Progress.Entry =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.DispatchAudit _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.Audited _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.ProviderReady _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.ProviderAttempted recorded =>
-    let b ←
-      read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq recorded phase
-    if b
-    then
-      let record ← request_effects.RequestEffects.phase self phase
-      let self1 ←
-        request_effects.RequestEffects.set_phase self phase
-          { record with provider_completed := true }
-      ok (true,
-        {
-          self1
-            with
-            progress := (request_effects.Progress.ProviderCompleted phase)
-        })
-    else request_effects.RequestEffects.reject self
-  | request_effects.Progress.ProviderCompleted _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.DispatchReturned _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.Selecting =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.Selected =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.CheckingBefore =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.BeforeAudit =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.CompletionAudit =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.CompletionAudited =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.CheckingAfter =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.AfterAudit =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.ValueReady =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.Halted =>
-    request_effects.RequestEffects.reject self
-
-/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::finish_dispatch]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 222:4-232:5
-    Visibility: public -/
-def request_effects.RequestEffects.finish_dispatch
-  (self : request_effects.RequestEffects) (phase : read_transition.Phase) :
-  Result (Bool × request_effects.RequestEffects)
-  := do
-  match self.progress with
-  | request_effects.Progress.Entry =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.DispatchAudit _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.Audited _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.ProviderReady _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.ProviderAttempted _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.ProviderCompleted recorded =>
-    let b ←
-      read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq recorded phase
-    if b
-    then
-      let record ← request_effects.RequestEffects.phase self phase
-      let self1 ←
-        request_effects.RequestEffects.set_phase self phase
-          { record with dispatch_succeeded := true }
-      ok (true,
-        {
-          self1
-            with
-            progress := (request_effects.Progress.DispatchReturned phase)
-        })
-    else request_effects.RequestEffects.reject self
-  | request_effects.Progress.DispatchReturned _ =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.Selecting =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.Selected =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.CheckingBefore =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.BeforeAudit =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.CompletionAudit =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.CompletionAudited =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.CheckingAfter =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.AfterAudit =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.ValueReady =>
-    request_effects.RequestEffects.reject self
-  | request_effects.Progress.Halted =>
-    request_effects.RequestEffects.reject self
 
 /-- [aivm_secrets_garrett_core::request_effects::{impl core::default::Default for aivm_secrets_garrett_core::request_effects::RequestEffects}::default]:
     Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 302:4-304:5

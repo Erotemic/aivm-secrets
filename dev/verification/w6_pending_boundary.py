@@ -68,14 +68,12 @@ def check(root: Path = ROOT) -> dict:
                 f'pending-read {key} contract changed without review')
     source = (root / RUST).read_text()
     request = source.split('    pub(super) fn request(', 1)[1].split('\n    pub(super) fn control(', 1)[0]
-    exchange = source.split('    fn exchange_manifest(', 1)[1].split('\nfn manifest_response(', 1)[0]
-    audited = request.find('let recorded = prepared.audit(')
-    executor = request.find('self.base.executor.exchange_manifest(')
-    require(audited != -1 and executor > audited,
+    require('dispatch::dispatch(' in request and '*effects.borrow_mut() = report.effects;' in request
+            and 'audit.write_record(' in source and 'phase.as_str()' in source,
             'native manifest might execute a provider effect before dispatch audit')
     require('let dispatch = |prepared: PreparedDispatch' in request and
-            'dispatch(PreparedDispatch::preflight(effect)?)' in request and
-            'dispatch(PreparedDispatch::final_effect(effect, op.write)?)' in request,
+            'dispatch(PreparedDispatch::preflight(effect))' in request and
+            'dispatch(PreparedDispatch::final_effect(effect, op.write))' in request,
             'manifest preflight/final no longer share the audited dispatcher')
     fresh = request.split('let current = || -> Outcome<guards::AdmissionStamp> {', 1)[-1].split('let canonical_request', 1)[0]
     for checked in ('self.base.check_coordination()?;',
@@ -87,11 +85,11 @@ def check(root: Path = ROOT) -> dict:
     primitive = source.split('fn send_manifest_bytes(', 1)[1].split('struct ManifestChannel {', 1)[0]
     require('let stream = StreamOwned::new(conn, socket);' in source and
             'writer.write_all(request)' in ''.join(primitive.split()) and
-            'if !effects.borrow_mut().begin_send(phase, state, write)' in primitive and
-            'send_manifest_bytes(&mutself.send_state,&mutchannel.stream,&channel.request,self.effect.write,&self.effects,self.phase,)' in ''.join(source.split()) and
-            'provider_exchange::exchange(&mutprovider,&audited.transition,)' in ''.join(exchange.split()) and
-            'current: &impl Fn() -> Outcome<guards::AdmissionStamp>' in exchange and
-            'let fresh = || current().map(|_| ());' in fresh and '&current,' in request,
+            'send_manifest_bytes(&mutchannel.stream,&channel.request)' in ''.join(source.split()) and
+            'aivm_secrets_garrett_core::dispatch::WorkforManifestProvider' in ''.join(source.split()) and
+            'fn recheck(&mut self) -> Outcome<guards::AdmissionStamp>' in source and
+            '(self.current)()' in source and 'current: &current,' in request and
+            'let fresh = || current().map(|_| ());' in fresh,
             'native provider may emit credentialed bytes without the last-admission gate')
     require('aivm_secrets_garrett_core::completion::Work' in source and
             'completion::complete(pending, before)' in source and

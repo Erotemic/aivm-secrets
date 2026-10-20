@@ -1,3 +1,4 @@
+import GarrettDispatchSimulation
 import GarrettCompletionSimulation
 import GarrettRequestTrace
 import GarrettRequestSimulation
@@ -615,3 +616,28 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.completion.Simulation.request_contracts
 #print axioms aivm_secrets_garrett_core.completion.Simulation.linked_native_success_origin
 #print axioms aivm_secrets_garrett_core.completion.Simulation.request_entry_with_owned_completion
+
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.setup_frame
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.receive_frame
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.current_frame
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.send_receipts
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.driver_receipts
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.audit_receipts
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.exchange_receipts
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.finish_receipts
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.run_receipts
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.dispatch_receipts
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.audit_refusal_prefix
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.audit_success_prefix
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.send_primitive_prefix
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.send_gate_refusal
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.coordinator_finish_refusal
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.rejected_preparation_no_primitive
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.dispatch_preserves_reachability
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.returned_report_iff
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.dispatch_positive_witness
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.fresh_refusal_prefix
+#print axioms aivm_secrets_garrett_core.dispatch.Proofs.reservation_refusal_prefix
+#print axioms aivm_secrets_garrett_core.dispatch.Simulation.linked_callback_receipts
+#print axioms aivm_secrets_garrett_core.dispatch.Simulation.request_contracts
+#print axioms aivm_secrets_garrett_core.dispatch.Simulation.request_entry_with_owned_adapters

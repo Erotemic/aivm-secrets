@@ -233,3 +233,5 @@ pub mod json_reflection;
 pub mod guest_frame;
 
 pub mod completion;
+
+pub mod dispatch;

@@ -331,43 +331,43 @@ fn acknowledge(action: &str, value: &Value) -> Outcome<()> {
     Ok(())
 }
 
-/// The native provider interpreter is called only through this extracted
-/// controller. Remote acknowledgement is not itself a proof of server storage.
-pub(crate) struct PendingDispatch<C, R, E, F> {
-    pub(crate) check: C,
-    pub(crate) reserve: R,
-    pub(crate) emit: E,
-    pub(crate) finish: F,
-}
-impl<C, R, E, F> aivm_secrets_garrett_core::coordination::Dispatch for PendingDispatch<C, R, E, F>
-where
-    C: Fn() -> Outcome<()>,
-    R: Fn() -> Outcome<()>,
-    E: Fn() -> Outcome<Value>,
-    F: Fn() -> Outcome<()>,
-{
-    type Output = Value;
-    type Error = Error;
-    fn check(&self) -> Outcome<()> {
-        (self.check)()
-    }
-    fn reserve(&self) -> Outcome<()> {
-        (self.reserve)()
-    }
-    fn emit(&self) -> Outcome<Value> {
-        (self.emit)()
-    }
-    fn finish(&self) -> Outcome<()> {
-        (self.finish)()
-    }
-    fn outcome_unknown(&self) -> Error {
-        Error::OutcomeUnknown
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Legacy generic coordination contract fixture; production manifest
+    // dispatch uses the owned controller in garrett-core::dispatch.
+    pub(crate) struct PendingDispatch<C, R, E, F> {
+        pub(crate) check: C,
+        pub(crate) reserve: R,
+        pub(crate) emit: E,
+        pub(crate) finish: F,
+    }
+    impl<C, R, E, F> aivm_secrets_garrett_core::coordination::Dispatch for PendingDispatch<C, R, E, F>
+    where
+        C: Fn() -> Outcome<()>,
+        R: Fn() -> Outcome<()>,
+        E: Fn() -> Outcome<Value>,
+        F: Fn() -> Outcome<()>,
+    {
+        type Output = Value;
+        type Error = Error;
+        fn check(&self) -> Outcome<()> {
+            (self.check)()
+        }
+        fn reserve(&self) -> Outcome<()> {
+            (self.reserve)()
+        }
+        fn emit(&self) -> Outcome<Value> {
+            (self.emit)()
+        }
+        fn finish(&self) -> Outcome<()> {
+            (self.finish)()
+        }
+        fn outcome_unknown(&self) -> Error {
+            Error::OutcomeUnknown
+        }
+    }
 
     #[test]
     fn admission_requires_a_complete_typed_acknowledgement() {

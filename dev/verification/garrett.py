@@ -667,6 +667,33 @@ THEOREMS += [
     'aivm_secrets_garrett_core.completion.Simulation.request_entry_with_owned_completion',
 ]
 
+THEOREMS += [
+    'aivm_secrets_garrett_core.dispatch.Proofs.setup_frame',
+    'aivm_secrets_garrett_core.dispatch.Proofs.receive_frame',
+    'aivm_secrets_garrett_core.dispatch.Proofs.current_frame',
+    'aivm_secrets_garrett_core.dispatch.Proofs.send_receipts',
+    'aivm_secrets_garrett_core.dispatch.Proofs.driver_receipts',
+    'aivm_secrets_garrett_core.dispatch.Proofs.audit_receipts',
+    'aivm_secrets_garrett_core.dispatch.Proofs.exchange_receipts',
+    'aivm_secrets_garrett_core.dispatch.Proofs.finish_receipts',
+    'aivm_secrets_garrett_core.dispatch.Proofs.run_receipts',
+    'aivm_secrets_garrett_core.dispatch.Proofs.dispatch_receipts',
+    'aivm_secrets_garrett_core.dispatch.Proofs.audit_refusal_prefix',
+    'aivm_secrets_garrett_core.dispatch.Proofs.audit_success_prefix',
+    'aivm_secrets_garrett_core.dispatch.Proofs.send_primitive_prefix',
+    'aivm_secrets_garrett_core.dispatch.Proofs.send_gate_refusal',
+    'aivm_secrets_garrett_core.dispatch.Proofs.coordinator_finish_refusal',
+    'aivm_secrets_garrett_core.dispatch.Proofs.rejected_preparation_no_primitive',
+    'aivm_secrets_garrett_core.dispatch.Proofs.dispatch_preserves_reachability',
+    'aivm_secrets_garrett_core.dispatch.Proofs.returned_report_iff',
+    'aivm_secrets_garrett_core.dispatch.Proofs.dispatch_positive_witness',
+    'aivm_secrets_garrett_core.dispatch.Proofs.fresh_refusal_prefix',
+    'aivm_secrets_garrett_core.dispatch.Proofs.reservation_refusal_prefix',
+    'aivm_secrets_garrett_core.dispatch.Simulation.linked_callback_receipts',
+    'aivm_secrets_garrett_core.dispatch.Simulation.request_contracts',
+    'aivm_secrets_garrett_core.dispatch.Simulation.request_entry_with_owned_adapters',
+]
+
 TESTS = [
     "tests/test_rust_http_response.py",
     "tests/test_rust_approval.py",
@@ -782,6 +809,8 @@ def inputs() -> list[str]:
         "proofs/GarrettRequestEffects.lean",
         "proofs/GarrettCompletion.lean",
         "proofs/GarrettCompletionSimulation.lean",
+        "proofs/GarrettDispatch.lean",
+        "proofs/GarrettDispatchSimulation.lean",
         "proofs/GarrettRequestPrefix.lean",
         "proofs/GarrettRequestTrace.lean",
         "tests/test_rust_w6_completion.py",
@@ -1147,6 +1176,16 @@ def mutate(pattern: str | None = None) -> None:
         (completion, 'owned completion repeated selector', '    let value = match pending.work.select() {', '    let _ignored = pending.work.select();\n    let value = match pending.work.select() {'),
         (completion, 'owned completion discarded selected value', '    pending.value = Some(value);', '    let _ignored = value;\n    pending.value = None;'),
         (completion, 'owned completion rolled back returned receipt', 'effects: pending.effects,', 'effects,'),
+    ]
+    owned_dispatch = source.with_name("dispatch.rs")
+    mutations += [
+        (owned_dispatch, 'owned dispatch ignored audit refusal', '    match pending.work.audit(prepared.phase()) {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }', '    let _ignored = pending.work.audit(prepared.phase());'),
+        (owned_dispatch, 'owned dispatch sent before attempt gate', '        if !self\n            .effects\n            .begin_send(self.phase, &mut self.local, self.write)\n        {\n            return Err(W::INVALID_TRANSITION);\n        }', '        let _ignored = self.work.send(channel);\n        if !self\n            .effects\n            .begin_send(self.phase, &mut self.local, self.write)\n        {\n            return Err(W::INVALID_TRANSITION);\n        }'),
+        (owned_dispatch, 'owned dispatch bypassed rejected send gate', '        if !self\n            .effects\n            .begin_send(self.phase, &mut self.local, self.write)\n        {\n            return Err(W::INVALID_TRANSITION);\n        }', '        let _ignored = self.effects.begin_send(self.phase, &mut self.local, self.write);'),
+        (owned_dispatch, 'owned dispatch lost finish uncertainty', 'Err(_) => return Err(W::OUTCOME_UNKNOWN),', 'Err(_) => return Err(W::INVALID_TRANSITION),'),
+        (owned_dispatch, 'owned dispatch rolled back returned receipt', 'effects: pending.effects,', 'effects,'),
+        (owned_dispatch, 'owned dispatch ignored fresh refusal', '    match pending.work.check() {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }', '    let _ignored = pending.work.check();'),
+        (owned_dispatch, 'owned dispatch ignored reservation refusal', '    match reserved {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }', '    let _ignored = reserved;'),
     ]
     receipts = source.with_name("request_effects.rs")
     mutations += [
@@ -1950,6 +1989,7 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettReadInvocations",
                 "GarrettRequestEffects",
                 "GarrettCompletion",
+                "GarrettDispatch",
                 "GarrettRequestPrefix",
                 "GarrettProviderExchange",
                 "Garrett",
@@ -1991,6 +2031,7 @@ def mutate(pattern: str | None = None) -> None:
                 "provider_exchange.rs": "GarrettProviderExchange",
                 "request_effects.rs": "GarrettRequestPrefix",
                 "completion.rs": "GarrettCompletion",
+                "dispatch.rs": "GarrettDispatch",
                 "approval.rs": "GarrettApproval",
                 "enrollment.rs": "GarrettEnrollment",
                 "authority.rs": "GarrettAuthority",
@@ -2017,9 +2058,9 @@ def mutate(pattern: str | None = None) -> None:
             if source.name == "guest_frame.rs":
                 modules.remove("GarrettLineFrame")
                 modules.insert(0, "GarrettLineFrame")
-            if source.name in {"provider_exchange.rs", "manifest.rs", "request_effects.rs", "completion.rs"}:
+            if source.name in {"provider_exchange.rs", "manifest.rs", "request_effects.rs", "completion.rs", "dispatch.rs"}:
                 dependencies = ["GarrettReadTransition", "GarrettLogin", "Garrett", "GarrettManifest", "GarrettProviderExchange"]
-                if source.name in {"request_effects.rs", "completion.rs"}:
+                if source.name in {"request_effects.rs", "completion.rs", "dispatch.rs"}:
                     dependencies.append("GarrettRequestEffects")
                 for dependency in dependencies:
                     modules.remove(dependency)

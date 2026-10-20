@@ -32,9 +32,9 @@ flowchart LR
     C --> D["Native credential executor"]
     D --> E["Account HTTPS exchange"]
     B --> F["Manifest request"]
-    F --> G["Core coordination::dispatch"]
-    G --> H["Native dispatch continuation"]
-    H --> I["Manifest HTTPS exchange"]
+    F --> G["Core dispatch::dispatch"]
+    G --> H["Core provider_exchange::exchange"]
+    H --> I["Native provider send_manifest_bytes"]
 ```
 
 These are **call-graph paths**, not feasible execution traces. In particular,

@@ -122,6 +122,16 @@ source-extracted mutants, both 164-case native build-mode gates and standalone
 product workflows, all 273 archive pins and six safe installed-vTPM cases. See
 the [owned-completion validation record](../../dev/validation/2026-10-20-owned-completion.json).
 
+**Owned dispatch update:** the [production dispatch controller and request composition](../garrett-owned-dispatch.md)
+now own audit, admission/reservation, provider/local attempt and finish gates.
+Twenty-four obligations cover all returned receipt paths, exact returned state,
+refusal prefixes, positive reads in both phases and composition with owned
+completion. Whole-dispatch and whole-completion receipt assumptions are derived
+under explicit native report/copy/outcome links. Instantiating those links and
+primitive/context contracts, selected JSON/frame observations, connected
+adaptive histories and NR-2–NR-5 remain open. Validation is recorded separately
+for the committed source; prior frozen evidence retains its original scope.
+
 ## Goal and present assurance level
 
 Garrett should let an untrusted guest perform **useful, explicitly authorized**
@@ -223,7 +233,7 @@ to grow source guards.
 | --- | --- | --- | --- |
 | **P0 / NR-0** | Freeze native read profile and evidence baseline | Identify the checked-out commit, exact source/feature profile, full list of guest and provider effects, verified successful/denied synthetic witnesses and reproducible focused gates. Name all excluded configurations. | **Baseline locally accepted at `aeae955`**: 31 source pins, all W0 sinks, no-skip native workflows and focused Lean checks passed in the October 20 record. Inventory and tests remain evidence, not native I/O refinement |
 | **P0 / guest utility** | Reproduce the actual standalone guest-to-broker workflow offline, beyond internal Rust test fixtures | A documented operator+guest run with a synthetic host-held credential, a permitted selected GitHub-shaped read, broker-denied write, host audit, no credential in the distributed guest files, and a revocation check | **Native witness passed at `aeae955` in both builds**: `python dev/offline_native_guest.py`, [workflow documentation](../offline-native-operator-guest.md). Selected reads, denied write, credential absence in guest files and revocation succeeded. Same-UID demo is not isolation. |
-| **P0 / NR-1** | Connect real Rust read orchestration to a small extractable transition kernel | Production `Session::request` uses a single checked transition interface with explicit external audit, authority, provider and release outcomes. Extract the *same* Rust decisions to Lean and prove the first preservation/simulation lemma. | **Pure orchestration and initial preservation locally checked.** Production uses `run_current` with private mutable invocation tracking and extracted dispatch/completion controllers; 33 obligations cover exact result origins, receipt states, the consuming gate, errors, freshness and uncertainty. Native callback invocation/effect correspondence is the next NR-2/3 obligation. |
+| **P0 / NR-1** | Connect real Rust read orchestration to a small extractable transition kernel | Production `Session::request` uses a single checked transition interface with explicit external audit, authority, provider and release outcomes. Extract the *same* Rust decisions to Lean and prove the first preservation/simulation lemma. | **Pure orchestration and initial preservation locally checked.** Production uses `run_current` with private mutable invocation tracking and extracted dispatch/completion controllers; 37 obligations cover exact result origins, receipt states, the consuming gate, errors, freshness and uncertainty. Native callback invocation/effect correspondence is the next NR-2/3 obligation. |
 | **P0 / NR-2** | Establish admission/audit/send/release forward simulation | Relate extracted steps to `GarrettReadPaths`/`GarrettReadPrefixes` events for successful, failed and audited-but-unsent final-only, checked-only and two-phase reads. Include host-state/identity continuity and an authorized successful witness. | **Open**; all returned controller outcomes have conditional W4 audit/provider/denial projections with exact gate counting and captured binding. Native callback/primitive/context instantiation, selected-value/guest-frame and session-history correspondence remain. |
 | **P0 / NR-3** | Close W3/W6 actual-I/O boundary for the restricted native profile | Enumerate guest-reachable effectful call paths (including callback, error, drop and dependency boundaries). Prove source-owned paths or assign explicit external contracts. Relate emitted HTTP/audit/guest frames to modeled events and acknowledge ambiguity of partial sends. | **Open**; develop alongside NR-1/2, final integration depends on both |
 | **P1 / NR-4** | Complete W5 guest observation/declassification correspondence | Define exact public response fields, errors, metadata, reflection-denial bit, lengths/close behavior and adaptive sequential input model. Prove only the relational property supported by explicit declassification premises; list excluded channels. | **Open**; depends on NR-2/3 |

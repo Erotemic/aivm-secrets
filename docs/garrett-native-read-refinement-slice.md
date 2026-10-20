@@ -17,20 +17,19 @@ This is W3/W6 advancement, **not** completion of W3–W6.
 ## Source-linked enforcement
 
 A policy-selected `Effect` has no right to perform credentialed I/O. The
-`PreparedDispatch` constructor enforces preflight-read and no read-to-write
-escalation; `PreparedDispatch::audit` rejects protected values in the target,
-then persists the selected phase/route/identity/digest and returns private
-`AuditedDispatch`. `Executor::exchange_manifest` now accepts only
-`&AuditedDispatch`, not `&Effect`. The existing late admission in
-`emit_current(fresh, ...)` is retained after successful provider TLS handshake.
-The existing final release selects schema-constrained fields, checks
-credential reflection and persists completion before guest success.
+`PreparedDispatch` factory enforces preflight-read and no read-to-write
+escalation. The [owned dispatch controller](garrett-owned-dispatch.md) invokes
+the native identity/target preparation and fixed durable audit callback before
+constructing the core `Audited` permit. It owns receipt gates, provider setup,
+current admission and the composite attempt gate around the native raw sender.
+Owned completion selects schema-constrained fields, checks reflection and
+persists completion with checks before and after audit before guest success.
 
-**Crucial separation:** the `AuditedDispatch` is an audit receipt in the code,
-not a proof that a valid current grant exists. The original extracted
-`manifest::authorize` checks remain the admission authority, revalidated
-immediately before provider I/O. Rust modules, external dependencies and panic
-paths still need a complete reachability/refinement argument.
+An audit receipt alone does not establish a current grant. The extracted
+`manifest::authorize` checks remain the admission authority, revalidated after
+TLS setup and immediately before the credentialed send. Native report links,
+primitive semantics, dependencies and panic/drop paths still need the complete
+reachability/refinement argument.
 
 ## Independent runtime evidence
 
@@ -54,13 +53,14 @@ native-process acceptance run.
 | Native fact | Modeled counterpart | Status |
 | --- | --- | --- |
 | Host policy compiles a checked preflight/final effect | W4 `providerSend(.preflight/.final)` and extracted `manifest::authorize` | Concrete finite trace compared to Python compiler; universal refinement open |
-| `AuditedDispatch` exists only after a successful audit write | W4 `auditAttempt` / auditOK premise | Source boundary + audit-visible-at-provider witness; crash durability and trace abstraction open |
-| `emit_current(fresh, ...)` after TLS setup | W4 `Gate.accepted` | Existing extracted late-authorize proof; Rust callsite/time/coordination correspondence open |
+| Core `Audited` permit follows the native audit callback | W4 `auditAttempt` / auditOK premise | Source boundary + audit-visible-at-provider witness; crash durability and trace abstraction open |
+| Owned provider current stamp after TLS setup | W4 `Gate.accepted` | Existing extracted late-authorize proof; Rust callsite/time/coordination correspondence open |
 | Native project + completed audit + one `GuestFrame` | W4 `guestReply`, W5 declassification | Actual scoped raw guest TLS bytes tested; full noninterference/metadata/closure refinement open |
 | Denied or revoked guest | W4 `guestDenied`, W5 denied observations | Selected synthetic examples, not all-input proof |
 
-No Lean files or proof scopes have been changed. Neither source guard nor
-finite trace tests are a kernel-checked relation from the production binary
+The owned controllers now have extracted returned-state contracts; neither
+these conditional contracts, source guards nor finite trace tests establish
+a universal relation from the production binary
 to W4/W5. Do **not** mark IO-REFINE, NO-PREFLIGHT, CHECKED-FACTS or METADATA
 as discharged in `docs/planning/aivm-secrets-w4-proof-scope.json`.
 

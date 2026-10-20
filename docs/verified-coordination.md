@@ -81,8 +81,10 @@ therefore produce `outcome_unknown`; it does not undo the action.
 
 ## Checked scope
 
-`coordination::dispatch` is the actual extracted Rust continuation used by native
-manifest dispatch. Seven `GarrettCoordination.lean` lemmas check denial before
+`coordination::dispatch` retains its extracted generic contract and native test
+fixture. Production manifest dispatch now uses the [owned dispatch controller](garrett-owned-dispatch.md),
+which owns the receipt and local send state across the same check/reserve/provider/finish
+primitives. Seven `GarrettCoordination.lean` lemmas check denial before
 provider invocation, reservation refusal, provider error propagation, uncertain
 completion, successful read/write witnesses and the conditional acknowledged
 write contract. A dedicated core denial preserves the fixed `revoked` code
