@@ -72,6 +72,11 @@ invariants compose with the actual request entry under explicit local adapter
 contracts. Complete W4/W5 event/history correspondence, native contract
 instantiation and NR-3/4/5 remain open.
 
+Source `6cc5724` passes 3,017 full-suite cases with zero skips, 492 named
+axiom checks, five selected final-source mutants, both native product modes,
+71 Rust workspace cases, all 263 source-archive pins and six safe installed-vTPM
+cases. See the [request-effect validation record](../../dev/validation/2026-10-20-request-effects.json).
+
 ## Goal and present assurance level
 
 Garrett should let an untrusted guest perform **useful, explicitly authorized**
