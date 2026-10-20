@@ -112,9 +112,227 @@ pub fn complete_current<C: Completion>(pending: C) -> Result<C::Output, C::Error
     pending.release()
 }
 
+/// Native manifest orchestration after request admission and write approval.
+/// JSON, policy compilation, audit/authority/provider effects and disclosure
+/// remain adapters. Their success, error and optional-effect outcomes are
+/// consumed here, so each native request follows this same extracted sequence.
+pub trait Request {
+    type Facts;
+    type Effect;
+    type Output;
+    type Error;
+
+    fn preflight(&self) -> Result<Option<Self::Effect>, Self::Error>;
+    fn empty_facts(&self) -> Self::Facts;
+    fn dispatch(&self, phase: Phase, effect: Self::Effect) -> Result<Self::Facts, Self::Error>;
+    fn final_effect(&self, facts: &Self::Facts) -> Result<Option<Self::Effect>, Self::Error>;
+    fn recheck(&self) -> Result<(), Self::Error>;
+    fn effect_write(&self, effect: &Self::Effect) -> bool;
+    fn complete(&self, raw: Self::Facts) -> Result<Self::Output, Self::Error>;
+    fn outcome_unknown(&self) -> Self::Error;
+}
+
+fn request_facts<R: Request>(ops: &R) -> Result<R::Facts, R::Error> {
+    match ops.preflight() {
+        Ok(Some(effect)) => ops.dispatch(Phase::Preflight, effect),
+        Ok(None) => Ok(ops.empty_facts()),
+        Err(error) => Err(error),
+    }
+}
+
+fn finish_request<R: Request>(ops: &R, facts: R::Facts) -> Result<R::Output, R::Error> {
+    let effect = match ops.final_effect(&facts) {
+        Ok(effect) => effect,
+        Err(error) => return Err(error),
+    };
+    // Even checked-only replies require a current grant after preflight.
+    match ops.recheck() {
+        Ok(()) => (),
+        Err(error) => return Err(error),
+    }
+    let (raw, sent_write) = match effect {
+        Some(effect) => {
+            let write = ops.effect_write(&effect);
+            match ops.dispatch(Phase::Final, effect) {
+                Ok(raw) => (raw, write),
+                Err(error) => return Err(error),
+            }
+        }
+        None => (facts, false),
+    };
+    if sent_write {
+        match ops.complete(raw) {
+            Ok(reply) => Ok(reply),
+            Err(_) => Err(ops.outcome_unknown()),
+        }
+    } else {
+        ops.complete(raw)
+    }
+}
+
+pub fn request_current<R: Request>(ops: &R) -> Result<R::Output, R::Error> {
+    match request_facts(ops) {
+        Ok(facts) => finish_request(ops, facts),
+        Err(error) => Err(error),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct TestRequest {
+        trace: std::cell::RefCell<Vec<&'static str>>,
+        preflight: bool,
+        final_effect: bool,
+        write: bool,
+        fault: Option<&'static str>,
+    }
+
+    impl TestRequest {
+        fn step(&self, name: &'static str) -> Result<(), &'static str> {
+            self.trace.borrow_mut().push(name);
+            if self.fault == Some(name) {
+                Err(name)
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    impl Request for TestRequest {
+        type Facts = u8;
+        type Effect = (u8, bool);
+        type Output = u8;
+        type Error = &'static str;
+
+        fn preflight(&self) -> Result<Option<Self::Effect>, Self::Error> {
+            self.step("preflight-plan")?;
+            Ok(self.preflight.then_some((11, false)))
+        }
+        fn empty_facts(&self) -> u8 {
+            self.trace.borrow_mut().push("empty");
+            0
+        }
+        fn dispatch(&self, phase: Phase, effect: Self::Effect) -> Result<u8, Self::Error> {
+            match phase {
+                Phase::Preflight => {
+                    self.step("preflight-provider")?;
+                    assert_eq!(effect, (11, false));
+                    Ok(101)
+                }
+                Phase::Final => {
+                    self.step("final-provider")?;
+                    assert_eq!(effect, (if self.preflight { 101 } else { 0 }, self.write));
+                    Ok(202)
+                }
+            }
+        }
+        fn final_effect(&self, facts: &u8) -> Result<Option<Self::Effect>, Self::Error> {
+            self.step("final-plan")?;
+            assert_eq!(*facts, if self.preflight { 101 } else { 0 });
+            Ok(self.final_effect.then_some((*facts, self.write)))
+        }
+        fn recheck(&self) -> Result<(), Self::Error> {
+            self.step("fresh")
+        }
+        fn effect_write(&self, effect: &Self::Effect) -> bool {
+            self.trace.borrow_mut().push("write-kind");
+            effect.1
+        }
+        fn complete(&self, raw: u8) -> Result<u8, Self::Error> {
+            self.step("complete")?;
+            assert_eq!(
+                raw,
+                if self.final_effect {
+                    202
+                } else if self.preflight {
+                    101
+                } else {
+                    0
+                }
+            );
+            Ok(raw)
+        }
+        fn outcome_unknown(&self) -> Self::Error {
+            self.trace.borrow_mut().push("uncertain");
+            "outcome-unknown"
+        }
+    }
+
+    #[test]
+    fn request_shape_uses_exact_facts_effects_and_provider_result() {
+        for preflight in [false, true] {
+            for final_effect in [false, true] {
+                let request = TestRequest {
+                    trace: std::cell::RefCell::new(Vec::new()),
+                    preflight,
+                    final_effect,
+                    write: false,
+                    fault: None,
+                };
+                assert_eq!(
+                    request_current(&request),
+                    Ok(if final_effect {
+                        202
+                    } else if preflight {
+                        101
+                    } else {
+                        0
+                    })
+                );
+                let mut expected = vec!["preflight-plan"];
+                expected.push(if preflight {
+                    "preflight-provider"
+                } else {
+                    "empty"
+                });
+                expected.extend(["final-plan", "fresh"]);
+                if final_effect {
+                    expected.extend(["write-kind", "final-provider"]);
+                }
+                expected.push("complete");
+                assert_eq!(*request.trace.borrow(), expected);
+            }
+        }
+    }
+
+    #[test]
+    fn request_failure_stops_each_continuation_and_never_retries() {
+        let stages = [
+            "preflight-plan",
+            "preflight-provider",
+            "final-plan",
+            "fresh",
+            "write-kind",
+            "final-provider",
+            "complete",
+        ];
+        for (index, stage) in stages.iter().enumerate() {
+            if *stage == "write-kind" {
+                continue;
+            }
+            for write in [false, true] {
+                let request = TestRequest {
+                    trace: std::cell::RefCell::new(Vec::new()),
+                    preflight: true,
+                    final_effect: true,
+                    write,
+                    fault: Some(stage),
+                };
+                let uncertain = write && *stage == "complete";
+                assert_eq!(
+                    request_current(&request),
+                    Err(if uncertain { "outcome-unknown" } else { *stage })
+                );
+                let mut expected = stages[..=index].to_vec();
+                if uncertain {
+                    expected.push("uncertain");
+                }
+                assert_eq!(*request.trace.borrow(), expected);
+            }
+        }
+    }
 
     #[test]
     fn read_preflight_and_final_carry_their_actual_phase() {

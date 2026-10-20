@@ -1987,3 +1987,52 @@ NR-2/3/4 runtime correspondence, NR-5 independent review, W7 live providers or
 W8 guest/host compartment validation. Source changes are committed with the
 required actual-model co-author; the goal remains incomplete beyond this
 validated increment. Exact model weights/configuration remain unavailable.
+
+
+## 2026-10-20 12:21:44 -0400
+
+Model: GPT-6 (Codex); exact weights/configuration variant unavailable.
+The prior goal turn was progress: 304b5eb/0334d9e/840f405 are present and the
+worktree began clean. Continued the full Garrett goal at the next authoritative
+NR-1 requirement, rather than treating the earlier completion leaf as the end.
+The actual post-admission native request now delegates optional preflight,
+final compilation, current checking, final provider outcome and completion
+uncertainty to the extracted request_current. Existing custody, policy, audit,
+coordination, TLS, disclosure and protected release adapters are retained.
+Private request_facts/finish_request helpers are runtime callers, not proof-only
+mirrors. This factoring avoids duplicated extracted continuation code while
+preserving exact values through the native path.
+
+The expanded 25-obligation module passes kernel/axiom audit with matching fresh
+regeneration. Its successful-request iff theorem inverts actual callback
+results and requires exact preflight/baseline origin, current check, final
+provider/checked-fact origin and completion reply. Failed or divergent unused
+adapters are not assumed to terminate. Four new re-extracted Rust bypass
+mutations fail the actual proofs. Latest native regression evidence is 207
+cases, plus the 158-case focused native gate, 87 boundary/source mutants, and
+60 Rust workspace cases. Consolidated record/full-suite/read-prefix integration
+is still running at this entry. The initial guard refactor exposed an ambiguous
+freshness string check: completion and request adapter bindings are now checked
+in separate source regions, and the formerly surviving mutant is rejected.
+
+Added a concrete vTPM manifest product witness alongside account-status use:
+TPM-signed native CSR and pinned-AK enrollment, selected manifest read, denied
+write and terminal revocation. All six selected device cases and sixteen
+isolated-emulator/prerequisite cases pass. Existing public object pins and DA
+state are unchanged; no lockout/ACL/hierarchy settings were touched this turn.
+The first manifest fixture used the account helper's default provider hostname
+instead of the manifest policy's host, so startup correctly refused it. The
+fixture now explicitly selects the matching synthetic host; product validation
+was not weakened. Bad-authentication negatives remain emulator-only.
+
+This supplies the pure orchestration/data-flow and initial preservation exit
+for NR-1, under the existing adapter boundary. It does not prove invocation
+counts or trace correspondence: an ignored successful effect can leave an
+extensional result equality unchanged. The next substantive step is NR-2's
+actual invocation/effect relation and the completion-acknowledged-but-denied
+prefix, alongside NR-3 transitive sink work. NR-4 observation correspondence,
+NR-5 independent review and real provider/VM validation remain open. Confidence
+is high in the scoped extracted decision result and sampled native behavior,
+not in a whole-service mediation/secrecy claim. No new Python runtime module or
+protocol/storage format was introduced; changed Python fixtures/verifiers are
+non-core. All changes will carry the required co-author and accounting commits.

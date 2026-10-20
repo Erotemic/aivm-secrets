@@ -25,6 +25,14 @@ Garrett axiom audit, four new re-extracted bypass mutants, scoped read proofs,
 both native product build modes and the five-case installed-vTPM witness.
 See the [increment validation record](../../dev/validation/2026-10-20-read-completion.json).
 
+**NR-1 orchestration update:** the [actual post-admission request kernel](../garrett-native-request-orchestration.md)
+now selects preflight/final phases, consumes provider/error outcomes, and
+chooses completion input in production Rust. The expanded 25-obligation proof
+characterizes successful returned data and failure propagation. This supplies
+the pure orchestration and initial preservation exit of NR-1. The next task
+is NR-2's invocation/event relation; result equality alone does not account for
+all native I/O calls. The NR-3/4/5 and W7/W8 gates remain open.
+
 ## Goal and present assurance level
 
 Garrett should let an untrusted guest perform **useful, explicitly authorized**
@@ -126,7 +134,7 @@ to grow source guards.
 | --- | --- | --- | --- |
 | **P0 / NR-0** | Freeze native read profile and evidence baseline | Identify the checked-out commit, exact source/feature profile, full list of guest and provider effects, verified successful/denied synthetic witnesses and reproducible focused gates. Name all excluded configurations. | **Baseline locally accepted at `aeae955`**: 31 source pins, all W0 sinks, no-skip native workflows and focused Lean checks passed in the October 20 record. Inventory and tests remain evidence, not native I/O refinement |
 | **P0 / guest utility** | Reproduce the actual standalone guest-to-broker workflow offline, beyond internal Rust test fixtures | A documented operator+guest run with a synthetic host-held credential, a permitted selected GitHub-shaped read, broker-denied write, host audit, no credential in the distributed guest files, and a revocation check | **Native witness passed at `aeae955` in both builds**: `python dev/offline_native_guest.py`, [workflow documentation](../offline-native-operator-guest.md). Selected reads, denied write, credential absence in guest files and revocation succeeded. Same-UID demo is not isolation. |
-| **P0 / NR-1** | Connect real Rust read orchestration to a small extractable transition kernel | Production `Session::request` uses a single checked transition interface with explicit external audit, authority, provider and release outcomes. Extract the *same* Rust decisions to Lean and prove the first preservation/simulation lemma. | **Dispatch and completion preservation added.** Production uses extracted `prepare`, `acknowledge` and `complete_current`; thirteen focused obligations cover preservation and external completion outcomes. Provider-outcome/orchestration simulation remains pending; this is not complete NR-1. |
+| **P0 / NR-1** | Connect real Rust read orchestration to a small extractable transition kernel | Production `Session::request` uses a single checked transition interface with explicit external audit, authority, provider and release outcomes. Extract the *same* Rust decisions to Lean and prove the first preservation/simulation lemma. | **Pure orchestration and initial preservation locally checked.** Production uses `request_current` with extracted dispatch/completion controllers; 25 obligations cover exact result origins, errors, freshness and uncertainty. Native callback invocation/effect correspondence is the next NR-2/3 obligation. |
 | **P0 / NR-2** | Establish admission/audit/send/release forward simulation | Relate extracted steps to `GarrettReadPaths`/`GarrettReadPrefixes` events for successful, failed and audited-but-unsent final-only, checked-only and two-phase reads. Include host-state/identity continuity and an authorized successful witness. | **Open**, depends on NR-1 |
 | **P0 / NR-3** | Close W3/W6 actual-I/O boundary for the restricted native profile | Enumerate guest-reachable effectful call paths (including callback, error, drop and dependency boundaries). Prove source-owned paths or assign explicit external contracts. Relate emitted HTTP/audit/guest frames to modeled events and acknowledge ambiguity of partial sends. | **Open**; develop alongside NR-1/2, final integration depends on both |
 | **P1 / NR-4** | Complete W5 guest observation/declassification correspondence | Define exact public response fields, errors, metadata, reflection-denial bit, lengths/close behavior and adaptive sequential input model. Prove only the relational property supported by explicit declassification premises; list excluded channels. | **Open**; depends on NR-2/3 |

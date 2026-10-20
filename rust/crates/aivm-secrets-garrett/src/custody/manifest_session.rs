@@ -111,6 +111,55 @@ impl CompletedRelease {
     }
 }
 
+// The core chooses phases and reply data; these adapters retain custody and
+// the existing policy/audit/authority/TLS/disclosure implementations.
+struct PendingRequest<P, D, F, C, R> {
+    preflight: P,
+    dispatch: D,
+    final_effect: F,
+    complete: C,
+    fresh: R,
+}
+
+impl<P, D, F, C, R> read_transition::Request for PendingRequest<P, D, F, C, R>
+where
+    P: Fn() -> Outcome<Option<Effect>>,
+    D: Fn(DispatchPhase, &Effect) -> Outcome<Value>,
+    F: Fn(&Value) -> Outcome<Option<Effect>>,
+    C: Fn(Value) -> Outcome<CompletedRelease>,
+    R: Fn() -> Outcome<()>,
+{
+    type Facts = Value;
+    type Effect = Effect;
+    type Output = CompletedRelease;
+    type Error = Error;
+
+    fn preflight(&self) -> Outcome<Option<Effect>> {
+        (self.preflight)()
+    }
+    fn empty_facts(&self) -> Value {
+        Value::Null
+    }
+    fn dispatch(&self, phase: DispatchPhase, effect: Effect) -> Outcome<Value> {
+        (self.dispatch)(phase, &effect)
+    }
+    fn final_effect(&self, facts: &Value) -> Outcome<Option<Effect>> {
+        (self.final_effect)(facts)
+    }
+    fn recheck(&self) -> Outcome<()> {
+        (self.fresh)()
+    }
+    fn effect_write(&self, effect: &Effect) -> bool {
+        effect.write
+    }
+    fn complete(&self, raw: Value) -> Outcome<CompletedRelease> {
+        (self.complete)(raw)
+    }
+    fn outcome_unknown(&self) -> Error {
+        Error::OutcomeUnknown
+    }
+}
+
 pub(crate) struct Session {
     base: AccountSession,
     policy: Policy,
@@ -475,22 +524,7 @@ impl Session {
             };
             aivm_secrets_garrett_core::coordination::dispatch(&pending, keyed_write)
         };
-        let facts = if let Some(effect) = self.policy.preflight(op, &args)? {
-            dispatch(PreparedDispatch::preflight(&effect)?)?
-        } else {
-            Value::Null
-        };
-        let effect = self.policy.final_effect(op, &args, &facts)?;
-        // Returning checked facts also requires a fresh grant, even when
-        // there is no final network effect.
-        fresh()?;
-        let sent_write = effect.as_ref().is_some_and(|e| e.write);
-        let raw = if let Some(effect) = effect {
-            dispatch(PreparedDispatch::final_effect(&effect, op.write)?)?
-        } else {
-            facts
-        };
-        let release = (|| -> Outcome<CompletedRelease> {
+        let release = |raw: Value| -> Outcome<CompletedRelease> {
             self.require_control_active(host_time()?)?;
             let meta = self.policy.pagination(op, &args, &raw)?;
             let result = self.disclosure.project(&op.name, &raw, &secret.0)?;
@@ -506,14 +540,18 @@ impl Session {
                 request_digest: &request_hash,
                 fresh: &fresh,
             })
-        })();
-        if sent_write {
-            release
-                .map_err(|_| Error::OutcomeUnknown)
-                .map(CompletedRelease::into_public)
-        } else {
-            release.map(CompletedRelease::into_public)
-        }
+        };
+        let pending = PendingRequest {
+            preflight: || self.policy.preflight(op, &args),
+            final_effect: |facts: &Value| self.policy.final_effect(op, &args, facts),
+            dispatch: |phase, effect: &Effect| match phase {
+                DispatchPhase::Preflight => dispatch(PreparedDispatch::preflight(effect)?),
+                DispatchPhase::Final => dispatch(PreparedDispatch::final_effect(effect, op.write)?),
+            },
+            complete: release,
+            fresh: &fresh,
+        };
+        read_transition::request_current(&pending).map(CompletedRelease::into_public)
     }
     pub(super) fn control(
         &mut self,

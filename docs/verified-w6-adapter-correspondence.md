@@ -248,7 +248,12 @@ not represented as proofs of the added runtime observations. See
 
 ## Independent native read release/metadata observations
 
-The [completed release refinement](garrett-native-read-release-refinement.md) requires a private `CompletedRelease` receipt after projection, reflection checks, and completion audit, with finite native W6 observations for no-preflight reads, preflight-only fact returns, and exact public metadata. The added source guards and portable mutations pass locally. Native Rust compilation and selected process cases remain to run on the maintainer's toolchain. No complete source-to-W4/W5 trace refinement is claimed.
+The [completed release refinement](garrett-native-read-release-refinement.md)
+requires a private `CompletedRelease` after projection, reflection and completion
+audit. Source `304b5eb` subsequently reproduced the native read/completion
+workflows and scoped kernel gates; the orchestration increment below adds
+production control extraction. These are finite native observations and scoped
+proofs, not a complete source-to-W4/W5 trace refinement.
 
 ## NR-1A dispatch transition
 
@@ -259,5 +264,10 @@ succeeds. The executor checks that the carried opaque permit's effect-write
 flag matches the emitted policy effect. The W6 source guard is updated for
 this specific handoff. This does **not** establish the missing proof linking
 all Rust execution effects to W4/W5 traces, or prove the external audit, TLS,
-filesystem, and network contracts. Kernel verification of the newly extracted
-transition is a separate NR-1 acceptance step.
+filesystem, and network contracts. The scoped dispatch/completion proofs and
+[native request orchestration](garrett-native-request-orchestration.md) now
+check these actual pure Rust decisions and callback-result data flow. The
+single post-admission native request interpreter is the extracted
+`request_current`; its private adapters retain the existing real I/O. W6 still
+owes a relation between callback results/invocations and actual wire, audit and
+guest-frame events, including completion acknowledgment followed by denial.

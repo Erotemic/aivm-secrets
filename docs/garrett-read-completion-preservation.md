@@ -115,6 +115,11 @@ snapshot/clone resistance or live-provider compatibility. Root was used only
 for this opt-in test process in the development VM; no account/device ACL was
 changed. New development/proof harnesses and fixtures are non-core Python.
 
+The later [request-orchestration increment](garrett-native-request-orchestration.md)
+adds a sixth selected device case for the native manifest profile, including
+selected read, denied write and revocation. The original five-case validation
+record below remains tied to its original source.
+
 Wrong-authorization signing tests run only on isolated swtpm. TPM dictionary-
 attack counters are shared across objects; repeating those negatives on the
 installed device triggered lockout during development. The counter was reset

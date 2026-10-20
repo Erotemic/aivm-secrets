@@ -205,9 +205,14 @@ solely by Rust type visibility. See
 
 ## Native read completion-audit boundary
 
-The [completed release refinement](garrett-native-read-release-refinement.md) requires a private `CompletedRelease` receipt after projection, reflection checks, and completion audit, with finite native W6 observations for no-preflight reads, preflight-only fact returns, and exact public metadata. The added source guards and portable mutations pass locally. Native Rust compilation and selected process cases remain to run on the maintainer's toolchain. No complete source-to-W4/W5 trace refinement is claimed.
+The [completed release refinement](garrett-native-read-release-refinement.md)
+requires a private `CompletedRelease` after projection, reflection and completion
+audit. Source `304b5eb` subsequently reproduced the native read/completion
+workflows and scoped kernel gates; the orchestration increment below adds
+production control extraction. These are finite native observations and scoped
+proofs, not a complete source-to-W4/W5 trace refinement.
 
-## NR-1A production-called transition (pending extracted proof)
+## Production-called transitions and request orchestration
 
 The manifest adapter now invokes `aivm_secrets_garrett_core::read_transition`
 for preflight/final effect admission and the `Prepared -> Audited` transition.
@@ -218,3 +223,14 @@ source fingerprint and mutation tests cover the handoff. These are source
 observations, not a closed compiler call graph or a proof of filesystem
 durability. Late authority checks, callback/dependency effects, and actual
 provider-byte emission remain unresolved.
+
+The dispatch/completion preservation and subsequent
+[native request orchestration](garrett-native-request-orchestration.md) now
+have extracted kernel results. The latter moves optional phase selection,
+provider-result data flow, fresh checking and completion uncertainty into the
+actual `request_current` called by the manifest broker. The native adapters
+retain audit/authority/provider/disclosure I/O. The W3 guard checks both the
+completion and request adapters' freshness bindings separately; finding one
+unchanged binding elsewhere must not hide a bypass of the other. Exact
+callback-result characterizations are not counts or refinements of all I/O
+invocations, and do not close the transitive W3 boundary.

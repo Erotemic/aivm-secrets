@@ -107,8 +107,9 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and 'headers.contains_key("content-length")' in parser
            and 'headers.contains_key("transfer-encoding")' in parser,
            'native HTTP parser accepts unframed success, framed 204, or waits for EOF after 204')
-    release = entry.split('let release = (|| -> Outcome<CompletedRelease> {', 1)
+    release = entry.split('let release = |raw: Value| -> Outcome<CompletedRelease> {', 1)
     ensure(len(release) == 2, 'native read must have a typed public-release boundary')
+    release[1] = release[1].split('let pending = PendingRequest {', 1)[0]
     selected = 'self.disclosure.project(&op.name, &raw, &secret.0)?'
     checked = 'ensure_safe(&reply, &secret.0)?'
     finished = 'read_transition::complete_current(PendingCompletion {'
@@ -122,7 +123,7 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            completed[1].split('pub(crate) struct Session {', 1)[0].index('audit.write_record(') <
                completed[1].split('pub(crate) struct Session {', 1)[0].index('Ok(CompletedRelease(self.reply))') and
            'fresh: &fresh,' in release[1] and '(self.fresh)()' in completed[1] and
-           'release.map(CompletedRelease::into_public)' in entry,
+           'read_transition::request_current(&pending).map(CompletedRelease::into_public)' in entry,
            'native success can reach guest without completion audit')
     return {'channels': len(channels), 'remaining': len(contract['remaining_obligations']),
             'status': 'review guard only; runtime/formal gates are separate'}

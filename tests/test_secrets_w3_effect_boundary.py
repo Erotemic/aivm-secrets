@@ -118,8 +118,8 @@ def mutate(repo, filename, before, after):
      '    fn audit(&self) -> Outcome<()> {\n        self.audit.write_record(&json!({\n            "schema":1,\n            "event":"completed",',
      '    fn audit(&self) -> Outcome<()> {\n        unchecked_release(&json!({\n            "schema":1,\n            "event":"completed",'),
     (RUST + 'custody/manifest_session.rs',
-     'release.map(CompletedRelease::into_public)',
-     'release.map(|r| r.0)'),
+     'read_transition::request_current(&pending).map(CompletedRelease::into_public)',
+     'unchecked_reply(&pending)'),
     (RUST + 'custody/manifest_session.rs',
      'read_transition::prepare(DispatchPhase::Final, admitted_write, effect.write)',
      'read_transition::prepare(DispatchPhase::Final, true, effect.write)'),
@@ -171,7 +171,7 @@ def mutate(repo, filename, before, after):
     ),
     (
         RUST + 'custody/manifest_session.rs',
-        'dispatch(PreparedDispatch::final_effect(&effect, op.write)?)?',
+        'dispatch(PreparedDispatch::final_effect(effect, op.write)?)',
         'self.base.executor.exchange_manifest(&self.base.grant.route, &secret, &effect, &self.policy.headers)?',
     ),
     (

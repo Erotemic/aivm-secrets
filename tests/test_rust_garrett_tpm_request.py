@@ -18,6 +18,7 @@ from tests.test_rust_garrett_authority import (
 )
 from tests.test_rust_garrett_certificates import creation_evidence
 from tests.test_rust_garrett_provider import provider_directory
+from tests.test_rust_garrett_manifest import policy, disclosure
 from tests.test_rust_garrett_tpm import DeviceTPM, SoftwareTPM, require_software_tpm_tools
 
 
@@ -173,8 +174,9 @@ def enroll_tpm(authority, tpm, csr):
             process.communicate()
 
 
+@pytest.mark.parametrize('profile', ['account', 'manifest'])
 def test_native_tpm_request_enrollment_and_provider_use_without_key_export(
-    tmp_path, provisioned
+    tmp_path, provisioned, profile
 ):
     tpm, config = provisioned
     result = request(tmp_path, config)
@@ -183,10 +185,34 @@ def test_native_tpm_request_enrollment_and_provider_use_without_key_export(
     assert enrolled["assurance"]["mode"] == "attested-tpm"
     assert result["key_fingerprint"] == enrolled["assurance"]["spki_sha256"]
     certs = authority.certs(enrollment=enrolled)
-    with TLSService(provider_directory(tmp_path)) as provider:
-        provider.routes[("GET", "/v1/account")] = dict(id=42, active=True)
+    with TLSService(provider_directory(tmp_path), host='api.example.org') as provider:
+        options = {}
+        invoke = dict(key_configuration=dict(key_mode='tpm2', **config))
+        if profile == 'account':
+            target = '/v1/account'
+            expected = dict(id=42, active=True)
+        else:
+            target = '/v1/tickets/7'
+            expected = dict(id=42)
+            options = dict(profile='manifest-https-v1', writes='deny', request_limit='unbounded',
+                           policy_file=str(private(tmp_path / 'policy.json', policy(tmp_path, provider))),
+                           disclosure_file=str(private(tmp_path / 'disclosure.json', disclosure())))
+            invoke.update(operation='ticket.view', arguments={'ticket': 7})
+        provider.routes[('GET', target)] = dict(id=42, active=True)
         with AuthorityProviderCase(
-            tmp_path, provider, authority, certs=certs, assurance="attested-tpm"
+            tmp_path, provider, authority, certs=certs, assurance="attested-tpm", **options
         ) as session:
-            reply = session.invoke(key_configuration=dict(key_mode="tpm2", **config))
-            assert reply["result"] == dict(id=42, active=True)
+            reply = session.invoke(**invoke)
+            assert reply['result'] == expected
+            assert len(provider.seen()) == 1
+            if profile == 'manifest':
+                denied = session.invoke(operation='ticket.edit',
+                    arguments={'ticket': 7, 'text': 'denied'},
+                    key_configuration=invoke['key_configuration'])
+                assert denied['error']['code'] == 'denied'
+                assert len(provider.seen()) == 1
+                authority.call('revoke', subject='vm-test')
+                assert not session.invoke(**invoke)['ok']
+                assert len(provider.seen()) == 1
+                assert not (tmp_path / 'client.key').exists()
+                assert list((tmp_path / 'work').iterdir()) == []

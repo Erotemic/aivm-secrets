@@ -4317,6 +4317,95 @@ def read_transition.complete_current
     | core.result.Result.Err error => ok (core.result.Result.Err error)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
+/-- Trait declaration: [aivm_secrets_garrett_core::read_transition::Request]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 119:0-133:1
+    Visibility: public -/
+structure read_transition.Request (Self : Type _) (Self_Facts : Type _)
+  (Self_Effect : Type _) (Self_Output : Type _) (Self_Error : Type _) where
+  preflight : Self → Result (core.result.Result (Option Self_Effect)
+    Self_Error)
+  empty_facts : Self → Result Self_Facts
+  dispatch : Self → read_transition.Phase → Self_Effect → Result
+    (core.result.Result Self_Facts Self_Error)
+  final_effect : Self → Self_Facts → Result (core.result.Result (Option
+    Self_Effect) Self_Error)
+  recheck : Self → Result (core.result.Result Unit Self_Error)
+  effect_write : Self → Self_Effect → Result Bool
+  complete : Self → Self_Facts → Result (core.result.Result Self_Output
+    Self_Error)
+  outcome_unknown : Self → Result Self_Error
+
+/-- [aivm_secrets_garrett_core::read_transition::request_facts]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 135:0-141:1 -/
+def read_transition.request_facts
+  {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
+  read_transition.Request R Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error) (ops : R) :
+  Result (core.result.Result Clause0_Facts Clause0_Error)
+  := do
+  let r ← RequestInst.preflight ops
+  match r with
+  | core.result.Result.Ok o =>
+    match o with
+    | none =>
+      let t ← RequestInst.empty_facts ops
+      ok (core.result.Result.Ok t)
+    | some effect =>
+      RequestInst.dispatch ops read_transition.Phase.Preflight effect
+  | core.result.Result.Err error => ok (core.result.Result.Err error)
+
+/-- [aivm_secrets_garrett_core::read_transition::finish_request]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 143:0-171:1 -/
+def read_transition.finish_request
+  {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
+  read_transition.Request R Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error) (ops : R) (facts : Clause0_Facts) :
+  Result (core.result.Result Clause0_Output Clause0_Error)
+  := do
+  let r ← RequestInst.final_effect ops facts
+  match r with
+  | core.result.Result.Ok effect =>
+    let r1 ← RequestInst.recheck ops
+    match r1 with
+    | core.result.Result.Ok _ =>
+      match effect with
+      | none => RequestInst.complete ops facts
+      | some effect1 =>
+        let write ← RequestInst.effect_write ops effect1
+        let r2 ← RequestInst.dispatch ops read_transition.Phase.Final effect1
+        match r2 with
+        | core.result.Result.Ok raw =>
+          if write
+          then
+            let r3 ← RequestInst.complete ops raw
+            match r3 with
+            | core.result.Result.Ok _ => ok r3
+            | core.result.Result.Err _ =>
+              let t ← RequestInst.outcome_unknown ops
+              ok (core.result.Result.Err t)
+          else RequestInst.complete ops raw
+        | core.result.Result.Err error => ok (core.result.Result.Err error)
+    | core.result.Result.Err error => ok (core.result.Result.Err error)
+  | core.result.Result.Err error => ok (core.result.Result.Err error)
+
+/-- [aivm_secrets_garrett_core::read_transition::request_current]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 173:0-178:1
+    Visibility: public -/
+def read_transition.request_current
+  {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
+  read_transition.Request R Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error) (ops : R) :
+  Result (core.result.Result Clause0_Output Clause0_Error)
+  := do
+  let r ← read_transition.request_facts RequestInst ops
+  match r with
+  | core.result.Result.Ok facts =>
+    read_transition.finish_request RequestInst ops facts
+  | core.result.Result.Err error => ok (core.result.Result.Err error)
+
 /-- [aivm_secrets_garrett_core::rebinding::Target]
     Source: 'crates/aivm-secrets-garrett-core/src/rebinding.rs', lines 6:0-12:1
     Visibility: public -/

@@ -74,8 +74,8 @@ def check(root: Path = ROOT) -> dict:
     require(audited != -1 and executor > audited,
             'native manifest might execute a provider effect before dispatch audit')
     require('let dispatch = |prepared: PreparedDispatch' in request and
-            'dispatch(PreparedDispatch::preflight(&effect)?)?' in request and
-            'dispatch(PreparedDispatch::final_effect(&effect, op.write)?)?' in request,
+            'dispatch(PreparedDispatch::preflight(effect)?)' in request and
+            'dispatch(PreparedDispatch::final_effect(effect, op.write)?)' in request,
             'manifest preflight/final no longer share the audited dispatcher')
     fresh = request.split('let fresh = || -> Outcome<()> {', 1)[-1].split('let canonical_request', 1)[0]
     for checked in ('self.base.check_coordination()?;',

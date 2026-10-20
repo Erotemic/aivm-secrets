@@ -112,15 +112,18 @@ here. In particular, a credential sent **to its authorized provider** is an
 expected authorized release, not a violation; another provider/destination
 or the guest is not authorized to receive it.
 
-### NR-1 handoff (dispatch/completion preservation; orchestration pending)
+### NR-1 handoff (pure orchestration and preservation; event simulation next)
 
 **October 20 update:** the exact extracted `prepare`/`acknowledge` seam now has
 a checked preservation lemma. The same core also supplies production-called
 `complete_current`, with distinct current-authority checkpoints before the
 completion audit and before release. See [the increment's scope and commands](../garrett-read-completion-preservation.md).
 The paragraphs below describe the original NR-1A seam; their initial missing
-dispatch theorem is discharged by this increment. The full provider-outcome
-and orchestration-to-trace relation is still missing.
+dispatch theorem is discharged by this increment. The [subsequent production
+orchestration extraction](../garrett-native-request-orchestration.md) now
+consumes optional phase and provider/error outcomes through the real
+`request_current`, with exact success/data-flow and failure lemmas. The full
+callback-invocation and orchestration-to-trace relation is still missing.
 
 `rust/crates/aivm-secrets-garrett-core/src/read_transition.rs` implements the
 actual phase/effect admission and audit-acknowledgment transition used by
@@ -137,8 +140,8 @@ authority checks and provider send attempts remain external NR-2/NR-3
 obligations. The new theorem is in `GarrettReadTransition.lean` and checks the
 regenerated production core; it is separate from the older W4/W5 abstract proofs.
 
-Focus the next proof work on extracted provider/failure outcomes and the
-concrete relation to W4/W5 event prefixes, including post-completion-audit
+Focus the next proof work on the extracted controller's callback invocation
+relation and W4/W5 event prefixes, including post-completion-audit
 revocation. Do not create an independently hand-written `read_transition`
 model. Preserve an authorized success witness from the standalone offline
 workflow in parallel.
@@ -151,7 +154,7 @@ Inspect the *actual production* code before any refactor:
   `Session::request`, `PreparedDispatch::preflight/final_effect`,
   `PreparedDispatch::audit → AuditedDispatch`, `Executor::exchange_manifest`,
   `manifest_request_bytes`, `manifest_response`,
-  `CompletedRelease::after_completion`.
+  `PendingRequest` and `PendingCompletion`.
 - `rust/crates/aivm-secrets-garrett/src/custody.rs`:
   `emit_current` and `Executor::exchange`, to find any alternate provider I/O.
 - `rust/crates/aivm-secrets-garrett/src/tls.rs` and bridge entry:

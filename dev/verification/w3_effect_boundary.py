@@ -98,15 +98,16 @@ def review_semantics(contents: dict[str, str]) -> None:
     require(same_order(request, 'control.state.admit(&approval_digest, op.write)?',
                        'Decision::Required =>', 'fresh()?;',
                        '.remember(&approval_digest, &canonical_request)?;',
-                       'let dispatch = |prepared: PreparedDispatch', 'self.policy.preflight('),
+                       'let dispatch = |prepared: PreparedDispatch', 'preflight: || self.policy.preflight('),
             'approval is not enforced before credentialed preflight/final effects')
     require('self.policy.digest()' in request and '"grant":self.base.executor.audit.grant' in request
             and 'self.require_control_active(current)?;' in request
             and 'fresh: &fresh,' in request,
             'approval identity or late revocation fencing bypassed')
     control = part(m, 'pub(super) fn control(', '\nfn manifest_request_bytes(')
-    dispatch = part(request, 'let dispatch = |prepared: PreparedDispatch', 'let facts = if let Some(effect)')
-    release = part(request, 'let release = (|| -> Outcome<CompletedRelease> {', 'if sent_write {')
+    dispatch = part(request, 'let dispatch = |prepared: PreparedDispatch', 'let release = |raw: Value|')
+    release = part(request, 'let release = |raw: Value| -> Outcome<CompletedRelease> {', 'let pending = PendingRequest {')
+    plan = part(request, 'let pending = PendingRequest {', 'read_transition::request_current(&pending)')
     reviewed = part(m, "impl<'a> PreparedDispatch<'a> {", 'pub(crate) struct Session {')
     require('struct PreparedDispatch<' in m and 'Phase as DispatchPhase' in m
             and 'struct AuditedDispatch<' in m and m.count('AuditedDispatch {') == 1,
@@ -135,8 +136,8 @@ def review_semantics(contents: dict[str, str]) -> None:
         'reviewed transition is no longer exported by native core')
     require(request.count('exchange_manifest(') == 1,
             'unexpected direct manifest HTTP dispatch outside the sole gated closure')
-    require(request.count('PreparedDispatch::preflight(&effect)?') == 1
-            and request.count('PreparedDispatch::final_effect(&effect, op.write)?') == 1,
+    require(request.count('PreparedDispatch::preflight(effect)?') == 1
+            and request.count('PreparedDispatch::final_effect(effect, op.write)?') == 1,
             'preflight/final not constrained to the reviewed write gate')
     require(same_order(dispatch,
                        'let recorded = prepared.audit(', 'let effect = recorded.effect;',
@@ -169,25 +170,36 @@ def review_semantics(contents: dict[str, str]) -> None:
     require(same_order(release, 'self.disclosure.project(', 'ensure_safe(&reply',
                        'read_transition::complete_current(PendingCompletion {'),
             'guest release bypasses selected disclosure/reflection/completion')
-    completion = part(transition, 'pub fn complete_current<', '#[cfg(test)]')
+    completion = part(transition, 'pub fn complete_current<', 'pub trait Request {')
     require(same_order(completion, 'pending.recheck(CompletionPhase::BeforeAudit)',
                        'pending.audit()', 'pending.recheck(CompletionPhase::BeforeRelease)',
                        'pending.release()') and
             completion.count('Err(error) => return Err(error)') == 3,
             'completion bypasses current authority, audit or post-audit freshness')
-    compact_request = ''.join(request.split())
-    require('release.map(CompletedRelease::into_public)' in request and
-            'release.map_err(|_|Error::OutcomeUnknown).map(CompletedRelease::into_public)' in compact_request,
+    require(request.count('read_transition::request_current(&pending).map(CompletedRelease::into_public)') == 1
+            and 'complete: release,' in plan and 'fresh: &fresh,' in plan
+            and 'fresh: &fresh,' in release,
             'guest result bypasses audited release or sent-write uncertainty')
     require('guards::authorize(' in request and 'open_surrogate(' in request
             and 'self.policy.operation(&request)' in request,
             'native request missing authorizing guard / policy compiler')
-    require('let effect = self.policy.final_effect(op, &args, &facts)?;' in request,
+    require('final_effect: |facts: &Value| self.policy.final_effect(op, &args, facts)' in request,
             'final effect is not compiled from checked facts')
-    require('self.policy.preflight(op, &args)?' in request,
+    require('preflight: || self.policy.preflight(op, &args)' in request,
             'preflight is no longer compiled from host policy')
-    require('let sent_write = effect.as_ref().is_some_and(|e| e.write);' in request
-            and 'release.map_err(|_|Error::OutcomeUnknown)' in compact_request,
+    orchestration = part(transition, 'fn request_facts<', '#[cfg(test)]')
+    require(same_order(orchestration, 'ops.preflight()', 'ops.dispatch(Phase::Preflight, effect)',
+                       'ops.final_effect(&facts)', 'ops.recheck()', 'ops.effect_write(&effect)',
+                       'ops.dispatch(Phase::Final, effect)', 'if sent_write', 'ops.complete(raw)',
+                       'Err(ops.outcome_unknown())', 'pub fn request_current<',
+                       'match request_facts(ops)', 'Ok(facts) => finish_request(ops, facts)')
+            and 'None => (facts, false)' in orchestration
+            and 'Ok(raw) => (raw, write)' in orchestration,
+            'extracted request bypasses provider outcomes, fresh admission or exact completion input')
+    adapter = part(m, 'impl<P, D, F, C, R> read_transition::Request', 'pub(crate) struct Session {')
+    require('fn effect_write(&self, effect: &Effect) -> bool' in adapter
+            and 'effect.write' in adapter and 'Error::OutcomeUnknown' in adapter
+            and 'Value::Null' in adapter,
             'write uncertainty boundary altered')
     # W6: the exact provider bytes are validated by a pure encoder BEFORE any
     # TCP/TLS effect. This also covers OAuthSource-created Credential values.

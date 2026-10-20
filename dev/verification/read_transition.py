@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Kernel-check preservation of the production-called Rust read dispatch seam.
+"""Kernel-check the production-called Rust dispatch/completion/request decisions.
 
 By default, regenerate the core with pinned Charon/Aeneas and compare the
 entire generated module before compiling the proof. --no-regenerate is useful
 while editing the Lean proof, but does not establish fresh source linkage.
-This is NR-1 dispatch preservation, not complete request/I/O simulation.
+This is NR-1 decision/data-flow preservation, not native request/I/O simulation.
 """
 from __future__ import annotations
 
@@ -27,6 +27,12 @@ THEOREMS = (
     'denied_before_completion', 'completion_audit_refusal',
     'revoked_after_completion_audit', 'current_completion_continuation',
     'completion_preservation', 'authorized_completion_witness',
+    'request_facts_success_iff', 'finish_request_success_iff', 'request_current_success_iff',
+    'failed_preflight_compilation_stops', 'failed_preflight_provider_stops',
+    'failed_final_compilation_stops', 'stale_after_preflight_stops',
+    'final_provider_failure_stops_completion', 'final_read_continuation',
+    'checked_only_continuation', 'sent_write_completion_failure_is_uncertain',
+    'two_phase_read_successful_witness',
 )
 
 
@@ -60,7 +66,7 @@ def main() -> None:
     output = directory / '.lake/build/lib/lean/GarrettReadTransition.olean'
     lean_step.run([lake, 'env', 'lean', '-DwarningAsError=true', '-o', str(output),
                    'GarrettReadTransition.lean'], directory,
-                  'production dispatch preservation')
+                  'production transition and orchestration preservation')
     # Keep the axiom report separate from the proof source and normal compiler
     # output. A successful import alone cannot replace the named axiom audit.
     with tempfile.TemporaryDirectory(prefix='read-transition-', dir=directory / '.lake') as scratch:
@@ -69,7 +75,7 @@ def main() -> None:
             f'#print axioms {NAMESPACE}{name}\n' for name in THEOREMS))
         audit(lean_step.run([lake, 'env', 'lean', '-DwarningAsError=true', str(check)],
                             directory, 'named theorem axiom audit'))
-    print(f'Kernel checked {len(THEOREMS)} extracted dispatch obligations; '
+    print(f'Kernel checked {len(THEOREMS)} extracted transition obligations; '
           f'source regeneration {"omitted" if args.no_regenerate else "matched"}. '
           'Audit durability, adapter correspondence and native I/O simulation remain open.')
 

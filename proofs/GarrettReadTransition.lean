@@ -158,4 +158,212 @@ theorem authorized_completion_witness {P O E : Type} (ops : Completion P O E)
     complete_current ops pending = Result.ok (.Ok value) := by
   rw [current_completion_continuation ops pending before ack afterAudit, released]
 
+/-- A successful extracted computation has a returned input and successful
+continuation. This inversion does not require termination of unused adapters. -/
+private theorem bind_returns_iff {A B : Type} (first : Result A)
+    (next : A → Result B) (result : B) :
+    (first >>= next) = Result.ok result ↔
+      ∃ value, first = Result.ok value ∧ next value = Result.ok result := by
+  cases first using Result.cases with
+  | ret value => simp
+  | vis effect continuation => simp
+  | div => simp
+
+/-- The request's facts are exactly its empty baseline or the actual returned
+preflight value. This is a specification of origin, not a second interpreter. -/
+def FactsFrom {P F E O X : Type} (ops : Request P F E O X) (pending : P)
+    (facts : F) : Prop :=
+  (ops.preflight pending = Result.ok (.Ok none) ∧
+    ops.empty_facts pending = Result.ok facts) ∨
+  ∃ effect, ops.preflight pending = Result.ok (.Ok (some effect)) ∧
+    ops.dispatch pending .Preflight effect = Result.ok (.Ok facts)
+
+theorem request_facts_success_iff {P F E O X : Type} (ops : Request P F E O X)
+    (pending : P) (facts : F) :
+    request_facts ops pending = Result.ok (.Ok facts) ↔ FactsFrom ops pending facts := by
+  cases h : ops.preflight pending using Result.cases with
+  | ret planned =>
+    cases planned with
+    | Err error => simp [request_facts, h, FactsFrom]
+    | Ok effect =>
+      cases effect with
+      | none =>
+        cases empty : ops.empty_facts pending using Result.cases <;>
+          simp [request_facts, h, FactsFrom, empty]
+      | some effect => simp [request_facts, h, FactsFrom]
+  | vis effect continuation => simp [request_facts, h, FactsFrom]
+  | div => simp [request_facts, h, FactsFrom]
+
+/-- The exact input to completion is either the checked facts for a no-final
+operation or the successful final provider return. No unrelated value qualifies. -/
+def RawFrom {P F E O X : Type} (ops : Request P F E O X) (pending : P)
+    (facts raw : F) : Prop :=
+  (ops.final_effect pending facts = Result.ok (.Ok none) ∧ raw = facts) ∨
+  ∃ effect write, ops.final_effect pending facts = Result.ok (.Ok (some effect)) ∧
+    ops.effect_write pending effect = Result.ok write ∧
+    ops.dispatch pending .Final effect = Result.ok (.Ok raw)
+
+def FinishSuccess {P F E O X : Type} (ops : Request P F E O X) (pending : P)
+    (facts : F) (reply : O) : Prop :=
+  ops.recheck pending = Result.ok (.Ok ()) ∧
+    ∃ raw, RawFrom ops pending facts raw ∧
+      ops.complete pending raw = Result.ok (.Ok reply)
+
+theorem finish_request_success_iff {P F E O X : Type} (ops : Request P F E O X)
+    (pending : P) (facts : F) (reply : O) :
+    finish_request ops pending facts = Result.ok (.Ok reply) ↔
+      FinishSuccess ops pending facts reply := by
+  constructor
+  · intro success
+    unfold finish_request at success
+    obtain ⟨planned, compiled, rest⟩ := (bind_returns_iff _ _ _).mp success
+    cases planned with
+    | Err error => simp at rest
+    | Ok selected =>
+      obtain ⟨checked, current, rest⟩ := (bind_returns_iff _ _ _).mp rest
+      cases checked with
+      | Err error => simp at rest
+      | Ok u =>
+        cases u
+        cases selected with
+        | none =>
+          exact ⟨current, facts, Or.inl ⟨compiled, rfl⟩, rest⟩
+        | some effect =>
+          obtain ⟨write, classified, rest⟩ := (bind_returns_iff _ _ _).mp rest
+          obtain ⟨provider, dispatched, rest⟩ := (bind_returns_iff _ _ _).mp rest
+          cases provider with
+          | Err error => simp at rest
+          | Ok raw =>
+            have completed : ops.complete pending raw = Result.ok (.Ok reply) := by
+              cases write with
+              | false => simpa using rest
+              | true =>
+                obtain ⟨out, completion, rest⟩ := (bind_returns_iff _ _ _).mp rest
+                cases out with
+                | Ok value =>
+                  have equal : value = reply := by simpa using rest
+                  simpa [equal] using completion
+                | Err error =>
+                  obtain ⟨unknown, _, impossible⟩ := (bind_returns_iff _ _ _).mp rest
+                  simp at impossible
+            exact ⟨current, raw, Or.inr ⟨effect, write, compiled, classified, dispatched⟩,
+              completed⟩
+  · rintro ⟨current, raw, origin, completed⟩
+    rcases origin with ⟨compiled, rfl⟩ | ⟨effect, write, compiled, classified, dispatched⟩
+    · simp [finish_request, compiled, current, completed]
+    · cases write <;> simp [finish_request, compiled, current, classified, dispatched, completed]
+
+/-- Complete successful-request characterization of the extracted runtime
+kernel. Current authority and completion are actual callback outcomes; the
+meaning of those adapter facts and their concrete I/O remain separate contracts. -/
+theorem request_current_success_iff {P F E O X : Type} (ops : Request P F E O X)
+    (pending : P) (reply : O) :
+    request_current ops pending = Result.ok (.Ok reply) ↔
+      ∃ facts, FactsFrom ops pending facts ∧ FinishSuccess ops pending facts reply := by
+  constructor
+  · intro success
+    unfold request_current at success
+    obtain ⟨out, produced, rest⟩ := (bind_returns_iff _ _ _).mp success
+    cases out with
+    | Err error => simp at rest
+    | Ok facts =>
+      exact ⟨facts, (request_facts_success_iff ops pending facts).mp produced,
+        (finish_request_success_iff ops pending facts reply).mp rest⟩
+  · rintro ⟨facts, produced, finished⟩
+    simp [request_current, (request_facts_success_iff ops pending facts).mpr produced,
+      (finish_request_success_iff ops pending facts reply).mpr finished]
+
+theorem failed_preflight_compilation_stops {P F E O X : Type}
+    (ops : Request P F E O X) (pending : P) (error : X)
+    (failed : ops.preflight pending = Result.ok (.Err error)) :
+    request_current ops pending = Result.ok (.Err error) := by
+  simp [request_current, request_facts, failed]
+
+theorem failed_preflight_provider_stops {P F E O X : Type}
+    (ops : Request P F E O X) (pending : P) (effect : E) (error : X)
+    (planned : ops.preflight pending = Result.ok (.Ok (some effect)))
+    (failed : ops.dispatch pending .Preflight effect = Result.ok (.Err error)) :
+    request_current ops pending = Result.ok (.Err error) := by
+  simp [request_current, request_facts, planned, failed]
+
+theorem failed_final_compilation_stops {P F E O X : Type}
+    (ops : Request P F E O X) (pending : P) (facts : F) (error : X)
+    (produced : FactsFrom ops pending facts)
+    (failed : ops.final_effect pending facts = Result.ok (.Err error)) :
+    request_current ops pending = Result.ok (.Err error) := by
+  simp [request_current, (request_facts_success_iff ops pending facts).mpr produced,
+    finish_request, failed]
+
+theorem stale_after_preflight_stops {P F E O X : Type}
+    (ops : Request P F E O X) (pending : P) (facts : F) (selected : Option E) (error : X)
+    (produced : FactsFrom ops pending facts)
+    (compiled : ops.final_effect pending facts = Result.ok (.Ok selected))
+    (denied : ops.recheck pending = Result.ok (.Err error)) :
+    request_current ops pending = Result.ok (.Err error) := by
+  simp [request_current, (request_facts_success_iff ops pending facts).mpr produced,
+    finish_request, compiled, denied]
+
+theorem final_provider_failure_stops_completion {P F E O X : Type}
+    (ops : Request P F E O X) (pending : P) (facts : F) (effect : E)
+    (write : Bool) (error : X)
+    (produced : FactsFrom ops pending facts)
+    (compiled : ops.final_effect pending facts = Result.ok (.Ok (some effect)))
+    (current : ops.recheck pending = Result.ok (.Ok ()))
+    (classified : ops.effect_write pending effect = Result.ok write)
+    (failed : ops.dispatch pending .Final effect = Result.ok (.Err error)) :
+    request_current ops pending = Result.ok (.Err error) := by
+  simp [request_current, (request_facts_success_iff ops pending facts).mpr produced,
+    finish_request, compiled, current, classified, failed]
+
+/-- Keep failures and divergence of disclosure/completion for read operations;
+no successful-provider assumption can erase them from the controller contract. -/
+theorem final_read_continuation {P F E O X : Type}
+    (ops : Request P F E O X) (pending : P) (facts raw : F) (effect : E)
+    (produced : FactsFrom ops pending facts)
+    (compiled : ops.final_effect pending facts = Result.ok (.Ok (some effect)))
+    (current : ops.recheck pending = Result.ok (.Ok ()))
+    (classified : ops.effect_write pending effect = Result.ok false)
+    (dispatched : ops.dispatch pending .Final effect = Result.ok (.Ok raw)) :
+    request_current ops pending = ops.complete pending raw := by
+  simp [request_current, (request_facts_success_iff ops pending facts).mpr produced,
+    finish_request, compiled, current, classified, dispatched]
+
+theorem checked_only_continuation {P F E O X : Type}
+    (ops : Request P F E O X) (pending : P) (facts : F)
+    (produced : FactsFrom ops pending facts)
+    (compiled : ops.final_effect pending facts = Result.ok (.Ok none))
+    (current : ops.recheck pending = Result.ok (.Ok ())) :
+    request_current ops pending = ops.complete pending facts := by
+  simp [request_current, (request_facts_success_iff ops pending facts).mpr produced,
+    finish_request, compiled, current]
+
+theorem sent_write_completion_failure_is_uncertain {P F E O X : Type}
+    (ops : Request P F E O X) (pending : P) (facts raw : F) (effect : E)
+    (error unknown : X)
+    (produced : FactsFrom ops pending facts)
+    (compiled : ops.final_effect pending facts = Result.ok (.Ok (some effect)))
+    (current : ops.recheck pending = Result.ok (.Ok ()))
+    (classified : ops.effect_write pending effect = Result.ok true)
+    (dispatched : ops.dispatch pending .Final effect = Result.ok (.Ok raw))
+    (failed : ops.complete pending raw = Result.ok (.Err error))
+    (code : ops.outcome_unknown pending = Result.ok unknown) :
+    request_current ops pending = Result.ok (.Err unknown) := by
+  simp [request_current, (request_facts_success_iff ops pending facts).mpr produced,
+    finish_request, compiled, current, classified, dispatched, failed, code]
+
+theorem two_phase_read_successful_witness {P F E O X : Type}
+    (ops : Request P F E O X) (pending : P) (preflight final : E) (facts raw : F)
+    (reply : O)
+    (preplanned : ops.preflight pending = Result.ok (.Ok (some preflight)))
+    (prefetched : ops.dispatch pending .Preflight preflight = Result.ok (.Ok facts))
+    (compiled : ops.final_effect pending facts = Result.ok (.Ok (some final)))
+    (current : ops.recheck pending = Result.ok (.Ok ()))
+    (classified : ops.effect_write pending final = Result.ok false)
+    (dispatched : ops.dispatch pending .Final final = Result.ok (.Ok raw))
+    (completed : ops.complete pending raw = Result.ok (.Ok reply)) :
+    request_current ops pending = Result.ok (.Ok reply) := by
+  rw [final_read_continuation ops pending facts raw final
+    (Or.inr ⟨preflight, preplanned, prefetched⟩) compiled current classified dispatched,
+    completed]
+
 end aivm_secrets_garrett_core.read_transition.Proofs

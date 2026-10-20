@@ -36,6 +36,18 @@ PROFILES = [
     "native-exact-write-approval-v1",
 ]
 THEOREMS = [
+    "aivm_secrets_garrett_core.read_transition.Proofs.request_facts_success_iff",
+    "aivm_secrets_garrett_core.read_transition.Proofs.finish_request_success_iff",
+    "aivm_secrets_garrett_core.read_transition.Proofs.request_current_success_iff",
+    "aivm_secrets_garrett_core.read_transition.Proofs.failed_preflight_compilation_stops",
+    "aivm_secrets_garrett_core.read_transition.Proofs.failed_preflight_provider_stops",
+    "aivm_secrets_garrett_core.read_transition.Proofs.failed_final_compilation_stops",
+    "aivm_secrets_garrett_core.read_transition.Proofs.stale_after_preflight_stops",
+    "aivm_secrets_garrett_core.read_transition.Proofs.final_provider_failure_stops_completion",
+    "aivm_secrets_garrett_core.read_transition.Proofs.final_read_continuation",
+    "aivm_secrets_garrett_core.read_transition.Proofs.checked_only_continuation",
+    "aivm_secrets_garrett_core.read_transition.Proofs.sent_write_completion_failure_is_uncertain",
+    "aivm_secrets_garrett_core.read_transition.Proofs.two_phase_read_successful_witness",
     "aivm_secrets_garrett_core.read_transition.Proofs.prepare_success_iff",
     "aivm_secrets_garrett_core.read_transition.Proofs.acknowledge_success_iff",
     "aivm_secrets_garrett_core.read_transition.Proofs.prepared_to_audited_preservation",
@@ -928,6 +940,14 @@ def mutate(pattern: str | None = None) -> None:
          "pending.recheck(CompletionPhase::BeforeRelease)", "Ok::<(), C::Error>(())"),
         (transition, "read transition completion audit bypass",
          "pending.audit()", "Ok::<(), C::Error>(())"),
+        (transition, "request orchestration missing fresh check",
+         "ops.recheck()", "Ok::<(), R::Error>(())"),
+        (transition, "request orchestration wrong preflight phase",
+         "ops.dispatch(Phase::Preflight, effect)", "ops.dispatch(Phase::Final, effect)"),
+        (transition, "request orchestration substituted final result",
+         "Ok(raw) => (raw, write)", "Ok(_raw) => (ops.empty_facts(), write)"),
+        (transition, "request orchestration lost write uncertainty",
+         "Err(_) => Err(ops.outcome_unknown())", "Err(error) => Err(error)"),
     ]
     use_source = source.with_name("credential_use.rs")
     mutations += [
