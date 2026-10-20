@@ -132,6 +132,14 @@ primitive/context contracts, selected JSON/frame observations, connected
 adaptive histories and NR-2–NR-5 remain open. Validation is recorded separately
 for the committed source; prior frozen evidence retains its original scope.
 
+Source `3e51590` passes 3,031 full-suite cases with zero skips, 574 named
+axiom checks, 767 release parity cases, 79 Rust workspace cases, seven new
+source-extracted mutants, both 164-case native build-mode gates and standalone
+product workflows, all 276 archive pins and six safe installed-vTPM cases.
+The updated optional specialized bridge capture finds eight required paths;
+its 42 fixture/capture tests pass, with no mediation claim. See the
+[owned-dispatch validation record](../../dev/validation/2026-10-20-owned-dispatch.json).
+
 ## Goal and present assurance level
 
 Garrett should let an untrusted guest perform **useful, explicitly authorized**
