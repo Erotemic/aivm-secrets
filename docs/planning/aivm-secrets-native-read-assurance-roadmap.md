@@ -151,6 +151,14 @@ This is the first provider component, not completion of NR-2: contract
 instantiation against the native I/O seam and composition through full requests,
 completion/denial and connected histories remain required.
 
+The [request-wide receipt increment](../garrett-request-effect-receipts.md)
+now adds actual audit/attempt/completion markers, a composite request/local send
+gate, mutable callback snapshots and 29 checked gate/composition obligations.
+It generalizes all 33 earlier request obligations to actual returned mutable
+states. Conditional composition reaches the actual consuming request entry;
+the local native callback contracts are still premises. Precise W4/W5 event
+binding, all failure prefixes and connected session histories remain open.
+
 Focus the next proof work on the extracted controller's callback invocation
 relation and W4/W5 event prefixes, including post-completion-audit
 revocation. Do not create an independently hand-written `read_transition`

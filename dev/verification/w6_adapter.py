@@ -79,7 +79,7 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
     runtime = source.split('#[cfg(test)]', 1)[0]
     ensure(runtime.count('.write_all(') == 1
            and 'writer.write_all(request)' in ''.join(runtime.split())
-           and 'provider_exchange::exchange(&mut provider, &audited.transition)' in provider_interpreter
+           and 'provider_exchange::exchange(&mutprovider,&audited.transition,)' in ''.join(provider_interpreter.split())
            and runtime.count('TcpStream::connect_timeout(') == 1,
            'native manifest adapter has another provider send')
     encoder = source.split('fn manifest_request_bytes(', 1)[1].split('// The standard Write contract', 1)[0]

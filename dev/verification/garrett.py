@@ -36,6 +36,35 @@ PROFILES = [
     "native-exact-write-approval-v1",
 ]
 THEOREMS = [
+    'aivm_secrets_garrett_core.request_effects.Proofs.audited_unsent_cannot_complete',
+    'aivm_secrets_garrett_core.request_effects.Proofs.attempted_cannot_submit_again',
+    'aivm_secrets_garrett_core.request_effects.Proofs.completion_ack_is_not_return_permission',
+    'aivm_secrets_garrett_core.request_effects.Proofs.initial_is_sound',
+    'aivm_secrets_garrett_core.request_effects.Proofs.begin_dispatch_audit_preserves',
+    'aivm_secrets_garrett_core.request_effects.Proofs.acknowledge_dispatch_preserves',
+    'aivm_secrets_garrett_core.request_effects.Proofs.begin_provider_preserves',
+    'aivm_secrets_garrett_core.request_effects.Proofs.provider_completed_preserves',
+    'aivm_secrets_garrett_core.request_effects.Proofs.finish_dispatch_preserves',
+    'aivm_secrets_garrett_core.request_effects.Proofs.begin_completion_preserves',
+    'aivm_secrets_garrett_core.request_effects.Proofs.selected_preserves',
+    'aivm_secrets_garrett_core.request_effects.Proofs.begin_completion_check_preserves',
+    'aivm_secrets_garrett_core.request_effects.Proofs.finish_completion_check_preserves',
+    'aivm_secrets_garrett_core.request_effects.Proofs.begin_completion_audit_preserves',
+    'aivm_secrets_garrett_core.request_effects.Proofs.acknowledge_completion_audit_preserves',
+    'aivm_secrets_garrett_core.request_effects.Proofs.value_ready_preserves',
+    'aivm_secrets_garrett_core.request_effects.Proofs.begin_send_preserves',
+    'aivm_secrets_garrett_core.request_effects.Proofs.step_preserves',
+    'aivm_secrets_garrett_core.request_effects.Proofs.steps_preserve',
+    'aivm_secrets_garrett_core.request_effects.Proofs.reachable_is_sound',
+    'aivm_secrets_garrett_core.request_effects.Proofs.provider_attempt_requires_audit_and_stamp',
+    'aivm_secrets_garrett_core.request_effects.Proofs.can_return_value_iff',
+    'aivm_secrets_garrett_core.request_effects.Proofs.completed_value_requires_selection_checks_and_audit',
+    'aivm_secrets_garrett_core.request_effects.Proofs.late_denial_retains_ack_with_no_return',
+    'aivm_secrets_garrett_core.request_effects.Proofs.rejected_call_closes_return_gate',
+    'aivm_secrets_garrett_core.request_effects.Simulation.facts_callback_steps',
+    'aivm_secrets_garrett_core.request_effects.Simulation.finishing_callback_steps',
+    'aivm_secrets_garrett_core.request_effects.Simulation.request_forward_simulation',
+    'aivm_secrets_garrett_core.request_effects.Simulation.successful_entry_has_completed_receipt',
     'aivm_secrets_garrett_core.manifest.StampProofs.current_success_iff',
     'aivm_secrets_garrett_core.manifest.StampProofs.denied_current_preserves_error',
     'aivm_secrets_garrett_core.provider_exchange.Proofs.read_run_iff',
@@ -684,6 +713,9 @@ def inputs() -> list[str]:
         "proofs/GarrettReadTransition.lean",
         "proofs/GarrettReadInvocations.lean",
         "proofs/GarrettProviderExchange.lean",
+        "proofs/GarrettRequestEffects.lean",
+        "proofs/GarrettRequestSimulation.lean",
+        "dev/verification/request_effects.py",
         "proofs/GarrettProviderSimulation.lean",
         "proofs/GarrettConfinement.lean",
         "dev/verification/provider_exchange.py",
@@ -874,6 +906,7 @@ def assurance_coordinates() -> dict:
         "implementation_linked": "Aeneas-generated optional coordinator dispatch continuation and issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission, and concrete authentication-header credential validation/exact byte appending and request-line method/target validation/exact single-line construction used by both native provider writers, exact bounded newline frame admission shared by bridge ingress, forwarded broker replies and the guest client, including empty observed suffix and post-send uncertainty mapping as a tested native adapter, and extended to complete request framing with Host/Accept, exact custom-header ordering, case-insensitive reserved/duplicate refusal, concrete decimal port/body length and exact opaque body bytes; exact bounded ASCII retry-name admission shared by the native host and named-operation client; optional coordinator authority exact peer/operator admission, absent-only activation, revocation/reservation/completion decisions and modeled terminal committed-decision histories; exact operator receipt admission distinguishing absent status from a terminal revocation, composed with successful extracted revocation; optional exact-write approval issuance/deadline and matching, unexpired, single-use consumption; production mutable manifest provider setup/current/send/receive driver, sampled admission-stamp origin, native guarded Write state and conditional W4 provider-event extension for every returned read outcome under explicit local primitive contracts",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
+            "The production request-wide receipt gates actual dispatch/completion audit markers, composite phase/current submission and completed native values. Extracted reachable-state invariants and conditional composition through mutable request callbacks require explicit callback-to-receipt-transition and primitive acknowledgement contracts. Native snapshot copying and completed-value checks are reviewed and tested, not a universal I/O refinement. Recorded stamps do not make revocation atomic with a syscall; complete W4/W5 event/history correspondence, non-returning/drop paths and guest frame emission remain open.",
             "Provider forward simulation composes explicit setup/current/send/receive contracts for a provider-attempt projection of mutable state. The native SendState makes its recorded-attempt projection concrete, but native context/world instantiation, the private std/rustls Write primitive, non-returning/drop effects and absence of other I/O are separate obligations; result/state equalities alone do not prove complete native mediation.",
             "Charon/Aeneas translation and supplied standard models, Lean kernel, Rust compiler and target ABI are trusted.",
             "Signature verification authenticates the exact envelope; sealing/unsealing implement their stated cryptographic contracts.",
@@ -1029,6 +1062,19 @@ def mutate(pattern: str | None = None) -> None:
         (source.with_name("manifest.rs"), "provider current stamp bypassed authorization",
          "match authorize(\n        claims,\n        grant,\n        requested,\n        selected,\n        write,\n        writes_allowed,\n        now,\n        elapsed,\n    ) {",
          "match Ok::<(), UseDenial>(()) {"),
+    ]
+    receipts = source.with_name("request_effects.rs")
+    mutations += [
+        (receipts, "request receipt missing local current gate",
+         "if !local.begin_send(write) {", "if false {"),
+        (receipts, "request receipt completion ack without audit",
+         "if !matches!(self.progress, Progress::CompletionAudit) {", "if false {"),
+        (receipts, "request receipt value before post-audit check",
+         "if !matches!(self.progress, Progress::AfterAudit) {", "if !matches!(self.progress, Progress::CompletionAudited) {"),
+        (receipts, "request receipt sticky value bypasses halted gate",
+         "matches!(self.progress, Progress::ValueReady)", "self.completion.value_ready"),
+        (receipts, "request receipt dispatch audit attempt unrecorded",
+         "record.audit_attempted = true;", "record.audit_attempted = false;"),
     ]
     use_source = source.with_name("credential_use.rs")
     mutations += [
@@ -1797,6 +1843,7 @@ def mutate(pattern: str | None = None) -> None:
             modules = [
                 "GarrettReadTransition",
                 "GarrettReadInvocations",
+                "GarrettRequestEffects",
                 "GarrettProviderExchange",
                 "Garrett",
                 "GarrettProtocol",
@@ -1834,6 +1881,7 @@ def mutate(pattern: str | None = None) -> None:
             preferred = {
                 "read_transition.rs": "GarrettReadTransition",
                 "provider_exchange.rs": "GarrettProviderExchange",
+                "request_effects.rs": "GarrettRequestEffects",
                 "approval.rs": "GarrettApproval",
                 "enrollment.rs": "GarrettEnrollment",
                 "authority.rs": "GarrettAuthority",
@@ -1856,7 +1904,7 @@ def mutate(pattern: str | None = None) -> None:
             if preferred:
                 modules.remove(preferred)
                 modules.insert(0, preferred)
-            if source.name in {"provider_exchange.rs", "manifest.rs"}:
+            if source.name in {"provider_exchange.rs", "manifest.rs", "request_effects.rs"}:
                 dependencies = ["GarrettReadTransition", "GarrettLogin", "Garrett", "GarrettManifest", "GarrettProviderExchange"]
                 for dependency in dependencies:
                     modules.remove(dependency)

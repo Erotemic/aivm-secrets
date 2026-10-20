@@ -87,9 +87,9 @@ def check(root: Path = ROOT) -> dict:
     primitive = source.split('fn send_manifest_bytes(', 1)[1].split('struct ManifestChannel {', 1)[0]
     require('let stream = StreamOwned::new(conn, socket);' in source and
             'writer.write_all(request)' in ''.join(primitive.split()) and
-            'if !state.begin_send(write)' in primitive and
-            'send_manifest_bytes(&mutself.send_state,&mutchannel.stream,&channel.request,self.effect.write,)' in ''.join(source.split()) and
-            'provider_exchange::exchange(&mut provider, &audited.transition)' in exchange and
+            'if !effects.borrow_mut().begin_send(phase, state, write)' in primitive and
+            'send_manifest_bytes(&mutself.send_state,&mutchannel.stream,&channel.request,self.effect.write,&self.effects,self.phase,)' in ''.join(source.split()) and
+            'provider_exchange::exchange(&mutprovider,&audited.transition,)' in ''.join(exchange.split()) and
             'current: &impl Fn() -> Outcome<guards::AdmissionStamp>' in exchange and
             'let fresh = || current().map(|_| ());' in fresh and '&current,' in request,
             'native provider may emit credentialed bytes without the last-admission gate')

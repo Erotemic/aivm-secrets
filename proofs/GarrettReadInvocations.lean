@@ -71,12 +71,12 @@ private theorem empty_step {P F E O X : Type} (ops : Request P F E O X)
   simp [Invocation.empty_facts, atState, factsState, returned]
 
 private theorem preflight_dispatch_step {P F E O X : Type} (ops : Request P F E O X)
-    (pending : P) (effect : E) (out : core.result.Result F X)
-    (returned : ops.dispatch pending .Preflight effect = Result.ok out) :
+    (pending after : P) (effect : E) (out : core.result.Result F X)
+    (returned : ops.dispatch pending .Preflight effect = Result.ok (out, after)) :
     Invocation.dispatch ops (atState pending .PreflightPlan .Preflight) .Preflight effect =
       Result.ok (out, match out with
-        | .Ok _ => factsState pending true
-        | .Err _ => atState pending .PreflightDispatch .Halted) := by
+        | .Ok _ => factsState after true
+        | .Err _ => atState after .PreflightDispatch .Halted) := by
   cases out <;> simp [Invocation.dispatch, atState, factsState, returned]
 
 private theorem final_plan_step {P F E O X : Type} (ops : Request P F E O X)
@@ -90,13 +90,13 @@ private theorem final_plan_step {P F E O X : Type} (ops : Request P F E O X)
       simp [Invocation.final_effect, atState, factsState, afterFinalPlan, returned]
 
 private theorem current_step {P F E O X : Type} (ops : Request P F E O X)
-    (pending : P) (preflight finalEffect : Bool) (out : core.result.Result Unit X)
-    (returned : ops.recheck pending = Result.ok out) :
+    (pending after : P) (preflight finalEffect : Bool) (out : core.result.Result Unit X)
+    (returned : ops.recheck pending = Result.ok (out, after)) :
     Invocation.recheck ops (atState pending (.FinalPlan preflight) (.Current preflight finalEffect)) =
       Result.ok (out, match out with
-        | .Err _ => atState pending (.Current preflight) .Halted
-        | .Ok _ => if finalEffect then atState pending (.Current preflight) (.WriteKind preflight)
-          else completeState pending preflight false false) := by
+        | .Err _ => atState after (.Current preflight) .Halted
+        | .Ok _ => if finalEffect then atState after (.Current preflight) (.WriteKind preflight)
+          else completeState after preflight false false) := by
   cases out with
   | Err error => simp [Invocation.recheck, atState, returned]
   | Ok u => cases u; cases finalEffect <;>
@@ -110,19 +110,19 @@ private theorem write_step {P F E O X : Type} (ops : Request P F E O X)
   simp [Invocation.effect_write, atState, returned]
 
 private theorem final_dispatch_step {P F E O X : Type} (ops : Request P F E O X)
-    (pending : P) (preflight write : Bool) (effect : E) (out : core.result.Result F X)
-    (returned : ops.dispatch pending .Final effect = Result.ok out) :
+    (pending after : P) (preflight write : Bool) (effect : E) (out : core.result.Result F X)
+    (returned : ops.dispatch pending .Final effect = Result.ok (out, after)) :
     Invocation.dispatch ops (atState pending (.WriteKind preflight) (.FinalDispatch preflight write))
       .Final effect = Result.ok (out, match out with
-        | .Ok _ => completeState pending preflight true write
-        | .Err _ => atState pending (.FinalDispatch preflight) .Halted) := by
+        | .Ok _ => completeState after preflight true write
+        | .Err _ => atState after (.FinalDispatch preflight) .Halted) := by
   cases out <;> simp [Invocation.dispatch, atState, completeState, returned]
 
 private theorem complete_step {P F E O X : Type} (ops : Request P F E O X)
-    (pending : P) (preflight finalEffect write : Bool) (raw : F) (out : core.result.Result O X)
-    (returned : ops.complete pending raw = Result.ok out) :
+    (pending after : P) (preflight finalEffect write : Bool) (raw : F) (out : core.result.Result O X)
+    (returned : ops.complete pending raw = Result.ok (out, after)) :
     Invocation.complete ops (completeState pending preflight finalEffect write) raw =
-      Result.ok (out, afterComplete pending preflight finalEffect write out) := by
+      Result.ok (out, afterComplete after preflight finalEffect write out) := by
   cases out <;> cases write <;>
     simp [Invocation.complete, completeState, atState, afterComplete, returned]
 
@@ -153,13 +153,14 @@ private theorem empty_bind {P F E O X : Type} (ops : Request P F E O X) (pending
 private theorem preflight_dispatch_bind {P F E O X : Type} (ops : Request P F E O X)
     (pending : P) (effect : E) :
     Invocation.dispatch ops (atState pending .PreflightPlan .Preflight) .Preflight effect = (do
-      let out ← ops.dispatch pending .Preflight effect
+      let (out, after) ← ops.dispatch pending .Preflight effect
       Result.ok (out, match out with
-        | .Ok _ => factsState pending true
-        | .Err _ => atState pending .PreflightDispatch .Halted)) := by
+        | .Ok _ => factsState after true
+        | .Err _ => atState after .PreflightDispatch .Halted)) := by
   simp [Invocation.dispatch, atState]
   congr 1
-  funext out
+  funext pair
+  rcases pair with ⟨out, after⟩
   cases out <;> rfl
 
 private theorem final_plan_bind {P F E O X : Type} (ops : Request P F E O X)
@@ -177,14 +178,15 @@ private theorem final_plan_bind {P F E O X : Type} (ops : Request P F E O X)
 private theorem current_bind {P F E O X : Type} (ops : Request P F E O X)
     (pending : P) (preflight finalEffect : Bool) :
     Invocation.recheck ops (atState pending (.FinalPlan preflight) (.Current preflight finalEffect)) = (do
-      let out ← ops.recheck pending
+      let (out, after) ← ops.recheck pending
       Result.ok (out, match out with
-        | .Err _ => atState pending (.Current preflight) .Halted
-        | .Ok _ => if finalEffect then atState pending (.Current preflight) (.WriteKind preflight)
-          else completeState pending preflight false false)) := by
+        | .Err _ => atState after (.Current preflight) .Halted
+        | .Ok _ => if finalEffect then atState after (.Current preflight) (.WriteKind preflight)
+          else completeState after preflight false false)) := by
   simp only [Invocation.recheck, atState]
   congr 1
-  funext out
+  funext pair
+  rcases pair with ⟨out, after⟩
   cases out with
   | Err error => rfl
   | Ok u => cases u; cases finalEffect <;> rfl
@@ -200,23 +202,25 @@ private theorem final_dispatch_bind {P F E O X : Type} (ops : Request P F E O X)
     (pending : P) (preflight write : Bool) (effect : E) :
     Invocation.dispatch ops (atState pending (.WriteKind preflight) (.FinalDispatch preflight write))
       .Final effect = (do
-      let out ← ops.dispatch pending .Final effect
+      let (out, after) ← ops.dispatch pending .Final effect
       Result.ok (out, match out with
-        | .Ok _ => completeState pending preflight true write
-        | .Err _ => atState pending (.FinalDispatch preflight) .Halted)) := by
+        | .Ok _ => completeState after preflight true write
+        | .Err _ => atState after (.FinalDispatch preflight) .Halted)) := by
   simp [Invocation.dispatch, atState]
   congr 1
-  funext out
+  funext pair
+  rcases pair with ⟨out, after⟩
   cases out <;> rfl
 
 private theorem complete_bind {P F E O X : Type} (ops : Request P F E O X)
     (pending : P) (preflight finalEffect write : Bool) (raw : F) :
     Invocation.complete ops (completeState pending preflight finalEffect write) raw = (do
-      let out ← ops.complete pending raw
-      Result.ok (out, afterComplete pending preflight finalEffect write out)) := by
+      let (out, after) ← ops.complete pending raw
+      Result.ok (out, afterComplete after preflight finalEffect write out)) := by
   simp only [Invocation.complete, completeState, atState]
   congr 1
-  funext out
+  funext pair
+  rcases pair with ⟨out, after⟩
   cases out with
   | Ok reply => rfl
   | Err error => cases write <;> rfl
@@ -228,19 +232,20 @@ private theorem uncertain_bind {P F E O X : Type} (ops : Request P F E O X)
       Result.ok (code, atState pending (.Uncertain preflight) .Halted)) := by
   rfl
 
-/-- Exact successful fact origin, retaining which callback branch ran. -/
+
+/-- Exact fact origin and returned mutable adapter state. -/
 def FactsFrom {P F E O X : Type} (ops : Request P F E O X) (pending : P)
-    (preflight : Bool) (facts : F) : Prop :=
+    (preflight : Bool) (facts : F) (after : P) : Prop :=
   if preflight then
     ∃ effect, ops.preflight pending = Result.ok (.Ok (some effect)) ∧
-      ops.dispatch pending .Preflight effect = Result.ok (.Ok facts)
+      ops.dispatch pending .Preflight effect = Result.ok (.Ok facts, after)
   else ops.preflight pending = Result.ok (.Ok none) ∧
-    ops.empty_facts pending = Result.ok facts
+    ops.empty_facts pending = Result.ok facts ∧ after = pending
 
 theorem request_facts_success_iff {P F E O X : Type} (ops : Request P F E O X)
     (pending : P) (facts : F) (after : Invocation P) :
     request_facts ops (initial pending) = Result.ok (.Ok facts, after) ↔
-      ∃ preflight, FactsFrom ops pending preflight facts ∧ after = factsState pending preflight := by
+      ∃ state preflight, FactsFrom ops pending preflight facts state ∧ after = factsState state preflight := by
   unfold request_facts
   rw [preflight_bind]
   cases h : ops.preflight pending using Result.cases with
@@ -258,7 +263,8 @@ theorem request_facts_success_iff {P F E O X : Type} (ops : Request P F E O X)
         simp [afterPreflight]
         rw [preflight_dispatch_bind]
         cases dispatched : ops.dispatch pending .Preflight effect using Result.cases with
-        | ret out => cases out <;> simp [dispatched, FactsFrom, h, eq_comm]
+        | ret pair => rcases pair with ⟨out, state⟩; cases out <;>
+            simp [dispatched, FactsFrom, h, eq_comm]
         | vis event continuation => simp [dispatched, FactsFrom, h]
         | div => simp [dispatched, FactsFrom, h]
   | vis event continuation => simp [h, FactsFrom]
@@ -267,30 +273,32 @@ theorem request_facts_success_iff {P F E O X : Type} (ops : Request P F E O X)
 def finishedState {P : Type} (pending : P) (preflight finalEffect : Bool) : Invocation P :=
   atState pending (.Complete preflight finalEffect) .Finished
 
-/-- Successful completion retains the selected facts, exact callback results,
-    and the concrete terminal invocation receipt. -/
+/-- The current, dispatch and completion callbacks thread their actual states.
+    Completion receives exactly the selected facts or final provider value. -/
 def FinishSuccess {P F E O X : Type} (ops : Request P F E O X) (pending : P)
     (preflight : Bool) (facts : F) (reply : O) (after : Invocation P) : Prop :=
-  ops.recheck pending = Result.ok (.Ok ()) ∧
+  ∃ checked, ops.recheck pending = Result.ok (.Ok (), checked) ∧
     ((ops.final_effect pending facts = Result.ok (.Ok none) ∧
-      ops.complete pending facts = Result.ok (.Ok reply) ∧
-      after = finishedState pending preflight false) ∨
-     ∃ effect write raw, ops.final_effect pending facts = Result.ok (.Ok (some effect)) ∧
-       ops.effect_write pending effect = Result.ok write ∧
-       ops.dispatch pending .Final effect = Result.ok (.Ok raw) ∧
-       ops.complete pending raw = Result.ok (.Ok reply) ∧
-       after = finishedState pending preflight true)
+      ∃ completed, ops.complete checked facts = Result.ok (.Ok reply, completed) ∧
+      after = finishedState completed preflight false) ∨
+     ∃ effect write raw dispatched completed,
+       ops.final_effect pending facts = Result.ok (.Ok (some effect)) ∧
+       ops.effect_write checked effect = Result.ok write ∧
+       ops.dispatch checked .Final effect = Result.ok (.Ok raw, dispatched) ∧
+       ops.complete dispatched raw = Result.ok (.Ok reply, completed) ∧
+       after = finishedState completed preflight true)
 
 private theorem complete_success_iff {P F E O X : Type} (ops : Request P F E O X)
     (pending : P) (preflight finalEffect write : Bool) (raw : F) (reply : O)
     (after : Invocation P) :
     Invocation.complete ops (completeState pending preflight finalEffect write) raw =
       Result.ok (.Ok reply, after) ↔
-      ops.complete pending raw = Result.ok (.Ok reply) ∧
-        after = finishedState pending preflight finalEffect := by
+      ∃ completed, ops.complete pending raw = Result.ok (.Ok reply, completed) ∧
+        after = finishedState completed preflight finalEffect := by
   rw [complete_bind]
   cases h : ops.complete pending raw using Result.cases with
-  | ret out => cases out <;> simp [afterComplete, finishedState, eq_comm]
+  | ret pair => rcases pair with ⟨out, completed⟩; cases out <;>
+      simp [afterComplete, finishedState, eq_comm]
   | vis event continuation => simp
   | div => simp
 
@@ -310,15 +318,16 @@ theorem finish_request_success_iff {P F E O X : Type} (ops : Request P F E O X)
       dsimp only [afterFinalPlan] at rest
       rw [current_bind] at rest
       simp at rest
-      obtain ⟨checked, current, rest⟩ := (bind_returns_iff _ _ _).mp rest
+      obtain ⟨⟨checked, state⟩, current, rest⟩ := (bind_returns_iff _ _ _).mp rest
       cases checked with
       | Err error => simp at rest
       | Ok u =>
         cases u
+        simp at rest
         cases selected with
         | none =>
-          have last := (complete_success_iff ops pending preflight false false facts reply after).mp rest
-          exact ⟨current, Or.inl ⟨compiled, last⟩⟩
+          have last := (complete_success_iff ops state preflight false false facts reply after).mp (by simpa using rest)
+          exact ⟨state, current, Or.inl ⟨compiled, last⟩⟩
         | some effect =>
           simp at rest
           rw [write_bind] at rest
@@ -326,43 +335,49 @@ theorem finish_request_success_iff {P F E O X : Type} (ops : Request P F E O X)
           obtain ⟨write, classified, rest⟩ := (bind_returns_iff _ _ _).mp rest
           rw [final_dispatch_bind] at rest
           simp at rest
-          obtain ⟨provider, dispatched, rest⟩ := (bind_returns_iff _ _ _).mp rest
+          obtain ⟨⟨provider, dispatched⟩, sent, rest⟩ := (bind_returns_iff _ _ _).mp rest
           cases provider with
           | Err error => simp at rest
           | Ok raw =>
-            dsimp only at rest
-            have last : ops.complete pending raw = Result.ok (.Ok reply) ∧
-                after = finishedState pending preflight true := by
+            simp at rest
+            have last : ∃ completed, ops.complete dispatched raw = Result.ok (.Ok reply, completed) ∧
+                after = finishedState completed preflight true := by
               cases write with
-              | false =>
-                exact (complete_success_iff ops pending preflight true false raw reply after).mp rest
+              | false => exact (complete_success_iff ops dispatched preflight true false raw reply after).mp (by simpa using rest)
               | true =>
+                simp at rest
                 rw [complete_bind] at rest
                 simp at rest
-                obtain ⟨out, completed, rest⟩ := (bind_returns_iff _ _ _).mp rest
+                obtain ⟨⟨out, completed⟩, completion, rest⟩ := (bind_returns_iff _ _ _).mp rest
                 cases out with
                 | Ok value =>
-                  have same : value = reply ∧ after = finishedState pending preflight true := by
+                  have same : value = reply ∧ after = finishedState completed preflight true := by
                     simpa [afterComplete, finishedState, eq_comm] using rest
-                  exact ⟨by simpa [same.1] using completed, same.2⟩
+                  exact ⟨completed, by simpa [same.1] using completion, same.2⟩
                 | Err error =>
-                  obtain ⟨⟨code, state⟩, _, impossible⟩ := (bind_returns_iff _ _ _).mp rest
+                  simp [afterComplete] at rest
+                  rw [uncertain_bind] at rest
+                  simp at rest
+                  obtain ⟨code, _, impossible⟩ := (bind_returns_iff _ _ _).mp rest
                   simp at impossible
-            exact ⟨current, Or.inr ⟨effect, write, raw, compiled, classified, dispatched, last⟩⟩
-  · rintro ⟨current, ⟨compiled, completed, rfl⟩ | ⟨effect, write, raw, compiled, classified, dispatched, completed, rfl⟩⟩
-    · simp [finish_request, final_plan_step _ _ _ _ _ compiled,
-        afterFinalPlan, current_step _ _ _ _ _ current, complete_step _ _ _ _ _ _ _ completed,
+            obtain ⟨completed, completion, same⟩ := last
+            exact ⟨state, current, Or.inr ⟨effect, write, raw, dispatched, completed,
+              compiled, classified, sent, completion, same⟩⟩
+  · rintro ⟨state, current, ⟨compiled, completed, completion, rfl⟩ |
+      ⟨effect, write, raw, dispatched, completed, compiled, classified, sent, completion, rfl⟩⟩
+    · simp [finish_request, final_plan_step _ _ _ _ _ compiled, afterFinalPlan,
+        current_step _ _ _ _ _ _ current, complete_step _ _ _ _ _ _ _ _ completion,
         afterComplete, finishedState]
     · cases write <;> simp [finish_request, final_plan_step _ _ _ _ _ compiled,
-        afterFinalPlan, current_step _ _ _ _ _ current, write_step _ _ _ _ _ classified,
-        final_dispatch_step _ _ _ _ _ _ dispatched, complete_step _ _ _ _ _ _ _ completed,
+        afterFinalPlan, current_step _ _ _ _ _ _ current, write_step _ _ _ _ _ classified,
+        final_dispatch_step _ _ _ _ _ _ _ sent, complete_step _ _ _ _ _ _ _ _ completion,
         afterComplete, finishedState]
 
 theorem request_current_success_iff {P F E O X : Type} (ops : Request P F E O X)
     (pending : P) (reply : O) (after : Invocation P) :
     request_current ops (initial pending) = Result.ok (.Ok reply, after) ↔
-      ∃ facts preflight, FactsFrom ops pending preflight facts ∧
-        FinishSuccess ops pending preflight facts reply after := by
+      ∃ facts state preflight, FactsFrom ops pending preflight facts state ∧
+        FinishSuccess ops state preflight facts reply after := by
   constructor
   · intro success
     unfold request_current at success
@@ -370,19 +385,20 @@ theorem request_current_success_iff {P F E O X : Type} (ops : Request P F E O X)
     cases out with
     | Err error => simp at rest
     | Ok facts =>
-      obtain ⟨preflight, origin, rfl⟩ := (request_facts_success_iff ops pending facts middle).mp produced
-      exact ⟨facts, preflight, origin,
-        (finish_request_success_iff ops pending preflight facts reply after).mp rest⟩
-  · rintro ⟨facts, preflight, origin, finish⟩
-    have produced := (request_facts_success_iff ops pending facts (factsState pending preflight)).mpr
-      ⟨preflight, origin, rfl⟩
+      obtain ⟨state, preflight, origin, rfl⟩ := (request_facts_success_iff ops pending facts middle).mp produced
+      exact ⟨facts, state, preflight, origin,
+        (finish_request_success_iff ops state preflight facts reply after).mp rest⟩
+  · rintro ⟨facts, state, preflight, origin, finish⟩
+    have produced := (request_facts_success_iff ops pending facts (factsState state preflight)).mpr
+      ⟨state, preflight, origin, rfl⟩
     simp [request_current, produced,
-      (finish_request_success_iff ops pending preflight facts reply after).mpr finish]
+      (finish_request_success_iff ops state preflight facts reply after).mpr finish]
 
 private theorem facts_return {P F E O X : Type} (ops : Request P F E O X)
-    (pending : P) (preflight : Bool) (facts : F) (origin : FactsFrom ops pending preflight facts) :
-    request_facts ops (initial pending) = Result.ok (.Ok facts, factsState pending preflight) :=
-  (request_facts_success_iff ops pending facts _).mpr ⟨preflight, origin, rfl⟩
+    (pending state : P) (preflight : Bool) (facts : F) (origin : FactsFrom ops pending preflight facts state) :
+    request_facts ops (initial pending) = Result.ok (.Ok facts, factsState state preflight) :=
+  (request_facts_success_iff ops pending facts _).mpr ⟨state, preflight, origin, rfl⟩
+
 
 theorem failed_preflight_compilation_stops {P F E O X : Type}
     (ops : Request P F E O X) (pending : P) (error : X)
@@ -392,112 +408,106 @@ theorem failed_preflight_compilation_stops {P F E O X : Type}
   simp [request_current, request_facts, preflight_step _ _ _ failed, afterPreflight]
 
 theorem failed_preflight_provider_stops {P F E O X : Type}
-    (ops : Request P F E O X) (pending : P) (effect : E) (error : X)
+    (ops : Request P F E O X) (pending after : P) (effect : E) (error : X)
     (planned : ops.preflight pending = Result.ok (.Ok (some effect)))
-    (failed : ops.dispatch pending .Preflight effect = Result.ok (.Err error)) :
+    (failed : ops.dispatch pending .Preflight effect = Result.ok (.Err error, after)) :
     request_current ops (initial pending) =
-      Result.ok (.Err error, atState pending .PreflightDispatch .Halted) := by
+      Result.ok (.Err error, atState after .PreflightDispatch .Halted) := by
   simp [request_current, request_facts, preflight_step _ _ _ planned, afterPreflight,
-    preflight_dispatch_step _ _ _ _ failed]
+    preflight_dispatch_step _ _ _ _ _ failed]
 
 theorem failed_final_compilation_stops {P F E O X : Type}
-    (ops : Request P F E O X) (pending : P) (preflight : Bool) (facts : F) (error : X)
-    (produced : FactsFrom ops pending preflight facts)
-    (failed : ops.final_effect pending facts = Result.ok (.Err error)) :
+    (ops : Request P F E O X) (pending state : P) (preflight : Bool) (facts : F) (error : X)
+    (produced : FactsFrom ops pending preflight facts state)
+    (failed : ops.final_effect state facts = Result.ok (.Err error)) :
     request_current ops (initial pending) =
-      Result.ok (.Err error, atState pending (.FinalPlan preflight) .Halted) := by
-  simp [request_current, facts_return _ _ _ _ produced, finish_request,
+      Result.ok (.Err error, atState state (.FinalPlan preflight) .Halted) := by
+  simp [request_current, facts_return _ _ _ _ _ produced, finish_request,
     final_plan_step _ _ _ _ _ failed, afterFinalPlan]
 
 theorem stale_after_preflight_stops {P F E O X : Type}
-    (ops : Request P F E O X) (pending : P) (preflight : Bool) (facts : F)
+    (ops : Request P F E O X) (pending state after : P) (preflight : Bool) (facts : F)
     (selected : Option E) (error : X)
-    (produced : FactsFrom ops pending preflight facts)
-    (compiled : ops.final_effect pending facts = Result.ok (.Ok selected))
-    (denied : ops.recheck pending = Result.ok (.Err error)) :
+    (produced : FactsFrom ops pending preflight facts state)
+    (compiled : ops.final_effect state facts = Result.ok (.Ok selected))
+    (denied : ops.recheck state = Result.ok (.Err error, after)) :
     request_current ops (initial pending) =
-      Result.ok (.Err error, atState pending (.Current preflight) .Halted) := by
-  simp [request_current, facts_return _ _ _ _ produced, finish_request,
-    final_plan_step _ _ _ _ _ compiled, afterFinalPlan, current_step _ _ _ _ _ denied]
+      Result.ok (.Err error, atState after (.Current preflight) .Halted) := by
+  simp [request_current, facts_return _ _ _ _ _ produced, finish_request,
+    final_plan_step _ _ _ _ _ compiled, afterFinalPlan, current_step _ _ _ _ _ _ denied]
 
 theorem final_provider_failure_stops_completion {P F E O X : Type}
-    (ops : Request P F E O X) (pending : P) (preflight : Bool) (facts : F) (effect : E)
+    (ops : Request P F E O X) (pending state checked after : P) (preflight : Bool) (facts : F) (effect : E)
     (write : Bool) (error : X)
-    (produced : FactsFrom ops pending preflight facts)
-    (compiled : ops.final_effect pending facts = Result.ok (.Ok (some effect)))
-    (current : ops.recheck pending = Result.ok (.Ok ()))
-    (classified : ops.effect_write pending effect = Result.ok write)
-    (failed : ops.dispatch pending .Final effect = Result.ok (.Err error)) :
+    (produced : FactsFrom ops pending preflight facts state)
+    (compiled : ops.final_effect state facts = Result.ok (.Ok (some effect)))
+    (current : ops.recheck state = Result.ok (.Ok (), checked))
+    (classified : ops.effect_write checked effect = Result.ok write)
+    (failed : ops.dispatch checked .Final effect = Result.ok (.Err error, after)) :
     request_current ops (initial pending) =
-      Result.ok (.Err error, atState pending (.FinalDispatch preflight) .Halted) := by
-  simp [request_current, facts_return _ _ _ _ produced, finish_request,
-    final_plan_step _ _ _ _ _ compiled, afterFinalPlan, current_step _ _ _ _ _ current,
-    write_step _ _ _ _ _ classified, final_dispatch_step _ _ _ _ _ _ failed]
+      Result.ok (.Err error, atState after (.FinalDispatch preflight) .Halted) := by
+  simp [request_current, facts_return _ _ _ _ _ produced, finish_request,
+    final_plan_step _ _ _ _ _ compiled, afterFinalPlan, current_step _ _ _ _ _ _ current,
+    write_step _ _ _ _ _ classified, final_dispatch_step _ _ _ _ _ _ _ failed]
 
-/-- Preserve the completion adapter's errors and divergence, with the actual
-    state returned by the extracted wrapper. -/
 theorem final_read_continuation {P F E O X : Type}
-    (ops : Request P F E O X) (pending : P) (preflight : Bool) (facts raw : F) (effect : E)
-    (produced : FactsFrom ops pending preflight facts)
-    (compiled : ops.final_effect pending facts = Result.ok (.Ok (some effect)))
-    (current : ops.recheck pending = Result.ok (.Ok ()))
-    (classified : ops.effect_write pending effect = Result.ok false)
-    (dispatched : ops.dispatch pending .Final effect = Result.ok (.Ok raw)) :
+    (ops : Request P F E O X) (pending state checked dispatched : P) (preflight : Bool) (facts raw : F) (effect : E)
+    (produced : FactsFrom ops pending preflight facts state)
+    (compiled : ops.final_effect state facts = Result.ok (.Ok (some effect)))
+    (current : ops.recheck state = Result.ok (.Ok (), checked))
+    (classified : ops.effect_write checked effect = Result.ok false)
+    (sent : ops.dispatch checked .Final effect = Result.ok (.Ok raw, dispatched)) :
     request_current ops (initial pending) = (do
-      let out ← ops.complete pending raw
-      Result.ok (out, afterComplete pending preflight true false out)) := by
-  simp [request_current, facts_return _ _ _ _ produced, finish_request,
-    final_plan_step _ _ _ _ _ compiled, afterFinalPlan, current_step _ _ _ _ _ current,
-    write_step _ _ _ _ _ classified, final_dispatch_step _ _ _ _ _ _ dispatched,
-    complete_bind]
+      let (out, completed) ← ops.complete dispatched raw
+      Result.ok (out, afterComplete completed preflight true false out)) := by
+  simp [request_current, facts_return _ _ _ _ _ produced, finish_request,
+    final_plan_step _ _ _ _ _ compiled, afterFinalPlan, current_step _ _ _ _ _ _ current,
+    write_step _ _ _ _ _ classified, final_dispatch_step _ _ _ _ _ _ _ sent, complete_bind]
 
 theorem checked_only_continuation {P F E O X : Type}
-    (ops : Request P F E O X) (pending : P) (preflight : Bool) (facts : F)
-    (produced : FactsFrom ops pending preflight facts)
-    (compiled : ops.final_effect pending facts = Result.ok (.Ok none))
-    (current : ops.recheck pending = Result.ok (.Ok ())) :
+    (ops : Request P F E O X) (pending state checked : P) (preflight : Bool) (facts : F)
+    (produced : FactsFrom ops pending preflight facts state)
+    (compiled : ops.final_effect state facts = Result.ok (.Ok none))
+    (current : ops.recheck state = Result.ok (.Ok (), checked)) :
     request_current ops (initial pending) = (do
-      let out ← ops.complete pending facts
-      Result.ok (out, afterComplete pending preflight false false out)) := by
-  simp [request_current, facts_return _ _ _ _ produced, finish_request,
-    final_plan_step _ _ _ _ _ compiled, afterFinalPlan, current_step _ _ _ _ _ current,
-    complete_bind]
+      let (out, completed) ← ops.complete checked facts
+      Result.ok (out, afterComplete completed preflight false false out)) := by
+  simp [request_current, facts_return _ _ _ _ _ produced, finish_request,
+    final_plan_step _ _ _ _ _ compiled, afterFinalPlan, current_step _ _ _ _ _ _ current, complete_bind]
 
 theorem sent_write_completion_failure_is_uncertain {P F E O X : Type}
-    (ops : Request P F E O X) (pending : P) (preflight : Bool) (facts raw : F) (effect : E)
-    (error unknown : X)
-    (produced : FactsFrom ops pending preflight facts)
-    (compiled : ops.final_effect pending facts = Result.ok (.Ok (some effect)))
-    (current : ops.recheck pending = Result.ok (.Ok ()))
-    (classified : ops.effect_write pending effect = Result.ok true)
-    (dispatched : ops.dispatch pending .Final effect = Result.ok (.Ok raw))
-    (failed : ops.complete pending raw = Result.ok (.Err error))
-    (code : ops.outcome_unknown pending = Result.ok unknown) :
+    (ops : Request P F E O X) (pending state checked dispatched completed : P)
+    (preflight : Bool) (facts raw : F) (effect : E) (error unknown : X)
+    (produced : FactsFrom ops pending preflight facts state)
+    (compiled : ops.final_effect state facts = Result.ok (.Ok (some effect)))
+    (current : ops.recheck state = Result.ok (.Ok (), checked))
+    (classified : ops.effect_write checked effect = Result.ok true)
+    (sent : ops.dispatch checked .Final effect = Result.ok (.Ok raw, dispatched))
+    (failed : ops.complete dispatched raw = Result.ok (.Err error, completed))
+    (code : ops.outcome_unknown completed = Result.ok unknown) :
     request_current ops (initial pending) =
-      Result.ok (.Err unknown, atState pending (.Uncertain preflight) .Halted) := by
-  simp [request_current, facts_return _ _ _ _ produced, finish_request,
-    final_plan_step _ _ _ _ _ compiled, afterFinalPlan, current_step _ _ _ _ _ current,
-    write_step _ _ _ _ _ classified, final_dispatch_step _ _ _ _ _ _ dispatched,
-    complete_step _ _ _ _ _ _ _ failed, afterComplete, uncertain_step _ _ _ _ code]
+      Result.ok (.Err unknown, atState completed (.Uncertain preflight) .Halted) := by
+  simp [request_current, facts_return _ _ _ _ _ produced, finish_request,
+    final_plan_step _ _ _ _ _ compiled, afterFinalPlan, current_step _ _ _ _ _ _ current,
+    write_step _ _ _ _ _ classified, final_dispatch_step _ _ _ _ _ _ _ sent,
+    complete_step _ _ _ _ _ _ _ _ failed, afterComplete, uncertain_step _ _ _ _ code]
 
 theorem two_phase_read_successful_witness {P F E O X : Type}
-    (ops : Request P F E O X) (pending : P) (preflight final : E) (facts raw : F)
-    (reply : O)
+    (ops : Request P F E O X) (pending state checked dispatched completed : P)
+    (preflight final : E) (facts raw : F) (reply : O)
     (preplanned : ops.preflight pending = Result.ok (.Ok (some preflight)))
-    (prefetched : ops.dispatch pending .Preflight preflight = Result.ok (.Ok facts))
-    (compiled : ops.final_effect pending facts = Result.ok (.Ok (some final)))
-    (current : ops.recheck pending = Result.ok (.Ok ()))
-    (classified : ops.effect_write pending final = Result.ok false)
-    (dispatched : ops.dispatch pending .Final final = Result.ok (.Ok raw))
-    (completed : ops.complete pending raw = Result.ok (.Ok reply)) :
+    (prefetched : ops.dispatch pending .Preflight preflight = Result.ok (.Ok facts, state))
+    (compiled : ops.final_effect state facts = Result.ok (.Ok (some final)))
+    (current : ops.recheck state = Result.ok (.Ok (), checked))
+    (classified : ops.effect_write checked final = Result.ok false)
+    (sent : ops.dispatch checked .Final final = Result.ok (.Ok raw, dispatched))
+    (completion : ops.complete dispatched raw = Result.ok (.Ok reply, completed)) :
     request_current ops (initial pending) =
-      Result.ok (.Ok reply, finishedState pending true true) := by
-  rw [final_read_continuation ops pending true facts raw final
-    (by exact ⟨preflight, preplanned, prefetched⟩) compiled current classified dispatched]
-  simp [completed, afterComplete, finishedState]
+      Result.ok (.Ok reply, finishedState completed true true) := by
+  rw [final_read_continuation ops pending state checked dispatched true facts raw final
+    (by exact ⟨preflight, preplanned, prefetched⟩) compiled current classified sent]
+  simp [completion, afterComplete, finishedState]
 
-/-- This is the native entry's complete extracted constructor/controller/gate,
-    rather than an independently specified request interpreter. -/
 private theorem into_result_success_iff {P F E O X : Type} (ops : Request P F E O X)
     (state : Invocation P) (out : core.result.Result O X) (reply : O) :
     Invocation.into_result ops state out = Result.ok (.Ok reply) ↔
@@ -513,7 +523,7 @@ private theorem finish_is_terminal {P F E O X : Type} (ops : Request P F E O X)
     (pending : P) (preflight : Bool) (facts : F) (reply : O) (after : Invocation P)
     (success : FinishSuccess ops pending preflight facts reply after) :
     after.progress = .Finished := by
-  rcases success with ⟨_, ⟨_, _, rfl⟩ | ⟨_, _, _, _, _, _, _, rfl⟩⟩ <;> rfl
+  rcases success with ⟨_, _, ⟨_, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, _, rfl⟩⟩ <;> rfl
 
 theorem constructor_starts_empty {P F E O X : Type} (ops : Request P F E O X) (pending : P) :
     Invocation.new ops pending = Result.ok (initial pending) := by
@@ -522,22 +532,22 @@ theorem constructor_starts_empty {P F E O X : Type} (ops : Request P F E O X) (p
 theorem run_current_success_iff {P F E O X : Type} (ops : Request P F E O X)
     (pending : P) (reply : O) :
     run_current ops pending = Result.ok (.Ok reply) ↔
-      ∃ facts preflight after, FactsFrom ops pending preflight facts ∧
-        FinishSuccess ops pending preflight facts reply after := by
+      ∃ facts state preflight after, FactsFrom ops pending preflight facts state ∧
+        FinishSuccess ops state preflight facts reply after := by
   constructor
   · intro success
     unfold run_current at success
     simp [constructor_starts_empty] at success
     obtain ⟨⟨out, after⟩, ran, gate⟩ := (bind_returns_iff _ _ _).mp success
     obtain ⟨rfl, _⟩ := (into_result_success_iff ops after out reply).mp gate
-    obtain ⟨facts, preflight, origin, finish⟩ :=
+    obtain ⟨facts, state, preflight, origin, finish⟩ :=
       (request_current_success_iff ops pending reply after).mp ran
-    exact ⟨facts, preflight, after, origin, finish⟩
-  · rintro ⟨facts, preflight, after, origin, finish⟩
+    exact ⟨facts, state, preflight, after, origin, finish⟩
+  · rintro ⟨facts, state, preflight, after, origin, finish⟩
     have ran := (request_current_success_iff ops pending reply after).mpr
-      ⟨facts, preflight, origin, finish⟩
+      ⟨facts, state, preflight, origin, finish⟩
     have gate := (into_result_success_iff ops after (.Ok reply) reply).mpr
-      ⟨rfl, finish_is_terminal ops pending preflight facts reply after finish⟩
+      ⟨rfl, finish_is_terminal ops state preflight facts reply after finish⟩
     simp [run_current, constructor_starts_empty, ran, gate]
 
 /-- Every successful controller run returns the concrete successful wrapper
@@ -545,12 +555,12 @@ theorem run_current_success_iff {P F E O X : Type} (ops : Request P F E O X)
 theorem successful_request_receipt {P F E O X : Type} (ops : Request P F E O X)
     (pending : P) (reply : O) (after : Invocation P)
     (success : request_current ops (initial pending) = Result.ok (.Ok reply, after)) :
-    ∃ preflight finalEffect, after = finishedState pending preflight finalEffect := by
-  obtain ⟨facts, preflight, _, finish⟩ :=
+    ∃ state preflight finalEffect, after = finishedState state preflight finalEffect := by
+  obtain ⟨facts, state, preflight, _, finish⟩ :=
     (request_current_success_iff ops pending reply after).mp success
-  rcases finish with ⟨_, ⟨_, _, same⟩ | ⟨_, _, _, _, _, _, _, same⟩⟩
-  · exact ⟨preflight, false, same⟩
-  · exact ⟨preflight, true, same⟩
+  rcases finish with ⟨_, _, ⟨_, completed, _, same⟩ | ⟨_, _, _, _, completed, _, _, _, _, same⟩⟩
+  · exact ⟨completed, preflight, false, same⟩
+  · exact ⟨completed, preflight, true, same⟩
 
 theorem finished_dispatch_is_rejected {P F E O X : Type} (ops : Request P F E O X)
     (pending : P) (preflight finalEffect : Bool) (phase : Phase) (effect : E) (error : X)
@@ -590,5 +600,6 @@ theorem unfinished_value_is_not_public {P F E O X : Type} (ops : Request P F E O
     Invocation.into_result ops (atState pending trace .Halted) (.Ok value) =
       Result.ok (.Err error) := by
   simp [Invocation.into_result, atState, constant]
+
 
 end aivm_secrets_garrett_core.read_transition.Proofs

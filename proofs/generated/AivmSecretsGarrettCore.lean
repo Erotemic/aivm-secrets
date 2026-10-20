@@ -3077,14 +3077,14 @@ partial_fixpoint
 end
 
 /-- [aivm_secrets_garrett_core::Denial]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 24:0-26:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 25:0-27:1
     Visibility: public -/
 @[discriminant isize]
 inductive Denial where
 | InvalidCapability : Denial
 
 /-- [aivm_secrets_garrett_core::Claims]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 28:0-37:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 29:0-38:1
     Visibility: public -/
 structure Claims where
   issuer : alloc.vec.Vec Std.U8
@@ -3097,7 +3097,7 @@ structure Claims where
   certificate : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::Expectation]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 39:0-44:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 40:0-45:1
     Visibility: public -/
 structure Expectation where
   issuer : alloc.vec.Vec Std.U8
@@ -3106,7 +3106,7 @@ structure Expectation where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::IssueWindow]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 46:0-50:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 47:0-51:1
     Visibility: public -/
 structure IssueWindow where
   issued_at : Std.I64
@@ -3114,7 +3114,7 @@ structure IssueWindow where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::issue_window]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 53:0-80:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 54:0-81:1
     Visibility: public -/
 def issue_window
   (active : Bool) (epoch : Std.I64) (not_after : Std.I64) (now : Std.I64)
@@ -3158,7 +3158,7 @@ def issue_window
   else ok (core.result.Result.Err Denial.InvalidCapability)
 
 /-- [aivm_secrets_garrett_core::present]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 84:0-111:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 85:0-112:1
     Visibility: public -/
 def present
   (claims : Claims) (expected : Expectation) (peer : alloc.vec.Vec Std.U8)
@@ -3222,21 +3222,21 @@ def present
                           else ok (core.result.Result.Ok ())
 
 /-- [aivm_secrets_garrett_core::AuthenticatedEnvelope]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 115:0-118:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 116:0-119:1
     Visibility: public -/
 structure AuthenticatedEnvelope where
   claims : Claims
   encrypted : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::OpenedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 120:0-123:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 121:0-124:1
     Visibility: public -/
 structure OpenedSurrogate (S : Type _) where
   claims : Claims
   secret : S
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeVerifier]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 126:0-130:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 127:0-131:1
     Visibility: public -/
 structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
   verify : Self → alloc.vec.Vec Std.U8 → Result (core.result.Result
@@ -3245,7 +3245,7 @@ structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
     Self_Secret Denial)
 
 /-- [aivm_secrets_garrett_core::open_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 135:0-157:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 136:0-158:1
     Visibility: public -/
 def open_surrogate
   {V : Type _} {Clause0_Secret : Type _} (EnvelopeVerifierInst :
@@ -3269,7 +3269,7 @@ def open_surrogate
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssueInputs]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 159:0-168:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 160:0-169:1
     Visibility: public -/
 structure IssueInputs where
   issuer : alloc.vec.Vec Std.U8
@@ -3282,7 +3282,7 @@ structure IssueInputs where
   not_after : Std.I64
 
 /-- [aivm_secrets_garrett_core::prepare_issue]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 171:0-186:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 172:0-187:1
     Visibility: public -/
 def prepare_issue
   (input : IssueInputs) (now : Std.I64) (lifetime : Std.I64) :
@@ -3305,21 +3305,21 @@ def prepare_issue
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssuedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 188:0-191:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 189:0-192:1
     Visibility: public -/
 structure IssuedSurrogate where
   claims : Claims
   token : alloc.vec.Vec Std.U8
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeIssuer]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 193:0-196:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 194:0-197:1
     Visibility: public -/
 structure EnvelopeIssuer (Self : Type _) (Self_Secret : Type _) where
   «seal» : Self → Claims → Self_Secret → Result (core.result.Result
     (alloc.vec.Vec Std.U8) Denial)
 
 /-- [aivm_secrets_garrett_core::issue_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 198:0-214:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 199:0-215:1
     Visibility: public -/
 def issue_surrogate
   {I : Type _} {Clause0_Secret : Type _} (EnvelopeIssuerInst : EnvelopeIssuer I
@@ -4723,7 +4723,7 @@ structure read_transition.invocation.Invocation (R : Type _) where
   progress : read_transition.invocation.Progress
 
 /-- Trait declaration: [aivm_secrets_garrett_core::read_transition::Request]
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 122:0-137:1
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 123:0-138:1
     Visibility: public -/
 structure read_transition.Request (Self : Type _) (Self_Facts : Type _)
   (Self_Effect : Type _) (Self_Output : Type _) (Self_Error : Type _) where
@@ -4732,13 +4732,13 @@ structure read_transition.Request (Self : Type _) (Self_Facts : Type _)
     Self_Error)
   empty_facts : Self → Result Self_Facts
   dispatch : Self → read_transition.Phase → Self_Effect → Result
-    (core.result.Result Self_Facts Self_Error)
+    ((core.result.Result Self_Facts Self_Error) × Self)
   final_effect : Self → Self_Facts → Result (core.result.Result (Option
     Self_Effect) Self_Error)
-  recheck : Self → Result (core.result.Result Unit Self_Error)
+  recheck : Self → Result ((core.result.Result Unit Self_Error) × Self)
   effect_write : Self → Self_Effect → Result Bool
-  complete : Self → Self_Facts → Result (core.result.Result Self_Output
-    Self_Error)
+  complete : Self → Self_Facts → Result ((core.result.Result Self_Output
+    Self_Error) × Self)
   outcome_unknown : Self → Result Self_Error
 
 /-- [aivm_secrets_garrett_core::read_transition::invocation::{aivm_secrets_garrett_core::read_transition::invocation::Invocation<R>}::new]:
@@ -4927,38 +4927,31 @@ def read_transition.invocation.Invocation.dispatch
           ok read_transition.invocation.Trace.PreflightDispatch
         | read_transition.Phase.Final =>
           ok (read_transition.invocation.Trace.FinalDispatch true)
-      let r ← RequestInst.dispatch self.adapter phase effect
+      let (r, t1) ← RequestInst.dispatch self.adapter phase effect
       match r with
       | core.result.Result.Ok _ =>
         match phase with
         | read_transition.Phase.Preflight =>
           ok (r,
             {
-              self
-                with
-                trace := t,
-                progress :=
-                  (read_transition.invocation.Progress.FinalPlan true)
+              adapter := t1,
+              trace := t,
+              progress := (read_transition.invocation.Progress.FinalPlan true)
             })
         | read_transition.Phase.Final =>
           ok (r,
             {
-              self
-                with
-                trace := t,
-                progress :=
-                  (read_transition.invocation.Progress.Complete
-                    true
-                    true
-                    false)
+              adapter := t1,
+              trace := t,
+              progress :=
+                (read_transition.invocation.Progress.Complete true true false)
             })
       | core.result.Result.Err _ =>
         ok (r,
           {
-            self
-              with
-              trace := t,
-              progress := read_transition.invocation.Progress.Halted
+            adapter := t1,
+            trace := t,
+            progress := read_transition.invocation.Progress.Halted
           })
     | read_transition.invocation.Progress.FinalPlan _ =>
       read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
@@ -5011,38 +5004,34 @@ def read_transition.invocation.Invocation.dispatch
           ok read_transition.invocation.Trace.PreflightDispatch
         | read_transition.Phase.Final =>
           ok (read_transition.invocation.Trace.FinalDispatch preflight)
-      let r ← RequestInst.dispatch self.adapter phase effect
+      let (r, t1) ← RequestInst.dispatch self.adapter phase effect
       match r with
       | core.result.Result.Ok _ =>
         match phase with
         | read_transition.Phase.Preflight =>
           ok (r,
             {
-              self
-                with
-                trace := t,
-                progress :=
-                  (read_transition.invocation.Progress.FinalPlan true)
+              adapter := t1,
+              trace := t,
+              progress := (read_transition.invocation.Progress.FinalPlan true)
             })
         | read_transition.Phase.Final =>
           ok (r,
             {
-              self
-                with
-                trace := t,
-                progress :=
-                  (read_transition.invocation.Progress.Complete
-                    preflight
-                    true
-                    write)
+              adapter := t1,
+              trace := t,
+              progress :=
+                (read_transition.invocation.Progress.Complete
+                  preflight
+                  true
+                  write)
             })
       | core.result.Result.Err _ =>
         ok (r,
           {
-            self
-              with
-              trace := t,
-              progress := read_transition.invocation.Progress.Halted
+            adapter := t1,
+            trace := t,
+            progress := read_transition.invocation.Progress.Halted
           })
     | read_transition.invocation.Progress.Complete _ _ _ =>
       read_transition.invocation.Invocation.reject Clause0_Facts RequestInst
@@ -5151,38 +5140,35 @@ def read_transition.invocation.Invocation.recheck
   | read_transition.invocation.Progress.FinalPlan _ =>
     read_transition.invocation.Invocation.reject Unit RequestInst self
   | read_transition.invocation.Progress.Current preflight final_effect =>
-    let r ← RequestInst.recheck self.adapter
+    let (r, t) ← RequestInst.recheck self.adapter
     match r with
     | core.result.Result.Ok _ =>
       if final_effect
       then
         ok (core.result.Result.Ok (),
           {
-            self
-              with
-              trace := (read_transition.invocation.Trace.Current preflight),
-              progress :=
-                (read_transition.invocation.Progress.WriteKind preflight)
+            adapter := t,
+            trace := (read_transition.invocation.Trace.Current preflight),
+            progress :=
+              (read_transition.invocation.Progress.WriteKind preflight)
           })
       else
         ok (core.result.Result.Ok (),
           {
-            self
-              with
-              trace := (read_transition.invocation.Trace.Current preflight),
-              progress :=
-                (read_transition.invocation.Progress.Complete
-                  preflight
-                  false
-                  false)
+            adapter := t,
+            trace := (read_transition.invocation.Trace.Current preflight),
+            progress :=
+              (read_transition.invocation.Progress.Complete
+                preflight
+                false
+                false)
           })
     | core.result.Result.Err _ =>
       ok (r,
         {
-          self
-            with
-            trace := (read_transition.invocation.Trace.Current preflight),
-            progress := read_transition.invocation.Progress.Halted
+          adapter := t,
+          trace := (read_transition.invocation.Trace.Current preflight),
+          progress := read_transition.invocation.Progress.Halted
         })
   | read_transition.invocation.Progress.WriteKind _ =>
     read_transition.invocation.Invocation.reject Unit RequestInst self
@@ -5275,43 +5261,38 @@ def read_transition.invocation.Invocation.complete
       self
   | read_transition.invocation.Progress.Complete preflight final_effect write
     =>
-    let r ← RequestInst.complete self.adapter raw
+    let (r, t) ← RequestInst.complete self.adapter raw
     match r with
     | core.result.Result.Ok _ =>
       ok (r,
         {
-          self
-            with
-            trace :=
-              (read_transition.invocation.Trace.Complete
-                preflight
-                final_effect),
-            progress := read_transition.invocation.Progress.Finished
+          adapter := t,
+          trace :=
+            (read_transition.invocation.Trace.Complete preflight final_effect),
+          progress := read_transition.invocation.Progress.Finished
         })
     | core.result.Result.Err _ =>
       if write
       then
         ok (r,
           {
-            self
-              with
-              trace :=
-                (read_transition.invocation.Trace.Complete
-                  preflight
-                  final_effect),
-              progress :=
-                (read_transition.invocation.Progress.Uncertain preflight)
+            adapter := t,
+            trace :=
+              (read_transition.invocation.Trace.Complete
+                preflight
+                final_effect),
+            progress :=
+              (read_transition.invocation.Progress.Uncertain preflight)
           })
       else
         ok (r,
           {
-            self
-              with
-              trace :=
-                (read_transition.invocation.Trace.Complete
-                  preflight
-                  final_effect),
-              progress := read_transition.invocation.Progress.Halted
+            adapter := t,
+            trace :=
+              (read_transition.invocation.Trace.Complete
+                preflight
+                final_effect),
+            progress := read_transition.invocation.Progress.Halted
           })
   | read_transition.invocation.Progress.Uncertain _ =>
     read_transition.invocation.Invocation.reject Clause0_Output RequestInst
@@ -5553,25 +5534,50 @@ def read_transition.acknowledge
   else ok (core.result.Result.Err Denial.InvalidCapability)
 
 /-- [aivm_secrets_garrett_core::read_transition::CompletionPhase]
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 89:0-92:1
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 90:0-93:1
     Visibility: public -/
 @[discriminant isize]
 inductive read_transition.CompletionPhase where
 | BeforeAudit : read_transition.CompletionPhase
 | BeforeRelease : read_transition.CompletionPhase
 
+/-- [aivm_secrets_garrett_core::read_transition::{impl core::clone::Clone for aivm_secrets_garrett_core::read_transition::CompletionPhase}::clone]:
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 89:9-89:14
+    Visibility: public -/
+def read_transition.CompletionPhase.Insts.CoreCloneClone.clone
+  (self : read_transition.CompletionPhase) :
+  Result read_transition.CompletionPhase
+  := do
+  ok self
+
+/-- Trait implementation: [aivm_secrets_garrett_core::read_transition::{impl core::clone::Clone for aivm_secrets_garrett_core::read_transition::CompletionPhase}]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 89:9-89:14 -/
+@[reducible]
+def read_transition.CompletionPhase.Insts.CoreCloneClone : core.clone.Clone
+  read_transition.CompletionPhase := {
+  clone := read_transition.CompletionPhase.Insts.CoreCloneClone.clone
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::read_transition::{impl core::marker::Copy for aivm_secrets_garrett_core::read_transition::CompletionPhase}]
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 89:16-89:20 -/
+@[reducible]
+def read_transition.CompletionPhase.Insts.CoreMarkerCopy : core.marker.Copy
+  read_transition.CompletionPhase := {
+  cloneInst := read_transition.CompletionPhase.Insts.CoreCloneClone
+}
+
 /-- Trait declaration: [aivm_secrets_garrett_core::read_transition::Completion]
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 94:0-100:1
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 95:0-101:1
     Visibility: public -/
 structure read_transition.Completion (Self : Type _) (Self_Output : Type _)
   (Self_Error : Type _) where
   recheck : Self → read_transition.CompletionPhase → Result
-    (core.result.Result Unit Self_Error)
-  audit : Self → Result (core.result.Result Unit Self_Error)
+    ((core.result.Result Unit Self_Error) × Self)
+  audit : Self → Result ((core.result.Result Unit Self_Error) × Self)
   release : Self → Result (core.result.Result Self_Output Self_Error)
 
 /-- [aivm_secrets_garrett_core::read_transition::complete_current]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 102:0-116:1
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 103:0-117:1
     Visibility: public -/
 def read_transition.complete_current
   {C : Type _} {Clause0_Output : Type _} {Clause0_Error : Type _}
@@ -5579,24 +5585,24 @@ def read_transition.complete_current
   (pending : C) :
   Result (core.result.Result Clause0_Output Clause0_Error)
   := do
-  let r ←
+  let (r, pending1) ←
     CompletionInst.recheck pending read_transition.CompletionPhase.BeforeAudit
   match r with
   | core.result.Result.Ok _ =>
-    let r1 ← CompletionInst.audit pending
+    let (r1, pending2) ← CompletionInst.audit pending1
     match r1 with
     | core.result.Result.Ok _ =>
-      let r2 ←
-        CompletionInst.recheck pending
+      let (r2, pending3) ←
+        CompletionInst.recheck pending2
           read_transition.CompletionPhase.BeforeRelease
       match r2 with
-      | core.result.Result.Ok _ => CompletionInst.release pending
+      | core.result.Result.Ok _ => CompletionInst.release pending3
       | core.result.Result.Err error => ok (core.result.Result.Err error)
     | core.result.Result.Err error => ok (core.result.Result.Err error)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::read_transition::request_facts]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 139:0-145:1 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 140:0-146:1 -/
 def read_transition.request_facts
   {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
   {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
@@ -5618,7 +5624,7 @@ def read_transition.request_facts
   | core.result.Result.Err error => ok (core.result.Result.Err error, ops1)
 
 /-- [aivm_secrets_garrett_core::read_transition::finish_request]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 147:0-181:1 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 148:0-182:1 -/
 def read_transition.finish_request
   {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
   {Clause0_Output : Type _} {Clause0_Error : Type _} (RequestInst :
@@ -5673,7 +5679,7 @@ def read_transition.finish_request
   | core.result.Result.Err error => ok (core.result.Result.Err error, ops1)
 
 /-- [aivm_secrets_garrett_core::read_transition::request_current]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 183:0-188:1
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 184:0-189:1
     Visibility: public -/
 def read_transition.request_current
   {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
@@ -5690,7 +5696,7 @@ def read_transition.request_current
   | core.result.Result.Err error => ok (core.result.Result.Err error, ops1)
 
 /-- [aivm_secrets_garrett_core::read_transition::run_current]:
-    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 191:0-195:1
+    Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 192:0-196:1
     Visibility: public -/
 def read_transition.run_current
   {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
@@ -5801,6 +5807,1156 @@ def rebinding.rebind
     | core.result.Result.Err error => ok (core.result.Result.Err error)
   else let t ← RebinderInst.rejected ops
        ok (core.result.Result.Err t)
+
+/-- [aivm_secrets_garrett_core::request_effects::DispatchRecord]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 11:0-19:1
+    Visibility: public -/
+structure request_effects.DispatchRecord where
+  audit_attempted : Bool
+  audit_acknowledged : Bool
+  provider_ready : Bool
+  current : Option manifest.AdmissionStamp
+  provider_attempted : Bool
+  provider_completed : Bool
+  dispatch_succeeded : Bool
+
+/-- [aivm_secrets_garrett_core::request_effects::{impl core::clone::Clone for aivm_secrets_garrett_core::request_effects::DispatchRecord}::clone]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 10:9-10:14
+    Visibility: public -/
+def request_effects.DispatchRecord.Insts.CoreCloneClone.clone
+  (self : request_effects.DispatchRecord) :
+  Result request_effects.DispatchRecord
+  := do
+  ok self
+
+/-- Trait implementation: [aivm_secrets_garrett_core::request_effects::{impl core::clone::Clone for aivm_secrets_garrett_core::request_effects::DispatchRecord}]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 10:9-10:14 -/
+@[reducible]
+def request_effects.DispatchRecord.Insts.CoreCloneClone : core.clone.Clone
+  request_effects.DispatchRecord := {
+  clone := request_effects.DispatchRecord.Insts.CoreCloneClone.clone
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::request_effects::{impl core::marker::Copy for aivm_secrets_garrett_core::request_effects::DispatchRecord}]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 10:16-10:20 -/
+@[reducible]
+def request_effects.DispatchRecord.Insts.CoreMarkerCopy : core.marker.Copy
+  request_effects.DispatchRecord := {
+  cloneInst := request_effects.DispatchRecord.Insts.CoreCloneClone
+}
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::DispatchRecord}::empty]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 21:4-31:5 -/
+def request_effects.DispatchRecord.empty
+  : Result request_effects.DispatchRecord := do
+  ok
+    {
+      audit_attempted := false,
+      audit_acknowledged := false,
+      provider_ready := false,
+      current := none,
+      provider_attempted := false,
+      provider_completed := false,
+      dispatch_succeeded := false
+    }
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::DispatchRecord}::audit_attempted]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 32:4-34:5
+    Visibility: public -/
+def request_effects.DispatchRecord.impl.audit_attempted
+  (self : request_effects.DispatchRecord) : Result Bool := do
+  ok self.audit_attempted
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::DispatchRecord}::audit_acknowledged]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 35:4-37:5
+    Visibility: public -/
+def request_effects.DispatchRecord.impl.audit_acknowledged
+  (self : request_effects.DispatchRecord) : Result Bool := do
+  ok self.audit_acknowledged
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::DispatchRecord}::provider_ready]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 38:4-40:5
+    Visibility: public -/
+def request_effects.DispatchRecord.impl.provider_ready
+  (self : request_effects.DispatchRecord) : Result Bool := do
+  ok self.provider_ready
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::DispatchRecord}::current]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 41:4-43:5
+    Visibility: public -/
+def request_effects.DispatchRecord.impl.current
+  (self : request_effects.DispatchRecord) :
+  Result (Option manifest.AdmissionStamp)
+  := do
+  ok self.current
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::DispatchRecord}::provider_attempted]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 44:4-46:5
+    Visibility: public -/
+def request_effects.DispatchRecord.impl.provider_attempted
+  (self : request_effects.DispatchRecord) : Result Bool := do
+  ok self.provider_attempted
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::DispatchRecord}::provider_completed]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 47:4-49:5
+    Visibility: public -/
+def request_effects.DispatchRecord.impl.provider_completed
+  (self : request_effects.DispatchRecord) : Result Bool := do
+  ok self.provider_completed
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::DispatchRecord}::dispatch_succeeded]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 50:4-52:5
+    Visibility: public -/
+def request_effects.DispatchRecord.impl.dispatch_succeeded
+  (self : request_effects.DispatchRecord) : Result Bool := do
+  ok self.dispatch_succeeded
+
+/-- [aivm_secrets_garrett_core::request_effects::CompletionRecord]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 55:0-62:1
+    Visibility: public -/
+structure request_effects.CompletionRecord where
+  selected : Bool
+  before_checked : Bool
+  audit_attempted : Bool
+  audit_acknowledged : Bool
+  after_checked : Bool
+  value_ready : Bool
+
+/-- [aivm_secrets_garrett_core::request_effects::{impl core::clone::Clone for aivm_secrets_garrett_core::request_effects::CompletionRecord}::clone]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 54:9-54:14
+    Visibility: public -/
+def request_effects.CompletionRecord.Insts.CoreCloneClone.clone
+  (self : request_effects.CompletionRecord) :
+  Result request_effects.CompletionRecord
+  := do
+  ok self
+
+/-- Trait implementation: [aivm_secrets_garrett_core::request_effects::{impl core::clone::Clone for aivm_secrets_garrett_core::request_effects::CompletionRecord}]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 54:9-54:14 -/
+@[reducible]
+def request_effects.CompletionRecord.Insts.CoreCloneClone : core.clone.Clone
+  request_effects.CompletionRecord := {
+  clone := request_effects.CompletionRecord.Insts.CoreCloneClone.clone
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::request_effects::{impl core::marker::Copy for aivm_secrets_garrett_core::request_effects::CompletionRecord}]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 54:16-54:20 -/
+@[reducible]
+def request_effects.CompletionRecord.Insts.CoreMarkerCopy : core.marker.Copy
+  request_effects.CompletionRecord := {
+  cloneInst := request_effects.CompletionRecord.Insts.CoreCloneClone
+}
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::CompletionRecord}::empty]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 64:4-73:5 -/
+def request_effects.CompletionRecord.empty
+  : Result request_effects.CompletionRecord := do
+  ok
+    {
+      selected := false,
+      before_checked := false,
+      audit_attempted := false,
+      audit_acknowledged := false,
+      after_checked := false,
+      value_ready := false
+    }
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::CompletionRecord}::selected]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 74:4-76:5
+    Visibility: public -/
+def request_effects.CompletionRecord.impl.selected
+  (self : request_effects.CompletionRecord) : Result Bool := do
+  ok self.selected
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::CompletionRecord}::before_checked]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 77:4-79:5
+    Visibility: public -/
+def request_effects.CompletionRecord.impl.before_checked
+  (self : request_effects.CompletionRecord) : Result Bool := do
+  ok self.before_checked
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::CompletionRecord}::audit_attempted]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 80:4-82:5
+    Visibility: public -/
+def request_effects.CompletionRecord.impl.audit_attempted
+  (self : request_effects.CompletionRecord) : Result Bool := do
+  ok self.audit_attempted
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::CompletionRecord}::audit_acknowledged]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 83:4-85:5
+    Visibility: public -/
+def request_effects.CompletionRecord.impl.audit_acknowledged
+  (self : request_effects.CompletionRecord) : Result Bool := do
+  ok self.audit_acknowledged
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::CompletionRecord}::after_checked]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 86:4-88:5
+    Visibility: public -/
+def request_effects.CompletionRecord.impl.after_checked
+  (self : request_effects.CompletionRecord) : Result Bool := do
+  ok self.after_checked
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::CompletionRecord}::value_ready]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 89:4-91:5
+    Visibility: public -/
+def request_effects.CompletionRecord.impl.value_ready
+  (self : request_effects.CompletionRecord) : Result Bool := do
+  ok self.value_ready
+
+/-- [aivm_secrets_garrett_core::request_effects::Progress]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 94:0-112:1 -/
+@[discriminant isize]
+inductive request_effects.Progress where
+| Entry : request_effects.Progress
+| DispatchAudit : read_transition.Phase → request_effects.Progress
+| Audited : read_transition.Phase → request_effects.Progress
+| ProviderReady : read_transition.Phase → request_effects.Progress
+| ProviderAttempted : read_transition.Phase → request_effects.Progress
+| ProviderCompleted : read_transition.Phase → request_effects.Progress
+| DispatchReturned : read_transition.Phase → request_effects.Progress
+| Selecting : request_effects.Progress
+| Selected : request_effects.Progress
+| CheckingBefore : request_effects.Progress
+| BeforeAudit : request_effects.Progress
+| CompletionAudit : request_effects.Progress
+| CompletionAudited : request_effects.Progress
+| CheckingAfter : request_effects.Progress
+| AfterAudit : request_effects.Progress
+| ValueReady : request_effects.Progress
+| Halted : request_effects.Progress
+
+/-- [aivm_secrets_garrett_core::request_effects::{impl core::clone::Clone for aivm_secrets_garrett_core::request_effects::Progress}::clone]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 93:9-93:14
+    Visibility: public -/
+def request_effects.Progress.Insts.CoreCloneClone.clone
+  (self : request_effects.Progress) : Result request_effects.Progress := do
+  ok self
+
+/-- Trait implementation: [aivm_secrets_garrett_core::request_effects::{impl core::clone::Clone for aivm_secrets_garrett_core::request_effects::Progress}]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 93:9-93:14 -/
+@[reducible]
+def request_effects.Progress.Insts.CoreCloneClone : core.clone.Clone
+  request_effects.Progress := {
+  clone := request_effects.Progress.Insts.CoreCloneClone.clone
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::request_effects::{impl core::marker::Copy for aivm_secrets_garrett_core::request_effects::Progress}]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 93:16-93:20 -/
+@[reducible]
+def request_effects.Progress.Insts.CoreMarkerCopy : core.marker.Copy
+  request_effects.Progress := {
+  cloneInst := request_effects.Progress.Insts.CoreCloneClone
+}
+
+/-- [aivm_secrets_garrett_core::request_effects::RequestEffects]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 114:0-119:1
+    Visibility: public -/
+structure request_effects.RequestEffects where
+  preflight : request_effects.DispatchRecord
+  final_effect : request_effects.DispatchRecord
+  completion : request_effects.CompletionRecord
+  progress : request_effects.Progress
+
+/-- [aivm_secrets_garrett_core::request_effects::{impl core::clone::Clone for aivm_secrets_garrett_core::request_effects::RequestEffects}::clone]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 113:9-113:14
+    Visibility: public -/
+def request_effects.RequestEffects.Insts.CoreCloneClone.clone
+  (self : request_effects.RequestEffects) :
+  Result request_effects.RequestEffects
+  := do
+  ok self
+
+/-- Trait implementation: [aivm_secrets_garrett_core::request_effects::{impl core::clone::Clone for aivm_secrets_garrett_core::request_effects::RequestEffects}]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 113:9-113:14 -/
+@[reducible]
+def request_effects.RequestEffects.Insts.CoreCloneClone : core.clone.Clone
+  request_effects.RequestEffects := {
+  clone := request_effects.RequestEffects.Insts.CoreCloneClone.clone
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::request_effects::{impl core::marker::Copy for aivm_secrets_garrett_core::request_effects::RequestEffects}]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 113:16-113:20 -/
+@[reducible]
+def request_effects.RequestEffects.Insts.CoreMarkerCopy : core.marker.Copy
+  request_effects.RequestEffects := {
+  cloneInst := request_effects.RequestEffects.Insts.CoreCloneClone
+}
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::new]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 121:4-128:5
+    Visibility: public -/
+def request_effects.RequestEffects.new
+  : Result request_effects.RequestEffects := do
+  let dr ← request_effects.DispatchRecord.empty
+  let cr ← request_effects.CompletionRecord.empty
+  ok
+    {
+      preflight := dr,
+      final_effect := dr,
+      completion := cr,
+      progress := request_effects.Progress.Entry
+    }
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::reject]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 129:4-132:5 -/
+def request_effects.RequestEffects.reject
+  (self : request_effects.RequestEffects) :
+  Result (Bool × request_effects.RequestEffects)
+  := do
+  ok (false, { self with progress := request_effects.Progress.Halted })
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::phase]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 133:4-138:5
+    Visibility: public -/
+def request_effects.RequestEffects.phase
+  (self : request_effects.RequestEffects) (phase : read_transition.Phase) :
+  Result request_effects.DispatchRecord
+  := do
+  match phase with
+  | read_transition.Phase.Preflight => ok self.preflight
+  | read_transition.Phase.Final => ok self.final_effect
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::set_phase]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 139:4-144:5 -/
+def request_effects.RequestEffects.set_phase
+  (self : request_effects.RequestEffects) (phase : read_transition.Phase)
+  (record : request_effects.DispatchRecord) :
+  Result request_effects.RequestEffects
+  := do
+  match phase with
+  | read_transition.Phase.Preflight => ok { self with preflight := record }
+  | read_transition.Phase.Final => ok { self with final_effect := record }
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::completion]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 145:4-147:5
+    Visibility: public -/
+def request_effects.RequestEffects.impl.completion
+  (self : request_effects.RequestEffects) :
+  Result request_effects.CompletionRecord
+  := do
+  ok self.completion
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::can_return_value]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 148:4-150:5
+    Visibility: public -/
+def request_effects.RequestEffects.can_return_value
+  (self : request_effects.RequestEffects) : Result Bool := do
+  match self.progress with
+  | request_effects.Progress.Entry => ok false
+  | request_effects.Progress.DispatchAudit _ => ok false
+  | request_effects.Progress.Audited _ => ok false
+  | request_effects.Progress.ProviderReady _ => ok false
+  | request_effects.Progress.ProviderAttempted _ => ok false
+  | request_effects.Progress.ProviderCompleted _ => ok false
+  | request_effects.Progress.DispatchReturned _ => ok false
+  | request_effects.Progress.Selecting => ok false
+  | request_effects.Progress.Selected => ok false
+  | request_effects.Progress.CheckingBefore => ok false
+  | request_effects.Progress.BeforeAudit => ok false
+  | request_effects.Progress.CompletionAudit => ok false
+  | request_effects.Progress.CompletionAudited => ok false
+  | request_effects.Progress.CheckingAfter => ok false
+  | request_effects.Progress.AfterAudit => ok false
+  | request_effects.Progress.ValueReady => ok true
+  | request_effects.Progress.Halted => ok false
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::begin_dispatch_audit]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 151:4-169:5
+    Visibility: public -/
+def request_effects.RequestEffects.begin_dispatch_audit
+  (self : request_effects.RequestEffects) (prepared : read_transition.Prepared)
+  :
+  Result (Bool × request_effects.RequestEffects)
+  := do
+  let phase ← read_transition.Prepared.impl.phase prepared
+  let allowed ←
+    match phase with
+    | read_transition.Phase.Preflight =>
+      match self.progress with
+      | request_effects.Progress.Entry => ok true
+      | request_effects.Progress.DispatchAudit _ => ok false
+      | request_effects.Progress.Audited _ => ok false
+      | request_effects.Progress.ProviderReady _ => ok false
+      | request_effects.Progress.ProviderAttempted _ => ok false
+      | request_effects.Progress.ProviderCompleted _ => ok false
+      | request_effects.Progress.DispatchReturned _ => ok false
+      | request_effects.Progress.Selecting => ok false
+      | request_effects.Progress.Selected => ok false
+      | request_effects.Progress.CheckingBefore => ok false
+      | request_effects.Progress.BeforeAudit => ok false
+      | request_effects.Progress.CompletionAudit => ok false
+      | request_effects.Progress.CompletionAudited => ok false
+      | request_effects.Progress.CheckingAfter => ok false
+      | request_effects.Progress.AfterAudit => ok false
+      | request_effects.Progress.ValueReady => ok false
+      | request_effects.Progress.Halted => ok false
+    | read_transition.Phase.Final =>
+      match self.progress with
+      | request_effects.Progress.Entry => ok true
+      | request_effects.Progress.DispatchAudit _ => ok false
+      | request_effects.Progress.Audited _ => ok false
+      | request_effects.Progress.ProviderReady _ => ok false
+      | request_effects.Progress.ProviderAttempted _ => ok false
+      | request_effects.Progress.ProviderCompleted _ => ok false
+      | request_effects.Progress.DispatchReturned p =>
+        match p with
+        | read_transition.Phase.Preflight => ok true
+        | read_transition.Phase.Final => ok false
+      | request_effects.Progress.Selecting => ok false
+      | request_effects.Progress.Selected => ok false
+      | request_effects.Progress.CheckingBefore => ok false
+      | request_effects.Progress.BeforeAudit => ok false
+      | request_effects.Progress.CompletionAudit => ok false
+      | request_effects.Progress.CompletionAudited => ok false
+      | request_effects.Progress.CheckingAfter => ok false
+      | request_effects.Progress.AfterAudit => ok false
+      | request_effects.Progress.ValueReady => ok false
+      | request_effects.Progress.Halted => ok false
+  if allowed
+  then
+    let record ← request_effects.RequestEffects.phase self phase
+    let self1 ←
+      request_effects.RequestEffects.set_phase self phase
+        { record with audit_attempted := true }
+    ok (true,
+      { self1 with progress := (request_effects.Progress.DispatchAudit phase) })
+  else request_effects.RequestEffects.reject self
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::acknowledge_dispatch]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 170:4-181:5
+    Visibility: public -/
+def request_effects.RequestEffects.acknowledge_dispatch
+  (self : request_effects.RequestEffects) (audited : read_transition.Audited) :
+  Result (Bool × request_effects.RequestEffects)
+  := do
+  let phase ← read_transition.Audited.impl.phase audited
+  match self.progress with
+  | request_effects.Progress.Entry =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.DispatchAudit recorded =>
+    let b ←
+      read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq recorded phase
+    if b
+    then
+      let record ← request_effects.RequestEffects.phase self phase
+      let self1 ←
+        request_effects.RequestEffects.set_phase self phase
+          { record with audit_acknowledged := true }
+      ok (true,
+        { self1 with progress := (request_effects.Progress.Audited phase) })
+    else request_effects.RequestEffects.reject self
+  | request_effects.Progress.Audited _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderReady _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderAttempted _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderCompleted _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.DispatchReturned _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Selecting =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Selected =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CheckingBefore =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.BeforeAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CompletionAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CompletionAudited =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CheckingAfter =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.AfterAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ValueReady =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Halted =>
+    request_effects.RequestEffects.reject self
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::begin_provider]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 182:4-193:5
+    Visibility: public -/
+def request_effects.RequestEffects.begin_provider
+  (self : request_effects.RequestEffects) (audited : read_transition.Audited) :
+  Result (Bool × request_effects.RequestEffects)
+  := do
+  let phase ← read_transition.Audited.impl.phase audited
+  match self.progress with
+  | request_effects.Progress.Entry =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.DispatchAudit _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Audited recorded =>
+    let b ←
+      read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq recorded phase
+    if b
+    then
+      let record ← request_effects.RequestEffects.phase self phase
+      let self1 ←
+        request_effects.RequestEffects.set_phase self phase
+          { record with provider_ready := true }
+      ok (true,
+        { self1 with progress := (request_effects.Progress.ProviderReady phase)
+        })
+    else request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderReady _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderAttempted _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderCompleted _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.DispatchReturned _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Selecting =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Selected =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CheckingBefore =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.BeforeAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CompletionAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CompletionAudited =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CheckingAfter =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.AfterAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ValueReady =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Halted =>
+    request_effects.RequestEffects.reject self
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::begin_send]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 196:4-210:5
+    Visibility: public -/
+def request_effects.RequestEffects.begin_send
+  (self : request_effects.RequestEffects) (phase : read_transition.Phase)
+  («local» : provider_exchange.SendState) (write : Bool) :
+  Result (Bool × request_effects.RequestEffects ×
+    provider_exchange.SendState)
+  := do
+  match self.progress with
+  | request_effects.Progress.Entry =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.DispatchAudit _ =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.Audited _ =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.ProviderReady recorded =>
+    let b ←
+      read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq recorded phase
+    if b
+    then
+      let (b1, local1) ←
+        provider_exchange.SendState.begin_send «local» write
+      if b1
+      then
+        let record ← request_effects.RequestEffects.phase self phase
+        let o ← provider_exchange.SendState.stamp local1
+        let self1 ←
+          request_effects.RequestEffects.set_phase self phase
+            { record with current := o, provider_attempted := true }
+        ok (true,
+          {
+            self1
+              with
+              progress := (request_effects.Progress.ProviderAttempted phase)
+          }, local1)
+      else
+        let (b2, self1) ← request_effects.RequestEffects.reject self
+        ok (b2, self1, local1)
+    else
+      let (b1, self1) ← request_effects.RequestEffects.reject self
+      ok (b1, self1, «local»)
+  | request_effects.Progress.ProviderAttempted _ =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.ProviderCompleted _ =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.DispatchReturned _ =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.Selecting =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.Selected =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.CheckingBefore =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.BeforeAudit =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.CompletionAudit =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.CompletionAudited =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.CheckingAfter =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.AfterAudit =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.ValueReady =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+  | request_effects.Progress.Halted =>
+    let (b, self1) ← request_effects.RequestEffects.reject self
+    ok (b, self1, «local»)
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::provider_completed]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 211:4-221:5
+    Visibility: public -/
+def request_effects.RequestEffects.provider_completed
+  (self : request_effects.RequestEffects) (phase : read_transition.Phase) :
+  Result (Bool × request_effects.RequestEffects)
+  := do
+  match self.progress with
+  | request_effects.Progress.Entry =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.DispatchAudit _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Audited _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderReady _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderAttempted recorded =>
+    let b ←
+      read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq recorded phase
+    if b
+    then
+      let record ← request_effects.RequestEffects.phase self phase
+      let self1 ←
+        request_effects.RequestEffects.set_phase self phase
+          { record with provider_completed := true }
+      ok (true,
+        {
+          self1
+            with
+            progress := (request_effects.Progress.ProviderCompleted phase)
+        })
+    else request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderCompleted _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.DispatchReturned _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Selecting =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Selected =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CheckingBefore =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.BeforeAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CompletionAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CompletionAudited =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CheckingAfter =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.AfterAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ValueReady =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Halted =>
+    request_effects.RequestEffects.reject self
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::finish_dispatch]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 222:4-232:5
+    Visibility: public -/
+def request_effects.RequestEffects.finish_dispatch
+  (self : request_effects.RequestEffects) (phase : read_transition.Phase) :
+  Result (Bool × request_effects.RequestEffects)
+  := do
+  match self.progress with
+  | request_effects.Progress.Entry =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.DispatchAudit _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Audited _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderReady _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderAttempted _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderCompleted recorded =>
+    let b ←
+      read_transition.Phase.Insts.CoreCmpPartialEqPhase.eq recorded phase
+    if b
+    then
+      let record ← request_effects.RequestEffects.phase self phase
+      let self1 ←
+        request_effects.RequestEffects.set_phase self phase
+          { record with dispatch_succeeded := true }
+      ok (true,
+        {
+          self1
+            with
+            progress := (request_effects.Progress.DispatchReturned phase)
+        })
+    else request_effects.RequestEffects.reject self
+  | request_effects.Progress.DispatchReturned _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Selecting =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Selected =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CheckingBefore =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.BeforeAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CompletionAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CompletionAudited =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CheckingAfter =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.AfterAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ValueReady =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Halted =>
+    request_effects.RequestEffects.reject self
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::begin_completion]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 233:4-240:5
+    Visibility: public -/
+def request_effects.RequestEffects.begin_completion
+  (self : request_effects.RequestEffects) :
+  Result (Bool × request_effects.RequestEffects)
+  := do
+  match self.progress with
+  | request_effects.Progress.Entry =>
+    ok (true, { self with progress := request_effects.Progress.Selecting })
+  | request_effects.Progress.DispatchAudit _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Audited _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderReady _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderAttempted _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ProviderCompleted _ =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.DispatchReturned _ =>
+    ok (true, { self with progress := request_effects.Progress.Selecting })
+  | request_effects.Progress.Selecting =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Selected =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CheckingBefore =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.BeforeAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CompletionAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CompletionAudited =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.CheckingAfter =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.AfterAudit =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.ValueReady =>
+    request_effects.RequestEffects.reject self
+  | request_effects.Progress.Halted =>
+    request_effects.RequestEffects.reject self
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::selected]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 241:4-248:5
+    Visibility: public -/
+def request_effects.RequestEffects.selected
+  (self : request_effects.RequestEffects) :
+  Result (Bool × request_effects.RequestEffects)
+  := do
+  let (p, b) ←
+    match self.progress with
+    | request_effects.Progress.Entry =>
+      ok (request_effects.Progress.Entry, false)
+    | request_effects.Progress.DispatchAudit _ => ok (self.progress, false)
+    | request_effects.Progress.Audited _ => ok (self.progress, false)
+    | request_effects.Progress.ProviderReady _ => ok (self.progress, false)
+    | request_effects.Progress.ProviderAttempted _ => ok (self.progress, false)
+    | request_effects.Progress.ProviderCompleted _ => ok (self.progress, false)
+    | request_effects.Progress.DispatchReturned _ => ok (self.progress, false)
+    | request_effects.Progress.Selecting =>
+      ok (request_effects.Progress.Selecting, true)
+    | request_effects.Progress.Selected =>
+      ok (request_effects.Progress.Selected, false)
+    | request_effects.Progress.CheckingBefore =>
+      ok (request_effects.Progress.CheckingBefore, false)
+    | request_effects.Progress.BeforeAudit =>
+      ok (request_effects.Progress.BeforeAudit, false)
+    | request_effects.Progress.CompletionAudit =>
+      ok (request_effects.Progress.CompletionAudit, false)
+    | request_effects.Progress.CompletionAudited =>
+      ok (request_effects.Progress.CompletionAudited, false)
+    | request_effects.Progress.CheckingAfter =>
+      ok (request_effects.Progress.CheckingAfter, false)
+    | request_effects.Progress.AfterAudit =>
+      ok (request_effects.Progress.AfterAudit, false)
+    | request_effects.Progress.ValueReady =>
+      ok (request_effects.Progress.ValueReady, false)
+    | request_effects.Progress.Halted =>
+      ok (request_effects.Progress.Halted, false)
+  if b
+  then
+    ok (true,
+      {
+        self
+          with
+          completion := { self.completion with selected := true },
+          progress := request_effects.Progress.Selected
+      })
+  else request_effects.RequestEffects.reject { self with progress := p }
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::begin_completion_check]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 249:4-260:5
+    Visibility: public -/
+def request_effects.RequestEffects.begin_completion_check
+  (self : request_effects.RequestEffects)
+  (phase : read_transition.CompletionPhase) :
+  Result (Bool × request_effects.RequestEffects)
+  := do
+  match phase with
+  | read_transition.CompletionPhase.BeforeAudit =>
+    match self.progress with
+    | request_effects.Progress.Entry =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.DispatchAudit _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.Audited _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.ProviderReady _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.ProviderAttempted _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.ProviderCompleted _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.DispatchReturned _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.Selecting =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.Selected =>
+      ok (true,
+        { self with progress := request_effects.Progress.CheckingBefore })
+    | request_effects.Progress.CheckingBefore =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.BeforeAudit =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.CompletionAudit =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.CompletionAudited =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.CheckingAfter =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.AfterAudit =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.ValueReady =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.Halted =>
+      request_effects.RequestEffects.reject self
+  | read_transition.CompletionPhase.BeforeRelease =>
+    match self.progress with
+    | request_effects.Progress.Entry =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.DispatchAudit _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.Audited _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.ProviderReady _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.ProviderAttempted _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.ProviderCompleted _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.DispatchReturned _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.Selecting =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.Selected =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.CheckingBefore =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.BeforeAudit =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.CompletionAudit =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.CompletionAudited =>
+      ok (true,
+        { self with progress := request_effects.Progress.CheckingAfter })
+    | request_effects.Progress.CheckingAfter =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.AfterAudit =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.ValueReady =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.Halted =>
+      request_effects.RequestEffects.reject self
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::finish_completion_check]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 261:4-274:5
+    Visibility: public -/
+def request_effects.RequestEffects.finish_completion_check
+  (self : request_effects.RequestEffects)
+  (phase : read_transition.CompletionPhase) :
+  Result (Bool × request_effects.RequestEffects)
+  := do
+  match phase with
+  | read_transition.CompletionPhase.BeforeAudit =>
+    match self.progress with
+    | request_effects.Progress.Entry =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.DispatchAudit _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.Audited _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.ProviderReady _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.ProviderAttempted _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.ProviderCompleted _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.DispatchReturned _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.Selecting =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.Selected =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.CheckingBefore =>
+      ok (true,
+        {
+          self
+            with
+            completion := { self.completion with before_checked := true },
+            progress := request_effects.Progress.BeforeAudit
+        })
+    | request_effects.Progress.BeforeAudit =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.CompletionAudit =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.CompletionAudited =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.CheckingAfter =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.AfterAudit =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.ValueReady =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.Halted =>
+      request_effects.RequestEffects.reject self
+  | read_transition.CompletionPhase.BeforeRelease =>
+    match self.progress with
+    | request_effects.Progress.Entry =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.DispatchAudit _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.Audited _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.ProviderReady _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.ProviderAttempted _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.ProviderCompleted _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.DispatchReturned _ =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.Selecting =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.Selected =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.CheckingBefore =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.BeforeAudit =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.CompletionAudit =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.CompletionAudited =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.CheckingAfter =>
+      ok (true,
+        {
+          self
+            with
+            completion := { self.completion with after_checked := true },
+            progress := request_effects.Progress.AfterAudit
+        })
+    | request_effects.Progress.AfterAudit =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.ValueReady =>
+      request_effects.RequestEffects.reject self
+    | request_effects.Progress.Halted =>
+      request_effects.RequestEffects.reject self
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::begin_completion_audit]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 275:4-282:5
+    Visibility: public -/
+def request_effects.RequestEffects.begin_completion_audit
+  (self : request_effects.RequestEffects) :
+  Result (Bool × request_effects.RequestEffects)
+  := do
+  let (p, b) ←
+    match self.progress with
+    | request_effects.Progress.Entry =>
+      ok (request_effects.Progress.Entry, false)
+    | request_effects.Progress.DispatchAudit _ => ok (self.progress, false)
+    | request_effects.Progress.Audited _ => ok (self.progress, false)
+    | request_effects.Progress.ProviderReady _ => ok (self.progress, false)
+    | request_effects.Progress.ProviderAttempted _ => ok (self.progress, false)
+    | request_effects.Progress.ProviderCompleted _ => ok (self.progress, false)
+    | request_effects.Progress.DispatchReturned _ => ok (self.progress, false)
+    | request_effects.Progress.Selecting =>
+      ok (request_effects.Progress.Selecting, false)
+    | request_effects.Progress.Selected =>
+      ok (request_effects.Progress.Selected, false)
+    | request_effects.Progress.CheckingBefore =>
+      ok (request_effects.Progress.CheckingBefore, false)
+    | request_effects.Progress.BeforeAudit =>
+      ok (request_effects.Progress.BeforeAudit, true)
+    | request_effects.Progress.CompletionAudit =>
+      ok (request_effects.Progress.CompletionAudit, false)
+    | request_effects.Progress.CompletionAudited =>
+      ok (request_effects.Progress.CompletionAudited, false)
+    | request_effects.Progress.CheckingAfter =>
+      ok (request_effects.Progress.CheckingAfter, false)
+    | request_effects.Progress.AfterAudit =>
+      ok (request_effects.Progress.AfterAudit, false)
+    | request_effects.Progress.ValueReady =>
+      ok (request_effects.Progress.ValueReady, false)
+    | request_effects.Progress.Halted =>
+      ok (request_effects.Progress.Halted, false)
+  if b
+  then
+    ok (true,
+      {
+        self
+          with
+          completion := { self.completion with audit_attempted := true },
+          progress := request_effects.Progress.CompletionAudit
+      })
+  else request_effects.RequestEffects.reject { self with progress := p }
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::acknowledge_completion_audit]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 283:4-290:5
+    Visibility: public -/
+def request_effects.RequestEffects.acknowledge_completion_audit
+  (self : request_effects.RequestEffects) :
+  Result (Bool × request_effects.RequestEffects)
+  := do
+  let (p, b) ←
+    match self.progress with
+    | request_effects.Progress.Entry =>
+      ok (request_effects.Progress.Entry, false)
+    | request_effects.Progress.DispatchAudit _ => ok (self.progress, false)
+    | request_effects.Progress.Audited _ => ok (self.progress, false)
+    | request_effects.Progress.ProviderReady _ => ok (self.progress, false)
+    | request_effects.Progress.ProviderAttempted _ => ok (self.progress, false)
+    | request_effects.Progress.ProviderCompleted _ => ok (self.progress, false)
+    | request_effects.Progress.DispatchReturned _ => ok (self.progress, false)
+    | request_effects.Progress.Selecting =>
+      ok (request_effects.Progress.Selecting, false)
+    | request_effects.Progress.Selected =>
+      ok (request_effects.Progress.Selected, false)
+    | request_effects.Progress.CheckingBefore =>
+      ok (request_effects.Progress.CheckingBefore, false)
+    | request_effects.Progress.BeforeAudit =>
+      ok (request_effects.Progress.BeforeAudit, false)
+    | request_effects.Progress.CompletionAudit =>
+      ok (request_effects.Progress.CompletionAudit, true)
+    | request_effects.Progress.CompletionAudited =>
+      ok (request_effects.Progress.CompletionAudited, false)
+    | request_effects.Progress.CheckingAfter =>
+      ok (request_effects.Progress.CheckingAfter, false)
+    | request_effects.Progress.AfterAudit =>
+      ok (request_effects.Progress.AfterAudit, false)
+    | request_effects.Progress.ValueReady =>
+      ok (request_effects.Progress.ValueReady, false)
+    | request_effects.Progress.Halted =>
+      ok (request_effects.Progress.Halted, false)
+  if b
+  then
+    ok (true,
+      {
+        self
+          with
+          completion := { self.completion with audit_acknowledged := true },
+          progress := request_effects.Progress.CompletionAudited
+      })
+  else request_effects.RequestEffects.reject { self with progress := p }
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::value_ready]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 292:4-299:5
+    Visibility: public -/
+def request_effects.RequestEffects.value_ready
+  (self : request_effects.RequestEffects) :
+  Result (Bool × request_effects.RequestEffects)
+  := do
+  let (p, b) ←
+    match self.progress with
+    | request_effects.Progress.Entry =>
+      ok (request_effects.Progress.Entry, false)
+    | request_effects.Progress.DispatchAudit _ => ok (self.progress, false)
+    | request_effects.Progress.Audited _ => ok (self.progress, false)
+    | request_effects.Progress.ProviderReady _ => ok (self.progress, false)
+    | request_effects.Progress.ProviderAttempted _ => ok (self.progress, false)
+    | request_effects.Progress.ProviderCompleted _ => ok (self.progress, false)
+    | request_effects.Progress.DispatchReturned _ => ok (self.progress, false)
+    | request_effects.Progress.Selecting =>
+      ok (request_effects.Progress.Selecting, false)
+    | request_effects.Progress.Selected =>
+      ok (request_effects.Progress.Selected, false)
+    | request_effects.Progress.CheckingBefore =>
+      ok (request_effects.Progress.CheckingBefore, false)
+    | request_effects.Progress.BeforeAudit =>
+      ok (request_effects.Progress.BeforeAudit, false)
+    | request_effects.Progress.CompletionAudit =>
+      ok (request_effects.Progress.CompletionAudit, false)
+    | request_effects.Progress.CompletionAudited =>
+      ok (request_effects.Progress.CompletionAudited, false)
+    | request_effects.Progress.CheckingAfter =>
+      ok (request_effects.Progress.CheckingAfter, false)
+    | request_effects.Progress.AfterAudit =>
+      ok (request_effects.Progress.AfterAudit, true)
+    | request_effects.Progress.ValueReady =>
+      ok (request_effects.Progress.ValueReady, false)
+    | request_effects.Progress.Halted =>
+      ok (request_effects.Progress.Halted, false)
+  if b
+  then
+    ok (true,
+      {
+        self
+          with
+          completion := { self.completion with value_ready := true },
+          progress := request_effects.Progress.ValueReady
+      })
+  else request_effects.RequestEffects.reject { self with progress := p }
+
+/-- [aivm_secrets_garrett_core::request_effects::{impl core::default::Default for aivm_secrets_garrett_core::request_effects::RequestEffects}::default]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 302:4-304:5
+    Visibility: public -/
+def request_effects.RequestEffects.Insts.CoreDefaultDefault.default
+  : Result request_effects.RequestEffects := do
+  request_effects.RequestEffects.new
+
+/-- Trait implementation: [aivm_secrets_garrett_core::request_effects::{impl core::default::Default for aivm_secrets_garrett_core::request_effects::RequestEffects}]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 301:0-305:1 -/
+@[reducible]
+def request_effects.RequestEffects.Insts.CoreDefaultDefault :
+  core.default.Default request_effects.RequestEffects := {
+  default := request_effects.RequestEffects.Insts.CoreDefaultDefault.default
+}
 
 /-- [aivm_secrets_garrett_core::trust::TrustDenial]
     Source: 'crates/aivm-secrets-garrett-core/src/trust.rs', lines 5:0-9:1

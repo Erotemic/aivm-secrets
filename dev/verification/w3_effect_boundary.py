@@ -144,7 +144,8 @@ def review_semantics(contents: dict[str, str]) -> None:
                        'let pending = crate::coordination::PendingDispatch',
                        'executor.exchange_manifest(', 'coordination::dispatch(&pending, keyed_write)'),
             'provider dispatch bypasses durable audit or fresh authorization')
-    require('&recorded,' in dispatch and 'matches!(recorded.transition.phase(), DispatchPhase::Final)' in dispatch,
+    require('&recorded,' in dispatch and 'matches!(recorded.transition.phase(), DispatchPhase::Final)' in dispatch
+            and '.finish_dispatch(recorded.transition.phase())' in dispatch,
             'executor is not passed the reviewed audited dispatch permit')
     require('check: &fresh,' in dispatch and 'reserve: || reservation_call(false),' in dispatch
             and 'finish: || reservation_call(true),' in dispatch
@@ -214,6 +215,28 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'effect.write' in adapter and 'Error::OutcomeUnknown' in adapter
             and 'Value::Null' in adapter,
             'write uncertainty boundary altered')
+    require('pub mod request_effects;' in contents[
+        'rust/crates/aivm-secrets-garrett-core/src/lib.rs']
+            and same_order(reviewed, 'begin_dispatch_audit(&self.transition)',
+                           'audit.write_record(', 'acknowledge_dispatch(&transition)')
+            and 'Rc<RefCell<RequestEffects>>' in m
+            and 'let effects = Rc::new(RefCell::new(RequestEffects::new()));' in request,
+            'request-wide audit receipt is detached from the actual audit primitive')
+    require(same_order(completed, 'begin_completion_check(phase)', '(self.fresh)()',
+                       'finish_completion_check(phase)', 'begin_completion_audit()',
+                       'self.audit.write_record(', 'acknowledge_completion_audit()',
+                       '.value_ready()', 'Ok(CompletedRelease(self.reply))')
+            and same_order(release, 'begin_completion()', 'self.disclosure.project(',
+                           'ensure_safe(&reply', '.selected()',
+                           'read_transition::complete_current(PendingCompletion {')
+            and 'effects: effects.clone(),' in release,
+            'completion receipt bypasses selection, freshness or actual audit acknowledgment')
+    require(adapter.count('self.snapshot = *self.effects.borrow();') == 3
+            and 'fn dispatch(&mut self,' in adapter and 'fn recheck(&mut self)' in adapter
+            and 'fn complete(&mut self,' in adapter
+            and 'if out.is_ok() && !self.snapshot.can_return_value()' in adapter
+            and 'snapshot: RequestEffects::new(),' in plan,
+            'effectful callbacks lost their actual post-state or completed-value gate')
     # W6: the exact provider bytes are validated by a pure encoder BEFORE any
     # TCP/TLS effect. This also covers OAuthSource-created Credential values.
     require(m.count('fn manifest_request_bytes(') == 1
@@ -256,7 +279,7 @@ def review_semantics(contents: dict[str, str]) -> None:
     runtime = m.split('#[cfg(test)]', 1)[0]
     require(runtime.count('TcpStream::connect_timeout(') == 1 and
             runtime.count('.write_all(') == 1 and
-            ''.join(runtime.split()).count('send_manifest_bytes(&mutself.send_state,&mutchannel.stream,&channel.request,self.effect.write,)') == 1,
+            ''.join(runtime.split()).count('send_manifest_bytes(&mutself.send_state,&mutchannel.stream,&channel.request,self.effect.write,&self.effects,self.phase,)') == 1,
             'native module added a credentialed socket or HTTP writer')
     require(runtime.count('exchange_manifest(') == 2,
             'extra native manifest executor call site')
@@ -265,10 +288,14 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'let effect = audited.effect;' in transport
             and 'audited.transition.is_write() != effect.write' in transport,
             'manifest provider executor accepts a raw, unaudited policy effect')
-    require('provider_exchange::exchange(&mut provider, &audited.transition)' in transport
+    require('provider_exchange::exchange(&mutprovider,&audited.transition,)' in ''.join(transport.split())
             and 'current: &impl Fn() -> Outcome<guards::AdmissionStamp>' in transport
             and '.into_result()' in transport and '&current,' in dispatch,
             'manifest provider bypasses the extracted staged continuation')
+    require(same_order(transport, 'begin_provider(&audited.transition)',
+                       'provider_exchange::exchange(', '.provider_completed(audited.transition.phase())',
+                       'report.into_result()'),
+            'provider receipt no longer distinguishes a response from completed dispatch')
     setup = part(runtime, 'fn setup(&mut self)', 'fn recheck(&mut self)')
     primitive = part(runtime, 'fn send_manifest_bytes(', 'struct ManifestChannel {')
     sender = part(runtime, 'fn send(&mut self, channel:', 'fn receive(&mut self, channel:')
@@ -279,8 +306,8 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'ClientConnection::new(self.executor.tls.clone(), name)' in setup,
             'provider setup bypasses wire validation or host route / TLS identity')
     require('writer.write_all(request)' in ''.join(primitive.split()) and 'writer.flush()' in primitive
-            and same_order(primitive, 'if !state.begin_send(write)', '.write_all(request)')
-            and 'send_manifest_bytes(&mutself.send_state,&mutchannel.stream,&channel.request,self.effect.write,)' in ''.join(sender.split())
+            and same_order(primitive, 'if !effects.borrow_mut().begin_send(phase, state, write)', '.write_all(request)')
+            and 'send_manifest_bytes(&mutself.send_state,&mutchannel.stream,&channel.request,self.effect.write,&self.effects,self.phase,)' in ''.join(sender.split())
             and same_order(part(runtime, 'fn recheck(&mut self)', 'fn send(&mut self, channel:'),
                            'self.send_state.begin_check()', '(self.current)()?',
                            'self.send_state.finish_check(stamp)'),

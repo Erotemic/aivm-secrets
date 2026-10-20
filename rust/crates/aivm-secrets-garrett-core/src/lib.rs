@@ -19,6 +19,7 @@ pub mod protocol;
 pub mod provider_exchange;
 pub mod read_transition;
 pub mod rebinding;
+pub mod request_effects;
 pub mod trust;
 
 pub enum Denial {

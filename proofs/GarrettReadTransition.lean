@@ -77,85 +77,80 @@ theorem authorized_read_witness (phase : Phase) (operationWrite : Bool) :
   simp [prepare, acknowledge]
 
 theorem denied_before_completion {P O E : Type} (ops : Completion P O E)
-    (pending : P) (error : E)
-    (denied : ops.recheck pending .BeforeAudit = Result.ok (.Err error)) :
+    (pending after : P) (error : E)
+    (denied : ops.recheck pending .BeforeAudit = Result.ok (.Err error, after)) :
     complete_current ops pending = Result.ok (.Err error) := by
   simp [complete_current, denied]
 
 theorem completion_audit_refusal {P O E : Type} (ops : Completion P O E)
-    (pending : P) (error : E)
-    (current : ops.recheck pending .BeforeAudit = Result.ok (.Ok ()))
-    (refused : ops.audit pending = Result.ok (.Err error)) :
+    (pending checked after : P) (error : E)
+    (current : ops.recheck pending .BeforeAudit = Result.ok (.Ok (), checked))
+    (refused : ops.audit checked = Result.ok (.Err error, after)) :
     complete_current ops pending = Result.ok (.Err error) := by
   simp [complete_current, current, refused]
 
-/-- An audit acknowledged after authority was lost does not authorize release.
-The two checkpoints are separate inputs in the extracted adapter interface. -/
 theorem revoked_after_completion_audit {P O E : Type} (ops : Completion P O E)
-    (pending : P) (error : E)
-    (before : ops.recheck pending .BeforeAudit = Result.ok (.Ok ()))
-    (ack : ops.audit pending = Result.ok (.Ok ()))
-    (afterAudit : ops.recheck pending .BeforeRelease = Result.ok (.Err error)) :
+    (pending checked audited after : P) (error : E)
+    (before : ops.recheck pending .BeforeAudit = Result.ok (.Ok (), checked))
+    (ack : ops.audit checked = Result.ok (.Ok (), audited))
+    (afterAudit : ops.recheck audited .BeforeRelease = Result.ok (.Err error, after)) :
     complete_current ops pending = Result.ok (.Err error) := by
   simp [complete_current, before, ack, afterAudit]
 
-/-- Retain the release adapter's failures and divergence, as well as success.
-The controller adds neither a cached authorization nor an automatic retry. -/
 theorem current_completion_continuation {P O E : Type} (ops : Completion P O E)
-    (pending : P)
-    (before : ops.recheck pending .BeforeAudit = Result.ok (.Ok ()))
-    (ack : ops.audit pending = Result.ok (.Ok ()))
-    (afterAudit : ops.recheck pending .BeforeRelease = Result.ok (.Ok ())) :
-    complete_current ops pending = ops.release pending := by
+    (pending checked audited current : P)
+    (before : ops.recheck pending .BeforeAudit = Result.ok (.Ok (), checked))
+    (ack : ops.audit checked = Result.ok (.Ok (), audited))
+    (afterAudit : ops.recheck audited .BeforeRelease = Result.ok (.Ok (), current)) :
+    complete_current ops pending = ops.release current := by
   simp [complete_current, before, ack, afterAudit]
 
-/-- Conditional preservation through the production completion controller.
-Adapters justify the individual sampled facts; the controller proves their
-conjunction on success. No contract is assumed for unused continuations.
-CurrentAfter holds at the last check, not throughout subsequent TLS writes. -/
+/-- Conditional preservation through the actual mutable completion controller.
+    Every continuation receives the state returned by the preceding callback;
+    unused continuations need no successful-outcome or termination contract. -/
 theorem completion_preservation {P O E : Type} (ops : Completion P O E)
     (pending : P) (CurrentBefore Audited CurrentAfter : Prop) (Released : O → Prop)
-    (before : ops.recheck pending .BeforeAudit ⦃ out => out = .Ok () → CurrentBefore ⦄)
-    (audit : CurrentBefore → ops.audit pending ⦃ out => out = .Ok () → Audited ⦄)
-    (afterAudit : CurrentBefore → Audited →
-      ops.recheck pending .BeforeRelease ⦃ out => out = .Ok () → CurrentAfter ⦄)
-    (release : CurrentBefore → Audited → CurrentAfter → ops.release pending
+    (before : ops.recheck pending .BeforeAudit ⦃ pair => pair.1 = .Ok () → CurrentBefore ⦄)
+    (audit : ∀ checked, CurrentBefore → ops.audit checked ⦃ pair => pair.1 = .Ok () → Audited ⦄)
+    (afterAudit : ∀ audited, CurrentBefore → Audited →
+      ops.recheck audited .BeforeRelease ⦃ pair => pair.1 = .Ok () → CurrentAfter ⦄)
+    (release : ∀ current, CurrentBefore → Audited → CurrentAfter → ops.release current
       ⦃ out => ∀ value, out = .Ok value → Released value ⦄) :
     complete_current ops pending ⦃ out => ∀ value, out = .Ok value →
       CurrentBefore ∧ Audited ∧ CurrentAfter ∧ Released value ⦄ := by
   unfold complete_current
   apply WP.spec_bind before
-  intro first hfirst
+  rintro ⟨first, checked⟩ hfirst
   cases first with
   | Err error => simp
   | Ok u =>
     cases u
     have currentBefore := hfirst rfl
-    apply WP.spec_bind (audit currentBefore)
-    intro acknowledged hack
+    apply WP.spec_bind (audit checked currentBefore)
+    rintro ⟨acknowledged, audited⟩ hack
     cases acknowledged with
     | Err error => simp
     | Ok u =>
       cases u
-      have audited := hack rfl
-      apply WP.spec_bind (afterAudit currentBefore audited)
-      intro last hlast
+      have auditAck := hack rfl
+      apply WP.spec_bind (afterAudit audited currentBefore auditAck)
+      rintro ⟨last, current⟩ hlast
       cases last with
       | Err error => simp
       | Ok u =>
         cases u
         have currentAfter := hlast rfl
-        apply WP.spec_mono (release currentBefore audited currentAfter)
+        apply WP.spec_mono (release current currentBefore auditAck currentAfter)
         intro out released value success
-        exact ⟨currentBefore, audited, currentAfter, released value success⟩
+        exact ⟨currentBefore, auditAck, currentAfter, released value success⟩
 
 theorem authorized_completion_witness {P O E : Type} (ops : Completion P O E)
-    (pending : P) (value : O)
-    (before : ops.recheck pending .BeforeAudit = Result.ok (.Ok ()))
-    (ack : ops.audit pending = Result.ok (.Ok ()))
-    (afterAudit : ops.recheck pending .BeforeRelease = Result.ok (.Ok ()))
-    (released : ops.release pending = Result.ok (.Ok value)) :
+    (pending checked audited current : P) (value : O)
+    (before : ops.recheck pending .BeforeAudit = Result.ok (.Ok (), checked))
+    (ack : ops.audit checked = Result.ok (.Ok (), audited))
+    (afterAudit : ops.recheck audited .BeforeRelease = Result.ok (.Ok (), current))
+    (released : ops.release current = Result.ok (.Ok value)) :
     complete_current ops pending = Result.ok (.Ok value) := by
-  rw [current_completion_continuation ops pending before ack afterAudit, released]
+  rw [current_completion_continuation ops pending checked audited current before ack afterAudit, released]
 
 end aivm_secrets_garrett_core.read_transition.Proofs

@@ -86,6 +86,7 @@ impl Audited {
 /// Completion audit and current authority are external adapter outcomes.
 /// The selected reply remains private until both have succeeded. Rechecking
 /// after the audit prevents a blocking append from extending its authority.
+#[derive(Clone, Copy)]
 pub enum CompletionPhase {
     BeforeAudit,
     BeforeRelease,
@@ -94,12 +95,12 @@ pub enum CompletionPhase {
 pub trait Completion {
     type Output;
     type Error;
-    fn recheck(&self, phase: CompletionPhase) -> Result<(), Self::Error>;
-    fn audit(&self) -> Result<(), Self::Error>;
+    fn recheck(&mut self, phase: CompletionPhase) -> Result<(), Self::Error>;
+    fn audit(&mut self) -> Result<(), Self::Error>;
     fn release(self) -> Result<Self::Output, Self::Error>;
 }
 
-pub fn complete_current<C: Completion>(pending: C) -> Result<C::Output, C::Error> {
+pub fn complete_current<C: Completion>(mut pending: C) -> Result<C::Output, C::Error> {
     match pending.recheck(CompletionPhase::BeforeAudit) {
         Ok(()) => (),
         Err(error) => return Err(error),
@@ -128,11 +129,11 @@ pub trait Request {
 
     fn preflight(&self) -> Result<Option<Self::Effect>, Self::Error>;
     fn empty_facts(&self) -> Self::Facts;
-    fn dispatch(&self, phase: Phase, effect: Self::Effect) -> Result<Self::Facts, Self::Error>;
+    fn dispatch(&mut self, phase: Phase, effect: Self::Effect) -> Result<Self::Facts, Self::Error>;
     fn final_effect(&self, facts: &Self::Facts) -> Result<Option<Self::Effect>, Self::Error>;
-    fn recheck(&self) -> Result<(), Self::Error>;
+    fn recheck(&mut self) -> Result<(), Self::Error>;
     fn effect_write(&self, effect: &Self::Effect) -> bool;
-    fn complete(&self, raw: Self::Facts) -> Result<Self::Output, Self::Error>;
+    fn complete(&mut self, raw: Self::Facts) -> Result<Self::Output, Self::Error>;
     fn outcome_unknown(&self) -> Self::Error;
 }
 
@@ -232,7 +233,7 @@ mod tests {
             self.trace.borrow_mut().push("empty");
             0
         }
-        fn dispatch(&self, phase: Phase, effect: Self::Effect) -> Result<u8, Self::Error> {
+        fn dispatch(&mut self, phase: Phase, effect: Self::Effect) -> Result<u8, Self::Error> {
             match phase {
                 Phase::Preflight => {
                     self.step("preflight-provider")?;
@@ -251,14 +252,14 @@ mod tests {
             assert_eq!(*facts, if self.preflight { 101 } else { 0 });
             Ok(self.final_effect.then_some((*facts, self.write)))
         }
-        fn recheck(&self) -> Result<(), Self::Error> {
+        fn recheck(&mut self) -> Result<(), Self::Error> {
             self.step("fresh")
         }
         fn effect_write(&self, effect: &Self::Effect) -> bool {
             self.trace.borrow_mut().push("write-kind");
             effect.1
         }
-        fn complete(&self, raw: u8) -> Result<u8, Self::Error> {
+        fn complete(&mut self, raw: u8) -> Result<u8, Self::Error> {
             self.step("complete")?;
             assert_eq!(
                 raw,
@@ -461,14 +462,14 @@ mod tests {
         type Output = &'static str;
         type Error = &'static str;
 
-        fn recheck(&self, phase: CompletionPhase) -> Result<(), Self::Error> {
+        fn recheck(&mut self, phase: CompletionPhase) -> Result<(), Self::Error> {
             self.step(match phase {
                 CompletionPhase::BeforeAudit => "before-audit",
                 CompletionPhase::BeforeRelease => "before-release",
             })
         }
 
-        fn audit(&self) -> Result<(), Self::Error> {
+        fn audit(&mut self) -> Result<(), Self::Error> {
             self.step("audit")
         }
 

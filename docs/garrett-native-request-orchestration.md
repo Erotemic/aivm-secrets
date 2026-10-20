@@ -104,6 +104,11 @@ unfinished saved reply and an omitted receipt transition. The mutation runner
 now retains nested Rust module paths and recompiles the invocation proof after
 its dispatch/completion dependency against each regenerated mutant.
 
+The [request-wide receipt increment](garrett-request-effect-receipts.md) now
+threads mutable raw-adapter states through these same 33 theorems and supplies
+a production effect gate with conditional request-level receipt composition.
+It retains the native I/O and event/history obligations below.
+
 ## What remains for NR-2 and NR-3
 
 This closes the production orchestration extraction and exact result/data-flow

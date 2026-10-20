@@ -100,6 +100,11 @@ before current admission, lost uncertainty, repeated-send permission and
 stamp construction without authorization. Required native tests still need
 to pass; source guards and theorem-name inventories cannot substitute for them.
 
+The [request-wide receipt increment](garrett-request-effect-receipts.md) adds
+actual shared audit/completion markers, a composite request/local send gate and
+conditional returned-request composition. The earlier provider theorem and
+primitive contracts remain in force; full event/history composition stays open.
+
 ## Still open
 
 - The primitive bridge from native audit acknowledgements, `SendState` marks,

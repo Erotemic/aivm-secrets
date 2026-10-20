@@ -8,6 +8,9 @@ use aivm_secrets_garrett_core::{manifest as guards, open_surrogate};
 // core. The private adapter alone can acknowledge a real host audit write.
 // Filesystem durability and late authorization remain external contracts.
 use aivm_secrets_garrett_core::read_transition::{self, Phase as DispatchPhase};
+use aivm_secrets_garrett_core::request_effects::RequestEffects;
+use std::{cell::RefCell, rc::Rc};
+type EffectsCell = Rc<RefCell<RequestEffects>>;
 
 struct PreparedDispatch<'a> {
     effect: &'a Effect,
@@ -39,10 +42,14 @@ impl<'a> PreparedDispatch<'a> {
         operation: &str,
         request_digest: &str,
         secret: &Credential,
+        effects: &EffectsCell,
     ) -> Outcome<AuditedDispatch<'a>> {
         // A hostile provider fact cannot turn a credential into a route or
         // an audit field. The body is intentionally absent from this record.
         crate::manifest::disclosure::ensure_safe(&json!({"target":self.effect.target}), &secret.0)?;
+        if !effects.borrow_mut().begin_dispatch_audit(&self.transition) {
+            return Err(Error::InternalError);
+        }
         audit.write_record(&json!({
             "schema":1,
             "event":"dispatch",
@@ -63,6 +70,9 @@ impl<'a> PreparedDispatch<'a> {
         // fsync/IO acknowledgement is an explicit external proof premise.
         let transition = read_transition::acknowledge(self.transition, true)
             .map_err(|_| Error::InternalError)?;
+        if !effects.borrow_mut().acknowledge_dispatch(&transition) {
+            return Err(Error::InternalError);
+        }
         Ok(AuditedDispatch {
             effect: self.effect,
             transition,
@@ -81,16 +91,27 @@ struct PendingCompletion<'a> {
     operation: &'a str,
     request_digest: &'a str,
     fresh: &'a dyn Fn() -> Outcome<()>,
+    effects: EffectsCell,
 }
 impl read_transition::Completion for PendingCompletion<'_> {
     type Output = CompletedRelease;
     type Error = Error;
 
-    fn recheck(&self, _phase: read_transition::CompletionPhase) -> Outcome<()> {
-        (self.fresh)()
+    fn recheck(&mut self, phase: read_transition::CompletionPhase) -> Outcome<()> {
+        if !self.effects.borrow_mut().begin_completion_check(phase) {
+            return Err(Error::InternalError);
+        }
+        (self.fresh)()?;
+        if !self.effects.borrow_mut().finish_completion_check(phase) {
+            return Err(Error::InternalError);
+        }
+        Ok(())
     }
 
-    fn audit(&self) -> Outcome<()> {
+    fn audit(&mut self) -> Outcome<()> {
+        if !self.effects.borrow_mut().begin_completion_audit() {
+            return Err(Error::InternalError);
+        }
         self.audit.write_record(&json!({
             "schema":1,
             "event":"completed",
@@ -98,10 +119,17 @@ impl read_transition::Completion for PendingCompletion<'_> {
             "grant":self.audit.grant,
             "policy":self.audit.policy,
             "request_digest":self.request_digest,
-        }))
+        }))?;
+        if !self.effects.borrow_mut().acknowledge_completion_audit() {
+            return Err(Error::InternalError);
+        }
+        Ok(())
     }
 
     fn release(self) -> Outcome<CompletedRelease> {
+        if !self.effects.borrow_mut().value_ready() {
+            return Err(Error::InternalError);
+        }
         Ok(CompletedRelease(self.reply))
     }
 }
@@ -119,6 +147,8 @@ struct PendingRequest<P, D, F, C, R> {
     final_effect: F,
     complete: C,
     fresh: R,
+    effects: EffectsCell,
+    snapshot: RequestEffects,
 }
 
 impl<P, D, F, C, R> read_transition::Request for PendingRequest<P, D, F, C, R>
@@ -141,20 +171,29 @@ where
     fn empty_facts(&self) -> Value {
         Value::Null
     }
-    fn dispatch(&self, phase: DispatchPhase, effect: Effect) -> Outcome<Value> {
-        (self.dispatch)(phase, &effect)
+    fn dispatch(&mut self, phase: DispatchPhase, effect: Effect) -> Outcome<Value> {
+        let out = (self.dispatch)(phase, &effect);
+        self.snapshot = *self.effects.borrow();
+        out
     }
     fn final_effect(&self, facts: &Value) -> Outcome<Option<Effect>> {
         (self.final_effect)(facts)
     }
-    fn recheck(&self) -> Outcome<()> {
-        (self.fresh)()
+    fn recheck(&mut self) -> Outcome<()> {
+        let out = (self.fresh)();
+        self.snapshot = *self.effects.borrow();
+        out
     }
     fn effect_write(&self, effect: &Effect) -> bool {
         effect.write
     }
-    fn complete(&self, raw: Value) -> Outcome<CompletedRelease> {
-        (self.complete)(raw)
+    fn complete(&mut self, raw: Value) -> Outcome<CompletedRelease> {
+        let out = (self.complete)(raw);
+        self.snapshot = *self.effects.borrow();
+        if out.is_ok() && !self.snapshot.can_return_value() {
+            return Err(Error::InternalError);
+        }
+        out
     }
     fn outcome_unknown(&self) -> Error {
         Error::OutcomeUnknown
@@ -475,6 +514,7 @@ impl Session {
         }
         // Single admission-to-I/O boundary for preflight and final effects.
         // Neither raw facts nor a guest-provided URL is a PreparedDispatch.
+        let effects = Rc::new(RefCell::new(RequestEffects::new()));
         let dispatch = |prepared: PreparedDispatch<'_>| -> Outcome<Value> {
             let recorded = prepared.audit(
                 &self.base.executor.audit,
@@ -484,6 +524,7 @@ impl Session {
                 &op.name,
                 &request_hash,
                 &secret,
+                &effects,
             )?;
             let effect = recorded.effect;
             // Durable audit and a fresh grant both precede credentialed I/O.
@@ -519,13 +560,25 @@ impl Session {
                         &recorded,
                         &headers,
                         &current,
+                        &effects,
                     )
                 },
                 finish: || reservation_call(true),
             };
-            aivm_secrets_garrett_core::coordination::dispatch(&pending, keyed_write)
+            let out = aivm_secrets_garrett_core::coordination::dispatch(&pending, keyed_write);
+            if out.is_ok()
+                && !effects
+                    .borrow_mut()
+                    .finish_dispatch(recorded.transition.phase())
+            {
+                return Err(Error::InternalError);
+            }
+            out
         };
         let release = |raw: Value| -> Outcome<CompletedRelease> {
+            if !effects.borrow_mut().begin_completion() {
+                return Err(Error::InternalError);
+            }
             self.require_control_active(host_time()?)?;
             let meta = self.policy.pagination(op, &args, &raw)?;
             let result = self.disclosure.project(&op.name, &raw, &secret.0)?;
@@ -534,12 +587,16 @@ impl Session {
                 reply["meta"] = meta;
             }
             crate::manifest::disclosure::ensure_safe(&reply, &secret.0)?;
+            if !effects.borrow_mut().selected() {
+                return Err(Error::InternalError);
+            }
             read_transition::complete_current(PendingCompletion {
                 reply,
                 audit: &self.base.executor.audit,
                 operation: &op.name,
                 request_digest: &request_hash,
                 fresh: &fresh,
+                effects: effects.clone(),
             })
         };
         let pending = PendingRequest {
@@ -551,6 +608,8 @@ impl Session {
             },
             complete: release,
             fresh: &fresh,
+            effects: effects.clone(),
+            snapshot: RequestEffects::new(),
         };
         read_transition::run_current(pending).map(CompletedRelease::into_public)
     }
@@ -645,8 +704,10 @@ fn send_manifest_bytes(
     writer: &mut impl Write,
     request: &[u8],
     write: bool,
+    effects: &EffectsCell,
+    phase: DispatchPhase,
 ) -> Outcome<()> {
-    if !state.begin_send(write) {
+    if !effects.borrow_mut().begin_send(phase, state, write) {
         return Err(Error::InternalError);
     }
     writer
@@ -668,6 +729,8 @@ struct ManifestProvider<'a, F> {
     headers: &'a BTreeMap<String, String>,
     current: &'a F,
     send_state: aivm_secrets_garrett_core::provider_exchange::SendState,
+    effects: EffectsCell,
+    phase: DispatchPhase,
 }
 impl<F: Fn() -> Outcome<guards::AdmissionStamp>>
     aivm_secrets_garrett_core::provider_exchange::Provider for ManifestProvider<'_, F>
@@ -733,6 +796,8 @@ impl<F: Fn() -> Outcome<guards::AdmissionStamp>>
             &mut channel.stream,
             &channel.request,
             self.effect.write,
+            &self.effects,
+            self.phase,
         )
     }
     fn receive(&mut self, channel: ManifestChannel) -> Outcome<Value> {
@@ -774,10 +839,14 @@ impl Executor {
         audited: &AuditedDispatch<'_>,
         headers: &BTreeMap<String, String>,
         current: &impl Fn() -> Outcome<guards::AdmissionStamp>,
+        effects: &EffectsCell,
     ) -> Outcome<Value> {
         let effect = audited.effect;
         if audited.transition.is_write() != effect.write {
             return Err(Error::InvalidPolicy);
+        }
+        if !effects.borrow_mut().begin_provider(&audited.transition) {
+            return Err(Error::InternalError);
         }
         let mut provider = ManifestProvider {
             executor: self,
@@ -787,9 +856,21 @@ impl Executor {
             headers,
             current,
             send_state: aivm_secrets_garrett_core::provider_exchange::SendState::new(),
+            effects: effects.clone(),
+            phase: audited.transition.phase(),
         };
-        aivm_secrets_garrett_core::provider_exchange::exchange(&mut provider, &audited.transition)
-            .into_result()
+        let report = aivm_secrets_garrett_core::provider_exchange::exchange(
+            &mut provider,
+            &audited.transition,
+        );
+        if report.stage() == aivm_secrets_garrett_core::provider_exchange::Stage::Complete
+            && !effects
+                .borrow_mut()
+                .provider_completed(audited.transition.phase())
+        {
+            return Err(Error::InternalError);
+        }
+        report.into_result()
     }
 }
 
@@ -924,6 +1005,99 @@ fn manifest_response(mut reader: impl BufRead, format: &str) -> Outcome<Vec<u8>>
 mod wire_tests {
     use super::*;
 
+    #[test]
+    fn completion_snapshot_tracks_real_audit_and_late_denial() {
+        use std::os::unix::fs::OpenOptionsExt;
+        // Exercise the actual audit primitive and mutable request adapter,
+        // including an acknowledged completion followed by fresh denial.
+        for (audit_failed, late_denial) in [(false, false), (true, false), (false, true)] {
+            let path = std::env::temp_dir().join(format!(
+                "garrett-completion-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            let file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&path)
+                .unwrap();
+            struct Cleanup(std::path::PathBuf);
+            impl Drop for Cleanup {
+                fn drop(&mut self) {
+                    let _ = std::fs::remove_file(&self.0);
+                }
+            }
+            let _cleanup = Cleanup(path.clone());
+            let audit = Audit {
+                state: Mutex::new(AuditState {
+                    file,
+                    failed: audit_failed,
+                }),
+                grant: "synthetic-grant".into(),
+                policy: "synthetic-policy".into(),
+            };
+            let effects = Rc::new(RefCell::new(RequestEffects::new()));
+            assert!(effects.borrow_mut().begin_completion());
+            assert!(effects.borrow_mut().selected());
+            let checks = std::cell::Cell::new(0);
+            let fresh = || {
+                checks.set(checks.get() + 1);
+                if checks.get() == 2 {
+                    let bytes = std::fs::read(&path).unwrap();
+                    let row: Value = serde_json::from_slice(&bytes).unwrap();
+                    assert_eq!(row["event"], "completed");
+                    assert!(effects.borrow().completion().audit_acknowledged());
+                    if late_denial {
+                        return Err(Error::Revoked);
+                    }
+                }
+                Ok(())
+            };
+            let mut adapter = PendingRequest {
+                preflight: || Ok(None),
+                dispatch: |_: DispatchPhase, _: &Effect| Ok(Value::Null),
+                final_effect: |_: &Value| Ok(None),
+                complete: |reply| {
+                    read_transition::complete_current(PendingCompletion {
+                        reply,
+                        audit: &audit,
+                        operation: "synthetic.read",
+                        request_digest: "synthetic-request",
+                        fresh: &fresh,
+                        effects: effects.clone(),
+                    })
+                },
+                fresh: || Ok(()),
+                effects: effects.clone(),
+                snapshot: RequestEffects::new(),
+            };
+            let out = read_transition::Request::complete(&mut adapter, json!({"ok":true}));
+            let recorded = adapter.snapshot.completion();
+            assert!(recorded.selected() && recorded.before_checked() && recorded.audit_attempted());
+            assert_eq!(recorded.audit_acknowledged(), !audit_failed);
+            assert_eq!(recorded.after_checked(), !audit_failed && !late_denial);
+            assert_eq!(
+                adapter.snapshot.can_return_value(),
+                !audit_failed && !late_denial
+            );
+            if audit_failed {
+                assert!(matches!(out, Err(Error::InternalError)));
+                assert_eq!(checks.get(), 1);
+                assert!(std::fs::read(&path).unwrap().is_empty());
+            } else if late_denial {
+                assert!(matches!(out, Err(Error::Revoked)));
+                assert_eq!(checks.get(), 2);
+            } else {
+                assert_eq!(out.unwrap().into_public(), json!({"ok":true}));
+                assert_eq!(checks.get(), 2);
+            }
+        }
+    }
+
     struct PartialWriter {
         accepted: std::rc::Rc<std::cell::RefCell<Vec<u8>>>,
         limit: usize,
@@ -953,6 +1127,7 @@ mod wire_tests {
         flush_error: bool,
         current: guards::AdmissionStamp,
         send_state: aivm_secrets_garrett_core::provider_exchange::SendState,
+        effects: EffectsCell,
         parsed: bool,
     }
     impl aivm_secrets_garrett_core::provider_exchange::Provider for FaultProvider {
@@ -979,6 +1154,8 @@ mod wire_tests {
                 writer,
                 b"synthetic-request",
                 self.current.write(),
+                &self.effects,
+                DispatchPhase::Final,
             )
         }
         fn receive(&mut self, _writer: PartialWriter) -> Outcome<Value> {
@@ -1019,14 +1196,14 @@ mod wire_tests {
                 )
                 .ok()
                 .unwrap();
-                let audited = read_transition::acknowledge(
-                    read_transition::prepare(DispatchPhase::Final, write, write)
-                        .ok()
-                        .unwrap(),
-                    true,
-                )
-                .ok()
-                .unwrap();
+                let prepared = read_transition::prepare(DispatchPhase::Final, write, write)
+                    .ok()
+                    .unwrap();
+                let effects = Rc::new(RefCell::new(RequestEffects::new()));
+                assert!(effects.borrow_mut().begin_dispatch_audit(&prepared));
+                let audited = read_transition::acknowledge(prepared, true).ok().unwrap();
+                assert!(effects.borrow_mut().acknowledge_dispatch(&audited));
+                assert!(effects.borrow_mut().begin_provider(&audited));
                 let accepted = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
                 let mut provider = FaultProvider {
                     accepted: accepted.clone(),
@@ -1034,6 +1211,7 @@ mod wire_tests {
                     flush_error,
                     current,
                     send_state: provider_exchange::SendState::new(),
+                    effects: effects.clone(),
                     parsed: false,
                 };
                 let report = provider_exchange::exchange(&mut provider, &audited);
@@ -1059,7 +1237,9 @@ mod wire_tests {
                         &mut provider.send_state,
                         &mut retry,
                         b"synthetic-request",
-                        write
+                        write,
+                        &effects,
+                        DispatchPhase::Final,
                     ),
                     Err(Error::InternalError)
                 );

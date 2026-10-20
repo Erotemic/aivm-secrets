@@ -49,6 +49,19 @@ def mutate(repo, filename, before, after):
 
 
 @pytest.mark.parametrize('file,old,new', [
+    (RUST + 'custody/manifest_session.rs', 'begin_dispatch_audit(&self.transition)', 'unchecked_dispatch_audit(&self.transition)'),
+    (RUST + 'custody/manifest_session.rs', 'acknowledge_dispatch(&transition)', 'unchecked_dispatch_ack(&transition)'),
+    (RUST + 'custody/manifest_session.rs', 'begin_provider(&audited.transition)', 'unchecked_provider(&audited.transition)'),
+    (RUST + 'custody/manifest_session.rs', '.provider_completed(audited.transition.phase())', '.unchecked_provider_completed(audited.transition.phase())'),
+    (RUST + 'custody/manifest_session.rs', '.finish_dispatch(recorded.transition.phase())', '.unchecked_dispatch_finished(recorded.transition.phase())'),
+    (RUST + 'custody/manifest_session.rs', 'begin_completion_check(phase)', 'unchecked_completion_check(phase)'),
+    (RUST + 'custody/manifest_session.rs', 'finish_completion_check(phase)', 'unchecked_completion_checked(phase)'),
+    (RUST + 'custody/manifest_session.rs', 'begin_completion_audit()', 'unchecked_completion_audit()'),
+    (RUST + 'custody/manifest_session.rs', 'acknowledge_completion_audit()', 'unchecked_completion_ack()'),
+    (RUST + 'custody/manifest_session.rs', 'value_ready()', 'unchecked_value_ready()'),
+    (RUST + 'custody/manifest_session.rs', 'self.snapshot = *self.effects.borrow();', '// lost callback post-state'),
+    (RUST + 'custody/manifest_session.rs', 'if out.is_ok() && !self.snapshot.can_return_value()', 'if false'),
+
     ('rust/crates/aivm-secrets-garrett/src/host_control.rs', 'if peer.uid != rustix::process::geteuid() {', 'if false {'),
     ('rust/crates/aivm-secrets-garrett/src/custody/approval.rs', 'let now = host_time()?;', 'let now = 0;'),
     ('rust/crates/aivm-secrets-garrett/src/custody/approval.rs', 'self.active.store(false, Ordering::Release)', 'self.active.store(true, Ordering::Release)'),
@@ -64,7 +77,7 @@ def mutate(repo, filename, before, after):
      'if false && !aivm_secrets_garrett_core::coordinator_authority::operator_acknowledged('),
     (RUST + 'coordinator_authority/server.rs', 'discard_after_reply(&mut stream.sock);', 'let _ = &stream.sock;'),
     (RUST + 'custody/manifest_session.rs',
-     'if !state.begin_send(write) {', 'if false {'),
+     'if !effects.borrow_mut().begin_send(phase, state, write) {', 'if false {'),
     (RUST + 'custody/manifest_session.rs',
      'self.send_state.finish_check(stamp)', 'true'),
     (RUST + 'custody/manifest_session.rs',
@@ -119,8 +132,8 @@ def mutate(repo, filename, before, after):
     (RUST + 'custody/manifest_session.rs',
      'finish: || reservation_call(true),', 'finish: || Ok(()),'),
     (RUST + 'custody/manifest_session.rs',
-     '    fn audit(&self) -> Outcome<()> {\n        self.audit.write_record(&json!({\n            "schema":1,\n            "event":"completed",',
-     '    fn audit(&self) -> Outcome<()> {\n        unchecked_release(&json!({\n            "schema":1,\n            "event":"completed",'),
+     'self.audit.write_record(&json!({\n            "schema":1,\n            "event":"completed",',
+     'unchecked_release(&json!({\n            "schema":1,\n            "event":"completed",'),
     (RUST + 'custody/manifest_session.rs',
      'read_transition::run_current(pending).map(CompletedRelease::into_public)',
      'unchecked_reply(&pending)'),
@@ -165,7 +178,7 @@ def mutate(repo, filename, before, after):
     ),
     (
         RUST + 'custody/manifest_session.rs',
-        'provider_exchange::exchange(&mut provider, &audited.transition)',
+        'provider_exchange::exchange(\n            &mut provider,\n            &audited.transition,\n        )',
         'unchecked_exchange(&mut provider)',
     ),
     (
