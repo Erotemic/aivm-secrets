@@ -35,6 +35,20 @@ Sources of truth for technical detail remain the
 them; it does not silently change protocol formats, current policies, or
 already verified theorems.
 
+## Compositional native read-history slice, October 19
+
+The [sequential read correspondence increment](../garrett-composable-read-history.md)
+introduces one normal form for independently checked success, provider-failure,
+and audited-but-unsent native read observations. It checks complete sequential
+session/audit continuity rather than only per-request slices. The new
+`GarrettReadPrefixes.lean` theorem candidates state generic model-level
+admission soundness, blocked sends, arbitrary-length sequential trace
+soundness, and conditional W5 observation equivalence. Portable checks have
+passed; **Lean kernel compilation and the new real-Rust two-request session
+case are separate maintainer acceptance gates**. No production runtime or
+compiler-derived reachability claim changes; universal native-to-Lean
+simulation and TLS/audit adapter proof remain open.
+
 ## Native W6 audited-but-unsent read prefixes, October 19
 
 The [pending read boundary](../garrett-audited-unsent-read-prefix.md) adds

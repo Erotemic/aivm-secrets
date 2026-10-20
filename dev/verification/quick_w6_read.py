@@ -23,6 +23,8 @@ ROOT = Path(__file__).resolve().parents[2]
 PORTABLE = [
     'tests/test_w6_release_oracle.py',
     'tests/test_w6_history_oracle.py',
+    'tests/test_w6_composition.py',
+    'tests/test_w6_prefix_proof_scope.py',
     'tests/test_rust_w6_adapter.py::test_w6_reference_trace_oracle_rejects_bypass_and_leaks',
     'tests/test_rust_w6_adapter.py::test_w6_reference_oracle_rejects_header_smuggling_and_unselected_release',
     'tests/test_rust_w6_adapter.py::test_w6_arrival_oracle_rejects_reordered_or_postdated_dispatch_audit',
@@ -33,6 +35,7 @@ PORTABLE = [
 NATIVE = [
     'tests/test_rust_w6_adapter.py::test_w6_native_no_preflight_pagination_is_exact_selected_guest_release',
     'tests/test_rust_w6_adapter.py::test_w6_native_preflight_only_check_release_has_no_final_send',
+    'tests/test_rust_w6_adapter.py::test_w6_native_two_sequential_reads_refine_one_complete_session_audit',
     'tests/test_rust_w6_adapter.py::test_w6_audit_is_present_when_each_read_reaches_real_https_provider',
     'tests/test_rust_w6_adapter.py::test_w6_two_run_no_preflight_private_provider_mutation_is_invisible',
     'tests/test_rust_w6_adapter.py::test_w6_two_run_checked_only_private_fact_mutation_is_invisible',
@@ -108,13 +111,15 @@ def main() -> int:
                         help='Run only the new W4/W5 failed-read observations')
     parser.add_argument('--pending-only', action='store_true',
                         help='Run only audited-but-unsent read prefix witnesses')
+    parser.add_argument('--composition-only', action='store_true',
+                        help='Run only the generic sequential-read prefix tests')
     parser.add_argument('--lean', action='store_true',
                         help='Compile/axiom-audit only new read-path Lean proofs and imports')
     parser.add_argument('--build', action='store_true',
                         help='Incrementally rebuild native binaries before --native')
     args = parser.parse_args()
-    if args.failure_only and args.pending_only:
-        parser.error('--failure-only and --pending-only are mutually exclusive')
+    if sum((args.failure_only, args.pending_only, args.composition_only)) > 1:
+        parser.error('choose at most one --failure-only/--pending-only/--composition-only')
     if args.build and not args.native:
         parser.error('--build requires --native')
     env = dict(os.environ)
@@ -131,9 +136,11 @@ def main() -> int:
                     'dev/verification/w6_pending_boundary.py', 'check'], env)
         checked_run('w4-w5-read-shape-source', [sys.executable,
                     'dev/verification/read_paths.py', 'check'], env)
+        checked_run('w4-w5-read-prefix-source', [sys.executable,
+                    'dev/verification/read_prefixes.py', 'check'], env)
         if args.lean:
-            checked_run('focused-read-path-Lean', [sys.executable,
-                        'dev/verification/read_paths.py', 'prove'], env)
+            checked_run('focused-read-prefix-Lean', [sys.executable,
+                        'dev/verification/read_prefixes.py', 'prove'], env)
         if args.build:
             checked_run('incremental-native-build', [
                 'cargo', 'build', '--locked', '--manifest-path', 'rust/Cargo.toml',
@@ -141,10 +148,15 @@ def main() -> int:
             ], env)
         if args.native:
             require_native_paths(env)
-        portable = (PENDING_PORTABLE if args.pending_only else
+        portable = (['tests/test_w6_composition.py',
+                     'tests/test_w6_prefix_proof_scope.py'] if args.composition_only else
+                    PENDING_PORTABLE if args.pending_only else
                     FAILURE_PORTABLE if args.failure_only else
                     PORTABLE + FAILURE_PORTABLE + PENDING_PORTABLE)
-        native = (PENDING_NATIVE if args.pending_only else
+        native = ([
+                    'tests/test_rust_w6_adapter.py::test_w6_native_two_sequential_reads_refine_one_complete_session_audit'
+                  ] if args.composition_only else
+                  PENDING_NATIVE if args.pending_only else
                   FAILURE_NATIVE if args.failure_only else
                   NATIVE + FAILURE_NATIVE + PENDING_NATIVE)
         with tempfile.TemporaryDirectory(prefix='garrett-quick-w6-') as tmp:

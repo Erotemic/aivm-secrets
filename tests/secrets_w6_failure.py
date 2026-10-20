@@ -123,7 +123,12 @@ def checked_failure_witness(
     for phase in contract.phases:
         events.extend((f'audit:{phase}', f'provider-send:{phase}'))
     events.append(f'guest-denied:{contract.error_code}')
-    return FailureWitness(tuple(events), observed.frame, contract.error_code)
+    from tests.secrets_w6_composition import ReadContract, read_prefix
+    normal = read_prefix(observed, ReadContract(
+        'provider-denied', contract.phases, contract.phases, contract.error_code))
+    if normal.events != tuple(events):
+        raise TraceMismatch('failed-read interpreter does not refine normal form')
+    return FailureWitness(normal.events, observed.frame, contract.error_code)
 
 
 def assert_failed_reads_publicly_equivalent(

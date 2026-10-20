@@ -467,3 +467,42 @@ claims are made. Remaining risks include admission-to-syscall races, TLS
 record visibility and source-to-history simulation; source guards are not
 control-flow proofs. Kept production code and Lean unchanged to avoid
 forcing heavyweight builds for test-only assurance work.
+
+## 2026-10-19 20:19:00 -0400 — Garrett compositional read-history bridge
+
+Replaced separate case-specific W6 event strings with a shared, independently
+checked causal read-prefix normal form for releases, provider denials and
+audited-but-unsent outcomes. Added a sequential session witness that joins
+request-local approved provider/audit/frame observations against one complete
+real native audit history and exact provider-arrival snapshots. No inference
+from an audit row to a network send is allowed; the external W6 byte, host
+policy and projection oracles remain required.
+
+Added `GarrettReadPrefixes.lean` candidate theorems for the audited-but-unsent
+abstract case, extracted authorization admission for any modeled send, generic
+finite-history soundness, and conditional sequential read noninterference.
+The adapter-provided providerReached and auditOK facts are explicit unproved
+inputs, not claimed as Rust/I/O refinement. Fingerprinted proof scope and
+focused source/kernel gates were added.
+
+This sandbox has no Rust or Lean toolchains; no native or kernel pass is
+asserted. Portable fast-gate and mutation tests were run separately. The only
+new native case uses existing mTLS bridge binaries and two local synthetic
+provider reads. Remaining risk is native-to-abstract simulation and all
+external I/O/closure/clock assumptions. No runtime, dependencies, or wire
+protocols changed; no full or Charon tests were necessary here.
+
+## 2026-10-19 19:45:00 -0400 — Focused Lean read-prefix runner diagnostics
+
+- Investigated a silent child-process failure in `read_prefixes.py prove`
+  while compiling the earlier `GarrettReadPaths.lean` module. The exception
+  omitted return code and signal; no Lean diagnostic was available, so the
+  cause is **not established**.
+- Added a shared focused tool invocation helper that reports command, runtime,
+  exit code or POSIX termination signal, and available stdout/stderr. A killed
+  compiler now retains the explicit possibility of OOM *without* asserting it.
+- Changed the audited `GarrettReadPaths.lean` pass to emit its import `.olean`
+  directly; the new prefix check consumes that file instead of recompiling the
+  proof file. No proof statements or trusted axiom allowlists were changed.
+- Added portable failure-diagnostic and single-compilation regression tests.
+  Toolchain compilation is pending on the provisioned maintainer machine.

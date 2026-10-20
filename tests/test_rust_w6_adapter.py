@@ -341,6 +341,51 @@ def test_w6_audit_is_present_when_each_read_reaches_real_https_provider(tmp_path
                      raw_guest=True)
 
 
+def test_w6_native_two_sequential_reads_refine_one_complete_session_audit(tmp_path):
+    """Join checked request-local witnesses into one real native session history.
+
+    The HTTPS observer records the host audit at the moment each credentialed
+    request arrives; this detects audit rows inserted after a provider send or
+    carried forward from a later read. No Rust rebuild or external API needed.
+    """
+    from tests.secrets_w6_composition import ReadContract, read_prefix, sequential_history
+    arrivals = []
+    path = tmp_path / 'provider-audit.jsonl'
+    with TLSService(provider_directory(tmp_path), host='api.example.org',
+                    wire_headers=True,
+                    on_request=lambda _: arrivals.append(records(path))) as server:
+        server.routes[('GET', '/v1/tickets/7')] = {
+            'id': 7, 'internal': {'secret': 'NEVER_RELEASE_THIS'},
+        }
+        p = ticket_policy(tmp_path, server)
+        rules = ticket_disclosure()
+        operation, args = 'ticket.view', {'ticket': 7}
+        plan = effects(p, operation, args, None)
+        assert [phase for phase, _ in plan] == ['final']
+        with ManifestCase(tmp_path, server, p, rules, writes='deny') as case:
+            seen = []
+            for _ in range(2):
+                seen.append(trace_of(
+                    case, tmp_path, server, operation, args, plan,
+                    expected_result={'id': 7}, expected_meta=None,
+                    provider_arrivals=arrivals, raw_guest=True,
+                    check_digest=True, capture_observation=True,
+                ))
+            prefixes = [read_prefix(obs, ReadContract(
+                'released', ('final',), ('final',))) for obs in seen]
+            full = records(path)
+            session = sequential_history(
+                prefixes=prefixes, session_open_and_issued=full[:2],
+                complete_host_audit=full, provider_arrivals=arrivals,
+            )
+            assert session.events == (
+                'audit:final', 'provider-send:final', 'audit:completed', 'guest-released',
+                'audit:final', 'provider-send:final', 'audit:completed', 'guest-released',
+            )
+            assert session.frames[0] == session.frames[1]
+            assert len(server.seen()) == 2
+
+
 def test_w6_arrival_oracle_rejects_reordered_or_postdated_dispatch_audit():
     """Fail on temporal mutants even if the final provider/audit sets agree."""
     declared = dict(method='GET', target='/v1/allowed', accept='application/json', body=None)

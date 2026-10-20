@@ -107,6 +107,11 @@ def assert_publicly_equivalent(
             audit_at_provider=run.provider_arrivals,
             guest_frame=run.frame,
         )
+        # Once the independent policy/bytes oracle has accepted this run,
+        # put it into the same abstract causal language as failed and pending
+        # reads. This does not substitute for the preceding W6 verification.
+        from tests.secrets_w6_composition import ReadContract, read_prefix
+        read_prefix(run, ReadContract('released', tuple(phases), tuple(phases)))
 
     if left.frame != right.frame:
         raise TraceMismatch('guest-visible TLS frames differ despite agreed releases')

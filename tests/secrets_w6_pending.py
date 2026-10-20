@@ -181,7 +181,12 @@ def checked_pending_witness(*, observed: ReadObservation, contract: PendingContr
         if index < sent_length:
             events.append(f'provider-send:{phase}')
     events.append(f'guest-denied:{contract.public_code}')
-    return PendingWitness(tuple(events), observed.frame, digest)
+    from tests.secrets_w6_composition import ReadContract, read_prefix
+    normal = read_prefix(observed, ReadContract(
+        'pending-denied', contract.audited, contract.sent, contract.public_code))
+    if normal.events != tuple(events) or normal.request_digest != digest:
+        raise TraceMismatch('pending-read interpreter does not refine normal form')
+    return PendingWitness(normal.events, observed.frame, digest)
 
 
 def assert_pending_publicly_equivalent(*, left: ReadObservation, right: ReadObservation,
