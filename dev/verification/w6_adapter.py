@@ -114,7 +114,7 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
     release[1] = release[1].split('let pending = PendingRequest {', 1)[0]
     selected = 'self.disclosure.project(&op.name, &raw, &secret.0)?'
     checked = 'ensure_safe(&reply, &secret.0)?'
-    finished = 'read_transition::complete_current(PendingCompletion {'
+    finished = 'complete_pending('
     ensure(all(marker in release[1] for marker in (selected, checked, finished)) and
            release[1].index(selected) < release[1].index(checked) <
            release[1].index(finished),
@@ -123,7 +123,9 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
     ensure(len(completed) == 2 and
            'audit.write_record(' in completed[1].split('pub(crate) struct Session {', 1)[0] and
            completed[1].split('pub(crate) struct Session {', 1)[0].index('audit.write_record(') <
-               completed[1].split('pub(crate) struct Session {', 1)[0].index('Ok(CompletedRelease(self.reply))') and
+               completed[1].split('pub(crate) struct Session {', 1)[0].index('CompletedRelease(completed.into_value())') and
+           'completion::complete(pending, before)' in completed[1] and
+           '*effects.borrow_mut() = report.effects;' in completed[1] and
            'fresh: &fresh,' in release[1] and '(self.fresh)()' in completed[1] and
            'read_transition::run_current(pending).map(CompletedRelease::into_public)' in entry,
            'native success can reach guest without completion audit')

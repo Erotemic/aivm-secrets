@@ -42,8 +42,8 @@ def test_pending_source_guard_rejects_unreviewed_boundary_mutation(tmp_path, mut
     elif mutation == 'skip-audit-construction':
         source = source.replace('let recorded = prepared.audit(', 'let recorded = prepared.unchecked(')
     elif mutation == 'skip-completion-audit':
-        source = source.replace('read_transition::complete_current(PendingCompletion {',
-                                'unchecked_completion(PendingCompletion {')
+        source = source.replace('complete_pending(',
+                                'unchecked_completion(')
     elif mutation == 'scope-status-upgrade':
         scope['status'] = 'whole-service-formally-proved'
     elif mutation == 'scope-dropped-exclusion':

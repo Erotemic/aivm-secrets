@@ -50,3 +50,5 @@ global-exclude __pycache__ *.py[cod]
 include proofs/GarrettRequestEffects.lean proofs/GarrettRequestSimulation.lean
 recursive-include tests/native *.c
 include proofs/GarrettRequestPrefix.lean proofs/GarrettRequestTrace.lean
+
+include proofs/GarrettCompletion.lean proofs/GarrettCompletionSimulation.lean

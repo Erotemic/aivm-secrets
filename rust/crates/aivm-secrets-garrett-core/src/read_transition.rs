@@ -97,10 +97,10 @@ pub trait Completion {
     type Error;
     fn recheck(&mut self, phase: CompletionPhase) -> Result<(), Self::Error>;
     fn audit(&mut self) -> Result<(), Self::Error>;
-    fn release(self) -> Result<Self::Output, Self::Error>;
+    fn release(&mut self) -> Result<Self::Output, Self::Error>;
 }
 
-pub fn complete_current<C: Completion>(mut pending: C) -> Result<C::Output, C::Error> {
+pub fn complete_current<C: Completion>(pending: &mut C) -> Result<C::Output, C::Error> {
     match pending.recheck(CompletionPhase::BeforeAudit) {
         Ok(()) => (),
         Err(error) => return Err(error),
@@ -473,7 +473,7 @@ mod tests {
             self.step("audit")
         }
 
-        fn release(self) -> Result<Self::Output, Self::Error> {
+        fn release(&mut self) -> Result<Self::Output, Self::Error> {
             self.step("release")?;
             Ok("selected-reply")
         }
@@ -484,16 +484,16 @@ mod tests {
         let stages = ["before-audit", "audit", "before-release", "release"];
         for (index, stage) in stages.iter().enumerate() {
             let trace = std::cell::RefCell::new(Vec::new());
-            let pending = TestCompletion {
+            let mut pending = TestCompletion {
                 trace: &trace,
                 fault: Some(stage),
             };
-            assert_eq!(complete_current(pending), Err(*stage));
+            assert_eq!(complete_current(&mut pending), Err(*stage));
             assert_eq!(*trace.borrow(), stages[..=index]);
         }
         let trace = std::cell::RefCell::new(Vec::new());
         assert_eq!(
-            complete_current(TestCompletion {
+            complete_current(&mut TestCompletion {
                 trace: &trace,
                 fault: None
             }),

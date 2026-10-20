@@ -93,8 +93,10 @@ def check(root: Path = ROOT) -> dict:
             'current: &impl Fn() -> Outcome<guards::AdmissionStamp>' in exchange and
             'let fresh = || current().map(|_| ());' in fresh and '&current,' in request,
             'native provider may emit credentialed bytes without the last-admission gate')
-    require('impl read_transition::Completion for PendingCompletion' in source and
-            'read_transition::complete_current(PendingCompletion {' in request,
+    require('aivm_secrets_garrett_core::completion::Work' in source and
+            'completion::complete(pending, before)' in source and
+            '*effects.borrow_mut() = report.effects;' in source and
+            'complete_pending(' in request,
             'guest completion no longer requires the host audit boundary')
     return {'scope': manifest['scope'], 'profiles': len(EXPECTED_PROFILES),
             'excluded': len(EXPECTED_EXCLUSIONS),

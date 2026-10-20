@@ -79,14 +79,14 @@ theorem authorized_read_witness (phase : Phase) (operationWrite : Bool) :
 theorem denied_before_completion {P O E : Type} (ops : Completion P O E)
     (pending after : P) (error : E)
     (denied : ops.recheck pending .BeforeAudit = Result.ok (.Err error, after)) :
-    complete_current ops pending = Result.ok (.Err error) := by
+    complete_current ops pending = Result.ok (.Err error, after) := by
   simp [complete_current, denied]
 
 theorem completion_audit_refusal {P O E : Type} (ops : Completion P O E)
     (pending checked after : P) (error : E)
     (current : ops.recheck pending .BeforeAudit = Result.ok (.Ok (), checked))
     (refused : ops.audit checked = Result.ok (.Err error, after)) :
-    complete_current ops pending = Result.ok (.Err error) := by
+    complete_current ops pending = Result.ok (.Err error, after) := by
   simp [complete_current, current, refused]
 
 theorem revoked_after_completion_audit {P O E : Type} (ops : Completion P O E)
@@ -94,7 +94,7 @@ theorem revoked_after_completion_audit {P O E : Type} (ops : Completion P O E)
     (before : ops.recheck pending .BeforeAudit = Result.ok (.Ok (), checked))
     (ack : ops.audit checked = Result.ok (.Ok (), audited))
     (afterAudit : ops.recheck audited .BeforeRelease = Result.ok (.Err error, after)) :
-    complete_current ops pending = Result.ok (.Err error) := by
+    complete_current ops pending = Result.ok (.Err error, after) := by
   simp [complete_current, before, ack, afterAudit]
 
 theorem current_completion_continuation {P O E : Type} (ops : Completion P O E)
@@ -115,8 +115,8 @@ theorem completion_preservation {P O E : Type} (ops : Completion P O E)
     (afterAudit : ∀ audited, CurrentBefore → Audited →
       ops.recheck audited .BeforeRelease ⦃ pair => pair.1 = .Ok () → CurrentAfter ⦄)
     (release : ∀ current, CurrentBefore → Audited → CurrentAfter → ops.release current
-      ⦃ out => ∀ value, out = .Ok value → Released value ⦄) :
-    complete_current ops pending ⦃ out => ∀ value, out = .Ok value →
+      ⦃ pair => ∀ value, pair.1 = .Ok value → Released value ⦄) :
+    complete_current ops pending ⦃ pair => ∀ value, pair.1 = .Ok value →
       CurrentBefore ∧ Audited ∧ CurrentAfter ∧ Released value ⦄ := by
   unfold complete_current
   apply WP.spec_bind before
@@ -145,12 +145,12 @@ theorem completion_preservation {P O E : Type} (ops : Completion P O E)
         exact ⟨currentBefore, auditAck, currentAfter, released value success⟩
 
 theorem authorized_completion_witness {P O E : Type} (ops : Completion P O E)
-    (pending checked audited current : P) (value : O)
+    (pending checked audited current after : P) (value : O)
     (before : ops.recheck pending .BeforeAudit = Result.ok (.Ok (), checked))
     (ack : ops.audit checked = Result.ok (.Ok (), audited))
     (afterAudit : ops.recheck audited .BeforeRelease = Result.ok (.Ok (), current))
-    (released : ops.release current = Result.ok (.Ok value)) :
-    complete_current ops pending = Result.ok (.Ok value) := by
+    (released : ops.release current = Result.ok (.Ok value, after)) :
+    complete_current ops pending = Result.ok (.Ok value, after) := by
   rw [current_completion_continuation ops pending checked audited current before ack afterAudit, released]
 
 end aivm_secrets_garrett_core.read_transition.Proofs

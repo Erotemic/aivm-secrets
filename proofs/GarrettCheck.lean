@@ -1,3 +1,4 @@
+import GarrettCompletionSimulation
 import GarrettRequestTrace
 import GarrettRequestSimulation
 import GarrettProviderSimulation
@@ -593,3 +594,24 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.guest_frame.Proofs.prepared_send_exact
 #print axioms aivm_secrets_garrett_core.guest_frame.Proofs.failed_send_cannot_retry
 #print axioms aivm_secrets_garrett_core.guest_frame.Proofs.prepared_positive_witness
+
+#print axioms aivm_secrets_garrett_core.completion.Proofs.recheck_receipts
+#print axioms aivm_secrets_garrett_core.completion.Proofs.audit_receipts
+#print axioms aivm_secrets_garrett_core.completion.Proofs.release_receipts
+#print axioms aivm_secrets_garrett_core.completion.Proofs.current_receipts
+#print axioms aivm_secrets_garrett_core.completion.Proofs.selection_and_completion_receipts
+#print axioms aivm_secrets_garrett_core.completion.Proofs.complete_receipts
+#print axioms aivm_secrets_garrett_core.completion.Proofs.recheck_success_iff
+#print axioms aivm_secrets_garrett_core.completion.Proofs.recheck_refusal_prefix
+#print axioms aivm_secrets_garrett_core.completion.Proofs.audit_success_iff
+#print axioms aivm_secrets_garrett_core.completion.Proofs.audit_refusal_prefix
+#print axioms aivm_secrets_garrett_core.completion.Proofs.complete_success_primitives
+#print axioms aivm_secrets_garrett_core.completion.Proofs.complete_preserves_reachability
+#print axioms aivm_secrets_garrett_core.completion.Proofs.successful_completion_requires_actual_checks_and_audit
+#print axioms aivm_secrets_garrett_core.completion.Proofs.repeated_completion_calls_no_primitive
+#print axioms aivm_secrets_garrett_core.completion.Proofs.completion_positive_witness
+#print axioms aivm_secrets_garrett_core.completion.Proofs.returned_report_iff
+#print axioms aivm_secrets_garrett_core.completion.Simulation.linked_callback_receipts
+#print axioms aivm_secrets_garrett_core.completion.Simulation.request_contracts
+#print axioms aivm_secrets_garrett_core.completion.Simulation.linked_native_success_origin
+#print axioms aivm_secrets_garrett_core.completion.Simulation.request_entry_with_owned_completion

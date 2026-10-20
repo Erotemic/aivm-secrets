@@ -163,13 +163,17 @@ def review_semantics(contents: dict[str, str]) -> None:
     require('let policy_hash = self.policy.digest();' in reservation,
             'coordinated request no longer uses normalized policy identity')
     completed = part(m, 'struct CompletedRelease(Value);', 'pub(crate) struct Session {')
-    require(completed.count('Ok(CompletedRelease(self.reply))') == 1 and
-            same_order(completed, 'fn recheck(', '(self.fresh)()', 'fn audit(',
-                       'self.audit.write_record(', 'fn release(',
-                       'Ok(CompletedRelease(self.reply))', 'fn into_public('),
-            'completed guest release can be manufactured before the completion audit')
+    require(completed.count('CompletedRelease(completed.into_value())') == 1
+            and 'impl<S: FnMut() -> Outcome<Value>>' in completed
+            and same_order(completed, 'fn recheck(', '(self.fresh)()', 'fn audit(',
+                           'self.audit.write_record(', 'fn complete_pending<',
+                           'let before = *effects.borrow();',
+                           'completion::complete(pending, before)',
+                           '*effects.borrow_mut() = report.effects;',
+                           '.outcome', 'CompletedRelease(completed.into_value())'),
+            'completed guest release bypasses owned controller or actual audit')
     require(same_order(release, 'self.disclosure.project(', 'ensure_safe(&reply',
-                       'read_transition::complete_current(PendingCompletion {'),
+                       'complete_pending(', 'PendingCompletion {'),
             'guest release bypasses selected disclosure/reflection/completion')
     completion = part(transition, 'pub fn complete_current<', 'pub trait Request {')
     require(same_order(completion, 'pending.recheck(CompletionPhase::BeforeAudit)',
@@ -222,15 +226,21 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'Rc<RefCell<RequestEffects>>' in m
             and 'let effects = Rc::new(RefCell::new(RequestEffects::new()));' in request,
             'request-wide audit receipt is detached from the actual audit primitive')
-    require(same_order(completed, 'begin_completion_check(phase)', '(self.fresh)()',
-                       'finish_completion_check(phase)', 'begin_completion_audit()',
-                       'self.audit.write_record(', 'acknowledge_completion_audit()',
-                       '.value_ready()', 'Ok(CompletedRelease(self.reply))')
-            and same_order(release, 'begin_completion()', 'self.disclosure.project(',
-                           'ensure_safe(&reply', '.selected()',
-                           'read_transition::complete_current(PendingCompletion {')
-            and 'effects: effects.clone(),' in release,
-            'completion receipt bypasses selection, freshness or actual audit acknowledgment')
+    owned = contents['rust/crates/aivm-secrets-garrett-core/src/completion.rs']
+    owned_callbacks = part(owned, 'impl<W: Work> read_transition::Completion', 'fn select_and_complete<')
+    require(same_order(owned_callbacks, 'fn recheck(', 'begin_completion_check(phase)',
+                       'match self.work.recheck(phase)', 'finish_completion_check(phase)',
+                       'fn audit(', 'begin_completion_audit()', 'match self.work.audit()',
+                       'acknowledge_completion_audit()', 'fn release(', '.value_ready()',
+                       'self.value.take()', 'Completed { value }')
+            and same_order(owned, 'fn select_and_complete<', 'begin_completion()',
+                           'match pending.work.select()', 'pending.effects.selected()',
+                           'pending.value = Some(value);', 'read_transition::complete_current(pending)')
+            and same_order(owned, 'pub fn complete<', 'select_and_complete(&mut pending)',
+                           'Report {', 'outcome,', 'work: pending.work,', 'effects: pending.effects,')
+            and 'pub value:' not in owned
+            and 'effects: EffectsCell' not in completed.split('fn complete_pending<', 1)[0],
+            'completion receipt bypasses source-owned selection/check/audit/release gates')
     require(adapter.count('self.snapshot = *self.effects.borrow();') == 3
             and 'fn dispatch(&mut self,' in adapter and 'fn recheck(&mut self)' in adapter
             and 'fn complete(&mut self,' in adapter

@@ -491,3 +491,9 @@ The [outbound frame increment](../garrett-outbound-guest-frame.md) checks the ac
 encoder and single application-attempt gate. Its exact bounded bytes and returning
 writer-state contracts discharge that segment only; selected-value/canonical JSON,
 TLS/close and complete request/session observation correspondence remain open.
+
+The [owned completion adapter](../garrett-owned-completion.md) derives the
+completion receipt and success-gate contracts from actual extracted code under
+an explicit native report/copy-back/outcome link. Native instantiation of that
+link, dispatch/outer-check primitives, JSON/wire/history and complete sink closure
+remain required NR-2/3/4/5 work.

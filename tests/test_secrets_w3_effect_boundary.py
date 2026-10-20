@@ -49,6 +49,8 @@ def mutate(repo, filename, before, after):
 
 
 @pytest.mark.parametrize('file,old,new', [
+    (RUST + 'custody/manifest_session.rs', '*effects.borrow_mut() = report.effects;', '// lost completion error post-state'),
+    (RUST + 'custody/manifest_session.rs', 'completion::complete(pending, before)', 'unchecked_complete(pending, before)'),
     ('rust/crates/aivm-secrets-garrett-core/src/guest_frame.rs', 'if payload.len() >= limit', 'if false'),
     ('rust/crates/aivm-secrets-garrett-core/src/guest_frame.rs', "payload.push(b'\\n');", "payload.push(b'\\r');"),
     ('rust/crates/aivm-secrets-garrett-core/src/guest_frame.rs', 'line_frame::complete(&payload, b"", limit)', 'unchecked_complete(&payload, b"", limit)'),
@@ -60,11 +62,11 @@ def mutate(repo, filename, before, after):
     (RUST + 'custody/manifest_session.rs', 'begin_provider(&audited.transition)', 'unchecked_provider(&audited.transition)'),
     (RUST + 'custody/manifest_session.rs', '.provider_completed(audited.transition.phase())', '.unchecked_provider_completed(audited.transition.phase())'),
     (RUST + 'custody/manifest_session.rs', '.finish_dispatch(recorded.transition.phase())', '.unchecked_dispatch_finished(recorded.transition.phase())'),
-    (RUST + 'custody/manifest_session.rs', 'begin_completion_check(phase)', 'unchecked_completion_check(phase)'),
-    (RUST + 'custody/manifest_session.rs', 'finish_completion_check(phase)', 'unchecked_completion_checked(phase)'),
-    (RUST + 'custody/manifest_session.rs', 'begin_completion_audit()', 'unchecked_completion_audit()'),
-    (RUST + 'custody/manifest_session.rs', 'acknowledge_completion_audit()', 'unchecked_completion_ack()'),
-    (RUST + 'custody/manifest_session.rs', 'value_ready()', 'unchecked_value_ready()'),
+    ('rust/crates/aivm-secrets-garrett-core/src/completion.rs', 'begin_completion_check(phase)', 'unchecked_completion_check(phase)'),
+    ('rust/crates/aivm-secrets-garrett-core/src/completion.rs', 'finish_completion_check(phase)', 'unchecked_completion_checked(phase)'),
+    ('rust/crates/aivm-secrets-garrett-core/src/completion.rs', 'begin_completion_audit()', 'unchecked_completion_audit()'),
+    ('rust/crates/aivm-secrets-garrett-core/src/completion.rs', 'acknowledge_completion_audit()', 'unchecked_completion_ack()'),
+    ('rust/crates/aivm-secrets-garrett-core/src/completion.rs', 'value_ready()', 'unchecked_value_ready()'),
     (RUST + 'custody/manifest_session.rs', 'self.snapshot = *self.effects.borrow();', '// lost callback post-state'),
     (RUST + 'custody/manifest_session.rs', 'if out.is_ok() && !self.snapshot.can_return_value()', 'if false'),
 

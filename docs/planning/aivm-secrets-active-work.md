@@ -108,6 +108,15 @@ concurrent full run's one-second Python grant timing failure is retained;
 the unchanged isolated case and final clean-load full rerun pass. See the
 [outbound frame validation record](../../dev/validation/2026-10-20-guest-frame.json).
 
+**Owned completion update:** the [production completion adapter and request composition](../garrett-owned-completion.md)
+now establish receipt steps and the selection/check/audit/check origins from
+extracted code. Twenty obligations include exact returned error state, native
+report/outcome linkage and integration with the actual request entry; the prior
+whole-completion Steps/success-gate premises are derived under that linkage.
+Native link/primitive instantiation, dispatch, selected JSON/frame observations,
+connected adaptive histories and NR-2–NR-5 remain open. Final native acceptance
+is recorded separately from these scoped proofs.
+
 ## Goal and present assurance level
 
 Garrett should let an untrusted guest perform **useful, explicitly authorized**

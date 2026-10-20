@@ -85,33 +85,27 @@ impl<'a> PreparedDispatch<'a> {
 // passed the reflection check (at the call site) and completion has been
 // durably audited. This type does not itself prove response-byte refinement.
 struct CompletedRelease(Value);
-struct PendingCompletion<'a> {
-    reply: Value,
+struct PendingCompletion<'a, S> {
+    select: S,
     audit: &'a Audit,
     operation: &'a str,
     request_digest: &'a str,
     fresh: &'a dyn Fn() -> Outcome<()>,
-    effects: EffectsCell,
 }
-impl read_transition::Completion for PendingCompletion<'_> {
-    type Output = CompletedRelease;
+impl<S: FnMut() -> Outcome<Value>> aivm_secrets_garrett_core::completion::Work
+    for PendingCompletion<'_, S>
+{
+    type Output = Value;
     type Error = Error;
+    const INVALID_TRANSITION: Error = Error::InternalError;
 
-    fn recheck(&mut self, phase: read_transition::CompletionPhase) -> Outcome<()> {
-        if !self.effects.borrow_mut().begin_completion_check(phase) {
-            return Err(Error::InternalError);
-        }
-        (self.fresh)()?;
-        if !self.effects.borrow_mut().finish_completion_check(phase) {
-            return Err(Error::InternalError);
-        }
-        Ok(())
+    fn select(&mut self) -> Outcome<Value> {
+        (self.select)()
     }
-
+    fn recheck(&mut self, _phase: read_transition::CompletionPhase) -> Outcome<()> {
+        (self.fresh)()
+    }
     fn audit(&mut self) -> Outcome<()> {
-        if !self.effects.borrow_mut().begin_completion_audit() {
-            return Err(Error::InternalError);
-        }
         self.audit.write_record(&json!({
             "schema":1,
             "event":"completed",
@@ -119,19 +113,21 @@ impl read_transition::Completion for PendingCompletion<'_> {
             "grant":self.audit.grant,
             "policy":self.audit.policy,
             "request_digest":self.request_digest,
-        }))?;
-        if !self.effects.borrow_mut().acknowledge_completion_audit() {
-            return Err(Error::InternalError);
-        }
-        Ok(())
+        }))
     }
-
-    fn release(self) -> Outcome<CompletedRelease> {
-        if !self.effects.borrow_mut().value_ready() {
-            return Err(Error::InternalError);
-        }
-        Ok(CompletedRelease(self.reply))
-    }
+}
+fn complete_pending<S: FnMut() -> Outcome<Value>>(
+    pending: PendingCompletion<'_, S>,
+    effects: &EffectsCell,
+) -> Outcome<CompletedRelease> {
+    // This copy is owned by the extracted controller. Copy every returned
+    // state back, including selection, freshness and audit failures.
+    let before = *effects.borrow();
+    let report = aivm_secrets_garrett_core::completion::complete(pending, before);
+    *effects.borrow_mut() = report.effects;
+    report
+        .outcome
+        .map(|completed| CompletedRelease(completed.into_value()))
 }
 impl CompletedRelease {
     fn into_public(self) -> Value {
@@ -576,28 +572,27 @@ impl Session {
             out
         };
         let release = |raw: Value| -> Outcome<CompletedRelease> {
-            if !effects.borrow_mut().begin_completion() {
-                return Err(Error::InternalError);
-            }
-            self.require_control_active(host_time()?)?;
-            let meta = self.policy.pagination(op, &args, &raw)?;
-            let result = self.disclosure.project(&op.name, &raw, &secret.0)?;
-            let mut reply = json!({"version":1,"ok":true,"result":result});
-            if let Some(meta) = meta {
-                reply["meta"] = meta;
-            }
-            crate::manifest::disclosure::ensure_safe(&reply, &secret.0)?;
-            if !effects.borrow_mut().selected() {
-                return Err(Error::InternalError);
-            }
-            read_transition::complete_current(PendingCompletion {
-                reply,
-                audit: &self.base.executor.audit,
-                operation: &op.name,
-                request_digest: &request_hash,
-                fresh: &fresh,
-                effects: effects.clone(),
-            })
+            let select = || {
+                self.require_control_active(host_time()?)?;
+                let meta = self.policy.pagination(op, &args, &raw)?;
+                let result = self.disclosure.project(&op.name, &raw, &secret.0)?;
+                let mut reply = json!({"version":1,"ok":true,"result":result});
+                if let Some(meta) = meta {
+                    reply["meta"] = meta;
+                }
+                crate::manifest::disclosure::ensure_safe(&reply, &secret.0)?;
+                Ok(reply)
+            };
+            complete_pending(
+                PendingCompletion {
+                    select,
+                    audit: &self.base.executor.audit,
+                    operation: &op.name,
+                    request_digest: &request_hash,
+                    fresh: &fresh,
+                },
+                &effects,
+            )
         };
         let pending = PendingRequest {
             preflight: || self.policy.preflight(op, &args),
@@ -1010,7 +1005,12 @@ mod wire_tests {
         use std::os::unix::fs::OpenOptionsExt;
         // Exercise the actual audit primitive and mutable request adapter,
         // including an acknowledged completion followed by fresh denial.
-        for (audit_failed, late_denial) in [(false, false), (true, false), (false, true)] {
+        for (selection_failed, audit_failed, late_denial) in [
+            (true, false, false),
+            (false, false, false),
+            (false, true, false),
+            (false, false, true),
+        ] {
             let path = std::env::temp_dir().join(format!(
                 "garrett-completion-{}-{}",
                 std::process::id(),
@@ -1041,8 +1041,6 @@ mod wire_tests {
                 policy: "synthetic-policy".into(),
             };
             let effects = Rc::new(RefCell::new(RequestEffects::new()));
-            assert!(effects.borrow_mut().begin_completion());
-            assert!(effects.borrow_mut().selected());
             let checks = std::cell::Cell::new(0);
             let fresh = || {
                 checks.set(checks.get() + 1);
@@ -1050,7 +1048,6 @@ mod wire_tests {
                     let bytes = std::fs::read(&path).unwrap();
                     let row: Value = serde_json::from_slice(&bytes).unwrap();
                     assert_eq!(row["event"], "completed");
-                    assert!(effects.borrow().completion().audit_acknowledged());
                     if late_denial {
                         return Err(Error::Revoked);
                     }
@@ -1061,15 +1058,23 @@ mod wire_tests {
                 preflight: || Ok(None),
                 dispatch: |_: DispatchPhase, _: &Effect| Ok(Value::Null),
                 final_effect: |_: &Value| Ok(None),
-                complete: |reply| {
-                    read_transition::complete_current(PendingCompletion {
-                        reply,
-                        audit: &audit,
-                        operation: "synthetic.read",
-                        request_digest: "synthetic-request",
-                        fresh: &fresh,
-                        effects: effects.clone(),
-                    })
+                complete: |reply: Value| {
+                    complete_pending(
+                        PendingCompletion {
+                            select: || {
+                                if selection_failed {
+                                    Err(Error::Denied)
+                                } else {
+                                    Ok(reply.clone())
+                                }
+                            },
+                            audit: &audit,
+                            operation: "synthetic.read",
+                            request_digest: "synthetic-request",
+                            fresh: &fresh,
+                        },
+                        &effects,
+                    )
                 },
                 fresh: || Ok(()),
                 effects: effects.clone(),
@@ -1077,14 +1082,29 @@ mod wire_tests {
             };
             let out = read_transition::Request::complete(&mut adapter, json!({"ok":true}));
             let recorded = adapter.snapshot.completion();
-            assert!(recorded.selected() && recorded.before_checked() && recorded.audit_attempted());
-            assert_eq!(recorded.audit_acknowledged(), !audit_failed);
-            assert_eq!(recorded.after_checked(), !audit_failed && !late_denial);
+            assert_eq!(recorded.selected(), !selection_failed);
+            assert_eq!(recorded.before_checked(), !selection_failed);
+            assert_eq!(recorded.audit_attempted(), !selection_failed);
+            assert_eq!(
+                recorded.audit_acknowledged(),
+                !selection_failed && !audit_failed
+            );
+            assert_eq!(
+                recorded.after_checked(),
+                !selection_failed && !audit_failed && !late_denial
+            );
             assert_eq!(
                 adapter.snapshot.can_return_value(),
-                !audit_failed && !late_denial
+                !selection_failed && !audit_failed && !late_denial
             );
-            if audit_failed {
+            if selection_failed {
+                assert!(matches!(out, Err(Error::Denied)));
+                assert_eq!(checks.get(), 0);
+                assert!(std::fs::read(&path).unwrap().is_empty());
+                // An all-false flag record still retains the attempted
+                // selection progress; losing copy-back would reopen it.
+                assert!(!effects.borrow_mut().begin_completion());
+            } else if audit_failed {
                 assert!(matches!(out, Err(Error::InternalError)));
                 assert_eq!(checks.get(), 1);
                 assert!(std::fs::read(&path).unwrap().is_empty());

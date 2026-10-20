@@ -116,7 +116,7 @@ def test_w6_completion_audit_is_required_before_native_public_success(tmp_path):
     checkout = fixture_checkout(tmp_path)
     path = checkout / SOURCE
     original = path.read_text()
-    marker = 'read_transition::complete_current(PendingCompletion {'
+    marker = 'complete_pending('
     assert marker in original
     path.write_text(original.replace(marker, 'unchecked_release(', 1))
     with pytest.raises(ContractError, match='selected/reflection-checked release'):
