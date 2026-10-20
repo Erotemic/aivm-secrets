@@ -19,26 +19,47 @@
     "non_committing_work": "requires_reconcile",
     "compaction_usage": "measured_signals_only_when_runtime_omits_usage"
   },
-  "through": null,
-  "ledger_rows": 0,
-  "commits_accounted": 0,
-  "turns": 0,
+  "through": "2026-10-20T15:56:53.358470+00:00",
+  "ledger_rows": 2,
+  "commits_accounted": 2,
+  "turns": 92,
   "tokens": {
-    "input": 0,
+    "input": 242424,
     "cache_write": 0,
-    "cache_read": 0,
-    "output": 0,
-    "billable_input": 0
+    "cache_read": 14258176,
+    "output": 71675,
+    "billable_input": 14500600
   },
-  "by_model": {},
-  "by_activity": {},
-  "by_agent": {},
+  "by_model": {
+    "gpt-6.1-sol": {
+      "input": 242424,
+      "cache_write": 0,
+      "cache_read": 14258176,
+      "output": 71675
+    }
+  },
+  "by_activity": {
+    "unlabeled": {
+      "input": 242424,
+      "cache_write": 0,
+      "cache_read": 14258176,
+      "output": 71675
+    }
+  },
+  "by_agent": {
+    "codex": {
+      "input": 242424,
+      "cache_write": 0,
+      "cache_read": 14258176,
+      "output": 71675
+    }
+  },
   "server_tool_calls": {
     "web_search": 0,
     "web_fetch": 0
   },
   "time": {
-    "wall_clock_s": 0.0
+    "wall_clock_s": 1958.9
   },
   "compaction_signals": {
     "events": 0,
