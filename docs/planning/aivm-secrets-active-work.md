@@ -58,6 +58,10 @@ submissions. Thirty focused obligations cover returned callback/channel states,
 W4 provider-event extension under explicit local primitive contracts and binding
 preservation. This advances one NR-2 component; native primitive/I/O contract
 instantiation, full request/history simulation and NR-3/4/5 remain open.
+Source `e2cd788` passes 3,005 full-suite cases without skips, 463 named axiom
+checks, six targeted source-extracted mutants, both native product modes,
+packaging with all 259 manifest inputs intact and six installed-vTPM cases.
+See the [provider validation record](../../dev/validation/2026-10-20-provider-exchange.json).
 
 ## Goal and present assurance level
 

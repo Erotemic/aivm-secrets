@@ -2189,3 +2189,39 @@ scoped source/control results and finite observations. Primitive I/O
 instantiation, non-returning/drop prefixes, full request/guest-release and
 connected-history simulation, NR-3/4/5 and W7/W8 remain open. Exact GPT-6
 weights/configuration variant is unavailable.
+
+## 2026-10-20 14:32:17 -0400
+
+Provider continuation source `e2cd788` now passes complete local acceptance
+for its listed scope: 3,005 full-suite cases without skips, wheel/sdist build
+and identical bytes for all 259 pinned inputs in the sdist. Full verification
+checked 463 named obligations and 761 native/parity cases. The focused
+provider verifier independently regenerated the source, compiled all 30
+named results and accepted only the existing allowed axioms. Six selected
+mutants (of 206 available) failed semantic proof obligations, including
+ignored raw callback invocations; resource or infrastructure failure was
+not counted as rejection. The scoped W4/W5 read/prefix proofs also passed.
+
+Native read acceptance has 158 passing cases in each build mode. The
+ordinary release run used the correct explicit release BINARIES paths,
+because quick_w6_read itself installs debug paths. Both independent native
+operator/guest workflows passed. All 67 workspace tests, 26 core and 31
+native-library cases passed, including the actual guarded partial-write and
+duplicate-submission primitive. The six installed-vTPM cases preserved the
+existing public objects and dictionary counters, with no shared-device
+wrong-auth, reset, global flush or ACL changes. Packaging ran only after
+the full suite to avoid competing setuptools staging. Runtime/proof source
+contents remained fixed at the committed version during acceptance.
+
+The new receipt is supporting evidence for this production component,
+not another NR-0 campaign or a full native I/O theorem. Next work remains
+stateful request-level effect composition: native primitive contract
+instantiation, all phase/audit/refusal/disclosure/completion/late-denial
+paths, guest-frame effects and connected sequential histories. The outer
+request adapter still has a separate extensional callback boundary. The
+provider's concrete send-state projection fixes the earlier impossible
+shallow-state observer, but it does not close those other paths or
+transitive dependency/drop effects. NR-2/3/4/5 and live/deployment review
+remain open. Confidence is high in the checked component and finite native
+observations, conditional on their named assumptions; exact GPT-6
+weights/configuration variant is unavailable.

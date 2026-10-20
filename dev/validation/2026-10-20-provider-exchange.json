@@ -1,0 +1,176 @@
+{
+  "schema": 1,
+  "status": "passed-for-listed-scopes",
+  "scope": "Production mutable provider driver, sampled admission stamps and native single-submission Write guard; conditional W4 provider-event extension under local contracts, not full native I/O correspondence",
+  "recorded_at": "2026-10-20T14:31:41.075084-04:00",
+  "source_commit": "e2cd78880889624e8e35f5ea8f94875f54971027",
+  "source_dirty": false,
+  "validation_source_mode": "Committed implementation; later changes append acceptance documentation and journal only.",
+  "source_sha256": {
+    "rust/crates/aivm-secrets-garrett-core/src/read_transition.rs": "8d327adecd1d903d0bb64d026fa50a6d13e7c3ec219a8ed0dd20ece6c57a9726",
+    "rust/crates/aivm-secrets-garrett-core/src/provider_exchange.rs": "05d8446b08c73905e0ceedfa34e53a2528b62e519a3c5a6d5a5c76e10ce503f7",
+    "rust/crates/aivm-secrets-garrett-core/src/manifest.rs": "872439b9ff63b374a300959b28fd8330e1cd19b0e3a2245a59441ee8f3fbb17a",
+    "rust/crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs": "04569885859a79388d748776ab2708946fb6c2ba75905ac060920c815d137624",
+    "rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs": "c250a7393d0cebf738c055850cd283b9dbab310f9d17ff807fa6b1fee4336693",
+    "proofs/generated/AivmSecretsGarrettCore.lean": "6f60c4b8550aae552a3d9b7f78caaf9514fd4ef9176e9f6b8b355b6ebf61b991",
+    "proofs/GarrettReadTransition.lean": "2216b837d9f03562c99700e16c5466c7aae154704bf24b1ca2aca0244c64a277",
+    "proofs/GarrettReadInvocations.lean": "7b4630df907c7dadd50f27a3cd8ff7d2ad700ed5a22351d73b02e280a97fe4e6",
+    "proofs/GarrettProviderExchange.lean": "cfa48f19debc03d3f709cff8b48d761ab32529463ffb99bf2c15164478b5aac4",
+    "proofs/GarrettProviderSimulation.lean": "8a7a638435533e39fda351d59d81fa422562fc8ab2a7aac8eaae7d434b299738",
+    "proofs/GarrettConfinement.lean": "709165a932ecab0d517080b4f36650a1f611db9db0f6ecca0905cec8ed718ad1",
+    "proofs/GarrettCheck.lean": "a603b7ce772821725489d0b442d36d7d06603e80d91c9624e1a5344fecdf3c92",
+    "proofs/manifest.json": "8e4332da43371ef0417554b00def4075768ee9cac5d0ef2e9cccb262fbd3ddeb",
+    "proofs/garrett-manifest.json": "c297ea77013a877f52939143dd2929760c2be1613c38bb0a5eb94bf12e81e2a9",
+    "proofs/lakefile.lean": "1bb303515bf88b8c7833607c80a0ea53e4b078a597ff1402fb67a94153c9a5aa",
+    "dev/verification/provider_exchange.py": "a873b5d18d7dd4e5c7e3607051911d6f881764193c334a320dac3f7bb00bfc42",
+    "dev/verification/read_transition.py": "a74292b6c7f4ece2922abb2f8426415f965d1d24a6ad5fd8897dd79d37a79251",
+    "dev/verification/garrett.py": "08985df309a3fa0b198d2b47a883e5e6afe67fd90c0969b29a9601f9a3d80b39",
+    "dev/verification/w3_effect_boundary.py": "eceb12b537c24195304d69fd149c5ba23f5e8616af7597a2a140610290724eff",
+    "dev/verification/w6_adapter.py": "b446fc9b48f8496122f9e3478fb9230c3fee957423fcffa12357aae5854ffc19",
+    "tests/test_secrets_w3_effect_boundary.py": "e83a8a2f99f52ccfadd6e03491512d607af0d5979d225d4d279d4505f0295f47"
+  },
+  "binary_sha256": {
+    "debug/garrett-bridge": "eaad3fa93767f10d5dc7bcd13072d81e27163e1d3eaa51f1d80dd5b775974c1c",
+    "debug/garrett-client": "49d638f46de9bfd29db463e307507467c8420757329371007fc0ce48efeeb09f",
+    "debug/garrett-authority": "765fb2e6ca39be9f97b2c2716792682734304178088fc8a6e9bee9a4232831e0",
+    "release/garrett-bridge": "f30afb75ac9a4c148670fb0aac27de69d07aca513dc5254b8de12666e39f75e3",
+    "release/garrett-client": "ba17947816d76e6a8a814d6e038a4c9d4347b383352ead43347db24c1abd9592",
+    "release/garrett-authority": "1a602077c75139e01b3a9fc16530bfd2acf99e70275b05a0aed155b70c6c744c"
+  },
+  "binary_profiles": {
+    "debug": "conformance,coordinator-server",
+    "release": "no-default-features,coordinator-server; all-feature parity passed before this ordinary rebuild"
+  },
+  "commands": {
+    "kernel": ".venv/bin/python dev/verification/provider_exchange.py",
+    "record": ".venv/bin/python dev/verification/garrett.py record",
+    "mutants": "PYTHONPATH=dev/verification .venv/bin/python -c \"import garrett; garrett.mutate('^provider (driver|native gate|current stamp)')\"",
+    "rust": "cargo test --locked --manifest-path rust/Cargo.toml --workspace --features conformance,coordinator-server",
+    "full": ".venv/bin/python -m pytest -q --junitxml=/tmp/garrett-provider-full.xml",
+    "read-path-prefix": ".venv/bin/python dev/verification/read_prefixes.py prove",
+    "native-read-debug": ".venv/bin/python dev/verification/quick_w6_read.py --native",
+    "native-read-ordinary": "Equivalent quick_w6_read PORTABLE + FAILURE_PORTABLE + PENDING_PORTABLE + NATIVE + FAILURE_NATIVE + PENDING_NATIVE pytest selection; three BINARIES variables explicitly select fresh release binaries; JUnit checked for skips.",
+    "native-product": ".venv/bin/python dev/offline_native_guest.py [--bin-dir rust/target/release]",
+    "ordinary-build": "cargo build --locked --release --manifest-path rust/Cargo.toml --bins --no-default-features --features coordinator-server",
+    "device": "sudo -n .venv/bin/python dev/verification/tpm_device.py --device /dev/tpmrm0",
+    "packaging": ".venv/bin/python -m build"
+  },
+  "environment": {
+    "full-suite": "garrett.RUNNERS and primitives/freshness runners select debug binaries; AIVM_SECRETS_REQUIRE_TPM_TESTS=1; device override removed, so negative authorization tests use isolated emulators.",
+    "record": "Release/all-features runners, required isolated-emulator TPM cases.",
+    "device": "Only the explicit device witness uses sudo. No ACL, hierarchy, dictionary settings, broad flush or wrong-auth operation changed shared device state."
+  },
+  "results": {
+    "full-python-native": {
+      "passed": 3005,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 551.47
+    },
+    "garrett-native-parity-cases": 761,
+    "named-garrett-axiom-audits": 463,
+    "provider-stamp-send-state-obligations": 30,
+    "targeted-rust-mutants-rejected": 6,
+    "mutation-campaign-scope": "6 selected of 206; not the complete campaign",
+    "rust-workspace-cases": 67,
+    "rust-core-cases": 26,
+    "source-guard-cases": 92,
+    "portable-read-cases": 142,
+    "native-read-debug-cases": 158,
+    "native-read-ordinary-cases": 158,
+    "read-path-obligations": 8,
+    "read-prefix-obligations": 5,
+    "native-product-both-modes": "passed",
+    "installed-device": {
+      "schema": 1,
+      "scope": "native-tpm-device-synthetic-workflow",
+      "status": "passed",
+      "device": "/dev/tpmrm0",
+      "tests": 6,
+      "existing_public_sha256": {
+        "0x81010001": "be2b11e4ebd8b35f5162b38ca6ad11768b56fefacb35246b557c62a53e037f61",
+        "0x81010016": "406374dd1cbdb93c570e35680917282ca93c414da572a920694c44827642531c"
+      },
+      "dictionary_attack_state_preserved": true,
+      "persistent_objects_preserved": true,
+      "fixture_handles_cleaned": true
+    },
+    "packaging": {
+      "status": "passed",
+      "source_archive": "aivm_secrets-0.2.0.tar.gz",
+      "manifest_inputs_identical": 259
+    }
+  },
+  "findings": [
+    "A concrete native SendState records checked and attempted state. A shallow unchanged adapter alone could not support a growing observation projection; the local ready predicate also avoids treating rejected duplicate submissions as new attempts.",
+    "Actual guarded Write helper tests cover zero-byte failure, partial acceptance, flush failure and a rejected second submission. Returned send/parser errors for writes remain OutcomeUnknown.",
+    "Thirty regenerated stamp/driver/send-state/simulation obligations pass the named axiom audit. Six freshly extracted Rust mutants are rejected, including ignored repeated raw calls and stamp construction without authorization.",
+    "AdmissionStamp avoids shadowing the older Lean Current predicate. A Boolean simp loop was fixed by case reduction and direct equality symmetry without weakening the theorem or raising kernel resource limits.",
+    "The ordinary release gate uses the same pytest selection with explicit correct release BINARIES paths; the quick runner itself deliberately installs debug paths."
+  ],
+  "next-acceptance": "NR-2: instantiate native primitive/effect contracts and compose the staged provider with audit refusal, all complete request shapes, disclosure, completion/late-denial/guest-frame effects and connected session histories.",
+  "remaining-obligations": [
+    "Conditional callback contracts concern a projected provider-attempt trace. Native marks-to-Write correspondence, std/rustls/context conversion, transitive effects and other sinks are not proved merely from result/state equality.",
+    "Non-returning, panic, drop/unwind, timeout and partial network delivery prefixes remain external obligations; a mark is not successful provider arrival.",
+    "The same runtime target still needs complete request/history simulation, NR-3 sink/dependency closure, NR-4 actual/adaptive observations and NR-5 independent review.",
+    "Real providers, deployed guest/host compartments and physical TPM provenance are not established by VM/synthetic acceptance."
+  ],
+  "log_sha256": {
+    "kernel-fresh": {
+      "path": "/tmp/garrett-provider-kernel-fresh.log",
+      "sha256": "caa78a565396798c8dee8be8e66ee40cd0f51f2b84eee19633f038f5f82bc43c"
+    },
+    "record": {
+      "path": "/tmp/garrett-provider-record.log",
+      "sha256": "0395165038fd5309ccac9e68d0abb101824321d41477b1ab567d2108c2736b42"
+    },
+    "mutants": {
+      "path": "/tmp/garrett-provider-mutants.log",
+      "sha256": "b928f6832273515174c4965f4b44e0f7e60a2648d54d8a5f25862fa39014dcc9"
+    },
+    "workspace": {
+      "path": "/tmp/garrett-provider-workspace.log",
+      "sha256": "70afb82e00979e166a1b3f24c6ee0919af478f3c0b33045790872b98574e2627"
+    },
+    "portable": {
+      "path": "/tmp/garrett-provider-portable.log",
+      "sha256": "f5c82855e4f0897ebae2991ffcc3f757d949647d0d7c4c23a17c945c93ca23e0"
+    },
+    "source-tests": {
+      "path": "/tmp/garrett-provider-source-tests.log",
+      "sha256": "f1f652d7de78595d9e53acde58a71312cc6903ec7bbdcc35b6fd0f6374ff544b"
+    },
+    "native-debug": {
+      "path": "/tmp/garrett-provider-native-debug.log",
+      "sha256": "b54fb42dcac8a0989e8fb346f8e5650c97d8223d6cc581d9ca50b43d622259de"
+    },
+    "native-ordinary": {
+      "path": "/tmp/garrett-provider-native-ordinary.log",
+      "sha256": "b6176a74cdb2cca5988dec9397edd0772c20ea34b03a4e3b2aea337827391454"
+    },
+    "product-debug": {
+      "path": "/tmp/garrett-provider-product-debug.log",
+      "sha256": "07dbbfe5ee30aa500aa129ff377dc47249297e1651502e6612b102e7ead504e1"
+    },
+    "product-ordinary": {
+      "path": "/tmp/garrett-provider-product-ordinary.log",
+      "sha256": "07dbbfe5ee30aa500aa129ff377dc47249297e1651502e6612b102e7ead504e1"
+    },
+    "device": {
+      "path": "/tmp/garrett-provider-device.log",
+      "sha256": "d9be4d5e22331f10d834e6b93f036bdbdaa4759e15d0363dfe1b50d309018269"
+    },
+    "prefix-proofs": {
+      "path": "/tmp/garrett-provider-prefix-proofs.log",
+      "sha256": "86c9f6a1a141c6bb3b6ca42714d1726d88fc2fccddb89138d5012b9ffca8c0a1"
+    },
+    "full": {
+      "path": "/tmp/garrett-provider-full.log",
+      "sha256": "1db2c77ac8845d14c86e8e358aa5979f4207f1699d961127ddc5a2de908b427d"
+    },
+    "build": {
+      "path": "/tmp/garrett-provider-build.log",
+      "sha256": "7daef0bb12cbc63e88f89e8ae8a9c82d3f2ecc1c175dd4c67b724cba351696b7"
+    }
+  }
+}

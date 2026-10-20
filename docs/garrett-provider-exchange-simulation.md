@@ -118,3 +118,10 @@ to pass; source guards and theorem-name inventories cannot substitute for them.
 
 These limits retain the original restricted read-only/sequential target. They
 do not establish whole-service secrecy, physical TPM provenance or VM isolation.
+
+The [validation record](../dev/validation/2026-10-20-provider-exchange.json)
+freezes source `e2cd788`: 3,005 full-suite cases without skips, 463 named
+Garrett axiom audits, all 30 focused provider obligations after regeneration,
+six selected mutants rejected, both native product build modes, six safe
+installed-device cases and identical archive bytes for all 259 source pins.
+This validates only the listed scopes and assumptions above.
