@@ -45,6 +45,10 @@ exact receipt states and the production entry's success characterization.
 NR-2 remains open: accepted wrapper prefixes still need the actual native
 adapter/effect relation and W4/W5 event simulation. In particular, the wrapper's
 raw callback internals retain an explicit source-review boundary.
+Source `11e0a5a` passes 3,003 full-suite cases without skips, 433 named axiom
+checks, eight targeted re-extracted mutants, both native product modes,
+packaging with all 254 manifest inputs intact and six installed-vTPM cases.
+See the [invocation validation record](../../dev/validation/2026-10-20-request-invocations.json).
 
 ## Goal and present assurance level
 

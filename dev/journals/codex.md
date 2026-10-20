@@ -2110,3 +2110,29 @@ NR-3/4/5 and W7/W8 remain open. Confidence is high in the checked source-level
 progression and sampled workflows, conditional on the documented extraction,
 compiler and external adapter assumptions; there is no new whole-service or
 VM isolation claim. Exact GPT-6 weights/configuration variant is unavailable.
+
+## 2026-10-20 13:30:41 -0400
+
+Source `11e0a5a` now has complete acceptance for this increment: 3,003
+full-suite tests, zero skips, build success and identical sdist bytes for all
+254 Garrett manifest inputs. The fresh full proof/native record checked 433
+named obligations and 761 parity/native cases. All eight selected mutations
+(of 200 available) were rejected after regeneration; the nested-module copy
+fix and invocation-proof dependency order were exercised by that run. Both
+conformance debug and ordinary release passed the 158-case read selection
+and the standalone native operator/guest witness. The six installed-device
+cases preserved the existing public objects and DA counters. The current
+native source matched the committed source throughout full acceptance.
+
+The quick gate deliberately overrides runner paths with debug executables.
+My first attempt to select ordinary release through environment variables
+therefore supplied no ordinary-build evidence. Re-ran the identical pytest
+selection with the correct explicit release variables and checked its JUnit
+for skips; that separate passing run is the recorded ordinary acceptance.
+Packaging ran after the full suite, avoiding the earlier staging-directory
+overlap. The new receipt is separate from the older frozen source records.
+Remaining risk/uncertainty is still the raw callback/native effect relation,
+not the checked consuming gate. NR-2 through NR-5 and W7/W8 remain open.
+Independent maintainer security review and real deployment/provider checks
+are not replaced by these tests. Confidence remains scoped to the precise
+assumptions and sources in the receipt; no whole-service claim is made.

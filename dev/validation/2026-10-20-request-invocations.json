@@ -1,0 +1,168 @@
+{
+  "schema": 1,
+  "status": "passed-for-listed-scopes",
+  "scope": "Production mutable request invocation enforcement and extracted exact-state/consuming-gate proofs; raw callback and native I/O simulation remain open",
+  "recorded_at": "2026-10-20T13:30:07.942378-04:00",
+  "source_commit": "11e0a5a14a659fd03ca99f0b34b55cbc91fc3956",
+  "source_dirty": false,
+  "validation_source_mode": "Committed implementation; later changes append acceptance documentation and journal only.",
+  "source_sha256": {
+    "rust/crates/aivm-secrets-garrett-core/src/read_transition.rs": "8d327adecd1d903d0bb64d026fa50a6d13e7c3ec219a8ed0dd20ece6c57a9726",
+    "rust/crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs": "04569885859a79388d748776ab2708946fb6c2ba75905ac060920c815d137624",
+    "rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs": "c6fcc15c1909329b941c157afffad47a76ae1739c4f22faab1697e2a1b00fba0",
+    "proofs/generated/AivmSecretsGarrettCore.lean": "9f51755f6871360567121eedfe009d919d91467a9542cac284c787b1a08b1a5a",
+    "proofs/GarrettReadTransition.lean": "2216b837d9f03562c99700e16c5466c7aae154704bf24b1ca2aca0244c64a277",
+    "proofs/GarrettReadInvocations.lean": "7b4630df907c7dadd50f27a3cd8ff7d2ad700ed5a22351d73b02e280a97fe4e6",
+    "proofs/GarrettCheck.lean": "3550448de975507b02453fc23be3e86bc9f5ee2913cb32da666823b618d4bd0e",
+    "proofs/manifest.json": "4e92899d933c446463ac2346ac41473b3b51aef1252adac6d0aca3ebff5d0361",
+    "proofs/garrett-manifest.json": "85a938c8b6922e4add63290423c76d198b5c03ee8b44a272ef23f912a5b9c3a0",
+    "proofs/lakefile.lean": "8fc12ac6376a70e50b5e85d040f99077a790ac9639f087e4b5d08edb106022db",
+    "dev/verification/read_transition.py": "a74292b6c7f4ece2922abb2f8426415f965d1d24a6ad5fd8897dd79d37a79251",
+    "dev/verification/garrett.py": "5a6e402d2146417facaebfadad9854736b3005cf8ea34bc5053fdfd19f6772ad",
+    "dev/verification/w3_effect_boundary.py": "7e54dc09fe210585fe01ca300562462b211200f9af5bb3568ea8a2f7b3492767",
+    "dev/verification/w6_adapter.py": "adb633a516d9ecb3b56b825a6fa936df7473613e3f5edd9c9f48c15fb7603922",
+    "tests/test_secrets_w3_effect_boundary.py": "4550d869da4a1655d50fe29c9f0425a895845c631d89e6af15524db125d5fd54"
+  },
+  "binary_sha256": {
+    "debug/garrett-bridge": "ca16672e822baff7e72038bd63740b24f30cd37d2cfb15c53b09b32c093cfd3e",
+    "debug/garrett-client": "000ebf02d1f6ed167d61a6d5e9fa64d35536b804677e164fc1fc750ef2295a5f",
+    "debug/garrett-authority": "eef114aca464e561b4a1a8d8cff2ece532a253cbd8c5d1b06f67df62191ee82e",
+    "release/garrett-bridge": "4e0511c25ad14b54372a8920b2a412d510ab348b5cc46aa5cc3b1e03dcfa0223",
+    "release/garrett-client": "a556bf6008fc2df719048d7cc60e4504c453a5de50f7a5519ba87936480b5da3",
+    "release/garrett-authority": "0d5659d4f72cdaf63f3fa19fcad14e6101d70bf9da2284806e7bcbdc9d265ea8"
+  },
+  "binary_profiles": {
+    "debug": "conformance,coordinator-server",
+    "release": "no-default-features,coordinator-server; all-feature parity passed before this ordinary rebuild"
+  },
+  "commands": {
+    "kernel": ".venv/bin/python dev/verification/read_transition.py",
+    "record": ".venv/bin/python dev/verification/garrett.py record",
+    "mutants": "PYTHONPATH=dev/verification .venv/bin/python -c \"import garrett; garrett.mutate('request orchestration|request invocation')\"",
+    "rust": "cargo test --locked --manifest-path rust/Cargo.toml --workspace --features conformance,coordinator-server",
+    "full": ".venv/bin/python -m pytest -q --junitxml=/tmp/garrett-invocation-full.xml",
+    "read-path-prefix": ".venv/bin/python dev/verification/read_prefixes.py prove",
+    "native-read-debug": ".venv/bin/python dev/verification/quick_w6_read.py --native",
+    "native-read-ordinary": "Equivalent quick_w6_read PORTABLE + FAILURE_PORTABLE + PENDING_PORTABLE + NATIVE + FAILURE_NATIVE + PENDING_NATIVE pytest selection; three BINARIES variables explicitly select fresh release binaries; JUnit checked for skips.",
+    "native-product": ".venv/bin/python dev/offline_native_guest.py [--bin-dir rust/target/release]",
+    "ordinary-build": "cargo build --locked --release --manifest-path rust/Cargo.toml --bins --no-default-features --features coordinator-server",
+    "device": "sudo -n .venv/bin/python dev/verification/tpm_device.py --device /dev/tpmrm0",
+    "packaging": ".venv/bin/python -m build"
+  },
+  "environment": {
+    "full-suite": "garrett.RUNNERS and primitives/freshness runners select debug binaries; AIVM_SECRETS_REQUIRE_TPM_TESTS=1; device override removed, so negative authorization tests use isolated emulators.",
+    "record": "Release/all-features runners, required isolated-emulator TPM cases.",
+    "device": "Only the explicit device witness uses sudo. No ACL, hierarchy, dictionary settings, broad flush or wrong-auth operation changed shared device state."
+  },
+  "results": {
+    "full-python-native": {
+      "passed": 3003,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 548.696
+    },
+    "garrett-native-parity-cases": 761,
+    "named-garrett-axiom-audits": 433,
+    "extracted-transition-obligations": 33,
+    "targeted-rust-mutants-rejected": 8,
+    "mutation-campaign-scope": "8 selected of 200; not the complete campaign",
+    "rust-workspace-cases": 62,
+    "rust-core-cases": 22,
+    "source-guard-cases": 79,
+    "portable-read-cases": 142,
+    "native-read-debug-cases": 158,
+    "native-read-ordinary-cases": 158,
+    "read-path-obligations": 8,
+    "read-prefix-obligations": 5,
+    "native-product-both-modes": "passed",
+    "installed-device": {
+      "schema": 1,
+      "scope": "native-tpm-device-synthetic-workflow",
+      "status": "passed",
+      "device": "/dev/tpmrm0",
+      "tests": 6,
+      "existing_public_sha256": {
+        "0x81010001": "be2b11e4ebd8b35f5162b38ca6ad11768b56fefacb35246b557c62a53e037f61",
+        "0x81010016": "406374dd1cbdb93c570e35680917282ca93c414da572a920694c44827642531c"
+      },
+      "dictionary_attack_state_preserved": true,
+      "persistent_objects_preserved": true,
+      "fixture_handles_cleaned": true
+    },
+    "packaging": {
+      "status": "passed",
+      "source_archive": "aivm_secrets-0.2.0.tar.gz",
+      "manifest_inputs_identical": 254
+    }
+  },
+  "findings": [
+    "An ignored extra wrapper invocation changes progression to Halted; consuming a saved success then fails. Exact returned-state proofs and native/core tests check this behavior.",
+    "Pinned Aeneas initially generated a duplicate Lean binder for Result<Error,Error>. Returning the actual Rust error value directly fixed extraction without editing the standard model or generated proof.",
+    "quick_w6_read intentionally installs debug runner paths. Ordinary release acceptance therefore used the same pytest selection with explicit correct release BINARIES variables; an initial debug run was not counted as ordinary evidence."
+  ],
+  "next-acceptance": "NR-2: actual raw callback/effect relation and W4/W5 forward simulation, including acknowledged completion audit followed by denied guest release.",
+  "remaining-obligations": [
+    "The receipt records accepted wrapper calls. Raw callbacks retain an extensional Result interface; ignored duplicate raw calls inside the wrapper seam and transitive effects are not ruled out solely by result equalities.",
+    "No complete native I/O, error/unwind/drop or sequential-history simulation and no whole-service noninterference result.",
+    "NR-3 sink/dependency closure, NR-4 observation/adaptive correspondence and NR-5 independent review remain open.",
+    "Real providers, deployed guest/host compartments and physical TPM provenance are not established by these VM/synthetic tests."
+  ],
+  "log_sha256": {
+    "kernel": {
+      "path": "/tmp/garrett-invocation-kernel.log",
+      "sha256": "a180e6635e3a789a8c6cee0d88bbff730da7eacca61d9c40e6a1484d6cfa3555"
+    },
+    "record": {
+      "path": "/tmp/garrett-invocation-record.log",
+      "sha256": "92892dc9c7fb6c37761ac5fad02fe0219022f88312c870118cf45dc5453f8a6e"
+    },
+    "mutants": {
+      "path": "/tmp/garrett-invocation-mutants.log",
+      "sha256": "72997acab0ee254c9ac6a6857deafca9f9c3731fa9435d2520ccd1a4e7768059"
+    },
+    "workspace": {
+      "path": "/tmp/garrett-invocation-workspace.log",
+      "sha256": "3bffa4babab73e6cec1fde737d2ad9ac5184406c292d071fa7d9e7bdb37e4b0a"
+    },
+    "portable": {
+      "path": "/tmp/garrett-invocation-portable.log",
+      "sha256": "adaf07466499c5171796fe94a9d02985bf92e18c0737d0eb8da5b26105621a18"
+    },
+    "review-tests": {
+      "path": "/tmp/garrett-invocation-review-tests.log",
+      "sha256": "a82e2fa5b73670d5bbab4676418963f730792d4428ed99b30f879198b7b16fa6"
+    },
+    "native-debug": {
+      "path": "/tmp/garrett-invocation-native-debug.log",
+      "sha256": "a08d4c6379a20c7e5923dff5de9956326dfb35e406bd8ab9d2541c478b4a4bc9"
+    },
+    "native-ordinary": {
+      "path": "/tmp/garrett-invocation-native-ordinary.log",
+      "sha256": "c93bd0140cf89d4f041b036c40610c4289e7eba739877ed4f548473eae27e89a"
+    },
+    "product-debug": {
+      "path": "/tmp/garrett-invocation-product-debug.log",
+      "sha256": "07dbbfe5ee30aa500aa129ff377dc47249297e1651502e6612b102e7ead504e1"
+    },
+    "product-ordinary": {
+      "path": "/tmp/garrett-invocation-product-ordinary.log",
+      "sha256": "07dbbfe5ee30aa500aa129ff377dc47249297e1651502e6612b102e7ead504e1"
+    },
+    "device": {
+      "path": "/tmp/garrett-invocation-device.log",
+      "sha256": "b1dc3d5512dd6476d744266b3cfc6ea2eeceaff5b542b547e227378ca059bf86"
+    },
+    "prefix-proofs": {
+      "path": "/tmp/garrett-invocation-prefix-proofs.log",
+      "sha256": "0d631e86bc84ecd7911dfc8f559fca434f58de988fb415f1edbff8924e7ddce0"
+    },
+    "full": {
+      "path": "/tmp/garrett-invocation-full.log",
+      "sha256": "d25fae89d56e9fcc6594fd2e3a79f217acdf2209d082b58649d962524ba8dc22"
+    },
+    "build": {
+      "path": "/tmp/garrett-invocation-build.log",
+      "sha256": "16c135d9f1bd217984bb272747717abf186fd08aa2b6846d1706e0a85d5b3650"
+    }
+  }
+}

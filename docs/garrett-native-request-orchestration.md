@@ -152,3 +152,10 @@ coordinates, matching fresh Charon/Aeneas regeneration, focused kernel
 compilation, and the named axiom audit. W0/W3/W6 inventory checks retain their
 source-review scope. The historical `dev/validation/2026-10-20-request-orchestration.json`
 records source `64d3caa`; it does not certify the stateful invocation changes.
+
+The stateful increment is frozen at source `11e0a5a` in
+[the invocation validation record](../dev/validation/2026-10-20-request-invocations.json):
+3,003 full-suite cases without skips, 433 named axiom audits, eight targeted
+mutants, both native product modes, packaging and six installed-device cases.
+The ordinary release run used the same quick-gate pytest selection with
+explicit release paths; `quick_w6_read.py --native` itself installs debug paths.
