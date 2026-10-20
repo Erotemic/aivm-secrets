@@ -35,6 +35,20 @@ Sources of truth for technical detail remain the
 them; it does not silently change protocol formats, current policies, or
 already verified theorems.
 
+## Native W6 audited-but-unsent read prefixes, October 19
+
+The [pending read boundary](../garrett-audited-unsent-read-prefix.md) adds
+independent evidence for an audited dispatch that never reaches provider HTTP:
+a wrong synthetic provider CA, terminal coordination revocation at the first
+TLS connection, and revocation after a successful preflight but before final
+credentialed HTTP. The test oracle independently compiles the authorized
+read effects, checks the provider-visible prefix and host audit causally,
+and requires one fixed guest denial with no completion. Portable mutation and
+source-shape gates are fast; new native mTLS tests remain an explicit maintainer
+gate. This does **not** prove byte-level non-emission, atomic authorization
+with an I/O syscall, universal Rust-to-Lean trace simulation or W3 complete
+reachability. The main priority remains closing those universal obligations.
+
 ## Local validation update, 2026-10-17
 
 The previously uncompiled native overlays now build on the pinned toolchain.

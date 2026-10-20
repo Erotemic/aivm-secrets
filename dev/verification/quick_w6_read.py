@@ -42,6 +42,13 @@ FAILURE_PORTABLE = [
     'tests/test_w6_failure_oracle.py',
     'tests/test_w6_error_boundary.py',
 ]
+PENDING_PORTABLE = [
+    'tests/test_w6_pending_oracle.py',
+    'tests/test_w6_pending_boundary.py',
+]
+PENDING_NATIVE = [
+    'tests/test_rust_w6_pending.py',
+]
 FAILURE_NATIVE = [
     'tests/test_rust_w6_adapter.py::test_w6_failed_final_read_private_diagnostics_are_invisible',
     'tests/test_rust_w6_adapter.py::test_w6_failed_final_read_malformed_private_representation_is_invisible',
@@ -99,11 +106,15 @@ def main() -> int:
     parser.add_argument('--native', action='store_true', help='Run selected mTLS/Rust process cases')
     parser.add_argument('--failure-only', action='store_true',
                         help='Run only the new W4/W5 failed-read observations')
+    parser.add_argument('--pending-only', action='store_true',
+                        help='Run only audited-but-unsent read prefix witnesses')
     parser.add_argument('--lean', action='store_true',
                         help='Compile/axiom-audit only new read-path Lean proofs and imports')
     parser.add_argument('--build', action='store_true',
                         help='Incrementally rebuild native binaries before --native')
     args = parser.parse_args()
+    if args.failure_only and args.pending_only:
+        parser.error('--failure-only and --pending-only are mutually exclusive')
     if args.build and not args.native:
         parser.error('--build requires --native')
     env = dict(os.environ)
@@ -116,6 +127,8 @@ def main() -> int:
             checked_run(name, [sys.executable, f'dev/verification/{name}.py', 'check'], env)
         checked_run('w6-public-error-source', [sys.executable,
                     'dev/verification/w6_error_boundary.py', 'check'], env)
+        checked_run('w6-pending-source', [sys.executable,
+                    'dev/verification/w6_pending_boundary.py', 'check'], env)
         checked_run('w4-w5-read-shape-source', [sys.executable,
                     'dev/verification/read_paths.py', 'check'], env)
         if args.lean:
@@ -128,8 +141,12 @@ def main() -> int:
             ], env)
         if args.native:
             require_native_paths(env)
-        portable = FAILURE_PORTABLE if args.failure_only else PORTABLE + FAILURE_PORTABLE
-        native = FAILURE_NATIVE if args.failure_only else NATIVE + FAILURE_NATIVE
+        portable = (PENDING_PORTABLE if args.pending_only else
+                    FAILURE_PORTABLE if args.failure_only else
+                    PORTABLE + FAILURE_PORTABLE + PENDING_PORTABLE)
+        native = (PENDING_NATIVE if args.pending_only else
+                  FAILURE_NATIVE if args.failure_only else
+                  NATIVE + FAILURE_NATIVE + PENDING_NATIVE)
         with tempfile.TemporaryDirectory(prefix='garrett-quick-w6-') as tmp:
             report = Path(tmp) / 'cases.xml'
             checked_run('w6-release-observations', [

@@ -449,3 +449,21 @@ Charon. Native subprocess acceptance must run separately on the maintainer's
 provisioned toolchain; previous passing validation cannot be transferred to
 new native tests. Confidence: high in the reviewed Python oracles and their
 portable counterexamples; native-case compatibility provisional until run.
+
+## 2026-10-19 19:34:00 -0400 — Garrett pending read prefix
+
+Added a bounded, independent pending-dispatch observer and real local native
+acceptance cases for audited-but-unsent read effects. A provider-arrival is
+not inferred from an audit row. The last checked read phase can be audited yet
+not emitted if TLS setup fails or terminal revocation is committed during
+setup; first and second phase cases are distinguished. Used existing W6
+byte-oracle on the actual sent prefix, then checked exactly one trailing
+unsent dispatch against normative policy, audit provenance and a fixed public
+denial. Portable adversarial/source checks run in seconds without Charon.
+
+The native cases require the maintainer's pinned Rust binaries. The tool
+environment used here has neither Rust nor Lean, so no new native or theorem
+claims are made. Remaining risks include admission-to-syscall races, TLS
+record visibility and source-to-history simulation; source guards are not
+control-flow proofs. Kept production code and Lean unchanged to avoid
+forcing heavyweight builds for test-only assurance work.
