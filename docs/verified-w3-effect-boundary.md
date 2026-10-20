@@ -206,3 +206,15 @@ solely by Rust type visibility. See
 ## Native read completion-audit boundary
 
 The [completed release refinement](garrett-native-read-release-refinement.md) requires a private `CompletedRelease` receipt after projection, reflection checks, and completion audit, with finite native W6 observations for no-preflight reads, preflight-only fact returns, and exact public metadata. The added source guards and portable mutations pass locally. Native Rust compilation and selected process cases remain to run on the maintainer's toolchain. No complete source-to-W4/W5 trace refinement is claimed.
+
+## NR-1A production-called transition (pending extracted proof)
+
+The manifest adapter now invokes `aivm_secrets_garrett_core::read_transition`
+for preflight/final effect admission and the `Prepared -> Audited` transition.
+The sole audit adapter calls `acknowledge` after `Audit::write_record`
+returns. The resulting opaque value carries the phase into the credentialed
+executor; the native layer no longer maintains a second phase field. W3's
+source fingerprint and mutation tests cover the handoff. These are source
+observations, not a closed compiler call graph or a proof of filesystem
+durability. Late authority checks, callback/dependency effects, and actual
+provider-byte emission remain unresolved.

@@ -112,6 +112,30 @@ here. In particular, a credential sent **to its authorized provider** is an
 expected authorized release, not a violation; another provider/destination
 or the guest is not authorized to receive it.
 
+### NR-1A handoff (production-called seam; proof pending)
+
+`rust/crates/aivm-secrets-garrett-core/src/read_transition.rs` implements the
+actual phase/effect admission and audit-acknowledgment transition used by
+`PreparedDispatch::preflight`, `::final_effect`, and `::audit` in the native
+manifest broker. `AuditedDispatch` carries the resulting opaque `Audited`
+value into `exchange_manifest`; there is no second native phase field to
+silently diverge. This is production code, not a test-only mirror.
+
+For this first seam, `read_transition::acknowledge(prepared, true)` is invoked
+**only after** `Audit::write_record` returns successfully. The adapter is
+responsible for the correctness of that acknowledgment; neither the Rust
+value nor a future extracted Lean theorem proves fsync/OS durability. Late
+authority checks and provider send attempts remain external NR-2/NR-3
+obligations. There is no extracted Lean theorem for this new transition until
+Charon/Aeneas regenerate the pinned sources and the resulting kernel proof
+passes. Existing W4/W5 abstract proofs cannot be rebranded as that result.
+
+Focus the next proof work on extracting **this exact production-called
+function**, comparing its emitted Lean signature with the Rust inputs/outputs,
+and proving an initial `Prepared -> Audited` preservation lemma. Do not create
+an independently hand-written `read_transition` model. Preserve an authorized
+success witness from the standalone offline workflow in parallel.
+
 ## 3. Concrete trust and transition boundary
 
 Inspect the *actual production* code before any refactor:

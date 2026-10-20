@@ -108,18 +108,31 @@ def review_semantics(contents: dict[str, str]) -> None:
     dispatch = part(request, 'let dispatch = |prepared: PreparedDispatch', 'let facts = if let Some(effect)')
     release = part(request, 'let release = (|| -> Outcome<CompletedRelease> {', 'if sent_write {')
     reviewed = part(m, "impl<'a> PreparedDispatch<'a> {", 'pub(crate) struct Session {')
-    require('struct PreparedDispatch<' in m and 'enum DispatchPhase {' in m
+    require('struct PreparedDispatch<' in m and 'Phase as DispatchPhase' in m
             and 'struct AuditedDispatch<' in m and m.count('AuditedDispatch {') == 1,
             'native executor permit can be manufactured outside the audit transition')
+    transition = contents['rust/crates/aivm-secrets-garrett-core/src/read_transition.rs']
     require(same_order(reviewed, "fn preflight(effect: &'a Effect) -> Outcome<Self>",
-                       'if effect.write {',
+                       'read_transition::prepare(DispatchPhase::Preflight, false, effect.write)',
                        "fn final_effect(effect: &'a Effect, admitted_write: bool) -> Outcome<Self>",
-                       'if effect.write && !admitted_write {',
+                       'read_transition::prepare(DispatchPhase::Final, admitted_write, effect.write)',
                        'fn audit(', 'ensure_safe(', 'audit.write_record(',
+                       'read_transition::acknowledge(self.transition, true)',
                        'Ok(AuditedDispatch {'),
-            'dispatch phase can escalate to write or produce permit without durable audit')
-    require('Ok(AuditedDispatch { phase: self.phase, effect: self.effect })' in reviewed,
-            'audited permit lost selected phase/effect identity')
+            'native dispatch bypasses extracted phase gate or audit acknowledgment')
+    require('Ok(AuditedDispatch { effect: self.effect, transition })' in reviewed
+            and reviewed.count('read_transition::acknowledge(self.transition, true)') == 1,
+            'audited permit lost the same core transition after host audit')
+    require(same_order(transition, 'pub fn prepare(', 'if effect_write',
+                       'matches!(phase, Phase::Preflight)',
+                       'pub fn acknowledge(', 'if !ack', 'Ok(Audited {'),
+            'extracted core permits preflight writes, unadmitted writes or failed audits')
+    require('|| !admitted_operation_write' in transition
+            and transition.count('if !ack {') == 1,
+            'extracted core gate bypasses write admission or audit acknowledgement')
+    require('pub mod read_transition;' in contents[
+        'rust/crates/aivm-secrets-garrett-core/src/lib.rs'],
+        'reviewed transition is no longer exported by native core')
     require(request.count('exchange_manifest(') == 1,
             'unexpected direct manifest HTTP dispatch outside the sole gated closure')
     require(request.count('PreparedDispatch::preflight(&effect)?') == 1
@@ -130,11 +143,11 @@ def review_semantics(contents: dict[str, str]) -> None:
                        'let pending = crate::coordination::PendingDispatch',
                        'executor.exchange_manifest(', 'coordination::dispatch(&pending, keyed_write)'),
             'provider dispatch bypasses durable audit or fresh authorization')
-    require('&recorded,' in dispatch and 'matches!(recorded.phase, DispatchPhase::Final)' in dispatch,
+    require('&recorded,' in dispatch and 'matches!(recorded.transition.phase(), DispatchPhase::Final)' in dispatch,
             'executor is not passed the reviewed audited dispatch permit')
     require('check: &fresh,' in dispatch and 'reserve: || reservation_call(false),' in dispatch
             and 'finish: || reservation_call(true),' in dispatch
-            and 'matches!(recorded.phase, DispatchPhase::Final)' in dispatch
+            and 'matches!(recorded.transition.phase(), DispatchPhase::Final)' in dispatch
             and '&& effect.write' in dispatch and '&& self.base.coordinator.is_some()' in dispatch,
             'coordinated final write bypasses check/reserve/finish or phase classification')
     require('self.base.check_coordination()?;' in request
@@ -213,7 +226,8 @@ def review_semantics(contents: dict[str, str]) -> None:
             'extra native manifest executor call site')
     transport = part(m, '    fn exchange_manifest(', '\nfn manifest_response(')
     require('audited: &AuditedDispatch<' in transport
-            and 'let effect = audited.effect;' in transport,
+            and 'let effect = audited.effect;' in transport
+            and 'audited.transition.is_write() != effect.write' in transport,
             'manifest provider executor accepts a raw, unaudited policy effect')
     require(same_order(transport, 'let effect = audited.effect;',
                        'let request = manifest_request_bytes(',

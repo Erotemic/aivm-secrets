@@ -118,14 +118,16 @@ def mutate(repo, filename, before, after):
      'release.map(CompletedRelease::into_public)',
      'release.map(|r| r.0)'),
     (RUST + 'custody/manifest_session.rs',
-     'if effect.write && !admitted_write {', 'if false {'),
+     'read_transition::prepare(DispatchPhase::Final, admitted_write, effect.write)',
+     'read_transition::prepare(DispatchPhase::Final, true, effect.write)'),
     (RUST + 'custody/manifest_session.rs',
-     'if effect.write {', 'if false {'),
+     'read_transition::prepare(DispatchPhase::Preflight, false, effect.write)',
+     'read_transition::prepare(DispatchPhase::Preflight, true, false)'),
     (RUST + 'custody/manifest_session.rs',
      'audit.write_record(&json!({', 'let _ = audit; // bypass\n        unchecked_record(&json!({'),
     (RUST + 'custody/manifest_session.rs',
-     'Ok(AuditedDispatch { phase: self.phase, effect: self.effect })',
-     'Ok(AuditedDispatch { phase: DispatchPhase::Final, effect: self.effect })'),
+     'Ok(AuditedDispatch { effect: self.effect, transition })',
+     'Ok(AuditedDispatch { effect: self.effect, transition: unchecked_transition() })'),
     (RUST + 'custody/manifest_session.rs',
      "audited: &AuditedDispatch<'_>", 'audited: &Effect'),
     (RUST + 'custody/manifest_session.rs',
@@ -251,3 +253,16 @@ def test_w3_reports_new_unreviewed_rust_source(tmp_path):
     path.write_text('pub fn unexpected_sink() {}\n')
     with pytest.raises(ContractError, match=r'new/unreviewed .*unexpected_sink\.rs'):
         check(repo)
+
+
+def test_nr1_production_called_transition_rejects_core_gate_mutations(tmp_path):
+    core = 'rust/crates/aivm-secrets-garrett-core/src/read_transition.rs'
+    for before, after in [
+        ('|| !admitted_operation_write', '|| false'),
+        ('matches!(phase, Phase::Preflight)', 'false'),
+        ('if !ack {', 'if false {'),
+    ]:
+        checkout = fake_checkout(tmp_path / before.replace(' ', '_').replace('!', 'not').replace('|', 'or').replace('(', '').replace(')', '')[:60])
+        mutate(checkout, core, before, after)
+        with pytest.raises(ContractError, match='extracted core'):
+            check(checkout)

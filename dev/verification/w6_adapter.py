@@ -66,13 +66,15 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and 'let recorded = prepared.audit(' in entry
            and 'exchange_manifest(' in entry
            and '&recorded,' in entry
-           and 'Ok(AuditedDispatch { phase: self.phase, effect: self.effect })' in constructor
-           and 'if effect.write && !admitted_write {' in constructor
-           and 'if effect.write {' in constructor,
+           and 'Ok(AuditedDispatch { effect: self.effect, transition })' in constructor
+           and 'read_transition::prepare(DispatchPhase::Preflight, false, effect.write)' in constructor
+           and 'read_transition::prepare(DispatchPhase::Final, admitted_write, effect.write)' in constructor
+           and constructor.index('audit.write_record(') < constructor.index('read_transition::acknowledge(self.transition, true)'),
            'provider effect not typed as audited/phase-authorized before dispatch')
     provider_interpreter = source.split('impl Executor {', 1)[1].split('fn manifest_response(', 1)[0]
     ensure('audited: &AuditedDispatch<' in provider_interpreter
-           and 'let effect = audited.effect;' in provider_interpreter,
+           and 'let effect = audited.effect;' in provider_interpreter
+           and 'audited.transition.is_write() != effect.write' in provider_interpreter,
            'provider executor accepts an unaudited policy effect')
     ensure(provider_interpreter.count('.write_all(') == 1
            and provider_interpreter.count('.write_all(&request)') == 1

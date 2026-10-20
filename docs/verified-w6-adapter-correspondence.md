@@ -249,3 +249,15 @@ not represented as proofs of the added runtime observations. See
 ## Independent native read release/metadata observations
 
 The [completed release refinement](garrett-native-read-release-refinement.md) requires a private `CompletedRelease` receipt after projection, reflection checks, and completion audit, with finite native W6 observations for no-preflight reads, preflight-only fact returns, and exact public metadata. The added source guards and portable mutations pass locally. Native Rust compilation and selected process cases remain to run on the maintainer's toolchain. No complete source-to-W4/W5 trace refinement is claimed.
+
+## NR-1A dispatch transition
+
+`manifest_session::PreparedDispatch` is now a concrete adapter around
+`aivm_secrets_garrett_core::read_transition::prepare`; it calls
+`read_transition::acknowledge` only after the corresponding host audit write
+succeeds. The executor checks that the carried opaque permit's effect-write
+flag matches the emitted policy effect. The W6 source guard is updated for
+this specific handoff. This does **not** establish the missing proof linking
+all Rust execution effects to W4/W5 traces, or prove the external audit, TLS,
+filesystem, and network contracts. Kernel verification of the newly extracted
+transition is a separate NR-1 acceptance step.

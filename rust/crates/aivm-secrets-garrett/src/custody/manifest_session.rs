@@ -4,57 +4,29 @@ use super::*;
 use crate::manifest::{disclosure::Disclosure, Effect, Policy};
 use aivm_secrets_garrett_core::{manifest as guards, open_surrogate};
 
-// W3 dispatch vocabulary. A policy-compiled effect is not enough to invoke
-// credential-bearing I/O. The native executor takes an AuditedDispatch, which
-// can only be constructed by recording the selected phase, request identity and
-// route in the private host audit. This is a source-level boundary, not a
-// substitute for the late authority check or a proof of compiler reachability.
-#[derive(Clone, Copy)]
-enum DispatchPhase {
-    Preflight,
-    Final,
-}
-impl DispatchPhase {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Preflight => "preflight",
-            Self::Final => "final",
-        }
-    }
-}
+// W3/NR-1: the single phase/write authority is the extractable production
+// core. The private adapter alone can acknowledge a real host audit write.
+// Filesystem durability and late authorization remain external contracts.
+use aivm_secrets_garrett_core::read_transition::{self, Phase as DispatchPhase};
+
 struct PreparedDispatch<'a> {
-    phase: DispatchPhase,
     effect: &'a Effect,
+    transition: read_transition::Prepared,
 }
-// Deliberately non-Copy and with private fields. Neither guest arguments nor
-// the manifest compiler can manufacture this type: only the private audited
-// transition below constructs it. The separate fresh check still runs after
-// provider TLS setup, immediately before credential-bearing network I/O.
 struct AuditedDispatch<'a> {
-    phase: DispatchPhase,
     effect: &'a Effect,
+    transition: read_transition::Audited,
 }
 impl<'a> PreparedDispatch<'a> {
     fn preflight(effect: &'a Effect) -> Outcome<Self> {
-        // Preflight exists to check host facts, never to perform a write.
-        if effect.write {
-            return Err(Error::InvalidPolicy);
-        }
-        Ok(Self {
-            phase: DispatchPhase::Preflight,
-            effect,
-        })
+        let transition = read_transition::prepare(DispatchPhase::Preflight, false, effect.write)
+            .map_err(|_| Error::InvalidPolicy)?;
+        Ok(Self { effect, transition })
     }
     fn final_effect(effect: &'a Effect, admitted_write: bool) -> Outcome<Self> {
-        // A read-only authorized operation cannot introduce a write while
-        // expanding a checked fact into its final effect.
-        if effect.write && !admitted_write {
-            return Err(Error::InvalidPolicy);
-        }
-        Ok(Self {
-            phase: DispatchPhase::Final,
-            effect,
-        })
+        let transition = read_transition::prepare(DispatchPhase::Final, admitted_write, effect.write)
+            .map_err(|_| Error::InvalidPolicy)?;
+        Ok(Self { effect, transition })
     }
     #[allow(clippy::too_many_arguments)]
     fn audit(
@@ -75,7 +47,7 @@ impl<'a> PreparedDispatch<'a> {
         audit.write_record(&json!({
             "schema":1,
             "event":"dispatch",
-            "phase":self.phase.as_str(),
+            "phase":self.transition.phase().as_str(),
             "grant":audit.grant,
             "policy":audit.policy,
             "identity":identity,
@@ -88,7 +60,11 @@ impl<'a> PreparedDispatch<'a> {
                 "path":self.effect.target,
             }
         }))?;
-        Ok(AuditedDispatch { phase: self.phase, effect: self.effect })
+        // The adapter can assert success only after write_record returns.
+        // fsync/IO acknowledgement is an explicit external proof premise.
+        let transition = read_transition::acknowledge(self.transition, true)
+            .map_err(|_| Error::InternalError)?;
+        Ok(AuditedDispatch { effect: self.effect, transition })
     }
 }
 
@@ -446,7 +422,7 @@ impl Session {
             let effect = recorded.effect;
             // Durable audit and a fresh grant both precede credentialed I/O.
             // Waiting for either must not extend identity or grant lifetime.
-            let keyed_write = matches!(recorded.phase, DispatchPhase::Final)
+            let keyed_write = matches!(recorded.transition.phase(), DispatchPhase::Final)
                 && effect.write
                 && self.base.coordinator.is_some();
             let mut headers = self.policy.headers.clone();
@@ -611,6 +587,9 @@ impl Executor {
         fresh: &impl Fn() -> Outcome<()>,
     ) -> Outcome<Value> {
         let effect = audited.effect;
+        if audited.transition.is_write() != effect.write {
+            return Err(Error::InvalidPolicy);
+        }
         // Validate all outbound bytes before connecting to any provider.
         // A malformed OAuth-issued credential must not reach a socket at all.
         let request = manifest_request_bytes(route, secret, effect, headers)?;
