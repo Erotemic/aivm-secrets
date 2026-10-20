@@ -53,3 +53,11 @@ six new mutants with `garrett.py mutate --mutation-filter '^guest framing '`.
 Compiler, extraction/standard models, TLS/OS/Write behavior, canonical JSON,
 selected-value provenance and full service mediation retain their stated trust
 or open obligations. No protocol version, dependency or credential scope changes.
+
+The [frozen acceptance](../dev/validation/2026-10-20-guest-frame.json) pins source
+`29ddf1e`: 3,029 full cases without skips, 530 named axiom audits, 767 release
+parity cases, 74 Rust workspace cases, all six new typed/extracted mutations,
+both native build modes, six safe installed-vTPM workflows and packaging with
+all 270 source pins and the embedded Garrett manifest byte-identical. The first
+concurrent run's one-second grant startup failure is retained; the unchanged
+isolated case and final full rerun pass. No expiry condition or timeout changed.

@@ -93,7 +93,20 @@ axiom checks, 54 focused receipt/prefix/trace and 37 request obligations,
 build-mode gates and product workflows, all 268 archive pins and six safe
 installed-vTPM cases. See the [returned-prefix validation record](../../dev/validation/2026-10-20-returned-request-traces.json).
 
-**Outbound frame update:** the [actual native reply encoder and attempt gate](../garrett-outbound-guest-frame.md) now bound the complete newline-terminated wire before writing and reject a second application attempt after any returned send result. Nine extracted production obligations connect admitted payload bytes to the writer callback and preserve errors and mutable state. This advances the byte/attempt segment; selected-value/JSON correspondence, TLS/close observations, native primitive instantiation and NR-2–NR-5 remain open. Full native acceptance is tracked separately from this scoped proof.
+**Outbound frame update:** the [actual native reply encoder and attempt gate](../garrett-outbound-guest-frame.md)
+now bound the complete newline-terminated wire before writing and reject a
+second application attempt after any returned send result. Nine extracted
+production obligations connect admitted payload bytes to the writer callback
+and preserve errors and mutable state. Selected-value/JSON correspondence,
+TLS/close observations, native primitive instantiation and NR-2–NR-5 remain open.
+
+Source `29ddf1e` passes 3,029 full-suite cases with zero skips, 530 named
+axiom checks, 767 release parity cases, 74 Rust workspace cases, six new
+source-extracted mutants, both 164-case native build-mode gates and product
+workflows, all 270 archive pins and six safe installed-vTPM cases. The first
+concurrent full run's one-second Python grant timing failure is retained;
+the unchanged isolated case and final clean-load full rerun pass. See the
+[outbound frame validation record](../../dev/validation/2026-10-20-guest-frame.json).
 
 ## Goal and present assurance level
 
