@@ -31,10 +31,10 @@ def test_reviewed_public_denial_leaf_is_stable(tmp_path):
 
 @pytest.mark.parametrize('name,original,mutant', [
     (checker.TLS, '"Broker failed closed."', '"Provider said: "'),
-    (checker.TLS, 'Self(answer.unwrap_or_else(failure))', 'Self(answer.unwrap())'),
-    (checker.TLS, 'write_all(&json::canonical(&self.0))', 'write_all(&b"raw"[..])'),
-    (checker.TLS, '.and_then(|_| writer.write_all(b"\\n"))',
-     '.and_then(|_| writer.write_all(b"\\n\\n"))'),
+    (checker.TLS, 'let value = answer.unwrap_or_else(failure);', 'let value = answer.unwrap();'),
+    (checker.TLS, 'write_all(wire)', 'write_all(&b"raw"[..])'),
+    (checker.TLS, 'self.0.send(&mut GuestWriter(writer))',
+     'unchecked_send(writer)'),
     (checker.ERROR, 'Self::UpstreamRejected => "upstream_rejected"',
      'Self::UpstreamRejected => "upstream_error"'),
     (checker.MANIFEST_SESSION, 'if (400..500).contains(&status) {',

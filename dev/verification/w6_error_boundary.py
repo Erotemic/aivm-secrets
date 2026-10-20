@@ -81,10 +81,11 @@ def check(root: Path = ROOT) -> dict:
             'guest denial schema no longer consists of fixed code/message')
     require('format!(' not in body and 'to_string(' not in body,
             'guest failure message may include nonfixed diagnostics')
-    require('Self(answer.unwrap_or_else(failure))' in tls and
-            'write_all(&json::canonical(&self.0))' in tls and
-            '.and_then(|_| writer.write_all(b"\\n"))' in tls,
-            'guest reply no longer uses canonical single-line emission')
+    require('let value = answer.unwrap_or_else(failure);' in tls
+            and 'guest_frame::prepare(json::canonical(&value), MAX_REPLY)' in tls
+            and 'self.0.send(&mut GuestWriter(writer))' in tls
+            and 'write_all(wire)' in tls and 'self.0.flush()' in tls,
+            'guest reply bypasses the canonical bounded single-attempt writer')
     for variant, code in [
         ('UpstreamRejected', 'upstream_rejected'),
         ('UpstreamError', 'upstream_error'),

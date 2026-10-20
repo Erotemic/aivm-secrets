@@ -34,7 +34,7 @@ include proofs/GarrettHttpWireHeaders.lean
 include proofs/GarrettHttpWireFormatting.lean
 include proofs/GarrettHttpWireValidation.lean
 include proofs/GarrettHttpWire.lean
-include proofs/GarrettLineFrame.lean
+include proofs/GarrettLineFrame.lean proofs/GarrettGuestFrame.lean
 include proofs/GarrettCoordinatorAuthority.lean
 include proofs/GarrettCoordinatorReply.lean
 include proofs/GarrettApproval.lean

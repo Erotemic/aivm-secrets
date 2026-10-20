@@ -78,3 +78,8 @@ Use focused `lake env lean -DwarningAsError=true GarrettLineFrame.lean` from
 `proofs/` during proof development. The full audit is `garrett.py record`; the
 filtered mutation family is `garrett.py mutate --mutation-filter '^line framing '`.
 All peers, keys and credentials in tests are synthetic. No VM or TPM is required.
+
+The [outbound guest encoder](garrett-outbound-guest-frame.md) now reuses this
+validator before writing. Its separate extracted contracts cover exact appended
+bytes, the bound and single application-attempt state; this ingress contract and
+its historical frozen acceptance retain their original scope.

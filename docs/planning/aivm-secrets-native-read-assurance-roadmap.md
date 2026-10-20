@@ -486,3 +486,8 @@ transition for NR-1. **Do not** create another independent formal trace
 constructor and call that a native simulation. If the checkout already has a
 fresh equivalent NR-0 evidence record, review it and proceed directly to
 NR-1, linking that record in the new PR.
+
+The [outbound frame increment](../garrett-outbound-guest-frame.md) checks the actual
+encoder and single application-attempt gate. Its exact bounded bytes and returning
+writer-state contracts discharge that segment only; selected-value/canonical JSON,
+TLS/close and complete request/session observation correspondence remain open.

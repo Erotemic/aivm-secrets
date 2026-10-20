@@ -93,6 +93,8 @@ axiom checks, 54 focused receipt/prefix/trace and 37 request obligations,
 build-mode gates and product workflows, all 268 archive pins and six safe
 installed-vTPM cases. See the [returned-prefix validation record](../../dev/validation/2026-10-20-returned-request-traces.json).
 
+**Outbound frame update:** the [actual native reply encoder and attempt gate](../garrett-outbound-guest-frame.md) now bound the complete newline-terminated wire before writing and reject a second application attempt after any returned send result. Nine extracted production obligations connect admitted payload bytes to the writer callback and preserve errors and mutable state. This advances the byte/attempt segment; selected-value/JSON correspondence, TLS/close observations, native primitive instantiation and NR-2–NR-5 remain open. Full native acceptance is tracked separately from this scoped proof.
+
 ## Goal and present assurance level
 
 Garrett should let an untrusted guest perform **useful, explicitly authorized**

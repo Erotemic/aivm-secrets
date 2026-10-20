@@ -340,13 +340,15 @@ def review_semantics(contents: dict[str, str]) -> None:
         require(forbidden not in runtime, 'unreviewed output path in manifest custody: ' + forbidden)
 
     t = contents[RUST + 'tls.rs']
-    guest = part(t, 'struct GuestFrame(Value);', 'impl Bridge {')
+    guest = part(t, 'struct GuestFrame(aivm_secrets_garrett_core::guest_frame::Frame);', 'impl Bridge {')
     serve = part(t, 'fn serve<S: Read + Write>', 'fn answer(')
     answer = part(t, 'fn answer(', 'fn forward(')
-    require(guest.count('.write_all(&json::canonical(&self.0))') == 1
-            and guest.count('writer.write_all(b"\\n")') == 1,
-            'guest frame serializer was changed or duplicated')
-    require('GuestFrame::from_answer(answer).send(&mut stream)?;' in serve
+    require(guest.count('.write_all(wire)') == 1
+            and 'self.0.flush()' in guest
+            and 'guest_frame::prepare(json::canonical(&value), MAX_REPLY)' in guest
+            and 'self.0.send(&mut GuestWriter(writer))' in guest,
+            'guest frame serializer bypasses the bounded single-attempt core')
+    require('GuestFrame::from_answer(answer)?.send(&mut stream)?;' in serve
             and '.write_all(' not in serve,
             'authenticated guest writer bypasses GuestFrame')
     require('answer.unwrap_or_else(failure)' in guest,
@@ -357,8 +359,16 @@ def review_semantics(contents: dict[str, str]) -> None:
             'backend selector/unsupported guest delegation changed')
     require(t.count('self.forward(&forwarded)') == 1,
             'additional legacy forwarding may be guest reachable')
-    require(t.count('write_all(&json::canonical(') == 1,
+    require(guest.count('json::canonical(') == 1 and t.split('#[cfg(test)]', 1)[0].count('.write_all(wire)') == 1,
             'extra guest stream serialization outside reviewed GuestFrame')
+    frame_core = contents['rust/crates/aivm-secrets-garrett-core/src/guest_frame.rs'].split('#[cfg(test)]', 1)[0]
+    require(same_order(frame_core, 'pub fn prepare(', 'if payload.len() >= limit',
+                       "payload.push(b'\\n')", 'line_frame::complete(&payload, b"", limit)',
+                       'Ok(Frame {')
+            and same_order(frame_core, 'pub fn send<', 'if self.attempted',
+                           'self.attempted = true;', 'writer.write_frame(&self.wire)')
+            and 'pub wire:' not in frame_core and 'pub attempted:' not in frame_core,
+            'guest frame preparation or mark-before-write gate bypassed')
     for forbidden in ('println!(', 'eprintln!('):
         require(forbidden not in t, 'unreviewed TLS diagnostic: ' + forbidden)
 

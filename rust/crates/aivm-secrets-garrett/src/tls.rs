@@ -180,17 +180,28 @@ pub struct Bridge {
 // The sole authenticated guest-frame serializer in the bridge. Native provider
 // code supplies a selected reply or a bounded Error; this type serializes the
 // result but does not by itself prove the reply's disclosure policy.
-struct GuestFrame(Value);
-impl GuestFrame {
-    fn from_answer(answer: Outcome<Value>) -> Self {
-        Self(answer.unwrap_or_else(failure))
-    }
-    fn send(&self, writer: &mut impl Write) -> Outcome<()> {
-        writer
-            .write_all(&json::canonical(&self.0))
-            .and_then(|_| writer.write_all(b"\n"))
-            .and_then(|_| writer.flush())
+struct GuestFrame(aivm_secrets_garrett_core::guest_frame::Frame);
+struct GuestWriter<'a, W>(&'a mut W);
+impl<W: Write> aivm_secrets_garrett_core::guest_frame::Writer for GuestWriter<'_, W> {
+    type Error = Error;
+    const ALREADY_ATTEMPTED: Error = Error::InternalError;
+
+    fn write_frame(&mut self, wire: &[u8]) -> Outcome<()> {
+        self.0
+            .write_all(wire)
+            .and_then(|_| self.0.flush())
             .map_err(|_| Error::InternalError)
+    }
+}
+impl GuestFrame {
+    fn from_answer(answer: Outcome<Value>) -> Outcome<Self> {
+        let value = answer.unwrap_or_else(failure);
+        aivm_secrets_garrett_core::guest_frame::prepare(json::canonical(&value), MAX_REPLY)
+            .map(Self)
+            .map_err(|_| Error::InternalError)
+    }
+    fn send(&mut self, writer: &mut impl Write) -> Outcome<()> {
+        self.0.send(&mut GuestWriter(writer))
     }
 }
 
@@ -351,7 +362,7 @@ impl Bridge {
         let answer = frame(&mut stream, MAX_FRAME)
             .and_then(|raw| json::parse(&raw, MAX_FRAME).map_err(|_| Error::InvalidRequest))
             .and_then(|v| self.answer(v, &peer, &now));
-        GuestFrame::from_answer(answer).send(&mut stream)?;
+        GuestFrame::from_answer(answer)?.send(&mut stream)?;
         stream.conn.send_close_notify();
         let _ = stream.flush();
         Ok(())
@@ -481,5 +492,79 @@ mod frame_tests {
             frame(Cursor::new(b"{}\n"), usize::MAX),
             Err(Error::InvalidRequest)
         );
+    }
+}
+
+#[cfg(test)]
+mod guest_frame_tests {
+    use super::*;
+
+    struct FaultWriter {
+        accepted: Vec<u8>,
+        limit: usize,
+        flush_error: bool,
+    }
+    impl Write for FaultWriter {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            if self.accepted.len() >= self.limit {
+                return Err(std::io::ErrorKind::BrokenPipe.into());
+            }
+            let count = bytes.len().min(self.limit - self.accepted.len());
+            self.accepted.extend_from_slice(&bytes[..count]);
+            Ok(count)
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            if self.flush_error {
+                Err(std::io::ErrorKind::BrokenPipe.into())
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    #[test]
+    fn actual_guest_writer_keeps_one_attempt_for_partial_zero_and_flush_errors() {
+        let value = json!({"version":1,"ok":true,"result":{"text":"line\n雪"}});
+        let mut expected = json::canonical(&value);
+        expected.push(b'\n');
+        for (limit, flush_error) in [
+            (0, false),
+            (3, false),
+            (usize::MAX, true),
+            (usize::MAX, false),
+        ] {
+            let mut frame = GuestFrame::from_answer(Ok(value.clone())).unwrap();
+            let mut writer = FaultWriter {
+                accepted: Vec::new(),
+                limit,
+                flush_error,
+            };
+            assert!(!frame.0.attempted());
+            let outcome = frame.send(&mut writer);
+            assert_eq!(outcome.is_ok(), limit == usize::MAX && !flush_error);
+            assert!(frame.0.attempted());
+            assert_eq!(writer.accepted, expected[..expected.len().min(limit)]);
+            let first = writer.accepted.clone();
+            assert!(matches!(frame.send(&mut writer), Err(Error::InternalError)));
+            assert_eq!(writer.accepted, first);
+        }
+    }
+
+    #[test]
+    fn actual_guest_constructor_preserves_fixed_errors_and_refuses_oversize() {
+        let mut frame = GuestFrame::from_answer(Err(Error::Revoked)).unwrap();
+        let mut writer = FaultWriter {
+            accepted: Vec::new(),
+            limit: usize::MAX,
+            flush_error: false,
+        };
+        frame.send(&mut writer).unwrap();
+        let value: Value = serde_json::from_slice(&writer.accepted).unwrap();
+        assert_eq!(value, failure(Error::Revoked));
+        assert_eq!(writer.accepted.iter().filter(|b| **b == b'\n').count(), 1);
+        assert!(matches!(
+            GuestFrame::from_answer(Ok(json!({"result":"x".repeat(MAX_REPLY)}))),
+            Err(Error::InternalError)
+        ));
     }
 }

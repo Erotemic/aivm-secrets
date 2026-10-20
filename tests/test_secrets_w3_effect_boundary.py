@@ -49,6 +49,12 @@ def mutate(repo, filename, before, after):
 
 
 @pytest.mark.parametrize('file,old,new', [
+    ('rust/crates/aivm-secrets-garrett-core/src/guest_frame.rs', 'if payload.len() >= limit', 'if false'),
+    ('rust/crates/aivm-secrets-garrett-core/src/guest_frame.rs', "payload.push(b'\\n');", "payload.push(b'\\r');"),
+    ('rust/crates/aivm-secrets-garrett-core/src/guest_frame.rs', 'line_frame::complete(&payload, b"", limit)', 'unchecked_complete(&payload, b"", limit)'),
+    ('rust/crates/aivm-secrets-garrett-core/src/guest_frame.rs', 'if self.attempted', 'if false'),
+    ('rust/crates/aivm-secrets-garrett-core/src/guest_frame.rs', 'self.attempted = true;', 'self.attempted = false;'),
+    ('rust/crates/aivm-secrets-garrett-core/src/guest_frame.rs', 'writer.write_frame(&self.wire)', 'writer.write_frame(b"{}\\n")'),
     (RUST + 'custody/manifest_session.rs', 'begin_dispatch_audit(&self.transition)', 'unchecked_dispatch_audit(&self.transition)'),
     (RUST + 'custody/manifest_session.rs', 'acknowledge_dispatch(&transition)', 'unchecked_dispatch_ack(&transition)'),
     (RUST + 'custody/manifest_session.rs', 'begin_provider(&audited.transition)', 'unchecked_provider(&audited.transition)'),
@@ -208,13 +214,13 @@ def mutate(repo, filename, before, after):
     ),
     (
         RUST + 'tls.rs',
-        'GuestFrame::from_answer(answer).send(&mut stream)?;',
-        'GuestFrame::from_answer(answer).send(&mut stream)?;\n        stream.write_all(b"bypass")?;',
+        'GuestFrame::from_answer(answer)?.send(&mut stream)?;',
+        'GuestFrame::from_answer(answer)?.send(&mut stream)?;\n        stream.write_all(b"bypass")?;',
     ),
     (
         RUST + 'tls.rs',
-        'Self(answer.unwrap_or_else(failure))',
-        'Self(answer.unwrap_or_else(|error| json!({"detail": format!("{:?}", error)})))',
+        'let value = answer.unwrap_or_else(failure);',
+        'let value = answer.unwrap_or_else(|error| json!({"detail": format!("{:?}", error)}));',
     ),
 ])
 def test_w3_bypass_mutants_fail_even_with_updated_source_digest(

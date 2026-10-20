@@ -1807,6 +1807,106 @@ def enrollment.enroll_client
     | core.result.Result.Err error => ok (core.result.Result.Err error)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
+/-- [aivm_secrets_garrett_core::guest_frame::FrameDenial]
+    Source: 'crates/aivm-secrets-garrett-core/src/guest_frame.rs', lines 5:0-7:1
+    Visibility: public -/
+@[discriminant isize]
+inductive guest_frame.FrameDenial where
+| Invalid : guest_frame.FrameDenial
+
+/-- [aivm_secrets_garrett_core::guest_frame::Frame]
+    Source: 'crates/aivm-secrets-garrett-core/src/guest_frame.rs', lines 9:0-12:1
+    Visibility: public -/
+structure guest_frame.Frame where
+  wire : alloc.vec.Vec Std.U8
+  attempted : Bool
+
+/-- [aivm_secrets_garrett_core::line_frame::complete]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/line_frame.rs', lines 9:4-16:1
+    Visibility: public -/
+@[rust_loop]
+def line_frame.complete_loop
+  (data : Slice Std.U8) (i : Std.Usize) : Result Bool := do
+  let i1 := Slice.len data
+  if i < i1
+  then
+    let i2 ← Slice.index_usize data i
+    if i2 = 10#u8
+    then let i3 ← i + 1#usize
+         let i4 := Slice.len data
+         ok (i3 = i4)
+    else let i3 ← i + 1#usize
+         line_frame.complete_loop data i3
+  else ok false
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::line_frame::complete]:
+    Source: 'crates/aivm-secrets-garrett-core/src/line_frame.rs', lines 4:0-16:1
+    Visibility: public -/
+def line_frame.complete
+  (data : Slice Std.U8) (buffered : Slice Std.U8) (limit : Std.Usize) :
+  Result Bool
+  := do
+  let i := Slice.len data
+  if i > limit
+  then ok false
+  else
+    let i1 := Slice.len buffered
+    if i1 != 0#usize
+    then ok false
+    else line_frame.complete_loop data 0#usize
+
+/-- [aivm_secrets_garrett_core::guest_frame::prepare]:
+    Source: 'crates/aivm-secrets-garrett-core/src/guest_frame.rs', lines 14:0-28:1
+    Visibility: public -/
+def guest_frame.prepare
+  (payload : alloc.vec.Vec Std.U8) (limit : Std.Usize) :
+  Result (core.result.Result guest_frame.Frame guest_frame.FrameDenial)
+  := do
+  let i := alloc.vec.Vec.len payload
+  if i >= limit
+  then ok (core.result.Result.Err guest_frame.FrameDenial.Invalid)
+  else
+    let payload1 ← alloc.vec.Vec.push payload 10#u8
+    let s := alloc.vec.Vec.deref payload1
+    let s1 ← lift (Array.to_slice (Std.Array.empty Std.U8))
+    let b ← line_frame.complete s s1 limit
+    if b
+    then ok (core.result.Result.Ok { wire := payload1, attempted := false })
+    else ok (core.result.Result.Err guest_frame.FrameDenial.Invalid)
+
+/-- Trait declaration: [aivm_secrets_garrett_core::guest_frame::Writer]
+    Source: 'crates/aivm-secrets-garrett-core/src/guest_frame.rs', lines 30:0-34:1
+    Visibility: public -/
+structure guest_frame.Writer (Self : Type _) (Self_Error : Type _) where
+  ALREADY_ATTEMPTED : Result Self_Error
+  write_frame : Self → Slice Std.U8 → Result ((core.result.Result Unit
+    Self_Error) × Self)
+
+/-- [aivm_secrets_garrett_core::guest_frame::{aivm_secrets_garrett_core::guest_frame::Frame}::attempted]:
+    Source: 'crates/aivm-secrets-garrett-core/src/guest_frame.rs', lines 37:4-39:5
+    Visibility: public -/
+def guest_frame.Frame.impl.attempted
+  (self : guest_frame.Frame) : Result Bool := do
+  ok self.attempted
+
+/-- [aivm_secrets_garrett_core::guest_frame::{aivm_secrets_garrett_core::guest_frame::Frame}::send]:
+    Source: 'crates/aivm-secrets-garrett-core/src/guest_frame.rs', lines 40:4-46:5
+    Visibility: public -/
+def guest_frame.Frame.send
+  {W : Type _} {Clause0_Error : Type _} (WriterInst : guest_frame.Writer W
+  Clause0_Error) (self : guest_frame.Frame) (writer : W) :
+  Result ((core.result.Result Unit Clause0_Error) × guest_frame.Frame × W)
+  := do
+  if self.attempted
+  then
+    let t ← WriterInst.ALREADY_ATTEMPTED
+    ok (core.result.Result.Err t, self, writer)
+  else
+    let s := alloc.vec.Vec.deref self.wire
+    let (r, writer1) ← WriterInst.write_frame writer s
+    ok (r, { self with attempted := true }, writer1)
+
 /-- [aivm_secrets_garrett_core::http_auth::HeaderDenial]
     Source: 'crates/aivm-secrets-garrett-core/src/http_auth.rs', lines 5:0-7:1
     Visibility: public -/
@@ -3336,41 +3436,6 @@ def issue_surrogate
       ok (core.result.Result.Ok { claims, token })
     | core.result.Result.Err error => ok (core.result.Result.Err error)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
-
-/-- [aivm_secrets_garrett_core::line_frame::complete]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/line_frame.rs', lines 9:4-16:1
-    Visibility: public -/
-@[rust_loop]
-def line_frame.complete_loop
-  (data : Slice Std.U8) (i : Std.Usize) : Result Bool := do
-  let i1 := Slice.len data
-  if i < i1
-  then
-    let i2 ← Slice.index_usize data i
-    if i2 = 10#u8
-    then let i3 ← i + 1#usize
-         let i4 := Slice.len data
-         ok (i3 = i4)
-    else let i3 ← i + 1#usize
-         line_frame.complete_loop data i3
-  else ok false
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::line_frame::complete]:
-    Source: 'crates/aivm-secrets-garrett-core/src/line_frame.rs', lines 4:0-16:1
-    Visibility: public -/
-def line_frame.complete
-  (data : Slice Std.U8) (buffered : Slice Std.U8) (limit : Std.Usize) :
-  Result Bool
-  := do
-  let i := Slice.len data
-  if i > limit
-  then ok false
-  else
-    let i1 := Slice.len buffered
-    if i1 != 0#usize
-    then ok false
-    else line_frame.complete_loop data 0#usize
 
 /-- [aivm_secrets_garrett_core::manifest::Scalar]
     Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 5:0-8:1

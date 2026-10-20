@@ -229,3 +229,5 @@ pub mod line_frame;
 pub mod bundle;
 
 pub mod json_reflection;
+
+pub mod guest_frame;

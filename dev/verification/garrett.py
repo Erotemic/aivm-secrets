@@ -632,6 +632,18 @@ THEOREMS += [
     'aivm_secrets_garrett_core.line_frame.Proofs.accepted_positive_witness',
 ]
 
+THEOREMS += [
+    'aivm_secrets_garrett_core.guest_frame.Proofs.prepare_contract',
+    'aivm_secrets_garrett_core.guest_frame.Proofs.returning_send_iff',
+    'aivm_secrets_garrett_core.guest_frame.Proofs.attempted_frame_rejects_repeat',
+    'aivm_secrets_garrett_core.guest_frame.Proofs.send_failure_keeps_attempt_and_wire',
+    'aivm_secrets_garrett_core.guest_frame.Proofs.prepare_admitted_iff',
+    'aivm_secrets_garrett_core.guest_frame.Proofs.prepared_wire_is_bounded_single_line',
+    'aivm_secrets_garrett_core.guest_frame.Proofs.prepared_send_exact',
+    'aivm_secrets_garrett_core.guest_frame.Proofs.failed_send_cannot_retry',
+    'aivm_secrets_garrett_core.guest_frame.Proofs.prepared_positive_witness',
+]
+
 TESTS = [
     "tests/test_rust_http_response.py",
     "tests/test_rust_approval.py",
@@ -735,6 +747,7 @@ def inputs() -> list[str]:
         "proofs/GarrettHttpWireValidation.lean",
         "proofs/GarrettHttpWire.lean",
         "proofs/GarrettLineFrame.lean",
+        "proofs/GarrettGuestFrame.lean",
         "proofs/GarrettCoordinatorAuthority.lean",
         "proofs/GarrettCoordinatorReply.lean",
         "proofs/GarrettApproval.lean",
@@ -941,6 +954,7 @@ def assurance_coordinates() -> dict:
         "implementation_linked": "Aeneas-generated optional coordinator dispatch continuation and issuance, request preparation/observation/use/release, key-approval/client-enrollment, current-peer/assurance/revocation, exact root-fencing/recovery-prefix ordered authority/trust-publication and durable-before-send OAuth refresh/lease and one-shot callback/code-exchange lifecycle controllers; exact byte/epoch/time decisions, manifest parameter membership/ranges and operation/write guards, and typed public-result projection, including exact recursive manifest filtering, schema-directed two-run noninterference and exact borrowed-byte literal-reflection search, plus ordered client private-key/CSR publication and uncertainty propagation, final admission-before-emission and repeated exact protocol admission, and concrete authentication-header credential validation/exact byte appending and request-line method/target validation/exact single-line construction used by both native provider writers, exact bounded newline frame admission shared by bridge ingress, forwarded broker replies and the guest client, including empty observed suffix and post-send uncertainty mapping as a tested native adapter, and extended to complete request framing with Host/Accept, exact custom-header ordering, case-insensitive reserved/duplicate refusal, concrete decimal port/body length and exact opaque body bytes; exact bounded ASCII retry-name admission shared by the native host and named-operation client; optional coordinator authority exact peer/operator admission, absent-only activation, revocation/reservation/completion decisions and modeled terminal committed-decision histories; exact operator receipt admission distinguishing absent status from a terminal revocation, composed with successful extracted revocation; optional exact-write approval issuance/deadline and matching, unexpired, single-use consumption; production mutable manifest provider setup/current/send/receive driver, sampled admission-stamp origin, native guarded Write state and conditional W4 provider-event extension for every returned read outcome under explicit local primitive contracts",
         "symbolic_model": "Dolev-Yao encrypted-message deduction, protected-signature origin and public protocol traces; conditional source-controller issuance/dispatch histories",
         "assumptions": [
+            "The production outbound guest encoder has exact bounded newline bytes and a returning single-attempt writer contract. Selected-value/canonical JSON, TLS/close, non-returning primitive and whole-service observation correspondence remain separate obligations.",
             "All returned mutable request prefixes, including planning/freshness/provider/completion errors and write uncertainty, relate to actual source receipt transitions. Exact occupied prefixes rule out hidden repeated audit/send marks. Their W4 audit/provider/denial projection and captured binding require explicit local callback histories and actual current-constructor origin; native primitive/context instantiation, selected-value and guest-frame correspondence, adaptive session histories and full sink closure remain open. The fsync barrier is Linux-only test instrumentation with synthetic data, not production middleware.",
             "The production request-wide receipt gates actual dispatch/completion audit markers, composite phase/current submission and completed native values. Extracted reachable-state invariants and conditional composition through mutable request callbacks require explicit callback-to-receipt-transition and primitive acknowledgement contracts. Native snapshot copying and completed-value checks are reviewed and tested, not a universal I/O refinement. Recorded stamps do not make revocation atomic with a syscall; complete W4/W5 event/history correspondence, non-returning/drop paths and guest frame emission remain open.",
             "Provider forward simulation composes explicit setup/current/send/receive contracts for a provider-attempt projection of mutable state. The native SendState makes its recorded-attempt projection concrete, but native context/world instantiation, the private std/rustls Write primitive, non-returning/drop effects and absence of other I/O are separate obligations; result/state equalities alone do not prove complete native mediation.",
@@ -1503,6 +1517,15 @@ def mutate(pattern: str | None = None) -> None:
         (frame_source, "line framing unterminated frame accepted", "    false\n}\n", "    true\n}\n"),
         (frame_source, "line framing all complete frames refused", "if data.len() > limit || buffered.len() != 0 {", "if true {"),
     ]
+    guest_frame = source.with_name("guest_frame.rs")
+    mutations += [
+        (guest_frame, 'guest framing bound ignored', 'payload.len() >= limit', 'false'),
+        (guest_frame, 'guest framing wrong delimiter', "payload.push(b'\\n');", "payload.push(b'\\r');"),
+        (guest_frame, 'guest framing internal newline accepted', '!crate::line_frame::complete(&payload, b"", limit)', 'false'),
+        (guest_frame, 'guest framing retry guard removed', 'if self.attempted {', 'if false {'),
+        (guest_frame, 'guest framing attempt mark removed', 'self.attempted = true;', 'self.attempted = false;'),
+        (guest_frame, 'guest framing wire substituted', 'writer.write_frame(&self.wire)', 'writer.write_frame(b"{}\\n")'),
+    ]
     wire_source = source.with_name("http_wire.rs")
     mutations += [
         (wire_source, "http wire case folding altered", "byte + 32", "byte + 31"),
@@ -1919,6 +1942,7 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettHttpWireValidation",
                 "GarrettHttpWire",
                 "GarrettLineFrame",
+                "GarrettGuestFrame",
                 "GarrettCoordinatorAuthority",
                 "GarrettCoordinatorReply",
                 "GarrettApproval",
@@ -1947,11 +1971,15 @@ def mutate(pattern: str | None = None) -> None:
                 "http_request.rs": "GarrettHttpRequest",
                 "http_wire.rs": "GarrettHttpWireDecimal",
                 "line_frame.rs": "GarrettLineFrame",
+                "guest_frame.rs": "GarrettGuestFrame",
                 "coordinator_authority.rs": "GarrettCoordinatorAuthority",
             }.get(source.name)
             if preferred:
                 modules.remove(preferred)
                 modules.insert(0, preferred)
+            if source.name == "guest_frame.rs":
+                modules.remove("GarrettLineFrame")
+                modules.insert(0, "GarrettLineFrame")
             if source.name in {"provider_exchange.rs", "manifest.rs", "request_effects.rs"}:
                 dependencies = ["GarrettReadTransition", "GarrettLogin", "Garrett", "GarrettManifest", "GarrettProviderExchange"]
                 if source.name == "request_effects.rs":

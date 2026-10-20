@@ -4,6 +4,7 @@ import GarrettProviderSimulation
 import GarrettApproval
 import GarrettReadInvocations
 import GarrettLineFrame
+import GarrettGuestFrame
 import GarrettHttpWire
 import GarrettCoordinatorReply
 import GarrettCoordinatorAuthority
@@ -582,3 +583,13 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.request_effects.TraceRefinement.trace_steps_keep_binding
 #print axioms aivm_secrets_garrett_core.request_effects.TraceRefinement.returned_entry_keeps_captured_binding
 #print axioms aivm_secrets_garrett_core.request_effects.TraceRefinement.late_check_keeps_audit_without_reply
+
+#print axioms aivm_secrets_garrett_core.guest_frame.Proofs.prepare_contract
+#print axioms aivm_secrets_garrett_core.guest_frame.Proofs.returning_send_iff
+#print axioms aivm_secrets_garrett_core.guest_frame.Proofs.attempted_frame_rejects_repeat
+#print axioms aivm_secrets_garrett_core.guest_frame.Proofs.send_failure_keeps_attempt_and_wire
+#print axioms aivm_secrets_garrett_core.guest_frame.Proofs.prepare_admitted_iff
+#print axioms aivm_secrets_garrett_core.guest_frame.Proofs.prepared_wire_is_bounded_single_line
+#print axioms aivm_secrets_garrett_core.guest_frame.Proofs.prepared_send_exact
+#print axioms aivm_secrets_garrett_core.guest_frame.Proofs.failed_send_cannot_retry
+#print axioms aivm_secrets_garrett_core.guest_frame.Proofs.prepared_positive_witness
