@@ -227,9 +227,16 @@ including actual captured submission to the native writer, and 49 fixture cases
 without a mediation claim. See the
 [provider-I/O validation record](../../dev/validation/2026-10-20-provider-io.json).
 
+**Owned provider channel update:** the [production captured channel and
+response gate](../garrett-provider-channel.md) now own request/writer/lifetime
+state in extracted Rust. Eleven obligations derive exact fields and post-states,
+failed/repeated-submission refusal and the actual successful write/flush origin
+of released response parts. Native receive must consume this gate before
+parsing. Validation is recorded separately for the committed source.
+
 The next implementation task remains native primitive correspondence: connect
-native setup/encoder/channel construction and the std/TLS writer adapter to the
-captured route, complete encoder bytes and extracted submission attempt. Keep trusted TLS/DNS/Write/parser and storage semantics
+native setup/encoder and std/TLS writer/buffer-view semantics to the captured
+route, complete encoder bytes and extracted channel submission/release. Keep trusted TLS/DNS/Write/parser and storage semantics
 explicit, and connect actual source parameters and returned states rather than
 adding a whole-provider-history, fake-arrival or whole-service mediation premise.
 The JSON/frame observation and sequential-session history obligations remain in

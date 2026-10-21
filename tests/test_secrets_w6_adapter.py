@@ -75,7 +75,7 @@ def test_w6_new_provider_send_or_public_raw_return_is_rejected(tmp_path):
     checkout = fixture_checkout(tmp_path)
     path = checkout / SOURCE
     original = path.read_text()
-    marker = '        send_manifest_bytes(&mut channel.stream, &mut channel.request)'
+    marker = '        // Core dispatch owns the composite receipt/current attempt gate.\n        send_manifest_bytes(channel)'
     assert original.count(marker) == 1
     body = original.replace(marker,
                             '        channel.stream.write_all(b"bypass").map_err(|_| Error::UpstreamResponse)?;\n' + marker, 1)

@@ -60,3 +60,4 @@ include proofs/GarrettCompletionTrace.lean
 include proofs/GarrettOwnedRequestTrace.lean
 include proofs/GarrettRequestContext.lean
 include proofs/GarrettProviderIO.lean
+include proofs/GarrettProviderChannel.lean

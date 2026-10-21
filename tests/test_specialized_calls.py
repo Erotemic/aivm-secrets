@@ -32,7 +32,7 @@ def projection():
         function(3, ['aivm_secrets_garrett','custody','<Impl>','exchange'], [6,8]),
         function(4, ['aivm_secrets_garrett_core','dispatch','dispatch'], [22]),
         function(5, ['aivm_secrets_garrett','custody','manifest_session','<Impl>',
-                     'send_manifest_bytes'], [32]),
+                     'send_manifest_bytes'], [36]),
         function(6, ['std','io','Write','write_all'], kind='Opaque'),
         function(7, ['rustls_pki_types','pem','reader'], unresolved={'Trait':2}),
         function(8, ['aivm_secrets_garrett','custody','account_request_bytes'], [14]),
@@ -49,7 +49,7 @@ def projection():
         function(18, ['aivm_secrets_garrett_core','http_wire','valid_name'], [19]),
         function(19, ['aivm_secrets_garrett_core','http_wire','reserved_name'], [20]),
         function(20, ['aivm_secrets_garrett_core','http_wire','ascii_equal']),
-        function(22, ['aivm_secrets_garrett_core','provider_exchange','exchange'], [5,9]),
+        function(22, ['aivm_secrets_garrett_core','provider_exchange','exchange'], [5,9,34]),
         function(23, ['aivm_secrets_garrett_core','request_adapter','<Impl>','dispatch'], [4,30]),
         function(24, ['aivm_secrets_garrett_core','request_adapter','<Impl>','complete'], [25]),
         function(25, ['aivm_secrets_garrett_core','completion','complete'], [26]),
@@ -60,6 +60,9 @@ def projection():
         function(31, ['aivm_secrets_garrett','custody','manifest_session','<Impl>','checks']),
         function(32, ['aivm_secrets_garrett_core','provider_io','<Impl>','submit'], [33]),
         function(33, ['aivm_secrets_garrett','custody','manifest_session','<Impl>','write_all'], [6]),
+        function(34, ['aivm_secrets_garrett','custody','manifest_session','<Impl>','receive'], [35]),
+        function(35, ['aivm_secrets_garrett_core','provider_io','<Impl>','into_parts']),
+        function(36, ['aivm_secrets_garrett_core','provider_io','<Impl>','submit'], [32]),
     ]))
 
 
@@ -69,7 +72,8 @@ def test_compiled_paths_keep_external_and_dynamic_obligations_explicit():
         'coordinated-manifest-executor':[0,29,23,4,22,5],
         'owned-request-completion-audit':[0,29,24,25,26,27],
         'owned-context-check-factory':[0,29,23,30,31],
-        'captured-provider-writer':[0,29,23,4,22,5,32,33],
+        'captured-provider-writer':[0,29,23,4,22,5,36,32,33],
+        'captured-provider-response-parts':[0,29,23,4,22,34,35],
         'account-authentication-bytes':[0,1,2,3,8,14,15,10,11],
         'manifest-authentication-bytes':[0,29,23,4,22,9,14,15,10,11],
         'account-request-line':[0,1,2,3,8,14,15,12,13],
@@ -84,7 +88,7 @@ def test_compiled_paths_keep_external_and_dynamic_obligations_explicit():
         'begin']['line'] == 4
 
 
-@pytest.mark.parametrize('victim', [0,1,2,3,4,8,9,10,12,14,15,16,17,18,19,21,22,23,24,25,27,28,30])
+@pytest.mark.parametrize('victim', [0,1,2,3,4,8,9,10,12,14,15,16,17,18,19,21,22,23,24,25,27,28,30,32,34])
 def test_missing_callback_link_cannot_be_rebaselined_as_a_passing_witness(victim):
     data = projection()
     data['translated']['fun_decls'][victim]['body']['blocks']['direct'] = []

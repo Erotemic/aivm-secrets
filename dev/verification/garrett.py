@@ -266,6 +266,20 @@ THEOREMS += [
 ]
 
 THEOREMS += [
+    'aivm_secrets_garrett_core.provider_io.ChannelProofs.channel_constructor',
+    'aivm_secrets_garrett_core.provider_io.ChannelProofs.channel_submit_iff',
+    'aivm_secrets_garrett_core.provider_io.ChannelProofs.channel_submission_run',
+    'aivm_secrets_garrett_core.provider_io.ChannelProofs.channel_preserves_capture',
+    'aivm_secrets_garrett_core.provider_io.ChannelProofs.channel_spent',
+    'aivm_secrets_garrett_core.provider_io.ChannelProofs.parts_success_iff',
+    'aivm_secrets_garrett_core.provider_io.ChannelProofs.blocked_parts',
+    'aivm_secrets_garrett_core.provider_io.ChannelProofs.fresh_parts_refused',
+    'aivm_secrets_garrett_core.provider_io.ChannelProofs.replay_withdraws_readiness',
+    'aivm_secrets_garrett_core.provider_io.ChannelProofs.released_parts_require_exact_flushed_bytes',
+    'aivm_secrets_garrett_core.provider_io.ChannelProofs.successful_channel_witness',
+]
+
+THEOREMS += [
     'aivm_secrets_garrett_core.dispatch.TraceRefinement.setup_trace',
     'aivm_secrets_garrett_core.dispatch.TraceRefinement.receive_trace',
     'aivm_secrets_garrett_core.dispatch.TraceRefinement.current_trace',
@@ -924,6 +938,7 @@ def inputs() -> list[str]:
         "proofs/GarrettOwnedRequestTrace.lean",
         "proofs/GarrettRequestContext.lean",
         "proofs/GarrettProviderIO.lean",
+        "proofs/GarrettProviderChannel.lean",
         "proofs/GarrettRequestPrefix.lean",
         "proofs/GarrettRequestTrace.lean",
         "tests/test_rust_w6_completion.py",
@@ -1319,6 +1334,14 @@ def mutate(pattern: str | None = None) -> None:
         (provider_io, 'provider io suppressed write refusal', 'Err(error) => return Err(error),', 'Err(_error) => (),'),
         (provider_io, 'provider io skipped flush', '        writer.flush()', '        Ok(())'),
         (provider_io, 'provider io ignored captured route', 'self.work.setup_route(self.route)', 'self.work.setup()'),
+    ]
+    mutations += [
+        (provider_io, 'provider channel starts ready', 'ready: false,', 'ready: true,'),
+        (provider_io, 'provider channel kept stale readiness', '        self.ready = false;', '        let _ignored = self.ready;'),
+        (provider_io, 'provider channel withheld successful response', '                self.ready = true;', '                self.ready = false;'),
+        (provider_io, 'provider channel skipped captured submission', 'self.request.submit(&mut self.writer)', 'self.writer.flush()'),
+        (provider_io, 'provider channel bypassed response gate', 'if !self.ready {', 'if false {'),
+        (provider_io, 'provider channel reset released request', 'Ok((self.writer, self.request, self.metadata))', 'Ok((self.writer, Request::new(self.request.body), self.metadata))'),
     ]
     admission = source.with_name("current_admission.rs")
     mutations += [
@@ -2151,6 +2174,7 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettOwnedRequestTrace",
                 "GarrettRequestContext",
                 "GarrettProviderIO",
+                "GarrettProviderChannel",
                 "GarrettConfinement",
                 "GarrettProviderSimulation",
                 "GarrettRequestPrefix",
@@ -2219,6 +2243,8 @@ def mutate(pattern: str | None = None) -> None:
                 "guest_frame.rs": "GarrettGuestFrame",
                 "coordinator_authority.rs": "GarrettCoordinatorAuthority",
             }.get(source.name)
+            if label.startswith("provider channel "):
+                preferred = "GarrettProviderChannel"
             if label.startswith("trace origin "):
                 preferred = "GarrettDispatchTrace"
             if preferred:
@@ -2251,7 +2277,7 @@ def mutate(pattern: str | None = None) -> None:
                 ]:
                     modules.remove(dependency)
                 modules[1:1] = ["GarrettLogin", "GarrettManifest", "GarrettDisclosure"]
-            if label.startswith(("trace origin ", "request context ", "provider io ")):
+            if label.startswith(("trace origin ", "request context ", "provider io ", "provider channel ")):
                 # Rebuild the actual local import closure against this mutant;
                 # cached proof objects are never substituted for dependencies.
                 closure: list[str] = []
@@ -2267,7 +2293,7 @@ def mutate(pattern: str | None = None) -> None:
                             visit(imported)
                     closure.append(module)
 
-                visit("GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
+                visit("GarrettProviderChannel" if label.startswith("provider channel ") else "GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
                 modules = closure + [module for module in modules if module not in seen]
             for module in modules:
                 proof = temporary / (module + ".lean")

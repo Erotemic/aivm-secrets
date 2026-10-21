@@ -49,6 +49,14 @@ def mutate(repo, filename, before, after):
 
 
 @pytest.mark.parametrize('file,old,new', [
+    ('rust/crates/aivm-secrets-garrett-core/src/provider_io.rs', '    ready: bool,', '    pub ready: bool,'),
+    ('rust/crates/aivm-secrets-garrett-core/src/provider_io.rs', 'ready: false,', 'ready: true,'),
+    ('rust/crates/aivm-secrets-garrett-core/src/provider_io.rs', 'self.ready = false;', 'self.ready = true;'),
+    ('rust/crates/aivm-secrets-garrett-core/src/provider_io.rs', 'self.ready = true;', 'self.ready = false;'),
+    ('rust/crates/aivm-secrets-garrett-core/src/provider_io.rs', 'self.request.submit(&mut self.writer)', 'self.writer.flush()'),
+    ('rust/crates/aivm-secrets-garrett-core/src/provider_io.rs', 'if !self.ready {', 'if false {'),
+    ('rust/crates/aivm-secrets-garrett-core/src/provider_io.rs', 'Ok((self.writer, self.request, self.metadata))', 'Ok((self.writer, Request::new(self.request.body), self.metadata))'),
+    ('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs', 'channel.into_parts()?', 'unchecked_parts(channel)?'),
     ('rust/crates/aivm-secrets-garrett-core/src/request_context.rs', 'provider_io::Routed::new(self.context.route(), plan.work)', 'provider_io::Routed::new(other_route(), plan.work)'),
     ('rust/crates/aivm-secrets-garrett-core/src/provider_io.rs', 'self.work.setup_route(self.route)', 'self.work.setup()'),
     ('rust/crates/aivm-secrets-garrett-core/src/provider_io.rs', 'self.work.audit_route(self.route, phase)', 'self.work.audit(phase)'),

@@ -1,5 +1,6 @@
 import GarrettRequestContext
 import GarrettProviderIO
+import GarrettProviderChannel
 import GarrettOwnedRequestTrace
 import GarrettCurrentAdmission
 import GarrettRequestAdapter
@@ -742,3 +743,15 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.provider_io.Proofs.every_return_is_spent
 #print axioms aivm_secrets_garrett_core.provider_io.Proofs.replay_calls_no_buffer_or_writer
 #print axioms aivm_secrets_garrett_core.request_context.Proofs.dispatch_route
+
+#print axioms aivm_secrets_garrett_core.provider_io.ChannelProofs.channel_constructor
+#print axioms aivm_secrets_garrett_core.provider_io.ChannelProofs.channel_submit_iff
+#print axioms aivm_secrets_garrett_core.provider_io.ChannelProofs.channel_submission_run
+#print axioms aivm_secrets_garrett_core.provider_io.ChannelProofs.channel_preserves_capture
+#print axioms aivm_secrets_garrett_core.provider_io.ChannelProofs.channel_spent
+#print axioms aivm_secrets_garrett_core.provider_io.ChannelProofs.parts_success_iff
+#print axioms aivm_secrets_garrett_core.provider_io.ChannelProofs.blocked_parts
+#print axioms aivm_secrets_garrett_core.provider_io.ChannelProofs.fresh_parts_refused
+#print axioms aivm_secrets_garrett_core.provider_io.ChannelProofs.replay_withdraws_readiness
+#print axioms aivm_secrets_garrett_core.provider_io.ChannelProofs.released_parts_require_exact_flushed_bytes
+#print axioms aivm_secrets_garrett_core.provider_io.ChannelProofs.successful_channel_witness

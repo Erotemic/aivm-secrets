@@ -86,9 +86,18 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and 'body: B,' in io and 'pub body:' not in io
            and 'if self.attempted {' in io and 'self.attempted = true;' in io
            and io.index('self.attempted = true;') < io.index('writer.write_all(bytes)')
-           and 'writer.flush()' in io and 'request.submit(&mut ProviderWriter(writer))' in source
-           and 'provider_io::Request::new(ManifestWire(bytes))' in source,
+           and 'writer.flush()' in io and 'channel.submit()' in source
+           and 'let request = ManifestWire(bytes);' in source,
            'captured route/buffer submission bypassed')
+    channel = io.split('pub struct Channel<', 1)[1]
+    receiver = source.split('fn receive(&mut self, channel: ManifestChannel)', 1)[1].split('impl aivm_secrets_garrett_core::provider_io::RouteWork', 1)[0]
+    ensure('request: Request::new(body)' in channel and 'ready: false,' in channel
+           and 'self.ready = false;' in channel and 'self.request.submit(&mut self.writer)' in channel
+           and 'self.ready = true;' in channel and 'if !self.ready {' in channel
+           and 'Ok((self.writer, self.request, self.metadata))' in channel
+           and 'channel.into_parts()?' in receiver
+           and receiver.index('channel.into_parts()?') < receiver.index('manifest_response('),
+           'captured channel or successful-flush response gate bypassed')
     admission = (root / CORE_CURRENT).read_text().split('#[cfg(test)]', 1)[0]
     scope = (root / CORE_CONTEXT).read_text().split('#[cfg(test)]', 1)[0]
     ensure('request_context::ScopedRequest::new(' in entry

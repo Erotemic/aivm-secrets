@@ -92,10 +92,12 @@ def check(root: Path = ROOT) -> dict:
             and 'current_context.current(&mut CurrentChecks' in fresh,
             'last-admission primitives detached from host state')
     scope = (root / 'rust/crates/aivm-secrets-garrett-core/src/request_context.rs').read_text().split('#[cfg(test)]', 1)[0]
-    primitive = source.split('struct ProviderWriter', 1)[1].split('struct ManifestChannel {', 1)[0]
+    primitive = source.split('struct ProviderWriter', 1)[1].split('type ManifestChannel =', 1)[0]
     require('let stream = StreamOwned::new(conn, socket);' in source and
+            'channel.into_parts()?' in source and
+            'channel.submit()' in primitive and
             'self.0.write_all(bytes)' in ''.join(primitive.split()) and
-            'send_manifest_bytes(&mutchannel.stream,&mutchannel.request)' in ''.join(source.split()) and
+            'send_manifest_bytes(channel)' in ''.join(source.split()) and
             'aivm_secrets_garrett_core::dispatch::WorkforManifestProvider' in ''.join(source.split()) and
             'fn recheck(&mut self) -> Outcome<guards::AdmissionStamp>' in source and
             'request_context::ScopedRequest::new(' in request

@@ -7158,6 +7158,62 @@ def provider_io.Request.submit
     | core.result.Result.Err _ =>
       ok (r, { self with attempted := true }, writer1)
 
+/-- [aivm_secrets_garrett_core::provider_io::Channel]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 119:0-124:1
+    Visibility: public -/
+structure provider_io.Channel (B : Type _) (W : Type _) (M : Type _)
+  (Clause1_Error : Type _) where
+  request : provider_io.Request B
+  writer : W
+  metadata : M
+  ready : Bool
+
+/-- [aivm_secrets_garrett_core::provider_io::{aivm_secrets_garrett_core::provider_io::Channel<B, W, M, Clause1_Error>}::new]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 126:4-133:5
+    Visibility: public -/
+def provider_io.Channel.new
+  {B : Type _} {W : Type _} {M : Type _} {Clause1_Error : Type _}
+  (WireBytesInst : provider_io.WireBytes B) (WriterInst : provider_io.Writer W
+  Clause1_Error) (body : B) (writer : W) (metadata : M) :
+  Result (provider_io.Channel B W M Clause1_Error)
+  := do
+  let r ← provider_io.Request.new WireBytesInst body
+  ok { request := r, writer, metadata, ready := false }
+
+/-- [aivm_secrets_garrett_core::provider_io::{aivm_secrets_garrett_core::provider_io::Channel<B, W, M, Clause1_Error>}::submit]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 134:4-144:5
+    Visibility: public -/
+def provider_io.Channel.submit
+  {B : Type _} {W : Type _} {M : Type _} {Clause1_Error : Type _}
+  (WireBytesInst : provider_io.WireBytes B) (WriterInst : provider_io.Writer W
+  Clause1_Error) (self : provider_io.Channel B W M Clause1_Error) :
+  Result ((core.result.Result Unit Clause1_Error) × (provider_io.Channel B W M
+    Clause1_Error))
+  := do
+  let (r, r1, t) ←
+    provider_io.Request.submit WireBytesInst WriterInst self.request
+      self.writer
+  match r with
+  | core.result.Result.Ok _ =>
+    ok (core.result.Result.Ok (),
+      { self with request := r1, writer := t, ready := true })
+  | core.result.Result.Err _ =>
+    ok (r, { self with request := r1, writer := t, ready := false })
+
+/-- [aivm_secrets_garrett_core::provider_io::{aivm_secrets_garrett_core::provider_io::Channel<B, W, M, Clause1_Error>}::into_parts]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 145:4-150:5
+    Visibility: public -/
+def provider_io.Channel.into_parts
+  {B : Type _} {W : Type _} {M : Type _} {Clause1_Error : Type _}
+  (WireBytesInst : provider_io.WireBytes B) (WriterInst : provider_io.Writer W
+  Clause1_Error) (self : provider_io.Channel B W M Clause1_Error) :
+  Result (core.result.Result (W × (provider_io.Request B) × M) Clause1_Error)
+  := do
+  if self.ready
+  then ok (core.result.Result.Ok (self.writer, self.request, self.metadata))
+  else let t ← WriterInst.INVALID_TRANSITION
+       ok (core.result.Result.Err t)
+
 /-- [aivm_secrets_garrett_core::read_transition::invocation::Trace]
     Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 9:0-20:1
     Visibility: public -/

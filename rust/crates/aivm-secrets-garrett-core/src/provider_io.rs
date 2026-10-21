@@ -114,6 +114,42 @@ impl<B: WireBytes> Request<B> {
     }
 }
 
+/// Keep the captured request, its concrete writer and response-lifetime state
+/// together. Parsing receives their exact states only after a successful flush.
+pub struct Channel<B: WireBytes, W: Writer, M> {
+    request: Request<B>,
+    writer: W,
+    metadata: M,
+    ready: bool,
+}
+impl<B: WireBytes, W: Writer, M> Channel<B, W, M> {
+    pub fn new(body: B, writer: W, metadata: M) -> Self {
+        Self {
+            request: Request::new(body),
+            writer,
+            metadata,
+            ready: false,
+        }
+    }
+    pub fn submit(&mut self) -> Result<(), W::Error> {
+        // A refused extra call also withdraws a previously successful receipt.
+        self.ready = false;
+        match self.request.submit(&mut self.writer) {
+            Ok(()) => {
+                self.ready = true;
+                Ok(())
+            }
+            Err(error) => Err(error),
+        }
+    }
+    pub fn into_parts(self) -> Result<(W, Request<B>, M), W::Error> {
+        if !self.ready {
+            return Err(W::INVALID_TRANSITION);
+        }
+        Ok((self.writer, self.request, self.metadata))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -208,5 +244,69 @@ mod tests {
             assert_eq!(sink.calls, calls);
             assert_eq!(request.body.reads.get(), 1);
         }
+    }
+    fn channel(limit: usize, flush_error: bool) -> Channel<Buffer, Sink, u64> {
+        Channel::new(
+            Buffer {
+                bytes: b"captured-channel\0\xff".to_vec(),
+                reads: Cell::new(0),
+            },
+            Sink {
+                calls: vec![],
+                accepted: vec![],
+                limit,
+                flush_error,
+            },
+            731,
+        )
+    }
+    #[test]
+    fn channel_captures_exact_parts_and_only_successful_flush_releases_them() {
+        for (limit, flush_error) in [
+            (0, false),
+            (4, false),
+            (usize::MAX, true),
+            (usize::MAX, false),
+        ] {
+            let mut pending = channel(limit, flush_error);
+            assert!(!pending.ready);
+            assert!(!pending.request.attempted());
+            let result = pending.submit();
+            let success = limit == usize::MAX && !flush_error;
+            assert_eq!(result.is_ok(), success);
+            assert_eq!(pending.ready, success);
+            assert!(pending.request.attempted());
+            assert_eq!(pending.request.body.reads.get(), 1);
+            assert_eq!(
+                pending.writer.accepted,
+                b"captured-channel\0\xff"[..b"captured-channel\0\xff".len().min(limit)]
+            );
+            if success {
+                let (writer, request, metadata) = pending.into_parts().ok().unwrap();
+                assert_eq!(writer.calls, ["write", "flush"]);
+                assert_eq!(writer.accepted, request.body.bytes);
+                assert!(request.attempted());
+                assert_eq!(metadata, 731);
+            } else {
+                assert!(matches!(pending.into_parts(), Err("replay")));
+            }
+        }
+    }
+    #[test]
+    fn channel_refuses_early_parse_and_extra_submission_withdraws_readiness() {
+        assert!(matches!(
+            channel(usize::MAX, false).into_parts(),
+            Err("replay")
+        ));
+        let mut pending = channel(usize::MAX, false);
+        assert_eq!(pending.submit(), Ok(()));
+        let accepted = pending.writer.accepted.clone();
+        let calls = pending.writer.calls.clone();
+        assert_eq!(pending.submit(), Err("replay"));
+        assert!(!pending.ready);
+        assert_eq!(pending.writer.accepted, accepted);
+        assert_eq!(pending.writer.calls, calls);
+        assert_eq!(pending.request.body.reads.get(), 1);
+        assert!(matches!(pending.into_parts(), Err("replay")));
     }
 }

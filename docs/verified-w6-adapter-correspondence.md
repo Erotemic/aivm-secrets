@@ -279,3 +279,10 @@ Its exact returned callback/state proofs and native partial-write/flush/replay
 cases supplement this reviewed adapter boundary. Native channel, encoder,
 std/TLS/DNS/parser and storage correspondence remain explicit contracts; neither
 this inventory nor the new leaf closes whole-service mediation or secrecy.
+
+The [owned provider channel](garrett-provider-channel.md) now extracts actual
+request/writer/lifetime field selection and the consuming successful-flush
+response gate used before native parsing. Its eleven exact state/origin
+obligations and early/partial/flush/replay cases supplement this adapter review.
+Native encoder/setup conversions and std/TLS/buffer-view/parser/storage
+semantics still need correspondence; complete I/O mediation remains open.

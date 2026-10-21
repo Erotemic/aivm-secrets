@@ -625,8 +625,8 @@ impl aivm_secrets_garrett_core::provider_io::WireBytes for ManifestWire {
         &self.0
     }
 }
-struct ProviderWriter<'a, W: Write>(&'a mut W);
-impl<W: Write> aivm_secrets_garrett_core::provider_io::Writer for ProviderWriter<'_, W> {
+struct ProviderWriter<W: Write>(W);
+impl<W: Write> aivm_secrets_garrett_core::provider_io::Writer for ProviderWriter<W> {
     type Error = Error;
     const INVALID_TRANSITION: Error = Error::InternalError;
     fn write_all(&mut self, bytes: &Vec<u8>) -> Outcome<()> {
@@ -636,18 +636,21 @@ impl<W: Write> aivm_secrets_garrett_core::provider_io::Writer for ProviderWriter
         self.0.flush().map_err(|_| Error::UpstreamResponse)
     }
 }
-fn send_manifest_bytes(
-    writer: &mut impl Write,
-    request: &mut aivm_secrets_garrett_core::provider_io::Request<ManifestWire>,
+fn send_manifest_bytes<W: Write, M>(
+    channel: &mut aivm_secrets_garrett_core::provider_io::Channel<
+        ManifestWire,
+        ProviderWriter<W>,
+        M,
+    >,
 ) -> Outcome<()> {
-    request.submit(&mut ProviderWriter(writer))
+    channel.submit()
 }
 
-struct ManifestChannel {
-    stream: StreamOwned<ClientConnection, TcpStream>,
-    request: aivm_secrets_garrett_core::provider_io::Request<ManifestWire>,
-    _deadline: Deadline,
-}
+type ManifestChannel = aivm_secrets_garrett_core::provider_io::Channel<
+    ManifestWire,
+    ProviderWriter<StreamOwned<ClientConnection, TcpStream>>,
+    Deadline,
+>;
 struct ManifestDispatch<'a> {
     policy: &'a Policy,
     identity: Option<Value>,
@@ -724,14 +727,10 @@ impl aivm_secrets_garrett_core::provider_exchange::Provider for ManifestProvider
     }
     fn send(&mut self, channel: &mut ManifestChannel) -> Outcome<()> {
         // Core dispatch owns the composite receipt/current attempt gate.
-        send_manifest_bytes(&mut channel.stream, &mut channel.request)
+        send_manifest_bytes(channel)
     }
     fn receive(&mut self, channel: ManifestChannel) -> Outcome<Value> {
-        let ManifestChannel {
-            stream,
-            request: _request,
-            _deadline,
-        } = channel;
+        let (ProviderWriter(stream), _request, _deadline) = channel.into_parts()?;
         let effect = &self.effect;
         let body = Zeroizing::new(manifest_response(BufReader::new(stream), &effect.response)?);
         if effect.response == "text" {
@@ -781,7 +780,7 @@ impl aivm_secrets_garrett_core::provider_io::RouteWork<ManifestChannel, Error>
     }
     fn setup_route(&mut self, route: &core::Route) -> Outcome<ManifestChannel> {
         let bytes = manifest_request_bytes(route, self.secret, &self.effect, &self.headers)?;
-        let request = aivm_secrets_garrett_core::provider_io::Request::new(ManifestWire(bytes));
+        let request = ManifestWire(bytes);
         let host = std::str::from_utf8(&route.host).map_err(|_| Error::InvalidPolicy)?;
         let mut socket = TcpStream::connect_timeout(
             &SocketAddr::new(
@@ -811,11 +810,11 @@ impl aivm_secrets_garrett_core::provider_io::RouteWork<ManifestChannel, Error>
         }
         let stream = StreamOwned::new(conn, socket);
 
-        Ok(ManifestChannel {
-            stream,
+        Ok(aivm_secrets_garrett_core::provider_io::Channel::new(
             request,
-            _deadline: deadline,
-        })
+            ProviderWriter(stream),
+            deadline,
+        ))
     }
 }
 fn manifest_response(mut reader: impl BufRead, format: &str) -> Outcome<Vec<u8>> {
@@ -1101,33 +1100,34 @@ mod wire_tests {
         parsed: bool,
     }
     impl aivm_secrets_garrett_core::provider_exchange::Provider for FaultProvider {
-        type Channel = (
-            PartialWriter,
-            aivm_secrets_garrett_core::provider_io::Request<ManifestWire>,
-        );
+        type Channel = aivm_secrets_garrett_core::provider_io::Channel<
+            ManifestWire,
+            ProviderWriter<PartialWriter>,
+            (),
+        >;
         type Output = Value;
         type Error = Error;
         const INVALID_POLICY: Error = Error::InvalidPolicy;
         const OUTCOME_UNKNOWN: Error = Error::OutcomeUnknown;
         fn setup(&mut self) -> Outcome<Self::Channel> {
-            Ok((
-                PartialWriter {
+            Ok(aivm_secrets_garrett_core::provider_io::Channel::new(
+                ManifestWire(Zeroizing::new(b"synthetic-request".to_vec())),
+                ProviderWriter(PartialWriter {
                     accepted: self.accepted.clone(),
                     limit: self.limit,
                     flush_error: self.flush_error,
-                },
-                aivm_secrets_garrett_core::provider_io::Request::new(ManifestWire(Zeroizing::new(
-                    b"synthetic-request".to_vec(),
-                ))),
+                }),
+                (),
             ))
         }
         fn recheck(&mut self) -> Outcome<guards::AdmissionStamp> {
             Ok(self.current)
         }
         fn send(&mut self, channel: &mut Self::Channel) -> Outcome<()> {
-            send_manifest_bytes(&mut channel.0, &mut channel.1)
+            send_manifest_bytes(channel)
         }
-        fn receive(&mut self, _channel: Self::Channel) -> Outcome<Value> {
+        fn receive(&mut self, channel: Self::Channel) -> Outcome<Value> {
+            let _parts = channel.into_parts()?;
             self.parsed = true;
             Ok(json!({"selected":true}))
         }
@@ -1165,23 +1165,58 @@ mod wire_tests {
             (usize::MAX, false),
         ] {
             let accepted = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-            let mut writer = PartialWriter {
+            let writer = PartialWriter {
                 accepted: accepted.clone(),
                 limit,
                 flush_error,
             };
-            let mut request = aivm_secrets_garrett_core::provider_io::Request::new(ManifestWire(
-                Zeroizing::new(b"synthetic-request".to_vec()),
-            ));
-            let first = send_manifest_bytes(&mut writer, &mut request);
+            let mut channel = aivm_secrets_garrett_core::provider_io::Channel::new(
+                ManifestWire(Zeroizing::new(b"synthetic-request".to_vec())),
+                ProviderWriter(writer),
+                (),
+            );
+            let first = send_manifest_bytes(&mut channel);
             assert_eq!(first.is_ok(), limit == usize::MAX && !flush_error);
-            assert!(request.attempted());
             let before = accepted.borrow().clone();
             assert!(matches!(
-                send_manifest_bytes(&mut writer, &mut request),
+                send_manifest_bytes(&mut channel),
                 Err(Error::InternalError)
             ));
             assert_eq!(*accepted.borrow(), before);
+            assert!(matches!(channel.into_parts(), Err(Error::InternalError)));
+        }
+    }
+    #[test]
+    fn native_channel_only_releases_exact_response_parts_after_successful_flush() {
+        for (limit, flush_error) in [
+            (0, false),
+            (5, false),
+            (usize::MAX, true),
+            (usize::MAX, false),
+        ] {
+            let accepted = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+            let writer = PartialWriter {
+                accepted: accepted.clone(),
+                limit,
+                flush_error,
+            };
+            let mut channel = aivm_secrets_garrett_core::provider_io::Channel::new(
+                ManifestWire(Zeroizing::new(b"synthetic-request".to_vec())),
+                ProviderWriter(writer),
+                731,
+            );
+            let success = limit == usize::MAX && !flush_error;
+            assert_eq!(send_manifest_bytes(&mut channel).is_ok(), success);
+            match channel.into_parts() {
+                Ok((ProviderWriter(writer), request, metadata)) => {
+                    assert!(success);
+                    assert!(request.attempted());
+                    assert_eq!(metadata, 731);
+                    assert!(std::rc::Rc::ptr_eq(&writer.accepted, &accepted));
+                    assert_eq!(*accepted.borrow(), b"synthetic-request");
+                }
+                Err(error) => assert!(matches!(error, Error::InternalError) && !success),
+            }
         }
     }
     #[test]

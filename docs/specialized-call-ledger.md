@@ -64,7 +64,10 @@ request context adds a tenth path through scoped dispatch to the concrete
 native check factory. The [captured provider request](garrett-provider-io.md)
 adds an eleventh path through the actual `Request::submit` to the native
 `ProviderWriter::write_all` adapter. Standard/TLS writer semantics remain
-opaque contracts. The coordinator profile retains
+opaque contracts. The [owned provider channel](garrett-provider-channel.md)
+adds a twelfth path from the native receive adapter to the actual consuming
+response-parts gate; it retains the exact submission-to-native-writer path.
+The coordinator profile retains
 six paths. These witnesses do not establish validation dominance or mediation.
 
 The optional [native authority](native-coordinator-authority.md) has a separate

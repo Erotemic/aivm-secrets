@@ -2512,3 +2512,118 @@ input, ordinary/debug binary digest, no-skip JUnit case, six actual leaf mutant
 rejections and packaged proof input was checked before freezing. Prior frozen
 records are unchanged. Queue and roadmap keep native setup/encoder/channel/
 writer correspondence and observation/history obligations open.
+
+## 2026-10-20 23:24:39 -0400
+
+The previous goal turn made verified progress: 87f5313/76223ef/b1c00da capture
+provider route/request and record 3,061 full cases, 665 named audits and vTPM
+acceptance. Clean tree revalidated before continuing. Implemented the next
+channel field-binding/response-eligibility seam in production provider_io::Channel.
+It owns the actual zeroizing request, concrete stream writer and deadline;
+constructor readiness is false, submit resets it and delegates to the exact
+owned request/writer, and only successful write+flush sets it. Consuming
+into_parts refuses before readiness and supplies the exact three owned states
+to native receive before parsing. A refused extra submission withdraws prior
+readiness. This is runtime enforcement rather than an advisory history flag.
+
+Native setup encodes/captures the zeroizing buffer before TCP/TLS and constructs
+the core channel afterward; setup failure still drops that buffer. Native
+receive retains the request and deadline through parsing, preserving the old
+lifetime. No wire version, authorization policy, runtime dependency, Python
+core contract, default identity/TPM requirement or coordinator semantics change.
+Python tools/tests remain non-core. The native buffer view, encoder/setup
+conversion, std/TLS/DNS/parser/storage and nonreturning/drop/unwind semantics
+remain explicit contracts; whole native I/O, selected JSON/frame/close and
+adaptive histories remain open. This is not an NR-2–NR-5 exit or native write/
+normative API parity claim.
+
+Core 45 and native library 36 tests pass. New cases exercise exact bytes,
+metadata/writer identity, partial write/flush refusal, positive response
+release, early parse refusal, and successful-submit then replay withdrawal.
+The prior controller failure fixtures now use the same core channel. All
+143 reviewed boundary cases and 51 specialized ledger fixture cases pass;
+the new optional path reaches the actual response-parts gate. Eleven source
+obligations are being kernel checked, including exact successful-flush origin
+of released parts with actual request/writer callback states and no readiness/
+provider-arrival/whole-callback-history premise.
+
+Development corrections: a broad test-only replacement added an out-of-scope
+channel assertion to an older controller fixture; removed it and native tests
+pass. The W6 injection fixture initially matched both production and synthetic
+send forwarding; made its marker include the unique production gate comment
+and reran all guards. No production workaround or weakened assertion was
+needed. Source-generated Lean is actual extraction, not hand-edited model text.
+
+All eleven new channel obligations compile with warningAsError. Constructor
+proof needed explicit unfolding of the monadic Request constructor. The first
+origin proof tried dependent elimination on projections of an owned channel;
+a private lemma over independently bound request/writer states retains exact
+write/flush origins and avoids that elimination failure. No theorem statement
+was weakened. The final extracted production model is unchanged after these
+proof edits. New files were staged and whitespace checked before heavyweight
+acceptance; full record and six selected source mutants are running.
+
+The full 91-case Rust workspace passes, as do both focused suites (143 source
+guards, 51 ledger fixtures), 168 debug read cases and the standalone native
+product witness. Six safe installed-vTPM cases preserve both persistent public
+objects, dictionary state and cleanup. The fresh bounded compiler capture finds
+twelve paths, including actual native receive to core into_parts, and exact
+input/analysis hashes match. The whole 1,850-job Lean build passes; named audits,
+release parity, selected mutants and full integration acceptance continue.
+
+Ownership tradeoff: the unparsed core channel now declares request before
+writer, so failed-channel field drops zeroize the request before writer drop;
+the deadline remains owned. Native successful receive retains request/deadline
+through parsing as before. Dependency drop/close and unwind effects remain
+explicit unresolved contracts; the extracted returned-state proof does not
+claim to refine them. This is recorded rather than silently treating drop
+ordering as proved complete I/O equivalence.
+
+The central audit passes 676 named obligations without admitted or project
+security axioms; focused eight read-path and five prefix kernel audits also
+pass against the final extraction. Four new channel mutants are already
+rejected in GarrettProviderChannel rather than prerequisite modules. The
+remaining two reset returned request state or bypass the consuming response
+gate. Release parity is running; no source is changed during acceptance.
+
+Final Garrett record passes 676 named obligations, 767 release parity cases
+and both Clippy modes. All six selected of 265 source mutations reject in the
+new GarrettProviderChannel leaf, including sticky prior readiness, initial
+readiness, skipped captured submission, withholding positive release, reset
+released request and bypassed response gate. The generated model exactly
+regenerates from final Rust source. All 288 manifest pins match. Ordinary
+release and the full quiet-VM suite/packaging are now running; earlier failed
+tactics and fixture markers supply no acceptance evidence.
+
+## 2026-10-20 23:48:51 -0400
+
+Owned provider channel acceptance completed: 3,071 full Python/native cases
+pass in 549.83 seconds with zero skips/failures/errors. Required isolated TPM
+cases ran, every native runner was explicitly mapped to fresh debug binaries,
+and heavy compiler/proof/mutation work finished before this quiet-VM run.
+Both package artifacts build; all 288 archive inputs and the embedded Garrett
+manifest match final sources. Both 168-case native read build modes and both
+standalone product workflows pass, including selected positive reads, denied
+writes and revocation. Six safe installed-vTPM cases preserve public objects,
+dictionary state and fixture cleanup; wrong-auth remains isolated.
+
+Final evidence also includes 676 named axiom audits (eleven new actual-channel
+obligations), 767 release parity cases, 91 Rust workspace tests (45 core and
+36 native library), 143 boundary cases, 51 specialized fixture cases, twelve
+fresh bounded compiler paths, six actual leaf mutant rejections, and eight
+read-path/five prefix kernel checks. Source extraction exactly regenerates;
+no hand-edited model, native readiness bit, provider-arrival assumption or
+whole-callback-history premise establishes the channel result. Every original
+route/context/owned-entry obligation remains present and passes.
+
+Confidence is high in the captured request/writer/metadata and successful-flush
+response-eligibility contracts, and in the stated finite synthetic VM tests.
+Native constructor inputs, encoder/setup conversion, zeroizing buffer view,
+std/TLS/DNS/parser/storage and drop/close/unwind semantics remain explicit
+contracts. Selected JSON/frame/close observations, transitive native I/O,
+adaptive sequential histories, NR-2–NR-5 exit, normative Rust parity and native
+write assurance remain open. Independent review, real provider validation,
+physical TPM provenance and deployed VM isolation are separate. Next work must
+connect actual native encoder/setup/std-writer semantics, not replace that seam
+with a new inventory. Implementation/evidence/accounting commits retain actual
+GPT-6 co-authorship with unavailable exact weights/config variant stated.

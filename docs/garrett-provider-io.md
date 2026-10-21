@@ -38,8 +38,9 @@ existing controller failure/uncertainty cases. Read workflow gates still need
 real native process execution without skips. Source guards and re-extracted
 bypass mutants are complementary checks, not semantic I/O proofs.
 
-The buffer-view trait and native zeroizing wrapper correspondence, native
-channel field wiring, standard `Write`, TLS, DNS/IP selection, parser, durable
+The [owned channel](garrett-provider-channel.md) now extracts field selection
+and successful-flush response eligibility. The buffer-view trait and native
+zeroizing wrapper correspondence, standard `Write`, TLS, DNS/IP selection, parser, durable
 audit and environment semantics remain explicit contracts. The captured host
 and port do not prove the resolver's IP or TLS implementation. `write_all`
 invocation is an attempt and may have partially accepted bytes on error; it

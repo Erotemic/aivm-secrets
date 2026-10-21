@@ -579,3 +579,23 @@ and effects, without assuming an entire provider history or replacing proof
 with a compiler inventory. NR-2–NR-5 and the native-write assurance scope remain
 open. The optional specialized path to `Request::submit`/native `write_all` is
 selected compiler linkage only, not dominance or complete mediation.
+
+### Owned channel and successful-flush response gate (October 20)
+
+The [production provider channel](../garrett-provider-channel.md) moves the
+actual request/writer/lifetime field selection into extracted Rust. Native setup
+constructs this owner; native receive consumes its parts gate before parsing.
+Only actual successful request submission enables response parts, and any
+refused replay withdraws prior readiness. Eleven obligations derive exact
+returned states, capture preservation, refusal and positive release, and the
+captured write-buffer/write-result/flush-result origin of parser eligibility.
+There is no supplied native readiness bit or whole provider history premise.
+
+This closes the owned channel selection/response-eligibility seam from its
+constructor through submission and consuming release. Native setup and encoder
+conversion, the zeroizing buffer view and standard/TLS/DNS/parser/storage
+semantics remain contracts. The next substantive step must connect these to
+actual route/encoder byte arguments, then selected JSON/frame/close observations
+and adaptive native histories. Compiler paths to the concrete writer and parts
+gate are complementary linkage evidence, not dominance or native I/O closure.
+NR-2–NR-5, native write assurance and normative Rust API parity remain open.
