@@ -109,12 +109,19 @@ theorem returned_dispatch_with_writer_segment
       [attemptedEvent phase (contexts phase) stamp] := sameDelta.trans projection
   have origin := checked_send_establishes_origin contexts gateBefore gateAfter
     localState nextLocal phase write true checkedOrigin marked
+  -- Use the same named context on both sides of the gate.  The prefix
+  -- hypothesis unfolds the constant function, whereas gateDelta names it.
+  have beforeTraceBound : TraceSteps contexts initial gateBefore beforeEvents :=
+    beforeTrace
+  have gateWithDelta : TraceSteps contexts initial gateAfter
+      (beforeEvents ++ delta contexts gateBefore gateAfter) :=
+    TraceSteps.next beforeTraceBound
+      (request_effects.Proofs.Step.begin_send true phase localState nextLocal write marked)
+      origin
   have gateTrace : TraceSteps contexts initial gateAfter
       (beforeEvents ++ [attemptedEvent phase (contexts phase) stamp]) := by
-    simpa only [gateDelta] using
-      (TraceSteps.next beforeTrace
-        (request_effects.Step.begin_send true phase localState nextLocal write marked)
-        origin)
+    rw [gateDelta] at gateWithDelta
+    exact gateWithDelta
   have completedTrace : TraceSteps contexts initial report.effects
       (beforeEvents ++ [attemptedEvent phase (contexts phase) stamp] ++ afterEvents) := by
     simpa only [List.append_assoc] using (traces_append gateTrace after)
