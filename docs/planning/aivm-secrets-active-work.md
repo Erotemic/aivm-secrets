@@ -198,7 +198,16 @@ planning/denial forwarding and the actual constructor/controller/consuming-entry
 trace and selected-value origin. Native factory context preservation is no
 longer a premise for this producer. Startup/input conversion, native primitive/
 I/O, selected JSON/frame/close and adaptive-history correspondence remain open;
-this is not an NR-2–NR-5 exit. Validation is recorded separately after VM gates.
+this is not an NR-2–NR-5 exit.
+
+Source `cde04b3` passes 3,053 full-suite cases with zero skips, 645 named
+axiom audits, 767 release parity cases, 86 Rust workspace cases, four selected
+source mutations rejected in the new context-wrapper proof, both 168-case
+native build-mode gates and standalone product workflows, all 285 archive pins
+and six safe installed-vTPM cases. Focused read-path/prefix proofs pass against
+the new extraction. The fresh optional compiler capture retains ten required
+paths and 48 fixture cases, without a mediation claim. See the
+[request-context validation record](../../dev/validation/2026-10-20-request-context.json).
 
 The next implementation task is native primitive correspondence, starting with
 the captured route/request buffer and the actual credential-bearing writer's
