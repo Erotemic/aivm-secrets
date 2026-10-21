@@ -2505,3 +2505,10 @@ and these synthetic VM observations. Real-provider validation, deployed VM
 isolation and independent review remain separate. The implementation and
 frozen evidence are committed with the GPT-6 co-author trailer and unavailable
 exact weights/config variant stated; accounting is published separately.
+
+Frozen provider-I/O acceptance records committed implementation 87f5313 in
+dev/validation/2026-10-20-provider-io.json. Every source pin, compiler analysis
+input, ordinary/debug binary digest, no-skip JUnit case, six actual leaf mutant
+rejections and packaged proof input was checked before freezing. Prior frozen
+records are unchanged. Queue and roadmap keep native setup/encoder/channel/
+writer correspondence and observation/history obligations open.

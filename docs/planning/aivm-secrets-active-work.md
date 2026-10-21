@@ -216,7 +216,16 @@ an extracted one-attempt writer controller. Twenty additional obligations cover
 exact arguments/post-states, route preservation and all returned write/flush
 prefixes. The native raw setup/audit/current paths refuse direct use. This
 advances the primitive seam without proving complete native I/O correspondence.
-Validation is recorded separately for the committed source.
+
+Source `87f5313` passes 3,061 full-suite cases with zero skips, 665 named
+axiom audits, 767 release parity cases, 88 Rust workspace cases, six selected
+source-extracted mutations rejected in the provider-I/O leaf, both 168-case
+native build-mode gates and standalone product workflows, all 287 archive pins
+and six safe installed-vTPM cases. Focused read-path/prefix proofs pass against
+the final extraction. The fresh optional compiler capture retains eleven paths,
+including actual captured submission to the native writer, and 49 fixture cases
+without a mediation claim. See the
+[provider-I/O validation record](../../dev/validation/2026-10-20-provider-io.json).
 
 The next implementation task remains native primitive correspondence: connect
 native setup/encoder/channel construction and the std/TLS writer adapter to the
