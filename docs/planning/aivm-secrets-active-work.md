@@ -232,7 +232,17 @@ response gate](../garrett-provider-channel.md) now own request/writer/lifetime
 state in extracted Rust. Eleven obligations derive exact fields and post-states,
 failed/repeated-submission refusal and the actual successful write/flush origin
 of released response parts. Native receive must consume this gate before
-parsing. Validation is recorded separately for the committed source.
+parsing.
+
+Source `7d1069d` passes 3,071 full-suite cases with zero skips, 676 named
+axiom audits, 767 release parity cases, 91 Rust workspace cases, six selected
+source mutations rejected in the channel leaf, both 168-case native build-mode
+gates and standalone product workflows, all 288 archive pins and six safe
+installed-vTPM cases. Eight read-path and five prefix kernel audits pass.
+The fresh optional compiler capture retains twelve paths and 51 fixture cases,
+including native receive to the actual response-parts gate, without a mediation
+claim. See the
+[channel validation record](../../dev/validation/2026-10-20-provider-channel.json).
 
 The next implementation task remains native primitive correspondence: connect
 native setup/encoder and std/TLS writer/buffer-view semantics to the captured

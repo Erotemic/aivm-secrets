@@ -2627,3 +2627,12 @@ physical TPM provenance and deployed VM isolation are separate. Next work must
 connect actual native encoder/setup/std-writer semantics, not replace that seam
 with a new inventory. Implementation/evidence/accounting commits retain actual
 GPT-6 co-authorship with unavailable exact weights/config variant stated.
+
+Frozen channel acceptance records committed implementation 7d1069d in
+dev/validation/2026-10-20-provider-channel.json. All source/analysis/binary
+hashes, no-skip full and ordinary JUnit cases, six actual leaf mutant
+rejections and packaged input bytes were verified before freezing. Prior
+frozen records are unchanged. Queue and roadmap advance owned channel field
+selection/response eligibility while retaining the native encoder/setup/view/
+std-writer and observation/history obligations. Accounting is published in a
+separate co-authored commit.
