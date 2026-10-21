@@ -40,8 +40,12 @@ def free_port():
         return listener.getsockname()[1]
 
 
-def vault(directory, **changes):
-    return VaultCase(directory, provider=profile(callback_port=free_port(), **changes))
+def vault(directory, endpoint, **changes):
+    # The provider must bind before this temporary callback-port probe closes;
+    # otherwise its port-zero bind can reclaim the chosen callback port.
+    port = free_port()
+    assert port != endpoint.port
+    return VaultCase(directory, provider=profile(callback_port=port, **changes))
 
 
 class Login:
@@ -63,7 +67,7 @@ class Login:
             ready, _, _ = select.select([self.child.stdout], [], [], 8)
             assert ready, "native login did not announce its bound callback"
             self.event = codec.loads(self.child.stdout.readline())
-            assert self.event["event"] == "authorization_required", self.event
+            assert self.event.get("event") == "authorization_required", self.event
             assert set(self.event) == {
                 "version",
                 "event",
@@ -119,9 +123,9 @@ class Login:
 def test_actual_pkce_exchange_installs_python_readable_grant_without_secret_output(
     tmp_path,
 ):
-    case = vault(tmp_path)
     observed = []
     with TLSService(tmp_path, host="login.example.org") as endpoint:
+        case = vault(tmp_path, endpoint)
 
         def issue(seen):
             form = parse_qs(seen["body"])
@@ -194,8 +198,8 @@ def test_actual_pkce_exchange_installs_python_readable_grant_without_secret_outp
 )
 def test_hostile_callback_does_not_consume_or_cancel_valid_login(tmp_path, noise):
     issuer = "https://login.example.org/issuer"
-    case = vault(tmp_path, issuer_response=issuer)
     with TLSService(tmp_path, host="login.example.org") as endpoint:
+        case = vault(tmp_path, endpoint, issuer_response=issuer)
         endpoint.routes[("POST", "/token")] = response()
         with Login(case, endpoint) as login:
             fields = {"code": CODE, "state": login.state, "iss": issuer}
@@ -256,8 +260,8 @@ def test_hostile_callback_does_not_consume_or_cancel_valid_login(tmp_path, noise
 
 
 def test_unexpected_issuer_is_refused_when_profile_has_none(tmp_path):
-    case = vault(tmp_path)
     with TLSService(tmp_path, host="login.example.org") as endpoint:
+        case = vault(tmp_path, endpoint)
         endpoint.routes[("POST", "/token")] = response()
         with Login(case, endpoint) as login:
             assert (
@@ -277,8 +281,8 @@ def test_unexpected_issuer_is_refused_when_profile_has_none(tmp_path):
 
 def test_matching_provider_denial_stops_without_secret_text_or_exchange(tmp_path):
     issuer = "https://login.example.org/issuer"
-    case = vault(tmp_path, issuer_response=issuer)
     with TLSService(tmp_path, host="login.example.org") as endpoint:
+        case = vault(tmp_path, endpoint, issuer_response=issuer)
         with Login(case, endpoint) as login:
             status, headers, body = login.visit(
                 {
@@ -299,9 +303,9 @@ def test_matching_provider_denial_stops_without_secret_text_or_exchange(tmp_path
 
 @pytest.mark.parametrize("idle", [True, False])
 def test_absolute_login_deadline_cuts_idle_and_trickling_clients(tmp_path, idle):
-    case = vault(tmp_path)
     stop = threading.Event()
     with TLSService(tmp_path, host="login.example.org") as endpoint:
+        case = vault(tmp_path, endpoint)
         with Login(case, endpoint, timeout=1) as login:
             connection = socket.create_connection(("127.0.0.1", login.port), timeout=2)
 
@@ -327,8 +331,8 @@ def test_absolute_login_deadline_cuts_idle_and_trickling_clients(tmp_path, idle)
 
 
 def test_slow_callback_is_cut_so_a_queued_valid_callback_can_succeed(tmp_path):
-    case = vault(tmp_path)
     with TLSService(tmp_path, host="login.example.org") as endpoint:
+        case = vault(tmp_path, endpoint)
         endpoint.routes[("POST", "/token")] = response()
         with Login(case, endpoint, timeout=12) as login:
             connection = socket.create_connection(("127.0.0.1", login.port), timeout=2)
@@ -381,8 +385,8 @@ def test_busy_callback_port_has_fixed_error_and_sends_nothing(tmp_path):
     "kind", ["redirect", "invalid_grant", "scope", "truncated", "non_bearer"]
 )
 def test_exchange_failure_is_fixed_and_does_not_install_or_retry(tmp_path, kind):
-    case = vault(tmp_path)
     with TLSService(tmp_path, host="login.example.org") as endpoint:
+        case = vault(tmp_path, endpoint)
         if kind == "redirect":
             route = lambda _: (
                 302,
@@ -411,8 +415,8 @@ def test_exchange_failure_is_fixed_and_does_not_install_or_retry(tmp_path, kind)
 
 
 def test_wrong_tls_identity_is_definitely_not_sent(tmp_path):
-    case = vault(tmp_path)
     with TLSService(tmp_path, host="wrong.example.org") as endpoint:
+        case = vault(tmp_path, endpoint)
         with Login(case, endpoint) as login:
             assert login.visit()[0] == 200
             login.finish(error="credential_source", reason="exchange_not_sent")
@@ -423,8 +427,8 @@ def test_wrong_tls_identity_is_definitely_not_sent(tmp_path):
 def test_successful_exchange_with_failed_install_reports_orphan_without_overwrite(
     tmp_path, failure
 ):
-    case = vault(tmp_path)
     with TLSService(tmp_path, host="login.example.org") as endpoint:
+        case = vault(tmp_path, endpoint)
 
         def issue(_):
             if failure == "race":
@@ -451,9 +455,9 @@ def test_successful_exchange_with_failed_install_reports_orphan_without_overwrit
 
 
 def test_explicit_reauthorization_advances_epoch_and_resets_grant_generation(tmp_path):
-    case = vault(tmp_path)
-    case.enroll(generation=8)
     with TLSService(tmp_path, host="login.example.org") as endpoint:
+        case = vault(tmp_path, endpoint)
+        case.enroll(generation=8)
         endpoint.routes[("POST", "/token")] = response()
         with Login(case, endpoint, replace=True) as login:
             login.visit()
@@ -466,10 +470,10 @@ def test_explicit_reauthorization_advances_epoch_and_resets_grant_generation(tmp
 def test_native_login_to_provider_action_never_requires_a_plaintext_grant_file(
     tmp_path,
 ):
-    case = vault(tmp_path)
     authdir = tmp_path / "oauth-service"
     authdir.mkdir(mode=0o700)
     with TLSService(authdir, host="login.example.org") as endpoint:
+        case = vault(tmp_path, endpoint)
         endpoint.routes[("POST", "/token")] = response(access_token=TOKEN)
         with Login(case, endpoint) as login:
             login.visit()
@@ -495,9 +499,9 @@ def test_native_login_to_provider_action_never_requires_a_plaintext_grant_file(
 
 
 def test_accepted_callback_cannot_redeem_again_while_exchange_is_blocked(tmp_path):
-    case = vault(tmp_path)
     entered, release = threading.Event(), threading.Event()
     with TLSService(tmp_path, host="login.example.org") as endpoint:
+        case = vault(tmp_path, endpoint)
 
         def issue(_):
             entered.set()

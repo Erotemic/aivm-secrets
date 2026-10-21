@@ -89,56 +89,68 @@ pub fn parse(bytes: &[u8], limit: usize) -> Outcome<Value> {
     let raw: Box<RawValue> = serde_json::from_slice(bytes).map_err(|_| Error::InvalidCapability)?;
     decode(&raw, 0)
 }
-fn string(out: &mut String, value: &str) {
-    let values = zeroize::Zeroizing::new(value.chars().map(u32::from).collect::<Vec<_>>());
-    let mut encoded = zeroize::Zeroizing::new(Vec::new());
-    assert!(
-        aivm_secrets_garrett_core::json_string::append(&mut encoded, &values),
-        "Rust string scalars"
-    );
-    out.push_str(std::str::from_utf8(&encoded).expect("ASCII JSON string"));
+// Capture ordering and number spelling once. Layout and string quoting are
+// owned by the extracted encoder used by both canonical bytes and guest frames.
+pub(crate) struct Captured(aivm_secrets_garrett_core::json_wire::Value);
+impl Drop for Captured {
+    fn drop(&mut self) {
+        use aivm_secrets_garrett_core::json_wire::Value as Wire;
+        use zeroize::Zeroize;
+        fn clear(value: &mut Wire) {
+            match value {
+                Wire::Number(bytes) => bytes.zeroize(),
+                Wire::Text(scalars) => scalars.zeroize(),
+                Wire::Array(values) => values.iter_mut().for_each(clear),
+                Wire::Object(fields) => {
+                    for (name, value) in fields {
+                        name.zeroize();
+                        clear(value);
+                    }
+                }
+                Wire::Null | Wire::Boolean(_) => (),
+            }
+        }
+        clear(&mut self.0);
+    }
 }
-
-fn encode(out: &mut String, value: &Value) {
-    match value {
-        Value::Null => out.push_str("null"),
-        Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
-        Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                out.push_str(&i.to_string());
+pub(crate) fn capture(value: &Value) -> Captured {
+    use aivm_secrets_garrett_core::json_wire::Value as Wire;
+    fn convert(value: &Value) -> Wire {
+        match value {
+            Value::Null => Wire::Null,
+            Value::Bool(value) => Wire::Boolean(*value),
+            Value::Number(value) => Wire::Number(if let Some(integer) = value.as_i64() {
+                integer.to_string().into_bytes()
             } else {
-                out.push_str(&n.to_string());
-            }
+                value.to_string().into_bytes()
+            }),
+            Value::String(value) => Wire::Text(value.chars().map(u32::from).collect()),
+            Value::Array(values) => Wire::Array(values.iter().map(convert).collect()),
+            Value::Object(fields) => Wire::Object(
+                fields
+                    .iter()
+                    .map(|(name, value)| (name.chars().map(u32::from).collect(), convert(value)))
+                    .collect(),
+            ),
         }
-        Value::String(s) => string(out, s),
-        Value::Array(a) => {
-            out.push('[');
-            for (i, v) in a.iter().enumerate() {
-                if i > 0 {
-                    out.push(',');
-                }
-                encode(out, v);
-            }
-            out.push(']');
-        }
-        Value::Object(m) => {
-            out.push('{');
-            for (i, (k, v)) in m.iter().enumerate() {
-                if i > 0 {
-                    out.push(',');
-                }
-                string(out, k);
-                out.push(':');
-                encode(out, v);
-            }
-            out.push('}');
-        }
+    }
+    Captured(convert(value))
+}
+impl Captured {
+    pub(crate) fn prepare(
+        &self,
+        limit: usize,
+    ) -> Result<
+        aivm_secrets_garrett_core::guest_frame::Frame,
+        aivm_secrets_garrett_core::guest_frame::FrameDenial,
+    > {
+        aivm_secrets_garrett_core::json_wire::prepare(&self.0, limit)
     }
 }
 pub fn canonical(value: &Value) -> Vec<u8> {
-    let mut out = String::new();
-    encode(&mut out, value);
-    out.into_bytes()
+    aivm_secrets_garrett_core::json_wire::encode(&capture(value).0)
+        .ok()
+        .expect("Rust JSON scalars")
 }
 
 pub fn keys<'a>(
@@ -226,6 +238,97 @@ mod tests {
 #[cfg(test)]
 mod canonical_tests {
     use super::*;
+    fn previous(value: &Value) -> Vec<u8> {
+        use std::fmt::Write;
+        fn string(out: &mut String, value: &str) {
+            out.push('"');
+            for c in value.chars() {
+                match c {
+                    '"' => out.push_str("\\\""),
+                    '\\' => out.push_str("\\\\"),
+                    '\u{8}' => out.push_str("\\b"),
+                    '\u{c}' => out.push_str("\\f"),
+                    '\n' => out.push_str("\\n"),
+                    '\r' => out.push_str("\\r"),
+                    '\t' => out.push_str("\\t"),
+                    ' '..='~' => out.push(c),
+                    _ => {
+                        for unit in c.encode_utf16(&mut [0; 2]) {
+                            write!(out, "\\u{unit:04x}").unwrap();
+                        }
+                    }
+                }
+            }
+            out.push('"');
+        }
+        fn emit(out: &mut String, value: &Value) {
+            match value {
+                Value::Null => out.push_str("null"),
+                Value::Bool(value) => out.push_str(if *value { "true" } else { "false" }),
+                Value::Number(value) => {
+                    if let Some(integer) = value.as_i64() {
+                        write!(out, "{integer}").unwrap();
+                    } else {
+                        write!(out, "{value}").unwrap();
+                    }
+                }
+                Value::String(value) => string(out, value),
+                Value::Array(values) => {
+                    out.push('[');
+                    for (index, value) in values.iter().enumerate() {
+                        if index > 0 {
+                            out.push(',');
+                        }
+                        emit(out, value);
+                    }
+                    out.push(']');
+                }
+                Value::Object(fields) => {
+                    out.push('{');
+                    for (index, (name, value)) in fields.iter().enumerate() {
+                        if index > 0 {
+                            out.push(',');
+                        }
+                        string(out, name);
+                        out.push(':');
+                        emit(out, value);
+                    }
+                    out.push('}');
+                }
+            }
+        }
+        let mut out = String::new();
+        emit(&mut out, value);
+        out.into_bytes()
+    }
+    #[test]
+    fn complete_core_encoder_preserves_native_number_and_container_spelling() {
+        for text in [
+            "null",
+            "true",
+            "false",
+            "[]",
+            "{}",
+            "-0",
+            "-9223372036854775808",
+            "18446744073709551616",
+            "1.2300",
+            "1e+04",
+            "-0.0",
+            "1e-300",
+            "[{},[],[1,true,null]]",
+            r#"{"$serde_json::private::Number":"kept","é":"😀"}"#,
+        ] {
+            let value = parse(text.as_bytes(), 65536).unwrap();
+            assert_eq!(canonical(&value), previous(&value), "{text}");
+        }
+        let huge = Value::Number(serde_json::from_str(&"9".repeat(4300)).unwrap());
+        let mut value = serde_json::json!({"number":huge,"text":"\u{0}\n\r\t\u{7f}é😀","flags":[true,false,null]});
+        for _ in 0..32 {
+            assert_eq!(canonical(&value), previous(&value));
+            value = serde_json::json!({"nested":[value,{},[]],"empty":""});
+        }
+    }
     #[test]
     fn native_canonical_preserves_exact_nested_unicode_and_control_bytes() {
         let value = serde_json::json!({"text":"\u{0}\n\"\\é😀", "array":["~\u{7f}",7,true,null], "é":"\u{2028}"});

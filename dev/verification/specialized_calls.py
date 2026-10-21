@@ -248,7 +248,7 @@ def explain(projection, profile="bridge"):
     declarations = [f for f in projection['translated']['fun_decls'] if f]
     nodes = {f['def_id']: f for f in declarations}
     require(len(nodes) == len(declarations), 'duplicate projected function ID')
-    root_name = (('aivm_secrets_garrett', 'tls', 'answer') if profile == 'bridge' else
+    root_name = (('aivm_secrets_garrett', 'tls', 'serve') if profile == 'bridge' else
         ('aivm_secrets_garrett', 'coordinator_authority', 'server', 'exchange'))
     root = select(nodes, root_name)
     witnesses = {}
@@ -278,8 +278,15 @@ def explain(projection, profile="bridge"):
             ('aivm_secrets_garrett_core','provider_wire',getter)]) for getter in ['host','port']],
         ('native-json-string-encoder', [
             ('aivm_secrets_garrett','json','canonical'),
-            ('aivm_secrets_garrett','json','string'),
+            ('aivm_secrets_garrett_core','json_wire','encode'),
+            ('aivm_secrets_garrett_core','json_wire','append'),
             ('aivm_secrets_garrett_core','json_string','append')]),
+        *[('guest-json-' + label, [
+            ('aivm_secrets_garrett','tls','from_answer'),
+            ('aivm_secrets_garrett','json','prepare'),
+            ('aivm_secrets_garrett_core','json_wire','prepare'),
+            ('aivm_secrets_garrett_core', module, target)])
+          for label, module, target in [('encoding','json_wire','encode'), ('framing','guest_frame','prepare')]],
         ('owned-context-check-factory', [
             ('aivm_secrets_garrett_core','read_transition','run_current'),
             ('aivm_secrets_garrett_core','request_adapter','dispatch'),

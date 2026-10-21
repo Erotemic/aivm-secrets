@@ -64,3 +64,6 @@ include proofs/GarrettProviderChannel.lean
 include proofs/GarrettProviderWire.lean
 include proofs/GarrettJsonStringScalar.lean
 include proofs/GarrettJsonString.lean
+
+include proofs/GarrettJsonWire.lean
+include proofs/GarrettJsonFrame.lean

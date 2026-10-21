@@ -5884,6 +5884,189 @@ def json_string.append
     ok (true, output3)
   else ok (false, output)
 
+/-- [aivm_secrets_garrett_core::json_wire::Value]
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 6:0-13:1
+    Visibility: public -/
+@[discriminant isize]
+inductive json_wire.Value where
+| Null : json_wire.Value
+| Boolean : Bool → json_wire.Value
+| Number : alloc.vec.Vec Std.U8 → json_wire.Value
+| Text : alloc.vec.Vec Std.U32 → json_wire.Value
+| Array : alloc.vec.Vec json_wire.Value → json_wire.Value
+| Object :
+  alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value) →
+  json_wire.Value
+
+/-- [aivm_secrets_garrett_core::json_wire::EncodingDenial]
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 14:0-16:1
+    Visibility: public -/
+@[discriminant isize]
+inductive json_wire.EncodingDenial where
+| InvalidText : json_wire.EncodingDenial
+
+mutual
+
+/-- [aivm_secrets_garrett_core::json_wire::append]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 18:0-34:1
+    Visibility: public -/
+def json_wire.append
+  (output : alloc.vec.Vec Std.U8) (value : json_wire.Value) :
+  Result (Bool × (alloc.vec.Vec Std.U8))
+  := do
+  match value with
+  | json_wire.Value.Null =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 4#usize [ 110#u8, 117#u8, 108#u8, 108#u8 ]))
+    let output1 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+    ok (true, output1)
+  | json_wire.Value.Boolean value1 =>
+    if value1
+    then
+      let s ←
+        lift (Array.to_slice
+          (Array.make 4#usize [ 116#u8, 114#u8, 117#u8, 101#u8 ]))
+      let output1 ←
+        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+      ok (true, output1)
+    else
+      let s ←
+        lift (Array.to_slice
+          (Array.make 5#usize [ 102#u8, 97#u8, 108#u8, 115#u8, 101#u8 ]))
+      let output1 ←
+        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+      ok (true, output1)
+  | json_wire.Value.Number token =>
+    let s := alloc.vec.Vec.deref token
+    let output1 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+    ok (true, output1)
+  | json_wire.Value.Text scalars => json_string.append output scalars
+  | json_wire.Value.Array values => json_wire.append_array output values
+  | json_wire.Value.Object fields => json_wire.append_fields output fields
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::json_wire::append_array]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 39:4-50:1 -/
+@[rust_loop]
+def json_wire.append_array_loop
+  (output : alloc.vec.Vec Std.U8) (values : alloc.vec.Vec json_wire.Value)
+  (index : Std.Usize) :
+  Result (Bool × (alloc.vec.Vec Std.U8))
+  := do
+  let i := alloc.vec.Vec.len values
+  if index < i
+  then
+    let output1 ←
+      if index > 0#usize
+      then alloc.vec.Vec.push output 44#u8
+      else ok output
+    let v ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        json_wire.Value) values index
+    let (b, output2) ← json_wire.append output1 v
+    if b
+    then
+      let index1 ← index + 1#usize
+      json_wire.append_array_loop output2 values index1
+    else ok (false, output2)
+  else let output1 ← alloc.vec.Vec.push output 93#u8
+       ok (true, output1)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::json_wire::append_array]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 36:0-50:1 -/
+def json_wire.append_array
+  (output : alloc.vec.Vec Std.U8) (values : alloc.vec.Vec json_wire.Value) :
+  Result (Bool × (alloc.vec.Vec Std.U8))
+  := do
+  let output1 ← alloc.vec.Vec.push output 91#u8
+  json_wire.append_array_loop output1 values 0#usize
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::json_wire::append_field]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 51:0-57:1 -/
+def json_wire.append_field
+  (output : alloc.vec.Vec Std.U8)
+  (field : ((alloc.vec.Vec Std.U32) × json_wire.Value)) :
+  Result (Bool × (alloc.vec.Vec Std.U8))
+  := do
+  let (v, v1) := field
+  let (b, output1) ← json_string.append output v
+  if b
+  then
+    let output2 ← alloc.vec.Vec.push output1 58#u8
+    json_wire.append output2 v1
+  else ok (false, output1)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::json_wire::append_fields]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 61:4-72:1 -/
+@[rust_loop]
+def json_wire.append_fields_loop
+  (output : alloc.vec.Vec Std.U8)
+  (fields : alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value))
+  (index : Std.Usize) :
+  Result (Bool × (alloc.vec.Vec Std.U8))
+  := do
+  let i := alloc.vec.Vec.len fields
+  if index < i
+  then
+    let output1 ←
+      if index > 0#usize
+      then alloc.vec.Vec.push output 44#u8
+      else ok output
+    let p ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        ((alloc.vec.Vec Std.U32) × json_wire.Value)) fields index
+    let (b, output2) ← json_wire.append_field output1 p
+    if b
+    then
+      let index1 ← index + 1#usize
+      json_wire.append_fields_loop output2 fields index1
+    else ok (false, output2)
+  else let output1 ← alloc.vec.Vec.push output 125#u8
+       ok (true, output1)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::json_wire::append_fields]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 58:0-72:1 -/
+def json_wire.append_fields
+  (output : alloc.vec.Vec Std.U8)
+  (fields : alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value)) :
+  Result (Bool × (alloc.vec.Vec Std.U8))
+  := do
+  let output1 ← alloc.vec.Vec.push output 123#u8
+  json_wire.append_fields_loop output1 fields 0#usize
+partial_fixpoint
+
+end
+
+/-- [aivm_secrets_garrett_core::json_wire::encode]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 74:0-80:1
+    Visibility: public -/
+def json_wire.encode
+  (value : json_wire.Value) :
+  Result (core.result.Result (alloc.vec.Vec Std.U8) json_wire.EncodingDenial)
+  := do
+  let (b, output) ← json_wire.append (alloc.vec.Vec.new Std.U8) value
+  if b
+  then ok (core.result.Result.Ok output)
+  else ok (core.result.Result.Err json_wire.EncodingDenial.InvalidText)
+
+/-- [aivm_secrets_garrett_core::json_wire::prepare]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 82:0-90:1
+    Visibility: public -/
+def json_wire.prepare
+  (value : json_wire.Value) (limit : Std.Usize) :
+  Result (core.result.Result guest_frame.Frame guest_frame.FrameDenial)
+  := do
+  let r ← json_wire.encode value
+  match r with
+  | core.result.Result.Ok payload => guest_frame.prepare payload limit
+  | core.result.Result.Err _ =>
+    ok (core.result.Result.Err guest_frame.FrameDenial.Invalid)
+
 /-- [aivm_secrets_garrett_core::IssueWindow]
     Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 47:0-51:1
     Visibility: public -/

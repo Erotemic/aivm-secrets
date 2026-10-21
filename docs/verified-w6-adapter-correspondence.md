@@ -303,3 +303,11 @@ Native character/scalar and byte/String conversion, container/number encoding,
 parsing and full implementation-to-observation correspondence remain explicit
 obligations. The source guard and native/exhaustive tests complement that leaf;
 they do not establish whole-service mediation or secrecy.
+
+The [complete typed JSON/frame refinement](garrett-json-wire.md) now owns
+production canonical container/scalar layout and direct captured-value encoding
+through guest-frame preparation and returned writer input/states. It eliminates
+the former native recursive String builder; serde capture, number spelling,
+object order, UTF-8/scalar conversion and native parser/transport semantics stay
+local contracts. Thirteen extracted obligations and exact native compatibility
+tests support this segment, not whole-service correspondence or secrecy.

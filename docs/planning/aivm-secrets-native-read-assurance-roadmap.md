@@ -632,3 +632,20 @@ Native UTF-8/scalar conversion and byte/String append remain local contracts.
 Container/number encoding, parsing, JSON/frame/close observations and native
 adaptive histories still need correspondence. This increment neither connects
 all native events nor closes NR-2–NR-5, native write assurance or API parity.
+
+### Complete typed JSON encoding through guest-frame send (October 21)
+
+The [production complete JSON encoder](../garrett-json-wire.md) replaces native
+recursive String construction with extracted Rust layout for the captured tree.
+Thirteen obligations derive bounded exact bytes, positive encoding, refusal,
+actual frame admission/denial and writer input/states. Native guest replies use
+its direct captured-value/encoder/frame chain. Number spelling, map order,
+UTF-8/scalar and serde capture remain local contracts. The prior byte/String
+append seam is eliminated from canonical encoding.
+
+`Bridge::serve` directly matches frame/parse outcomes before its answer call,
+preserving failure mapping while exposing the source-owned dispatch edge.
+Compiler linkage is rooted there and includes reply encoding/framing. These
+bounded paths are not execution traces or sink closure. Native outcome/event,
+selected disclosure/observation and adaptive-history correspondence, parser/
+transport/storage/close contracts and NR-2–NR-5 exit remain open.

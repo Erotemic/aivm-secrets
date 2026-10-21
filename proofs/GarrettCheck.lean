@@ -1,3 +1,4 @@
+import GarrettJsonFrame
 import GarrettRequestContext
 import GarrettProviderIO
 import GarrettProviderChannel
@@ -800,3 +801,17 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.json_string.Proofs.string_printable
 #print axioms aivm_secrets_garrett_core.json_string.Proofs.returned_quote_printable
 #print axioms aivm_secrets_garrett_core.json_string.Proofs.returned_quote_has_no_line_breaks
+
+#print axioms aivm_secrets_garrett_core.json_wire.Proofs.bytes_length_bound
+#print axioms aivm_secrets_garrett_core.json_wire.Proofs.append_contract
+#print axioms aivm_secrets_garrett_core.json_wire.Proofs.encode_contract
+#print axioms aivm_secrets_garrett_core.json_wire.Proofs.encoded_witness
+#print axioms aivm_secrets_garrett_core.json_wire.Proofs.returned_encoding_exact
+#print axioms aivm_secrets_garrett_core.json_wire.Proofs.encoding_refusal_blocks_frame
+#print axioms aivm_secrets_garrett_core.json_wire.Proofs.prepared_encoding_origin
+#print axioms aivm_secrets_garrett_core.json_wire.Proofs.prepared_wire_exact
+#print axioms aivm_secrets_garrett_core.json_wire.Proofs.prepare_admitted_iff
+#print axioms aivm_secrets_garrett_core.json_wire.Proofs.prepare_denied_iff
+#print axioms aivm_secrets_garrett_core.json_wire.Proofs.framed_value_witness
+#print axioms aivm_secrets_garrett_core.json_wire.Proofs.prepared_send_value_origin
+#print axioms aivm_secrets_garrett_core.json_wire.Proofs.paired_preparations_same_wire

@@ -279,8 +279,18 @@ capture retains fifteen paths and 55 fixture cases, including the native
 canonical/string/core encoder link; this is not mediation. See the
 [JSON string validation record](../../dev/validation/2026-10-21-json-string.json).
 
+**Complete JSON/frame refinement update:** the [production typed encoder](../garrett-json-wire.md)
+now owns all canonical layout and feeds captured values directly into bounded
+guest-frame preparation. Thirteen extracted obligations derive recursive exact
+bytes, positive encoding, frame admission/denial and actual returned writer
+input/states. Native serde capture, Unicode conversion, number spelling and map
+order remain local contracts. `serve` now explicitly matches frame/parse results
+before its sole answer call; the optional compiler root includes reply handling.
+This closes the native recursive String builder and its byte/String append seam,
+not native parser, transport, event or adaptive-history correspondence.
+
 The next implementation task remains native primitive correspondence: connect
-native UTF-8/scalar and byte/String conversion, header and remaining JSON
+native UTF-8/scalar and serde capture, number spelling/map order, header
 conversion, faithful zeroizing buffer view and
 std/TLS/DNS/parser/storage contracts to the now-source-derived endpoint, complete
 request bytes and channel submission/release. Relate the actual native outcomes

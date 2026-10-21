@@ -196,7 +196,8 @@ impl<W: Write> aivm_secrets_garrett_core::guest_frame::Writer for GuestWriter<'_
 impl GuestFrame {
     fn from_answer(answer: Outcome<Value>) -> Outcome<Self> {
         let value = answer.unwrap_or_else(failure);
-        aivm_secrets_garrett_core::guest_frame::prepare(json::canonical(&value), MAX_REPLY)
+        json::capture(&value)
+            .prepare(MAX_REPLY)
             .map(Self)
             .map_err(|_| Error::InternalError)
     }
@@ -359,9 +360,13 @@ impl Bridge {
         }
         let peer = VerifiedPeer::from_connection(&connection)?;
         let mut stream = StreamOwned::new(connection, socket);
-        let answer = frame(&mut stream, MAX_FRAME)
-            .and_then(|raw| json::parse(&raw, MAX_FRAME).map_err(|_| Error::InvalidRequest))
-            .and_then(|v| self.answer(v, &peer, &now));
+        let answer = match frame(&mut stream, MAX_FRAME) {
+            Ok(raw) => match json::parse(&raw, MAX_FRAME) {
+                Ok(value) => self.answer(value, &peer, &now),
+                Err(_) => Err(Error::InvalidRequest),
+            },
+            Err(error) => Err(error),
+        };
         GuestFrame::from_answer(answer)?.send(&mut stream)?;
         stream.conn.send_close_notify();
         let _ = stream.flush();

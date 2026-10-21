@@ -295,6 +295,22 @@ THEOREMS += [
 ]
 
 THEOREMS += [
+    'aivm_secrets_garrett_core.json_wire.Proofs.bytes_length_bound',
+    'aivm_secrets_garrett_core.json_wire.Proofs.append_contract',
+    'aivm_secrets_garrett_core.json_wire.Proofs.encode_contract',
+    'aivm_secrets_garrett_core.json_wire.Proofs.encoded_witness',
+    'aivm_secrets_garrett_core.json_wire.Proofs.returned_encoding_exact',
+    'aivm_secrets_garrett_core.json_wire.Proofs.encoding_refusal_blocks_frame',
+    'aivm_secrets_garrett_core.json_wire.Proofs.prepared_encoding_origin',
+    'aivm_secrets_garrett_core.json_wire.Proofs.prepared_wire_exact',
+    'aivm_secrets_garrett_core.json_wire.Proofs.prepare_admitted_iff',
+    'aivm_secrets_garrett_core.json_wire.Proofs.prepare_denied_iff',
+    'aivm_secrets_garrett_core.json_wire.Proofs.framed_value_witness',
+    'aivm_secrets_garrett_core.json_wire.Proofs.prepared_send_value_origin',
+    'aivm_secrets_garrett_core.json_wire.Proofs.paired_preparations_same_wire',
+]
+
+THEOREMS += [
     'aivm_secrets_garrett_core.json_string.Proofs.nibble_value',
     'aivm_secrets_garrett_core.json_string.Proofs.nibble_printable',
     'aivm_secrets_garrett_core.json_string.Proofs.surrogate_pair_exact',
@@ -989,6 +1005,8 @@ def inputs() -> list[str]:
         "proofs/GarrettProviderWire.lean",
         "proofs/GarrettJsonStringScalar.lean",
         "proofs/GarrettJsonString.lean",
+        "proofs/GarrettJsonWire.lean",
+        "proofs/GarrettJsonFrame.lean",
         "proofs/GarrettRequestPrefix.lean",
         "proofs/GarrettRequestTrace.lean",
         "tests/test_rust_w6_completion.py",
@@ -1410,6 +1428,17 @@ def mutate(pattern: str | None = None) -> None:
         (json_string, 'json string changed hexadecimal case', "b'a' + (value - 10) as u8", "b'A' + (value - 10) as u8"),
         (json_string, 'json string corrupted high surrogate', '55296 + remaining / 1024', '56320 + remaining / 1024'),
         (json_string, 'json string emitted raw newline', r'output.extend_from_slice(b"\\n");', "output.push(b'\\n');"),
+    ]
+    json_wire = source.with_name("json_wire.rs")
+    mutations += [
+        (json_wire, 'json wire changed null bytes', 'output.extend_from_slice(b"null")', 'output.extend_from_slice(b"true")'),
+        (json_wire, 'json wire changed number token', 'output.extend_from_slice(token)', 'output.extend_from_slice(b"0")'),
+        (json_wire, 'json wire changed array terminator', "output.push(b']');", "output.push(b'}');"),
+        (json_wire, 'json wire changed object colon', "output.push(b':');", "output.push(b',');"),
+        (json_wire, 'json wire omitted object key', 'if !crate::json_string::append(output, &field.0)', 'if false'),
+        (json_wire, 'json wire skipped recursive encoding', 'if !append(&mut output, value)', 'if false'),
+        (json_wire, 'json wire substituted frame payload', 'crate::guest_frame::prepare(payload, limit)', 'crate::guest_frame::prepare(Vec::new(), limit)'),
+        (json_wire, 'json wire ignored frame bound', 'crate::guest_frame::prepare(payload, limit)', 'crate::guest_frame::prepare(payload, usize::MAX)'),
     ]
     admission = source.with_name("current_admission.rs")
     mutations += [
@@ -2246,6 +2275,8 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettProviderWire",
                 "GarrettJsonStringScalar",
                 "GarrettJsonString",
+                "GarrettJsonWire",
+                "GarrettJsonFrame",
                 "GarrettConfinement",
                 "GarrettProviderSimulation",
                 "GarrettRequestPrefix",
@@ -2296,6 +2327,7 @@ def mutate(pattern: str | None = None) -> None:
                 "provider_io.rs": "GarrettProviderIO",
                 "provider_wire.rs": "GarrettProviderWire",
                 "json_string.rs": "GarrettJsonString",
+                "json_wire.rs": "GarrettJsonFrame",
                 "approval.rs": "GarrettApproval",
                 "enrollment.rs": "GarrettEnrollment",
                 "authority.rs": "GarrettAuthority",
@@ -2350,7 +2382,7 @@ def mutate(pattern: str | None = None) -> None:
                 ]:
                     modules.remove(dependency)
                 modules[1:1] = ["GarrettLogin", "GarrettManifest", "GarrettDisclosure"]
-            if label.startswith(("trace origin ", "request context ", "provider io ", "provider channel ", "provider wire ", "json string ")):
+            if label.startswith(("trace origin ", "request context ", "provider io ", "provider channel ", "provider wire ", "json string ", "json wire ")):
                 # Rebuild the actual local import closure against this mutant;
                 # cached proof objects are never substituted for dependencies.
                 closure: list[str] = []
@@ -2366,7 +2398,7 @@ def mutate(pattern: str | None = None) -> None:
                             visit(imported)
                     closure.append(module)
 
-                visit("GarrettJsonString" if label.startswith("json string ") else "GarrettProviderWire" if label.startswith("provider wire ") else "GarrettProviderChannel" if label.startswith("provider channel ") else "GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
+                visit("GarrettJsonFrame" if label.startswith("json wire ") else "GarrettJsonString" if label.startswith("json string ") else "GarrettProviderWire" if label.startswith("provider wire ") else "GarrettProviderChannel" if label.startswith("provider channel ") else "GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
                 modules = closure + [module for module in modules if module not in seen]
             for module in modules:
                 proof = temporary / (module + ".lean")

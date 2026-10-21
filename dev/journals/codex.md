@@ -2835,3 +2835,79 @@ before freezing. The active queue records this scoped progress while retaining
 the remaining native conversion/primitive/event/observation/history and parity
 requirements. Prior frozen records are unchanged. Publish resource accounting
 separately; all commits retain the actual-model co-author trailer.
+
+## 2026-10-21 02:09:54 -0400
+
+Previous goal turn made verified progress in 5f39fc4/42670b7/f9cdd82.
+Revalidated the clean tree and active queue. Implemented production whole-tree
+canonical JSON layout in extracted json_wire Rust and linked captured values
+directly through bounded guest-frame preparation. Native serde conversion
+retains existing order and number spelling; a private captured tree clears its
+owned numeric/text/name buffers on normal drop. Extra tree allocation/traversal
+is a deliberate cost, with partial construction/drop/unwind still contracts.
+Removed the native recursive String encoder and ASCII-to-String seam. Exact
+compatibility tests preserve numeric spellings, huge integers and nested values.
+
+Thirteen focused obligations derive actual recursive bytes, capacity bounds,
+positive construction, frame refusal/admission and returned writer input/state.
+Proof depth is not runtime fuel. Native UTF-8/serde conversion and numeric-token
+grammar/order remain explicit local contracts; no whole native history or
+secrecy conclusion is assumed. Fixed proof tuple reductions, scalar zero value
+and literal slice inference without weakening the statements. Initial extraction
+rejected early returns nested under match loops, so factored actual array/field
+helpers and regenerated from Rust; generated Lean is never hand edited.
+
+A fresh compiler capture exposed the opaque std Result::and_then edge between
+serve and answer. Replaced those two source callbacks with explicit matches
+that retain the same error mapping and single answer call, and moved compiler
+root to serve so reply encoding/framing witnesses follow real calls. A failed
+initial capture is diagnostic evidence, not a passing gate. Source guards and
+rebaselined bypass mutants cover actual captured value, separators, frame and
+request/error mapping. Python tooling edits are non-core; no dependency, core
+API, wire version, authorization, identity or stored-state migration is added.
+Confidence is high in the focused layout/frame contract; native primitive/event/
+observation/adaptive-history correspondence, NR-2–NR-5 and independent real
+provider/deployed tests remain open. Full acceptance is still pending.
+
+Acceptance investigation: initial release parity had 766 passes and one login
+startup failure. Retained fixture data showed callback_port and synthetic TLS
+provider port were both 39331: the callback probe closed before TLSService
+bound port zero, allowing it to reclaim that port. Native login correctly
+refused the occupied listener before announcement. Moved callback allocation
+after provider binding throughout this test helper, made the endpoint argument
+explicit and assert distinct ports. Startup assertion now reports a missing
+event as the actual fixed error rather than KeyError. No OAuth production code,
+timeout, retry or safety check changes. The initial focused module run mapped
+only OAuth and therefore skipped its cross-authority case; rerunning with every
+release runner explicitly mapped and strict no-skip JUnit before final parity.
+
+## 2026-10-21 11:57:57 -0400
+
+User directed finishing the current commit task. Keep this pass scoped to
+the complete JSON/frame increment and its acceptance/commits; no new queue
+item is started. Revalidated the staged source and terminal ordinary-release
+workflow, current 730-audit/296-input manifest, and unchanged binary build
+timestamps. Corrected release parity passed all 767 cases after the evidenced
+callback/provider fixture port-collision repair. Eight read-path/five prefix
+proofs, 102 Rust workspace cases, Clippy, eight selected source mutants, 188
+source/error guard cases, 60 compiler fixtures, seventeen actual serve-rooted
+compiler paths, both native read/product modes and six safe installed-vTPM
+cases passed. The final full suite and package build are now running alone.
+
+Final acceptance: 3,116 full Python/native cases, zero failures/skips, 548.80
+seconds, followed by successful wheel/sdist build. All 296 checked archive
+inputs and the embedded manifest match the tested source. 730 named axiom
+audits, 767 corrected release parity cases, 102 Rust workspace cases (53 core,
+39 native library), Clippy, 188 source/error boundary cases, 60 compiler-ledger
+fixtures and eight selected of 285 re-extracted mutants pass. Both 168-case
+native read modes and both standalone guest workflows pass, as do eight
+read-path/five prefix kernel audits and six safe installed-vTPM cases. All
+33 focused native login cases pass without skips after the evidenced fixture
+repair. Documentation maps the retained contracts to existing RUST-JSON-01,
+RUST-COMPILER-01, RUST-MTLS-01 and MANIFEST-RUST-01, and guest frame/close sinks;
+no new approved environmental assumption or whole-service claim is introduced.
+
+Commit implementation, scoped evidence and resource accounting with actual
+GPT-6 Codex co-authorship (exact weights/config variant unavailable). This
+finishes the current commit task only; remaining native conversion/primitive,
+parser/event/observation/adaptive-history and NR-2–NR-5 work stays open.

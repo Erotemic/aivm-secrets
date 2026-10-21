@@ -82,7 +82,7 @@ def check(root: Path = ROOT) -> dict:
     require('format!(' not in body and 'to_string(' not in body,
             'guest failure message may include nonfixed diagnostics')
     require('let value = answer.unwrap_or_else(failure);' in tls
-            and 'guest_frame::prepare(json::canonical(&value), MAX_REPLY)' in tls
+            and 'json::capture(&value)' in tls and '.prepare(MAX_REPLY)' in tls
             and 'self.0.send(&mut GuestWriter(writer))' in tls
             and 'write_all(wire)' in tls and 'self.0.flush()' in tls,
             'guest reply bypasses the canonical bounded single-attempt writer')

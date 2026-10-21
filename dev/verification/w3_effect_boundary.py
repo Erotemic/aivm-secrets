@@ -88,17 +88,25 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'self.active.store(false, Ordering::Release)' in approval,
             'host revocation waits for audit before withdrawing authority')
     decoded = contents[RUST + 'json.rs']
-    parse = part(decoded, 'pub fn parse(', '\nfn string(')
+    parse = part(decoded, 'pub fn parse(', '\n// Capture ordering')
     require('decode(&raw, 0)' in parse and 'Ok(Value::Object(' in decoded,
             'JSON objects can bypass explicit structure-preserving decoding')
-    quoted = part(decoded, 'fn string(', 'fn encode(')
+    quoted = part(decoded, 'pub(crate) fn capture(', '\npub fn keys')
     quoted_core = contents['rust/crates/aivm-secrets-garrett-core/src/json_string.rs'].split('#[cfg(test)]', 1)[0]
     quote_entry = quoted_core.split('pub fn append(', 1)[1]
-    require('value.chars().map(u32::from).collect::<Vec<_>>()' in quoted
-            and quoted.count('zeroize::Zeroizing::new(') == 2
-            and 'json_string::append(&mut encoded, &values)' in quoted
-            and 'out.push_str(std::str::from_utf8(&encoded).expect(' in quoted
+    wire_core = contents['rust/crates/aivm-secrets-garrett-core/src/json_wire.rs'].split('#[cfg(test)]', 1)[0]
+    require('Value::String(value) => Wire::Text(value.chars().map(u32::from).collect())' in quoted
+            and 'name.chars().map(u32::from).collect(), convert(value)' in quoted
+            and 'Value::Array(values) => Wire::Array(values.iter().map(convert).collect())' in quoted
+            and '.map(|(name, value)| (name.chars().map(u32::from).collect(), convert(value)))' in quoted
+            and 'value.as_i64()' in quoted and 'integer.to_string().into_bytes()' in quoted
+            and 'value.to_string().into_bytes()' in quoted and 'Captured(convert(value))' in quoted
+            and 'json_wire::encode(&capture(value).0)' in quoted
+            and 'json_wire::prepare(&self.0, limit)' in quoted
+            and 'impl Drop for Captured' in decoded and 'clear(&mut self.0)' in decoded
+            and all(item + '.zeroize()' in decoded for item in ('bytes', 'scalars', 'name'))
             and 'encode_utf16(' not in quoted and 'write!(' not in quoted
+            and 'Value::Text(scalars) => return crate::json_string::append(output, scalars)' in wire_core
             and 'value <= 0x10ffff && (value < 0xd800 || value > 0xdfff)' in quoted_core
             and 'if !valid_scalar(values[index])' in quoted_core
             and "b'a' + (value - 10) as u8" in quoted_core
@@ -107,6 +115,21 @@ def review_semantics(contents: dict[str, str]) -> None:
             and same_order(quote_entry, 'if !valid_text(values)', 'return false;', 'output.push(', 'append_scalar(output, values[index])')
             and 'index += 1;' in quote_entry,
             'canonical JSON string bypasses scalar validation, exact escaping or native byte binding')
+    require('Value::Null => output.extend_from_slice(b"null")' in wire_core
+            and 'output.extend_from_slice(b"true")' in wire_core and 'output.extend_from_slice(b"false")' in wire_core
+            and 'Value::Number(token) => output.extend_from_slice(token)' in wire_core
+            and 'Value::Array(values) => return append_array(output, values)' in wire_core
+            and 'Value::Object(fields) => return append_fields(output, fields)' in wire_core
+            and 'if !append(output, &values[index])' in wire_core
+            and 'if !append_field(output, &fields[index])' in wire_core
+            and 'if !crate::json_string::append(output, &field.0)' in wire_core
+            and 'append(output, &field.1)' in wire_core
+            and wire_core.count("output.push(b',');") == 2
+            and all("output.push(b'" + byte + "');" in wire_core for byte in '[]{}:')
+            and same_order(wire_core, 'pub fn encode(', 'if !append(&mut output, value)', 'return Err(EncodingDenial::InvalidText)', 'Ok(output)')
+            and 'Ok(payload) => crate::guest_frame::prepare(payload, limit)' in wire_core
+            and 'Err(_) => Err(crate::guest_frame::FrameDenial::Invalid)' in wire_core,
+            'canonical JSON layout/frame bypasses captured values, separators, validation or exact bytes')
     # The sole native manifest call to the credential-bearing HTTP adapter is
     # after policy compilation, durable audit and current grant revalidation.
     m = contents[RUST + 'custody/manifest_session.rs']
@@ -441,9 +464,14 @@ def review_semantics(contents: dict[str, str]) -> None:
     answer = part(t, 'fn answer(', 'fn forward(')
     require(guest.count('.write_all(wire)') == 1
             and 'self.0.flush()' in guest
-            and 'guest_frame::prepare(json::canonical(&value), MAX_REPLY)' in guest
+            and 'json::capture(&value)' in guest and '.prepare(MAX_REPLY)' in guest
             and 'self.0.send(&mut GuestWriter(writer))' in guest,
             'guest frame serializer bypasses the bounded single-attempt core')
+    require(serve.count('self.answer(') == 1 and same_order(serve, 'match frame(&mut stream, MAX_FRAME)',
+                       'Ok(raw) => match json::parse(&raw, MAX_FRAME)',
+                       'Ok(value) => self.answer(value, &peer, &now)',
+                       'Err(_) => Err(Error::InvalidRequest)', 'Err(error) => Err(error)'),
+            'guest request dispatch bypasses successful framing/parsing or changes failure mapping')
     require('GuestFrame::from_answer(answer)?.send(&mut stream)?;' in serve
             and '.write_all(' not in serve,
             'authenticated guest writer bypasses GuestFrame')
@@ -455,7 +483,7 @@ def review_semantics(contents: dict[str, str]) -> None:
             'backend selector/unsupported guest delegation changed')
     require(t.count('self.forward(&forwarded)') == 1,
             'additional legacy forwarding may be guest reachable')
-    require(guest.count('json::canonical(') == 1 and t.split('#[cfg(test)]', 1)[0].count('.write_all(wire)') == 1,
+    require(guest.count('json::capture(') == 1 and t.split('#[cfg(test)]', 1)[0].count('.write_all(wire)') == 1,
             'extra guest stream serialization outside reviewed GuestFrame')
     frame_core = contents['rust/crates/aivm-secrets-garrett-core/src/guest_frame.rs'].split('#[cfg(test)]', 1)[0]
     require(same_order(frame_core, 'pub fn prepare(', 'if payload.len() >= limit',
@@ -616,7 +644,7 @@ def review_semantics(contents: dict[str, str]) -> None:
     require(client.count('crate::tls::frame(&mut stream, limit).map_err(|_| Error::OutcomeUnknown)?') == 1
             and 'read_until(' not in client,
             'client reply bypasses shared framing or loses post-send uncertainty')
-    require('let answer = frame(&mut stream, MAX_FRAME)' in transport
+    require('let answer = match frame(&mut stream, MAX_FRAME)' in transport
             and 'let raw = frame(&mut socket, MAX_REPLY).map_err(|_| Error::OutcomeUnknown)?;' in transport,
             'bridge ingress/reply no longer share frame admission with phase-correct errors')
 

@@ -68,28 +68,36 @@ def projection():
         function(39, ['aivm_secrets_garrett_core','provider_wire','<Impl>','host']),
         function(40, ['aivm_secrets_garrett_core','provider_wire','<Impl>','port']),
         function(41, ['aivm_secrets_garrett','json','canonical'], [42]),
-        function(42, ['aivm_secrets_garrett','json','string'], [43]),
-        function(43, ['aivm_secrets_garrett_core','json_string','append']),
+        function(42, ['aivm_secrets_garrett_core','json_wire','encode'], [43]),
+        function(43, ['aivm_secrets_garrett_core','json_wire','append'], [44]),
+        function(44, ['aivm_secrets_garrett_core','json_string','append']),
+        function(45, ['aivm_secrets_garrett','tls','<Impl>','from_answer'], [46]),
+        function(46, ['aivm_secrets_garrett','json','<Impl>','prepare'], [47]),
+        function(47, ['aivm_secrets_garrett_core','json_wire','prepare'], [42,48]),
+        function(48, ['aivm_secrets_garrett_core','guest_frame','prepare']),
+        function(49, ['aivm_secrets_garrett','tls','<Impl>','serve'], [0,45]),
     ]))
 
 
 def test_compiled_paths_keep_external_and_dynamic_obligations_explicit():
     result = explain(projection())
-    assert result['witnesses'] == {'account-controller-executor':[0,1,2,3],
-        'coordinated-manifest-executor':[0,29,23,4,22,5],
-        'owned-request-completion-audit':[0,29,24,25,26,27],
-        'owned-context-check-factory':[0,29,23,30,31],
-        'captured-provider-writer':[0,29,23,4,22,5,36,32,33],
-        'captured-provider-response-parts':[0,29,23,4,22,34,35],
-        'manifest-encoded-endpoint-host':[0,29,23,4,22,38,39],
-        'manifest-encoded-endpoint-port':[0,29,23,4,22,38,40],
-        'native-json-string-encoder':[0,41,42,43],
-        'account-authentication-bytes':[0,1,2,3,8,14,15,10,11],
-        'manifest-authentication-bytes':[0,29,23,4,22,38,9,37,15,10,11],
-        'account-request-line':[0,1,2,3,8,14,15,12,13],
-        'manifest-request-line':[0,29,23,4,22,38,9,37,15,12,13],
-        'account-complete-header-admission':[0,1,2,3,8,14,15,16,17,18,19,20],
-        'manifest-complete-header-admission':[0,29,23,4,22,38,9,37,15,16,17,18,19,20]}
+    assert result['witnesses'] == {'account-controller-executor':[49,0,1,2,3],
+        'coordinated-manifest-executor':[49,0,29,23,4,22,5],
+        'owned-request-completion-audit':[49,0,29,24,25,26,27],
+        'owned-context-check-factory':[49,0,29,23,30,31],
+        'captured-provider-writer':[49,0,29,23,4,22,5,36,32,33],
+        'captured-provider-response-parts':[49,0,29,23,4,22,34,35],
+        'manifest-encoded-endpoint-host':[49,0,29,23,4,22,38,39],
+        'manifest-encoded-endpoint-port':[49,0,29,23,4,22,38,40],
+        'native-json-string-encoder':[49,0,41,42,43,44],
+        'guest-json-encoding':[49,45,46,47,42],
+        'guest-json-framing':[49,45,46,47,48],
+        'account-authentication-bytes':[49,0,1,2,3,8,14,15,10,11],
+        'manifest-authentication-bytes':[49,0,29,23,4,22,38,9,37,15,10,11],
+        'account-request-line':[49,0,1,2,3,8,14,15,12,13],
+        'manifest-request-line':[49,0,29,23,4,22,38,9,37,15,12,13],
+        'account-complete-header-admission':[49,0,1,2,3,8,14,15,16,17,18,19,20],
+        'manifest-complete-header-admission':[49,0,29,23,4,22,38,9,37,15,16,17,18,19,20]}
     assert result['opaque_boundaries'] == [6]
     assert result['unresolved_calls'] == {7:{'Trait':2}}
     assert result['unresolved_in_root'] == {}
@@ -98,7 +106,7 @@ def test_compiled_paths_keep_external_and_dynamic_obligations_explicit():
         'begin']['line'] == 4
 
 
-@pytest.mark.parametrize('victim', [0,1,2,3,4,8,9,10,12,14,15,16,17,18,19,21,22,23,24,25,27,28,30,32,34,35,36,39,40])
+@pytest.mark.parametrize('victim', [0,1,2,3,4,8,9,10,12,14,15,16,17,18,19,21,22,23,24,25,27,28,30,32,34,35,36,39,40,41,43,44,45,47])
 def test_missing_callback_link_cannot_be_rebaselined_as_a_passing_witness(victim):
     data = projection()
     data['translated']['fun_decls'][victim]['body']['blocks']['direct'] = []

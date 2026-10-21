@@ -27,7 +27,9 @@ checks paths through actual concrete instantiations of:
 
 ```mermaid
 flowchart LR
-    A["TLS Bridge::answer"] --> B["Native request"]
+    S["TLS Bridge::serve"] --> A["TLS Bridge::answer"]
+    S --> R["Captured JSON encoding and frame preparation"]
+    A --> B["Native request"]
     B --> C["Core protocol::perform"]
     C --> D["Native credential executor"]
     D --> E["Account HTTPS exchange"]
@@ -154,3 +156,10 @@ The canonical JSON string refinement adds `native-json-string-encoder`:
 `json_string::append`. This is a bounded compiler linkage witness; exact quoting
 is checked separately in [the string leaf](garrett-json-string.md). Neither
 establishes all JSON/parser observations or native I/O mediation.
+
+The [complete JSON/frame refinement](garrett-json-wire.md) moves the bridge root
+to actual `Bridge::serve`, which now directly matches framing/parsing before
+`answer`. The string witness goes through `json_wire::encode/append`; two new
+reply paths reach captured-value encoding and guest-frame preparation. Rooting
+at `serve` exposes additional dependency/close obligations; it does not establish
+that those effects are fully refined or mediated.

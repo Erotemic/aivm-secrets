@@ -1,11 +1,11 @@
 # Source-owned canonical JSON string quoting
 
-The production native canonical encoder now sends each Rust string's Unicode
-scalars to `json_string::append` in the extracted core, then appends its ASCII
-bytes to the existing native output string. Object order, container layout and
-number formatting remain native and unchanged. The new temporary scalar and
-encoded-byte buffers use native zeroizing wrappers. This changes neither the
-versioned wire format nor authorization or identity modes.
+The [complete production encoder](garrett-json-wire.md) captures each native
+string as Unicode scalars and calls `json_string::append` directly into its
+final byte vector. The scalar/list quoting implementation and theorems below
+remain the actual production leaf. Native recursive String layout and
+ASCII-to-String append have now been removed from canonical serialization;
+ordering, number spelling and UTF-8/scalar capture remain local contracts.
 
 The core accepts the complete Unicode scalar domain, including supplementary
 planes, controls and noncharacters; it refuses surrogate code points and values
@@ -34,8 +34,8 @@ re-extracted mutations complement these checks; optional compiler linkage to
 the actual native canonical/string/core encoder is not dominance or mediation.
 
 This discharges the source-owned scalar/list quoting segment. Native UTF-8
-iteration and scalar-list conversion, zeroizing views, ASCII-to-String append,
-container/number formatting, JSON parsing, frame composition, TLS/close behavior,
+iteration and scalar-list conversion, number spelling and object order,
+zeroizing views, JSON parsing, TLS/close behavior,
 complete native outcome/event and adaptive-history correspondence remain
 contracts or open implementation links. The printable-byte theorem is not a
 proof of the native parser or of decoded/encoded credential noninterference.
