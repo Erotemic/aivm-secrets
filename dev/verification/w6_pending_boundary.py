@@ -78,20 +78,26 @@ def check(root: Path = ROOT) -> dict:
             and 'request_adapter::DispatchPlan { work, keyed_write }' in request
             and 'operation_write: op.write,' in request,
             'manifest preflight/final no longer share the audited dispatcher')
-    fresh = request.split('let current = || -> Outcome<guards::AdmissionStamp> {', 1)[-1].split('let canonical_request', 1)[0]
-    for checked in ('self.base.check_coordination()?;',
-                    'self.require_control_active(current)?;',
-                    'lease.require_current(current)?;',
-                    'aivm_secrets_garrett_core::present(',
-                    'guards::current('):
-        require(checked in fresh, f'last-admission closure dropped {checked}')
+    fresh = request.split('let current_peer =', 1)[-1].split('let canonical_request', 1)[0]
+    native_checks = source.split("struct CurrentChecks<'a, L>", 1)[1].split('pub(crate) struct Session {', 1)[0]
+    admission = (root / 'rust/crates/aivm-secrets-garrett-core/src/current_admission.rs').read_text().split('#[cfg(test)]', 1)[0]
+    for checked in ('checks.coordination()', 'checks.clock()', 'checks.control(now)', 'checks.lease(now)',
+                    'crate::present(self.identity, self.expected, self.peer, now)', 'checks.elapsed()', 'manifest::current('):
+        require(checked in admission, f'last-admission closure dropped {checked}')
+    require('self.session.base.check_coordination()' in native_checks
+            and 'self.session.require_control_active(now)' in native_checks
+            and 'host_time()' in native_checks and 'self.session.base.elapsed()' in native_checks
+            and '(self.lease)(now)' in native_checks
+            and 'lease.require_current(current)?;' in fresh
+            and 'current_context.current(&mut CurrentChecks' in fresh,
+            'last-admission primitives detached from host state')
     primitive = source.split('fn send_manifest_bytes(', 1)[1].split('struct ManifestChannel {', 1)[0]
     require('let stream = StreamOwned::new(conn, socket);' in source and
             'writer.write_all(request)' in ''.join(primitive.split()) and
             'send_manifest_bytes(&mutchannel.stream,&channel.request)' in ''.join(source.split()) and
             'aivm_secrets_garrett_core::dispatch::WorkforManifestProvider' in ''.join(source.split()) and
             'fn recheck(&mut self) -> Outcome<guards::AdmissionStamp>' in source and
-            '(self.current)()' in source and 'current: &current,' in request and
+            'current_admission::Bound::new(' in request and 'self.context.current(&mut self.checks)' in admission and
             'let fresh = || current().map(|_| ());' in fresh,
             'native provider may emit credentialed bytes without the last-admission gate')
     require('aivm_secrets_garrett_core::completion::Work' in source

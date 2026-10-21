@@ -18,6 +18,7 @@ def test_pending_source_guard_accepts_reviewed_native_boundary():
     'skip-current-token-check', 'skip-authorization',
     'skip-audit-construction', 'skip-completion-audit',
     'scope-status-upgrade', 'scope-dropped-exclusion',
+    'unbound-provider', 'unbound-current', 'wrong-control-time', 'wrong-lease-time',
 ])
 def test_pending_source_guard_rejects_unreviewed_boundary_mutation(tmp_path, mutation):
     from dev.verification.w6_pending_boundary import ROOT, RUST, SCOPE
@@ -27,30 +28,40 @@ def test_pending_source_guard_rejects_unreviewed_boundary_mutation(tmp_path, mut
     controller_path = 'rust/crates/aivm-secrets-garrett-core/src/request_adapter.rs'
     (tmp_path / controller_path).parent.mkdir(parents=True)
     controller = (ROOT / controller_path).read_text()
+    admission_path = 'rust/crates/aivm-secrets-garrett-core/src/current_admission.rs'
+    admission = (ROOT / admission_path).read_text()
     source = (ROOT / RUST).read_text()
     scope = json.loads((ROOT / SCOPE).read_text())
     if mutation == 'no-fresh-before-emit':
         controller = controller.replace('dispatch::dispatch(', 'unchecked_dispatch(')
     elif mutation == 'skip-coordinate-check':
-        source = source.replace('let current = || -> Outcome<guards::AdmissionStamp> {\n            self.base.check_coordination()?;',
-                                'let current = || -> Outcome<guards::AdmissionStamp> {\n            // no late coordination check')
+        admission = admission.replace('checks.coordination()', 'unchecked_coordination()')
     elif mutation == 'skip-active-check':
-        source = source.replace('self.require_control_active(current)?;', 'Ok(())?;')
+        source = source.replace('self.session.require_control_active(now)', 'Ok(())?;')
     elif mutation == 'skip-lease-check':
         source = source.replace('lease.require_current(current)?;', 'Ok(())?;')
     elif mutation == 'skip-current-token-check':
-        source = source.replace('aivm_secrets_garrett_core::present(', 'broken_gate(')
+        admission = admission.replace('crate::present(', 'broken_gate(')
     elif mutation == 'skip-authorization':
-        source = source.replace('guards::current(', 'unchecked_authorize(')
+        admission = admission.replace('manifest::current(', 'unchecked_authorize(')
     elif mutation == 'skip-audit-construction':
         source = source.replace('audit.write_record(', 'audit.unchecked_record(')
     elif mutation == 'skip-completion-audit':
         controller = controller.replace('completion::complete(', 'unchecked_completion(')
+    elif mutation == 'unbound-provider':
+        source = source.replace('current_admission::Bound::new(', 'unchecked_provider(')
+    elif mutation == 'unbound-current':
+        admission = admission.replace('self.context.current(&mut self.checks)', 'self.work.recheck()')
+    elif mutation == 'wrong-control-time':
+        admission = admission.replace('checks.control(now)', 'checks.control(0)')
+    elif mutation == 'wrong-lease-time':
+        admission = admission.replace('checks.lease(now)', 'checks.lease(0)')
     elif mutation == 'scope-status-upgrade':
         scope['status'] = 'whole-service-formally-proved'
     elif mutation == 'scope-dropped-exclusion':
         scope['exclusions'].remove('sent-but-not-observed-TLS-application-data')
     (tmp_path / controller_path).write_text(controller)
+    (tmp_path / admission_path).write_text(admission)
     (tmp_path / RUST).write_text(source)
     (tmp_path / SCOPE).write_text(json.dumps(scope))
     with pytest.raises(ReviewError):

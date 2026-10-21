@@ -230,6 +230,33 @@ THEOREMS = [
     "Garrett.Protocol.all_traces_preserve_credential_secrecy",
 ]
 THEOREMS += [
+    'aivm_secrets_garrett_core.current_admission.Proofs.context_constructor',
+    'aivm_secrets_garrett_core.current_admission.Proofs.current_success_iff',
+    'aivm_secrets_garrett_core.current_admission.Proofs.current_issued',
+    'aivm_secrets_garrett_core.current_admission.Proofs.current_snapshot_accepted',
+    'aivm_secrets_garrett_core.current_admission.Proofs.bound_constructor',
+    'aivm_secrets_garrett_core.current_admission.Proofs.bound_setup_frame',
+    'aivm_secrets_garrett_core.current_admission.Proofs.bound_receive_frame',
+    'aivm_secrets_garrett_core.current_admission.Proofs.bound_send_frame',
+    'aivm_secrets_garrett_core.current_admission.Proofs.bound_recheck_iff',
+    'aivm_secrets_garrett_core.current_admission.Proofs.bound_recheck_frame',
+    'aivm_secrets_garrett_core.current_admission.Proofs.bound_recheck_issued',
+    'aivm_secrets_garrett_core.current_admission.Proofs.read_driver_stamp_origin',
+    'aivm_secrets_garrett_core.current_admission.Proofs.dispatch_setup_context',
+    'aivm_secrets_garrett_core.current_admission.Proofs.dispatch_receive_context',
+    'aivm_secrets_garrett_core.current_admission.Proofs.dispatch_send_context',
+    'aivm_secrets_garrett_core.current_admission.Proofs.dispatch_current_origin',
+    'aivm_secrets_garrett_core.current_admission.Proofs.owned_read_driver_stamp_origin',
+    'aivm_secrets_garrett_core.current_admission.Proofs.coordination_refusal',
+    'aivm_secrets_garrett_core.current_admission.Proofs.bound_prepare_frame',
+    'aivm_secrets_garrett_core.current_admission.Proofs.bound_audit_frame',
+    'aivm_secrets_garrett_core.current_admission.Proofs.bound_configure_frame',
+    'aivm_secrets_garrett_core.current_admission.Proofs.bound_check_frame',
+    'aivm_secrets_garrett_core.current_admission.Proofs.bound_reserve_frame',
+    'aivm_secrets_garrett_core.current_admission.Proofs.bound_finish_frame',
+]
+
+THEOREMS += [
     "aivm_secrets_garrett_core.credential_use.Proofs.require_use_current_contract",
     "aivm_secrets_garrett_core.credential_use.Proofs.authorize_use_contract",
     "aivm_secrets_garrett_core.credential_use.Proofs.release_reply_exact",
@@ -829,6 +856,7 @@ def inputs() -> list[str]:
         "proofs/GarrettDispatch.lean",
         "proofs/GarrettDispatchSimulation.lean",
         "proofs/GarrettRequestAdapter.lean",
+        "proofs/GarrettCurrentAdmission.lean",
         "proofs/GarrettRequestPrefix.lean",
         "proofs/GarrettRequestTrace.lean",
         "tests/test_rust_w6_completion.py",
@@ -1204,6 +1232,15 @@ def mutate(pattern: str | None = None) -> None:
         (owned_dispatch, 'owned dispatch rolled back returned receipt', 'effects: pending.effects,', 'effects,'),
         (owned_dispatch, 'owned dispatch ignored fresh refusal', '    match pending.work.check() {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }', '    let _ignored = pending.work.check();'),
         (owned_dispatch, 'owned dispatch ignored reservation refusal', '    match reserved {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }', '    let _ignored = reserved;'),
+    ]
+    admission = source.with_name("current_admission.rs")
+    mutations += [
+        (admission, 'current admission ignored coordination refusal', 'match checks.coordination() {\n            Ok(()) => (),\n            Err(error) => return Err(error),\n        }', 'let _ignored = checks.coordination();'),
+        (admission, 'current admission control used stale time', 'checks.control(now)', 'checks.control(0)'),
+        (admission, 'current admission lease used stale time', 'checks.lease(now)', 'checks.lease(0)'),
+        (admission, 'current admission changed identity peer', 'crate::present(self.identity, self.expected, self.peer, now)', 'crate::present(self.identity, self.expected, self.operation, now)'),
+        (admission, 'current admission changed requested operation', '            self.operation,\n            self.operation,', '            self.peer,\n            self.operation,'),
+        (admission, 'current admission delegated bound current', 'self.context.current(&mut self.checks)', 'self.work.recheck()'),
     ]
     request_adapter = source.with_name("request_adapter.rs")
     mutations += [
@@ -2021,6 +2058,9 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettDispatch",
                 "GarrettRequestSimulation",
                 "GarrettRequestAdapter",
+                "GarrettCurrentAdmission",
+                "GarrettConfinement",
+                "GarrettProviderSimulation",
                 "GarrettRequestPrefix",
                 "GarrettProviderExchange",
                 "Garrett",
@@ -2064,6 +2104,7 @@ def mutate(pattern: str | None = None) -> None:
                 "completion.rs": "GarrettCompletion",
                 "dispatch.rs": "GarrettDispatch",
                 "request_adapter.rs": "GarrettRequestAdapter",
+                "current_admission.rs": "GarrettCurrentAdmission",
                 "approval.rs": "GarrettApproval",
                 "enrollment.rs": "GarrettEnrollment",
                 "authority.rs": "GarrettAuthority",
@@ -2090,12 +2131,14 @@ def mutate(pattern: str | None = None) -> None:
             if source.name == "guest_frame.rs":
                 modules.remove("GarrettLineFrame")
                 modules.insert(0, "GarrettLineFrame")
-            if source.name in {"provider_exchange.rs", "manifest.rs", "request_effects.rs", "completion.rs", "dispatch.rs", "request_adapter.rs"}:
+            if source.name in {"provider_exchange.rs", "manifest.rs", "request_effects.rs", "completion.rs", "dispatch.rs", "request_adapter.rs", "current_admission.rs"}:
                 dependencies = ["GarrettReadTransition", "GarrettLogin", "Garrett", "GarrettManifest", "GarrettProviderExchange"]
-                if source.name in {"request_effects.rs", "completion.rs", "dispatch.rs", "request_adapter.rs"}:
+                if source.name in {"request_effects.rs", "completion.rs", "dispatch.rs", "request_adapter.rs", "current_admission.rs"}:
                     dependencies.append("GarrettRequestEffects")
                 if source.name == "request_adapter.rs":
                     dependencies.extend(["GarrettReadInvocations", "GarrettCompletion", "GarrettDispatch", "GarrettRequestSimulation"])
+                if source.name == "current_admission.rs":
+                    dependencies.extend(["GarrettDispatch", "GarrettProtocol", "GarrettDisclosure", "GarrettConfinement", "GarrettProviderSimulation"])
                 for dependency in dependencies:
                     modules.remove(dependency)
                 modules[:0] = dependencies

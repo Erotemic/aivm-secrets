@@ -103,6 +103,37 @@ where
     }
 }
 
+// Only external observations remain native; the context and validation order
+// are owned by the extracted current-admission controller.
+struct CurrentChecks<'a, L> {
+    session: &'a Session,
+    lease: L,
+}
+impl<L: Fn(i64) -> Outcome<()>> aivm_secrets_garrett_core::current_admission::Checks
+    for CurrentChecks<'_, L>
+{
+    type Error = Error;
+    const INVALID_CAPABILITY: Error = Error::InvalidCapability;
+    fn coordination(&mut self) -> Outcome<()> {
+        self.session.base.check_coordination()
+    }
+    fn clock(&mut self) -> Outcome<i64> {
+        host_time()
+    }
+    fn control(&mut self, now: i64) -> Outcome<()> {
+        self.session.require_control_active(now)
+    }
+    fn lease(&mut self, now: i64) -> Outcome<()> {
+        (self.lease)(now)
+    }
+    fn elapsed(&mut self) -> Outcome<i64> {
+        self.session.base.elapsed()
+    }
+    fn use_error(error: aivm_secrets_garrett_core::credential_use::UseDenial) -> Error {
+        use_error(error)
+    }
+}
+
 pub(crate) struct Session {
     base: AccountSession,
     policy: Policy,
@@ -358,31 +389,29 @@ impl Session {
             &json::canonical(&json!({"operation":op.name,"arguments":args})),
         )
         .as_ref());
-        let current = || -> Outcome<guards::AdmissionStamp> {
-            self.base.check_coordination()?;
-            let current = host_time()?;
-            self.require_control_active(current)?;
+        let current_peer = peer.thumbprint().as_bytes().to_vec();
+        let current_operation = op.name.as_bytes().to_vec();
+        let current_context = aivm_secrets_garrett_core::current_admission::Context::new(
+            &outer.claims,
+            &expected,
+            &current_peer,
+            &claims,
+            &self.base.grant,
+            &current_operation,
+            op.write,
+            self.writes_allowed(),
+        );
+        let current_lease = |current| {
             if let Some(lease) = &_vault {
                 lease.require_current(current)?;
             }
-            aivm_secrets_garrett_core::present(
-                &outer.claims,
-                &expected,
-                &peer.thumbprint().as_bytes().to_vec(),
-                current,
-            )
-            .map_err(|_| Error::InvalidCapability)?;
-            guards::current(
-                &claims,
-                &self.base.grant,
-                &op.name.as_bytes().to_vec(),
-                &op.name.as_bytes().to_vec(),
-                op.write,
-                self.writes_allowed(),
-                current,
-                self.base.elapsed()?,
-            )
-            .map_err(use_error)
+            Ok(())
+        };
+        let current = || -> Outcome<guards::AdmissionStamp> {
+            current_context.current(&mut CurrentChecks {
+                session: self,
+                lease: &current_lease,
+            })
         };
         let fresh = || current().map(|_| ());
         let canonical_request = json!({"operation":op.name,"arguments":args});
@@ -427,7 +456,6 @@ impl Session {
                 secret: &secret,
                 effect,
                 headers: BTreeMap::new(),
-                current: &current,
                 dispatch: ManifestDispatch {
                     policy: &self.policy,
                     identity: None,
@@ -442,6 +470,14 @@ impl Session {
                     idempotency_header: op.idempotency_header,
                 },
             };
+            let work = aivm_secrets_garrett_core::current_admission::Bound::new(
+                &current_context,
+                work,
+                CurrentChecks {
+                    session: self,
+                    lease: &current_lease,
+                },
+            );
             request_adapter::DispatchPlan { work, keyed_write }
         };
         let session = &*self;
@@ -588,18 +624,15 @@ struct ManifestDispatch<'a> {
     reservation: Option<(&'a str, &'a str)>,
     idempotency_header: bool,
 }
-struct ManifestProvider<'a, F> {
+struct ManifestProvider<'a> {
     executor: &'a Executor,
     route: &'a core::Route,
     secret: &'a Credential,
     effect: Effect,
     headers: BTreeMap<String, String>,
-    current: &'a F,
     dispatch: ManifestDispatch<'a>,
 }
-impl<F: Fn() -> Outcome<guards::AdmissionStamp>> aivm_secrets_garrett_core::dispatch::Work
-    for ManifestProvider<'_, F>
-{
+impl aivm_secrets_garrett_core::dispatch::Work for ManifestProvider<'_> {
     const INVALID_TRANSITION: Error = Error::InternalError;
     fn effect_write(&self) -> bool {
         self.effect.write
@@ -656,9 +689,7 @@ impl<F: Fn() -> Outcome<guards::AdmissionStamp>> aivm_secrets_garrett_core::disp
             .finish(key, fingerprint)
     }
 }
-impl<F: Fn() -> Outcome<guards::AdmissionStamp>>
-    aivm_secrets_garrett_core::provider_exchange::Provider for ManifestProvider<'_, F>
-{
+impl aivm_secrets_garrett_core::provider_exchange::Provider for ManifestProvider<'_> {
     type Channel = ManifestChannel;
     type Output = Value;
     type Error = Error;
@@ -703,7 +734,9 @@ impl<F: Fn() -> Outcome<guards::AdmissionStamp>>
         })
     }
     fn recheck(&mut self) -> Outcome<guards::AdmissionStamp> {
-        (self.current)()
+        // Only current_admission::Bound may supply admission to this raw
+        // adapter. An accidental direct driver call refuses before HTTP send.
+        Err(Error::InternalError)
     }
     fn send(&mut self, channel: &mut ManifestChannel) -> Outcome<()> {
         // Core dispatch owns the composite receipt/current attempt gate.

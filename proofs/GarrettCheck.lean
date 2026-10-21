@@ -1,3 +1,4 @@
+import GarrettCurrentAdmission
 import GarrettRequestAdapter
 import GarrettDispatchSimulation
 import GarrettCompletionSimulation
@@ -657,3 +658,28 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.request_adapter.Proofs.positive_read_witness
 #print axioms aivm_secrets_garrett_core.request_adapter.Proofs.completion_selection_origin
 #print axioms aivm_secrets_garrett_core.request_adapter.Proofs.successful_entry_selection_origin
+
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.context_constructor
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.current_success_iff
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.current_issued
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.current_snapshot_accepted
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.bound_constructor
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.bound_setup_frame
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.bound_receive_frame
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.bound_send_frame
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.bound_recheck_iff
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.bound_recheck_frame
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.bound_recheck_issued
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.read_driver_stamp_origin
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.dispatch_setup_context
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.dispatch_receive_context
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.dispatch_send_context
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.dispatch_current_origin
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.owned_read_driver_stamp_origin
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.coordination_refusal
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.bound_prepare_frame
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.bound_audit_frame
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.bound_configure_frame
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.bound_check_frame
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.bound_reserve_frame
+#print axioms aivm_secrets_garrett_core.current_admission.Proofs.bound_finish_frame

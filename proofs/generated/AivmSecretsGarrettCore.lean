@@ -1789,6 +1789,614 @@ def credential_use.use_credential
       grant.route
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
+/-- [aivm_secrets_garrett_core::Expectation]
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 40:0-45:1
+    Visibility: public -/
+structure Expectation where
+  issuer : alloc.vec.Vec Std.U8
+  audience : alloc.vec.Vec Std.U8
+  subject : alloc.vec.Vec Std.U8
+  epoch : Std.I64
+
+/-- [aivm_secrets_garrett_core::Claims]
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 29:0-38:1
+    Visibility: public -/
+structure Claims where
+  issuer : alloc.vec.Vec Std.U8
+  audience : alloc.vec.Vec Std.U8
+  subject : alloc.vec.Vec Std.U8
+  token_id : alloc.vec.Vec Std.U8
+  issued_at : Std.I64
+  expires_at : Std.I64
+  epoch : Std.I64
+  certificate : alloc.vec.Vec Std.U8
+
+/-- [aivm_secrets_garrett_core::current_admission::Context]
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 10:0-19:1
+    Visibility: public -/
+structure current_admission.Context where
+  identity : Claims
+  expected : Expectation
+  peer : alloc.vec.Vec Std.U8
+  claims : credential_use.UseClaims
+  grant : credential_use.UseGrant
+  operation : alloc.vec.Vec Std.U8
+  write : Bool
+  allowed : Bool
+
+/-- [aivm_secrets_garrett_core::current_admission::{aivm_secrets_garrett_core::current_admission::Context<'a>}::new]:
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 22:4-42:5
+    Visibility: public -/
+def current_admission.Context.new
+  (identity : Claims) (expected : Expectation) (peer : alloc.vec.Vec Std.U8)
+  (claims : credential_use.UseClaims) (grant : credential_use.UseGrant)
+  (operation : alloc.vec.Vec Std.U8) (write : Bool) (allowed : Bool) :
+  Result current_admission.Context
+  := do
+  ok { identity, expected, peer, claims, grant, operation, write, allowed }
+
+/-- [aivm_secrets_garrett_core::manifest::authorize]:
+    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 42:0-60:1
+    Visibility: public -/
+def manifest.authorize
+  (claims : credential_use.UseClaims) (grant : credential_use.UseGrant)
+  (requested : alloc.vec.Vec Std.U8) (selected : alloc.vec.Vec Std.U8)
+  (write : Bool) (writes_allowed : Bool) (now : Std.I64) (elapsed : Std.I64) :
+  Result (core.result.Result Unit credential_use.UseDenial)
+  := do
+  let r ← credential_use.require_use_current claims grant now elapsed
+  match r with
+  | core.result.Result.Ok _ =>
+    let b ←
+      alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8 requested
+        selected
+    if b
+    then ok (core.result.Result.Err credential_use.UseDenial.Denied)
+    else
+      if write
+      then
+        if writes_allowed
+        then ok (core.result.Result.Ok ())
+        else ok (core.result.Result.Err credential_use.UseDenial.Denied)
+      else ok (core.result.Result.Ok ())
+  | core.result.Result.Err _ => ok r
+
+/-- [aivm_secrets_garrett_core::manifest::current]:
+    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 90:0-117:1
+    Visibility: public -/
+def manifest.current
+  (claims : credential_use.UseClaims) (grant : credential_use.UseGrant)
+  (requested : alloc.vec.Vec Std.U8) (selected : alloc.vec.Vec Std.U8)
+  (write : Bool) (writes_allowed : Bool) (now : Std.I64) (elapsed : Std.I64) :
+  Result (core.result.Result manifest.AdmissionStamp credential_use.UseDenial)
+  := do
+  let r ←
+    manifest.authorize claims grant requested selected write writes_allowed now
+      elapsed
+  match r with
+  | core.result.Result.Ok _ =>
+    ok (core.result.Result.Ok { now, elapsed, write })
+  | core.result.Result.Err error => ok (core.result.Result.Err error)
+
+/-- [aivm_secrets_garrett_core::Denial]
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 25:0-27:1
+    Visibility: public -/
+@[discriminant isize]
+inductive Denial where
+| InvalidCapability : Denial
+
+/-- [aivm_secrets_garrett_core::present]:
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 85:0-112:1
+    Visibility: public -/
+def present
+  (claims : Claims) (expected : Expectation) (peer : alloc.vec.Vec Std.U8)
+  (now : Std.I64) :
+  Result (core.result.Result Unit Denial)
+  := do
+  let b ←
+    alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8 claims.issuer
+      expected.issuer
+  if b
+  then ok (core.result.Result.Err Denial.InvalidCapability)
+  else
+    let b1 ←
+      alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8 claims.audience
+        expected.audience
+    if b1
+    then ok (core.result.Result.Err Denial.InvalidCapability)
+    else
+      let b2 ←
+        alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8
+          claims.subject expected.subject
+      if b2
+      then ok (core.result.Result.Err Denial.InvalidCapability)
+      else
+        let b3 ←
+          alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8
+            claims.certificate peer
+        if b3
+        then ok (core.result.Result.Err Denial.InvalidCapability)
+        else
+          if claims.epoch < 0#i64
+          then ok (core.result.Result.Err Denial.InvalidCapability)
+          else
+            if claims.epoch > 2147483647#i64
+            then ok (core.result.Result.Err Denial.InvalidCapability)
+            else
+              if claims.epoch != expected.epoch
+              then ok (core.result.Result.Err Denial.InvalidCapability)
+              else
+                if claims.issued_at < 0#i64
+                then ok (core.result.Result.Err Denial.InvalidCapability)
+                else
+                  if claims.issued_at > 9223372036854772207#i64
+                  then ok (core.result.Result.Err Denial.InvalidCapability)
+                  else
+                    if claims.expires_at <= claims.issued_at
+                    then ok (core.result.Result.Err Denial.InvalidCapability)
+                    else
+                      let i ← claims.issued_at + 3600#i64
+                      if claims.expires_at > i
+                      then ok (core.result.Result.Err Denial.InvalidCapability)
+                      else
+                        if now < claims.issued_at
+                        then
+                          ok (core.result.Result.Err Denial.InvalidCapability)
+                        else
+                          if now >= claims.expires_at
+                          then
+                            ok (core.result.Result.Err
+                              Denial.InvalidCapability)
+                          else ok (core.result.Result.Ok ())
+
+/-- Trait declaration: [aivm_secrets_garrett_core::current_admission::Checks]
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 84:0-93:1
+    Visibility: public -/
+structure current_admission.Checks (Self : Type _) (Self_Error : Type _) where
+  INVALID_CAPABILITY : Result Self_Error
+  coordination : Self → Result ((core.result.Result Unit Self_Error) × Self)
+  clock : Self → Result ((core.result.Result Std.I64 Self_Error) × Self)
+  control : Self → Std.I64 → Result ((core.result.Result Unit Self_Error)
+    × Self)
+  lease : Self → Std.I64 → Result ((core.result.Result Unit Self_Error) ×
+    Self)
+  elapsed : Self → Result ((core.result.Result Std.I64 Self_Error) × Self)
+  use_error : credential_use.UseDenial → Result Self_Error
+
+/-- [aivm_secrets_garrett_core::current_admission::{aivm_secrets_garrett_core::current_admission::Context<'a>}::current]:
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 43:4-81:5
+    Visibility: public -/
+def current_admission.Context.current
+  {C : Type _} {Clause0_Error : Type _} (ChecksInst : current_admission.Checks
+  C Clause0_Error) (self : current_admission.Context) (checks : C) :
+  Result ((core.result.Result manifest.AdmissionStamp Clause0_Error) × C)
+  := do
+  let (r, checks1) ← ChecksInst.coordination checks
+  match r with
+  | core.result.Result.Ok _ =>
+    let (r1, checks2) ← ChecksInst.clock checks1
+    match r1 with
+    | core.result.Result.Ok now =>
+      let (r2, checks3) ← ChecksInst.control checks2 now
+      match r2 with
+      | core.result.Result.Ok _ =>
+        let (r3, checks4) ← ChecksInst.lease checks3 now
+        match r3 with
+        | core.result.Result.Ok _ =>
+          let r4 ← present self.identity self.expected self.peer now
+          match r4 with
+          | core.result.Result.Ok _ =>
+            let (r5, checks5) ← ChecksInst.elapsed checks4
+            match r5 with
+            | core.result.Result.Ok elapsed =>
+              let r6 ←
+                manifest.current self.claims self.grant self.operation
+                  self.operation self.write self.allowed now elapsed
+              match r6 with
+              | core.result.Result.Ok stamp =>
+                ok (core.result.Result.Ok stamp, checks5)
+              | core.result.Result.Err error =>
+                let t ← ChecksInst.use_error error
+                ok (core.result.Result.Err t, checks5)
+            | core.result.Result.Err error =>
+              ok (core.result.Result.Err error, checks5)
+          | core.result.Result.Err _ =>
+            let t ← ChecksInst.INVALID_CAPABILITY
+            ok (core.result.Result.Err t, checks4)
+        | core.result.Result.Err error =>
+          ok (core.result.Result.Err error, checks4)
+      | core.result.Result.Err error =>
+        ok (core.result.Result.Err error, checks3)
+    | core.result.Result.Err error =>
+      ok (core.result.Result.Err error, checks2)
+  | core.result.Result.Err error => ok (core.result.Result.Err error, checks1)
+
+/-- [aivm_secrets_garrett_core::current_admission::Bound]
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 97:0-101:1
+    Visibility: public -/
+structure current_admission.Bound (W : Type _) (C : Type _)
+  (Clause0_Clause0_Channel : Type _) (Clause0_Clause0_Output : Type _)
+  (Clause0_Clause0_Error : Type _) where
+  context : current_admission.Context
+  work : W
+  checks : C
+
+/-- Trait declaration: [aivm_secrets_garrett_core::provider_exchange::Provider]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 9:0-20:1
+    Visibility: public -/
+structure provider_exchange.Provider (Self : Type _) (Self_Channel : Type _)
+  (Self_Output : Type _) (Self_Error : Type _) where
+  INVALID_POLICY : Result Self_Error
+  OUTCOME_UNKNOWN : Result Self_Error
+  setup : Self → Result ((core.result.Result Self_Channel Self_Error) ×
+    Self)
+  recheck : Self → Result ((core.result.Result manifest.AdmissionStamp
+    Self_Error) × Self)
+  send : Self → Self_Channel → Result ((core.result.Result Unit Self_Error)
+    × Self × Self_Channel)
+  receive : Self → Self_Channel → Result ((core.result.Result Self_Output
+    Self_Error) × Self)
+
+/-- Trait declaration: [aivm_secrets_garrett_core::dispatch::Work]
+    Source: 'crates/aivm-secrets-garrett-core/src/dispatch.rs', lines 12:0-21:1
+    Visibility: public -/
+structure dispatch.Work (Self : Type _) (Self_Clause0_Channel : Type _)
+  (Self_Clause0_Output : Type _) (Self_Clause0_Error : Type _) where
+  INVALID_TRANSITION : Result Self_Clause0_Error
+  provider_exchangeProviderInst : provider_exchange.Provider Self
+    Self_Clause0_Channel Self_Clause0_Output Self_Clause0_Error
+  effect_write : Self → Result Bool
+  prepare : Self → Result ((core.result.Result Unit Self_Clause0_Error) ×
+    Self)
+  audit : Self → read_transition.Phase → Result ((core.result.Result Unit
+    Self_Clause0_Error) × Self)
+  configure : Self → Bool → Result ((core.result.Result Unit
+    Self_Clause0_Error) × Self)
+  check : Self → Result ((core.result.Result Unit Self_Clause0_Error) ×
+    Self)
+  reserve : Self → Result ((core.result.Result Unit Self_Clause0_Error) ×
+    Self)
+  finish : Self → Result ((core.result.Result Unit Self_Clause0_Error) ×
+    Self)
+
+/-- [aivm_secrets_garrett_core::current_admission::{aivm_secrets_garrett_core::current_admission::Bound<'a, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::new]:
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 103:4-109:5
+    Visibility: public -/
+def current_admission.Bound.new
+  {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
+  {Clause0_Clause0_Output : Type _} {Clause0_Clause0_Error : Type _}
+  (dispatchWorkInst : dispatch.Work W Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) (ChecksInst :
+  current_admission.Checks C Clause0_Clause0_Error)
+  (context : current_admission.Context) (work : W) (checks : C) :
+  Result (current_admission.Bound W C Clause0_Clause0_Channel
+    Clause0_Clause0_Output Clause0_Clause0_Error)
+  := do
+  ok { context, work, checks }
+
+/-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::receive]:
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 128:4-130:5
+    Visibility: public -/
+def
+  current_admission.Bound.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.receive
+  {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
+  {Clause0_Clause0_Output : Type _} {Clause0_Clause0_Error : Type _}
+  (dispatchWorkInst : dispatch.Work W Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) (ChecksInst :
+  current_admission.Checks C Clause0_Clause0_Error)
+  (self : current_admission.Bound W C Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error)
+  (channel : Clause0_Clause0_Channel) :
+  Result ((core.result.Result Clause0_Clause0_Output Clause0_Clause0_Error) ×
+    (current_admission.Bound W C Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ←
+    dispatchWorkInst.provider_exchangeProviderInst.receive self.work channel
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::send]:
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 125:4-127:5
+    Visibility: public -/
+def
+  current_admission.Bound.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.send
+  {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
+  {Clause0_Clause0_Output : Type _} {Clause0_Clause0_Error : Type _}
+  (dispatchWorkInst : dispatch.Work W Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) (ChecksInst :
+  current_admission.Checks C Clause0_Clause0_Error)
+  (self : current_admission.Bound W C Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error)
+  (channel : Clause0_Clause0_Channel) :
+  Result ((core.result.Result Unit Clause0_Clause0_Error) ×
+    (current_admission.Bound W C Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error) × Clause0_Clause0_Channel)
+  := do
+  let (r, t, channel1) ←
+    dispatchWorkInst.provider_exchangeProviderInst.send self.work channel
+  ok (r, { self with work := t }, channel1)
+
+/-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::recheck]:
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 122:4-124:5
+    Visibility: public -/
+def
+  current_admission.Bound.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.recheck
+  {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
+  {Clause0_Clause0_Output : Type _} {Clause0_Clause0_Error : Type _}
+  (dispatchWorkInst : dispatch.Work W Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) (ChecksInst :
+  current_admission.Checks C Clause0_Clause0_Error)
+  (self : current_admission.Bound W C Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) :
+  Result ((core.result.Result manifest.AdmissionStamp Clause0_Clause0_Error) ×
+    (current_admission.Bound W C Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ←
+    current_admission.Context.current ChecksInst self.context self.checks
+  ok (r, { self with checks := t })
+
+/-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::setup]:
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 119:4-121:5
+    Visibility: public -/
+def
+  current_admission.Bound.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.setup
+  {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
+  {Clause0_Clause0_Output : Type _} {Clause0_Clause0_Error : Type _}
+  (dispatchWorkInst : dispatch.Work W Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) (ChecksInst :
+  current_admission.Checks C Clause0_Clause0_Error)
+  (self : current_admission.Bound W C Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) :
+  Result ((core.result.Result Clause0_Clause0_Channel Clause0_Clause0_Error) ×
+    (current_admission.Bound W C Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ← dispatchWorkInst.provider_exchangeProviderInst.setup self.work
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::OUTCOME_UNKNOWN]
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 118:4-118:60
+    Visibility: public -/
+@[global_simps, irreducible]
+def
+  current_admission.Bound.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.OUTCOME_UNKNOWN
+  {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
+  {Clause0_Clause0_Output : Type _} {Clause0_Clause0_Error : Type _}
+  (dispatchWorkInst : dispatch.Work W Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) (ChecksInst :
+  current_admission.Checks C Clause0_Clause0_Error)
+  : Result Clause0_Clause0_Error :=
+  dispatchWorkInst.provider_exchangeProviderInst.OUTCOME_UNKNOWN
+
+/-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::INVALID_POLICY]
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 117:4-117:58
+    Visibility: public -/
+@[global_simps, irreducible]
+def
+  current_admission.Bound.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.INVALID_POLICY
+  {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
+  {Clause0_Clause0_Output : Type _} {Clause0_Clause0_Error : Type _}
+  (dispatchWorkInst : dispatch.Work W Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) (ChecksInst :
+  current_admission.Checks C Clause0_Clause0_Error)
+  : Result Clause0_Clause0_Error :=
+  dispatchWorkInst.provider_exchangeProviderInst.INVALID_POLICY
+
+/-- Trait implementation: [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}]
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 111:0-131:1 -/
+@[reducible]
+def
+  current_admission.Bound.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider
+  {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
+  {Clause0_Clause0_Output : Type _} {Clause0_Clause0_Error : Type _}
+  (dispatchWorkInst : dispatch.Work W Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) (ChecksInst :
+  current_admission.Checks C Clause0_Clause0_Error) :
+  provider_exchange.Provider (current_admission.Bound W C
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error := {
+  INVALID_POLICY :=
+    current_admission.Bound.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.INVALID_POLICY
+    dispatchWorkInst ChecksInst
+  OUTCOME_UNKNOWN :=
+    current_admission.Bound.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.OUTCOME_UNKNOWN
+    dispatchWorkInst ChecksInst
+  setup :=
+    current_admission.Bound.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.setup
+    dispatchWorkInst ChecksInst
+  recheck :=
+    current_admission.Bound.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.recheck
+    dispatchWorkInst ChecksInst
+  send :=
+    current_admission.Bound.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.send
+    dispatchWorkInst ChecksInst
+  receive :=
+    current_admission.Bound.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.receive
+    dispatchWorkInst ChecksInst
+}
+
+/-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::finish]:
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 154:4-156:5
+    Visibility: public -/
+def current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.finish
+  {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
+  {Clause0_Clause0_Output : Type _} {Clause0_Clause0_Error : Type _}
+  (dispatchWorkInst : dispatch.Work W Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) (ChecksInst :
+  current_admission.Checks C Clause0_Clause0_Error)
+  (self : current_admission.Bound W C Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) :
+  Result ((core.result.Result Unit Clause0_Clause0_Error) ×
+    (current_admission.Bound W C Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ← dispatchWorkInst.finish self.work
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::reserve]:
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 151:4-153:5
+    Visibility: public -/
+def current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.reserve
+  {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
+  {Clause0_Clause0_Output : Type _} {Clause0_Clause0_Error : Type _}
+  (dispatchWorkInst : dispatch.Work W Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) (ChecksInst :
+  current_admission.Checks C Clause0_Clause0_Error)
+  (self : current_admission.Bound W C Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) :
+  Result ((core.result.Result Unit Clause0_Clause0_Error) ×
+    (current_admission.Bound W C Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ← dispatchWorkInst.reserve self.work
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::check]:
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 148:4-150:5
+    Visibility: public -/
+def current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.check
+  {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
+  {Clause0_Clause0_Output : Type _} {Clause0_Clause0_Error : Type _}
+  (dispatchWorkInst : dispatch.Work W Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) (ChecksInst :
+  current_admission.Checks C Clause0_Clause0_Error)
+  (self : current_admission.Bound W C Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) :
+  Result ((core.result.Result Unit Clause0_Clause0_Error) ×
+    (current_admission.Bound W C Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ← dispatchWorkInst.check self.work
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::configure]:
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 145:4-147:5
+    Visibility: public -/
+def
+  current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.configure
+  {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
+  {Clause0_Clause0_Output : Type _} {Clause0_Clause0_Error : Type _}
+  (dispatchWorkInst : dispatch.Work W Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) (ChecksInst :
+  current_admission.Checks C Clause0_Clause0_Error)
+  (self : current_admission.Bound W C Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) (keyed_write : Bool) :
+  Result ((core.result.Result Unit Clause0_Clause0_Error) ×
+    (current_admission.Bound W C Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ← dispatchWorkInst.configure self.work keyed_write
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::audit]:
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 142:4-144:5
+    Visibility: public -/
+def current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.audit
+  {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
+  {Clause0_Clause0_Output : Type _} {Clause0_Clause0_Error : Type _}
+  (dispatchWorkInst : dispatch.Work W Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) (ChecksInst :
+  current_admission.Checks C Clause0_Clause0_Error)
+  (self : current_admission.Bound W C Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) (phase : read_transition.Phase)
+  :
+  Result ((core.result.Result Unit Clause0_Clause0_Error) ×
+    (current_admission.Bound W C Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ← dispatchWorkInst.audit self.work phase
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::prepare]:
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 139:4-141:5
+    Visibility: public -/
+def current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.prepare
+  {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
+  {Clause0_Clause0_Output : Type _} {Clause0_Clause0_Error : Type _}
+  (dispatchWorkInst : dispatch.Work W Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) (ChecksInst :
+  current_admission.Checks C Clause0_Clause0_Error)
+  (self : current_admission.Bound W C Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) :
+  Result ((core.result.Result Unit Clause0_Clause0_Error) ×
+    (current_admission.Bound W C Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ← dispatchWorkInst.prepare self.work
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::effect_write]:
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 136:4-138:5
+    Visibility: public -/
+def
+  current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.effect_write
+  {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
+  {Clause0_Clause0_Output : Type _} {Clause0_Clause0_Error : Type _}
+  (dispatchWorkInst : dispatch.Work W Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) (ChecksInst :
+  current_admission.Checks C Clause0_Clause0_Error)
+  (self : current_admission.Bound W C Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) :
+  Result Bool
+  := do
+  dispatchWorkInst.effect_write self.work
+
+/-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::INVALID_TRANSITION]
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 135:4-135:66
+    Visibility: public -/
+@[global_simps, irreducible]
+def
+  current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.INVALID_TRANSITION
+  {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
+  {Clause0_Clause0_Output : Type _} {Clause0_Clause0_Error : Type _}
+  (dispatchWorkInst : dispatch.Work W Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) (ChecksInst :
+  current_admission.Checks C Clause0_Clause0_Error)
+  : Result Clause0_Clause0_Error :=
+  dispatchWorkInst.INVALID_TRANSITION
+
+/-- Trait implementation: [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}]
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 132:0-157:1 -/
+@[reducible]
+def current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork {W :
+  Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
+  {Clause0_Clause0_Output : Type _} {Clause0_Clause0_Error : Type _}
+  (dispatchWorkInst : dispatch.Work W Clause0_Clause0_Channel
+  Clause0_Clause0_Output Clause0_Clause0_Error) (ChecksInst :
+  current_admission.Checks C Clause0_Clause0_Error) : dispatch.Work
+  (current_admission.Bound W C Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error := {
+  INVALID_TRANSITION :=
+    current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.INVALID_TRANSITION
+    dispatchWorkInst ChecksInst
+  provider_exchangeProviderInst :=
+    current_admission.Bound.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider
+    dispatchWorkInst ChecksInst
+  effect_write :=
+    current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.effect_write
+    dispatchWorkInst ChecksInst
+  prepare :=
+    current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.prepare
+    dispatchWorkInst ChecksInst
+  audit :=
+    current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.audit
+    dispatchWorkInst ChecksInst
+  configure :=
+    current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.configure
+    dispatchWorkInst ChecksInst
+  check :=
+    current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.check
+    dispatchWorkInst ChecksInst
+  reserve :=
+    current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.reserve
+    dispatchWorkInst ChecksInst
+  finish :=
+    current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.finish
+    dispatchWorkInst ChecksInst
+}
+
 /-- [aivm_secrets_garrett_core::disclosure::Json]
     Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 6:0-14:1
     Visibility: public -/
@@ -2379,44 +2987,6 @@ partial_fixpoint
 
 end
 
-/-- Trait declaration: [aivm_secrets_garrett_core::provider_exchange::Provider]
-    Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 9:0-20:1
-    Visibility: public -/
-structure provider_exchange.Provider (Self : Type _) (Self_Channel : Type _)
-  (Self_Output : Type _) (Self_Error : Type _) where
-  INVALID_POLICY : Result Self_Error
-  OUTCOME_UNKNOWN : Result Self_Error
-  setup : Self → Result ((core.result.Result Self_Channel Self_Error) ×
-    Self)
-  recheck : Self → Result ((core.result.Result manifest.AdmissionStamp
-    Self_Error) × Self)
-  send : Self → Self_Channel → Result ((core.result.Result Unit Self_Error)
-    × Self × Self_Channel)
-  receive : Self → Self_Channel → Result ((core.result.Result Self_Output
-    Self_Error) × Self)
-
-/-- Trait declaration: [aivm_secrets_garrett_core::dispatch::Work]
-    Source: 'crates/aivm-secrets-garrett-core/src/dispatch.rs', lines 12:0-21:1
-    Visibility: public -/
-structure dispatch.Work (Self : Type _) (Self_Clause0_Channel : Type _)
-  (Self_Clause0_Output : Type _) (Self_Clause0_Error : Type _) where
-  INVALID_TRANSITION : Result Self_Clause0_Error
-  provider_exchangeProviderInst : provider_exchange.Provider Self
-    Self_Clause0_Channel Self_Clause0_Output Self_Clause0_Error
-  effect_write : Self → Result Bool
-  prepare : Self → Result ((core.result.Result Unit Self_Clause0_Error) ×
-    Self)
-  audit : Self → read_transition.Phase → Result ((core.result.Result Unit
-    Self_Clause0_Error) × Self)
-  configure : Self → Bool → Result ((core.result.Result Unit
-    Self_Clause0_Error) × Self)
-  check : Self → Result ((core.result.Result Unit Self_Clause0_Error) ×
-    Self)
-  reserve : Self → Result ((core.result.Result Unit Self_Clause0_Error) ×
-    Self)
-  finish : Self → Result ((core.result.Result Unit Self_Clause0_Error) ×
-    Self)
-
 /-- [aivm_secrets_garrett_core::provider_exchange::SendProgress]
     Source: 'crates/aivm-secrets-garrett-core/src/provider_exchange.rs', lines 120:0-126:1 -/
 @[discriminant isize]
@@ -2966,13 +3536,6 @@ def request_effects.RequestEffects.begin_dispatch_audit
     ok (true,
       { self1 with progress := (request_effects.Progress.DispatchAudit phase) })
   else request_effects.RequestEffects.reject self
-
-/-- [aivm_secrets_garrett_core::Denial]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 25:0-27:1
-    Visibility: public -/
-@[discriminant isize]
-inductive Denial where
-| InvalidCapability : Denial
 
 /-- [aivm_secrets_garrett_core::read_transition::acknowledge]:
     Source: 'crates/aivm-secrets-garrett-core/src/read_transition.rs', lines 66:0-74:1
@@ -5135,28 +5698,6 @@ partial_fixpoint
 
 end
 
-/-- [aivm_secrets_garrett_core::Claims]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 29:0-38:1
-    Visibility: public -/
-structure Claims where
-  issuer : alloc.vec.Vec Std.U8
-  audience : alloc.vec.Vec Std.U8
-  subject : alloc.vec.Vec Std.U8
-  token_id : alloc.vec.Vec Std.U8
-  issued_at : Std.I64
-  expires_at : Std.I64
-  epoch : Std.I64
-  certificate : alloc.vec.Vec Std.U8
-
-/-- [aivm_secrets_garrett_core::Expectation]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 40:0-45:1
-    Visibility: public -/
-structure Expectation where
-  issuer : alloc.vec.Vec Std.U8
-  audience : alloc.vec.Vec Std.U8
-  subject : alloc.vec.Vec Std.U8
-  epoch : Std.I64
-
 /-- [aivm_secrets_garrett_core::IssueWindow]
     Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 47:0-51:1
     Visibility: public -/
@@ -5208,70 +5749,6 @@ def issue_window
                       ok (core.result.Result.Ok
                         { issued_at := now, expires_at := not_after, epoch })
   else ok (core.result.Result.Err Denial.InvalidCapability)
-
-/-- [aivm_secrets_garrett_core::present]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 85:0-112:1
-    Visibility: public -/
-def present
-  (claims : Claims) (expected : Expectation) (peer : alloc.vec.Vec Std.U8)
-  (now : Std.I64) :
-  Result (core.result.Result Unit Denial)
-  := do
-  let b ←
-    alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8 claims.issuer
-      expected.issuer
-  if b
-  then ok (core.result.Result.Err Denial.InvalidCapability)
-  else
-    let b1 ←
-      alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8 claims.audience
-        expected.audience
-    if b1
-    then ok (core.result.Result.Err Denial.InvalidCapability)
-    else
-      let b2 ←
-        alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8
-          claims.subject expected.subject
-      if b2
-      then ok (core.result.Result.Err Denial.InvalidCapability)
-      else
-        let b3 ←
-          alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8
-            claims.certificate peer
-        if b3
-        then ok (core.result.Result.Err Denial.InvalidCapability)
-        else
-          if claims.epoch < 0#i64
-          then ok (core.result.Result.Err Denial.InvalidCapability)
-          else
-            if claims.epoch > 2147483647#i64
-            then ok (core.result.Result.Err Denial.InvalidCapability)
-            else
-              if claims.epoch != expected.epoch
-              then ok (core.result.Result.Err Denial.InvalidCapability)
-              else
-                if claims.issued_at < 0#i64
-                then ok (core.result.Result.Err Denial.InvalidCapability)
-                else
-                  if claims.issued_at > 9223372036854772207#i64
-                  then ok (core.result.Result.Err Denial.InvalidCapability)
-                  else
-                    if claims.expires_at <= claims.issued_at
-                    then ok (core.result.Result.Err Denial.InvalidCapability)
-                    else
-                      let i ← claims.issued_at + 3600#i64
-                      if claims.expires_at > i
-                      then ok (core.result.Result.Err Denial.InvalidCapability)
-                      else
-                        if now < claims.issued_at
-                        then
-                          ok (core.result.Result.Err Denial.InvalidCapability)
-                        else
-                          if now >= claims.expires_at
-                          then
-                            ok (core.result.Result.Err
-                              Denial.InvalidCapability)
-                          else ok (core.result.Result.Ok ())
 
 /-- [aivm_secrets_garrett_core::AuthenticatedEnvelope]
     Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 116:0-119:1
@@ -5477,32 +5954,6 @@ def manifest.parameter
         then ok (core.result.Result.Err credential_use.UseDenial.Denied)
         else ok (core.result.Result.Ok ())
 
-/-- [aivm_secrets_garrett_core::manifest::authorize]:
-    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 42:0-60:1
-    Visibility: public -/
-def manifest.authorize
-  (claims : credential_use.UseClaims) (grant : credential_use.UseGrant)
-  (requested : alloc.vec.Vec Std.U8) (selected : alloc.vec.Vec Std.U8)
-  (write : Bool) (writes_allowed : Bool) (now : Std.I64) (elapsed : Std.I64) :
-  Result (core.result.Result Unit credential_use.UseDenial)
-  := do
-  let r ← credential_use.require_use_current claims grant now elapsed
-  match r with
-  | core.result.Result.Ok _ =>
-    let b ←
-      alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8 requested
-        selected
-    if b
-    then ok (core.result.Result.Err credential_use.UseDenial.Denied)
-    else
-      if write
-      then
-        if writes_allowed
-        then ok (core.result.Result.Ok ())
-        else ok (core.result.Result.Err credential_use.UseDenial.Denied)
-      else ok (core.result.Result.Ok ())
-  | core.result.Result.Err _ => ok r
-
 /-- [aivm_secrets_garrett_core::manifest::ProviderReply]
     Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 61:0-64:1
     Visibility: public -/
@@ -5553,23 +6004,6 @@ def manifest.AdmissionStamp.impl.now
 def manifest.AdmissionStamp.impl.elapsed
   (self : manifest.AdmissionStamp) : Result Std.I64 := do
   ok self.elapsed
-
-/-- [aivm_secrets_garrett_core::manifest::current]:
-    Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 90:0-117:1
-    Visibility: public -/
-def manifest.current
-  (claims : credential_use.UseClaims) (grant : credential_use.UseGrant)
-  (requested : alloc.vec.Vec Std.U8) (selected : alloc.vec.Vec Std.U8)
-  (write : Bool) (writes_allowed : Bool) (now : Std.I64) (elapsed : Std.I64) :
-  Result (core.result.Result manifest.AdmissionStamp credential_use.UseDenial)
-  := do
-  let r ←
-    manifest.authorize claims grant requested selected write writes_allowed now
-      elapsed
-  match r with
-  | core.result.Result.Ok _ =>
-    ok (core.result.Result.Ok { now, elapsed, write })
-  | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::oauth_login::Stage]
     Source: 'crates/aivm-secrets-garrett-core/src/oauth_login.rs', lines 3:0-10:1

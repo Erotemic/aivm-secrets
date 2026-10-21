@@ -157,6 +157,21 @@ The updated optional specialized bridge capture finds nine required paths;
 47 ledger fixture/capture cases pass without a mediation claim. See the
 [owned-request validation record](../../dev/validation/2026-10-20-owned-request.json).
 
+**Current admission update:** the [actual bound admission controller](../garrett-current-admission.md)
+now owns coordination/clock/control/lease/identity/grant validation order in
+production Rust. Twenty-four extracted obligations derive stamp origin and
+preserve the captured context through the read provider driver, including its
+actual owned-send wrapper and failed prefixes. Native primitive semantics,
+whole-request event/history simulation and NR-2–NR-5 remain open. Validation
+for this source increment is recorded separately after the VM gates pass.
+
+The next NR-2 implementation task is to compose the bound driver's derived
+stamp origin with the owned dispatcher's receipt/local-send gates, across
+preparation, audit, setup and returned failure prefixes, then instantiate the
+actual request adapter's W4/W5 event relation. Do not replace this with another
+inventory or a whole-callback `FreshOrigin` assumption. Native primitive
+semantics and the remaining I/O/observation/history obligations stay explicit.
+
 ## Goal and present assurance level
 
 Garrett should let an untrusted guest perform **useful, explicitly authorized**

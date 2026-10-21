@@ -101,7 +101,7 @@ def review_semantics(contents: dict[str, str]) -> None:
                        'let dispatch = |phase: DispatchPhase, effect: Effect|', 'preflight: || self.policy.preflight('),
             'approval is not enforced before credentialed preflight/final effects')
     require('self.policy.digest()' in request and '"grant":self.base.executor.audit.grant' in request
-            and 'self.require_control_active(current)?;' in request
+            and 'self.session.require_control_active(now)' in m
             and 'fresh: &fresh,' in request,
             'approval identity or late revocation fencing bypassed')
     control = part(m, 'pub(super) fn control(', '\nfn manifest_request_bytes(')
@@ -133,7 +133,9 @@ def review_semantics(contents: dict[str, str]) -> None:
                            'request_adapter::DispatchPlan { work, keyed_write }')
             and 'matches!(phase, DispatchPhase::Final)' in dispatch
             and '&& effect.write' in dispatch and '&& self.base.coordinator.is_some()' in dispatch
-            and 'fresh: &fresh,' in dispatch and 'current: &current,' in dispatch
+            and 'fresh: &fresh,' in dispatch
+            and 'aivm_secrets_garrett_core::current_admission::Bound::new(' in dispatch
+            and '&current_context,' in dispatch and 'lease: &current_lease,' in dispatch
             and 'coordinator: self.base.coordinator.as_ref(),' in dispatch
             and 'reservation:reservation.as_ref()' in ''.join(dispatch.split()),
             'owned dispatch lost actual report, current binding or coordination inputs')
@@ -298,7 +300,9 @@ def review_semantics(contents: dict[str, str]) -> None:
     require('self.headers = self.dispatch.policy.headers.clone();' in provider_work
             and 'self.dispatch.coordinator' in ''.join(provider_work.split()) and '.reserve(key, fingerprint)' in provider_work
             and '.finish(key, fingerprint)' in provider_work
-            and '(self.dispatch.fresh)()' in provider_work and '(self.current)()' in provider_work,
+            and '(self.dispatch.fresh)()' in provider_work
+            and 'Err(Error::InternalError)' in part(provider_work, 'fn recheck(&mut self)', 'fn send(&mut self,')
+            and '(self.current)()' not in provider_work,
             'native coordination/current primitives detached from host inputs')
     require('audited: &read_transition::Audited' in dispatch_core
             and same_order(dispatch_core, 'fn exchange<', 'audited.is_write() != pending.work.effect_write()',
@@ -319,13 +323,32 @@ def review_semantics(contents: dict[str, str]) -> None:
     require('writer.write_all(request)' in ''.join(primitive.split()) and 'writer.flush()' in primitive
             and 'send_manifest_bytes(&mutchannel.stream,&channel.request)' in ''.join(sender.split()),
             'native raw credential-bearing writer bypassed')
-    sampled = part(request, 'let current = || -> Outcome<guards::AdmissionStamp>',
-                   'let canonical_request')
-    require('guards::current(' in sampled and 'let fresh = || current().map(|_| ());' in sampled
-            and 'self.base.check_coordination()?;' in sampled
-            and 'aivm_secrets_garrett_core::present(' in sampled
+    sampled = part(request, 'let current_peer =', 'let canonical_request')
+    native_checks = part(m, "struct CurrentChecks<'a, L>", 'pub(crate) struct Session {')
+    admission = contents['rust/crates/aivm-secrets-garrett-core/src/current_admission.rs'].split('#[cfg(test)]', 1)[0]
+    check_body = part(admission, 'pub fn current<C: Checks>', 'pub trait Checks {')
+    require(same_order(check_body, 'checks.coordination()', 'checks.clock()',
+                       'checks.control(now)', 'checks.lease(now)',
+                       'crate::present(self.identity, self.expected, self.peer, now)',
+                       'Err(C::INVALID_CAPABILITY)', 'checks.elapsed()', 'manifest::current(', 'C::use_error(error)')
+            and 'self.operation,self.operation,self.write,self.allowed,now,elapsed,' in ''.join(check_body.split())
+            and 'context: &' in admission and 'pub context:' not in admission
+            and 'self.context.current(&mut self.checks)' in admission
+            and 'self.work.recheck()' not in admission,
+            'current stamp bypasses extracted primitive order, identity or fixed context')
+    require('peer.thumbprint().as_bytes().to_vec()' in sampled
+            and 'current_operation = op.name.as_bytes().to_vec()' in sampled
+            and 'current_admission::Context::new(&outer.claims,&expected,&current_peer,&claims,&self.base.grant,&current_operation,op.write,self.writes_allowed(),)' in ''.join(sampled.split())
+            and 'current_context.current(&mut CurrentChecks' in sampled
+            and 'lease: &current_lease,' in sampled
             and 'lease.require_current(current)?;' in sampled
-            and 'self.require_control_active(current)?;' in sampled,
+            and 'let fresh = || current().map(|_| ());' in sampled
+            and 'self.session.base.check_coordination()' in native_checks
+            and 'host_time()' in native_checks
+            and 'self.session.require_control_active(now)' in native_checks
+            and '(self.lease)(now)' in native_checks
+            and 'self.session.base.elapsed()' in native_checks
+            and 'use_error(error)' in native_checks,
             'current stamp bypasses full native late authority checks')
     provider = contents['rust/crates/aivm-secrets-garrett-core/src/provider_exchange.rs'].split('#[cfg(test)]', 1)[0]
     require(same_order(provider, 'pub fn exchange<', 'ops.setup()', 'ops.recheck()',

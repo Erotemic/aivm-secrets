@@ -49,6 +49,12 @@ def mutate(repo, filename, before, after):
 
 
 @pytest.mark.parametrize('file,old,new', [
+    ('rust/crates/aivm-secrets-garrett-core/src/current_admission.rs', 'checks.coordination()', 'unchecked_coordination()'),
+    ('rust/crates/aivm-secrets-garrett-core/src/current_admission.rs', 'checks.clock()', 'unchecked_clock()'),
+    ('rust/crates/aivm-secrets-garrett-core/src/current_admission.rs', 'checks.control(now)', 'checks.control(0)'),
+    ('rust/crates/aivm-secrets-garrett-core/src/current_admission.rs', 'checks.lease(now)', 'checks.lease(0)'),
+    ('rust/crates/aivm-secrets-garrett-core/src/current_admission.rs', 'crate::present(self.identity, self.expected, self.peer, now)', 'crate::present(self.identity, self.expected, self.operation, now)'),
+    ('rust/crates/aivm-secrets-garrett-core/src/current_admission.rs', 'self.context.current(&mut self.checks)', 'self.work.recheck()'),
     ('rust/crates/aivm-secrets-garrett-core/src/request_adapter.rs', 'let report = completion::complete(pending, self.effects);\n        self.effects = report.effects;', 'let report = completion::complete(pending, self.effects);'),
     ('rust/crates/aivm-secrets-garrett-core/src/request_adapter.rs', 'completion::complete(pending, self.effects)', 'unchecked_complete(pending, self.effects)'),
     ('rust/crates/aivm-secrets-garrett-core/src/guest_frame.rs', 'if payload.len() >= limit', 'if false'),
