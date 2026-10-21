@@ -16,6 +16,7 @@ TESTS = 'tests/test_rust_w6_adapter.py'
 CORE_ENCODER = 'rust/crates/aivm-secrets-garrett-core/src/http_wire.rs'
 CORE_DISPATCH = 'rust/crates/aivm-secrets-garrett-core/src/dispatch.rs'
 CORE_REQUEST = 'rust/crates/aivm-secrets-garrett-core/src/request_adapter.rs'
+CORE_CONTEXT = 'rust/crates/aivm-secrets-garrett-core/src/request_context.rs'
 CORE_CURRENT = 'rust/crates/aivm-secrets-garrett-core/src/current_admission.rs'
 COMMON_ENCODER = 'rust/crates/aivm-secrets-garrett/src/custody.rs'
 
@@ -78,7 +79,10 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and 'begin_provider(audited)' in dispatch_core,
            'provider executor accepts an unaudited policy effect')
     admission = (root / CORE_CURRENT).read_text().split('#[cfg(test)]', 1)[0]
-    ensure('current_admission::Bound::new(' in entry
+    scope = (root / CORE_CONTEXT).read_text().split('#[cfg(test)]', 1)[0]
+    ensure('request_context::ScopedRequest::new(' in entry
+           and 'current_admission::Bound::new(self.context, plan.work, checks)' in scope
+           and 'self.factory.checks()' in scope
            and '&current_context,' in entry and 'self.context.current(&mut self.checks)' in admission
            and 'crate::present(self.identity, self.expected, self.peer, now)' in admission
            and 'manifest::current(' in admission and 'self.work.recheck()' not in admission,

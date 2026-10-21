@@ -230,6 +230,19 @@ THEOREMS = [
     "Garrett.Protocol.all_traces_preserve_credential_secrecy",
 ]
 THEOREMS += [
+    'aivm_secrets_garrett_core.request_context.Proofs.scoped_constructor',
+    'aivm_secrets_garrett_core.request_context.Proofs.dispatch_return_iff',
+    'aivm_secrets_garrett_core.request_context.Proofs.dispatch_context',
+    'aivm_secrets_garrett_core.request_context.Proofs.recheck_return_iff',
+    'aivm_secrets_garrett_core.request_context.Proofs.complete_return_iff',
+    'aivm_secrets_garrett_core.request_context.Proofs.native_context_contract',
+    'aivm_secrets_garrett_core.request_context.Proofs.initial_context',
+    'aivm_secrets_garrett_core.request_context.Proofs.production_entry_trace',
+    'aivm_secrets_garrett_core.request_context.Proofs.production_selection_origin',
+    'aivm_secrets_garrett_core.request_context.Proofs.planning_forwarded',
+]
+
+THEOREMS += [
     'aivm_secrets_garrett_core.dispatch.TraceRefinement.setup_trace',
     'aivm_secrets_garrett_core.dispatch.TraceRefinement.receive_trace',
     'aivm_secrets_garrett_core.dispatch.TraceRefinement.current_trace',
@@ -886,6 +899,7 @@ def inputs() -> list[str]:
         "proofs/GarrettDispatchTrace.lean",
         "proofs/GarrettCompletionTrace.lean",
         "proofs/GarrettOwnedRequestTrace.lean",
+        "proofs/GarrettRequestContext.lean",
         "proofs/GarrettRequestPrefix.lean",
         "proofs/GarrettRequestTrace.lean",
         "tests/test_rust_w6_completion.py",
@@ -1265,6 +1279,13 @@ def mutate(pattern: str | None = None) -> None:
     mutations += [
         (owned_dispatch, 'trace origin replaced stored current stamp', '        if !self.local.finish_check(stamp) {', '        let stored = match self.work.recheck() {\n            Ok(stored) => stored,\n            Err(error) => return Err(error),\n        };\n        if !self.local.finish_check(stored) {'),
         (owned_dispatch, 'trace origin discarded failed send receipt', '        if !self\n            .effects\n            .begin_send(self.phase, &mut self.local, self.write)\n        {\n            return Err(W::INVALID_TRANSITION);\n        }\n        self.work.send(channel)', '        let before = self.effects;\n        if !self\n            .effects\n            .begin_send(self.phase, &mut self.local, self.write)\n        {\n            return Err(W::INVALID_TRANSITION);\n        }\n        match self.work.send(channel) {\n            Ok(()) => Ok(()),\n            Err(error) => {\n                self.effects = before;\n                Err(error)\n            }\n        }'),
+    ]
+    context = source.with_name("request_context.rs")
+    mutations += [
+        (context, 'request context dropped coordinated-write flag', 'keyed_write: plan.keyed_write,', 'keyed_write: false,'),
+        (context, 'request context ignored outer-check denial', '        self.work.recheck()', '        let _ignored = self.work.recheck();\n        Ok(())'),
+        (context, 'request context replaced completion input', '        self.work.complete(raw)', '        let _ignored = raw;\n        let empty = self.work.empty_facts();\n        self.work.complete(empty)'),
+        (context, 'request context repeated check factory', '        let checks = self.factory.checks();', '        let _ignored = self.factory.checks();\n        let checks = self.factory.checks();'),
     ]
     admission = source.with_name("current_admission.rs")
     mutations += [
@@ -2095,6 +2116,7 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettDispatchTrace",
                 "GarrettCompletionTrace",
                 "GarrettOwnedRequestTrace",
+                "GarrettRequestContext",
                 "GarrettConfinement",
                 "GarrettProviderSimulation",
                 "GarrettRequestPrefix",
@@ -2141,6 +2163,7 @@ def mutate(pattern: str | None = None) -> None:
                 "dispatch.rs": "GarrettDispatch",
                 "request_adapter.rs": "GarrettRequestAdapter",
                 "current_admission.rs": "GarrettCurrentAdmission",
+                "request_context.rs": "GarrettRequestContext",
                 "approval.rs": "GarrettApproval",
                 "enrollment.rs": "GarrettEnrollment",
                 "authority.rs": "GarrettAuthority",
@@ -2193,7 +2216,7 @@ def mutate(pattern: str | None = None) -> None:
                 ]:
                     modules.remove(dependency)
                 modules[1:1] = ["GarrettLogin", "GarrettManifest", "GarrettDisclosure"]
-            if label.startswith("trace origin "):
+            if label.startswith(("trace origin ", "request context ")):
                 # Rebuild the actual local import closure against this mutant;
                 # cached proof objects are never substituted for dependencies.
                 closure: list[str] = []
@@ -2209,7 +2232,7 @@ def mutate(pattern: str | None = None) -> None:
                             visit(imported)
                     closure.append(module)
 
-                visit("GarrettDispatchTrace")
+                visit("GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
                 modules = closure + [module for module in modules if module not in seen]
             for module in modules:
                 proof = temporary / (module + ".lean")

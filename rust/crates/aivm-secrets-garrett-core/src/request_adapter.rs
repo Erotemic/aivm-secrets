@@ -418,4 +418,168 @@ mod tests {
         );
         assert!(!pending.effects().can_return_value());
     }
+
+    struct ScopedChecks(Source);
+    impl crate::current_admission::Checks for ScopedChecks {
+        type Error = &'static str;
+        const INVALID_CAPABILITY: Self::Error = "identity";
+        fn coordination(&mut self) -> Result<(), Self::Error> {
+            self.0.step("coordination")
+        }
+        fn clock(&mut self) -> Result<i64, Self::Error> {
+            self.0.step("clock")?;
+            Ok(2)
+        }
+        fn control(&mut self, _: i64) -> Result<(), Self::Error> {
+            self.0.step("control")
+        }
+        fn lease(&mut self, _: i64) -> Result<(), Self::Error> {
+            self.0.step("lease")
+        }
+        fn elapsed(&mut self) -> Result<i64, Self::Error> {
+            self.0.step("elapsed")?;
+            Ok(1)
+        }
+        fn use_error(_: crate::credential_use::UseDenial) -> Self::Error {
+            "admission"
+        }
+    }
+    struct ScopedFactory(Source);
+    impl crate::request_context::CheckFactory for ScopedFactory {
+        type Error = &'static str;
+        type Checks = ScopedChecks;
+        fn checks(&mut self) -> ScopedChecks {
+            self.0.factory("factory.checks");
+            ScopedChecks(self.0.clone())
+        }
+    }
+
+    #[test]
+    fn scoped_request_preserves_shapes_values_keyed_writes_and_failure_prefixes() {
+        let identity = crate::Claims {
+            issuer: b"issuer".to_vec(),
+            audience: b"audience".to_vec(),
+            subject: b"subject".to_vec(),
+            token_id: b"token".to_vec(),
+            issued_at: 1,
+            expires_at: 100,
+            epoch: 0,
+            certificate: b"peer".to_vec(),
+        };
+        let expected = crate::Expectation {
+            issuer: b"issuer".to_vec(),
+            audience: b"audience".to_vec(),
+            subject: b"subject".to_vec(),
+            epoch: 0,
+        };
+        let peer = b"peer".to_vec();
+        let claims = UseClaims {
+            binding: b"peer".to_vec(),
+            policy: b"policy".to_vec(),
+            grant: b"grant".to_vec(),
+            issued_at: 1,
+            expires_at: 100,
+        };
+        let grant = UseGrant {
+            claims: UseClaims {
+                binding: b"peer".to_vec(),
+                policy: b"policy".to_vec(),
+                grant: b"grant".to_vec(),
+                issued_at: 1,
+                expires_at: 100,
+            },
+            operation: b"op".to_vec(),
+            active: true,
+            route: Route {
+                host: b"api.example.org".to_vec(),
+                port: 443,
+                path: b"/".to_vec(),
+                authentication: Authentication::Bearer,
+            },
+        };
+        let operation = b"op".to_vec();
+        for (preflight, final_effect, write, selected) in [
+            (false, true, false, 3),
+            (true, false, false, 21),
+            (true, true, false, 43),
+            (false, true, true, 3),
+        ] {
+            let context = crate::current_admission::Context::new(
+                &identity, &expected, &peer, &claims, &grant, &operation, write, true,
+            );
+            let original = source(preflight, final_effect, write);
+            let work = crate::request_context::ScopedRequest::new(
+                &context,
+                original.clone(),
+                ScopedFactory(original.clone()),
+            );
+            let out = read_transition::run_current(Pending::new(work)).unwrap();
+            assert_eq!(out.into_value(), selected);
+            let calls = original.calls.borrow().clone();
+            assert!(
+                !calls.contains(&"current"),
+                "raw provider recheck must not supply authority"
+            );
+            assert_eq!(
+                calls
+                    .iter()
+                    .filter(|name| **name == "factory.checks")
+                    .count(),
+                usize::from(preflight) + usize::from(final_effect)
+            );
+            assert_eq!(calls.contains(&"reserve"), write);
+            assert_eq!(calls.contains(&"finish"), write);
+            for (index, name) in calls.iter().enumerate() {
+                if name.starts_with("factory.") {
+                    continue;
+                }
+                let mut failed = source(preflight, final_effect, write);
+                failed.fault = Some(index);
+                let observed = failed.calls.clone();
+                let factory = ScopedFactory(failed.clone());
+                let work = crate::request_context::ScopedRequest::new(&context, failed, factory);
+                let out = read_transition::run_current(Pending::new(work));
+                assert_eq!(*observed.borrow(), calls[..=index]);
+                let uncertain = write
+                    && [
+                        "send",
+                        "receive",
+                        "finish",
+                        "select",
+                        "before",
+                        "completed",
+                        "after",
+                    ]
+                    .contains(name);
+                assert!(
+                    matches!(out, Err(error) if error == if uncertain { "unknown" } else { "failure" })
+                );
+            }
+        }
+        for (phase, write) in [(Phase::Preflight, true), (Phase::Final, false)] {
+            let context = crate::current_admission::Context::new(
+                &identity, &expected, &peer, &claims, &grant, &operation, write, true,
+            );
+            let original = source(false, true, write);
+            let calls = original.calls.clone();
+            let factory = ScopedFactory(original.clone());
+            let work = crate::request_context::ScopedRequest::new(&context, original, factory);
+            let mut pending = Pending::new(work);
+            assert_eq!(
+                Request::dispatch(
+                    &mut pending,
+                    phase,
+                    Effect {
+                        value: 1,
+                        write: true
+                    }
+                ),
+                Err("policy")
+            );
+            assert!(
+                calls.borrow().is_empty(),
+                "invalid preparation must call neither factory"
+            );
+        }
+    }
 }

@@ -44,14 +44,11 @@ The remaining `NativeContext` input contract is **state indexed**. It requires:
 
 These are constructor/typeclass and immutable-field correspondence obligations,
 not admitted-stamp, audit-success, provider-reached or callback-history premises.
-They are still uninstantiated for the complete native adapter. In particular,
-the theorem does not fix one context across every possible native work value;
-it tracks each request's own initial context through its actual mutable states.
-The reviewed native closure uses `&current_context`, but source review alone is
-not a formal discharge of this contract. A source-owned context/factory wrapper
-or equivalent exact native constructor refinement is the next implementation
-seam; preserve these per-state frame obligations rather than substituting a
-universal fixed-context assumption.
+For the production path they are now derived by the extracted
+[source-owned request context wrapper](garrett-request-context.md). The generic
+interface remains state indexed: each request tracks its own initial context,
+rather than fixing one context over every possible work value. Native startup
+and input conversions, primitive/environment and I/O semantics remain separate.
 
 `TraceSteps` records exact receipt changes in controller order and feeds the
 existing W4 gate-soundness and captured-binding results. Native audit

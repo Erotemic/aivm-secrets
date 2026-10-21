@@ -1,3 +1,4 @@
+import GarrettRequestContext
 import GarrettOwnedRequestTrace
 import GarrettCurrentAdmission
 import GarrettRequestAdapter
@@ -708,3 +709,14 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.request_adapter.TraceRefinement.completion_callback_trace
 #print axioms aivm_secrets_garrett_core.request_adapter.TraceRefinement.returned_entry_sound_trace
 #print axioms aivm_secrets_garrett_core.request_adapter.TraceRefinement.returned_entry_bound_trace
+
+#print axioms aivm_secrets_garrett_core.request_context.Proofs.scoped_constructor
+#print axioms aivm_secrets_garrett_core.request_context.Proofs.dispatch_return_iff
+#print axioms aivm_secrets_garrett_core.request_context.Proofs.dispatch_context
+#print axioms aivm_secrets_garrett_core.request_context.Proofs.recheck_return_iff
+#print axioms aivm_secrets_garrett_core.request_context.Proofs.complete_return_iff
+#print axioms aivm_secrets_garrett_core.request_context.Proofs.native_context_contract
+#print axioms aivm_secrets_garrett_core.request_context.Proofs.initial_context
+#print axioms aivm_secrets_garrett_core.request_context.Proofs.production_entry_trace
+#print axioms aivm_secrets_garrett_core.request_context.Proofs.production_selection_origin
+#print axioms aivm_secrets_garrett_core.request_context.Proofs.planning_forwarded

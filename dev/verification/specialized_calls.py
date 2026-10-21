@@ -262,6 +262,11 @@ def explain(projection, profile="bridge"):
             ('aivm_secrets_garrett_core','dispatch','dispatch'),
             ('aivm_secrets_garrett_core','provider_exchange','exchange'),
             ('aivm_secrets_garrett','custody','manifest_session','send_manifest_bytes')]),
+        ('owned-context-check-factory', [
+            ('aivm_secrets_garrett_core','read_transition','run_current'),
+            ('aivm_secrets_garrett_core','request_adapter','dispatch'),
+            ('aivm_secrets_garrett_core','request_context','dispatch'),
+            ('aivm_secrets_garrett','custody','manifest_session','checks')]),
         ('owned-request-completion-audit', [
             ('aivm_secrets_garrett_core','read_transition','run_current'),
             ('aivm_secrets_garrett_core','request_adapter','complete'),

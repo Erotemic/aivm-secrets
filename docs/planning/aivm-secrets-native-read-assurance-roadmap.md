@@ -540,3 +540,19 @@ those fields remains open; a source-owned context/factory wrapper is the next
 concrete seam. Primitive/environment semantics, transitive native I/O/drop/
 unwind closure, selected JSON/frame/close observations and adaptive histories
 remain separate. This is still not an NR-2/3/4/5 exit or whole-service secrecy.
+
+### Source-owned request context/factory (October 20)
+
+The [production context wrapper](../garrett-request-context.md) now owns the
+captured context and constructs the canonical bound provider after the raw
+native factory returns. Ten extracted obligations derive all formerly native
+context/typeclass/frame clauses, exact factory state/order/keyed-write flags,
+forwarded planning/errors, constructor-to-consuming-entry traces and raw
+completion/selector origin. The per-state context input contract is discharged
+for this producer; no whole-current or whole-callback history premise replaces it.
+
+Native startup/data conversion and primitive/environment semantics are still
+separate. The next seam is actual route/request-buffer/credentialed writer
+correspondence, followed by the open native I/O/drop/unwind, JSON/frame/close and
+adaptive session obligations. Source guards and optional compiler paths retain
+their non-exhaustive scope. This does not complete NR-2/3/4/5 or independent review.

@@ -50,12 +50,14 @@ def projection():
         function(19, ['aivm_secrets_garrett_core','http_wire','reserved_name'], [20]),
         function(20, ['aivm_secrets_garrett_core','http_wire','ascii_equal']),
         function(22, ['aivm_secrets_garrett_core','provider_exchange','exchange'], [5,9]),
-        function(23, ['aivm_secrets_garrett_core','request_adapter','<Impl>','dispatch'], [4]),
+        function(23, ['aivm_secrets_garrett_core','request_adapter','<Impl>','dispatch'], [4,30]),
         function(24, ['aivm_secrets_garrett_core','request_adapter','<Impl>','complete'], [25]),
         function(25, ['aivm_secrets_garrett_core','completion','complete'], [26]),
         function(26, ['aivm_secrets_garrett','custody','manifest_session','<Impl>','audit'], [27]),
         function(27, ['aivm_secrets_garrett','custody','<Impl>','write_record'], [6]),
         function(29, ['aivm_secrets_garrett_core','read_transition','run_current'], [23,24]),
+        function(30, ['aivm_secrets_garrett_core','request_context','<Impl>','dispatch'], [31]),
+        function(31, ['aivm_secrets_garrett','custody','manifest_session','<Impl>','checks']),
     ]))
 
 
@@ -64,6 +66,7 @@ def test_compiled_paths_keep_external_and_dynamic_obligations_explicit():
     assert result['witnesses'] == {'account-controller-executor':[0,1,2,3],
         'coordinated-manifest-executor':[0,29,23,4,22,5],
         'owned-request-completion-audit':[0,29,24,25,26,27],
+        'owned-context-check-factory':[0,29,23,30,31],
         'account-authentication-bytes':[0,1,2,3,8,14,15,10,11],
         'manifest-authentication-bytes':[0,29,23,4,22,9,14,15,10,11],
         'account-request-line':[0,1,2,3,8,14,15,12,13],
@@ -78,7 +81,7 @@ def test_compiled_paths_keep_external_and_dynamic_obligations_explicit():
         'begin']['line'] == 4
 
 
-@pytest.mark.parametrize('victim', [0,1,2,3,4,8,9,10,12,14,15,16,17,18,19,21,22,23,24,25,27])
+@pytest.mark.parametrize('victim', [0,1,2,3,4,8,9,10,12,14,15,16,17,18,19,21,22,23,24,25,27,28])
 def test_missing_callback_link_cannot_be_rebaselined_as_a_passing_witness(victim):
     data = projection()
     data['translated']['fun_decls'][victim]['body']['blocks']['direct'] = []

@@ -134,8 +134,9 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'matches!(phase, DispatchPhase::Final)' in dispatch
             and '&& effect.write' in dispatch and '&& self.base.coordinator.is_some()' in dispatch
             and 'fresh: &fresh,' in dispatch
-            and 'aivm_secrets_garrett_core::current_admission::Bound::new(' in dispatch
-            and '&current_context,' in dispatch and 'lease: &current_lease,' in dispatch
+            and 'request_context::ScopedRequest::new(' in request
+            and '&current_context,' in request and 'lease: &current_lease,' in request
+            and 'current_admission::Bound::new(' not in dispatch
             and 'coordinator: self.base.coordinator.as_ref(),' in dispatch
             and 'reservation:reservation.as_ref()' in ''.join(dispatch.split()),
             'owned dispatch lost actual report, current binding or coordination inputs')
@@ -350,6 +351,17 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'self.session.base.elapsed()' in native_checks
             and 'use_error(error)' in native_checks,
             'current stamp bypasses full native late authority checks')
+    scope = contents['rust/crates/aivm-secrets-garrett-core/src/request_context.rs'].split('#[cfg(test)]', 1)[0]
+    require(same_order(scope, 'let plan = self.work.dispatch(phase, effect)',
+                       'let checks = self.factory.checks()',
+                       'current_admission::Bound::new(self.context, plan.work, checks)',
+                       'keyed_write: plan.keyed_write')
+            and "context: &'a current_admission::Context<'a>" in scope and 'pub context:' not in scope
+            and 'self.work.complete(raw)' in scope and 'self.work.recheck()' in scope
+            and 'type Dispatch = current_admission::Bound<' in scope
+            and 'CheckFactoryforCurrentFactory' in ''.join(m.split())
+            and 'session: self.session,' in native_checks and 'lease: self.lease,' in native_checks,
+            'request context wrapper lost private context, exact factories or canonical bound provider')
     provider = contents['rust/crates/aivm-secrets-garrett-core/src/provider_exchange.rs'].split('#[cfg(test)]', 1)[0]
     require(same_order(provider, 'pub fn exchange<', 'ops.setup()', 'ops.recheck()',
                        'if write && !current.write()', 'ops.send(&mut channel)', 'ops.receive(channel)')

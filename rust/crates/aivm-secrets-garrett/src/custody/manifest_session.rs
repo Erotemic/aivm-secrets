@@ -134,6 +134,25 @@ impl<L: Fn(i64) -> Outcome<()>> aivm_secrets_garrett_core::current_admission::Ch
     }
 }
 
+// This factory supplies observations only. The extracted request wrapper
+// chooses the one context used by every produced provider adapter.
+struct CurrentFactory<'a, L> {
+    session: &'a Session,
+    lease: L,
+}
+impl<'a, L: Copy + Fn(i64) -> Outcome<()>> aivm_secrets_garrett_core::request_context::CheckFactory
+    for CurrentFactory<'a, L>
+{
+    type Error = Error;
+    type Checks = CurrentChecks<'a, L>;
+    fn checks(&mut self) -> Self::Checks {
+        CurrentChecks {
+            session: self.session,
+            lease: self.lease,
+        }
+    }
+}
+
 pub(crate) struct Session {
     base: AccountSession,
     policy: Policy,
@@ -470,14 +489,6 @@ impl Session {
                     idempotency_header: op.idempotency_header,
                 },
             };
-            let work = aivm_secrets_garrett_core::current_admission::Bound::new(
-                &current_context,
-                work,
-                CurrentChecks {
-                    session: self,
-                    lease: &current_lease,
-                },
-            );
             request_adapter::DispatchPlan { work, keyed_write }
         };
         let session = &*self;
@@ -510,6 +521,14 @@ impl Session {
             fresh: &fresh,
             operation_write: op.write,
         };
+        let work = aivm_secrets_garrett_core::request_context::ScopedRequest::new(
+            &current_context,
+            work,
+            CurrentFactory {
+                session: self,
+                lease: &current_lease,
+            },
+        );
         let pending = request_adapter::Pending::new(work);
         read_transition::run_current(pending)
             .map(aivm_secrets_garrett_core::completion::Completed::into_value)

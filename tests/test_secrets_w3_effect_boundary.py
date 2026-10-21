@@ -49,6 +49,12 @@ def mutate(repo, filename, before, after):
 
 
 @pytest.mark.parametrize('file,old,new', [
+    ('rust/crates/aivm-secrets-garrett-core/src/request_context.rs', "context: &'a current_admission::Context<'a>", "pub context: &'a current_admission::Context<'a>"),
+    ('rust/crates/aivm-secrets-garrett-core/src/request_context.rs', 'current_admission::Bound::new(self.context, plan.work, checks)', 'current_admission::Bound::new(unchecked_context(), plan.work, checks)'),
+    ('rust/crates/aivm-secrets-garrett-core/src/request_context.rs', 'self.factory.checks()', 'unchecked_checks()'),
+    ('rust/crates/aivm-secrets-garrett-core/src/request_context.rs', 'keyed_write: plan.keyed_write', 'keyed_write: false'),
+    ('rust/crates/aivm-secrets-garrett-core/src/request_context.rs', 'self.work.recheck()', 'Ok(())'),
+    ('rust/crates/aivm-secrets-garrett-core/src/request_context.rs', 'self.work.complete(raw)', 'self.work.complete(self.work.empty_facts())'),
     ('rust/crates/aivm-secrets-garrett-core/src/current_admission.rs', 'checks.coordination()', 'unchecked_coordination()'),
     ('rust/crates/aivm-secrets-garrett-core/src/current_admission.rs', 'checks.clock()', 'unchecked_clock()'),
     ('rust/crates/aivm-secrets-garrett-core/src/current_admission.rs', 'checks.control(now)', 'checks.control(0)'),

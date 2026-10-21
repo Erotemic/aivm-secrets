@@ -30,6 +30,8 @@ def test_pending_source_guard_rejects_unreviewed_boundary_mutation(tmp_path, mut
     controller = (ROOT / controller_path).read_text()
     admission_path = 'rust/crates/aivm-secrets-garrett-core/src/current_admission.rs'
     admission = (ROOT / admission_path).read_text()
+    scope_path = 'rust/crates/aivm-secrets-garrett-core/src/request_context.rs'
+    scope_source = (ROOT / scope_path).read_text()
     source = (ROOT / RUST).read_text()
     scope = json.loads((ROOT / SCOPE).read_text())
     if mutation == 'no-fresh-before-emit':
@@ -49,7 +51,7 @@ def test_pending_source_guard_rejects_unreviewed_boundary_mutation(tmp_path, mut
     elif mutation == 'skip-completion-audit':
         controller = controller.replace('completion::complete(', 'unchecked_completion(')
     elif mutation == 'unbound-provider':
-        source = source.replace('current_admission::Bound::new(', 'unchecked_provider(')
+        source = source.replace('request_context::ScopedRequest::new(', 'unchecked_provider(')
     elif mutation == 'unbound-current':
         admission = admission.replace('self.context.current(&mut self.checks)', 'self.work.recheck()')
     elif mutation == 'wrong-control-time':
@@ -62,6 +64,7 @@ def test_pending_source_guard_rejects_unreviewed_boundary_mutation(tmp_path, mut
         scope['exclusions'].remove('sent-but-not-observed-TLS-application-data')
     (tmp_path / controller_path).write_text(controller)
     (tmp_path / admission_path).write_text(admission)
+    (tmp_path / scope_path).write_text(scope_source)
     (tmp_path / RUST).write_text(source)
     (tmp_path / SCOPE).write_text(json.dumps(scope))
     with pytest.raises(ReviewError):
