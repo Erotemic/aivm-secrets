@@ -149,6 +149,14 @@ reachability and a positive final-read witness. Native report/copy/outcome links
 are no longer premises for this producer. Primitive/context, native event/JSON/
 frame observation, connected adaptive history and NR-2–NR-5 remain open.
 
+Source `db55279` passes 3,036 full-suite cases with zero skips, 588 named
+axiom checks, 767 release parity cases, 82 Rust workspace cases, eight new
+source-extracted mutants, both 164-case native build-mode gates and standalone
+product workflows, all 278 archive pins and six safe installed-vTPM cases.
+The updated optional specialized bridge capture finds nine required paths;
+47 ledger fixture/capture cases pass without a mediation claim. See the
+[owned-request validation record](../../dev/validation/2026-10-20-owned-request.json).
+
 ## Goal and present assurance level
 
 Garrett should let an untrusted guest perform **useful, explicitly authorized**
