@@ -27,13 +27,20 @@ python dev/offline_native_guest.py
 To save the synthetic host and guest files and a redacted summary for inspection:
 
 ```bash
-python dev/offline_native_guest.py \
-  --workspace .tools/offline-garrett-run-01
+RUN="/tmp/offline-garrett-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+python dev/offline_native_guest.py --workspace "$RUN"
 ```
 
 The specified workspace must not exist. It is created with private permissions;
-the script never overwrites a credential or identity file. To use existing
-binaries in a different directory, pass `--bin-dir /absolute/path/to/binaries`.
+the script never overwrites a credential or identity file. Use `/tmp` or another
+trusted path whose **entire ancestor chain** passes the native directory check:
+ordinary user-owned ancestors must not be group/world-writable, and only
+root-owned sticky directories may be writable by others. A checkout's
+`.tools/` or the repository itself may be group-writable, causing native
+authority initialization to fail with `unsafe_file`. Do not relax the native
+check or recursively change repository permissions to run the demo.
+To use existing binaries in a different directory, pass
+`--bin-dir /absolute/path/to/binaries`.
 
 **Native file-permission contract:** The native broker opens its pinned local
 provider CA using `files::read_private`, and the guest client uses the same
@@ -57,6 +64,12 @@ operator check now rejects incomplete or extra disclosure entries before the
 broker starts; the native Rust parser remains authoritative for projection
 validity and enforcement.
 
+If a native authority action fails, the script reports the exit status and
+only a fixed public code decoded from the native JSON failure envelope. This
+avoids a generic `exit 1` while never printing raw subprocess diagnostics. A
+missing `summary.json` after an authority failure is expected: reporting occurs
+only after the end-to-end demonstration completes.
+
 If the native bridge exits before sending a readiness frame, the script reports
 its exit status and a fixed-shape native error code (when one is available).
 It never prints arbitrary native stderr, which might contain sensitive paths
@@ -67,8 +80,8 @@ acceptance test; Python-only tests cannot establish native startup success.
 **To use the guest client yourself**, launch the session interactively:
 
 ```bash
-python dev/offline_native_guest.py \
-  --interactive --workspace .tools/offline-garrett-manual-01
+RUN="/tmp/offline-garrett-manual-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+python dev/offline_native_guest.py --interactive --workspace "$RUN"
 ```
 
 The script prints an actual `garrett-client ... gh pr checks ...` command and

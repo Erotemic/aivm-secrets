@@ -610,3 +610,15 @@ chronology regression passed in the maintainer's log; there are no Rust
 changes here. This environment cannot run the pinned Lean toolchain, so
 `lake build GarrettNativeDispatchEvents` remains the focused acceptance gate.
 No routine axiom-printing or admission checks were added.
+
+## 2026-10-21 17:10:00 -0400 - Offline authority startup diagnostic
+
+The operator's first native offline demonstration failed at authority `init`,
+while the Python driver suppressed the structured public error code and the
+documented `.tools/` workspace could violate the native ancestor permissions
+contract on a group-writable checkout. Keep the Rust file boundary strict.
+Decode only a fixed public error code from authority JSON failures; never
+propagate arbitrary process output. Recommend a private new workspace below
+`/tmp` for the synthetic exercise; preserve explicit failure on unsafe roots.
+This is diagnostic and documentation work, not a claim of completed VM isolation
+or a replacement for an actual local native end-to-end run.

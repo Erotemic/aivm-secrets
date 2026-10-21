@@ -282,6 +282,33 @@ def run(command: list[str | Path], *, input_data: bytes | None = None,
     return result
 
 
+# Native garrett-authority emits this fixed public error vocabulary. Never
+# forward arbitrary stdout/stderr from an operator action (even on failure).
+PUBLIC_AUTHORITY_CODES = frozenset({
+    'invalid_capability', 'invalid_policy', 'resource_mismatch',
+    'invalid_request', 'denied', 'unreachable', 'upstream_response',
+    'upstream_rejected', 'upstream_error', 'internal_error', 'unsafe_file',
+    'outcome_unknown', 'exhausted', 'revoked', 'credential_source',
+    'expired',
+})
+
+
+def authority_error_code(stdout: bytes) -> str | None:
+    """Decode only a known public code from the native JSON failure envelope."""
+    try:
+        response = codec.loads(stdout, limit=4096)
+    except SecretsError:
+        return None
+    if (not isinstance(response, dict) or response.get('version') != 1
+            or response.get('ok') is not False):
+        return None
+    error = response.get('error')
+    if not isinstance(error, dict):
+        return None
+    code = error.get('code')
+    return code if isinstance(code, str) and code in PUBLIC_AUTHORITY_CODES else None
+
+
 def authority_action(binary: Path, host: Path, action: str, **kwargs) -> dict:
     path = write(host / f'operator-{action}.json', kwargs)
     try:
@@ -289,7 +316,9 @@ def authority_action(binary: Path, host: Path, action: str, **kwargs) -> dict:
     finally:
         path.unlink()
     if result.returncode or not result.stdout:
-        raise DemoError(f'native authority action {action} failed (exit {result.returncode})')
+        code = authority_error_code(result.stdout)
+        detail = f'; native error={code}' if code else ''
+        raise DemoError(f'native authority action {action} failed (exit {result.returncode}{detail})')
     try:
         data = codec.loads(result.stdout)
     except (ValueError, TypeError):

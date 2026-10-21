@@ -8,12 +8,14 @@ from __future__ import annotations
 import base64
 import json
 import socket
+import subprocess
 import ssl
 
 import pytest
 
 from dev.offline_native_guest import (
-    FAKE_TOKEN, HOSTNAME, PULL_PATH, DemoError, LocalProvider, binaries,
+    FAKE_TOKEN, HOSTNAME, PULL_PATH, DemoError, LocalProvider, authority_action,
+    authority_error_code, binaries,
     bridge_config, disclosure, distribute_guest_certificates, guest_config,
     mkdir, native_error_code, policy, start_bridge, validate_disclosure_coverage,
     validate_sent, write,
@@ -148,6 +150,35 @@ def test_guest_certificates_are_private_for_native_client(tmp_path):
 
 def _fake_bridge(directory, body):
     return write(directory / 'fake-bridge', '#!/bin/sh\n' + body, mode=0o700)
+
+
+def test_authority_init_failure_reports_only_public_error_code(tmp_path, monkeypatch):
+    host = mkdir(tmp_path / 'host')
+    payload = b'{"version":1,"ok":false,"error":{"code":"unsafe_file"}}\n'
+    monkeypatch.setattr('dev.offline_native_guest.run', lambda *args, **kwargs:
+                        subprocess.CompletedProcess([], 1, payload, b'secret path'))
+    with pytest.raises(DemoError, match=r'init failed \(exit 1; native error=unsafe_file\)'):
+        authority_action(tmp_path / 'authority', host, 'init',
+                         issuer='aivm.test', audience='aivm-secrets.remote')
+    assert not (host / 'operator-init.json').exists()
+
+
+@pytest.mark.parametrize('payload', [
+    b'{"version":1,"ok":false,"error":{"code":"private_file"}}',
+    b'{"version":1,"ok":true,"error":{"code":"unsafe_file"}}',
+    b'{"version":1,"ok":false,"error":{"code":"unsafe_file","secret":"x"',
+    b'/home/operator/private_secret',
+])
+def test_authority_failure_never_reflects_arbitrary_output(tmp_path, monkeypatch, payload):
+    host = mkdir(tmp_path / 'host')
+    monkeypatch.setattr('dev.offline_native_guest.run', lambda *args, **kwargs:
+                        subprocess.CompletedProcess([], 1, payload, b'private path'))
+    with pytest.raises(DemoError) as captured:
+        authority_action(tmp_path / 'authority', host, 'init',
+                         issuer='aivm.test', audience='aivm-secrets.remote')
+    assert str(captured.value) == 'native authority action init failed (exit 1)'
+    assert not (host / 'operator-init.json').exists()
+    assert authority_error_code(payload) is None
 
 
 def test_broker_startup_reports_native_exit_not_invalid_json(tmp_path):
