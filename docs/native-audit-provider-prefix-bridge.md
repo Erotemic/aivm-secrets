@@ -111,3 +111,5 @@ hashes as a substitute for verification.
   native-to-W4 observation relation.
 - Complete the NR-3 reachable-sink/dependency closure separately; this change
   does not assert complete I/O mediation.
+
+Follow-up: [Native Writer callback-to-W4 projection](native-writer-callback-simulation.md).

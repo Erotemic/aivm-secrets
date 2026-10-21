@@ -1205,6 +1205,68 @@ mod wire_tests {
             assert!(matches!(channel.into_parts(), Err(Error::InternalError)));
         }
     }
+    // std::io::Write::write_all is one extracted Writer callback but may
+    // perform several underlying writes, retry Interrupted and accept a prefix
+    // before a terminal WriteZero. Neither case arms a second provider attempt.
+    #[test]
+    fn native_writer_callback_retries_interrupted_but_never_retries_spent_request() {
+        use std::cell::{Cell, RefCell};
+        use std::rc::Rc;
+
+        struct InterruptedWriter {
+            calls: Rc<Cell<usize>>,
+            flushes: Rc<Cell<usize>>,
+            accepted: Rc<RefCell<Vec<u8>>>,
+            stop_after_prefix: bool,
+        }
+        impl Write for InterruptedWriter {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                let call = self.calls.get();
+                self.calls.set(call + 1);
+                if call == 0 {
+                    return Err(std::io::Error::from(std::io::ErrorKind::Interrupted));
+                }
+                let mut accepted = self.accepted.borrow_mut();
+                if self.stop_after_prefix && accepted.len() >= 3 {
+                    return Ok(0);
+                }
+                let count = if self.stop_after_prefix { bytes.len().min(3) } else { bytes.len() };
+                accepted.extend_from_slice(&bytes[..count]);
+                Ok(count)
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                self.flushes.set(self.flushes.get() + 1);
+                Ok(())
+            }
+        }
+        for stop_after_prefix in [false, true] {
+            let calls = Rc::new(Cell::new(0));
+            let flushes = Rc::new(Cell::new(0));
+            let accepted = Rc::new(RefCell::new(Vec::new()));
+            let mut channel = aivm_secrets_garrett_core::provider_io::Channel::new(
+                ManifestWire(Zeroizing::new(b"synthetic-request".to_vec())),
+                ProviderWriter(InterruptedWriter {
+                    calls: calls.clone(), flushes: flushes.clone(),
+                    accepted: accepted.clone(), stop_after_prefix,
+                }),
+                89,
+            );
+            let result = send_manifest_bytes(&mut channel);
+            assert_eq!(result.is_ok(), !stop_after_prefix);
+            assert_eq!(calls.get(), if stop_after_prefix { 3 } else { 2 });
+            assert_eq!(flushes.get(), if stop_after_prefix { 0 } else { 1 });
+            assert_eq!(&*accepted.borrow(), if stop_after_prefix {
+                &b"syn"[..]
+            } else {
+                &b"synthetic-request"[..]
+            });
+            let before = (calls.get(), flushes.get(), accepted.borrow().clone());
+            assert!(matches!(send_manifest_bytes(&mut channel), Err(Error::InternalError)));
+            assert_eq!((calls.get(), flushes.get(), accepted.borrow().clone()), before);
+            // A refused replay also withdraws a formerly successful receipt.
+            assert!(matches!(channel.into_parts(), Err(Error::InternalError)));
+        }
+    }
     #[test]
     fn native_channel_only_releases_exact_response_parts_after_successful_flush() {
         for (limit, flush_error) in [

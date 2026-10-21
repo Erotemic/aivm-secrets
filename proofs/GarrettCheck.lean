@@ -2,6 +2,7 @@ import GarrettJsonFrame
 import GarrettRequestContext
 import GarrettProviderIO
 import GarrettProviderChannel
+import GarrettNativeWriterEvents
 import GarrettProviderWire
 import GarrettJsonString
 import GarrettOwnedRequestTrace

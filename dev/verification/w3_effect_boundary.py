@@ -375,9 +375,20 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'std::str::from_utf8(endpoint.host())' in setup
             and 'u16::try_from(route.port)' not in setup and 'std::str::from_utf8(&route.host)' not in setup and 'ClientConnection::new(self.executor.tls.clone(), name)' in setup,
             'provider setup bypasses wire validation or host route / TLS identity')
-    require('self.0.write_all(bytes)' in ''.join(primitive.split()) and 'self.0.flush()' in primitive
+    # A Write callback is a high-level std::io::Write::write_all invocation;
+    # it can accept an arbitrary prefix or retry Interrupted internally. Both
+    # returned write and flush errors must be visible to the extracted
+    # Channel::submit result, never converted to a successful parser permit.
+    require(same_order(primitive,
+                       'fn write_all(&mut self, bytes: &Vec<u8>)',
+                       'self.0.write_all(bytes).map_err(|_| Error::UpstreamResponse)',
+                       'fn flush(&mut self)',
+                       'self.0.flush().map_err(|_| Error::UpstreamResponse)',
+                       'channel.submit()')
+            and primitive.count('self.0.write_all(bytes)') == 1
+            and primitive.count('self.0.flush()') == 1
             and 'send_manifest_bytes(channel)' in ''.join(sender.split()),
-            'native raw credential-bearing writer bypassed')
+            'native raw credential-bearing writer callback ordering/error mapping bypassed')
     sampled = part(request, 'let current_peer =', 'let canonical_request')
     native_checks = part(m, "struct CurrentChecks<'a, L>", 'pub(crate) struct Session {')
     admission = contents['rust/crates/aivm-secrets-garrett-core/src/current_admission.rs'].split('#[cfg(test)]', 1)[0]
