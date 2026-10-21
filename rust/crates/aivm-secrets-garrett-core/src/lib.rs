@@ -235,3 +235,5 @@ pub mod guest_frame;
 pub mod completion;
 
 pub mod dispatch;
+
+pub mod request_adapter;

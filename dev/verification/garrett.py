@@ -694,6 +694,23 @@ THEOREMS += [
     'aivm_secrets_garrett_core.dispatch.Simulation.request_entry_with_owned_adapters',
 ]
 
+THEOREMS += [
+    'aivm_secrets_garrett_core.request_adapter.Proofs.recheck_frame',
+    'aivm_secrets_garrett_core.request_adapter.Proofs.dispatch_receipts',
+    'aivm_secrets_garrett_core.request_adapter.Proofs.completion_receipts',
+    'aivm_secrets_garrett_core.request_adapter.Proofs.request_contracts',
+    'aivm_secrets_garrett_core.request_adapter.Proofs.completion_report_iff',
+    'aivm_secrets_garrett_core.request_adapter.Proofs.recheck_primitive_prefix',
+    'aivm_secrets_garrett_core.request_adapter.Proofs.preparation_refusal',
+    'aivm_secrets_garrett_core.request_adapter.Proofs.dispatch_success_origin',
+    'aivm_secrets_garrett_core.request_adapter.Proofs.initial_receipt',
+    'aivm_secrets_garrett_core.request_adapter.Proofs.returned_entry_receipt',
+    'aivm_secrets_garrett_core.request_adapter.Proofs.successful_entry_completion',
+    'aivm_secrets_garrett_core.request_adapter.Proofs.positive_read_witness',
+    'aivm_secrets_garrett_core.request_adapter.Proofs.completion_selection_origin',
+    'aivm_secrets_garrett_core.request_adapter.Proofs.successful_entry_selection_origin',
+]
+
 TESTS = [
     "tests/test_rust_http_response.py",
     "tests/test_rust_approval.py",
@@ -811,6 +828,7 @@ def inputs() -> list[str]:
         "proofs/GarrettCompletionSimulation.lean",
         "proofs/GarrettDispatch.lean",
         "proofs/GarrettDispatchSimulation.lean",
+        "proofs/GarrettRequestAdapter.lean",
         "proofs/GarrettRequestPrefix.lean",
         "proofs/GarrettRequestTrace.lean",
         "tests/test_rust_w6_completion.py",
@@ -1186,6 +1204,17 @@ def mutate(pattern: str | None = None) -> None:
         (owned_dispatch, 'owned dispatch rolled back returned receipt', 'effects: pending.effects,', 'effects,'),
         (owned_dispatch, 'owned dispatch ignored fresh refusal', '    match pending.work.check() {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }', '    let _ignored = pending.work.check();'),
         (owned_dispatch, 'owned dispatch ignored reservation refusal', '    match reserved {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }', '    let _ignored = reserved;'),
+    ]
+    request_adapter = source.with_name("request_adapter.rs")
+    mutations += [
+        (request_adapter, 'owned request lost dispatch error receipt', 'let report = dispatch::dispatch(plan.work, Ok(prepared), self.effects, plan.keyed_write);\n        self.effects = report.effects;', 'let report = dispatch::dispatch(plan.work, Ok(prepared), self.effects, plan.keyed_write);'),
+        (request_adapter, 'owned request lost completion error receipt', 'let report = completion::complete(pending, self.effects);\n        self.effects = report.effects;', 'let report = completion::complete(pending, self.effects);'),
+        (request_adapter, 'owned request promoted write admission', 'self.work.operation_write(),', 'true,'),
+        (request_adapter, 'owned request promoted preflight to final', '            phase,\n            self.work.operation_write(),', '            read_transition::Phase::Final,\n            self.work.operation_write(),'),
+        (request_adapter, 'owned request ignored outer freshness refusal', '        self.work.recheck()', '        let _ignored = self.work.recheck();\n        Ok(())'),
+        (request_adapter, 'owned request repeated completion factory', '        let pending = self.work.complete(raw);', '        let _ignored = self.work.complete(raw);\n        let pending = self.work.complete(self.work.empty_facts());'),
+        (request_adapter, 'owned request changed preparation denial', 'Err(_) => return Err(W::INVALID_POLICY),', 'Err(_) => return Err(W::INVALID_TRANSITION),'),
+        (request_adapter, 'owned request reset completion receipt', 'completion::complete(pending, self.effects)', 'completion::complete(pending, RequestEffects::new())'),
     ]
     receipts = source.with_name("request_effects.rs")
     mutations += [
@@ -1990,6 +2019,8 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettRequestEffects",
                 "GarrettCompletion",
                 "GarrettDispatch",
+                "GarrettRequestSimulation",
+                "GarrettRequestAdapter",
                 "GarrettRequestPrefix",
                 "GarrettProviderExchange",
                 "Garrett",
@@ -2032,6 +2063,7 @@ def mutate(pattern: str | None = None) -> None:
                 "request_effects.rs": "GarrettRequestPrefix",
                 "completion.rs": "GarrettCompletion",
                 "dispatch.rs": "GarrettDispatch",
+                "request_adapter.rs": "GarrettRequestAdapter",
                 "approval.rs": "GarrettApproval",
                 "enrollment.rs": "GarrettEnrollment",
                 "authority.rs": "GarrettAuthority",
@@ -2058,10 +2090,12 @@ def mutate(pattern: str | None = None) -> None:
             if source.name == "guest_frame.rs":
                 modules.remove("GarrettLineFrame")
                 modules.insert(0, "GarrettLineFrame")
-            if source.name in {"provider_exchange.rs", "manifest.rs", "request_effects.rs", "completion.rs", "dispatch.rs"}:
+            if source.name in {"provider_exchange.rs", "manifest.rs", "request_effects.rs", "completion.rs", "dispatch.rs", "request_adapter.rs"}:
                 dependencies = ["GarrettReadTransition", "GarrettLogin", "Garrett", "GarrettManifest", "GarrettProviderExchange"]
-                if source.name in {"request_effects.rs", "completion.rs", "dispatch.rs"}:
+                if source.name in {"request_effects.rs", "completion.rs", "dispatch.rs", "request_adapter.rs"}:
                     dependencies.append("GarrettRequestEffects")
+                if source.name == "request_adapter.rs":
+                    dependencies.extend(["GarrettReadInvocations", "GarrettCompletion", "GarrettDispatch", "GarrettRequestSimulation"])
                 for dependency in dependencies:
                     modules.remove(dependency)
                 modules[:0] = dependencies

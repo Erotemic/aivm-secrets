@@ -17,8 +17,9 @@ This is W3/W6 advancement, **not** completion of W3–W6.
 ## Source-linked enforcement
 
 A policy-selected `Effect` has no right to perform credentialed I/O. The
-`PreparedDispatch` factory enforces preflight-read and no read-to-write
-escalation. The [owned dispatch controller](garrett-owned-dispatch.md) invokes
+[source-owned request adapter](garrett-owned-request.md) enforces exact
+phase/write preparation before a provider factory. The
+[owned dispatch controller](garrett-owned-dispatch.md) invokes
 the native identity/target preparation and fixed durable audit callback before
 constructing the core `Audited` permit. It owns receipt gates, provider setup,
 current admission and the composite attempt gate around the native raw sender.
@@ -27,8 +28,8 @@ persists completion with checks before and after audit before guest success.
 
 An audit receipt alone does not establish a current grant. The extracted
 `manifest::authorize` checks remain the admission authority, revalidated after
-TLS setup and immediately before the credentialed send. Native report links,
-primitive semantics, dependencies and panic/drop paths still need the complete
+TLS setup and immediately before the credentialed send. Receipt/report handoffs are now extracted code. Native primitive/context
+semantics, dependencies and panic/drop paths still need the complete
 reachability/refinement argument.
 
 ## Independent runtime evidence

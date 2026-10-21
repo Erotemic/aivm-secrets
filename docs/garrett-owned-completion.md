@@ -6,9 +6,9 @@ NR-2's implementation-to-receipt relation. The extracted controller establishes
 its own receipt transitions, rather than requiring a premise that an entire
 completion callback already follows `Steps` and returns only a ready value.
 
-This does not complete NR-2 or establish whole-service I/O correspondence. The
-native report/copy-back/outcome equation remains an explicit adapter obligation;
-actual JSON selection/conversion, current-authority semantics, audit bytes and
+This does not complete NR-2 or establish whole-service I/O correspondence. The [source-owned request adapter](garrett-owned-request.md) now derives
+the receipt/report handoff from extracted code, replacing the former native
+report/copy-back/outcome obligation for the actual producer. Actual JSON selection/conversion, current-authority semantics, audit bytes and
 durability, other callbacks, sink closure and adaptive observations remain open.
 
 ## Production path
@@ -35,11 +35,9 @@ rules and runtime dependencies are unchanged. Successful OAuth refresh and
 bound certificate renewal retain their separate existing flows.
 
 `completion::Report` returns the primitive work state, exact receipt and outcome
-on every return. Native `complete_pending` copies the shared receipt before the
-call, copies `report.effects` back unconditionally, and maps only the completed
-outcome. `PendingRequest` then copies the actual shared receipt into its snapshot
-and checks the return gate as before. No `RefCell` guard is held across selection,
-authority or filesystem operations. An early selection error has an all-false
+on every return. The extracted request adapter retains the returned receipt
+and exact outcome, including failures. Native factories and primitives hold no
+reference to this private receipt. An early selection error has an all-false
 flag record but retains non-replayable progress; restoring an older receipt
 would incorrectly reopen completion.
 
@@ -60,14 +58,15 @@ Sixteen obligations in `GarrettCompletion.lean` cover actual extracted methods:
   merely requiring some earlier sound receipt.
 
 Four obligations in `GarrettCompletionSimulation.lean` integrate this with the
-existing actual request controller. `Link` requires equality to the actual core
+generic request controller. Their older `Link` requires equality to the actual core
 report, copy-back of that report's receipt on all returns, and exact success/error
 outcome mapping through the private native wrapper. It does **not** assume the
 receipt invariant or the desired whole-request conclusion. Under this link,
 the two old whole-completion receipt/success-gate hypotheses are derived from
 the extracted body. Dispatch and outer recheck correspondence remain independent
-premises. Native instantiation of `Link` for Rc/closures/JSON is source reviewed
-and tested here, not universally kernel-proved.
+premises. The production request adapter now derives these receipt contracts
+without `Link`; native primitive/context, conversion and I/O semantics still
+need their own correspondence.
 
 The central named axiom audit includes all twenty obligations. No new project
 security axiom or independent executable trace interpreter is introduced. The

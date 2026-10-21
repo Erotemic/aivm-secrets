@@ -510,3 +510,15 @@ This advances NR-2's controller composition and NR-3's owned send gate; native
 links, primitive/context instantiation and transitive I/O/drop/callback closure
 remain open. Receipt reachability alone is not native history correspondence,
 whole-service mediation or an NR-2/3/4/5 exit.
+
+### Owned request increment
+
+The [actual request adapter](../garrett-owned-request.md) now owns the single
+receipt and invokes owned dispatch/completion itself. This removes native
+report/copy/outcome links and outer recheck frame assumptions from the actual
+producer's receipt and selected-value-origin results. Phase/write preparation
+also lives in extracted code, before any provider factory. The invocation kernel
+still consumes the request and preserves terminal failure/write uncertainty.
+Native primitive/context and concrete event/JSON/frame observations, connected
+adaptive histories and transitive I/O/drop/callback closure remain open; this
+increment does not complete NR-2/3/4/5 or independent review.

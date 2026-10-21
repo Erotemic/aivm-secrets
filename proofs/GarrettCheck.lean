@@ -1,3 +1,4 @@
+import GarrettRequestAdapter
 import GarrettDispatchSimulation
 import GarrettCompletionSimulation
 import GarrettRequestTrace
@@ -641,3 +642,18 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.dispatch.Simulation.linked_callback_receipts
 #print axioms aivm_secrets_garrett_core.dispatch.Simulation.request_contracts
 #print axioms aivm_secrets_garrett_core.dispatch.Simulation.request_entry_with_owned_adapters
+
+#print axioms aivm_secrets_garrett_core.request_adapter.Proofs.recheck_frame
+#print axioms aivm_secrets_garrett_core.request_adapter.Proofs.dispatch_receipts
+#print axioms aivm_secrets_garrett_core.request_adapter.Proofs.completion_receipts
+#print axioms aivm_secrets_garrett_core.request_adapter.Proofs.request_contracts
+#print axioms aivm_secrets_garrett_core.request_adapter.Proofs.completion_report_iff
+#print axioms aivm_secrets_garrett_core.request_adapter.Proofs.recheck_primitive_prefix
+#print axioms aivm_secrets_garrett_core.request_adapter.Proofs.preparation_refusal
+#print axioms aivm_secrets_garrett_core.request_adapter.Proofs.dispatch_success_origin
+#print axioms aivm_secrets_garrett_core.request_adapter.Proofs.initial_receipt
+#print axioms aivm_secrets_garrett_core.request_adapter.Proofs.returned_entry_receipt
+#print axioms aivm_secrets_garrett_core.request_adapter.Proofs.successful_entry_completion
+#print axioms aivm_secrets_garrett_core.request_adapter.Proofs.positive_read_witness
+#print axioms aivm_secrets_garrett_core.request_adapter.Proofs.completion_selection_origin
+#print axioms aivm_secrets_garrett_core.request_adapter.Proofs.successful_entry_selection_origin

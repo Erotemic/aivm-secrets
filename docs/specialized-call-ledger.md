@@ -32,9 +32,12 @@ flowchart LR
     C --> D["Native credential executor"]
     D --> E["Account HTTPS exchange"]
     B --> F["Manifest request"]
-    F --> G["Core dispatch::dispatch"]
+    F --> K["Core request_adapter::Pending"]
+    K --> G["Core dispatch::dispatch"]
     G --> H["Core provider_exchange::exchange"]
     H --> I["Native provider send_manifest_bytes"]
+    K --> L["Core completion::complete"]
+    L --> M["Native completion audit writer"]
 ```
 
 These are **call-graph paths**, not feasible execution traces. In particular,
@@ -55,7 +58,8 @@ builder-to-`http_request::append_line`/`valid_target` paths with the same limits
 The [complete request encoder](verified-http-wire.md) routes those four byte-leaf
 paths through the common native wrapper and `http_wire::append_request`. Two
 additional paths reach custom-header admission and case-insensitive reserved-name
-checks, for eight required bridge paths total. The coordinator profile retains
+checks. The owned request adds a ninth path through the actual consuming
+entry and completion controller to the native audit writer. The coordinator profile retains
 six paths. These witnesses do not establish validation dominance or mediation.
 
 The optional [native authority](native-coordinator-authority.md) has a separate

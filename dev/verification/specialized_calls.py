@@ -258,9 +258,16 @@ def explain(projection, profile="bridge"):
             ('aivm_secrets_garrett','custody','execute'),
             ('aivm_secrets_garrett','custody','exchange')]),
         ('coordinated-manifest-executor', [
+            ('aivm_secrets_garrett_core','request_adapter','dispatch'),
             ('aivm_secrets_garrett_core','dispatch','dispatch'),
             ('aivm_secrets_garrett_core','provider_exchange','exchange'),
             ('aivm_secrets_garrett','custody','manifest_session','send_manifest_bytes')]),
+        ('owned-request-completion-audit', [
+            ('aivm_secrets_garrett_core','read_transition','run_current'),
+            ('aivm_secrets_garrett_core','request_adapter','complete'),
+            ('aivm_secrets_garrett_core','completion','complete'),
+            ('aivm_secrets_garrett','custody','manifest_session','audit'),
+            ('aivm_secrets_garrett','custody','write_record')]),
         ('account-authentication-bytes', [
             ('aivm_secrets_garrett','custody','exchange'),
             ('aivm_secrets_garrett','custody','account_request_bytes'),

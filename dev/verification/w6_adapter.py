@@ -15,6 +15,7 @@ SOURCE = 'rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs'
 TESTS = 'tests/test_rust_w6_adapter.py'
 CORE_ENCODER = 'rust/crates/aivm-secrets-garrett-core/src/http_wire.rs'
 CORE_DISPATCH = 'rust/crates/aivm-secrets-garrett-core/src/dispatch.rs'
+CORE_REQUEST = 'rust/crates/aivm-secrets-garrett-core/src/request_adapter.rs'
 COMMON_ENCODER = 'rust/crates/aivm-secrets-garrett/src/custody.rs'
 
 
@@ -50,22 +51,23 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
     ensure(len(contract['remaining_obligations']) >= 5,
            'W6 silently removed outstanding correspondence obligations')
     source = (root / SOURCE).read_text()
-    request = source.index('        let request = manifest_request_bytes(self.route, self.secret, self.effect, &self.headers)?;')
+    request = source.index('        let request = manifest_request_bytes(self.route, self.secret, &self.effect, &self.headers)?;')
     connect = source.index('TcpStream::connect_timeout(')
     ensure(request < connect, 'TCP effect before request-byte validation')
     ensure(source.count('fn manifest_request_bytes(') == 1
-           and source.count('let request = manifest_request_bytes(self.route, self.secret, self.effect, &self.headers)?;') == 1,
+           and source.count('let request = manifest_request_bytes(self.route, self.secret, &self.effect, &self.headers)?;') == 1,
            'native manifest adapter has additional unreviewed encoder')
     # The real credential-bearing executor only accepts the type constructed
     # after durable audit. This checks the reviewed source topology; it cannot
     # prove what a compiler or an external dependency ultimately executes.
-    constructor = source.split("impl<'a> PreparedDispatch<'a> {", 1)[1].split('pub(crate) struct Session {', 1)[0]
     entry = source.split('pub(super) fn request(', 1)[1].split('pub(super) fn control(', 1)[0]
     dispatch_core = (root / CORE_DISPATCH).read_text().split('#[cfg(test)]', 1)[0]
-    ensure('transition: Outcome<read_transition::Prepared>' in source
-           and 'read_transition::prepare(DispatchPhase::Preflight, false, effect.write)' in constructor
-           and 'read_transition::prepare(DispatchPhase::Final,admitted_write,effect.write,)' in ''.join(constructor.split())
-           and 'dispatch::dispatch(' in entry and '*effects.borrow_mut() = report.effects;' in entry
+    request_core = (root / CORE_REQUEST).read_text().split('impl<W: Work> read_transition::Request', 1)[1].split('#[cfg(test)]', 1)[0]
+    ensure('read_transition::prepare(phase,self.work.operation_write(),self.work.effect_write(&effect),)' in ''.join(request_core.split())
+           and 'dispatch::dispatch(plan.work, Ok(prepared), self.effects, plan.keyed_write)' in request_core
+           and request_core.count('self.effects = report.effects;') == 2
+           and 'request_adapter::Pending::new(work)' in entry
+           and 'operation_write: op.write,' in entry
            and 'pending.work.audit(prepared.phase())' in dispatch_core
            and 'read_transition::acknowledge(prepared, true)' in dispatch_core
            and dispatch_core.index('pending.work.audit(prepared.phase())') < dispatch_core.index('read_transition::acknowledge(prepared, true)'),
@@ -107,25 +109,22 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and 'headers.contains_key("content-length")' in parser
            and 'headers.contains_key("transfer-encoding")' in parser,
            'native HTTP parser accepts unframed success, framed 204, or waits for EOF after 204')
-    release = entry.split('let release = |raw: Value| -> Outcome<CompletedRelease> {', 1)
+    release = entry.split('let release = |raw: Value| PendingCompletion {', 1)
     ensure(len(release) == 2, 'native read must have a typed public-release boundary')
-    release[1] = release[1].split('let pending = PendingRequest {', 1)[0]
-    selected = 'self.disclosure.project(&op.name, &raw, &secret.0)?'
-    checked = 'ensure_safe(&reply, &secret.0)?'
-    finished = 'complete_pending('
+    release[1] = release[1].split('let work = PendingRequest {', 1)[0]
+    release[1] = ''.join(release[1].split())
+    selected = 'session.disclosure.project(&op.name,&raw,&selection_secret.0)?'
+    checked = 'ensure_safe(&reply,&selection_secret.0)?'
+    finished = 'audit:&self.base.executor.audit,'
     ensure(all(marker in release[1] for marker in (selected, checked, finished)) and
-           release[1].index(selected) < release[1].index(checked) <
-           release[1].index(finished),
+           release[1].index(selected) < release[1].index(checked) < release[1].index(finished),
            'raw provider body may be returned without selected/reflection-checked release')
-    completed = source.split('struct CompletedRelease(Value);', 1)
-    ensure(len(completed) == 2 and
-           'audit.write_record(' in completed[1].split('pub(crate) struct Session {', 1)[0] and
-           completed[1].split('pub(crate) struct Session {', 1)[0].index('audit.write_record(') <
-               completed[1].split('pub(crate) struct Session {', 1)[0].index('CompletedRelease(completed.into_value())') and
-           'completion::complete(pending, before)' in completed[1] and
-           '*effects.borrow_mut() = report.effects;' in completed[1] and
-           'fresh: &fresh,' in release[1] and '(self.fresh)()' in completed[1] and
-           'read_transition::run_current(pending).map(CompletedRelease::into_public)' in entry,
+    completed = source.split("struct PendingCompletion<'a, S>", 1)[1].split('struct PendingRequest<', 1)[0]
+    ensure('self.audit.write_record(' in completed and '(self.fresh)()' in completed
+           and 'completion::complete(pending, self.effects)' in request_core
+           and 'let pending = self.work.complete(raw);' in request_core
+           and 'fresh:&fresh,' in release[1]
+           and 'read_transition::run_current(pending).map(aivm_secrets_garrett_core::completion::Completed::into_value)' in ''.join(entry.split()),
            'native success can reach guest without completion audit')
     return {'channels': len(channels), 'remaining': len(contract['remaining_obligations']),
             'status': 'review guard only; runtime/formal gates are separate'}

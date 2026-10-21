@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from dev.verification.w6_adapter import CONTRACT, SOURCE, TESTS, CORE_ENCODER, CORE_DISPATCH, COMMON_ENCODER, ContractError, check
+from dev.verification.w6_adapter import CONTRACT, SOURCE, TESTS, CORE_ENCODER, CORE_DISPATCH, CORE_REQUEST, COMMON_ENCODER, ContractError, check
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def fixture_checkout(tmp_path):
     dst = tmp_path / 'checkout'
     contract = json.loads((ROOT / CONTRACT).read_text())
-    names = {CONTRACT, SOURCE, TESTS, CORE_ENCODER, CORE_DISPATCH, COMMON_ENCODER,
+    names = {CONTRACT, SOURCE, TESTS, CORE_ENCODER, CORE_DISPATCH, CORE_REQUEST, COMMON_ENCODER,
              'docs/planning/aivm-secrets-w0-boundaries.json',
              'docs/planning/aivm-secrets-assumptions.json'}
     names.update(channel['path'] for channel in contract['channels'])
@@ -48,7 +48,7 @@ def test_w6_moving_wire_validation_after_connect_is_rejected(tmp_path):
     checkout = fixture_checkout(tmp_path)
     path = checkout / SOURCE
     body = path.read_text()
-    line = '        let request = manifest_request_bytes(self.route, self.secret, self.effect, &self.headers)?;\n'
+    line = '        let request = manifest_request_bytes(self.route, self.secret, &self.effect, &self.headers)?;\n'
     assert line in body
     body = body.replace(line, '', 1)
     marker = '        let stream = StreamOwned::new(conn, socket);\n'
@@ -82,7 +82,7 @@ def test_w6_new_provider_send_or_public_raw_return_is_rejected(tmp_path):
     path.write_text(body)
     with pytest.raises(ContractError, match='another provider send'):
         check(checkout)
-    body = original.replace('let result = self.disclosure.project(&op.name, &raw, &secret.0)?;',
+    body = original.replace('let result = session\n                    .disclosure\n                    .project(&op.name, &raw, &selection_secret.0)?;',
                                     'let result = raw.clone();', 1)
     path.write_text(body)
     with pytest.raises(ContractError, match='raw provider body'):
@@ -116,11 +116,14 @@ def test_w6_completion_audit_is_required_before_native_public_success(tmp_path):
     checkout = fixture_checkout(tmp_path)
     path = checkout / SOURCE
     original = path.read_text()
-    marker = 'complete_pending('
-    assert marker in original
-    path.write_text(original.replace(marker, 'unchecked_release(', 1))
-    with pytest.raises(ContractError, match='selected/reflection-checked release'):
+    controller = checkout / CORE_REQUEST
+    core_original = controller.read_text()
+    marker = 'completion::complete('
+    assert marker in core_original
+    controller.write_text(core_original.replace(marker, 'unchecked_release(', 1))
+    with pytest.raises(ContractError, match='completion audit'):
         check(checkout)
+    controller.write_text(core_original)
     path.write_text(original.replace(
         '        self.audit.write_record(&json!({\n            "schema":1,\n            "event":"completed",',
         '        unchecked_record(&json!({\n            "schema":1,\n            "event":"completed",', 1))

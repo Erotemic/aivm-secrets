@@ -24,10 +24,13 @@ def test_pending_source_guard_rejects_unreviewed_boundary_mutation(tmp_path, mut
 
     (tmp_path / RUST).parent.mkdir(parents=True)
     (tmp_path / SCOPE).parent.mkdir(parents=True)
+    controller_path = 'rust/crates/aivm-secrets-garrett-core/src/request_adapter.rs'
+    (tmp_path / controller_path).parent.mkdir(parents=True)
+    controller = (ROOT / controller_path).read_text()
     source = (ROOT / RUST).read_text()
     scope = json.loads((ROOT / SCOPE).read_text())
     if mutation == 'no-fresh-before-emit':
-        source = source.replace('aivm_secrets_garrett_core::dispatch::dispatch(', 'unchecked_dispatch(')
+        controller = controller.replace('dispatch::dispatch(', 'unchecked_dispatch(')
     elif mutation == 'skip-coordinate-check':
         source = source.replace('let current = || -> Outcome<guards::AdmissionStamp> {\n            self.base.check_coordination()?;',
                                 'let current = || -> Outcome<guards::AdmissionStamp> {\n            // no late coordination check')
@@ -42,12 +45,12 @@ def test_pending_source_guard_rejects_unreviewed_boundary_mutation(tmp_path, mut
     elif mutation == 'skip-audit-construction':
         source = source.replace('audit.write_record(', 'audit.unchecked_record(')
     elif mutation == 'skip-completion-audit':
-        source = source.replace('complete_pending(',
-                                'unchecked_completion(')
+        controller = controller.replace('completion::complete(', 'unchecked_completion(')
     elif mutation == 'scope-status-upgrade':
         scope['status'] = 'whole-service-formally-proved'
     elif mutation == 'scope-dropped-exclusion':
         scope['exclusions'].remove('sent-but-not-observed-TLS-application-data')
+    (tmp_path / controller_path).write_text(controller)
     (tmp_path / RUST).write_text(source)
     (tmp_path / SCOPE).write_text(json.dumps(scope))
     with pytest.raises(ReviewError):

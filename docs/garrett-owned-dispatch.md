@@ -3,8 +3,9 @@
 The native manifest session now delegates dispatch to the production
 `garrett-core::dispatch` controller. Its private pending state owns the
 request receipt and local send state; native primitives cannot edit either.
-The native wrapper copies the returned receipt on success **and error**,
-then returns the exact outcome. No `RefCell` borrow spans a primitive call.
+The [source-owned request adapter](garrett-owned-request.md) retains the
+returned receipt on success **and error** and returns the exact outcome. Native
+code no longer owns a shared receipt or report-copy wrapper.
 
 The controller preserves the existing order: identity/target preparation,
 audit attempt and durable audit callback, acknowledgment, header configuration,
@@ -24,8 +25,9 @@ retains work, receipt, local attempt, provider stage and current stamp.
 `proofs/GarrettDispatchSimulation.lean` composes this with owned completion and
 the actual request entry: the former whole-dispatch and whole-completion
 receipt assumptions follow from explicit native report/copy/outcome links.
-Those links remain reviewed/tested adapter obligations, not universal native
-correspondence proofs.
+Those generic conditional results remain available. The actual producer now
+derives the request receipt contracts from its extracted body without native
+report links; primitive/context and native I/O correspondence remain open.
 
 The primitive contracts remain explicit: Rust/compiler correctness; context
 capture and conversion; clock/authority semantics; durable audit bytes and

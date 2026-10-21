@@ -68,12 +68,15 @@ def check(root: Path = ROOT) -> dict:
                 f'pending-read {key} contract changed without review')
     source = (root / RUST).read_text()
     request = source.split('    pub(super) fn request(', 1)[1].split('\n    pub(super) fn control(', 1)[0]
-    require('dispatch::dispatch(' in request and '*effects.borrow_mut() = report.effects;' in request
+    controller = (root / 'rust/crates/aivm-secrets-garrett-core/src/request_adapter.rs').read_text().split('#[cfg(test)]', 1)[0]
+    require('request_adapter::Pending::new(work)' in request
+            and 'dispatch::dispatch(plan.work, Ok(prepared), self.effects, plan.keyed_write)' in controller
+            and controller.count('self.effects = report.effects;') == 2
             and 'audit.write_record(' in source and 'phase.as_str()' in source,
             'native manifest might execute a provider effect before dispatch audit')
-    require('let dispatch = |prepared: PreparedDispatch' in request and
-            'dispatch(PreparedDispatch::preflight(effect))' in request and
-            'dispatch(PreparedDispatch::final_effect(effect, op.write))' in request,
+    require('let dispatch = |phase: DispatchPhase, effect: Effect|' in request
+            and 'request_adapter::DispatchPlan { work, keyed_write }' in request
+            and 'operation_write: op.write,' in request,
             'manifest preflight/final no longer share the audited dispatcher')
     fresh = request.split('let current = || -> Outcome<guards::AdmissionStamp> {', 1)[-1].split('let canonical_request', 1)[0]
     for checked in ('self.base.check_coordination()?;',
@@ -91,10 +94,10 @@ def check(root: Path = ROOT) -> dict:
             '(self.current)()' in source and 'current: &current,' in request and
             'let fresh = || current().map(|_| ());' in fresh,
             'native provider may emit credentialed bytes without the last-admission gate')
-    require('aivm_secrets_garrett_core::completion::Work' in source and
-            'completion::complete(pending, before)' in source and
-            '*effects.borrow_mut() = report.effects;' in source and
-            'complete_pending(' in request,
+    require('aivm_secrets_garrett_core::completion::Work' in source
+            and 'completion::complete(pending, self.effects)' in controller
+            and 'self.audit.write_record(' in source
+            and 'let release = |raw: Value| PendingCompletion {' in request,
             'guest completion no longer requires the host audit boundary')
     return {'scope': manifest['scope'], 'profiles': len(EXPECTED_PROFILES),
             'excluded': len(EXPECTED_EXCLUSIONS),

@@ -7382,6 +7382,356 @@ def rebinding.rebind
   else let t ← RebinderInst.rejected ops
        ok (core.result.Result.Err t)
 
+/-- [aivm_secrets_garrett_core::request_adapter::DispatchPlan]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_adapter.rs', lines 6:0-9:1
+    Visibility: public -/
+structure request_adapter.DispatchPlan (D : Type _) (Clause0_Clause0_Channel :
+  Type _) (Clause0_Clause0_Output : Type _) (Clause0_Clause0_Error : Type _)
+  where
+  work : D
+  keyed_write : Bool
+
+/-- Trait declaration: [aivm_secrets_garrett_core::request_adapter::Work]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_adapter.rs', lines 11:0-34:1
+    Visibility: public -/
+structure request_adapter.Work (Self : Type _) (Self_Facts : Type _)
+  (Self_Effect : Type _) (Self_Output : Type _) (Self_Error : Type _)
+  (Self_Dispatch : Type _) (Self_Completion : Type _)
+  (Self_Clause0_Clause0_Channel : Type _) where
+  INVALID_TRANSITION : Result Self_Error
+  INVALID_POLICY : Result Self_Error
+  dispatchWorkInst : dispatch.Work Self_Dispatch Self_Clause0_Clause0_Channel
+    Self_Facts Self_Error
+  completionWorkInst : completion.Work Self_Completion Self_Output Self_Error
+  preflight : Self → Result (core.result.Result (Option Self_Effect)
+    Self_Error)
+  empty_facts : Self → Result Self_Facts
+  final_effect : Self → Self_Facts → Result (core.result.Result (Option
+    Self_Effect) Self_Error)
+  effect_write : Self → Self_Effect → Result Bool
+  operation_write : Self → Result Bool
+  dispatch : Self → read_transition.Phase → Self_Effect → Result
+    ((request_adapter.DispatchPlan Self_Dispatch Self_Clause0_Clause0_Channel
+    Self_Facts Self_Error) × Self)
+  complete : Self → Self_Facts → Result (Self_Completion × Self)
+  recheck : Self → Result ((core.result.Result Unit Self_Error) × Self)
+  outcome_unknown : Self → Result Self_Error
+
+/-- [aivm_secrets_garrett_core::request_adapter::Pending]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_adapter.rs', lines 36:0-39:1
+    Visibility: public -/
+structure request_adapter.Pending (W : Type _) (Clause0_Facts : Type _)
+  (Clause0_Effect : Type _) (Clause0_Output : Type _) (Clause0_Error : Type _)
+  (Clause0_Dispatch : Type _) (Clause0_Completion : Type _)
+  (Clause0_Clause0_Clause0_Channel : Type _) where
+  work : W
+  effects : request_effects.RequestEffects
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::CompletionRecord}::empty]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 64:4-73:5 -/
+def request_effects.CompletionRecord.empty
+  : Result request_effects.CompletionRecord := do
+  ok
+    {
+      selected := false,
+      before_checked := false,
+      audit_attempted := false,
+      audit_acknowledged := false,
+      after_checked := false,
+      value_ready := false
+    }
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::DispatchRecord}::empty]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 21:4-31:5 -/
+def request_effects.DispatchRecord.empty
+  : Result request_effects.DispatchRecord := do
+  ok
+    {
+      audit_attempted := false,
+      audit_acknowledged := false,
+      provider_ready := false,
+      current := none,
+      provider_attempted := false,
+      provider_completed := false,
+      dispatch_succeeded := false
+    }
+
+/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::new]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 121:4-128:5
+    Visibility: public -/
+def request_effects.RequestEffects.new
+  : Result request_effects.RequestEffects := do
+  let dr ← request_effects.DispatchRecord.empty
+  let cr ← request_effects.CompletionRecord.empty
+  ok
+    {
+      preflight := dr,
+      final_effect := dr,
+      completion := cr,
+      progress := request_effects.Progress.Entry
+    }
+
+/-- [aivm_secrets_garrett_core::request_adapter::{aivm_secrets_garrett_core::request_adapter::Pending<W, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel>}::new]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_adapter.rs', lines 41:4-46:5
+    Visibility: public -/
+def request_adapter.Pending.new
+  {W : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
+  Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
+  Type _} (WorkInst : request_adapter.Work W Clause0_Facts Clause0_Effect
+  Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel) (work : W) :
+  Result (request_adapter.Pending W Clause0_Facts Clause0_Effect Clause0_Output
+    Clause0_Error Clause0_Dispatch Clause0_Completion
+    Clause0_Clause0_Clause0_Channel)
+  := do
+  let re ← request_effects.RequestEffects.new
+  ok { work, effects := re }
+
+/-- [aivm_secrets_garrett_core::request_adapter::{aivm_secrets_garrett_core::request_adapter::Pending<W, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel>}::effects]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_adapter.rs', lines 47:4-49:5
+    Visibility: public -/
+def request_adapter.Pending.impl.effects
+  {W : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
+  Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
+  Type _} (WorkInst : request_adapter.Work W Clause0_Facts Clause0_Effect
+  Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel)
+  (self : request_adapter.Pending W Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel) :
+  Result request_effects.RequestEffects
+  := do
+  ok self.effects
+
+/-- [aivm_secrets_garrett_core::request_adapter::{impl aivm_secrets_garrett_core::read_transition::Request<Clause0_Facts, Clause0_Effect, aivm_secrets_garrett_core::completion::Completed<Clause0_Output>, Clause0_Error> for aivm_secrets_garrett_core::request_adapter::Pending<W, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel>}::outcome_unknown]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_adapter.rs', lines 97:4-99:5
+    Visibility: public -/
+def
+  request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.outcome_unknown
+  {W : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
+  Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
+  Type _} (WorkInst : request_adapter.Work W Clause0_Facts Clause0_Effect
+  Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel)
+  (self : request_adapter.Pending W Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel) :
+  Result Clause0_Error
+  := do
+  WorkInst.outcome_unknown self.work
+
+/-- [aivm_secrets_garrett_core::request_adapter::{impl aivm_secrets_garrett_core::read_transition::Request<Clause0_Facts, Clause0_Effect, aivm_secrets_garrett_core::completion::Completed<Clause0_Output>, Clause0_Error> for aivm_secrets_garrett_core::request_adapter::Pending<W, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel>}::complete]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_adapter.rs', lines 91:4-96:5
+    Visibility: public -/
+def
+  request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.complete
+  {W : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
+  Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
+  Type _} (WorkInst : request_adapter.Work W Clause0_Facts Clause0_Effect
+  Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel)
+  (self : request_adapter.Pending W Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel) (raw : Clause0_Facts) :
+  Result ((core.result.Result (completion.Completed Clause0_Output)
+    Clause0_Error) × (request_adapter.Pending W Clause0_Facts Clause0_Effect
+    Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
+    Clause0_Clause0_Clause0_Channel))
+  := do
+  let (pending, t) ← WorkInst.complete self.work raw
+  let report ←
+    completion.complete WorkInst.completionWorkInst pending self.effects
+  ok (report.outcome, { work := t, effects := report.effects })
+
+/-- [aivm_secrets_garrett_core::request_adapter::{impl aivm_secrets_garrett_core::read_transition::Request<Clause0_Facts, Clause0_Effect, aivm_secrets_garrett_core::completion::Completed<Clause0_Output>, Clause0_Error> for aivm_secrets_garrett_core::request_adapter::Pending<W, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel>}::recheck]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_adapter.rs', lines 88:4-90:5
+    Visibility: public -/
+def
+  request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.recheck
+  {W : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
+  Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
+  Type _} (WorkInst : request_adapter.Work W Clause0_Facts Clause0_Effect
+  Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel)
+  (self : request_adapter.Pending W Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel) :
+  Result ((core.result.Result Unit Clause0_Error) × (request_adapter.Pending W
+    Clause0_Facts Clause0_Effect Clause0_Output Clause0_Error Clause0_Dispatch
+    Clause0_Completion Clause0_Clause0_Clause0_Channel))
+  := do
+  let (r, t) ← WorkInst.recheck self.work
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::request_adapter::{impl aivm_secrets_garrett_core::read_transition::Request<Clause0_Facts, Clause0_Effect, aivm_secrets_garrett_core::completion::Completed<Clause0_Output>, Clause0_Error> for aivm_secrets_garrett_core::request_adapter::Pending<W, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel>}::dispatch]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_adapter.rs', lines 70:4-87:5
+    Visibility: public -/
+def
+  request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.dispatch
+  {W : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
+  Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
+  Type _} (WorkInst : request_adapter.Work W Clause0_Facts Clause0_Effect
+  Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel)
+  (self : request_adapter.Pending W Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel) (phase : read_transition.Phase)
+  (effect : Clause0_Effect) :
+  Result ((core.result.Result Clause0_Facts Clause0_Error) ×
+    (request_adapter.Pending W Clause0_Facts Clause0_Effect Clause0_Output
+    Clause0_Error Clause0_Dispatch Clause0_Completion
+    Clause0_Clause0_Clause0_Channel))
+  := do
+  let b ← WorkInst.operation_write self.work
+  let b1 ← WorkInst.effect_write self.work effect
+  let r ← read_transition.prepare phase b b1
+  match r with
+  | core.result.Result.Ok prepared =>
+    let (plan, t) ← WorkInst.dispatch self.work phase effect
+    let report ←
+      dispatch.dispatch WorkInst.dispatchWorkInst plan.work
+        (core.result.Result.Ok prepared) self.effects plan.keyed_write
+    ok (report.outcome, { work := t, effects := report.effects })
+  | core.result.Result.Err _ =>
+    let t ← WorkInst.INVALID_POLICY
+    ok (core.result.Result.Err t, self)
+
+/-- [aivm_secrets_garrett_core::request_adapter::{impl aivm_secrets_garrett_core::read_transition::Request<Clause0_Facts, Clause0_Effect, aivm_secrets_garrett_core::completion::Completed<Clause0_Output>, Clause0_Error> for aivm_secrets_garrett_core::request_adapter::Pending<W, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel>}::effect_write]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_adapter.rs', lines 67:4-69:5
+    Visibility: public -/
+def
+  request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.effect_write
+  {W : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
+  Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
+  Type _} (WorkInst : request_adapter.Work W Clause0_Facts Clause0_Effect
+  Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel)
+  (self : request_adapter.Pending W Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel) (effect : Clause0_Effect) :
+  Result Bool
+  := do
+  WorkInst.effect_write self.work effect
+
+/-- [aivm_secrets_garrett_core::request_adapter::{impl aivm_secrets_garrett_core::read_transition::Request<Clause0_Facts, Clause0_Effect, aivm_secrets_garrett_core::completion::Completed<Clause0_Output>, Clause0_Error> for aivm_secrets_garrett_core::request_adapter::Pending<W, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel>}::final_effect]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_adapter.rs', lines 64:4-66:5
+    Visibility: public -/
+def
+  request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.final_effect
+  {W : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
+  Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
+  Type _} (WorkInst : request_adapter.Work W Clause0_Facts Clause0_Effect
+  Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel)
+  (self : request_adapter.Pending W Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel) (facts : Clause0_Facts) :
+  Result (core.result.Result (Option Clause0_Effect) Clause0_Error)
+  := do
+  WorkInst.final_effect self.work facts
+
+/-- [aivm_secrets_garrett_core::request_adapter::{impl aivm_secrets_garrett_core::read_transition::Request<Clause0_Facts, Clause0_Effect, aivm_secrets_garrett_core::completion::Completed<Clause0_Output>, Clause0_Error> for aivm_secrets_garrett_core::request_adapter::Pending<W, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel>}::empty_facts]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_adapter.rs', lines 61:4-63:5
+    Visibility: public -/
+def
+  request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.empty_facts
+  {W : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
+  Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
+  Type _} (WorkInst : request_adapter.Work W Clause0_Facts Clause0_Effect
+  Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel)
+  (self : request_adapter.Pending W Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel) :
+  Result Clause0_Facts
+  := do
+  WorkInst.empty_facts self.work
+
+/-- [aivm_secrets_garrett_core::request_adapter::{impl aivm_secrets_garrett_core::read_transition::Request<Clause0_Facts, Clause0_Effect, aivm_secrets_garrett_core::completion::Completed<Clause0_Output>, Clause0_Error> for aivm_secrets_garrett_core::request_adapter::Pending<W, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel>}::preflight]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_adapter.rs', lines 58:4-60:5
+    Visibility: public -/
+def
+  request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.preflight
+  {W : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
+  Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
+  Type _} (WorkInst : request_adapter.Work W Clause0_Facts Clause0_Effect
+  Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel)
+  (self : request_adapter.Pending W Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel) :
+  Result (core.result.Result (Option Clause0_Effect) Clause0_Error)
+  := do
+  WorkInst.preflight self.work
+
+/-- [aivm_secrets_garrett_core::request_adapter::{impl aivm_secrets_garrett_core::read_transition::Request<Clause0_Facts, Clause0_Effect, aivm_secrets_garrett_core::completion::Completed<Clause0_Output>, Clause0_Error> for aivm_secrets_garrett_core::request_adapter::Pending<W, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel>}::INVALID_TRANSITION]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_adapter.rs', lines 56:4-56:66
+    Visibility: public -/
+@[global_simps, irreducible]
+def
+  request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.INVALID_TRANSITION
+  {W : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
+  Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
+  Type _} (WorkInst : request_adapter.Work W Clause0_Facts Clause0_Effect
+  Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel) : Result Clause0_Error :=
+  WorkInst.INVALID_TRANSITION
+
+/-- Trait implementation: [aivm_secrets_garrett_core::request_adapter::{impl aivm_secrets_garrett_core::read_transition::Request<Clause0_Facts, Clause0_Effect, aivm_secrets_garrett_core::completion::Completed<Clause0_Output>, Clause0_Error> for aivm_secrets_garrett_core::request_adapter::Pending<W, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel>}]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_adapter.rs', lines 51:0-100:1 -/
+@[reducible]
+def
+  request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error
+  {W : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
+  Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
+  Type _} (WorkInst : request_adapter.Work W Clause0_Facts Clause0_Effect
+  Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel) : read_transition.Request
+  (request_adapter.Pending W Clause0_Facts Clause0_Effect Clause0_Output
+  Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel) Clause0_Facts Clause0_Effect
+  (completion.Completed Clause0_Output) Clause0_Error := {
+  INVALID_TRANSITION :=
+    request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.INVALID_TRANSITION
+    WorkInst
+  preflight :=
+    request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.preflight
+    WorkInst
+  empty_facts :=
+    request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.empty_facts
+    WorkInst
+  dispatch :=
+    request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.dispatch
+    WorkInst
+  final_effect :=
+    request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.final_effect
+    WorkInst
+  recheck :=
+    request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.recheck
+    WorkInst
+  effect_write :=
+    request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.effect_write
+    WorkInst
+  complete :=
+    request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.complete
+    WorkInst
+  outcome_unknown :=
+    request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.outcome_unknown
+    WorkInst
+}
+
 /-- [aivm_secrets_garrett_core::request_effects::{impl core::clone::Clone for aivm_secrets_garrett_core::request_effects::DispatchRecord}::clone]:
     Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 10:9-10:14
     Visibility: public -/
@@ -7406,21 +7756,6 @@ def request_effects.DispatchRecord.Insts.CoreMarkerCopy : core.marker.Copy
   request_effects.DispatchRecord := {
   cloneInst := request_effects.DispatchRecord.Insts.CoreCloneClone
 }
-
-/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::DispatchRecord}::empty]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 21:4-31:5 -/
-def request_effects.DispatchRecord.empty
-  : Result request_effects.DispatchRecord := do
-  ok
-    {
-      audit_attempted := false,
-      audit_acknowledged := false,
-      provider_ready := false,
-      current := none,
-      provider_attempted := false,
-      provider_completed := false,
-      dispatch_succeeded := false
-    }
 
 /-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::DispatchRecord}::audit_attempted]:
     Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 32:4-34:5
@@ -7497,20 +7832,6 @@ def request_effects.CompletionRecord.Insts.CoreMarkerCopy : core.marker.Copy
   request_effects.CompletionRecord := {
   cloneInst := request_effects.CompletionRecord.Insts.CoreCloneClone
 }
-
-/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::CompletionRecord}::empty]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 64:4-73:5 -/
-def request_effects.CompletionRecord.empty
-  : Result request_effects.CompletionRecord := do
-  ok
-    {
-      selected := false,
-      before_checked := false,
-      audit_attempted := false,
-      audit_acknowledged := false,
-      after_checked := false,
-      value_ready := false
-    }
 
 /-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::CompletionRecord}::selected]:
     Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 74:4-76:5
@@ -7601,21 +7922,6 @@ def request_effects.RequestEffects.Insts.CoreMarkerCopy : core.marker.Copy
   request_effects.RequestEffects := {
   cloneInst := request_effects.RequestEffects.Insts.CoreCloneClone
 }
-
-/-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::new]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 121:4-128:5
-    Visibility: public -/
-def request_effects.RequestEffects.new
-  : Result request_effects.RequestEffects := do
-  let dr ← request_effects.DispatchRecord.empty
-  let cr ← request_effects.CompletionRecord.empty
-  ok
-    {
-      preflight := dr,
-      final_effect := dr,
-      completion := cr,
-      progress := request_effects.Progress.Entry
-    }
 
 /-- [aivm_secrets_garrett_core::request_effects::{aivm_secrets_garrett_core::request_effects::RequestEffects}::completion]:
     Source: 'crates/aivm-secrets-garrett-core/src/request_effects.rs', lines 145:4-147:5

@@ -4,47 +4,14 @@ use super::*;
 use crate::manifest::{disclosure::Disclosure, Effect, Policy};
 use aivm_secrets_garrett_core::{manifest as guards, open_surrogate};
 
-// W3/NR-1: the single phase/write authority is the extractable production
-// core. The private adapter alone can acknowledge a real host audit write.
-// Filesystem durability and late authorization remain external contracts.
+// The core owns phase/write permits and receipt transitions. Native work
+// supplies the actual authority, audit, TLS and selected-value primitives.
+// Their context, durability and I/O semantics retain separate contracts.
 use aivm_secrets_garrett_core::read_transition::{self, Phase as DispatchPhase};
-use aivm_secrets_garrett_core::request_effects::RequestEffects;
-use std::{cell::RefCell, rc::Rc};
-type EffectsCell = Rc<RefCell<RequestEffects>>;
+use aivm_secrets_garrett_core::request_adapter;
 
-struct PreparedDispatch<'a> {
-    effect: &'a Effect,
-    transition: Outcome<read_transition::Prepared>,
-    phase: DispatchPhase,
-}
-impl<'a> PreparedDispatch<'a> {
-    fn preflight(effect: &'a Effect) -> Self {
-        Self {
-            effect,
-            phase: DispatchPhase::Preflight,
-            transition: read_transition::prepare(DispatchPhase::Preflight, false, effect.write)
-                .map_err(|_| Error::InvalidPolicy),
-        }
-    }
-    fn final_effect(effect: &'a Effect, admitted_write: bool) -> Self {
-        Self {
-            effect,
-            phase: DispatchPhase::Final,
-            transition: read_transition::prepare(
-                DispatchPhase::Final,
-                admitted_write,
-                effect.write,
-            )
-            .map_err(|_| Error::InvalidPolicy),
-        }
-    }
-}
-
-// W5/W6 guest-release boundary for successful manifest requests. A selected
-// result is not a completed public reply until its exact fixed envelope has
-// passed the reflection check (at the call site) and completion has been
-// durably audited. This type does not itself prove response-byte refinement.
-struct CompletedRelease(Value);
+// Native factories retain custody and conversion/I/O semantics. The extracted
+// request adapter owns the one receipt across dispatch and completed release.
 struct PendingCompletion<'a, S> {
     select: S,
     audit: &'a Audit,
@@ -76,50 +43,32 @@ impl<S: FnMut() -> Outcome<Value>> aivm_secrets_garrett_core::completion::Work
         }))
     }
 }
-fn complete_pending<S: FnMut() -> Outcome<Value>>(
-    pending: PendingCompletion<'_, S>,
-    effects: &EffectsCell,
-) -> Outcome<CompletedRelease> {
-    // This copy is owned by the extracted controller. Copy every returned
-    // state back, including selection, freshness and audit failures.
-    let before = *effects.borrow();
-    let report = aivm_secrets_garrett_core::completion::complete(pending, before);
-    *effects.borrow_mut() = report.effects;
-    report
-        .outcome
-        .map(|completed| CompletedRelease(completed.into_value()))
-}
-impl CompletedRelease {
-    fn into_public(self) -> Value {
-        self.0
-    }
-}
-
-// The core chooses phases and reply data; these adapters retain custody and
-// the existing policy/audit/authority/TLS/disclosure implementations.
 struct PendingRequest<P, D, F, C, R> {
     preflight: P,
     dispatch: D,
     final_effect: F,
     complete: C,
     fresh: R,
-    effects: EffectsCell,
-    snapshot: RequestEffects,
+    operation_write: bool,
 }
-
-impl<P, D, F, C, R> read_transition::Request for PendingRequest<P, D, F, C, R>
+impl<P, D, F, C, R, DP, CP> request_adapter::Work for PendingRequest<P, D, F, C, R>
 where
     P: Fn() -> Outcome<Option<Effect>>,
-    D: Fn(DispatchPhase, &Effect) -> Outcome<Value>,
+    D: FnMut(DispatchPhase, Effect) -> request_adapter::DispatchPlan<DP>,
     F: Fn(&Value) -> Outcome<Option<Effect>>,
-    C: Fn(Value) -> Outcome<CompletedRelease>,
+    C: FnMut(Value) -> CP,
     R: Fn() -> Outcome<()>,
+    DP: aivm_secrets_garrett_core::dispatch::Work<Output = Value, Error = Error>,
+    CP: aivm_secrets_garrett_core::completion::Work<Output = Value, Error = Error>,
 {
     type Facts = Value;
     type Effect = Effect;
-    type Output = CompletedRelease;
+    type Output = Value;
     type Error = Error;
+    type Dispatch = DP;
+    type Completion = CP;
     const INVALID_TRANSITION: Error = Error::InternalError;
+    const INVALID_POLICY: Error = Error::InvalidPolicy;
 
     fn preflight(&self) -> Outcome<Option<Effect>> {
         (self.preflight)()
@@ -127,29 +76,27 @@ where
     fn empty_facts(&self) -> Value {
         Value::Null
     }
-    fn dispatch(&mut self, phase: DispatchPhase, effect: Effect) -> Outcome<Value> {
-        let out = (self.dispatch)(phase, &effect);
-        self.snapshot = *self.effects.borrow();
-        out
-    }
     fn final_effect(&self, facts: &Value) -> Outcome<Option<Effect>> {
         (self.final_effect)(facts)
-    }
-    fn recheck(&mut self) -> Outcome<()> {
-        let out = (self.fresh)();
-        self.snapshot = *self.effects.borrow();
-        out
     }
     fn effect_write(&self, effect: &Effect) -> bool {
         effect.write
     }
-    fn complete(&mut self, raw: Value) -> Outcome<CompletedRelease> {
-        let out = (self.complete)(raw);
-        self.snapshot = *self.effects.borrow();
-        if out.is_ok() && !self.snapshot.can_return_value() {
-            return Err(Error::InternalError);
-        }
-        out
+    fn operation_write(&self) -> bool {
+        self.operation_write
+    }
+    fn dispatch(
+        &mut self,
+        phase: DispatchPhase,
+        effect: Effect,
+    ) -> request_adapter::DispatchPlan<DP> {
+        (self.dispatch)(phase, effect)
+    }
+    fn complete(&mut self, raw: Value) -> CP {
+        (self.complete)(raw)
+    }
+    fn recheck(&mut self) -> Outcome<()> {
+        (self.fresh)()
     }
     fn outcome_unknown(&self) -> Error {
         Error::OutcomeUnknown
@@ -468,18 +415,17 @@ impl Session {
                 return Ok(reply);
             }
         }
-        // Single admission-to-I/O boundary for preflight and final effects.
-        // Neither raw facts nor a guest-provided URL is a PreparedDispatch.
-        let effects = Rc::new(RefCell::new(RequestEffects::new()));
-        let dispatch = |prepared: PreparedDispatch<'_>| -> Outcome<Value> {
-            let keyed_write = matches!(prepared.phase, DispatchPhase::Final)
-                && prepared.effect.write
+        // Factories return primitive adapters only. Receipt ownership, phase
+        // preparation, controller calls and every error post-state are core.
+        let dispatch = |phase: DispatchPhase, effect: Effect| {
+            let keyed_write = matches!(phase, DispatchPhase::Final)
+                && effect.write
                 && self.base.coordinator.is_some();
             let work = ManifestProvider {
                 executor: &self.base.executor,
                 route: &self.base.grant.route,
                 secret: &secret,
-                effect: prepared.effect,
+                effect,
                 headers: BTreeMap::new(),
                 current: &current,
                 dispatch: ManifestDispatch {
@@ -496,53 +442,43 @@ impl Session {
                     idempotency_header: op.idempotency_header,
                 },
             };
-            let before = *effects.borrow();
-            let report = aivm_secrets_garrett_core::dispatch::dispatch(
-                work,
-                prepared.transition,
-                before,
-                keyed_write,
-            );
-            *effects.borrow_mut() = report.effects;
-            report.outcome
+            request_adapter::DispatchPlan { work, keyed_write }
         };
-        let release = |raw: Value| -> Outcome<CompletedRelease> {
-            let select = || {
-                self.require_control_active(host_time()?)?;
-                let meta = self.policy.pagination(op, &args, &raw)?;
-                let result = self.disclosure.project(&op.name, &raw, &secret.0)?;
+        let session = &*self;
+        let selection_args = &args;
+        let selection_secret = &secret;
+        let release = |raw: Value| PendingCompletion {
+            select: move || {
+                session.require_control_active(host_time()?)?;
+                let meta = session.policy.pagination(op, selection_args, &raw)?;
+                let result = session
+                    .disclosure
+                    .project(&op.name, &raw, &selection_secret.0)?;
                 let mut reply = json!({"version":1,"ok":true,"result":result});
                 if let Some(meta) = meta {
                     reply["meta"] = meta;
                 }
-                crate::manifest::disclosure::ensure_safe(&reply, &secret.0)?;
+                crate::manifest::disclosure::ensure_safe(&reply, &selection_secret.0)?;
                 Ok(reply)
-            };
-            complete_pending(
-                PendingCompletion {
-                    select,
-                    audit: &self.base.executor.audit,
-                    operation: &op.name,
-                    request_digest: &request_hash,
-                    fresh: &fresh,
-                },
-                &effects,
-            )
+            },
+            audit: &self.base.executor.audit,
+            operation: &op.name,
+            request_digest: &request_hash,
+            fresh: &fresh,
         };
-        let pending = PendingRequest {
+        let work = PendingRequest {
             preflight: || self.policy.preflight(op, &args),
             final_effect: |facts: &Value| self.policy.final_effect(op, &args, facts),
-            dispatch: |phase, effect: &Effect| match phase {
-                DispatchPhase::Preflight => dispatch(PreparedDispatch::preflight(effect)),
-                DispatchPhase::Final => dispatch(PreparedDispatch::final_effect(effect, op.write)),
-            },
+            dispatch,
             complete: release,
             fresh: &fresh,
-            effects: effects.clone(),
-            snapshot: RequestEffects::new(),
+            operation_write: op.write,
         };
-        read_transition::run_current(pending).map(CompletedRelease::into_public)
+        let pending = request_adapter::Pending::new(work);
+        read_transition::run_current(pending)
+            .map(aivm_secrets_garrett_core::completion::Completed::into_value)
     }
+
     pub(super) fn control(
         &mut self,
         verifier: &Verifier,
@@ -656,7 +592,7 @@ struct ManifestProvider<'a, F> {
     executor: &'a Executor,
     route: &'a core::Route,
     secret: &'a Credential,
-    effect: &'a Effect,
+    effect: Effect,
     headers: BTreeMap<String, String>,
     current: &'a F,
     dispatch: ManifestDispatch<'a>,
@@ -730,7 +666,7 @@ impl<F: Fn() -> Outcome<guards::AdmissionStamp>>
     const OUTCOME_UNKNOWN: Error = Error::OutcomeUnknown;
 
     fn setup(&mut self) -> Outcome<ManifestChannel> {
-        let request = manifest_request_bytes(self.route, self.secret, self.effect, &self.headers)?;
+        let request = manifest_request_bytes(self.route, self.secret, &self.effect, &self.headers)?;
         let host = std::str::from_utf8(&self.route.host).map_err(|_| Error::InvalidPolicy)?;
         let mut socket = TcpStream::connect_timeout(
             &SocketAddr::new(
@@ -779,7 +715,7 @@ impl<F: Fn() -> Outcome<guards::AdmissionStamp>>
             request: _request,
             _deadline,
         } = channel;
-        let effect = self.effect;
+        let effect = &self.effect;
         let body = Zeroizing::new(manifest_response(BufReader::new(stream), &effect.response)?);
         if effect.response == "text" {
             Ok(json!(
@@ -934,9 +870,10 @@ fn manifest_response(mut reader: impl BufRead, format: &str) -> Outcome<Vec<u8>>
 #[cfg(test)]
 mod wire_tests {
     use super::*;
+    use aivm_secrets_garrett_core::request_effects::RequestEffects;
 
     #[test]
-    fn completion_snapshot_tracks_real_audit_and_late_denial() {
+    fn completion_receipt_tracks_real_audit_and_late_denial() {
         use std::os::unix::fs::OpenOptionsExt;
         // Exercise the actual audit primitive and mutable request adapter,
         // including an acknowledged completion followed by fresh denial.
@@ -975,7 +912,6 @@ mod wire_tests {
                 grant: "synthetic-grant".into(),
                 policy: "synthetic-policy".into(),
             };
-            let effects = Rc::new(RefCell::new(RequestEffects::new()));
             let checks = std::cell::Cell::new(0);
             let fresh = || {
                 checks.set(checks.get() + 1);
@@ -989,34 +925,33 @@ mod wire_tests {
                 }
                 Ok(())
             };
-            let mut adapter = PendingRequest {
+            let work = PendingRequest {
                 preflight: || Ok(None),
-                dispatch: |_: DispatchPhase, _: &Effect| Ok(Value::Null),
+                dispatch: |_: DispatchPhase,
+                           _: Effect|
+                 -> request_adapter::DispatchPlan<FaultProvider> {
+                    panic!("completion-only fixture must not construct a provider")
+                },
                 final_effect: |_: &Value| Ok(None),
-                complete: |reply: Value| {
-                    complete_pending(
-                        PendingCompletion {
-                            select: || {
-                                if selection_failed {
-                                    Err(Error::Denied)
-                                } else {
-                                    Ok(reply.clone())
-                                }
-                            },
-                            audit: &audit,
-                            operation: "synthetic.read",
-                            request_digest: "synthetic-request",
-                            fresh: &fresh,
-                        },
-                        &effects,
-                    )
+                complete: |reply: Value| PendingCompletion {
+                    select: move || {
+                        if selection_failed {
+                            Err(Error::Denied)
+                        } else {
+                            Ok(reply.clone())
+                        }
+                    },
+                    audit: &audit,
+                    operation: "synthetic.read",
+                    request_digest: "synthetic-request",
+                    fresh: &fresh,
                 },
                 fresh: || Ok(()),
-                effects: effects.clone(),
-                snapshot: RequestEffects::new(),
+                operation_write: false,
             };
+            let mut adapter = request_adapter::Pending::new(work);
             let out = read_transition::Request::complete(&mut adapter, json!({"ok":true}));
-            let recorded = adapter.snapshot.completion();
+            let recorded = adapter.effects().completion();
             assert_eq!(recorded.selected(), !selection_failed);
             assert_eq!(recorded.before_checked(), !selection_failed);
             assert_eq!(recorded.audit_attempted(), !selection_failed);
@@ -1029,7 +964,7 @@ mod wire_tests {
                 !selection_failed && !audit_failed && !late_denial
             );
             assert_eq!(
-                adapter.snapshot.can_return_value(),
+                adapter.effects().can_return_value(),
                 !selection_failed && !audit_failed && !late_denial
             );
             if selection_failed {
@@ -1038,7 +973,11 @@ mod wire_tests {
                 assert!(std::fs::read(&path).unwrap().is_empty());
                 // An all-false flag record still retains the attempted
                 // selection progress; losing copy-back would reopen it.
-                assert!(!effects.borrow_mut().begin_completion());
+                assert!(matches!(
+                    read_transition::Request::complete(&mut adapter, json!({"ok":true})),
+                    Err(Error::InternalError)
+                ));
+                assert_eq!(checks.get(), 0);
             } else if audit_failed {
                 assert!(matches!(out, Err(Error::InternalError)));
                 assert_eq!(checks.get(), 1);
@@ -1047,7 +986,7 @@ mod wire_tests {
                 assert!(matches!(out, Err(Error::Revoked)));
                 assert_eq!(checks.get(), 2);
             } else {
-                assert_eq!(out.unwrap().into_public(), json!({"ok":true}));
+                assert_eq!(out.unwrap().into_value(), json!({"ok":true}));
                 assert_eq!(checks.get(), 2);
             }
         }
@@ -1237,24 +1176,35 @@ mod wire_tests {
     }
     #[test]
     fn unapproved_read_or_preflight_cannot_become_write_dispatch() {
-        let read = effect();
-        assert!(PreparedDispatch::preflight(&read).transition.is_ok());
-        assert!(PreparedDispatch::final_effect(&read, false)
-            .transition
-            .is_ok());
         let mut write = effect();
         write.write = true;
-        assert!(matches!(
-            PreparedDispatch::preflight(&write).transition,
-            Err(Error::InvalidPolicy)
-        ));
-        assert!(matches!(
-            PreparedDispatch::final_effect(&write, false).transition,
-            Err(Error::InvalidPolicy)
-        ));
-        assert!(PreparedDispatch::final_effect(&write, true)
-            .transition
-            .is_ok());
+        // Exercise the actual owned request callback: rejected preparation
+        // must not even construct a native provider adapter.
+        for (phase, admitted, effect) in [
+            (DispatchPhase::Preflight, true, write.clone()),
+            (DispatchPhase::Final, false, write),
+        ] {
+            let work = PendingRequest {
+                preflight: || Ok(None),
+                final_effect: |_: &Value| Ok(None),
+                dispatch: |_: DispatchPhase,
+                           _: Effect|
+                 -> request_adapter::DispatchPlan<FaultProvider> {
+                    panic!("forbidden effect reached provider factory")
+                },
+                complete: |_: Value| -> PendingCompletion<fn() -> Outcome<Value>> {
+                    panic!("forbidden effect reached completion factory")
+                },
+                fresh: || Ok(()),
+                operation_write: admitted,
+            };
+            let mut pending = request_adapter::Pending::new(work);
+            assert!(matches!(
+                read_transition::Request::dispatch(&mut pending, phase, effect),
+                Err(Error::InvalidPolicy)
+            ));
+            assert!(!pending.effects().phase(phase).audit_attempted());
+        }
     }
 
     #[test]

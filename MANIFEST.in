@@ -53,3 +53,4 @@ include proofs/GarrettRequestPrefix.lean proofs/GarrettRequestTrace.lean
 
 include proofs/GarrettCompletion.lean proofs/GarrettCompletionSimulation.lean
 include proofs/GarrettDispatch.lean proofs/GarrettDispatchSimulation.lean
+include proofs/GarrettRequestAdapter.lean

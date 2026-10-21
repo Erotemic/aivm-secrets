@@ -98,40 +98,41 @@ def review_semantics(contents: dict[str, str]) -> None:
     require(same_order(request, 'control.state.admit(&approval_digest, op.write)?',
                        'Decision::Required =>', 'fresh()?;',
                        '.remember(&approval_digest, &canonical_request)?;',
-                       'let dispatch = |prepared: PreparedDispatch', 'preflight: || self.policy.preflight('),
+                       'let dispatch = |phase: DispatchPhase, effect: Effect|', 'preflight: || self.policy.preflight('),
             'approval is not enforced before credentialed preflight/final effects')
     require('self.policy.digest()' in request and '"grant":self.base.executor.audit.grant' in request
             and 'self.require_control_active(current)?;' in request
             and 'fresh: &fresh,' in request,
             'approval identity or late revocation fencing bypassed')
     control = part(m, 'pub(super) fn control(', '\nfn manifest_request_bytes(')
-    dispatch = part(request, 'let dispatch = |prepared: PreparedDispatch', 'let release = |raw: Value|')
-    release = part(request, 'let release = |raw: Value| -> Outcome<CompletedRelease> {', 'let pending = PendingRequest {')
-    plan = part(request, 'let pending = PendingRequest {', 'read_transition::run_current(pending)')
-    reviewed = part(m, "impl<'a> PreparedDispatch<'a> {", 'pub(crate) struct Session {')
-    require('struct PreparedDispatch<' in m and 'Phase as DispatchPhase' in m
-            and 'transition: Outcome<read_transition::Prepared>' in m,
-            'native prepared effect lost the checked preparation outcome')
+    dispatch = part(request, 'let dispatch = |phase: DispatchPhase, effect: Effect|', 'let release = |raw: Value|')
+    release = part(request, 'let release = |raw: Value| PendingCompletion {', 'let work = PendingRequest {')
+    plan = part(request, 'let work = PendingRequest {', 'read_transition::run_current(pending)')
     transition = contents['rust/crates/aivm-secrets-garrett-core/src/read_transition.rs']
     dispatch_core = contents['rust/crates/aivm-secrets-garrett-core/src/dispatch.rs'].split('#[cfg(test)]', 1)[0]
-    require(same_order(reviewed, "fn preflight(effect: &'a Effect) -> Self",
-                       'read_transition::prepare(DispatchPhase::Preflight, false, effect.write)',
-                       "fn final_effect(effect: &'a Effect, admitted_write: bool) -> Self")
-            and 'read_transition::prepare(DispatchPhase::Final,admitted_write,effect.write,)' in ''.join(reviewed.split()),
+    request_core = contents['rust/crates/aivm-secrets-garrett-core/src/request_adapter.rs'].split('#[cfg(test)]', 1)[0]
+    core_callbacks = request_core.split('impl<W: Work> read_transition::Request', 1)[1]
+    core_dispatch = part(core_callbacks, '    fn dispatch(', '    fn recheck(')
+    require('Phase as DispatchPhase' in m and
+            same_order(core_dispatch, 'read_transition::prepare(', 'phase,',
+                       'self.work.operation_write()', 'self.work.effect_write(&effect)',
+                       'Err(_) => return Err(W::INVALID_POLICY)',
+                       'self.work.dispatch(phase, effect)'),
             'native dispatch bypasses extracted phase/write preparation')
     require(same_order(transition, 'pub fn prepare(', 'if effect_write',
                        'matches!(phase, Phase::Preflight)', 'pub fn acknowledge(', 'if !ack', 'Ok(Audited {')
             and '|| !admitted_operation_write' in transition and transition.count('if !ack {') == 1,
             'extracted core preparation/acknowledgement bypassed')
-    require(request.count('dispatch::dispatch(') == 1
-            and request.count('PreparedDispatch::preflight(effect)') == 1
-            and request.count('PreparedDispatch::final_effect(effect, op.write)') == 1,
+    require('dispatch::dispatch(' not in request and 'completion::complete(' not in request
+            and request.count('request_adapter::Pending::new(work)') == 1,
             'unexpected direct dispatch or phase/write factory bypass')
-    require(same_order(dispatch, 'let work = ManifestProvider {', 'let before = *effects.borrow();',
-                       'dispatch::dispatch(', '*effects.borrow_mut() = report.effects;', 'report.outcome')
-            and 'prepared.transition,' in dispatch and 'before,' in dispatch and 'keyed_write,' in dispatch
-            and 'matches!(prepared.phase, DispatchPhase::Final)' in dispatch
-            and '&& prepared.effect.write' in dispatch and '&& self.base.coordinator.is_some()' in dispatch
+    require(same_order(core_dispatch, 'let plan = self.work.dispatch(phase, effect)',
+                       'dispatch::dispatch(plan.work, Ok(prepared), self.effects, plan.keyed_write)',
+                       'self.effects = report.effects;', 'report.outcome')
+            and same_order(dispatch, 'let keyed_write =', 'let work = ManifestProvider {',
+                           'request_adapter::DispatchPlan { work, keyed_write }')
+            and 'matches!(phase, DispatchPhase::Final)' in dispatch
+            and '&& effect.write' in dispatch and '&& self.base.coordinator.is_some()' in dispatch
             and 'fresh: &fresh,' in dispatch and 'current: &current,' in dispatch
             and 'coordinator: self.base.coordinator.as_ref(),' in dispatch
             and 'reservation:reservation.as_ref()' in ''.join(dispatch.split()),
@@ -156,18 +157,18 @@ def review_semantics(contents: dict[str, str]) -> None:
     reservation = part(request, 'let reservation = retry.map(', 'guards::authorize(')
     require('let policy_hash = self.policy.digest();' in reservation,
             'coordinated request no longer uses normalized policy identity')
-    completed = part(m, 'struct CompletedRelease(Value);', 'pub(crate) struct Session {')
-    require(completed.count('CompletedRelease(completed.into_value())') == 1
-            and 'impl<S: FnMut() -> Outcome<Value>>' in completed
-            and same_order(completed, 'fn recheck(', '(self.fresh)()', 'fn audit(',
-                           'self.audit.write_record(', 'fn complete_pending<',
-                           'let before = *effects.borrow();',
-                           'completion::complete(pending, before)',
-                           '*effects.borrow_mut() = report.effects;',
-                           '.outcome', 'CompletedRelease(completed.into_value())'),
+    completed = part(m, "struct PendingCompletion<'a, S>", 'struct PendingRequest<')
+    core_completion = part(core_callbacks, '    fn complete(&mut self, raw:', '    fn outcome_unknown(')
+    require('impl<S: FnMut() -> Outcome<Value>>' in completed
+            and same_order(completed, 'fn recheck(', '(self.fresh)()', 'fn audit(', 'self.audit.write_record(')
+            and same_order(core_completion, 'self.work.complete(raw)',
+                           'completion::complete(pending, self.effects)',
+                           'self.effects = report.effects;', 'report.outcome'),
             'completed guest release bypasses owned controller or actual audit')
-    require(same_order(release, 'self.disclosure.project(', 'ensure_safe(&reply',
-                       'complete_pending(', 'PendingCompletion {'),
+    require(same_order(''.join(release.split()), 'select:move||', 'session.policy.pagination(',
+                       'session.disclosure.project(', 'ensure_safe(&reply', 'audit:&self.base.executor.audit,')
+            and 'selection_args = &args;' in request and 'selection_secret = &secret;' in request
+            and 'session = &*self;' in request and 'fresh: &fresh,' in release,
             'guest release bypasses selected disclosure/reflection/completion')
     completion = part(transition, 'pub fn complete_current<', 'pub trait Request {')
     require(same_order(completion, 'pending.recheck(CompletionPhase::BeforeAudit)',
@@ -175,7 +176,7 @@ def review_semantics(contents: dict[str, str]) -> None:
                        'pending.release()') and
             completion.count('Err(error) => return Err(error)') == 3,
             'completion bypasses current authority, audit or post-audit freshness')
-    require(request.count('read_transition::run_current(pending).map(CompletedRelease::into_public)') == 1
+    require(''.join(request.split()).count('read_transition::run_current(pending).map(aivm_secrets_garrett_core::completion::Completed::into_value)') == 1
             and 'complete: release,' in plan and 'fresh: &fresh,' in plan
             and 'fresh: &fresh,' in release,
             'guest result bypasses audited release or sent-write uncertainty')
@@ -208,15 +209,17 @@ def review_semantics(contents: dict[str, str]) -> None:
             'self.progress = Progress::Halted;\n        Err(R::INVALID_TRANSITION)' in invocations and
             'if matches!(self.progress, Progress::Finished)' in invocations,
             'reviewed invocation wrapper/callback multiplicity or terminal gate changed')
-    adapter = part(m, 'impl<P, D, F, C, R> read_transition::Request', 'pub(crate) struct Session {')
+    adapter = part(m, 'impl<P, D, F, C, R, DP, CP> request_adapter::Work', 'pub(crate) struct Session {')
     require('fn effect_write(&self, effect: &Effect) -> bool' in adapter
             and 'effect.write' in adapter and 'Error::OutcomeUnknown' in adapter
             and 'Value::Null' in adapter,
             'write uncertainty boundary altered')
-    require('pub mod request_effects;' in contents['rust/crates/aivm-secrets-garrett-core/src/lib.rs']
-            and 'pub mod dispatch;' in contents['rust/crates/aivm-secrets-garrett-core/src/lib.rs']
-            and 'Rc<RefCell<RequestEffects>>' in m
-            and 'let effects = Rc::new(RefCell::new(RequestEffects::new()));' in request,
+    require('pub mod request_adapter;' in contents['rust/crates/aivm-secrets-garrett-core/src/lib.rs']
+            and 'Rc<RefCell<RequestEffects>>' not in m and 'snapshot:' not in m
+            and 'effects: RequestEffects,' in request_core and 'pub effects:' not in request_core
+            and request_core.count('self.effects = report.effects;') == 2
+            and 'operation_write: op.write,' in plan
+            and 'request_adapter::Pending::new(work)' in plan,
             'request-wide receipt is detached from actual owned controllers')
     owned = contents['rust/crates/aivm-secrets-garrett-core/src/completion.rs']
     owned_callbacks = part(owned, 'impl<W: Work> read_transition::Completion', 'fn select_and_complete<')
@@ -231,18 +234,18 @@ def review_semantics(contents: dict[str, str]) -> None:
             and same_order(owned, 'pub fn complete<', 'select_and_complete(&mut pending)',
                            'Report {', 'outcome,', 'work: pending.work,', 'effects: pending.effects,')
             and 'pub value:' not in owned
-            and 'effects: EffectsCell' not in completed.split('fn complete_pending<', 1)[0],
+            and 'RequestEffects' not in completed,
             'completion receipt bypasses source-owned selection/check/audit/release gates')
-    require(adapter.count('self.snapshot = *self.effects.borrow();') == 3
-            and 'fn dispatch(&mut self,' in adapter and 'fn recheck(&mut self)' in adapter
-            and 'fn complete(&mut self,' in adapter
-            and 'if out.is_ok() && !self.snapshot.can_return_value()' in adapter
-            and 'snapshot: RequestEffects::new(),' in plan,
+    require('self.work.recheck()' in part(core_callbacks, '    fn recheck(&mut self)', '    fn complete(&mut self, raw:')
+            and 'DP: aivm_secrets_garrett_core::dispatch::Work<Output = Value, Error = Error>' in adapter
+            and 'CP: aivm_secrets_garrett_core::completion::Work<Output = Value, Error = Error>' in adapter
+            and 'self.operation_write' in adapter
+            and 'aivm_secrets_garrett_core::completion::Completed::into_value' in request,
             'effectful callbacks lost their actual post-state or completed-value gate')
     # W6: the exact provider bytes are validated by a pure encoder BEFORE any
     # TCP/TLS effect. This also covers OAuthSource-created Credential values.
     require(m.count('fn manifest_request_bytes(') == 1
-            and m.count('let request = manifest_request_bytes(self.route, self.secret, self.effect, &self.headers)?;') == 1
+            and m.count('let request = manifest_request_bytes(self.route, self.secret, &self.effect, &self.headers)?;') == 1
             and m.index('let request = manifest_request_bytes(') < m.index('TcpStream::connect_timeout('),
             'provider socket opened before outbound wire validation')
     wire = part(m, 'fn manifest_request_bytes(', '// The standard Write contract')
@@ -281,7 +284,8 @@ def review_semantics(contents: dict[str, str]) -> None:
     runtime = m.split('#[cfg(test)]', 1)[0]
     require(runtime.count('TcpStream::connect_timeout(') == 1 and runtime.count('.write_all(') == 1
             and ''.join(runtime.split()).count('send_manifest_bytes(&mutchannel.stream,&channel.request)') == 1
-            and runtime.count('dispatch::dispatch(') == 1,
+            and runtime.count('request_adapter::Pending::new(work)') == 1
+            and 'dispatch::dispatch(' not in runtime,
             'native module added a credentialed socket or alternate HTTP writer')
     provider_work = part(runtime, "struct ManifestDispatch<'a>", 'fn manifest_response(')
     require('aivm_secrets_garrett_core::dispatch::WorkforManifestProvider' in ''.join(provider_work.split())
