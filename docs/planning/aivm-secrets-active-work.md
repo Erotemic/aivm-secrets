@@ -269,6 +269,16 @@ nested JSON fixtures check the preserved wire behavior. Native UTF-8/scalar and
 byte/String conversion remain explicit local contracts; this does not discharge
 JSON containers/numbers, parsing, observation or whole-service secrecy.
 
+Source `5f39fc4` passes 3,095 full-suite cases with zero skips, 717 named
+axiom audits, 767 release parity cases, 98 Rust workspace cases and all-feature
+Clippy. Six selected re-extracted mutations are rejected in the actual scalar
+or string leaves. Both 168-case native build-mode gates and standalone guest
+workflows, all 293 archive pins and six safe installed-vTPM cases pass. Eight
+read-path and five prefix kernel audits pass. The fresh bounded compiler
+capture retains fifteen paths and 55 fixture cases, including the native
+canonical/string/core encoder link; this is not mediation. See the
+[JSON string validation record](../../dev/validation/2026-10-21-json-string.json).
+
 The next implementation task remains native primitive correspondence: connect
 native UTF-8/scalar and byte/String conversion, header and remaining JSON
 conversion, faithful zeroizing buffer view and

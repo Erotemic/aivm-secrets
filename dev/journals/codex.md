@@ -2824,3 +2824,14 @@ Implementation and evidence are committed separately with actual GPT-6 Codex
 co-authorship; exact weights/config variant is unavailable. Native event,
 observation/history, parser/transport and remaining conversion contracts,
 NR-2–NR-5 and independent real/deployed tests remain open.
+
+## 2026-10-21 01:44:16 -0400
+
+Frozen JSON string acceptance for committed implementation 5f39fc4 in
+dev/validation/2026-10-21-json-string.json. Verified the clean source snapshot,
+all recorded source/compiler/binary hashes, 293 archive inputs and embedded
+manifest, six actual re-extracted proof rejections and strict no-skip JUnit
+before freezing. The active queue records this scoped progress while retaining
+the remaining native conversion/primitive/event/observation/history and parity
+requirements. Prior frozen records are unchanged. Publish resource accounting
+separately; all commits retain the actual-model co-author trailer.
