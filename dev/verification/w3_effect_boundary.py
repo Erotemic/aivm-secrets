@@ -519,8 +519,27 @@ def review_semantics(contents: dict[str, str]) -> None:
                        'let now = host_time()?;', 'lease.require_current(now)?;',
                        'verifier.open(token, peer, &expected, now)?;'),
             'account control samples authority before the coordinator wait')
-    require('fn write_record(&self, value: &Value)' in c and '.sync_all()' in c,
-            'audit persistence acknowledgement changed')
+    # Native audit durability is still an external File/OS contract, but the
+    # source-owned sequence must mark an attempt before any possible I/O and
+    # acknowledge it only after both record framing and sync succeed. A
+    # failed append remains terminal even if the file received a byte prefix.
+    audit = part(c, 'fn append_durable_record<S: DurableAuditSink>(', 'struct AuditState {')
+    sink = part(c, 'trait DurableAuditSink {', 'struct AuditState {')
+    audit_call = part(c, '    fn write_record(&self, value: &Value)',
+                      '// This private adapter alone turns the opaque credential')
+    require('impl DurableAuditSink for File' in sink
+            and 'self.write_all(bytes).map_err(|_| Error::InternalError)' in sink
+            and 'self.sync_all().map_err(|_| Error::InternalError)' in sink
+            and same_order(audit, 'if *poisoned {', 'return Err(Error::InternalError);',
+                           '*poisoned = true;', 'sink.append(bytes)?;',
+                           'sink.append(b"\\n")?;', 'sink.sync_record()?;',
+                           '*poisoned = false;', 'Ok(())')
+            and same_order(audit_call, 'self.state.lock()', 'if state.failed {',
+                           'let bytes = json::canonical(value);',
+                           'let AuditState { file, failed } = &mut *state;',
+                           'append_durable_record(file, failed, &bytes)')
+            and audit_call.count('append_durable_record(') == 1,
+            'native audit bypasses payload/delimiter/sync, fail-stop, or acknowledgement order')
     require('aivm_secrets_garrett_core::emission::emit_current(PendingEmission { check, emit })' in c
             and '(self.check)()' in c and '(self.emit)()' in c,
             'native emission bypasses the extracted admission controller')

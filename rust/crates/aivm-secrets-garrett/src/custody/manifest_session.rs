@@ -1104,6 +1104,8 @@ mod wire_tests {
         flush_error: bool,
         current: guards::AdmissionStamp,
         parsed: bool,
+        audit: Option<Arc<Audit>>,
+        deny_after_audit: bool,
     }
     impl aivm_secrets_garrett_core::provider_exchange::Provider for FaultProvider {
         type Channel = aivm_secrets_garrett_core::provider_io::Channel<
@@ -1127,6 +1129,9 @@ mod wire_tests {
             ))
         }
         fn recheck(&mut self) -> Outcome<guards::AdmissionStamp> {
+            if self.deny_after_audit {
+                return Err(Error::Revoked);
+            }
             Ok(self.current)
         }
         fn send(&mut self, channel: &mut Self::Channel) -> Outcome<()> {
@@ -1146,8 +1151,16 @@ mod wire_tests {
         fn prepare(&mut self) -> Outcome<()> {
             Ok(())
         }
-        fn audit(&mut self, _: DispatchPhase) -> Outcome<()> {
-            Ok(())
+        fn audit(&mut self, phase: DispatchPhase) -> Outcome<()> {
+            if let Some(audit) = &self.audit {
+                audit.write_record(&json!({
+                    "schema":1, "event":"dispatch", "phase":phase.as_str(),
+                    "operation":"synthetic.read", "request_digest":"synthetic-request",
+                    "grant":audit.grant, "policy":audit.policy,
+                }))
+            } else {
+                Ok(())
+            }
         }
         fn configure(&mut self, _: bool) -> Outcome<()> {
             Ok(())
@@ -1268,6 +1281,8 @@ mod wire_tests {
                     flush_error,
                     current,
                     parsed: false,
+                    audit: None,
+                    deny_after_audit: false,
                 };
                 let report = aivm_secrets_garrett_core::dispatch::dispatch(
                     provider,
@@ -1305,6 +1320,112 @@ mod wire_tests {
                     &b"synthetic-request"[..limit.min(b"synthetic-request".len())]
                 );
             }
+        }
+    }
+
+    #[test]
+    fn real_durable_dispatch_audit_precedes_each_native_write_prefix() {
+        use aivm_secrets_garrett_core::{
+            credential_use::{UseClaims, UseGrant}, provider_exchange,
+        };
+        use std::os::unix::fs::OpenOptionsExt;
+        struct Cleanup(std::path::PathBuf);
+        impl Drop for Cleanup {
+            fn drop(&mut self) { let _ = std::fs::remove_file(&self.0); }
+        }
+        let claims = || UseClaims {
+            binding: b"client".to_vec(), policy: b"policy".to_vec(),
+            grant: b"grant".to_vec(), issued_at: 1, expires_at: 100,
+        };
+        let grant = UseGrant {
+            claims: claims(), operation: b"read".to_vec(),
+            route: route(), active: true,
+        };
+        // This matrix observes real host-audit file bytes and a native Writer
+        // reached through the production dispatch/controller entry point.
+        for (audit_failed, late_denial, limit, flush_error) in [
+            (true, false, usize::MAX, false),
+            (false, true, usize::MAX, false),
+            (false, false, 0, false),
+            (false, false, 5, false),
+            (false, false, usize::MAX, true),
+            (false, false, usize::MAX, false),
+        ] {
+            let path = std::env::temp_dir().join(format!(
+                "garrett-dispatch-{}-{}", std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+            ));
+            let _cleanup = Cleanup(path.clone());
+            let file = std::fs::OpenOptions::new().write(true).create_new(true)
+                .mode(0o600).open(&path).unwrap();
+            let audit = Arc::new(Audit {
+                state: Mutex::new(AuditState { file, failed: audit_failed }),
+                grant: "synthetic-grant".into(),
+                policy: "synthetic-policy".into(),
+            });
+            let current = guards::current(
+                &claims(), &grant, &b"read".to_vec(), &b"read".to_vec(),
+                false, false, 2, 1,
+            ).ok().unwrap();
+            let accepted = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+            let report = aivm_secrets_garrett_core::dispatch::dispatch(
+                FaultProvider {
+                    accepted: accepted.clone(), limit, flush_error, current,
+                    parsed: false, audit: Some(audit), deny_after_audit: late_denial,
+                },
+                Ok(read_transition::prepare(DispatchPhase::Final, false, false).ok().unwrap()),
+                RequestEffects::new(), false,
+            );
+            let receipt = report.effects.phase(DispatchPhase::Final);
+            assert!(receipt.audit_attempted());
+            assert_eq!(receipt.audit_acknowledged(), !audit_failed);
+            assert_eq!(receipt.provider_attempted(), !audit_failed && !late_denial);
+            assert_eq!(report.local.attempted(), !audit_failed && !late_denial);
+            assert_eq!(report.provider_stage, if audit_failed {
+                None
+            } else if late_denial {
+                Some(provider_exchange::Stage::Admission)
+            } else if limit < b"synthetic-request".len() || flush_error {
+                Some(provider_exchange::Stage::Send)
+            } else {
+                Some(provider_exchange::Stage::Complete)
+            });
+            let lines = std::fs::read(&path).unwrap();
+            if audit_failed {
+                assert!(matches!(report.outcome, Err(Error::InternalError)));
+                assert!(lines.is_empty());
+                assert!(accepted.borrow().is_empty());
+            } else {
+                let record: Value = serde_json::from_slice(&lines).unwrap();
+                assert_eq!(record["event"], "dispatch");
+                assert_eq!(record["phase"], "final");
+                assert_eq!(record["grant"], "synthetic-grant");
+                assert_eq!(record["request_digest"], "synthetic-request");
+                let successful = !late_denial && limit == usize::MAX && !flush_error;
+                if late_denial {
+                    assert!(matches!(&report.outcome, Err(Error::Revoked)));
+                }
+                assert_eq!(report.outcome.is_ok(), successful);
+                assert_eq!(report.work.parsed, successful);
+                let expected_prefix = if late_denial {
+                    &b""[..]
+                } else {
+                    &b"synthetic-request"[..limit.min(b"synthetic-request".len())]
+                };
+                assert_eq!(&*accepted.borrow(), expected_prefix);
+            }
+            // The gate's previous receipt cannot be reused to append another
+            // audit or to repeat the credential-bearing writer callback.
+            let before = accepted.borrow().clone();
+            let repeat = aivm_secrets_garrett_core::dispatch::dispatch(
+                report.work,
+                Ok(read_transition::prepare(DispatchPhase::Final, false, false).ok().unwrap()),
+                report.effects, false,
+            );
+            assert!(matches!(repeat.outcome, Err(Error::InternalError)));
+            assert_eq!(*accepted.borrow(), before);
+            assert_eq!(std::fs::read(&path).unwrap(), lines);
         }
     }
 

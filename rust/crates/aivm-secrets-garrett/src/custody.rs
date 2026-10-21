@@ -164,6 +164,42 @@ impl InnerEnvelope {
     }
 }
 
+// The only production implementation uses File::write_all and File::sync_all.
+// These external primitives are an explicit NR-2/NR-3 contract; sequencing,
+// denial after failure, and acknowledgement only after sync are source-owned.
+trait DurableAuditSink {
+    fn append(&mut self, bytes: &[u8]) -> Outcome<()>;
+    fn sync_record(&mut self) -> Outcome<()>;
+}
+impl DurableAuditSink for File {
+    fn append(&mut self, bytes: &[u8]) -> Outcome<()> {
+        self.write_all(bytes).map_err(|_| Error::InternalError)
+    }
+    fn sync_record(&mut self) -> Outcome<()> {
+        self.sync_all().map_err(|_| Error::InternalError)
+    }
+}
+
+// One attempt comprises a canonical record, its delimiter and a sync. Mark
+// poisoned *before* the first possible effect, so a failure or unwind cannot
+// leave this state available for an unacknowledged second record. The caller
+// holds the one session-wide mutex for the whole operation.
+fn append_durable_record<S: DurableAuditSink>(
+    sink: &mut S,
+    poisoned: &mut bool,
+    bytes: &[u8],
+) -> Outcome<()> {
+    if *poisoned {
+        return Err(Error::InternalError);
+    }
+    *poisoned = true;
+    sink.append(bytes)?;
+    sink.append(b"\n")?;
+    sink.sync_record()?;
+    *poisoned = false;
+    Ok(())
+}
+
 struct AuditState {
     file: File,
     failed: bool,
@@ -236,16 +272,9 @@ impl Audit {
         if state.failed {
             return Err(Error::InternalError);
         }
-        let result = state
-            .file
-            .write_all(&json::canonical(value))
-            .and_then(|_| state.file.write_all(b"\n"))
-            .and_then(|_| state.file.sync_all());
-        if result.is_err() {
-            state.failed = true;
-            return Err(Error::InternalError);
-        }
-        Ok(())
+        let bytes = json::canonical(value);
+        let AuditState { file, failed } = &mut *state;
+        append_durable_record(file, failed, &bytes)
     }
 }
 // This private adapter alone turns the opaque credential into provider wire
@@ -1045,6 +1074,83 @@ fn parse_operation(value: &Value) -> Outcome<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct FaultAuditSink {
+        steps: Vec<&'static str>,
+        accepted: Vec<u8>,
+        fail_at: Option<&'static str>,
+    }
+    impl DurableAuditSink for FaultAuditSink {
+        fn append(&mut self, bytes: &[u8]) -> Outcome<()> {
+            let step = if bytes == b"\n" { "newline" } else { "payload" };
+            self.steps.push(step);
+            if self.fail_at == Some("partial") && step == "payload" {
+                self.accepted.extend_from_slice(&bytes[..bytes.len().min(3)]);
+                return Err(Error::InternalError);
+            }
+            if self.fail_at == Some(step) {
+                return Err(Error::InternalError);
+            }
+            self.accepted.extend_from_slice(bytes);
+            Ok(())
+        }
+        fn sync_record(&mut self) -> Outcome<()> {
+            self.steps.push("sync");
+            if self.fail_at == Some("sync") {
+                Err(Error::InternalError)
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    #[test]
+    fn durable_audit_ack_only_after_payload_delimiter_and_sync() {
+        for (fault, calls, accepted) in [
+            (Some("payload"), vec!["payload"], b"".as_slice()),
+            (Some("partial"), vec!["payload"], b"{\"x".as_slice()),
+            (Some("newline"), vec!["payload", "newline"], b"{\"x\":1}".as_slice()),
+            (Some("sync"), vec!["payload", "newline", "sync"], b"{\"x\":1}\n".as_slice()),
+            (None, vec!["payload", "newline", "sync"], b"{\"x\":1}\n".as_slice()),
+        ] {
+            let mut sink = FaultAuditSink {
+                steps: vec![], accepted: vec![], fail_at: fault,
+            };
+            let mut poisoned = false;
+            let result = append_durable_record(&mut sink, &mut poisoned, b"{\"x\":1}");
+            assert_eq!(result.is_ok(), fault.is_none());
+            assert_eq!(sink.steps, calls);
+            assert_eq!(sink.accepted, accepted);
+            assert_eq!(poisoned, fault.is_some());
+            let steps = sink.steps.clone();
+            if fault.is_some() {
+                assert!(matches!(append_durable_record(&mut sink, &mut poisoned, b"second"),
+                    Err(Error::InternalError)));
+                assert_eq!(sink.steps, steps, "poisoned audit replayed I/O");
+            } else {
+                append_durable_record(&mut sink, &mut poisoned, b"second").unwrap();
+                assert!(!poisoned);
+                assert_eq!(&sink.accepted, b"{\"x\":1}\nsecond\n");
+            }
+        }
+    }
+
+    #[test]
+    fn panic_during_audit_append_leaves_attempt_poisoned() {
+        struct Panicking;
+        impl DurableAuditSink for Panicking {
+            fn append(&mut self, _bytes: &[u8]) -> Outcome<()> {
+                panic!("synthetic sink panic")
+            }
+            fn sync_record(&mut self) -> Outcome<()> { unreachable!() }
+        }
+        let mut failed = false;
+        let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = append_durable_record(&mut Panicking, &mut failed, b"private");
+        }));
+        assert!(caught.is_err());
+        assert!(failed);
+    }
 
     #[test]
     fn account_wire_authentication_is_exact_and_host_selected() {

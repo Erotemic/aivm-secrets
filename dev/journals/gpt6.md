@@ -506,3 +506,21 @@ protocols changed; no full or Charon tests were necessary here.
   proof file. No proof statements or trusted axiom allowlists were changed.
 - Added portable failure-diagnostic and single-compilation regression tests.
   Toolchain compilation is pending on the provisioned maintainer machine.
+
+## 2026-10-21 14:55:40 -0400 — Native audit/provider primitive seam
+
+Added a production-called fail-stop audit append adapter: mark poisoned before
+any file append, append canonical payload and delimiter, and acknowledge only
+after sync. The existing dispatch and provider channel already own the
+audit/attempt/flush receipts; this work keeps those controllers authoritative
+and adds a real host-audit/native-writer fault matrix, including a late
+revocation after audit but before provider send. Expanded the existing W3
+source-shape guard and its bypass mutations; no new abstract request interpreter.
+
+Tradeoff: the native simulation remains conditional on the File/OS and TLS
+writer contracts, and the matrix is finite test evidence, not a Lean proof of
+all reachable I/O. The provenance manifest was deliberately not re-recorded
+without rerunning the pinned Rust/Lean toolchain. Portable W0/W3/W6 and the
+quick W6 read checks passed; native Rust/Lean execution was unavailable.
+Confidence: high in the source guard/mutation coverage, pending actual Rust
+compilation and native test execution.

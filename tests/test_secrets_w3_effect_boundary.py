@@ -49,6 +49,13 @@ def mutate(repo, filename, before, after):
 
 
 @pytest.mark.parametrize('file,old,new', [
+    (RUST + 'custody.rs', 'sink.append(bytes)?;', 'Ok(())?;'),
+    (RUST + 'custody.rs', 'sink.append(b"\\n")?;', 'Ok(())?;'),
+    (RUST + 'custody.rs', 'sink.sync_record()?;', 'Ok(())?;'),
+    (RUST + 'custody.rs', '*poisoned = true;', '*poisoned = false;'),
+    (RUST + 'custody.rs', 'self.sync_all().map_err(|_| Error::InternalError)', 'Ok(())'),
+    (RUST + 'custody.rs', 'append_durable_record(file, failed, &bytes)', 'Ok(())'),
+    (RUST + 'custody.rs', 'self.write_all(bytes).map_err(|_| Error::InternalError)', 'Ok(())'),
     ('rust/crates/aivm-secrets-garrett-core/src/provider_io.rs', '    ready: bool,', '    pub ready: bool,'),
     ('rust/crates/aivm-secrets-garrett-core/src/provider_io.rs', 'ready: false,', 'ready: true,'),
     ('rust/crates/aivm-secrets-garrett-core/src/provider_io.rs', 'self.ready = false;', 'self.ready = true;'),
