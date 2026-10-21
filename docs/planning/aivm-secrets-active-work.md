@@ -249,7 +249,16 @@ now binds Host, checked port and authentication in extracted Rust and returns
 an immutable endpoint only after complete encoding. Native TCP/TLS setup uses
 that endpoint. Twelve obligations derive exact bounded bytes and compose actual
 encoding with channel write/flush origin under the explicit local buffer-view
-contract. Validation is recorded separately for the committed source.
+contract.
+
+Source `1b58b20` passes 3,083 full-suite cases with zero skips, 688 named
+axiom audits, 767 release parity cases, 94 Rust workspace cases, six selected
+source mutations rejected in the route/encoder leaf, both 168-case native
+build-mode gates and standalone product workflows, all 290 archive pins and
+six safe installed-vTPM cases. Eight read-path and five prefix kernel audits
+pass. The fresh bounded compiler capture retains fourteen paths and 53 fixture
+cases, including native endpoint getters, without a mediation claim. See the
+[route/encoder validation record](../../dev/validation/2026-10-21-provider-wire.json).
 
 The next implementation task remains native primitive correspondence: connect
 native String/header/JSON conversion, faithful zeroizing buffer view and

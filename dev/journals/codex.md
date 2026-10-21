@@ -2747,3 +2747,14 @@ Independent security review remains required. The next work must connect those
 actual primitive/event/observation contracts, not substitute another inventory.
 Every authored implementation/evidence/accounting commit has actual GPT-6
 co-authorship with unavailable exact weights/config variant stated.
+
+Frozen route/encoder acceptance records committed implementation 1b58b20 in
+dev/validation/2026-10-21-provider-wire.json. Exact source, binary, compiler
+analysis and packaged-input hashes and strict no-skip JUnit cases were verified
+before freezing; prior frozen records are unchanged. The first temporary
+recorder attempt indexed the report instead of its witnesses dictionary for
+one path assertion; corrected that recorder-only check and reran it with the
+implementation still clean, without changing source, tests or evidence. Queue
+and roadmap advance route/byte/endpoint composition while retaining actual
+native conversion/primitive/event/observation/history obligations. Accounting
+is published separately with the actual-model co-author trailer.
