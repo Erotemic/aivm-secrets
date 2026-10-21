@@ -1,20 +1,25 @@
 # AIVM / aivm-secrets repository boundary and extraction plan
 
-Original policy: **maintainer direction, 2026-10-14**. `aivm-secrets` remains an
-**experimental, unaudited Python implementation**. This document is the
-current integration/repository policy. It takes precedence over older
-statements that co-distribution or a process boundary alone makes the system
-ready for general AIVM users. The original decision deferred repository extraction while development
-continued here. The **2026-10-16 update below** authorizes the initial port.
+**Current boundary policy — 2026-10-21.** `aivm-secrets` is now an
+independently built standalone repository and distribution. Normal AIVM
+functions must continue to work without its import, installation or service.
+Opt-in integration is **versioned process/wire-only**; the trusted standalone
+broker owns policy, secret custody, audit, provider egress and release. AIVM
+may establish trusted VM identity facts and coordinate the selected session
+lifetime, but never inherit broker authorization decisions or provider keys.
+See [the extraction record](../extraction.md),
+[product roadmap](aivm-secrets-product-roadmap.md) and
+[current task queue](aivm-secrets-active-work.md). Real isolated VM integration
+remains a separate W8/OUT-2 acceptance gate. Rust native code and selected
+implementation-linked Lean proofs exist, but no production security or
+whole-service confinement endorsement follows.
 
-**Current status (2026-10-17):** this is now the independently built
-`aivm-secrets` source repository. The 2026-10-14 branch audit and original
-instructions about a *future* extraction below are historical. The enduring
-policy is optional, versioned, process-only AIVM integration; see
-[the extraction record](../extraction.md) and the
-[active implementation/security work queue](aivm-secrets-active-work.md).
-Rust native execution and selected implementation-linked Lean proofs now exist;
-these do not establish production security or end-to-end confinement.
+**Historical sections below:** the October 14–16 plan described a *future*
+extraction and an old co-located AIVM branch; that extraction happened. Its
+rules forbidding ordinary AIVM coupling and implicit secrets activation remain
+binding, but its projected migration tasks and pre-extraction state are not a
+current to-do list. Source changes to AIVM-owned adapters must be made and
+verified in the AIVM checkout, not asserted from this repository alone.
 
 ## Extraction update, 2026-10-16
 
@@ -25,7 +30,7 @@ original instruction above to defer extraction. AIVM's existing copy and optiona
 adapters remain in its repository for now; independent publication and security
 endorsement remain separate decisions. The constraints below still apply.
 
-## Decision
+## Historical extraction decision (enduring integration constraints)
 
 1. **AIVM is a usable, independently maintainable VM manager.** No ordinary
    AIVM install, CLI import, VM creation, start, attachment, `aivm ssh`,
@@ -60,7 +65,7 @@ endorsement remain separate decisions. The constraints below still apply.
    container, or hardware identity; mTLS/TPM are optional higher-assurance
    identity modes, not dependencies of local authorization.
 
-## Audited state of this branch
+## Historical audit of the pre-extraction AIVM branch
 
 | Boundary | Present code | Assessment / required direction |
 | --- | --- | --- |
@@ -73,8 +78,9 @@ endorsement remain separate decisions. The constraints below still apply.
 | Testing | Secret test modules, protocol vectors and real-VM integration tests are currently interleaved with AIVM CI | Preserve coverage now; move broker-specific suites to independent CI later, leaving a small cross-project integration matrix. |
 | Assurance | Python reference + synthetic TLS/provider tests; no shipped independent Rust backend, no implementation-linked Lean proof, no live managed-VM identity/provider validation | Keep experimental label and require explicit security/e2e gates before broader release. |
 
-The two packages are co-located in source **but are separate build/install
-artifacts**. Neither the normal install nor any AIVM extra (`tests`, `all`,
+**Historical branch state:** at the original audit date the two packages
+were co-located in source **but were separate build/install artifacts**.
+Neither the normal install nor any AIVM extra (`tests`, `all`,
 `optional`, `docs`) depends on the experimental package. The previously
 advertised `aivm[secrets]` extra is intentionally absent until the separate
 project is published and explicitly approved. This is a pre-extraction packaging boundary, not an independently
@@ -85,7 +91,13 @@ Source-checkout use of the opt-in broker first installs the sibling project
 (`python -m pip install ./aivm_secrets`) in a trusted host environment;
 standard `pip install aivm` does not pull it in.
 
-## Rules for all work while sharing this branch
+## Enduring optional-integration rules
+
+These rules describe the intended **current** separation even where file paths
+below refer to the earlier AIVM branch. Verify actual adapter files and default
+command behavior in the *AIVM* repository during W8; do not import those
+historical locations into `aivm-secrets` or treat an old branch audit as a
+current deployed acceptance result.
 
 - Every new AIVM-to-secrets dependency must be justified as an **existing
   explicit opt-in adapter**; otherwise implement it inside `aivm_secrets` or

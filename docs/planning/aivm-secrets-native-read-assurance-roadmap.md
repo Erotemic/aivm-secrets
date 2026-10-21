@@ -1,23 +1,24 @@
 # Garrett native read assurance: implementation-to-trace roadmap
 
-**Plan, not an assurance certificate. Last reconciled 2026-10-19.**
+**Technical read-only campaign; last reconciled 2026-10-21. NOT an assurance certificate.**
 
-**Start here if you are the next implementation agent.** The authoritative
-priority order is [active work](aivm-secrets-active-work.md); this document
-specifies the first campaign's technical scope, dependencies, deliverables and
-exit gates. The earlier running commentary was archived as
-[historical work](aivm-secrets-active-work-history-2026-10-19.md).
+**Read the [product roadmap](aivm-secrets-product-roadmap.md) and
+[current task queue](aivm-secrets-active-work.md) first.** The product is
+useful authorized secret use by an untrusted AIVM guest; this NR-0..NR-5
+campaign addresses the *first, restricted native read assurance claim*.
+Initial NR-0 baseline and NR-1 production extraction are accepted at their
+recorded scope. NR-2 and NR-3 are **in progress**, NR-4 and NR-5 **open**.
+Real AIVM deployment/isolation (W8), opt-in live provider (W7), and approved
+write assurance are separate product gates, not consequences of NR-5.
 
-**Priority guardrail:** This is a means to the original goal: an agent
-actually uses a host-held credential for narrowly authorized work without
-being given the credential. Keep the independent offline guest-to-broker
-workflow in the [active queue](aivm-secrets-active-work.md) as a parallel
-acceptance witness. Do not postpone all integration and operator usability
-until the final theorem, and do not promote additional inventories, source
-hashes, synthetic traces or unrelated abstract lemmas into new milestones.
-The next substantive assurance change must be **production-called Rust
-extraction**, followed by an implementation-linked simulation proof. NR-0
-is one baseline check, not a continuing evidence-generation campaign.
+**Current proof priority:** finish the source-to-native primitive/event link
+for admission, audit, provider write/flush, completion and guest reply. Reuse
+the production-called extracted Rust controllers and existing W4/W5 event
+relations; do **not** construct another model, source allowlist, or success-only
+trace as a substitute. Maintain the authorized offline success/denial witness
+in parallel. See the [Track A dispatch observation](../native-dispatch-callback-observation.md)
+and [writer callback simulation](../native-writer-callback-simulation.md) for
+the latest reported partial step, not a full NR-2/3 closure.
 
 ## 1. Target result and why it is still missing
 
@@ -52,18 +53,20 @@ send. These distinctions must survive the proof and its public summary.
 | Live native Rust + synthetic local TLS/provider tests | Sampled credentialed requests, selected replies, public denials, causal host audit, sequential histories; passing runs were reported during this campaign | All executions, bytes attempted but not received, real provider compatibility |
 | Source guards (`w3_effect_boundary`, `w6_adapter`, read/failure/pending review scripts) | Pinned reviewed source shapes, manifest contracts and deliberate bypass mutations | Closed transitive call graph, semantic proof of runtime branches |
 | Specialized Charon callback ledger | Evidence of intended compiler-specialized paths in an analyzed build | Unresolved dependency/callback/drop effects, dominance or complete reachability |
-| `GarrettConfinement`, `GarrettNoninterference`, `GarrettReadPaths`, `GarrettReadPrefixes` | Scoped theorem statements derived from extracted admission/disclosure leaves; read-path/prefix `prove` reportedly passed on the maintainer's pinned Lean toolchain | Extraction of the complete native `Session::request` orchestration; trustworthiness of adapter-provided `auditOK` or `providerReached` |
+| `GarrettConfinement`, `GarrettNoninterference`, `GarrettReadPaths`, `GarrettReadPrefixes` and newer production-extracted dispatch/writer modules | Scoped model and source-linked returned-path/event results, including actual owned request/JSON/frame controllers and partial native writer observations | Complete instantiation of native primitive contracts, all I/O/callback/drop/close effects, adaptive guest observation and service-level refinement |
 | `AuditedDispatch` and `CompletedRelease` private Rust types | Source-level restrictions on calling the native provider writer and returning success | That no other sink can be reached, or that the actual I/O matches the abstract trace |
 
-**Evidence provenance rule:** The source snapshot available to this planning
-round is `b91748b` plus incremental Garrett overlays through the reported
-read-path/prefix proof repair. It is not a newly exported HEAD of the user's
-current working tree. Agents must record the actual `git rev-parse HEAD`,
-`git status --short`, feature/configuration choices and the result of
-re-running focused acceptance before replacing “reported” with “reproduced”.
-A source-scope JSON `status` of `source-reviewed-kernel-verification-required`
-means a portable source check cannot certify compilation; do not overwrite
-this value merely because a different checkout previously passed `prove`.
+**Evidence provenance rule:** The latest available source archive for this
+documentation refresh is `8986ce6` plus the subsequently supplied Track A
+native audit/writer/dispatch and Lean-fix overlays. The user's *current HEAD*
+is not known from that archive. The frozen full-run result at `e741383`
+belongs to its exact source. The maintainer reported passing native dispatch
+chronology and earlier writer-event compilation; the final dispatch trace
+context-fix build result was not supplied. Before declaring a new gate closed,
+inspect `git rev-parse HEAD`, `git status --short`, relevant features and the
+actual focused compiler/native output. A proof-scope JSON `status` of
+`source-reviewed-kernel-verification-required` is a source-gate statement;
+it is not a contradiction of a successful scoped Lean build at another commit.
 
 ## 2. Profile boundary: what the eventual theorem quantifies over
 
@@ -159,11 +162,14 @@ states. Conditional composition reaches the actual consuming request entry;
 the local native callback contracts are still premises. Precise W4/W5 event
 binding, all failure prefixes and connected session histories remain open.
 
-Focus the next proof work on the extracted controller's callback invocation
-relation and W4/W5 event prefixes, including post-completion-audit
-revocation. Do not create an independently hand-written `read_transition`
-model. Preserve an authorized success witness from the standalone offline
-workflow in parallel.
+**Historical NR-1 handoff:** that phase sought the extracted controller's
+callback invocation relation and W4/W5 event prefixes, including revocation.
+The newer source-owned controller and writer/dispatch increments address parts
+of that seam. For the **current** unsatisfied native callback/IO correspondence,
+follow [section 8](#8-immediate-track-a-assignment-not-a-new-nr-0-or-nr-1-campaign)
+and the [active queue](aivm-secrets-active-work.md), not this older instruction.
+Do not create a hand-written second `read_transition` model. Preserve the
+standalone authorized success witness.
 
 ## 3. Concrete trust and transition boundary
 
@@ -237,39 +243,36 @@ secrecy conclusion as a premise.**
 
 ## 4. Work packages: owners, deliverables, dependencies, exit gates
 
-### NR-0 — Reproducible profile and evidence freeze (prepared; maintainer replay pending)
+### NR-0 — Reproducible profile and evidence freeze (initially accepted)
 
-The [NR-0 evidence record](aivm-secrets-native-read-nr0-evidence.md),
-[machine-readable profile](aivm-secrets-native-read-nr0.json), and
-`dev/verification/native_read_profile.py` now pin the 30 source/proof/harness
-files, selected native fixture, all 14 W0 sink dispositions and eight native
-test nodes across six witness classes. Portable checks were reproduced on the
-reconstructed archive. **Exit remains open** until `--portable --native --lean`
-passes on the actual checked-out tree with recorded binary digests and zero
-skips; the fixture's ability to override `writes=deny` and remaining alternate
-backend/control channels are explicit boundaries, not proof of isolation.
-
+**Status:** initial source/configuration/test baseline accepted in the
+October 20 main reconciliation at `aeae955`. The original
+[NR-0 evidence](aivm-secrets-native-read-nr0-evidence.md) and
+[machine-readable read profile](aivm-secrets-native-read-nr0.json) retain
+their recorded earlier evidence and limitations. A successful NR-0 baseline is
+*not* exhaustiveness of guest-reachable I/O or a VM isolation result.
+Do not repeatedly generate baseline inventories. Revisit only if the selected
+source, features, guest interface or trust assumptions materially change.
 
 **Owner:** integration/security review. **Dependencies:** none.
 
-1. Record exact checkout/dirty state, production Rust hashes, generated Lean
-   hashes, toolchain pins/features, start profile and denial of writes.
-2. Establish the selected binary's guest entry points and the operative
-   trust/compartment rules. Classify all W0/W6 sinks as included, host-only
-   assumption, separately modeled control, or unreachable **with evidence**.
-3. Replay one selected successful read, one denied request, one failed
-   provider read, one audited-but-unsent path and a two-request session using
-   the **same actual Rust code** and synthetic TLS/provider. Record all tests
-   executed and skips; do not invent a new mock broker.
-4. Reproduce `read_prefixes.py prove` with a named axiom report, rather than
-   treating the `check` status label as kernel output.
+The baseline must identify production Rust/Lean source and toolchain pins,
+profile and effective `writes=deny` restriction, W0 sink dispositions,
+positive allowed read, denial, provider failure, audited-but-unsent and
+sequential history. The original NR-0 exit gate required portable, native,
+and focused Lean acceptance with explicit skips/limitations. Preserve the
+existing source-scoped evidence; the maintainer's recorded successful run is
+accepted for *that scope* unless concrete contradictory evidence appears.
+Future baseline refreshes must report their actual tests and **not** restore
+routine axiom-print inventories to Lean compilation.
 
-**Exit:** `docs/planning` evidence record or review appendix with sources,
-configuration, observable trace sample, trust assumptions and exact commands;
-no unverified “all native cases pass” claim. This can be a documentation-only
-PR. Failure to restrict write/alternate profile channels blocks NR-1's claim.
+### NR-1 — Extract the actual read step and make it authoritative (initially accepted)
 
-### NR-1 — Extract the actual read step and make it authoritative
+**Status:** production-called invocation, admission, request/dispatch,
+provider and completion controllers have been extracted and carry checked
+results at the recorded scope. This **does not** establish native primitive
+I/O correspondence, which belongs to NR-2/3. The following exit specification
+is retained to govern changes to the source-called kernel.
 
 **Owner:** Rust/extraction. **Dependencies:** NR-0.
 
@@ -390,7 +393,7 @@ python dev/verification/quick_w6_read.py --native
 # Incremental native build after Rust changes, then selected integration cases
 python dev/verification/quick_w6_read.py --native --build
 
-# Focused Lean kernel + exact named axiom check (must pass on pinned toolchain)
+# Focused Lean kernel compilation; no routine axiom printing
 python dev/verification/read_prefixes.py prove
 
 # Optional narrower per-area paths
@@ -427,13 +430,15 @@ assuming it is hung.
 | Semantic W5 equivalence hides public denial/timing leaks | Define declassification and observation precisely; model reflectionStatus and errors explicitly |
 | Proof depends on `providerReached`/`auditOK` supplied by trusted test oracle | Establish adapter link or list these as retained assumptions; not a service-level theorem |
 | Test/build/proof passes with skipped or stale binaries | Record non-skipped native test evidence, source hashes and generated-proof provenance |
-| Implementing broader features distracts from first claim | Defer writes, general provider adapters, real OAuth, TPM and VM proof work unless necessary for the scoped read profile |
+| Confusing the restricted read claim with the product | Keep writes/general adapters outside the read theorem; progress real AIVM VM isolation (W8), live provider compatibility (W7), and write assurance as separately scoped product gates in parallel |
 
 ## 7. Cross-agent handoff contract
 
 A new agent should first run `git status --short`, record `git rev-parse HEAD`,
-read `AGENTS.md`, [active work](aivm-secrets-active-work.md), W0, this roadmap,
-and the source/proof files named in section 3. Select exactly one NR task.
+read `AGENTS.md`, [product roadmap](aivm-secrets-product-roadmap.md),
+[active work](aivm-secrets-active-work.md), W0, this roadmap, and the
+source/proof files named in section 3. Select one task from the current queue
+(or an independently assigned W7/W8 product integration track).
 Avoid simultaneous edits to the native transition APIs, extracted Lean files
 and shared W3 manifests by independent agents without a handoff. Parallelize
 independent trace fixtures, adapter contract review and theorem planning
@@ -458,45 +463,39 @@ This roadmap is intentionally a plan with falsifiable acceptance conditions.
 Do not add a new “verified” milestone just because another theorem compiles;
 close the production-to-model link first.
 
-## 8. Immediate next-agent assignment
+## 8. Immediate Track A assignment (not a new NR-0 or NR-1 campaign)
 
-**Issue: NR-0 acceptance replay, then NR-1 extraction.** The NR-0 source
-freeze and targeted runner now exist; first reproduce the maintainer native and
-Lean acceptance using the [NR-0 instructions](aivm-secrets-native-read-nr0-evidence.md).
-If hashes differ, review the exact change rather than automatically accepting
-new source. Then begin the first production-called Rust transition extraction
-in NR-1; the evidence record names the precise seam.
+**First:** on the actual checkout, confirm whether
+`lake build GarrettNativeDispatchEvents` succeeds after the final trace-context
+fix. The native `native_read_dispatch_audit_to_writer_callback_chronology` test
+was reported passing. Do not turn an unreported Lean result into either a
+failure or a verified success; report the actual build and then move on.
 
-**Original NR-0 acceptance definition:**
-Before extending any Lean theorem, reconcile the checked-out Rust/Lean
-revision and produce one compact provenance record for the chosen
-`manifest-https-v1`, `writes=deny`, software-identity read configuration.
-Show exactly how the guest is restricted to the modeled request and control
-entry points; list reachable host-only authority, OAuth-lease, audit and
-network sinks. Reproduce the portable W6, focused native read, and focused
-Lean kernel/axiom gates on the checked-out tree. Record one successful
-selected read, one denied request, one provider failure and one audited-but-
-unsent trace, including provider arrivals and audit ordering. Describe any
-skipped or unrun test rather than calling the profile verified.
+**Next substantive work:** connect the source-owned `Session::request` to
+actual native primitive callback arguments, returned states and observable
+effects: audit-file acknowledgment before the native writer, late admission,
+write/flush attempt (including partial failure), provider parsing and
+completion audit, then selected JSON/frame/close. Compose with the existing
+`request_effects` / read-trace relation. Retain explicit std/TLS/DNS, serde,
+zeroizing buffer, storage, parser and close contracts where those external
+functions cannot be proved from source. Characterize repeated sequential
+requests and revocation, not only a successful single send. The
+[writer callback simulation](../native-writer-callback-simulation.md) and
+[dispatch-to-writer observation](../native-dispatch-callback-observation.md)
+are partial inputs to this task.
 
-**Definition of done:** reviewed profile/configuration, hashes and feature
-flags, reproducible command results with no unexpected native skips,
-assumption/sink crosswalk, and a proposed smallest production-called Rust
-transition for NR-1. **Do not** create another independent formal trace
-constructor and call that a native simulation. If the checkout already has a
-fresh equivalent NR-0 evidence record, review it and proceed directly to
-NR-1, linking that record in the new PR.
+**Acceptance for this increment:** one source-linked typed simulation result
+plus focused native tests covering success and refused/partially attempted
+paths, exact trusted/external assumptions and the gap still left for NR-2/3.
+It is **not** a whole-service mediation claim. Keep current progress and
+priority in [active work](aivm-secrets-active-work.md), and use the
+[product roadmap](aivm-secrets-product-roadmap.md) for W8/W7 and write goals.
 
-The [outbound frame increment](../garrett-outbound-guest-frame.md) checks the actual
-encoder and single application-attempt gate. Its exact bounded bytes and returning
-writer-state contracts discharge that segment only; selected-value/canonical JSON,
-TLS/close and complete request/session observation correspondence remain open.
+## 9. Historical source-extraction increments (record, not assignment)
 
-The [owned completion adapter](../garrett-owned-completion.md) derives the
-completion receipt and success-gate contracts from actual extracted code under
-an explicit native report/copy-back/outcome link. Native instantiation of that
-link, dispatch/outer-check primitives, JSON/wire/history and complete sink closure
-remain required NR-2/3/4/5 work.
+The dated notes below preserve implementation context and prior dependencies.
+Their older "next seam" wording is superseded by section 8 and the current
+active queue. Do not restart accepted milestones based on these notes.
 
 ### Owned dispatch increment
 

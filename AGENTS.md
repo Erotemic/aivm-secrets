@@ -1,10 +1,38 @@
 # Contributor instructions
 
 `aivm-secrets` is an experimental, unaudited, independently packaged credential
-broker and identity project. Read `docs/extraction.md` and
+broker and identity project. **The end goal** is a host-owned, proof-backed
+secret-*use* service: an untrusted AIVM agent performs exactly authorized
+provider actions without receiving the provider credential. It must provide
+useful authorized success, not just denials. Normal AIVM remains independent;
+the secrets adapter is explicitly enabled, versioned and process/wire-only.
+
+**Start warm, in this order:**
+1. `docs/planning/aivm-secrets-product-roadmap.md` for product OUT-0..OUT-5,
+   proof/deployment/write gates, and what success actually requires.
+2. `docs/planning/aivm-secrets-active-work.md` for the **sole current task
+   priority/acceptance queue** and latest known verification boundary.
+3. The relevant technical scope, especially
+   `docs/planning/aivm-secrets-native-read-assurance-roadmap.md` (NR-0..NR-5),
+   `docs/planning/aivm-secrets-conditional-confinement.md` and assumptions.
+4. The actual source tree: inspect `git status --short`, `git rev-parse HEAD`,
+   latest commit and applicable reports; do not assume an overlay is committed
+   or the last Lean fix has been compiled unless its result was reported.
+
+**Anti-drift:** the read-only NR proof is one product gate, not the product.
+Move NR-2/3 toward concrete native primitive-to-event refinement instead of
+creating new trace surrogates, inventory-only milestones or recurring proof
+publicity. Real VM guest isolation (W8), opt-in provider compatibility (W7),
+and scoped authorized-write assurance are separately necessary for broader
+product claims and can progress in parallel. Never imply that a source guard,
+compiling model or same-UID offline demo establishes whole-service credential
+secrecy, VM isolation or native writes. Keep accepted NR-0/NR-1 initial work
+accepted unless new evidence changes their stated scope; read dated progress
+history as history, not the next assignment.
+
+Read `docs/extraction.md` and
 `docs/planning/aivm-secrets-repository-boundary.md` before changing boundaries.
-For new work, use `docs/planning/aivm-secrets-active-work.md` as the **current
-task priority and acceptance queue**. W0 now has the
+W0 now has the
 [conditional-confinement scope](docs/planning/aivm-secrets-conditional-confinement.md)
 and [sink inventory](docs/planning/aivm-secrets-w0-boundaries.json); check
 references with `python dev/verification/w0_contract.py check`. The W0

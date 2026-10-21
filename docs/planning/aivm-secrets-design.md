@@ -1,6 +1,10 @@
 # AIVM Secrets: credential-use capabilities with a verifiable core
 
-Status (2026-10-17): **architecture and historical P0-P5 milestones**.
+Status (2026-10-21): **architecture and historical P0-P5 milestones**, not
+the active task queue. The [product roadmap](aivm-secrets-product-roadmap.md)
+defines the end state, including real AIVM isolation, approved actions,
+provider validation and assurance-based release. The
+[active queue](aivm-secrets-active-work.md) orders current work.
 The Python reference includes local-host broker workflows and opt-in identity,
 OAuth/PKCE acquisition, vault/refresh and administrative lifecycle support;
 these are experimental and are not formally verified. A separate native Rust
@@ -28,7 +32,8 @@ obligations and the evidence needed before making stronger claims; the
 [the operator guide](../source/secrets.rst) for the commands, and
 [the validation record](aivm-secrets-validation.md) for what was run.
 The [repository boundary and extraction decision](aivm-secrets-repository-boundary.md)
-governs optional AIVM integration and the planned independent repository.
+governs optional AIVM integration; independent repository extraction was
+completed on 2026-10-16. The older migration narrative below is historical.
 
 ## 1. Decision and scope
 
@@ -155,9 +160,9 @@ then does with it.
 
 ## 4. Package and trust-boundary layout
 
-**Planned decomposition (not yet delivered).** Introduce internal
-`aivm_secrets.primitives` leaf modules, with acyclic imports and contracts
-that can each be ported to independently implemented Rust. Keep Garrett
+**Historical Python-first decomposition.** The package/module table below
+records the Python/reference layout and original intended boundaries, not a
+claim that the Rust side has not yet been started. Keep Garrett
 credential issuance/redemption as a higher-level identity protocol, not
 a general-purpose primitive. This is a refactor of the tables below, not
 a new runtime feature or a separate distribution. See [the modular proof architecture](aivm-secrets-modular-proof-architecture.md)
@@ -192,22 +197,24 @@ resolved in, and never leaves, that process. AIVM reaches it only through its
 command line, one line of JSON and the lifetime of a pipe -- which is the
 contract a Rust broker will be dropped in behind.
 
-Longer term, use separate Rust crates for `secrets-kernel`, `secrets-protocol`
-and `secrets-host`, with a Lean proof package. The independent conformance
-corpus they must reproduce already exists (`tests/secrets_vectors/`); the
-crates themselves are planned boundaries, not code included here.
+The separate Rust implementation now exists in `rust/crates/`, including
+`aivm-secrets-primitives`, `aivm-secrets-garrett-core` and
+`aivm-secrets-garrett`, with source-linked proof modules under `proofs/`.
+The independent conformance corpus in `tests/secrets_vectors/` continues to
+supply Python/Rust behavioral checks; full normative-core parity and
+implementation-to-native-I/O refinement remain open.
 The trusted service should eventually own credential material and egress in
 its own process. Merely returning `True` from a verified Rust policy function
 to arbitrary Python that still owns the token does not establish complete
 mediation. The executor must be constrained to kernel-generated effects.
 
-Keep optional integrations optional. The initial crypto dependency is an
-`aivm[secrets]` extra. Ordinary AIVM must import and run without the secrets
-implementation installed or cryptographic extras available; explicit opt-in
-features fail clearly if unavailable. Both packages are still included in
-the same source distribution **on this branch only**; packaging independence
-is a pending extraction gate, not an accomplished property. See the
-[repository boundary and extraction plan](aivm-secrets-repository-boundary.md).
+Keep optional integrations optional. The standalone `aivm-secrets`
+distribution and executable **already exist**; there is no ordinary required
+`aivm[secrets]` extra. AIVM must import and run without the service or its
+cryptographic extras installed, and explicitly enabled features must fail
+clearly when unavailable. The original same-source-distribution paragraph was
+superseded by the 2026-10-16 extraction. See the
+[repository boundary](aivm-secrets-repository-boundary.md).
 
 ## 5. Credential lifecycle and Garrett-style envelopes
 

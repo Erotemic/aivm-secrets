@@ -1,14 +1,18 @@
 # AIVM Secrets: provider-neutral integrations and CLI compatibility
 
-**Planning precedence (2026-10-17):** the P0-P5 roadmap below documents the
-original delivery sequence, not the current agent work queue. Use
-[active work](aivm-secrets-active-work.md) for priorities and gates; retain
-this document for service-neutral policy and adapter contracts. Native Rust
-manifest execution and typed disclosure now exist but are not a fully verified
-or parity-complete service (see [the disclosure record](../verified-disclosure.md)).
+**Planning precedence (2026-10-21):** the P0-P5 roadmap below is the
+*historical integration delivery sequence*, not the active queue. Begin with
+the [product outcome roadmap](aivm-secrets-product-roadmap.md) and
+[active work](aivm-secrets-active-work.md). Retain this document for the
+service-neutral, host-trusted typed manifest/adapter contracts.
 
-Status: **implemented experimental Python schema 2 with planned verified Rust
-kernel** (updated 2026-10-10). This refines [the main architecture](aivm-secrets-design.md) and
+Status: **experimental Python schema 2 implemented; selected native Rust
+manifest execution, typed disclosure and source-linked Lean proofs implemented**.
+The Rust service is **not** Python feature-parity complete, proved across its
+full I/O boundary, or approved for generic plugins/production deployment.
+See [the disclosure record](../verified-disclosure.md) and the
+[native read roadmap](aivm-secrets-native-read-assurance-roadmap.md).
+This refines [the main architecture](aivm-secrets-design.md) and
 [the assurance plan](aivm-secrets-formal-assurance.md); the implemented state
 machine is specified in [the kernel specification](aivm-secrets-kernel-spec.md).
 The original GitHub PR schema 1 remains a compatibility integration, **not the
@@ -38,7 +42,7 @@ entirely without increasing authority.
         | Trusted secret-use broker                                 |
         | identity + grant + operation + budget + epoch + audit    |
         |              + constrained effect compiler              |
-        | [target] small safe-Rust kernel + typed effect executor  |
+        | native Rust kernel + typed effect executor (partial)   |
         +---------------------------------+-------------------------+
                                           |
                                  fixed authenticated egress
@@ -405,16 +409,19 @@ implementations must reproduce.
   grammar are implemented and pinned by vectors. Still open: declaring the
   manifest schema frozen, optional CLI wrappers outside the TCB, and explicit
   identity semantics and auth-scope introspection per service.
-* **P2:** safe-Rust implementation of common policy, typed manifest compiler,
-  reservation and effect-ticket construction, with Aeneas/Lean proof artifacts.
-  Keep Python/libvirt orchestration outside the verified crate.
-* **P3:** credential-owning Rust service with constrained egress/serialization,
-  tamper-resistant policy source, audited plugin install/approval, safe rotation
-  and secret-provider refresh. Evaluate stock CLI HTTP(S) proxy modes with real
-  protocol tests; do not claim universal CLI compatibility.
-* **P4:** remotely bound identity with mTLS, external issuer, certificate
-  binding and carefully specified non-exportable keys / snapshot semantics.
-  Improve revocation and multi-session quota sharing.
+* **P2 (partly delivered):** Rust provider/authorization/manifest components
+  and source-linked Aeneas/Lean artifacts exist. Their exact source-linked
+  properties are narrower than complete Python core parity or native effect
+  mediation. Continue the outstanding parity/IO boundary obligations.
+* **P3 (partly delivered):** the native Rust service holds credentials and uses
+  bounded typed HTTPS effects. Real-provider compatibility, complete I/O
+  correspondence, independently reviewed adapter installation, additional
+  write/approval semantics and release hardening remain open. Do not claim
+  arbitrary CLI or plugin compatibility.
+* **P4 (partly delivered):** native mTLS, certificate-bound identity, issuer
+  and optional TPM enrollment paths exist. Real AIVM VM isolation, physical
+  provenance, key non-exportability and cross-session authority/recovery still
+  require scoped deployment evidence and review.
 * **P5:** approved third-party adapter ecosystem, signed/versioned manifests,
   conformance corpus, hardening and security review. Publication claims name
   exactly which adapter version and proof obligations have been checked.

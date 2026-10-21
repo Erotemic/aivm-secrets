@@ -1,52 +1,71 @@
-- [Runnable offline native operator/guest workflow](../offline-native-operator-guest.md) — real Rust authority, broker, guest CLI, approved reads, broker-denied write, operator revocation. Native acceptance required; not a VM-isolation claim.
 # Planning index: aivm-secrets / Garrett
 
-- [NR-0 native read evidence freeze](aivm-secrets-native-read-nr0-evidence.md) — pinned source/sink/fixture scope, fast reproducible acceptance, and NR-1 extraction handoff.
+**Start here when joining or resuming.** `aivm-secrets` is meant to provide an
+**independently installed, optionally AIVM-integrated, proof-backed service
+that lets an untrusted agent perform narrowly authorized actions without
+access to the provider credential**. It is still experimental and unaudited.
+The first assurance campaign covers only a restricted native read profile;
+it is not the entire product destination.
 
-For a new contributor or coding agent, read these in order:
+Read in this order:
 
-1. [Current priority and acceptance queue](aivm-secrets-active-work.md).
-   **Only this file ranks current work.** It names the next NR-0 through NR-5
-   native read-assurance tasks and a parallel offline guest-utility checkpoint.
-2. [Detailed native read assurance roadmap](aivm-secrets-native-read-assurance-roadmap.md).
-   Task owners, Rust/Lean links, dependencies, trust boundaries, evidence types,
-   exit criteria, acceptance commands and cross-agent handoffs.
-3. [W0 conditional-confinement contract](aivm-secrets-conditional-confinement.md)
-   and [boundary inventory](aivm-secrets-w0-boundaries.json).
-   Normative security scope, sinks, adversary and allowed releases.
-4. [Formal assurance architecture](aivm-secrets-formal-assurance.md),
-   [Garrett-specific proof obligations](aivm-secrets-garrett-verification.md),
-   [assumption ledger](aivm-secrets-assumptions.json) and
-   [modular proof architecture](aivm-secrets-modular-proof-architecture.md).
-5. Machine-readable scoped evidence records:
-   [W3 reachability](aivm-secrets-w3-reachability.json),
-   [W4 proof scope](aivm-secrets-w4-proof-scope.json),
-   [W5 proof scope](aivm-secrets-w5-proof-scope.json),
-   [W6 adapters](aivm-secrets-w6-adapters.json),
-   [read-path proofs](aivm-secrets-read-path-proof-scope.json),
-   [read-prefix proofs](aivm-secrets-read-prefix-proof-scope.json),
-   [read failures](aivm-secrets-read-failure-scope.json) and
-   [audited-but-unsent reads](aivm-secrets-read-pending-scope.json).
-   Each has its own validation semantics: a source guard is not a Lean theorem;
-   a finite native witness is not a universal I/O simulation.
+1. [Product outcome roadmap](aivm-secrets-product-roadmap.md) — **why the
+   project exists, product acceptance gates OUT-0..OUT-5, dependencies,
+   isolation/write/release boundaries and anti-drift rules**.
+2. [Active implementation queue](aivm-secrets-active-work.md) — **the current
+   ordered next tasks**, open blockers, evidence basis and focused commands.
+   This is the only rolling task queue; do not treat dated histories as tasks.
+3. [Native read assurance roadmap](aivm-secrets-native-read-assurance-roadmap.md)
+   — NR-0..NR-5 technical read-only scope, actual Rust/Lean seams, assumptions
+   and exit criteria. Not a substitute for the product outcome roadmap.
+4. [W0 conditional-confinement contract](aivm-secrets-conditional-confinement.md)
+   and [boundary inventory](aivm-secrets-w0-boundaries.json) — normative
+   principals, adversary, allowed releases and scoped sinks.
+5. [Assumption ledger](aivm-secrets-assumptions.json),
+   [formal assurance architecture](aivm-secrets-formal-assurance.md),
+   [Garrett proof obligations](aivm-secrets-garrett-verification.md) and
+   [modular proof design](aivm-secrets-modular-proof-architecture.md).
 
-The [October 19 historical active-work archive](aivm-secrets-active-work-history-2026-10-19.md)
-retains earlier dated milestones and detailed implementation notes, including
-superseded pass counts and pending statuses. It is historical reference, **not**
-a parallel current implementation plan. Other `aivm-secrets-*.md` documents
-in this folder remain specifications, specialized designs or deferred work,
-not competing active task queues.
+For cross-project delivery, also consult the
+[standalone operator/guest workflow](../offline-native-operator-guest.md),
+[optional AIVM repository/process boundary](aivm-secrets-repository-boundary.md),
+[provider-neutral typed integration design](aivm-secrets-agnostic-integrations.md),
+[managed-VM integration constraints](aivm-secrets-p4a-managed-vm.md), and
+[native write approval design](../native-write-approval.md). These describe
+separate implementation and environment obligations; none closes them merely
+by being documented.
 
-For ordinary local iterations, use
-`python dev/verification/quick_w6_read.py`; add `--native` for the selected
-actual Rust tests and `python dev/verification/read_prefixes.py prove` for the
-Lean kernel/axiom audit. Reserve full suite and specialized compiler
-extraction for relevant changes and scheduled integration checkpoints. Do not
-use real services or production credentials for ordinary tests.
+## Evidence and history
 
-**Documentation hygiene:** update the active queue when a task's evidence or
-priority changes; update the detailed roadmap if interfaces/dependencies or
-exit gates change; update proof/assumption scope JSON only with its required
-source/proof review. Record actual tool output and remaining obligations before
-claiming completion. Never label the complete native read claim as proved from
-a passing quick gate alone.
+- [NR-0 recorded native baseline](aivm-secrets-native-read-nr0-evidence.md)
+  and [machine-readable profile](aivm-secrets-native-read-nr0.json).
+- [W3 reachability](aivm-secrets-w3-reachability.json),
+  [W4 proof scope](aivm-secrets-w4-proof-scope.json),
+  [W5 proof scope](aivm-secrets-w5-proof-scope.json),
+  [W6 adapters](aivm-secrets-w6-adapters.json),
+  [read-path proofs](aivm-secrets-read-path-proof-scope.json),
+  [read-prefix proofs](aivm-secrets-read-prefix-proof-scope.json),
+  [read failures](aivm-secrets-read-failure-scope.json), and
+  [audited-but-unsent reads](aivm-secrets-read-pending-scope.json).
+  A manifest/source fingerprint is not a compiler proof; an extracted theorem
+  is not an entire service/I/O refinement; a test witness is not exhaustiveness.
+- [October 21 progress archive](aivm-secrets-active-work-history-2026-10-21.md)
+  and [October 19 progress archive](aivm-secrets-active-work-history-2026-10-19.md)
+  retain detailed dated validation narratives. They are **historical**, not
+  competing roadmaps or instructions to repeat old milestones.
+
+Use `python3 dev/verification/quick_w6_read.py` for portable regression
+feedback from the repository root. Run the focused Rust tests when native code
+changes and a targeted `lake build <module>` (after `lake exe cache get`) when
+Lean changes. Ordinary builds must **not** print bulk theorem or axiom reports;
+comparative dependency auditing belongs to an opt-in, final assurance review
+per `../../AGENTS.md`. Do not use production credentials or contact real
+providers in ordinary CI. The W7 live-provider test is separate and opt-in.
+
+**Documentation upkeep:** update the active queue when real status, blocker,
+priority or acceptance changes; update the product roadmap when an outcome
+condition/dependency changes; update the NR roadmap when a technical proof
+interface or exit criterion changes. Put chronological results in
+`dev/validation/` or history, and update proof/sink JSON only with the
+corresponding source/proof review. Before calling anything completed, name the
+exact checkout, supported profile, positive witness and outstanding premises.

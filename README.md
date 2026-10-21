@@ -1,12 +1,22 @@
 # aivm-secrets (experimental)
 
-An experimental Python broker for using host-held service credentials through
-explicitly authorized operations. **Unaudited: not approved for production
+An experimental standalone credential-use broker with a Python reference
+implementation and a native Rust implementation for selected profiles. **Unaudited: not approved for production
 credentials or unattended privileged use.** It is not a TPM or hardware identity
 service and it is not a formally verified implementation.
 
 This is the standalone project extracted from AIVM. It installs its own
 `aivm-secrets` executable and does not require or bundle the AIVM VM manager.
+The long-term objective is a **proof-backed secret-use module** through which
+an untrusted AIVM guest can perform narrowly authorized provider actions
+without possessing the real credential. Read the
+[product outcome roadmap](docs/planning/aivm-secrets-product-roadmap.md),
+[current task queue](docs/planning/aivm-secrets-active-work.md) and
+[planning index](docs/planning/README.md) before choosing work. The existing
+offline native workflow is useful but does not establish actual VM isolation;
+read-only source-linked proofs do not yet justify a general production/write
+claim. Real AIVM integration, live-provider compatibility, and review are
+explicit separate gates.
 The package version remains **0.2.0**; extraction does not change the wire
 protocol or migrate existing authority, certificate, or OAuth vault state.
 
