@@ -55,3 +55,6 @@ include proofs/GarrettCompletion.lean proofs/GarrettCompletionSimulation.lean
 include proofs/GarrettDispatch.lean proofs/GarrettDispatchSimulation.lean
 include proofs/GarrettRequestAdapter.lean
 include proofs/GarrettCurrentAdmission.lean
+include proofs/GarrettDispatchTrace.lean
+include proofs/GarrettCompletionTrace.lean
+include proofs/GarrettOwnedRequestTrace.lean

@@ -172,12 +172,21 @@ The fresh optional specialized bridge capture retains nine paths and passes
 47 fixture/capture cases without a mediation claim. See the
 [current-admission validation record](../../dev/validation/2026-10-20-current-admission.json).
 
-The next NR-2 implementation task is to compose the bound driver's derived
-stamp origin with the owned dispatcher's receipt/local-send gates, across
-preparation, audit, setup and returned failure prefixes, then instantiate the
-actual request adapter's W4/W5 event relation. Do not replace this with another
-inventory or a whole-callback `FreshOrigin` assumption. Native primitive
-semantics and the remaining I/O/observation/history obligations stay explicit.
+**Owned-controller trace update:** [actual dispatch/completion/request traces](../garrett-owned-request-traces.md)
+now compose source-derived stamp origin and chronological receipt gates through
+all returned outcomes of the actual request entry. Twenty-three new obligations
+remove whole-current and whole-dispatch/completion history premises. The precise,
+state-indexed native constructor/typeclass/context-frame input contract remains
+uninstantiated; native primitive/I/O, selected JSON/frame/close and adaptive
+history correspondence and NR-2–NR-5 remain open. Validation for this source
+increment is recorded separately after the VM gates pass.
+
+The next implementation seam is a source-owned native context/factory wrapper
+or equivalent exact constructor refinement that discharges the per-state
+`NativeContext` clauses in `GarrettOwnedRequestTrace.lean`. Preserve each
+request's own context across returned primitive work states; a universal fixed
+context over arbitrary work values is not an adequate native instantiation.
+Do not replace this with another inventory or a whole-callback trace premise.
 
 ## Goal and present assurance level
 
@@ -281,7 +290,7 @@ to grow source guards.
 | **P0 / NR-0** | Freeze native read profile and evidence baseline | Identify the checked-out commit, exact source/feature profile, full list of guest and provider effects, verified successful/denied synthetic witnesses and reproducible focused gates. Name all excluded configurations. | **Baseline locally accepted at `aeae955`**: 31 source pins, all W0 sinks, no-skip native workflows and focused Lean checks passed in the October 20 record. Inventory and tests remain evidence, not native I/O refinement |
 | **P0 / guest utility** | Reproduce the actual standalone guest-to-broker workflow offline, beyond internal Rust test fixtures | A documented operator+guest run with a synthetic host-held credential, a permitted selected GitHub-shaped read, broker-denied write, host audit, no credential in the distributed guest files, and a revocation check | **Native witness passed at `aeae955` in both builds**: `python dev/offline_native_guest.py`, [workflow documentation](../offline-native-operator-guest.md). Selected reads, denied write, credential absence in guest files and revocation succeeded. Same-UID demo is not isolation. |
 | **P0 / NR-1** | Connect real Rust read orchestration to a small extractable transition kernel | Production `Session::request` uses a single checked transition interface with explicit external audit, authority, provider and release outcomes. Extract the *same* Rust decisions to Lean and prove the first preservation/simulation lemma. | **Pure orchestration and initial preservation locally checked.** Production uses `run_current` with private mutable invocation tracking and extracted dispatch/completion controllers; 37 obligations cover exact result origins, receipt states, the consuming gate, errors, freshness and uncertainty. Native callback invocation/effect correspondence is the next NR-2/3 obligation. |
-| **P0 / NR-2** | Establish admission/audit/send/release forward simulation | Relate extracted steps to `GarrettReadPaths`/`GarrettReadPrefixes` events for successful, failed and audited-but-unsent final-only, checked-only and two-phase reads. Include host-state/identity continuity and an authorized successful witness. | **Open**; the actual owned request adapter derives all returned receipt paths and selected-value origin without whole-callback or native report-link assumptions. Conditional W4 audit/provider/denial projections retain primitive/current/context, selected JSON/frame and session-history correspondence obligations. |
+| **P0 / NR-2** | Establish admission/audit/send/release forward simulation | Relate extracted steps to `GarrettReadPaths`/`GarrettReadPrefixes` events for successful, failed and audited-but-unsent final-only, checked-only and two-phase reads. Include host-state/identity continuity and an authorized successful witness. | **Open**; the actual owned request adapter derives all returned receipt paths and selected-value origin without whole-callback or native report-link assumptions. The source-owned controllers derive all returned audit/provider-attempt/denial histories and stamp origin; state-indexed native context inputs, primitive/I/O semantics, selected JSON/frame and session-history correspondence remain open. |
 | **P0 / NR-3** | Close W3/W6 actual-I/O boundary for the restricted native profile | Enumerate guest-reachable effectful call paths (including callback, error, drop and dependency boundaries). Prove source-owned paths or assign explicit external contracts. Relate emitted HTTP/audit/guest frames to modeled events and acknowledge ambiguity of partial sends. | **Open**; develop alongside NR-1/2, final integration depends on both |
 | **P1 / NR-4** | Complete W5 guest observation/declassification correspondence | Define exact public response fields, errors, metadata, reflection-denial bit, lengths/close behavior and adaptive sequential input model. Prove only the relational property supported by explicit declassification premises; list excluded channels. | **Open**; depends on NR-2/3 |
 | **P1 / NR-5** | Integrate and independently review a scoped assurance claim | Reproducible evidence manifest, all proof axioms/assumptions, one real local successful operation, negative mutants, all profiled sinks accounted for, recorded limitations and review sign-off. | **Open**, last gate for the native read claim |

@@ -230,6 +230,32 @@ THEOREMS = [
     "Garrett.Protocol.all_traces_preserve_credential_secrecy",
 ]
 THEOREMS += [
+    'aivm_secrets_garrett_core.dispatch.TraceRefinement.setup_trace',
+    'aivm_secrets_garrett_core.dispatch.TraceRefinement.receive_trace',
+    'aivm_secrets_garrett_core.dispatch.TraceRefinement.current_trace',
+    'aivm_secrets_garrett_core.dispatch.TraceRefinement.successful_current_records_stamp',
+    'aivm_secrets_garrett_core.dispatch.TraceRefinement.checked_origin',
+    'aivm_secrets_garrett_core.dispatch.TraceRefinement.send_trace',
+    'aivm_secrets_garrett_core.dispatch.TraceRefinement.driver_trace',
+    'aivm_secrets_garrett_core.dispatch.TraceRefinement.audit_trace',
+    'aivm_secrets_garrett_core.dispatch.TraceRefinement.exchange_trace',
+    'aivm_secrets_garrett_core.dispatch.TraceRefinement.finish_trace',
+    'aivm_secrets_garrett_core.dispatch.TraceRefinement.run_trace',
+    'aivm_secrets_garrett_core.dispatch.TraceRefinement.dispatch_trace',
+    'aivm_secrets_garrett_core.dispatch.TraceRefinement.dispatch_sound_trace',
+    'aivm_secrets_garrett_core.completion.TraceRefinement.recheck_trace',
+    'aivm_secrets_garrett_core.completion.TraceRefinement.audit_trace',
+    'aivm_secrets_garrett_core.completion.TraceRefinement.release_trace',
+    'aivm_secrets_garrett_core.completion.TraceRefinement.current_trace',
+    'aivm_secrets_garrett_core.completion.TraceRefinement.selection_and_completion_trace',
+    'aivm_secrets_garrett_core.completion.TraceRefinement.complete_trace',
+    'aivm_secrets_garrett_core.request_adapter.TraceRefinement.dispatch_callback_trace',
+    'aivm_secrets_garrett_core.request_adapter.TraceRefinement.completion_callback_trace',
+    'aivm_secrets_garrett_core.request_adapter.TraceRefinement.returned_entry_sound_trace',
+    'aivm_secrets_garrett_core.request_adapter.TraceRefinement.returned_entry_bound_trace',
+]
+
+THEOREMS += [
     'aivm_secrets_garrett_core.current_admission.Proofs.context_constructor',
     'aivm_secrets_garrett_core.current_admission.Proofs.current_success_iff',
     'aivm_secrets_garrett_core.current_admission.Proofs.current_issued',
@@ -857,6 +883,9 @@ def inputs() -> list[str]:
         "proofs/GarrettDispatchSimulation.lean",
         "proofs/GarrettRequestAdapter.lean",
         "proofs/GarrettCurrentAdmission.lean",
+        "proofs/GarrettDispatchTrace.lean",
+        "proofs/GarrettCompletionTrace.lean",
+        "proofs/GarrettOwnedRequestTrace.lean",
         "proofs/GarrettRequestPrefix.lean",
         "proofs/GarrettRequestTrace.lean",
         "tests/test_rust_w6_completion.py",
@@ -1232,6 +1261,10 @@ def mutate(pattern: str | None = None) -> None:
         (owned_dispatch, 'owned dispatch rolled back returned receipt', 'effects: pending.effects,', 'effects,'),
         (owned_dispatch, 'owned dispatch ignored fresh refusal', '    match pending.work.check() {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }', '    let _ignored = pending.work.check();'),
         (owned_dispatch, 'owned dispatch ignored reservation refusal', '    match reserved {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }', '    let _ignored = reserved;'),
+    ]
+    mutations += [
+        (owned_dispatch, 'trace origin replaced stored current stamp', '        if !self.local.finish_check(stamp) {', '        let stored = match self.work.recheck() {\n            Ok(stored) => stored,\n            Err(error) => return Err(error),\n        };\n        if !self.local.finish_check(stored) {'),
+        (owned_dispatch, 'trace origin discarded failed send receipt', '        if !self\n            .effects\n            .begin_send(self.phase, &mut self.local, self.write)\n        {\n            return Err(W::INVALID_TRANSITION);\n        }\n        self.work.send(channel)', '        let before = self.effects;\n        if !self\n            .effects\n            .begin_send(self.phase, &mut self.local, self.write)\n        {\n            return Err(W::INVALID_TRANSITION);\n        }\n        match self.work.send(channel) {\n            Ok(()) => Ok(()),\n            Err(error) => {\n                self.effects = before;\n                Err(error)\n            }\n        }'),
     ]
     admission = source.with_name("current_admission.rs")
     mutations += [
@@ -2059,6 +2092,9 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettRequestSimulation",
                 "GarrettRequestAdapter",
                 "GarrettCurrentAdmission",
+                "GarrettDispatchTrace",
+                "GarrettCompletionTrace",
+                "GarrettOwnedRequestTrace",
                 "GarrettConfinement",
                 "GarrettProviderSimulation",
                 "GarrettRequestPrefix",
@@ -2125,6 +2161,8 @@ def mutate(pattern: str | None = None) -> None:
                 "guest_frame.rs": "GarrettGuestFrame",
                 "coordinator_authority.rs": "GarrettCoordinatorAuthority",
             }.get(source.name)
+            if label.startswith("trace origin "):
+                preferred = "GarrettDispatchTrace"
             if preferred:
                 modules.remove(preferred)
                 modules.insert(0, preferred)
@@ -2155,6 +2193,24 @@ def mutate(pattern: str | None = None) -> None:
                 ]:
                     modules.remove(dependency)
                 modules[1:1] = ["GarrettLogin", "GarrettManifest", "GarrettDisclosure"]
+            if label.startswith("trace origin "):
+                # Rebuild the actual local import closure against this mutant;
+                # cached proof objects are never substituted for dependencies.
+                closure: list[str] = []
+                seen: set[str] = set()
+
+                def visit(module: str) -> None:
+                    if module in seen:
+                        return
+                    seen.add(module)
+                    proof = PROOFS / (module + ".lean")
+                    for imported in re.findall(r"(?m)^import ([A-Za-z0-9_]+)$", proof.read_text()):
+                        if (PROOFS / (imported + ".lean")).is_file():
+                            visit(imported)
+                    closure.append(module)
+
+                visit("GarrettDispatchTrace")
+                modules = closure + [module for module in modules if module not in seen]
             for module in modules:
                 proof = temporary / (module + ".lean")
                 shutil.copy2(PROOFS / proof.name, proof)

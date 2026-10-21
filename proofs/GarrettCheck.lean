@@ -1,3 +1,4 @@
+import GarrettOwnedRequestTrace
 import GarrettCurrentAdmission
 import GarrettRequestAdapter
 import GarrettDispatchSimulation
@@ -683,3 +684,27 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.current_admission.Proofs.bound_check_frame
 #print axioms aivm_secrets_garrett_core.current_admission.Proofs.bound_reserve_frame
 #print axioms aivm_secrets_garrett_core.current_admission.Proofs.bound_finish_frame
+
+#print axioms aivm_secrets_garrett_core.dispatch.TraceRefinement.setup_trace
+#print axioms aivm_secrets_garrett_core.dispatch.TraceRefinement.receive_trace
+#print axioms aivm_secrets_garrett_core.dispatch.TraceRefinement.current_trace
+#print axioms aivm_secrets_garrett_core.dispatch.TraceRefinement.successful_current_records_stamp
+#print axioms aivm_secrets_garrett_core.dispatch.TraceRefinement.checked_origin
+#print axioms aivm_secrets_garrett_core.dispatch.TraceRefinement.send_trace
+#print axioms aivm_secrets_garrett_core.dispatch.TraceRefinement.driver_trace
+#print axioms aivm_secrets_garrett_core.dispatch.TraceRefinement.audit_trace
+#print axioms aivm_secrets_garrett_core.dispatch.TraceRefinement.exchange_trace
+#print axioms aivm_secrets_garrett_core.dispatch.TraceRefinement.finish_trace
+#print axioms aivm_secrets_garrett_core.dispatch.TraceRefinement.run_trace
+#print axioms aivm_secrets_garrett_core.dispatch.TraceRefinement.dispatch_trace
+#print axioms aivm_secrets_garrett_core.dispatch.TraceRefinement.dispatch_sound_trace
+#print axioms aivm_secrets_garrett_core.completion.TraceRefinement.recheck_trace
+#print axioms aivm_secrets_garrett_core.completion.TraceRefinement.audit_trace
+#print axioms aivm_secrets_garrett_core.completion.TraceRefinement.release_trace
+#print axioms aivm_secrets_garrett_core.completion.TraceRefinement.current_trace
+#print axioms aivm_secrets_garrett_core.completion.TraceRefinement.selection_and_completion_trace
+#print axioms aivm_secrets_garrett_core.completion.TraceRefinement.complete_trace
+#print axioms aivm_secrets_garrett_core.request_adapter.TraceRefinement.dispatch_callback_trace
+#print axioms aivm_secrets_garrett_core.request_adapter.TraceRefinement.completion_callback_trace
+#print axioms aivm_secrets_garrett_core.request_adapter.TraceRefinement.returned_entry_sound_trace
+#print axioms aivm_secrets_garrett_core.request_adapter.TraceRefinement.returned_entry_bound_trace

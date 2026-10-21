@@ -522,3 +522,21 @@ still consumes the request and preserves terminal failure/write uncertainty.
 Native primitive/context and concrete event/JSON/frame observations, connected
 adaptive histories and transitive I/O/drop/callback closure remain open; this
 increment does not complete NR-2/3/4/5 or independent review.
+
+### Source-owned chronological controller traces (October 20)
+
+The [actual dispatch/completion/request trace composition](../garrett-owned-request-traces.md)
+adds 23 extracted-source obligations across all returned outcomes. The provider
+check-to-local-stamp-to-composite-send link is derived; both owned controllers
+supply chronological receipt histories, and the actual request constructor and
+consuming entry compose them. Whole-current/dispatch/completion history premises
+are eliminated. Runtime Rust and wire protocols are unchanged in this increment.
+
+The native input contract is per-state: the canonical bound dispatcher instance,
+the factory's captured constructor context, and context-field preservation at
+dispatch-factory, outer-check and completion-factory returns. It does not fix a
+single context over all possible native work values. Native instantiation of
+those fields remains open; a source-owned context/factory wrapper is the next
+concrete seam. Primitive/environment semantics, transitive native I/O/drop/
+unwind closure, selected JSON/frame/close observations and adaptive histories
+remain separate. This is still not an NR-2/3/4/5 exit or whole-service secrecy.
