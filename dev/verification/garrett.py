@@ -1010,6 +1010,8 @@ def inputs() -> list[str]:
         "proofs/GarrettRequestContext.lean",
         "proofs/GarrettProviderIO.lean",
         "proofs/GarrettProviderChannel.lean",
+        "proofs/GarrettNativeWriterEvents.lean",
+        "proofs/GarrettNativeDispatchEvents.lean",
         "proofs/GarrettProviderWire.lean",
         "proofs/GarrettJsonStringScalar.lean",
         "proofs/GarrettJsonString.lean",

@@ -1491,6 +1491,280 @@ mod wire_tests {
         }
     }
 
+    // Exercise the complete returned dispatch path with a real audit File and
+    // the *production* ProviderWriter -> Channel::submit callback, observing
+    // the moment of each underlying Write call (not just the final buffers).
+    // The test writer asserts the audit acknowledgement already exists before
+    // the first provider byte can be accepted.
+    #[test]
+    fn native_read_dispatch_audit_to_writer_callback_chronology() {
+        use aivm_secrets_garrett_core::{
+            credential_use::{UseClaims, UseGrant}, provider_exchange,
+        };
+        use std::cell::RefCell;
+        use std::os::unix::fs::OpenOptionsExt;
+        use std::rc::Rc;
+
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        enum Fault {
+            Prepare, Audit, Configure, Check, Recheck,
+            WriteZero, PartialWrite, Flush, None,
+        }
+        struct Cleanup(std::path::PathBuf);
+        impl Drop for Cleanup {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_file(&self.0);
+            }
+        }
+        struct ObservedWriter {
+            path: std::path::PathBuf,
+            trace: Rc<RefCell<Vec<&'static str>>>,
+            accepted: Rc<RefCell<Vec<u8>>>,
+            fault: Fault,
+        }
+        impl Write for ObservedWriter {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                // This assertion runs at the actual native write callback,
+                // rather than checking audit order only after dispatch.
+                let record: Value = serde_json::from_slice(&std::fs::read(&self.path)?)
+                    .map_err(std::io::Error::other)?;
+                assert_eq!(record["event"], "dispatch");
+                assert_eq!(record["operation"], "synthetic.read");
+                assert_eq!(record["request_digest"], "synthetic-request");
+                assert!(self.trace.borrow().contains(&"audit-ack"));
+                self.trace.borrow_mut().push("write");
+                if self.fault == Fault::WriteZero {
+                    return Ok(0);
+                }
+                let mut accepted = self.accepted.borrow_mut();
+                if self.fault == Fault::PartialWrite && !accepted.is_empty() {
+                    return Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe));
+                }
+                let count = if self.fault == Fault::PartialWrite {
+                    bytes.len().min(7)
+                } else {
+                    bytes.len()
+                };
+                accepted.extend_from_slice(&bytes[..count]);
+                Ok(count)
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                self.trace.borrow_mut().push("flush");
+                if self.fault == Fault::Flush {
+                    Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))
+                } else {
+                    Ok(())
+                }
+            }
+        }
+        struct ObservedProvider {
+            audit: Arc<Audit>,
+            audit_path: std::path::PathBuf,
+            trace: Rc<RefCell<Vec<&'static str>>>,
+            accepted: Rc<RefCell<Vec<u8>>>,
+            current: guards::AdmissionStamp,
+            fault: Fault,
+        }
+        impl provider_exchange::Provider for ObservedProvider {
+            type Channel = aivm_secrets_garrett_core::provider_io::Channel<
+                ManifestWire, ProviderWriter<ObservedWriter>, (),
+            >;
+            type Output = Value;
+            type Error = Error;
+            const INVALID_POLICY: Error = Error::InvalidPolicy;
+            const OUTCOME_UNKNOWN: Error = Error::OutcomeUnknown;
+            fn setup(&mut self) -> Outcome<Self::Channel> {
+                self.trace.borrow_mut().push("setup");
+                // The real native request encoder is exercised on this path.
+                let (wire, _) = manifest_request_bytes(
+                    &route(), &secret(b"SYNTHETIC_TOKEN_123456"),
+                    &effect(), &BTreeMap::new(),
+                )?;
+                Ok(aivm_secrets_garrett_core::provider_io::Channel::new(
+                    ManifestWire(wire),
+                    ProviderWriter(ObservedWriter {
+                        path: self.audit_path.clone(),
+                        trace: self.trace.clone(),
+                        accepted: self.accepted.clone(),
+                        fault: self.fault,
+                    }),
+                    (),
+                ))
+            }
+            fn recheck(&mut self) -> Outcome<guards::AdmissionStamp> {
+                self.trace.borrow_mut().push("current");
+                if self.fault == Fault::Recheck {
+                    Err(Error::Revoked)
+                } else {
+                    Ok(self.current.clone())
+                }
+            }
+            fn send(&mut self, channel: &mut Self::Channel) -> Outcome<()> {
+                self.trace.borrow_mut().push("send");
+                send_manifest_bytes(channel)
+            }
+            fn receive(&mut self, channel: Self::Channel) -> Outcome<Value> {
+                self.trace.borrow_mut().push("receive");
+                let _parts = channel.into_parts()?;
+                Ok(json!({"selected":true}))
+            }
+        }
+        impl aivm_secrets_garrett_core::dispatch::Work for ObservedProvider {
+            const INVALID_TRANSITION: Error = Error::InternalError;
+            fn effect_write(&self) -> bool { false }
+            fn prepare(&mut self) -> Outcome<()> {
+                self.trace.borrow_mut().push("prepare");
+                if self.fault == Fault::Prepare {
+                    Err(Error::InvalidPolicy)
+                } else { Ok(()) }
+            }
+            fn audit(&mut self, phase: DispatchPhase) -> Outcome<()> {
+                self.trace.borrow_mut().push("audit");
+                self.audit.write_record(&json!({
+                    "schema":1, "event":"dispatch", "phase":phase.as_str(),
+                    "operation":"synthetic.read", "request_digest":"synthetic-request",
+                    "grant":self.audit.grant, "policy":self.audit.policy,
+                }))?;
+                self.trace.borrow_mut().push("audit-ack");
+                Ok(())
+            }
+            fn configure(&mut self, _: bool) -> Outcome<()> {
+                self.trace.borrow_mut().push("configure");
+                if self.fault == Fault::Configure {
+                    Err(Error::InvalidPolicy)
+                } else { Ok(()) }
+            }
+            fn check(&mut self) -> Outcome<()> {
+                self.trace.borrow_mut().push("check");
+                if self.fault == Fault::Check {
+                    Err(Error::Revoked)
+                } else { Ok(()) }
+            }
+            fn reserve(&mut self) -> Outcome<()> {
+                panic!("read dispatch must not reserve a write")
+            }
+            fn finish(&mut self) -> Outcome<()> {
+                panic!("read dispatch must not finish a write")
+            }
+        }
+
+        let claims = || UseClaims {
+            binding: b"client".to_vec(), policy: b"policy".to_vec(),
+            grant: b"grant".to_vec(), issued_at: 1, expires_at: 100,
+        };
+        let grant = UseGrant {
+            claims: claims(), operation: b"read".to_vec(),
+            route: route(), active: true,
+        };
+        let phases = [DispatchPhase::Preflight, DispatchPhase::Final];
+        let faults = [
+            Fault::Prepare, Fault::Audit, Fault::Configure, Fault::Check,
+            Fault::Recheck, Fault::WriteZero, Fault::PartialWrite,
+            Fault::Flush, Fault::None,
+        ];
+        for (phase_index, phase) in phases.into_iter().enumerate() {
+            for (fault_index, fault) in faults.into_iter().enumerate() {
+                let path = std::env::temp_dir().join(format!(
+                    "garrett-timeline-{}-{}-{}-{}", std::process::id(),
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos(),
+                    phase_index, fault_index,
+                ));
+                let _cleanup = Cleanup(path.clone());
+                let file = std::fs::OpenOptions::new().write(true).create_new(true)
+                    .mode(0o600).open(&path).unwrap();
+                let audit = Arc::new(Audit {
+                    state: Mutex::new(AuditState { file, failed: fault == Fault::Audit }),
+                    grant: "synthetic-grant".into(),
+                    policy: "synthetic-policy".into(),
+                });
+                let current = guards::current(
+                    &claims(), &grant, &b"read".to_vec(), &b"read".to_vec(),
+                    false, false, 2, 1,
+                ).ok().unwrap();
+                let trace = Rc::new(RefCell::new(Vec::new()));
+                let accepted = Rc::new(RefCell::new(Vec::new()));
+                let report = aivm_secrets_garrett_core::dispatch::dispatch(
+                    ObservedProvider {
+                        audit, audit_path: path.clone(), trace: trace.clone(),
+                        accepted: accepted.clone(), current, fault,
+                    },
+                    Ok(read_transition::prepare(phase, false, false).ok().unwrap()),
+                    RequestEffects::new(), false,
+                );
+                let mut expected = vec!["prepare"];
+                if fault != Fault::Prepare {
+                    expected.push("audit");
+                }
+                if fault != Fault::Prepare && fault != Fault::Audit {
+                    expected.extend(["audit-ack", "configure"]);
+                    if fault != Fault::Configure {
+                        expected.push("check");
+                        if fault != Fault::Check {
+                            expected.extend(["setup", "current"]);
+                            if fault != Fault::Recheck {
+                                expected.extend(["send", "write"]);
+                                if fault == Fault::PartialWrite {
+                                    expected.push("write");
+                                }
+                                if !matches!(fault, Fault::WriteZero | Fault::PartialWrite) {
+                                    expected.push("flush");
+                                    if fault == Fault::None {
+                                        expected.push("receive");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                assert_eq!(*trace.borrow(), expected, "{phase:?} {fault:?}");
+                let receipt = report.effects.phase(phase);
+                let audit_called = fault != Fault::Prepare;
+                let audited = audit_called && fault != Fault::Audit;
+                let sent = !matches!(fault,
+                    Fault::Prepare | Fault::Audit | Fault::Configure |
+                    Fault::Check | Fault::Recheck);
+                assert_eq!(receipt.audit_attempted(), audit_called);
+                assert_eq!(receipt.audit_acknowledged(), audited);
+                assert_eq!(receipt.provider_attempted(), sent);
+                assert_eq!(report.local.attempted(), sent);
+                assert_eq!(report.outcome.is_ok(), fault == Fault::None);
+                let audit_bytes = std::fs::read(&path).unwrap();
+                if audited {
+                    let row: Value = serde_json::from_slice(&audit_bytes).unwrap();
+                    assert_eq!(row["phase"], phase.as_str());
+                } else {
+                    assert!(audit_bytes.is_empty());
+                }
+                let (wire, _) = manifest_request_bytes(
+                    &route(), &secret(b"SYNTHETIC_TOKEN_123456"),
+                    &effect(), &BTreeMap::new(),
+                ).unwrap();
+                let prefix_len = match fault {
+                    Fault::WriteZero | Fault::Prepare | Fault::Audit |
+                    Fault::Configure | Fault::Check | Fault::Recheck => 0,
+                    Fault::PartialWrite => 7,
+                    _ => wire.len(),
+                };
+                assert_eq!(&*accepted.borrow(), &wire[..prefix_len]);
+                // A returned dispatch that already crossed its audit gate
+                // must not audit or write again, even after failed send/flush.
+                if fault != Fault::Prepare {
+                    let before = trace.borrow().clone();
+                    let again = aivm_secrets_garrett_core::dispatch::dispatch(
+                        report.work,
+                        Ok(read_transition::prepare(phase, false, false).ok().unwrap()),
+                        report.effects, false,
+                    );
+                    assert!(matches!(again.outcome, Err(Error::InternalError)));
+                    assert_eq!(&*trace.borrow(), &[before, vec!["prepare"]].concat());
+                    assert_eq!(std::fs::read(&path).unwrap(), audit_bytes);
+                    assert_eq!(&*accepted.borrow(), &wire[..prefix_len]);
+                }
+            }
+        }
+    }
+
     fn route() -> core::Route {
         core::Route {
             host: b"api.example.org".to_vec(),

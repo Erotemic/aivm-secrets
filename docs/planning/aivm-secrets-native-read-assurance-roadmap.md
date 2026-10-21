@@ -649,3 +649,13 @@ Compiler linkage is rooted there and includes reply encoding/framing. These
 bounded paths are not execution traces or sink closure. Native outcome/event,
 selected disclosure/observation and adaptive-history correspondence, parser/
 transport/storage/close contracts and NR-2–NR-5 exit remain open.
+
+### Track A dispatch-to-writer increment (October 21, 2026)
+
+The [native dispatch callback observation](../native-dispatch-callback-observation.md)
+adds a conditional Lean composition at the extracted dispatch gate and a
+native at-write audit chronology regression. It narrows the NR-2 linkage
+remaining at the source-owned dispatch/IO seam; neither the callback-path
+premises nor the external filesystem/TLS contracts are thereby discharged.
+Re-run pinned Rust and Lean focused targets before recording a new verification
+baseline. The NR-3 complete reachable-sink inventory is still open.

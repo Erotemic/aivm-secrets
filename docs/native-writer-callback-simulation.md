@@ -99,3 +99,5 @@ completion-audit/selected guest frame/close and connected request histories.
 Resolve NR-3 reachable effects of all dependency callbacks and failures in
 parallel. The present theorem only covers the producer of the provider-send
 observation under its stated native linkage premises.
+
+Follow-up: [Source dispatch and native writer callback chronology](native-dispatch-callback-observation.md).

@@ -584,3 +584,29 @@ remains returned callback paths, not TLS arrival or whole-service refinement.
 - Portable source checks and focused pytest passed; neither proves the writer
   lemma without `lake build`. No Rust implementation or external I/O
   assumptions were modified.
+
+## 2026-10-21 16:04:15 -0400
+
+Track A increment 3: add a native at-write audit chronology test over both
+read phases, preparation/audit/current denials, partial/zero writes, failed
+flush and successful response; rerun the same returned receipt to ensure
+no second audit/provider callback. Use real host audit File and the production
+native HTTP encoder/ProviderWriter/Channel.submit without live credentials.
+Add a conditional Lean trace-composition module that splits an actual bounded
+dispatch at its source `begin_send` gate, identifies the same native writer
+callback, and obtains a chronological W4 provider-attempt segment. Do not
+promote the remaining File/Write, path-split or external I/O premises into
+proved conclusions. No routine axiom printing. Rust/Lean compilation requires
+maintainer pinned toolchains.
+
+## 2026-10-21 16:30:44 -0400
+
+Repaired the parser failure in the Track A dispatch callback composition:
+`prefix` was used as a theorem binder, but is Lean syntax. Renamed it to
+`beforeTrace` without changing the theorem statement's logical requirements.
+Normalized the composed trace's `List.append` parentheses with
+`List.append_assoc` to match the declared conclusion. The existing Rust
+chronology regression passed in the maintainer's log; there are no Rust
+changes here. This environment cannot run the pinned Lean toolchain, so
+`lake build GarrettNativeDispatchEvents` remains the focused acceptance gate.
+No routine axiom-printing or admission checks were added.
