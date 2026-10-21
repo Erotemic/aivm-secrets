@@ -92,14 +92,15 @@ def check(root: Path = ROOT) -> dict:
             and 'current_context.current(&mut CurrentChecks' in fresh,
             'last-admission primitives detached from host state')
     scope = (root / 'rust/crates/aivm-secrets-garrett-core/src/request_context.rs').read_text().split('#[cfg(test)]', 1)[0]
-    primitive = source.split('fn send_manifest_bytes(', 1)[1].split('struct ManifestChannel {', 1)[0]
+    primitive = source.split('struct ProviderWriter', 1)[1].split('struct ManifestChannel {', 1)[0]
     require('let stream = StreamOwned::new(conn, socket);' in source and
-            'writer.write_all(request)' in ''.join(primitive.split()) and
-            'send_manifest_bytes(&mutchannel.stream,&channel.request)' in ''.join(source.split()) and
+            'self.0.write_all(bytes)' in ''.join(primitive.split()) and
+            'send_manifest_bytes(&mutchannel.stream,&mutchannel.request)' in ''.join(source.split()) and
             'aivm_secrets_garrett_core::dispatch::WorkforManifestProvider' in ''.join(source.split()) and
             'fn recheck(&mut self) -> Outcome<guards::AdmissionStamp>' in source and
             'request_context::ScopedRequest::new(' in request
-            and 'current_admission::Bound::new(self.context, plan.work, checks)' in scope
+            and 'current_admission::Bound::new(self.context, routed, checks)' in scope
+            and 'provider_io::Routed::new(self.context.route(), plan.work)' in scope
             and 'self.factory.checks()' in scope and 'self.context.current(&mut self.checks)' in admission and
             'let fresh = || current().map(|_| ());' in fresh,
             'native provider may emit credentialed bytes without the last-admission gate')

@@ -16,6 +16,7 @@ TESTS = 'tests/test_rust_w6_adapter.py'
 CORE_ENCODER = 'rust/crates/aivm-secrets-garrett-core/src/http_wire.rs'
 CORE_DISPATCH = 'rust/crates/aivm-secrets-garrett-core/src/dispatch.rs'
 CORE_REQUEST = 'rust/crates/aivm-secrets-garrett-core/src/request_adapter.rs'
+CORE_IO = 'rust/crates/aivm-secrets-garrett-core/src/provider_io.rs'
 CORE_CONTEXT = 'rust/crates/aivm-secrets-garrett-core/src/request_context.rs'
 CORE_CURRENT = 'rust/crates/aivm-secrets-garrett-core/src/current_admission.rs'
 COMMON_ENCODER = 'rust/crates/aivm-secrets-garrett/src/custody.rs'
@@ -53,11 +54,11 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
     ensure(len(contract['remaining_obligations']) >= 5,
            'W6 silently removed outstanding correspondence obligations')
     source = (root / SOURCE).read_text()
-    request = source.index('        let request = manifest_request_bytes(self.route, self.secret, &self.effect, &self.headers)?;')
+    request = source.index('        let bytes = manifest_request_bytes(route, self.secret, &self.effect, &self.headers)?;')
     connect = source.index('TcpStream::connect_timeout(')
     ensure(request < connect, 'TCP effect before request-byte validation')
     ensure(source.count('fn manifest_request_bytes(') == 1
-           and source.count('let request = manifest_request_bytes(self.route, self.secret, &self.effect, &self.headers)?;') == 1,
+           and source.count('let bytes = manifest_request_bytes(route, self.secret, &self.effect, &self.headers)?;') == 1,
            'native manifest adapter has additional unreviewed encoder')
     # The real credential-bearing executor only accepts the type constructed
     # after durable audit. This checks the reviewed source topology; it cannot
@@ -78,17 +79,28 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and 'audited.is_write() != pending.work.effect_write()' in dispatch_core
            and 'begin_provider(audited)' in dispatch_core,
            'provider executor accepts an unaudited policy effect')
+    io = (root / CORE_IO).read_text().split('#[cfg(test)]', 1)[0]
+    ensure('route: &' in io and 'pub route:' not in io
+           and 'self.work.setup_route(self.route)' in io
+           and 'self.work.audit_route(self.route, phase)' in io
+           and 'body: B,' in io and 'pub body:' not in io
+           and 'if self.attempted {' in io and 'self.attempted = true;' in io
+           and io.index('self.attempted = true;') < io.index('writer.write_all(bytes)')
+           and 'writer.flush()' in io and 'request.submit(&mut ProviderWriter(writer))' in source
+           and 'provider_io::Request::new(ManifestWire(bytes))' in source,
+           'captured route/buffer submission bypassed')
     admission = (root / CORE_CURRENT).read_text().split('#[cfg(test)]', 1)[0]
     scope = (root / CORE_CONTEXT).read_text().split('#[cfg(test)]', 1)[0]
     ensure('request_context::ScopedRequest::new(' in entry
-           and 'current_admission::Bound::new(self.context, plan.work, checks)' in scope
+           and 'current_admission::Bound::new(self.context, routed, checks)' in scope
+           and 'provider_io::Routed::new(self.context.route(), plan.work)' in scope
            and 'self.factory.checks()' in scope
            and '&current_context,' in entry and 'self.context.current(&mut self.checks)' in admission
            and 'crate::present(self.identity, self.expected, self.peer, now)' in admission
            and 'manifest::current(' in admission and 'self.work.recheck()' not in admission,
            'native provider bypasses the source-owned bound current check')
     runtime = source.split('#[cfg(test)]', 1)[0]
-    ensure(runtime.count('.write_all(') == 1 and 'writer.write_all(request)' in ''.join(runtime.split())
+    ensure(runtime.count('.write_all(') == 1 and 'self.0.write_all(bytes)' in ''.join(runtime.split())
            and 'provider_exchange::exchange(pending, audited)' in dispatch_core
            and 'self.work.send(channel)' in dispatch_core and '.begin_send(self.phase, &mut self.local, self.write)' in dispatch_core
            and runtime.count('TcpStream::connect_timeout(') == 1,

@@ -2409,3 +2409,99 @@ Accepted committed source cde04b3 for the production context/factory owner. Full
 All four new Rust mutations extracted and were rejected specifically in GarrettRequestContext: dropped coordinated-write bit, ignored outer-check denial, changed completion input, repeated check factory. This is four selected of 253 total, not an exhaustive campaign. Six safe installed-vTPM cases preserve the two existing persistent public objects, dictionary-attack state and fixture cleanup; wrong-auth stays in isolated emulators. Initial associated-constant proof-build failure is retained separately and supplies no acceptance evidence; explicit unfolding repaired the exact statement before the successful record/full run. New files were staged and whitespace-checked before acceptance, with no post-test source normalization. Frozen record: dev/validation/2026-10-20-request-context.json. Prior frozen records are unchanged.
 
 The prior per-state NativeContext contract is now derived for the actual source-called producer, including its constructor/typeclass/factory frames; it is no longer left as a native premise. The initial context itself still comes from native startup/parsed identity-peer-grant-policy-operation conversion. Native primitive/environment, actual route/request-buffer/writer/parser and selected JSON/frame/close correspondence, transitive I/O/drop/unwind closure, connected adaptive histories, NR-2–NR-5 exit and independent review remain open. The next queue item is actual native primitive correspondence, not another inventory or a fake arrival assumption. Confidence is high in this bounded producer result and finite synthetic VM workflows; no whole-service secrecy or physical TPM/VM isolation claim follows. Every authored commit has the actual-model co-author trailer with unknown exact weights/config variant; accounting is published separately.
+
+## 2026-10-20 22:49:12 -0400
+
+Continuing the active Garrett goal from cde04b3/b18e71e/da84c43. Implemented
+production provider_io::Routed and Request, bound by ScopedRequest to the
+admission context grant route. Native setup/audit consume that route; raw
+native setup/audit/current fail closed. Native channel owns the captured
+zeroizing request and forwards its stream to one-attempt submission. Attempt
+is marked before buffer view/write, write errors skip flush, all returned
+prefixes remain spent, and replay does not read the buffer or call the writer.
+No wire version, authorization policy, runtime dependency or Python core
+contract changed. Python verification modules remain non-core tooling.
+
+Nineteen new extracted provider-I/O obligations and one context route obligation
+cover exact primitive arguments, mutable states, route frames and write/flush
+prefixes. The ten preceding context-entry obligations remain general after
+routing. Native buffer/channel/std-TLS/DNS/parser/storage and startup/encoder
+conversion are still explicit contracts; this does not establish native I/O
+mediation, provider arrival, whole-service secrecy or an NR-2–NR-5 exit. The
+thin native binding and selected JSON/frame/close/adaptive histories remain the
+next substantive seams. Generic writes do not complete native write assurance
+or Python normative core parity.
+
+Development corrections: a RouteWork supertrait triggered an Aeneas associated
+type mapping assertion, so explicit channel/error trait parameters retain the
+same runtime bounds and extract successfully. The first route-frame tactics
+projected from Result instead of its returned pair; explicit successful-pair
+injection fixes the exact statements. Clippy requested slices; this leaf uses
+the repository's documented borrowed Vec carrier convention for the extracted
+contract, with a local ptr_arg allowance and no runtime allocation. A compiler
+fixture mutation mistakenly selected an already terminal check node; removed
+that ineffective case and kept the new submit-edge severing case. An early
+CLI mutation attempt refused stale prerequisite provenance while freshness
+record was running; the direct targeted mutation function uses isolated actual
+extractions and recompiles its local proof import closure.
+
+Before heavyweight acceptance, staged new files and checked whitespace. Core
+43/native library 35 and the full 88-case Rust workspace pass; 135 adversarial
+source guard cases pass. Six safe installed-vTPM cases preserve both existing
+persistent public objects and dictionary state; wrong-auth remains isolated.
+Full proof/release parity, six selected mutants, both native build workflows,
+read kernel proofs and full Python/native suite/packaging are being completed.
+Confidence is high in the scoped pure controller result; physical TPM
+provenance, VM confinement and independent review remain outside this witness.
+
+The final record also refused stale generated Lean after the Rust carrier
+annotation changed source coordinates. Regenerated actual Charon/Aeneas output
+into a persistent scratch directory, copied that output without manual model
+edits, refreshed the existing W4/W5/read/profile provenance keys, and reran
+the entire Garrett record. A first attempt to copy the record verifier's
+automatically cleaned temporary output correctly failed; explicit extraction
+resolved it. These diagnostic failures are not acceptance evidence. Native
+debug product and 168-case read gate pass; the fresh bounded compiler report
+finds eleven paths, with the new actual captured-request/native-writer path,
+and 49 ledger fixture cases pass.
+
+All six selected source mutations re-extracted and were rejected specifically
+in GarrettProviderIO (six of 259 total, not a complete campaign): spent-buffer
+reuse, missing attempt mark, replacement buffer bytes, suppressed write error,
+skipped flush and ignored captured route. The actual final generated model
+passes the complete 1,849-job Lean build; named audits and release/native
+acceptance continue. No surrogate proof object or hand-edited extraction was
+used to make a mutant fail.
+
+Final Garrett record passes all 665 named axiom audits, 767 release parity
+cases with required isolated TPM tests and no shared-device override, both
+feature-mode Clippy checks, and native library 35 cases. All 287 input pins
+match the final source. Focused final-source provider-I/O/context compilation
+is clean, and eight read-path plus five prefix kernel/axiom checks pass.
+Ordinary release and the quiet-VM full suite/packaging are the remaining
+acceptance steps before committing and freezing this increment.
+
+## 2026-10-20 23:13:25 -0400
+
+Provider-route/request-submission acceptance completed on a quiet VM: all
+3,061 full Python/native cases pass in 557.44 seconds with zero skips, failures
+or errors, required isolated TPM cases and every native runner explicitly bound
+to fresh debug binaries. Packaging builds both artifacts; all 287 Garrett
+archive input pins and the embedded manifest match final sources. Both native
+168-case read build modes and standalone product workflows pass. The final
+record also includes 665 named audits, 767 release parity cases, 88 workspace
+Rust tests (43 core, 35 native library), 135 boundary tests, 49 optional ledger
+cases, eleven fresh specialized paths, six selected source-extracted mutants,
+eight read-path/five prefix kernel audits and six safe installed-vTPM cases.
+
+The new production route and captured-buffer state are enforced and linked to
+actual extracted controllers. The thin native setup/encoder/channel/std-TLS
+writer and buffer-view bindings still retain explicit semantic contracts;
+resolver IP, parser/storage/crypto, selected JSON/frame/close, transitive I/O,
+nonreturning/panic/drop/unwind and adaptive native histories remain open. This
+increment does not close NR-2–NR-5 or native write/core-API parity. Confidence
+is high in the stated source-owned route and returned submission contracts
+and these synthetic VM observations. Real-provider validation, deployed VM
+isolation and independent review remain separate. The implementation and
+frozen evidence are committed with the GPT-6 co-author trailer and unavailable
+exact weights/config variant stated; accounting is published separately.

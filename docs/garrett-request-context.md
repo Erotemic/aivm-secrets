@@ -4,6 +4,8 @@ The native manifest path now constructs `request_context::ScopedRequest` before
 the existing receipt adapter and consuming request entry. This private core
 wrapper borrows the one `current_admission::Context`, owns the raw native work
 and a check factory, and supplies the canonical `Bound` provider instance.
+The [captured route wrapper](garrett-provider-io.md) now also derives the
+provider route from that context before constructing `Bound`.
 Native dispatch factories return raw provider plans; they cannot select the
 context installed in the bound plan. The native raw provider's recheck still
 refuses direct use.
@@ -17,7 +19,7 @@ public denial classifications are exact forwards. The native check factory
 only copies its session and lease references, preserving the previous current
 check ordering and policy behavior.
 
-`proofs/GarrettRequestContext.lean` has ten named obligations over the actual
+`proofs/GarrettRequestContext.lean` has eleven named obligations over the actual
 Charon/Aeneas extraction. They prove the exact constructor and dispatch-factory
 return relation, outer-check/completion return relations, unchanged context and
 all four `NativeContext` clauses from the preceding request trace composition.
@@ -58,7 +60,7 @@ lake build +GarrettOwnedRequestTrace
 lake env lean -DwarningAsError=true GarrettRequestContext.lean
 ```
 
-The ten names are audited centrally in `GarrettCheck`. This leaf adds no default
+The eleven names are audited centrally in `GarrettCheck`. This leaf adds no default
 per-theorem axiom dumps. Verification scripts and fixture changes are non-core
 Python tooling; no Python core module, runtime dependency or wire version is
 introduced. Targeted re-extracted mutations use

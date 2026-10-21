@@ -220,6 +220,23 @@ mod tests {
             self.source.step("finish")
         }
     }
+    impl crate::provider_io::RouteWork<u8, &'static str> for ProviderWork {
+        fn setup_route(
+            &mut self,
+            route: &crate::credential_use::Route,
+        ) -> Result<u8, &'static str> {
+            assert_eq!(route.host, b"api.example.org");
+            self.setup()
+        }
+        fn audit_route(
+            &mut self,
+            route: &crate::credential_use::Route,
+            phase: Phase,
+        ) -> Result<(), &'static str> {
+            assert_eq!(route.port, 443);
+            dispatch::Work::audit(self, phase)
+        }
+    }
     struct CompletionWork {
         source: Source,
         raw: u8,

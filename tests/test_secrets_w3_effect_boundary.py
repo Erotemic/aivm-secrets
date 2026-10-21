@@ -49,8 +49,15 @@ def mutate(repo, filename, before, after):
 
 
 @pytest.mark.parametrize('file,old,new', [
+    ('rust/crates/aivm-secrets-garrett-core/src/request_context.rs', 'provider_io::Routed::new(self.context.route(), plan.work)', 'provider_io::Routed::new(other_route(), plan.work)'),
+    ('rust/crates/aivm-secrets-garrett-core/src/provider_io.rs', 'self.work.setup_route(self.route)', 'self.work.setup()'),
+    ('rust/crates/aivm-secrets-garrett-core/src/provider_io.rs', 'self.work.audit_route(self.route, phase)', 'self.work.audit(phase)'),
+    ('rust/crates/aivm-secrets-garrett-core/src/provider_io.rs', 'if self.attempted {', 'if false {'),
+    ('rust/crates/aivm-secrets-garrett-core/src/provider_io.rs', 'self.attempted = true;', 'self.attempted = false;'),
+    ('rust/crates/aivm-secrets-garrett-core/src/provider_io.rs', 'writer.write_all(bytes)', 'writer.write_all(&Vec::new())'),
+    ('rust/crates/aivm-secrets-garrett-core/src/provider_io.rs', 'writer.flush()', 'Ok(())'),
     ('rust/crates/aivm-secrets-garrett-core/src/request_context.rs', "context: &'a current_admission::Context<'a>", "pub context: &'a current_admission::Context<'a>"),
-    ('rust/crates/aivm-secrets-garrett-core/src/request_context.rs', 'current_admission::Bound::new(self.context, plan.work, checks)', 'current_admission::Bound::new(unchecked_context(), plan.work, checks)'),
+    ('rust/crates/aivm-secrets-garrett-core/src/request_context.rs', 'current_admission::Bound::new(self.context, routed, checks)', 'current_admission::Bound::new(unchecked_context(), routed, checks)'),
     ('rust/crates/aivm-secrets-garrett-core/src/request_context.rs', 'self.factory.checks()', 'unchecked_checks()'),
     ('rust/crates/aivm-secrets-garrett-core/src/request_context.rs', 'keyed_write: plan.keyed_write', 'keyed_write: false'),
     ('rust/crates/aivm-secrets-garrett-core/src/request_context.rs', 'self.work.recheck()', 'Ok(())'),

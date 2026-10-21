@@ -209,9 +209,18 @@ the new extraction. The fresh optional compiler capture retains ten required
 paths and 48 fixture cases, without a mediation claim. See the
 [request-context validation record](../../dev/validation/2026-10-20-request-context.json).
 
-The next implementation task is native primitive correspondence, starting with
-the captured route/request buffer and the actual credential-bearing writer's
-attempt relation. Keep trusted TLS/DNS/Write/parser and storage semantics
+**Captured provider I/O update:** the [production routed provider and request
+submission](../garrett-provider-io.md) now capture the admitted grant route,
+forward it to setup/audit, and own the zeroizing native request buffer through
+an extracted one-attempt writer controller. Twenty additional obligations cover
+exact arguments/post-states, route preservation and all returned write/flush
+prefixes. The native raw setup/audit/current paths refuse direct use. This
+advances the primitive seam without proving complete native I/O correspondence.
+Validation is recorded separately for the committed source.
+
+The next implementation task remains native primitive correspondence: connect
+native setup/encoder/channel construction and the std/TLS writer adapter to the
+captured route, complete encoder bytes and extracted submission attempt. Keep trusted TLS/DNS/Write/parser and storage semantics
 explicit, and connect actual source parameters and returned states rather than
 adding a whole-provider-history, fake-arrival or whole-service mediation premise.
 The JSON/frame observation and sequential-session history obligations remain in

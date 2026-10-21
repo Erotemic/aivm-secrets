@@ -40,6 +40,9 @@ impl<'a> Context<'a> {
             allowed,
         }
     }
+    pub(crate) fn route(&self) -> &crate::credential_use::Route {
+        &self.grant.route
+    }
     pub fn current<C: Checks>(&self, checks: &mut C) -> Result<AdmissionStamp, C::Error> {
         match checks.coordination() {
             Ok(()) => (),

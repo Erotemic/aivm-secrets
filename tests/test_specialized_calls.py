@@ -32,7 +32,7 @@ def projection():
         function(3, ['aivm_secrets_garrett','custody','<Impl>','exchange'], [6,8]),
         function(4, ['aivm_secrets_garrett_core','dispatch','dispatch'], [22]),
         function(5, ['aivm_secrets_garrett','custody','manifest_session','<Impl>',
-                     'send_manifest_bytes'], [6]),
+                     'send_manifest_bytes'], [32]),
         function(6, ['std','io','Write','write_all'], kind='Opaque'),
         function(7, ['rustls_pki_types','pem','reader'], unresolved={'Trait':2}),
         function(8, ['aivm_secrets_garrett','custody','account_request_bytes'], [14]),
@@ -58,6 +58,8 @@ def projection():
         function(29, ['aivm_secrets_garrett_core','read_transition','run_current'], [23,24]),
         function(30, ['aivm_secrets_garrett_core','request_context','<Impl>','dispatch'], [31]),
         function(31, ['aivm_secrets_garrett','custody','manifest_session','<Impl>','checks']),
+        function(32, ['aivm_secrets_garrett_core','provider_io','<Impl>','submit'], [33]),
+        function(33, ['aivm_secrets_garrett','custody','manifest_session','<Impl>','write_all'], [6]),
     ]))
 
 
@@ -67,6 +69,7 @@ def test_compiled_paths_keep_external_and_dynamic_obligations_explicit():
         'coordinated-manifest-executor':[0,29,23,4,22,5],
         'owned-request-completion-audit':[0,29,24,25,26,27],
         'owned-context-check-factory':[0,29,23,30,31],
+        'captured-provider-writer':[0,29,23,4,22,5,32,33],
         'account-authentication-bytes':[0,1,2,3,8,14,15,10,11],
         'manifest-authentication-bytes':[0,29,23,4,22,9,14,15,10,11],
         'account-request-line':[0,1,2,3,8,14,15,12,13],
@@ -81,7 +84,7 @@ def test_compiled_paths_keep_external_and_dynamic_obligations_explicit():
         'begin']['line'] == 4
 
 
-@pytest.mark.parametrize('victim', [0,1,2,3,4,8,9,10,12,14,15,16,17,18,19,21,22,23,24,25,27,28])
+@pytest.mark.parametrize('victim', [0,1,2,3,4,8,9,10,12,14,15,16,17,18,19,21,22,23,24,25,27,28,30])
 def test_missing_callback_link_cannot_be_rebaselined_as_a_passing_witness(victim):
     data = projection()
     data['translated']['fun_decls'][victim]['body']['blocks']['direct'] = []

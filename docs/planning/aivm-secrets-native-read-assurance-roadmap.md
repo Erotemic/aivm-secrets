@@ -556,3 +556,26 @@ separate. The next seam is actual route/request-buffer/credentialed writer
 correspondence, followed by the open native I/O/drop/unwind, JSON/frame/close and
 adaptive session obligations. Source guards and optional compiler paths retain
 their non-exhaustive scope. This does not complete NR-2/3/4/5 or independent review.
+
+### Captured provider route/buffer submission (October 20)
+
+The [production routed provider and request owner](../garrett-provider-io.md)
+now bind setup/audit route arguments to the private admission context's grant.
+The raw native provider no longer owns an independent route and refuses raw
+setup/audit/current calls. Extracted mutable forwards preserve the captured
+route. Native setup encodes before connecting and moves its zeroizing buffer
+into a private one-attempt request. Exact buffer view, write/flush callback
+post-states and every returned refusal/success prefix are source-derived;
+replay invokes neither buffer nor writer. The nineteen provider-I/O obligations
+and new context route obligation leave the preceding entry-trace result intact.
+
+The actual native `ManifestWire`/channel/standard-TLS writer field bindings and
+setup/encoder conversions still need semantic correspondence. The extracted
+trait callbacks name those contracts; they do not prove every native syscall
+or provider arrival. Resolver/IP and TLS/parser/storage contracts, selected
+JSON/frame/close observations, transitive I/O/drop/unwind and adaptive native
+histories remain open. The next increment must connect these actual parameters
+and effects, without assuming an entire provider history or replacing proof
+with a compiler inventory. NR-2–NR-5 and the native-write assurance scope remain
+open. The optional specialized path to `Request::submit`/native `write_all` is
+selected compiler linkage only, not dominance or complete mediation.

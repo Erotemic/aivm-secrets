@@ -1,4 +1,5 @@
 import GarrettRequestContext
+import GarrettProviderIO
 import GarrettOwnedRequestTrace
 import GarrettCurrentAdmission
 import GarrettRequestAdapter
@@ -720,3 +721,24 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.request_context.Proofs.production_entry_trace
 #print axioms aivm_secrets_garrett_core.request_context.Proofs.production_selection_origin
 #print axioms aivm_secrets_garrett_core.request_context.Proofs.planning_forwarded
+
+#print axioms aivm_secrets_garrett_core.provider_io.Proofs.context_route
+#print axioms aivm_secrets_garrett_core.provider_io.Proofs.routed_constructor
+#print axioms aivm_secrets_garrett_core.provider_io.Proofs.routed_setup_iff
+#print axioms aivm_secrets_garrett_core.provider_io.Proofs.routed_audit_iff
+#print axioms aivm_secrets_garrett_core.provider_io.Proofs.setup_keeps_route
+#print axioms aivm_secrets_garrett_core.provider_io.Proofs.audit_keeps_route
+#print axioms aivm_secrets_garrett_core.provider_io.Proofs.recheck_keeps_route
+#print axioms aivm_secrets_garrett_core.provider_io.Proofs.send_keeps_route
+#print axioms aivm_secrets_garrett_core.provider_io.Proofs.receive_keeps_route
+#print axioms aivm_secrets_garrett_core.provider_io.Proofs.prepare_keeps_route
+#print axioms aivm_secrets_garrett_core.provider_io.Proofs.configure_keeps_route
+#print axioms aivm_secrets_garrett_core.provider_io.Proofs.check_keeps_route
+#print axioms aivm_secrets_garrett_core.provider_io.Proofs.reserve_keeps_route
+#print axioms aivm_secrets_garrett_core.provider_io.Proofs.finish_keeps_route
+#print axioms aivm_secrets_garrett_core.provider_io.Proofs.request_constructor
+#print axioms aivm_secrets_garrett_core.provider_io.Proofs.submit_run_iff
+#print axioms aivm_secrets_garrett_core.provider_io.Proofs.returned_body_is_captured
+#print axioms aivm_secrets_garrett_core.provider_io.Proofs.every_return_is_spent
+#print axioms aivm_secrets_garrett_core.provider_io.Proofs.replay_calls_no_buffer_or_writer
+#print axioms aivm_secrets_garrett_core.request_context.Proofs.dispatch_route

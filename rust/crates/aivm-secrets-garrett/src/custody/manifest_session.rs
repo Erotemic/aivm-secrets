@@ -471,7 +471,6 @@ impl Session {
                 && self.base.coordinator.is_some();
             let work = ManifestProvider {
                 executor: &self.base.executor,
-                route: &self.base.grant.route,
                 secret: &secret,
                 effect,
                 headers: BTreeMap::new(),
@@ -620,16 +619,33 @@ fn manifest_request_bytes(
 
 // The standard Write contract includes partial acceptance before an error.
 // Keep the raw credential-bearing primitive this small and separately tested.
-fn send_manifest_bytes(writer: &mut impl Write, request: &[u8]) -> Outcome<()> {
-    writer
-        .write_all(request)
-        .and_then(|_| writer.flush())
-        .map_err(|_| Error::UpstreamResponse)
+struct ManifestWire(Zeroizing<Vec<u8>>);
+impl aivm_secrets_garrett_core::provider_io::WireBytes for ManifestWire {
+    fn bytes(&self) -> &Vec<u8> {
+        &self.0
+    }
+}
+struct ProviderWriter<'a, W: Write>(&'a mut W);
+impl<W: Write> aivm_secrets_garrett_core::provider_io::Writer for ProviderWriter<'_, W> {
+    type Error = Error;
+    const INVALID_TRANSITION: Error = Error::InternalError;
+    fn write_all(&mut self, bytes: &Vec<u8>) -> Outcome<()> {
+        self.0.write_all(bytes).map_err(|_| Error::UpstreamResponse)
+    }
+    fn flush(&mut self) -> Outcome<()> {
+        self.0.flush().map_err(|_| Error::UpstreamResponse)
+    }
+}
+fn send_manifest_bytes(
+    writer: &mut impl Write,
+    request: &mut aivm_secrets_garrett_core::provider_io::Request<ManifestWire>,
+) -> Outcome<()> {
+    request.submit(&mut ProviderWriter(writer))
 }
 
 struct ManifestChannel {
     stream: StreamOwned<ClientConnection, TcpStream>,
-    request: Zeroizing<Vec<u8>>,
+    request: aivm_secrets_garrett_core::provider_io::Request<ManifestWire>,
     _deadline: Deadline,
 }
 struct ManifestDispatch<'a> {
@@ -645,7 +661,6 @@ struct ManifestDispatch<'a> {
 }
 struct ManifestProvider<'a> {
     executor: &'a Executor,
-    route: &'a core::Route,
     secret: &'a Credential,
     effect: Effect,
     headers: BTreeMap<String, String>,
@@ -663,24 +678,8 @@ impl aivm_secrets_garrett_core::dispatch::Work for ManifestProvider<'_> {
             &self.secret.0,
         )
     }
-    fn audit(&mut self, phase: DispatchPhase) -> Outcome<()> {
-        let audit = &self.executor.audit;
-        audit.write_record(&json!({
-            "schema":1,
-            "event":"dispatch",
-            "phase":phase.as_str(),
-            "grant":audit.grant,
-            "policy":audit.policy,
-            "identity":self.dispatch.identity.as_ref().ok_or(Error::InternalError)?,
-            "operation":self.dispatch.operation,
-            "request_digest":self.dispatch.request_digest,
-            "route":{
-                "host":self.dispatch.policy.host,
-                "port":self.route.port,
-                "method":self.effect.method,
-                "path":self.effect.target,
-            }
-        }))
+    fn audit(&mut self, _phase: DispatchPhase) -> Outcome<()> {
+        Err(Error::InternalError)
     }
     fn configure(&mut self, keyed_write: bool) -> Outcome<()> {
         self.headers = self.dispatch.policy.headers.clone();
@@ -716,41 +715,7 @@ impl aivm_secrets_garrett_core::provider_exchange::Provider for ManifestProvider
     const OUTCOME_UNKNOWN: Error = Error::OutcomeUnknown;
 
     fn setup(&mut self) -> Outcome<ManifestChannel> {
-        let request = manifest_request_bytes(self.route, self.secret, &self.effect, &self.headers)?;
-        let host = std::str::from_utf8(&self.route.host).map_err(|_| Error::InvalidPolicy)?;
-        let mut socket = TcpStream::connect_timeout(
-            &SocketAddr::new(
-                self.executor.address,
-                u16::try_from(self.route.port).map_err(|_| Error::InvalidPolicy)?,
-            ),
-            Duration::from_secs(5),
-        )
-        .map_err(|_| Error::Unreachable)?;
-        socket
-            .set_read_timeout(Some(Duration::from_secs(15)))
-            .map_err(|_| Error::Unreachable)?;
-        socket
-            .set_write_timeout(Some(Duration::from_secs(15)))
-            .map_err(|_| Error::Unreachable)?;
-        let killer = socket.try_clone().map_err(|_| Error::Unreachable)?;
-        let deadline = Deadline::start_for(Duration::from_secs(40), move || {
-            let _ = killer.shutdown(std::net::Shutdown::Both);
-        });
-        let name = rustls::pki_types::ServerName::try_from(host.to_owned())
-            .map_err(|_| Error::InvalidPolicy)?;
-        let mut conn = ClientConnection::new(self.executor.tls.clone(), name)
-            .map_err(|_| Error::Unreachable)?;
-        while conn.is_handshaking() {
-            conn.complete_io(&mut socket)
-                .map_err(|_| Error::Unreachable)?;
-        }
-        let stream = StreamOwned::new(conn, socket);
-
-        Ok(ManifestChannel {
-            stream,
-            request,
-            _deadline: deadline,
-        })
+        Err(Error::InternalError)
     }
     fn recheck(&mut self) -> Outcome<guards::AdmissionStamp> {
         // Only current_admission::Bound may supply admission to this raw
@@ -759,7 +724,7 @@ impl aivm_secrets_garrett_core::provider_exchange::Provider for ManifestProvider
     }
     fn send(&mut self, channel: &mut ManifestChannel) -> Outcome<()> {
         // Core dispatch owns the composite receipt/current attempt gate.
-        send_manifest_bytes(&mut channel.stream, &channel.request)
+        send_manifest_bytes(&mut channel.stream, &mut channel.request)
     }
     fn receive(&mut self, channel: ManifestChannel) -> Outcome<Value> {
         let ManifestChannel {
@@ -790,6 +755,67 @@ impl aivm_secrets_garrett_core::provider_exchange::Provider for ManifestProvider
             }
             Ok(value)
         }
+    }
+}
+impl aivm_secrets_garrett_core::provider_io::RouteWork<ManifestChannel, Error>
+    for ManifestProvider<'_>
+{
+    fn audit_route(&mut self, route: &core::Route, phase: DispatchPhase) -> Outcome<()> {
+        let audit = &self.executor.audit;
+        audit.write_record(&json!({
+            "schema":1,
+            "event":"dispatch",
+            "phase":phase.as_str(),
+            "grant":audit.grant,
+            "policy":audit.policy,
+            "identity":self.dispatch.identity.as_ref().ok_or(Error::InternalError)?,
+            "operation":self.dispatch.operation,
+            "request_digest":self.dispatch.request_digest,
+            "route":{
+                "host":std::str::from_utf8(&route.host).map_err(|_| Error::InvalidPolicy)?,
+                "port":route.port,
+                "method":self.effect.method,
+                "path":self.effect.target,
+            }
+        }))
+    }
+    fn setup_route(&mut self, route: &core::Route) -> Outcome<ManifestChannel> {
+        let bytes = manifest_request_bytes(route, self.secret, &self.effect, &self.headers)?;
+        let request = aivm_secrets_garrett_core::provider_io::Request::new(ManifestWire(bytes));
+        let host = std::str::from_utf8(&route.host).map_err(|_| Error::InvalidPolicy)?;
+        let mut socket = TcpStream::connect_timeout(
+            &SocketAddr::new(
+                self.executor.address,
+                u16::try_from(route.port).map_err(|_| Error::InvalidPolicy)?,
+            ),
+            Duration::from_secs(5),
+        )
+        .map_err(|_| Error::Unreachable)?;
+        socket
+            .set_read_timeout(Some(Duration::from_secs(15)))
+            .map_err(|_| Error::Unreachable)?;
+        socket
+            .set_write_timeout(Some(Duration::from_secs(15)))
+            .map_err(|_| Error::Unreachable)?;
+        let killer = socket.try_clone().map_err(|_| Error::Unreachable)?;
+        let deadline = Deadline::start_for(Duration::from_secs(40), move || {
+            let _ = killer.shutdown(std::net::Shutdown::Both);
+        });
+        let name = rustls::pki_types::ServerName::try_from(host.to_owned())
+            .map_err(|_| Error::InvalidPolicy)?;
+        let mut conn = ClientConnection::new(self.executor.tls.clone(), name)
+            .map_err(|_| Error::Unreachable)?;
+        while conn.is_handshaking() {
+            conn.complete_io(&mut socket)
+                .map_err(|_| Error::Unreachable)?;
+        }
+        let stream = StreamOwned::new(conn, socket);
+
+        Ok(ManifestChannel {
+            stream,
+            request,
+            _deadline: deadline,
+        })
     }
 }
 fn manifest_response(mut reader: impl BufRead, format: &str) -> Outcome<Vec<u8>> {
@@ -1075,25 +1101,33 @@ mod wire_tests {
         parsed: bool,
     }
     impl aivm_secrets_garrett_core::provider_exchange::Provider for FaultProvider {
-        type Channel = PartialWriter;
+        type Channel = (
+            PartialWriter,
+            aivm_secrets_garrett_core::provider_io::Request<ManifestWire>,
+        );
         type Output = Value;
         type Error = Error;
         const INVALID_POLICY: Error = Error::InvalidPolicy;
         const OUTCOME_UNKNOWN: Error = Error::OutcomeUnknown;
-        fn setup(&mut self) -> Outcome<PartialWriter> {
-            Ok(PartialWriter {
-                accepted: self.accepted.clone(),
-                limit: self.limit,
-                flush_error: self.flush_error,
-            })
+        fn setup(&mut self) -> Outcome<Self::Channel> {
+            Ok((
+                PartialWriter {
+                    accepted: self.accepted.clone(),
+                    limit: self.limit,
+                    flush_error: self.flush_error,
+                },
+                aivm_secrets_garrett_core::provider_io::Request::new(ManifestWire(Zeroizing::new(
+                    b"synthetic-request".to_vec(),
+                ))),
+            ))
         }
         fn recheck(&mut self) -> Outcome<guards::AdmissionStamp> {
             Ok(self.current)
         }
-        fn send(&mut self, writer: &mut PartialWriter) -> Outcome<()> {
-            send_manifest_bytes(writer, b"synthetic-request")
+        fn send(&mut self, channel: &mut Self::Channel) -> Outcome<()> {
+            send_manifest_bytes(&mut channel.0, &mut channel.1)
         }
-        fn receive(&mut self, _writer: PartialWriter) -> Outcome<Value> {
+        fn receive(&mut self, _channel: Self::Channel) -> Outcome<Value> {
             self.parsed = true;
             Ok(json!({"selected":true}))
         }
@@ -1120,6 +1154,34 @@ mod wire_tests {
         }
         fn finish(&mut self) -> Outcome<()> {
             Ok(())
+        }
+    }
+    #[test]
+    fn captured_native_request_cannot_replay_after_partial_write_or_flush_error() {
+        for (limit, flush_error) in [
+            (0, false),
+            (5, false),
+            (usize::MAX, true),
+            (usize::MAX, false),
+        ] {
+            let accepted = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+            let mut writer = PartialWriter {
+                accepted: accepted.clone(),
+                limit,
+                flush_error,
+            };
+            let mut request = aivm_secrets_garrett_core::provider_io::Request::new(ManifestWire(
+                Zeroizing::new(b"synthetic-request".to_vec()),
+            ));
+            let first = send_manifest_bytes(&mut writer, &mut request);
+            assert_eq!(first.is_ok(), limit == usize::MAX && !flush_error);
+            assert!(request.attempted());
+            let before = accepted.borrow().clone();
+            assert!(matches!(
+                send_manifest_bytes(&mut writer, &mut request),
+                Err(Error::InternalError)
+            ));
+            assert_eq!(*accepted.borrow(), before);
         }
     }
     #[test]

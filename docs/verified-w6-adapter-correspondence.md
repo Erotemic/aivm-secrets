@@ -271,3 +271,11 @@ single post-admission native request interpreter is the extracted
 `request_current`; its private adapters retain the existing real I/O. W6 still
 owes a relation between callback results/invocations and actual wire, audit and
 guest-frame events, including completion acknowledgment followed by denial.
+
+The [captured provider route/request submission](garrett-provider-io.md) now
+supplies setup/audit with the private admitted grant route and moves the native
+zeroizing request into the extracted one-attempt write/flush controller.
+Its exact returned callback/state proofs and native partial-write/flush/replay
+cases supplement this reviewed adapter boundary. Native channel, encoder,
+std/TLS/DNS/parser and storage correspondence remain explicit contracts; neither
+this inventory nor the new leaf closes whole-service mediation or secrecy.

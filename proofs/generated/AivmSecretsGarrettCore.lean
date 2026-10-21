@@ -1835,6 +1835,12 @@ def current_admission.Context.new
   := do
   ok { identity, expected, peer, claims, grant, operation, write, allowed }
 
+/-- [aivm_secrets_garrett_core::current_admission::{aivm_secrets_garrett_core::current_admission::Context<'a>}::route]:
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 43:4-45:5 -/
+def current_admission.Context.route
+  (self : current_admission.Context) : Result credential_use.Route := do
+  ok self.grant.route
+
 /-- [aivm_secrets_garrett_core::manifest::authorize]:
     Source: 'crates/aivm-secrets-garrett-core/src/manifest.rs', lines 42:0-60:1
     Visibility: public -/
@@ -1950,7 +1956,7 @@ def present
                           else ok (core.result.Result.Ok ())
 
 /-- Trait declaration: [aivm_secrets_garrett_core::current_admission::Checks]
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 84:0-93:1
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 87:0-96:1
     Visibility: public -/
 structure current_admission.Checks (Self : Type _) (Self_Error : Type _) where
   INVALID_CAPABILITY : Result Self_Error
@@ -1964,7 +1970,7 @@ structure current_admission.Checks (Self : Type _) (Self_Error : Type _) where
   use_error : credential_use.UseDenial → Result Self_Error
 
 /-- [aivm_secrets_garrett_core::current_admission::{aivm_secrets_garrett_core::current_admission::Context<'a>}::current]:
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 43:4-81:5
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 46:4-84:5
     Visibility: public -/
 def current_admission.Context.current
   {C : Type _} {Clause0_Error : Type _} (ChecksInst : current_admission.Checks
@@ -2012,7 +2018,7 @@ def current_admission.Context.current
   | core.result.Result.Err error => ok (core.result.Result.Err error, checks1)
 
 /-- [aivm_secrets_garrett_core::current_admission::Bound]
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 97:0-101:1
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 100:0-104:1
     Visibility: public -/
 structure current_admission.Bound (W : Type _) (C : Type _)
   (Clause0_Clause0_Channel : Type _) (Clause0_Clause0_Output : Type _)
@@ -2060,7 +2066,7 @@ structure dispatch.Work (Self : Type _) (Self_Clause0_Channel : Type _)
     Self)
 
 /-- [aivm_secrets_garrett_core::current_admission::{aivm_secrets_garrett_core::current_admission::Bound<'a, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::new]:
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 103:4-109:5
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 106:4-112:5
     Visibility: public -/
 def current_admission.Bound.new
   {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
@@ -2075,7 +2081,7 @@ def current_admission.Bound.new
   ok { context, work, checks }
 
 /-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::receive]:
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 128:4-130:5
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 131:4-133:5
     Visibility: public -/
 def
   current_admission.Bound.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.receive
@@ -2096,7 +2102,7 @@ def
   ok (r, { self with work := t })
 
 /-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::send]:
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 125:4-127:5
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 128:4-130:5
     Visibility: public -/
 def
   current_admission.Bound.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.send
@@ -2117,7 +2123,7 @@ def
   ok (r, { self with work := t }, channel1)
 
 /-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::recheck]:
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 122:4-124:5
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 125:4-127:5
     Visibility: public -/
 def
   current_admission.Bound.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.recheck
@@ -2137,7 +2143,7 @@ def
   ok (r, { self with checks := t })
 
 /-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::setup]:
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 119:4-121:5
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 122:4-124:5
     Visibility: public -/
 def
   current_admission.Bound.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.setup
@@ -2156,7 +2162,7 @@ def
   ok (r, { self with work := t })
 
 /-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::OUTCOME_UNKNOWN]
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 118:4-118:60
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 121:4-121:60
     Visibility: public -/
 @[global_simps, irreducible]
 def
@@ -2170,7 +2176,7 @@ def
   dispatchWorkInst.provider_exchangeProviderInst.OUTCOME_UNKNOWN
 
 /-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::INVALID_POLICY]
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 117:4-117:58
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 120:4-120:58
     Visibility: public -/
 @[global_simps, irreducible]
 def
@@ -2184,7 +2190,7 @@ def
   dispatchWorkInst.provider_exchangeProviderInst.INVALID_POLICY
 
 /-- Trait implementation: [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}]
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 111:0-131:1 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 114:0-134:1 -/
 @[reducible]
 def
   current_admission.Bound.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider
@@ -2217,7 +2223,7 @@ def
 }
 
 /-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::finish]:
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 154:4-156:5
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 157:4-159:5
     Visibility: public -/
 def current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.finish
   {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
@@ -2235,7 +2241,7 @@ def current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.finish
   ok (r, { self with work := t })
 
 /-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::reserve]:
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 151:4-153:5
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 154:4-156:5
     Visibility: public -/
 def current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.reserve
   {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
@@ -2253,7 +2259,7 @@ def current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.reserve
   ok (r, { self with work := t })
 
 /-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::check]:
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 148:4-150:5
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 151:4-153:5
     Visibility: public -/
 def current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.check
   {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
@@ -2271,7 +2277,7 @@ def current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.check
   ok (r, { self with work := t })
 
 /-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::configure]:
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 145:4-147:5
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 148:4-150:5
     Visibility: public -/
 def
   current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.configure
@@ -2290,7 +2296,7 @@ def
   ok (r, { self with work := t })
 
 /-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::audit]:
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 142:4-144:5
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 145:4-147:5
     Visibility: public -/
 def current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.audit
   {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
@@ -2309,7 +2315,7 @@ def current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.audit
   ok (r, { self with work := t })
 
 /-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::prepare]:
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 139:4-141:5
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 142:4-144:5
     Visibility: public -/
 def current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.prepare
   {W : Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
@@ -2327,7 +2333,7 @@ def current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.prepare
   ok (r, { self with work := t })
 
 /-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::effect_write]:
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 136:4-138:5
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 139:4-141:5
     Visibility: public -/
 def
   current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.effect_write
@@ -2343,7 +2349,7 @@ def
   dispatchWorkInst.effect_write self.work
 
 /-- [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::INVALID_TRANSITION]
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 135:4-135:66
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 138:4-138:66
     Visibility: public -/
 @[global_simps, irreducible]
 def
@@ -2357,7 +2363,7 @@ def
   dispatchWorkInst.INVALID_TRANSITION
 
 /-- Trait implementation: [aivm_secrets_garrett_core::current_admission::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::current_admission::Bound<'_0, W, C, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}]
-    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 132:0-157:1 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/current_admission.rs', lines 135:0-160:1 -/
 @[reducible]
 def current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork {W :
   Type _} {C : Type _} {Clause0_Clause0_Channel : Type _}
@@ -6746,6 +6752,412 @@ def provider_exchange.SendState.Insts.CoreDefaultDefault : core.default.Default
   default := provider_exchange.SendState.Insts.CoreDefaultDefault.default
 }
 
+/-- Trait declaration: [aivm_secrets_garrett_core::provider_io::RouteWork]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 7:0-10:1
+    Visibility: public -/
+structure provider_io.RouteWork (Self : Type _) (C : Type _) (E : Type _) where
+  setup_route : Self → credential_use.Route → Result ((core.result.Result C
+    E) × Self)
+  audit_route : Self → credential_use.Route → read_transition.Phase →
+    Result ((core.result.Result Unit E) × Self)
+
+/-- [aivm_secrets_garrett_core::provider_io::Routed]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 12:0-18:1
+    Visibility: public -/
+structure provider_io.Routed (W : Type _) (Clause0_Clause0_Channel : Type _)
+  (Clause0_Clause0_Output : Type _) (Clause0_Clause0_Error : Type _) where
+  route : credential_use.Route
+  work : W
+
+/-- [aivm_secrets_garrett_core::provider_io::{aivm_secrets_garrett_core::provider_io::Routed<'a, W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::new]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 23:4-25:5
+    Visibility: public -/
+def provider_io.Routed.new
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (dispatchWorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (RouteWorkInst : provider_io.RouteWork W Clause0_Clause0_Channel
+  Clause0_Clause0_Error) (route : credential_use.Route) (work : W) :
+  Result (provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error)
+  := do
+  ok { route, work }
+
+/-- [aivm_secrets_garrett_core::provider_io::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::provider_io::Routed<'_0, W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::receive]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 45:4-47:5
+    Visibility: public -/
+def
+  provider_io.Routed.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.receive
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (dispatchWorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (RouteWorkInst : provider_io.RouteWork W Clause0_Clause0_Channel
+  Clause0_Clause0_Error)
+  (self : provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) (channel : Clause0_Clause0_Channel) :
+  Result ((core.result.Result Clause0_Clause0_Output Clause0_Clause0_Error) ×
+    (provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ←
+    dispatchWorkInst.provider_exchangeProviderInst.receive self.work channel
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::provider_io::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::provider_io::Routed<'_0, W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::send]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 42:4-44:5
+    Visibility: public -/
+def
+  provider_io.Routed.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.send
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (dispatchWorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (RouteWorkInst : provider_io.RouteWork W Clause0_Clause0_Channel
+  Clause0_Clause0_Error)
+  (self : provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) (channel : Clause0_Clause0_Channel) :
+  Result ((core.result.Result Unit Clause0_Clause0_Error) ×
+    (provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error) × Clause0_Clause0_Channel)
+  := do
+  let (r, t, channel1) ←
+    dispatchWorkInst.provider_exchangeProviderInst.send self.work channel
+  ok (r, { self with work := t }, channel1)
+
+/-- [aivm_secrets_garrett_core::provider_io::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::provider_io::Routed<'_0, W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::recheck]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 39:4-41:5
+    Visibility: public -/
+def
+  provider_io.Routed.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.recheck
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (dispatchWorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (RouteWorkInst : provider_io.RouteWork W Clause0_Clause0_Channel
+  Clause0_Clause0_Error)
+  (self : provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) :
+  Result ((core.result.Result manifest.AdmissionStamp Clause0_Clause0_Error) ×
+    (provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ←
+    dispatchWorkInst.provider_exchangeProviderInst.recheck self.work
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::provider_io::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::provider_io::Routed<'_0, W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::setup]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 36:4-38:5
+    Visibility: public -/
+def
+  provider_io.Routed.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.setup
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (dispatchWorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (RouteWorkInst : provider_io.RouteWork W Clause0_Clause0_Channel
+  Clause0_Clause0_Error)
+  (self : provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) :
+  Result ((core.result.Result Clause0_Clause0_Channel Clause0_Clause0_Error) ×
+    (provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ← RouteWorkInst.setup_route self.work self.route
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::provider_io::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::provider_io::Routed<'_0, W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::OUTCOME_UNKNOWN]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 35:4-35:60
+    Visibility: public -/
+@[global_simps, irreducible]
+def
+  provider_io.Routed.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.OUTCOME_UNKNOWN
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (dispatchWorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (RouteWorkInst : provider_io.RouteWork W Clause0_Clause0_Channel
+  Clause0_Clause0_Error) : Result Clause0_Clause0_Error :=
+  dispatchWorkInst.provider_exchangeProviderInst.OUTCOME_UNKNOWN
+
+/-- [aivm_secrets_garrett_core::provider_io::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::provider_io::Routed<'_0, W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::INVALID_POLICY]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 34:4-34:58
+    Visibility: public -/
+@[global_simps, irreducible]
+def
+  provider_io.Routed.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.INVALID_POLICY
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (dispatchWorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (RouteWorkInst : provider_io.RouteWork W Clause0_Clause0_Channel
+  Clause0_Clause0_Error) : Result Clause0_Clause0_Error :=
+  dispatchWorkInst.provider_exchangeProviderInst.INVALID_POLICY
+
+/-- Trait implementation: [aivm_secrets_garrett_core::provider_io::{impl aivm_secrets_garrett_core::provider_exchange::Provider<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::provider_io::Routed<'_0, W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 27:0-48:1 -/
+@[reducible]
+def provider_io.Routed.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (dispatchWorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (RouteWorkInst : provider_io.RouteWork W Clause0_Clause0_Channel
+  Clause0_Clause0_Error) : provider_exchange.Provider (provider_io.Routed W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error := {
+  INVALID_POLICY :=
+    provider_io.Routed.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.INVALID_POLICY
+    dispatchWorkInst RouteWorkInst
+  OUTCOME_UNKNOWN :=
+    provider_io.Routed.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.OUTCOME_UNKNOWN
+    dispatchWorkInst RouteWorkInst
+  setup :=
+    provider_io.Routed.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.setup
+    dispatchWorkInst RouteWorkInst
+  recheck :=
+    provider_io.Routed.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.recheck
+    dispatchWorkInst RouteWorkInst
+  send :=
+    provider_io.Routed.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.send
+    dispatchWorkInst RouteWorkInst
+  receive :=
+    provider_io.Routed.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider.receive
+    dispatchWorkInst RouteWorkInst
+}
+
+/-- [aivm_secrets_garrett_core::provider_io::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::provider_io::Routed<'_0, W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::finish]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 72:4-74:5
+    Visibility: public -/
+def provider_io.Routed.Insts.Aivm_secrets_garrett_coreDispatchWork.finish
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (dispatchWorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (RouteWorkInst : provider_io.RouteWork W Clause0_Clause0_Channel
+  Clause0_Clause0_Error)
+  (self : provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) :
+  Result ((core.result.Result Unit Clause0_Clause0_Error) ×
+    (provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ← dispatchWorkInst.finish self.work
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::provider_io::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::provider_io::Routed<'_0, W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::reserve]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 69:4-71:5
+    Visibility: public -/
+def provider_io.Routed.Insts.Aivm_secrets_garrett_coreDispatchWork.reserve
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (dispatchWorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (RouteWorkInst : provider_io.RouteWork W Clause0_Clause0_Channel
+  Clause0_Clause0_Error)
+  (self : provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) :
+  Result ((core.result.Result Unit Clause0_Clause0_Error) ×
+    (provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ← dispatchWorkInst.reserve self.work
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::provider_io::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::provider_io::Routed<'_0, W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::check]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 66:4-68:5
+    Visibility: public -/
+def provider_io.Routed.Insts.Aivm_secrets_garrett_coreDispatchWork.check
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (dispatchWorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (RouteWorkInst : provider_io.RouteWork W Clause0_Clause0_Channel
+  Clause0_Clause0_Error)
+  (self : provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) :
+  Result ((core.result.Result Unit Clause0_Clause0_Error) ×
+    (provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ← dispatchWorkInst.check self.work
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::provider_io::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::provider_io::Routed<'_0, W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::configure]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 63:4-65:5
+    Visibility: public -/
+def provider_io.Routed.Insts.Aivm_secrets_garrett_coreDispatchWork.configure
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (dispatchWorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (RouteWorkInst : provider_io.RouteWork W Clause0_Clause0_Channel
+  Clause0_Clause0_Error)
+  (self : provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) (keyed_write : Bool) :
+  Result ((core.result.Result Unit Clause0_Clause0_Error) ×
+    (provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ← dispatchWorkInst.configure self.work keyed_write
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::provider_io::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::provider_io::Routed<'_0, W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::audit]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 60:4-62:5
+    Visibility: public -/
+def provider_io.Routed.Insts.Aivm_secrets_garrett_coreDispatchWork.audit
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (dispatchWorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (RouteWorkInst : provider_io.RouteWork W Clause0_Clause0_Channel
+  Clause0_Clause0_Error)
+  (self : provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) (phase : read_transition.Phase) :
+  Result ((core.result.Result Unit Clause0_Clause0_Error) ×
+    (provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ← RouteWorkInst.audit_route self.work self.route phase
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::provider_io::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::provider_io::Routed<'_0, W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::prepare]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 57:4-59:5
+    Visibility: public -/
+def provider_io.Routed.Insts.Aivm_secrets_garrett_coreDispatchWork.prepare
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (dispatchWorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (RouteWorkInst : provider_io.RouteWork W Clause0_Clause0_Channel
+  Clause0_Clause0_Error)
+  (self : provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) :
+  Result ((core.result.Result Unit Clause0_Clause0_Error) ×
+    (provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+    Clause0_Clause0_Error))
+  := do
+  let (r, t) ← dispatchWorkInst.prepare self.work
+  ok (r, { self with work := t })
+
+/-- [aivm_secrets_garrett_core::provider_io::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::provider_io::Routed<'_0, W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::effect_write]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 54:4-56:5
+    Visibility: public -/
+def provider_io.Routed.Insts.Aivm_secrets_garrett_coreDispatchWork.effect_write
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (dispatchWorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (RouteWorkInst : provider_io.RouteWork W Clause0_Clause0_Channel
+  Clause0_Clause0_Error)
+  (self : provider_io.Routed W Clause0_Clause0_Channel Clause0_Clause0_Output
+  Clause0_Clause0_Error) :
+  Result Bool
+  := do
+  dispatchWorkInst.effect_write self.work
+
+/-- [aivm_secrets_garrett_core::provider_io::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::provider_io::Routed<'_0, W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}::INVALID_TRANSITION]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 53:4-53:66
+    Visibility: public -/
+@[global_simps, irreducible]
+def
+  provider_io.Routed.Insts.Aivm_secrets_garrett_coreDispatchWork.INVALID_TRANSITION
+  {W : Type _} {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output :
+  Type _} {Clause0_Clause0_Error : Type _} (dispatchWorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (RouteWorkInst : provider_io.RouteWork W Clause0_Clause0_Channel
+  Clause0_Clause0_Error) : Result Clause0_Clause0_Error :=
+  dispatchWorkInst.INVALID_TRANSITION
+
+/-- Trait implementation: [aivm_secrets_garrett_core::provider_io::{impl aivm_secrets_garrett_core::dispatch::Work<Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error> for aivm_secrets_garrett_core::provider_io::Routed<'_0, W, Clause0_Clause0_Channel, Clause0_Clause0_Output, Clause0_Clause0_Error>}]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 49:0-75:1 -/
+@[reducible]
+def provider_io.Routed.Insts.Aivm_secrets_garrett_coreDispatchWork {W : Type _}
+  {Clause0_Clause0_Channel : Type _} {Clause0_Clause0_Output : Type _}
+  {Clause0_Clause0_Error : Type _} (dispatchWorkInst : dispatch.Work W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  (RouteWorkInst : provider_io.RouteWork W Clause0_Clause0_Channel
+  Clause0_Clause0_Error) : dispatch.Work (provider_io.Routed W
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error)
+  Clause0_Clause0_Channel Clause0_Clause0_Output Clause0_Clause0_Error := {
+  INVALID_TRANSITION :=
+    provider_io.Routed.Insts.Aivm_secrets_garrett_coreDispatchWork.INVALID_TRANSITION
+    dispatchWorkInst RouteWorkInst
+  provider_exchangeProviderInst :=
+    provider_io.Routed.Insts.Aivm_secrets_garrett_coreProvider_exchangeProvider
+    dispatchWorkInst RouteWorkInst
+  effect_write :=
+    provider_io.Routed.Insts.Aivm_secrets_garrett_coreDispatchWork.effect_write
+    dispatchWorkInst RouteWorkInst
+  prepare :=
+    provider_io.Routed.Insts.Aivm_secrets_garrett_coreDispatchWork.prepare
+    dispatchWorkInst RouteWorkInst
+  audit := provider_io.Routed.Insts.Aivm_secrets_garrett_coreDispatchWork.audit
+    dispatchWorkInst RouteWorkInst
+  configure :=
+    provider_io.Routed.Insts.Aivm_secrets_garrett_coreDispatchWork.configure
+    dispatchWorkInst RouteWorkInst
+  check := provider_io.Routed.Insts.Aivm_secrets_garrett_coreDispatchWork.check
+    dispatchWorkInst RouteWorkInst
+  reserve :=
+    provider_io.Routed.Insts.Aivm_secrets_garrett_coreDispatchWork.reserve
+    dispatchWorkInst RouteWorkInst
+  finish :=
+    provider_io.Routed.Insts.Aivm_secrets_garrett_coreDispatchWork.finish
+    dispatchWorkInst RouteWorkInst
+}
+
+/-- Trait declaration: [aivm_secrets_garrett_core::provider_io::WireBytes]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 77:0-79:1
+    Visibility: public -/
+structure provider_io.WireBytes (Self : Type _) where
+  bytes : Self → Result (alloc.vec.Vec Std.U8)
+
+/-- Trait declaration: [aivm_secrets_garrett_core::provider_io::Writer]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 80:0-85:1
+    Visibility: public -/
+structure provider_io.Writer (Self : Type _) (Self_Error : Type _) where
+  INVALID_TRANSITION : Result Self_Error
+  write_all : Self → alloc.vec.Vec Std.U8 → Result ((core.result.Result
+    Unit Self_Error) × Self)
+  flush : Self → Result ((core.result.Result Unit Self_Error) × Self)
+
+/-- [aivm_secrets_garrett_core::provider_io::Request]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 89:0-92:1
+    Visibility: public -/
+structure provider_io.Request (B : Type _) where
+  body : B
+  attempted : Bool
+
+/-- [aivm_secrets_garrett_core::provider_io::{aivm_secrets_garrett_core::provider_io::Request<B>}::new]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 94:4-99:5
+    Visibility: public -/
+def provider_io.Request.new
+  {B : Type _} (WireBytesInst : provider_io.WireBytes B) (body : B) :
+  Result (provider_io.Request B)
+  := do
+  ok { body, attempted := false }
+
+/-- [aivm_secrets_garrett_core::provider_io::{aivm_secrets_garrett_core::provider_io::Request<B>}::attempted]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 100:4-102:5
+    Visibility: public -/
+def provider_io.Request.impl.attempted
+  {B : Type _} (WireBytesInst : provider_io.WireBytes B)
+  (self : provider_io.Request B) :
+  Result Bool
+  := do
+  ok self.attempted
+
+/-- [aivm_secrets_garrett_core::provider_io::{aivm_secrets_garrett_core::provider_io::Request<B>}::submit]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 103:4-114:5
+    Visibility: public -/
+def provider_io.Request.submit
+  {B : Type _} {W : Type _} {Clause1_Error : Type _} (WireBytesInst :
+  provider_io.WireBytes B) (WriterInst : provider_io.Writer W Clause1_Error)
+  (self : provider_io.Request B) (writer : W) :
+  Result ((core.result.Result Unit Clause1_Error) × (provider_io.Request B) ×
+    W)
+  := do
+  if self.attempted
+  then
+    let t ← WriterInst.INVALID_TRANSITION
+    ok (core.result.Result.Err t, self, writer)
+  else
+    let bytes ← WireBytesInst.bytes self.body
+    let (r, writer1) ← WriterInst.write_all writer bytes
+    match r with
+    | core.result.Result.Ok _ =>
+      let (r1, writer2) ← WriterInst.flush writer1
+      ok (r1, { self with attempted := true }, writer2)
+    | core.result.Result.Err _ =>
+      ok (r, { self with attempted := true }, writer1)
+
 /-- [aivm_secrets_garrett_core::read_transition::invocation::Trace]
     Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 9:0-20:1
     Visibility: public -/
@@ -8175,7 +8587,7 @@ structure request_context.CheckFactory (Self : Type _) (Self_Error : Type _)
   checks : Self → Result (Self_Checks × Self)
 
 /-- [aivm_secrets_garrett_core::request_context::ScopedRequest]
-    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 12:0-16:1
+    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 12:0-22:1
     Visibility: public -/
 structure request_context.ScopedRequest (W : Type _) (F : Type _)
   (Clause0_Facts : Type _) (Clause0_Effect : Type _) (Clause0_Output : Type _)
@@ -8187,7 +8599,7 @@ structure request_context.ScopedRequest (W : Type _) (F : Type _)
   factory : F
 
 /-- [aivm_secrets_garrett_core::request_context::{aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::new]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 18:4-24:5
+    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 30:4-36:5
     Visibility: public -/
 def request_context.ScopedRequest.new
   {W : Type _} {F : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
@@ -8198,6 +8610,8 @@ def request_context.ScopedRequest.new
   Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel) (CheckFactoryInst :
   request_context.CheckFactory F Clause0_Error Clause1_Checks)
+  (provider_ioRouteWorkInst : provider_io.RouteWork Clause0_Dispatch
+  Clause0_Clause0_Clause0_Channel Clause0_Error)
   (context : current_admission.Context) (work : W) (factory : F) :
   Result (request_context.ScopedRequest W F Clause0_Facts Clause0_Effect
     Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
@@ -8205,11 +8619,11 @@ def request_context.ScopedRequest.new
   := do
   ok { context, work, factory }
 
-/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, Clause0_Dispatch, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::outcome_unknown]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 72:4-74:5
+/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, aivm_secrets_garrett_core::provider_io::Routed<'a, Clause0_Dispatch, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::outcome_unknown]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 90:4-92:5
     Visibility: public -/
 def
-  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.outcome_unknown
+  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.outcome_unknown
   {W : Type _} {F : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
   {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
   Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
@@ -8218,6 +8632,8 @@ def
   Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel) (CheckFactoryInst :
   request_context.CheckFactory F Clause0_Error Clause1_Checks)
+  (provider_ioRouteWorkInst : provider_io.RouteWork Clause0_Dispatch
+  Clause0_Clause0_Clause0_Channel Clause0_Error)
   (self : request_context.ScopedRequest W F Clause0_Facts Clause0_Effect
   Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel Clause1_Checks) :
@@ -8225,11 +8641,11 @@ def
   := do
   request_adapterWorkInst.outcome_unknown self.work
 
-/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, Clause0_Dispatch, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::recheck]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 69:4-71:5
+/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, aivm_secrets_garrett_core::provider_io::Routed<'a, Clause0_Dispatch, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::recheck]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 87:4-89:5
     Visibility: public -/
 def
-  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.recheck
+  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.recheck
   {W : Type _} {F : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
   {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
   Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
@@ -8238,6 +8654,8 @@ def
   Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel) (CheckFactoryInst :
   request_context.CheckFactory F Clause0_Error Clause1_Checks)
+  (provider_ioRouteWorkInst : provider_io.RouteWork Clause0_Dispatch
+  Clause0_Clause0_Clause0_Channel Clause0_Error)
   (self : request_context.ScopedRequest W F Clause0_Facts Clause0_Effect
   Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel Clause1_Checks) :
@@ -8249,11 +8667,11 @@ def
   let (r, t) ← request_adapterWorkInst.recheck self.work
   ok (r, { self with work := t })
 
-/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, Clause0_Dispatch, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::complete]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 66:4-68:5
+/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, aivm_secrets_garrett_core::provider_io::Routed<'a, Clause0_Dispatch, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::complete]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 84:4-86:5
     Visibility: public -/
 def
-  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.complete
+  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.complete
   {W : Type _} {F : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
   {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
   Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
@@ -8262,6 +8680,8 @@ def
   Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel) (CheckFactoryInst :
   request_context.CheckFactory F Clause0_Error Clause1_Checks)
+  (provider_ioRouteWorkInst : provider_io.RouteWork Clause0_Dispatch
+  Clause0_Clause0_Clause0_Channel Clause0_Error)
   (self : request_context.ScopedRequest W F Clause0_Facts Clause0_Effect
   Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel Clause1_Checks) (raw : Clause0_Facts) :
@@ -8272,11 +8692,11 @@ def
   let (t, t1) ← request_adapterWorkInst.complete self.work raw
   ok (t, { self with work := t1 })
 
-/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, Clause0_Dispatch, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::dispatch]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 53:4-65:5
+/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, aivm_secrets_garrett_core::provider_io::Routed<'a, Clause0_Dispatch, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::dispatch]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 70:4-83:5
     Visibility: public -/
 def
-  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.dispatch
+  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.dispatch
   {W : Type _} {F : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
   {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
   Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
@@ -8285,12 +8705,15 @@ def
   Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel) (CheckFactoryInst :
   request_context.CheckFactory F Clause0_Error Clause1_Checks)
+  (provider_ioRouteWorkInst : provider_io.RouteWork Clause0_Dispatch
+  Clause0_Clause0_Clause0_Channel Clause0_Error)
   (self : request_context.ScopedRequest W F Clause0_Facts Clause0_Effect
   Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel Clause1_Checks)
   (phase : read_transition.Phase) (effect : Clause0_Effect) :
   Result ((request_adapter.DispatchPlan (current_admission.Bound
-    Clause0_Dispatch Clause1_Checks Clause0_Clause0_Clause0_Channel
+    (provider_io.Routed Clause0_Dispatch Clause0_Clause0_Clause0_Channel
+    Clause0_Facts Clause0_Error) Clause1_Checks Clause0_Clause0_Clause0_Channel
     Clause0_Facts Clause0_Error) Clause0_Clause0_Clause0_Channel Clause0_Facts
     Clause0_Error) × (request_context.ScopedRequest W F Clause0_Facts
     Clause0_Effect Clause0_Output Clause0_Error Clause0_Dispatch
@@ -8298,18 +8721,23 @@ def
   := do
   let (plan, t) ← request_adapterWorkInst.dispatch self.work phase effect
   let (checks, t1) ← CheckFactoryInst.checks self.factory
+  let r ← current_admission.Context.route self.context
+  let routed ←
+    provider_io.Routed.new request_adapterWorkInst.dispatchWorkInst
+      provider_ioRouteWorkInst r plan.work
   let work ←
-    current_admission.Bound.new request_adapterWorkInst.dispatchWorkInst
-      CheckFactoryInst.current_admissionChecksInst self.context plan.work
-      checks
+    current_admission.Bound.new
+      (provider_io.Routed.Insts.Aivm_secrets_garrett_coreDispatchWork
+      request_adapterWorkInst.dispatchWorkInst provider_ioRouteWorkInst)
+      CheckFactoryInst.current_admissionChecksInst self.context routed checks
   ok ({ work, keyed_write := plan.keyed_write },
     { self with work := t, factory := t1 })
 
-/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, Clause0_Dispatch, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::operation_write]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 50:4-52:5
+/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, aivm_secrets_garrett_core::provider_io::Routed<'a, Clause0_Dispatch, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::operation_write]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 67:4-69:5
     Visibility: public -/
 def
-  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.operation_write
+  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.operation_write
   {W : Type _} {F : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
   {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
   Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
@@ -8318,6 +8746,8 @@ def
   Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel) (CheckFactoryInst :
   request_context.CheckFactory F Clause0_Error Clause1_Checks)
+  (provider_ioRouteWorkInst : provider_io.RouteWork Clause0_Dispatch
+  Clause0_Clause0_Clause0_Channel Clause0_Error)
   (self : request_context.ScopedRequest W F Clause0_Facts Clause0_Effect
   Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel Clause1_Checks) :
@@ -8325,11 +8755,11 @@ def
   := do
   request_adapterWorkInst.operation_write self.work
 
-/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, Clause0_Dispatch, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::effect_write]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 47:4-49:5
+/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, aivm_secrets_garrett_core::provider_io::Routed<'a, Clause0_Dispatch, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::effect_write]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 64:4-66:5
     Visibility: public -/
 def
-  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.effect_write
+  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.effect_write
   {W : Type _} {F : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
   {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
   Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
@@ -8338,6 +8768,8 @@ def
   Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel) (CheckFactoryInst :
   request_context.CheckFactory F Clause0_Error Clause1_Checks)
+  (provider_ioRouteWorkInst : provider_io.RouteWork Clause0_Dispatch
+  Clause0_Clause0_Clause0_Channel Clause0_Error)
   (self : request_context.ScopedRequest W F Clause0_Facts Clause0_Effect
   Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel Clause1_Checks) (effect : Clause0_Effect) :
@@ -8345,11 +8777,11 @@ def
   := do
   request_adapterWorkInst.effect_write self.work effect
 
-/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, Clause0_Dispatch, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::final_effect]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 44:4-46:5
+/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, aivm_secrets_garrett_core::provider_io::Routed<'a, Clause0_Dispatch, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::final_effect]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 61:4-63:5
     Visibility: public -/
 def
-  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.final_effect
+  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.final_effect
   {W : Type _} {F : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
   {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
   Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
@@ -8358,6 +8790,8 @@ def
   Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel) (CheckFactoryInst :
   request_context.CheckFactory F Clause0_Error Clause1_Checks)
+  (provider_ioRouteWorkInst : provider_io.RouteWork Clause0_Dispatch
+  Clause0_Clause0_Clause0_Channel Clause0_Error)
   (self : request_context.ScopedRequest W F Clause0_Facts Clause0_Effect
   Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel Clause1_Checks) (facts : Clause0_Facts) :
@@ -8365,11 +8799,11 @@ def
   := do
   request_adapterWorkInst.final_effect self.work facts
 
-/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, Clause0_Dispatch, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::empty_facts]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 41:4-43:5
+/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, aivm_secrets_garrett_core::provider_io::Routed<'a, Clause0_Dispatch, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::empty_facts]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 58:4-60:5
     Visibility: public -/
 def
-  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.empty_facts
+  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.empty_facts
   {W : Type _} {F : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
   {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
   Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
@@ -8378,6 +8812,8 @@ def
   Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel) (CheckFactoryInst :
   request_context.CheckFactory F Clause0_Error Clause1_Checks)
+  (provider_ioRouteWorkInst : provider_io.RouteWork Clause0_Dispatch
+  Clause0_Clause0_Clause0_Channel Clause0_Error)
   (self : request_context.ScopedRequest W F Clause0_Facts Clause0_Effect
   Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel Clause1_Checks) :
@@ -8385,11 +8821,11 @@ def
   := do
   request_adapterWorkInst.empty_facts self.work
 
-/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, Clause0_Dispatch, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::preflight]:
-    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 38:4-40:5
+/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, aivm_secrets_garrett_core::provider_io::Routed<'a, Clause0_Dispatch, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::preflight]:
+    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 55:4-57:5
     Visibility: public -/
 def
-  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.preflight
+  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.preflight
   {W : Type _} {F : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
   {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
   Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
@@ -8398,6 +8834,8 @@ def
   Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel) (CheckFactoryInst :
   request_context.CheckFactory F Clause0_Error Clause1_Checks)
+  (provider_ioRouteWorkInst : provider_io.RouteWork Clause0_Dispatch
+  Clause0_Clause0_Clause0_Channel Clause0_Error)
   (self : request_context.ScopedRequest W F Clause0_Facts Clause0_Effect
   Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel Clause1_Checks) :
@@ -8405,12 +8843,12 @@ def
   := do
   request_adapterWorkInst.preflight self.work
 
-/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, Clause0_Dispatch, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::INVALID_POLICY]
-    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 36:4-36:58
+/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, aivm_secrets_garrett_core::provider_io::Routed<'a, Clause0_Dispatch, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::INVALID_POLICY]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 53:4-53:58
     Visibility: public -/
 @[global_simps, irreducible]
 def
-  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.INVALID_POLICY
+  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.INVALID_POLICY
   {W : Type _} {F : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
   {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
   Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
@@ -8419,15 +8857,16 @@ def
   Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel) (CheckFactoryInst :
   request_context.CheckFactory F Clause0_Error Clause1_Checks)
-  : Result Clause0_Error :=
+  (provider_ioRouteWorkInst : provider_io.RouteWork Clause0_Dispatch
+  Clause0_Clause0_Clause0_Channel Clause0_Error) : Result Clause0_Error :=
   request_adapterWorkInst.INVALID_POLICY
 
-/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, Clause0_Dispatch, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::INVALID_TRANSITION]
-    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 35:4-35:66
+/-- [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, aivm_secrets_garrett_core::provider_io::Routed<'a, Clause0_Dispatch, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}::INVALID_TRANSITION]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 52:4-52:66
     Visibility: public -/
 @[global_simps, irreducible]
 def
-  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.INVALID_TRANSITION
+  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.INVALID_TRANSITION
   {W : Type _} {F : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
   {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
   Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
@@ -8436,14 +8875,15 @@ def
   Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel) (CheckFactoryInst :
   request_context.CheckFactory F Clause0_Error Clause1_Checks)
-  : Result Clause0_Error :=
+  (provider_ioRouteWorkInst : provider_io.RouteWork Clause0_Dispatch
+  Clause0_Clause0_Clause0_Channel Clause0_Error) : Result Clause0_Error :=
   request_adapterWorkInst.INVALID_TRANSITION
 
-/-- Trait implementation: [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, Clause0_Dispatch, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}]
-    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 26:0-75:1 -/
+/-- Trait implementation: [aivm_secrets_garrett_core::request_context::{impl aivm_secrets_garrett_core::request_adapter::Work<Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, aivm_secrets_garrett_core::current_admission::Bound<'a, aivm_secrets_garrett_core::provider_io::Routed<'a, Clause0_Dispatch, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause1_Checks, Clause0_Clause0_Clause0_Channel, Clause0_Facts, Clause0_Error>, Clause0_Completion, Clause0_Clause0_Clause0_Channel> for aivm_secrets_garrett_core::request_context::ScopedRequest<'a, W, F, Clause0_Facts, Clause0_Effect, Clause0_Output, Clause0_Error, Clause0_Dispatch, Clause0_Completion, Clause0_Clause0_Clause0_Channel, Clause1_Checks>}]
+    Source: 'crates/aivm-secrets-garrett-core/src/request_context.rs', lines 38:0-93:1 -/
 @[reducible]
 def
-  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel
+  request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel
   {W : Type _} {F : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
   {Clause0_Output : Type _} {Clause0_Error : Type _} {Clause0_Dispatch :
   Type _} {Clause0_Completion : Type _} {Clause0_Clause0_Clause0_Channel :
@@ -8451,52 +8891,55 @@ def
   request_adapter.Work W Clause0_Facts Clause0_Effect Clause0_Output
   Clause0_Error Clause0_Dispatch Clause0_Completion
   Clause0_Clause0_Clause0_Channel) (CheckFactoryInst :
-  request_context.CheckFactory F Clause0_Error Clause1_Checks) :
-  request_adapter.Work (request_context.ScopedRequest W F Clause0_Facts
-  Clause0_Effect Clause0_Output Clause0_Error Clause0_Dispatch
-  Clause0_Completion Clause0_Clause0_Clause0_Channel Clause1_Checks)
-  Clause0_Facts Clause0_Effect Clause0_Output Clause0_Error
-  (current_admission.Bound Clause0_Dispatch Clause1_Checks
-  Clause0_Clause0_Clause0_Channel Clause0_Facts Clause0_Error)
+  request_context.CheckFactory F Clause0_Error Clause1_Checks)
+  (provider_ioRouteWorkInst : provider_io.RouteWork Clause0_Dispatch
+  Clause0_Clause0_Clause0_Channel Clause0_Error) : request_adapter.Work
+  (request_context.ScopedRequest W F Clause0_Facts Clause0_Effect
+  Clause0_Output Clause0_Error Clause0_Dispatch Clause0_Completion
+  Clause0_Clause0_Clause0_Channel Clause1_Checks) Clause0_Facts Clause0_Effect
+  Clause0_Output Clause0_Error (current_admission.Bound (provider_io.Routed
+  Clause0_Dispatch Clause0_Clause0_Clause0_Channel Clause0_Facts Clause0_Error)
+  Clause1_Checks Clause0_Clause0_Clause0_Channel Clause0_Facts Clause0_Error)
   Clause0_Completion Clause0_Clause0_Clause0_Channel := {
   INVALID_TRANSITION :=
-    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.INVALID_TRANSITION
-    request_adapterWorkInst CheckFactoryInst
+    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.INVALID_TRANSITION
+    request_adapterWorkInst CheckFactoryInst provider_ioRouteWorkInst
   INVALID_POLICY :=
-    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.INVALID_POLICY
-    request_adapterWorkInst CheckFactoryInst
+    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.INVALID_POLICY
+    request_adapterWorkInst CheckFactoryInst provider_ioRouteWorkInst
   dispatchWorkInst :=
     current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork
-    request_adapterWorkInst.dispatchWorkInst
+    (provider_io.Routed.Insts.Aivm_secrets_garrett_coreDispatchWork
+    request_adapterWorkInst.dispatchWorkInst provider_ioRouteWorkInst)
     CheckFactoryInst.current_admissionChecksInst
   completionWorkInst := request_adapterWorkInst.completionWorkInst
   preflight :=
-    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.preflight
-    request_adapterWorkInst CheckFactoryInst
+    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.preflight
+    request_adapterWorkInst CheckFactoryInst provider_ioRouteWorkInst
   empty_facts :=
-    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.empty_facts
-    request_adapterWorkInst CheckFactoryInst
+    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.empty_facts
+    request_adapterWorkInst CheckFactoryInst provider_ioRouteWorkInst
   final_effect :=
-    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.final_effect
-    request_adapterWorkInst CheckFactoryInst
+    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.final_effect
+    request_adapterWorkInst CheckFactoryInst provider_ioRouteWorkInst
   effect_write :=
-    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.effect_write
-    request_adapterWorkInst CheckFactoryInst
+    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.effect_write
+    request_adapterWorkInst CheckFactoryInst provider_ioRouteWorkInst
   operation_write :=
-    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.operation_write
-    request_adapterWorkInst CheckFactoryInst
+    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.operation_write
+    request_adapterWorkInst CheckFactoryInst provider_ioRouteWorkInst
   dispatch :=
-    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.dispatch
-    request_adapterWorkInst CheckFactoryInst
+    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.dispatch
+    request_adapterWorkInst CheckFactoryInst provider_ioRouteWorkInst
   complete :=
-    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.complete
-    request_adapterWorkInst CheckFactoryInst
+    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.complete
+    request_adapterWorkInst CheckFactoryInst provider_ioRouteWorkInst
   recheck :=
-    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.recheck
-    request_adapterWorkInst CheckFactoryInst
+    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.recheck
+    request_adapterWorkInst CheckFactoryInst provider_ioRouteWorkInst
   outcome_unknown :=
-    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundClause0_CompletionClause0_Clause0_Clause0_Channel.outcome_unknown
-    request_adapterWorkInst CheckFactoryInst
+    request_context.ScopedRequest.Insts.Aivm_secrets_garrett_coreRequest_adapterWorkClause0_FactsClause0_EffectClause0_OutputClause0_ErrorBoundARoutedClause1_ChecksClause0_Clause0_Clause0_ChannelClause0_FactsClause0_ErrorClause0_CompletionClause0_Clause0_Clause0_Channel.outcome_unknown
+    request_adapterWorkInst CheckFactoryInst provider_ioRouteWorkInst
 }
 
 /-- [aivm_secrets_garrett_core::request_effects::{impl core::clone::Clone for aivm_secrets_garrett_core::request_effects::DispatchRecord}::clone]:

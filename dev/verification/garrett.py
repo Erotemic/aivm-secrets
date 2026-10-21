@@ -243,6 +243,29 @@ THEOREMS += [
 ]
 
 THEOREMS += [
+    'aivm_secrets_garrett_core.provider_io.Proofs.context_route',
+    'aivm_secrets_garrett_core.provider_io.Proofs.routed_constructor',
+    'aivm_secrets_garrett_core.provider_io.Proofs.routed_setup_iff',
+    'aivm_secrets_garrett_core.provider_io.Proofs.routed_audit_iff',
+    'aivm_secrets_garrett_core.provider_io.Proofs.setup_keeps_route',
+    'aivm_secrets_garrett_core.provider_io.Proofs.audit_keeps_route',
+    'aivm_secrets_garrett_core.provider_io.Proofs.recheck_keeps_route',
+    'aivm_secrets_garrett_core.provider_io.Proofs.send_keeps_route',
+    'aivm_secrets_garrett_core.provider_io.Proofs.receive_keeps_route',
+    'aivm_secrets_garrett_core.provider_io.Proofs.prepare_keeps_route',
+    'aivm_secrets_garrett_core.provider_io.Proofs.configure_keeps_route',
+    'aivm_secrets_garrett_core.provider_io.Proofs.check_keeps_route',
+    'aivm_secrets_garrett_core.provider_io.Proofs.reserve_keeps_route',
+    'aivm_secrets_garrett_core.provider_io.Proofs.finish_keeps_route',
+    'aivm_secrets_garrett_core.provider_io.Proofs.request_constructor',
+    'aivm_secrets_garrett_core.provider_io.Proofs.submit_run_iff',
+    'aivm_secrets_garrett_core.provider_io.Proofs.returned_body_is_captured',
+    'aivm_secrets_garrett_core.provider_io.Proofs.every_return_is_spent',
+    'aivm_secrets_garrett_core.provider_io.Proofs.replay_calls_no_buffer_or_writer',
+    'aivm_secrets_garrett_core.request_context.Proofs.dispatch_route',
+]
+
+THEOREMS += [
     'aivm_secrets_garrett_core.dispatch.TraceRefinement.setup_trace',
     'aivm_secrets_garrett_core.dispatch.TraceRefinement.receive_trace',
     'aivm_secrets_garrett_core.dispatch.TraceRefinement.current_trace',
@@ -900,6 +923,7 @@ def inputs() -> list[str]:
         "proofs/GarrettCompletionTrace.lean",
         "proofs/GarrettOwnedRequestTrace.lean",
         "proofs/GarrettRequestContext.lean",
+        "proofs/GarrettProviderIO.lean",
         "proofs/GarrettRequestPrefix.lean",
         "proofs/GarrettRequestTrace.lean",
         "tests/test_rust_w6_completion.py",
@@ -1286,6 +1310,15 @@ def mutate(pattern: str | None = None) -> None:
         (context, 'request context ignored outer-check denial', '        self.work.recheck()', '        let _ignored = self.work.recheck();\n        Ok(())'),
         (context, 'request context replaced completion input', '        self.work.complete(raw)', '        let _ignored = raw;\n        let empty = self.work.empty_facts();\n        self.work.complete(empty)'),
         (context, 'request context repeated check factory', '        let checks = self.factory.checks();', '        let _ignored = self.factory.checks();\n        let checks = self.factory.checks();'),
+    ]
+    provider_io = source.with_name("provider_io.rs")
+    mutations += [
+        (provider_io, 'provider io reused spent buffer', 'if self.attempted {', 'if false {'),
+        (provider_io, 'provider io forgot attempt', 'self.attempted = true;', 'self.attempted = false;'),
+        (provider_io, 'provider io replaced captured bytes', 'writer.write_all(bytes)', 'writer.write_all(&Vec::new())'),
+        (provider_io, 'provider io suppressed write refusal', 'Err(error) => return Err(error),', 'Err(_error) => (),'),
+        (provider_io, 'provider io skipped flush', '        writer.flush()', '        Ok(())'),
+        (provider_io, 'provider io ignored captured route', 'self.work.setup_route(self.route)', 'self.work.setup()'),
     ]
     admission = source.with_name("current_admission.rs")
     mutations += [
@@ -2117,6 +2150,7 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettCompletionTrace",
                 "GarrettOwnedRequestTrace",
                 "GarrettRequestContext",
+                "GarrettProviderIO",
                 "GarrettConfinement",
                 "GarrettProviderSimulation",
                 "GarrettRequestPrefix",
@@ -2164,6 +2198,7 @@ def mutate(pattern: str | None = None) -> None:
                 "request_adapter.rs": "GarrettRequestAdapter",
                 "current_admission.rs": "GarrettCurrentAdmission",
                 "request_context.rs": "GarrettRequestContext",
+                "provider_io.rs": "GarrettProviderIO",
                 "approval.rs": "GarrettApproval",
                 "enrollment.rs": "GarrettEnrollment",
                 "authority.rs": "GarrettAuthority",
@@ -2216,7 +2251,7 @@ def mutate(pattern: str | None = None) -> None:
                 ]:
                     modules.remove(dependency)
                 modules[1:1] = ["GarrettLogin", "GarrettManifest", "GarrettDisclosure"]
-            if label.startswith(("trace origin ", "request context ")):
+            if label.startswith(("trace origin ", "request context ", "provider io ")):
                 # Rebuild the actual local import closure against this mutant;
                 # cached proof objects are never substituted for dependencies.
                 closure: list[str] = []
@@ -2232,7 +2267,7 @@ def mutate(pattern: str | None = None) -> None:
                             visit(imported)
                     closure.append(module)
 
-                visit("GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
+                visit("GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
                 modules = closure + [module for module in modules if module not in seen]
             for module in modules:
                 proof = temporary / (module + ".lean")
