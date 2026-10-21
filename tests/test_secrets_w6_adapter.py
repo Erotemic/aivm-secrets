@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from dev.verification.w6_adapter import CONTRACT, SOURCE, TESTS, CORE_ENCODER, CORE_DISPATCH, CORE_REQUEST, CORE_CURRENT, CORE_CONTEXT, CORE_IO, COMMON_ENCODER, ContractError, check
+from dev.verification.w6_adapter import CONTRACT, SOURCE, TESTS, CORE_ROUTE, CORE_ENCODER, CORE_DISPATCH, CORE_REQUEST, CORE_CURRENT, CORE_CONTEXT, CORE_IO, COMMON_ENCODER, ContractError, check
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def fixture_checkout(tmp_path):
     dst = tmp_path / 'checkout'
     contract = json.loads((ROOT / CONTRACT).read_text())
-    names = {CONTRACT, SOURCE, TESTS, CORE_ENCODER, CORE_DISPATCH, CORE_REQUEST, CORE_CURRENT, CORE_CONTEXT, CORE_IO, COMMON_ENCODER,
+    names = {CONTRACT, SOURCE, TESTS, CORE_ROUTE, CORE_ENCODER, CORE_DISPATCH, CORE_REQUEST, CORE_CURRENT, CORE_CONTEXT, CORE_IO, COMMON_ENCODER,
              'docs/planning/aivm-secrets-w0-boundaries.json',
              'docs/planning/aivm-secrets-assumptions.json'}
     names.update(channel['path'] for channel in contract['channels'])
@@ -48,7 +48,7 @@ def test_w6_moving_wire_validation_after_connect_is_rejected(tmp_path):
     checkout = fixture_checkout(tmp_path)
     path = checkout / SOURCE
     body = path.read_text()
-    line = '        let bytes = manifest_request_bytes(route, self.secret, &self.effect, &self.headers)?;\n'
+    line = '        let (bytes, endpoint) =\n            manifest_request_bytes(route, self.secret, &self.effect, &self.headers)?;\n'
     assert line in body
     body = body.replace(line, '', 1)
     marker = '        let stream = StreamOwned::new(conn, socket);\n'

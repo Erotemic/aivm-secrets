@@ -588,15 +588,16 @@ fn manifest_request_bytes(
     secret: &Credential,
     effect: &Effect,
     headers: &BTreeMap<String, String>,
-) -> Outcome<Zeroizing<Vec<u8>>> {
-    let head = http_wire::Head {
+) -> Outcome<(
+    Zeroizing<Vec<u8>>,
+    aivm_secrets_garrett_core::provider_wire::Endpoint,
+)> {
+    let fields = aivm_secrets_garrett_core::provider_wire::Fields {
         method: effect.method.as_bytes().to_vec(),
         target: effect.target.as_bytes().to_vec(),
-        host: route.host.clone(),
-        port: u16::try_from(route.port).map_err(|_| Error::InvalidPolicy)?,
         accept: effect.accept.as_bytes().to_vec(),
-        // BTreeMap preserves the existing deterministic wire order. The core
-        // independently checks case-insensitive uniqueness and reserved names.
+        // Preserve BTreeMap order; the checked encoder rejects overrides and
+        // case-insensitive duplicates after conversion.
         headers: headers
             .iter()
             .map(|(name, value)| http_wire::Header {
@@ -609,12 +610,19 @@ fn manifest_request_bytes(
         .body
         .as_ref()
         .map(|value| Zeroizing::new(json::canonical(value)));
-    provider_request_bytes(
-        &head,
-        secret,
-        &route.authentication,
-        body.as_ref().map(|v| v.as_slice()),
+    let mut output = Zeroizing::new(Vec::new());
+    let endpoint = aivm_secrets_garrett_core::provider_wire::append(
+        &mut output,
+        route,
+        fields,
+        &secret.0,
+        body.as_ref().map(|value| value.as_slice()),
     )
+    .map_err(|error| match error {
+        http_wire::EncodingDenial::InvalidRequest => Error::InvalidPolicy,
+        http_wire::EncodingDenial::InvalidCredential => Error::CredentialSource,
+    })?;
+    Ok((output, endpoint))
 }
 
 // The standard Write contract includes partial acceptance before an error.
@@ -779,14 +787,12 @@ impl aivm_secrets_garrett_core::provider_io::RouteWork<ManifestChannel, Error>
         }))
     }
     fn setup_route(&mut self, route: &core::Route) -> Outcome<ManifestChannel> {
-        let bytes = manifest_request_bytes(route, self.secret, &self.effect, &self.headers)?;
+        let (bytes, endpoint) =
+            manifest_request_bytes(route, self.secret, &self.effect, &self.headers)?;
         let request = ManifestWire(bytes);
-        let host = std::str::from_utf8(&route.host).map_err(|_| Error::InvalidPolicy)?;
+        let host = std::str::from_utf8(endpoint.host()).map_err(|_| Error::InvalidPolicy)?;
         let mut socket = TcpStream::connect_timeout(
-            &SocketAddr::new(
-                self.executor.address,
-                u16::try_from(route.port).map_err(|_| Error::InvalidPolicy)?,
-            ),
+            &SocketAddr::new(self.executor.address, endpoint.port()),
             Duration::from_secs(5),
         )
         .map_err(|_| Error::Unreachable)?;
@@ -1367,7 +1373,7 @@ mod wire_tests {
             &headers,
         )
         .unwrap();
-        let wire = String::from_utf8(request.to_vec()).unwrap();
+        let wire = String::from_utf8(request.0.to_vec()).unwrap();
         assert!(
             wire.starts_with("GET /v1/pull/7?state=open HTTP/1.1\r\nHost: api.example.org:443\r\n")
         );
@@ -1388,7 +1394,7 @@ mod wire_tests {
             &BTreeMap::new(),
         )
         .unwrap();
-        let wire = String::from_utf8(request.to_vec()).unwrap();
+        let wire = String::from_utf8(request.0.to_vec()).unwrap();
         assert!(wire.contains("\r\nX-API-Key: SYNTHETIC_TOKEN_123456\r\n"));
         assert!(!wire.contains("Authorization:"));
         assert_eq!(wire.matches("SYNTHETIC_TOKEN_123456").count(), 1);
@@ -1456,13 +1462,52 @@ mod wire_tests {
             &BTreeMap::new(),
         )
         .unwrap();
-        let wire = String::from_utf8(bytes.to_vec()).unwrap();
+        let wire = String::from_utf8(bytes.0.to_vec()).unwrap();
         let (head, body) = wire.split_once("\r\n\r\n").unwrap();
         assert!(head.contains(&format!("Content-Length: {}", body.len())));
         assert_eq!(
             serde_json::from_str::<Value>(body).unwrap(),
             post.body.unwrap()
         );
+    }
+    #[test]
+    fn native_encoder_endpoint_matches_captured_channel_bytes() {
+        let mut route = route();
+        route.port = 9443;
+        route.authentication = core::Authentication::ApiKey;
+        let (bytes, endpoint) = manifest_request_bytes(
+            &route,
+            &secret(b"SYNTHETIC_TOKEN_123456"),
+            &effect(),
+            &BTreeMap::new(),
+        )
+        .unwrap();
+        assert_eq!(endpoint.host(), &route.host);
+        assert_eq!(endpoint.port(), 9443);
+        let expected = bytes.to_vec();
+        assert!(String::from_utf8(expected.clone())
+            .unwrap()
+            .contains("\r\nHost: api.example.org:9443\r\n"));
+        assert!(String::from_utf8(expected.clone())
+            .unwrap()
+            .contains("\r\nX-API-Key: SYNTHETIC_TOKEN_123456\r\n"));
+        let accepted = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+        let writer = PartialWriter {
+            accepted: accepted.clone(),
+            limit: usize::MAX,
+            flush_error: false,
+        };
+        let mut channel = aivm_secrets_garrett_core::provider_io::Channel::new(
+            ManifestWire(bytes),
+            ProviderWriter(writer),
+            endpoint,
+        );
+        assert!(send_manifest_bytes(&mut channel).is_ok());
+        let (_, request, returned) = channel.into_parts().ok().unwrap();
+        assert!(request.attempted());
+        assert_eq!(*accepted.borrow(), expected);
+        assert_eq!(returned.host(), &route.host);
+        assert_eq!(returned.port(), 9443);
     }
     #[test]
     fn manifest_response_rejects_redirect_partial_and_ambiguous_framing() {

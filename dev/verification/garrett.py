@@ -280,6 +280,21 @@ THEOREMS += [
 ]
 
 THEOREMS += [
+    'aivm_secrets_garrett_core.provider_wire.Proofs.endpoint_host',
+    'aivm_secrets_garrett_core.provider_wire.Proofs.endpoint_port',
+    'aivm_secrets_garrett_core.provider_wire.Proofs.port_cast_exact',
+    'aivm_secrets_garrett_core.provider_wire.Proofs.head_refuses_invalid_port',
+    'aivm_secrets_garrett_core.provider_wire.Proofs.head_exact',
+    'aivm_secrets_garrett_core.provider_wire.Proofs.head_success_iff',
+    'aivm_secrets_garrett_core.provider_wire.Proofs.append_success_iff',
+    'aivm_secrets_garrett_core.provider_wire.Proofs.invalid_port_preserves_buffer',
+    'aivm_secrets_garrett_core.provider_wire.Proofs.successful_endpoint_origin',
+    'aivm_secrets_garrett_core.provider_wire.Proofs.accepted_route_exact',
+    'aivm_secrets_garrett_core.provider_wire.Proofs.returned_route_bytes',
+    'aivm_secrets_garrett_core.provider_wire.Proofs.encoded_channel_write_origin',
+]
+
+THEOREMS += [
     'aivm_secrets_garrett_core.dispatch.TraceRefinement.setup_trace',
     'aivm_secrets_garrett_core.dispatch.TraceRefinement.receive_trace',
     'aivm_secrets_garrett_core.dispatch.TraceRefinement.current_trace',
@@ -939,6 +954,7 @@ def inputs() -> list[str]:
         "proofs/GarrettRequestContext.lean",
         "proofs/GarrettProviderIO.lean",
         "proofs/GarrettProviderChannel.lean",
+        "proofs/GarrettProviderWire.lean",
         "proofs/GarrettRequestPrefix.lean",
         "proofs/GarrettRequestTrace.lean",
         "tests/test_rust_w6_completion.py",
@@ -1342,6 +1358,15 @@ def mutate(pattern: str | None = None) -> None:
         (provider_io, 'provider channel skipped captured submission', 'self.request.submit(&mut self.writer)', 'self.writer.flush()'),
         (provider_io, 'provider channel bypassed response gate', 'if !self.ready {', 'if false {'),
         (provider_io, 'provider channel reset released request', 'Ok((self.writer, self.request, self.metadata))', 'Ok((self.writer, Request::new(self.request.body), self.metadata))'),
+    ]
+    provider_wire = source.with_name("provider_wire.rs")
+    mutations += [
+        (provider_wire, 'provider wire replaced route host', 'host: route.host.clone()', 'host: route.path.clone()'),
+        (provider_wire, 'provider wire replaced route port', 'port: route.port as u16', 'port: 443'),
+        (provider_wire, 'provider wire replaced selected target', 'target: fields.target', 'target: route.path.clone()'),
+        (provider_wire, 'provider wire replaced authentication mode', '&route.authentication, body', '&crate::credential_use::Authentication::ApiKey, body'),
+        (provider_wire, 'provider wire skipped checked port', 'if route.port <= 0 || route.port > 65535', 'if false'),
+        (provider_wire, 'provider wire forged returned endpoint', 'host: head.host,', 'host: route.path.clone(),'),
     ]
     admission = source.with_name("current_admission.rs")
     mutations += [
@@ -2175,6 +2200,7 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettRequestContext",
                 "GarrettProviderIO",
                 "GarrettProviderChannel",
+                "GarrettProviderWire",
                 "GarrettConfinement",
                 "GarrettProviderSimulation",
                 "GarrettRequestPrefix",
@@ -2223,6 +2249,7 @@ def mutate(pattern: str | None = None) -> None:
                 "current_admission.rs": "GarrettCurrentAdmission",
                 "request_context.rs": "GarrettRequestContext",
                 "provider_io.rs": "GarrettProviderIO",
+                "provider_wire.rs": "GarrettProviderWire",
                 "approval.rs": "GarrettApproval",
                 "enrollment.rs": "GarrettEnrollment",
                 "authority.rs": "GarrettAuthority",
@@ -2277,7 +2304,7 @@ def mutate(pattern: str | None = None) -> None:
                 ]:
                     modules.remove(dependency)
                 modules[1:1] = ["GarrettLogin", "GarrettManifest", "GarrettDisclosure"]
-            if label.startswith(("trace origin ", "request context ", "provider io ", "provider channel ")):
+            if label.startswith(("trace origin ", "request context ", "provider io ", "provider channel ", "provider wire ")):
                 # Rebuild the actual local import closure against this mutant;
                 # cached proof objects are never substituted for dependencies.
                 closure: list[str] = []
@@ -2293,7 +2320,7 @@ def mutate(pattern: str | None = None) -> None:
                             visit(imported)
                     closure.append(module)
 
-                visit("GarrettProviderChannel" if label.startswith("provider channel ") else "GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
+                visit("GarrettProviderWire" if label.startswith("provider wire ") else "GarrettProviderChannel" if label.startswith("provider channel ") else "GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
                 modules = closure + [module for module in modules if module not in seen]
             for module in modules:
                 proof = temporary / (module + ".lean")

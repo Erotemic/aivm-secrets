@@ -7214,6 +7214,83 @@ def provider_io.Channel.into_parts
   else let t ← WriterInst.INVALID_TRANSITION
        ok (core.result.Result.Err t)
 
+/-- [aivm_secrets_garrett_core::provider_wire::Fields]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_wire.rs', lines 6:0-11:1
+    Visibility: public -/
+structure provider_wire.Fields where
+  method : alloc.vec.Vec Std.U8
+  target : alloc.vec.Vec Std.U8
+  accept : alloc.vec.Vec Std.U8
+  headers : alloc.vec.Vec http_wire.Header
+
+/-- [aivm_secrets_garrett_core::provider_wire::Endpoint]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_wire.rs', lines 14:0-17:1
+    Visibility: public -/
+structure provider_wire.Endpoint where
+  host : alloc.vec.Vec Std.U8
+  port : Std.U16
+
+/-- [aivm_secrets_garrett_core::provider_wire::{aivm_secrets_garrett_core::provider_wire::Endpoint}::host]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_wire.rs', lines 19:4-21:5
+    Visibility: public -/
+def provider_wire.Endpoint.impl.host
+  (self : provider_wire.Endpoint) : Result (alloc.vec.Vec Std.U8) := do
+  ok self.host
+
+/-- [aivm_secrets_garrett_core::provider_wire::{aivm_secrets_garrett_core::provider_wire::Endpoint}::port]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_wire.rs', lines 22:4-24:5
+    Visibility: public -/
+def provider_wire.Endpoint.impl.port
+  (self : provider_wire.Endpoint) : Result Std.U16 := do
+  ok self.port
+
+/-- [aivm_secrets_garrett_core::provider_wire::head]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_wire.rs', lines 27:0-39:1 -/
+def provider_wire.head
+  (route : credential_use.Route) (fields : provider_wire.Fields) :
+  Result (core.result.Result http_wire.Head http_wire.EncodingDenial)
+  := do
+  if route.port <= 0#i64
+  then ok (core.result.Result.Err http_wire.EncodingDenial.InvalidRequest)
+  else
+    if route.port > 65535#i64
+    then ok (core.result.Result.Err http_wire.EncodingDenial.InvalidRequest)
+    else
+      let v ← alloc.vec.CloneVec.clone core.clone.CloneU8 route.host
+      let i ← lift (IScalar.hcast .U16 route.port)
+      ok (core.result.Result.Ok
+        {
+          method := fields.method,
+          target := fields.target,
+          host := v,
+          port := i,
+          accept := fields.accept,
+          headers := fields.headers
+        })
+
+/-- [aivm_secrets_garrett_core::provider_wire::append]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_wire.rs', lines 43:0-62:1
+    Visibility: public -/
+def provider_wire.append
+  (output : alloc.vec.Vec Std.U8) (route : credential_use.Route)
+  (fields : provider_wire.Fields) (secret : Slice Std.U8)
+  (body : Option (Slice Std.U8)) :
+  Result ((core.result.Result provider_wire.Endpoint http_wire.EncodingDenial)
+    × (alloc.vec.Vec Std.U8))
+  := do
+  let r ← provider_wire.head route fields
+  match r with
+  | core.result.Result.Ok head =>
+    let (r1, output1) ←
+      http_wire.append_request output head secret route.authentication body
+    match r1 with
+    | core.result.Result.Ok _ =>
+      ok (core.result.Result.Ok { host := head.host, port := head.port },
+        output1)
+    | core.result.Result.Err error =>
+      ok (core.result.Result.Err error, output1)
+  | core.result.Result.Err error => ok (core.result.Result.Err error, output)
+
 /-- [aivm_secrets_garrett_core::read_transition::invocation::Trace]
     Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 9:0-20:1
     Visibility: public -/

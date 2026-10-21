@@ -37,7 +37,7 @@ def projection():
         function(7, ['rustls_pki_types','pem','reader'], unresolved={'Trait':2}),
         function(8, ['aivm_secrets_garrett','custody','account_request_bytes'], [14]),
         function(9, ['aivm_secrets_garrett','custody','manifest_session',
-                     'manifest_request_bytes'], [14]),
+                     'manifest_request_bytes'], [37]),
         function(10, ['aivm_secrets_garrett_core','http_auth','append_header'], [11]),
         function(11, ['aivm_secrets_garrett_core','http_auth','valid_credential']),
         function(12, ['aivm_secrets_garrett_core','http_request','append_line'], [13]),
@@ -49,7 +49,7 @@ def projection():
         function(18, ['aivm_secrets_garrett_core','http_wire','valid_name'], [19]),
         function(19, ['aivm_secrets_garrett_core','http_wire','reserved_name'], [20]),
         function(20, ['aivm_secrets_garrett_core','http_wire','ascii_equal']),
-        function(22, ['aivm_secrets_garrett_core','provider_exchange','exchange'], [5,9,34]),
+        function(22, ['aivm_secrets_garrett_core','provider_exchange','exchange'], [5,34,38]),
         function(23, ['aivm_secrets_garrett_core','request_adapter','<Impl>','dispatch'], [4,30]),
         function(24, ['aivm_secrets_garrett_core','request_adapter','<Impl>','complete'], [25]),
         function(25, ['aivm_secrets_garrett_core','completion','complete'], [26]),
@@ -63,6 +63,10 @@ def projection():
         function(34, ['aivm_secrets_garrett','custody','manifest_session','<Impl>','receive'], [35]),
         function(35, ['aivm_secrets_garrett_core','provider_io','<Impl>','into_parts']),
         function(36, ['aivm_secrets_garrett_core','provider_io','<Impl>','submit'], [32]),
+        function(37, ['aivm_secrets_garrett_core','provider_wire','append'], [15]),
+        function(38, ['aivm_secrets_garrett','custody','manifest_session','<Impl>','setup_route'], [9,39,40]),
+        function(39, ['aivm_secrets_garrett_core','provider_wire','<Impl>','host']),
+        function(40, ['aivm_secrets_garrett_core','provider_wire','<Impl>','port']),
     ]))
 
 
@@ -74,12 +78,14 @@ def test_compiled_paths_keep_external_and_dynamic_obligations_explicit():
         'owned-context-check-factory':[0,29,23,30,31],
         'captured-provider-writer':[0,29,23,4,22,5,36,32,33],
         'captured-provider-response-parts':[0,29,23,4,22,34,35],
+        'manifest-encoded-endpoint-host':[0,29,23,4,22,38,39],
+        'manifest-encoded-endpoint-port':[0,29,23,4,22,38,40],
         'account-authentication-bytes':[0,1,2,3,8,14,15,10,11],
-        'manifest-authentication-bytes':[0,29,23,4,22,9,14,15,10,11],
+        'manifest-authentication-bytes':[0,29,23,4,22,38,9,37,15,10,11],
         'account-request-line':[0,1,2,3,8,14,15,12,13],
-        'manifest-request-line':[0,29,23,4,22,9,14,15,12,13],
+        'manifest-request-line':[0,29,23,4,22,38,9,37,15,12,13],
         'account-complete-header-admission':[0,1,2,3,8,14,15,16,17,18,19,20],
-        'manifest-complete-header-admission':[0,29,23,4,22,9,14,15,16,17,18,19,20]}
+        'manifest-complete-header-admission':[0,29,23,4,22,38,9,37,15,16,17,18,19,20]}
     assert result['opaque_boundaries'] == [6]
     assert result['unresolved_calls'] == {7:{'Trait':2}}
     assert result['unresolved_in_root'] == {}
@@ -88,7 +94,7 @@ def test_compiled_paths_keep_external_and_dynamic_obligations_explicit():
         'begin']['line'] == 4
 
 
-@pytest.mark.parametrize('victim', [0,1,2,3,4,8,9,10,12,14,15,16,17,18,19,21,22,23,24,25,27,28,30,32,34])
+@pytest.mark.parametrize('victim', [0,1,2,3,4,8,9,10,12,14,15,16,17,18,19,21,22,23,24,25,27,28,30,32,34,35,36])
 def test_missing_callback_link_cannot_be_rebaselined_as_a_passing_witness(victim):
     data = projection()
     data['translated']['fun_decls'][victim]['body']['blocks']['direct'] = []

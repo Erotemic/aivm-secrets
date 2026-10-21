@@ -2636,3 +2636,114 @@ frozen records are unchanged. Queue and roadmap advance owned channel field
 selection/response eligibility while retaining the native encoder/setup/view/
 std-writer and observation/history obligations. Accounting is published in a
 separate co-authored commit.
+
+## 2026-10-21 00:02:13 -0400
+
+Previous turn was verified progress: 7d1069d/59c9e81/b2b267b own the native
+provider channel with successful-flush parser eligibility and frozen 3,071-case
+acceptance. Clean tree rechecked before continuing. Implemented production
+provider_wire::append: route-derived Host/checked port/authentication, independent
+operation Fields, and immutable Endpoint returned only after complete HTTP
+encoding. Native manifest setup takes TCP port and TLS host from that endpoint,
+removing duplicate native route conversions; cached resolver IP remains the
+existing explicit contract. Zeroizing output ownership, selected target,
+ordered headers/body, error mapping and encode-before-TCP order are retained.
+
+Core 47 and native library 37 cases pass, along with all-feature Clippy.
+New cases cover exact complete binary bytes, both auth modes, nonstandard
+port, invalid route/request/credential/header refusal, and native encoder to
+owned channel/writer with the same endpoint and bytes. All 153 source guard
+cases and 53 specialized fixture cases pass. The optional ledger now routes
+manifest byte paths through the actual route-bound appender and adds endpoint
+host/port getter paths; those are linkage evidence only.
+
+Twelve new obligations are being kernel checked. They cover private endpoint
+getters, nonwrapping port cast, exact head/argument/returned-buffer relations,
+route endpoint origin, bounded complete bytes and composition through the real
+channel constructor/submission/response-parts gate under a local faithful buffer
+view contract. No supplied native readiness, arrival or whole-callback history
+is used. Native conversion/view/std-TLS/DNS/parser/storage/drop/close/unwind,
+selected JSON/frame and adaptive histories remain open; this is not an
+NR-2–NR-5 exit or a whole-service assurance claim. Python edits remain non-core;
+no runtime dependency, wire version, authorization policy or identity mode was
+added. Final evidence will be committed with actual GPT-6 co-authorship and
+unknown exact weights/config variant stated.
+
+Native conversion ordering slightly changes for invalid internal routes: JSON/
+header materialization precedes the extracted port refusal, while no provider
+I/O can occur. Normal admitted routes already satisfy route validation; bounded
+allocation/timing and malformed native conversion remain explicit contracts.
+The encoder retains the caller's zeroizing output even on refusal. Review and
+full VM acceptance remain necessary before freezing this source.
+
+All twelve new source obligations compile with warningAsError. Initial proof
+corrections used simplification rather than dependent elimination on the ITree
+return equality, explicit bind reduction for the reverse append relation, and
+constructor injection for the returned endpoint equality. No statement was
+weakened; bounded bytes and actual write/flush composition remain intact.
+New files are staged/whitespace checked before full acceptance. Full record,
+six route/port/target/authentication/gate/endpoint mutants, fresh compiler
+capture and safe vTPM/native product acceptance are running.
+
+All 94 Rust workspace tests pass (47 core, 37 native library), as do 153
+boundary and 53 specialized fixture cases, 168 debug read cases and the
+standalone native product witness. Six safe installed-vTPM cases preserve
+public objects, dictionary state and cleanup. The bounded fresh compiler
+capture finds fourteen paths including the actual endpoint getters; all
+native/analysis hashes match. The 1,851-job full Lean build passes. Central
+named audits, release parity, six selected mutants and focused read proofs
+are being completed before quiet full-suite/packaging acceptance.
+
+The central audit passes all 688 named obligations without admitted or
+project-specific security axioms. Eight read-path and five prefix kernel/axiom
+checks pass against the final extraction. Release parity and the six selected
+mutations continue; the complete source remains unchanged during acceptance.
+
+Final Garrett record passes 688 named obligations, 767 release parity cases
+in 221.97 seconds, both Clippy feature modes and exact regenerated source.
+All 290 manifest input hashes match. Four selected route/port/target/auth
+mutants reject in GarrettProviderWire; the checked-port/forged-endpoint models
+continue through their own rebuilt import closures. Ordinary release workflow
+acceptance runs now; the full suite waits for heavy proof jobs to finish.
+
+All six new selected of 271 source mutations reject specifically in
+GarrettProviderWire, including bypassing the checked port and forging the
+returned endpoint; every mutant used its actual extraction and rebuilt local
+import closure. Both 168-case native build modes and standalone workflows
+pass. All heavy acceptance jobs are terminal. The full required no-skip
+Python/native suite and subsequent packaging now run on a quiet VM before
+implementation/evidence/accounting commits.
+
+## 2026-10-21 00:29:48 -0400
+
+Route-bound wire/endpoint acceptance completed: 3,083 full Python/native cases
+pass in 546.56 seconds, zero skips/failures/errors, required isolated TPM tests
+and all native runners mapped to fresh debug binaries. Heavy proof/compiler/
+mutation jobs were terminal before this quiet-VM run. Both package artifacts
+build; all 290 Garrett archive inputs and the embedded manifest match final
+sources. Both 168-case native read modes and standalone product workflows pass.
+Six safe installed-vTPM cases preserve public objects, dictionary state and
+fixture cleanup; wrong-auth remains isolated.
+
+The final record passes 688 named audits (twelve new source-owned route/byte/
+endpoint/channel obligations), 767 release parity cases, 94 Rust workspace
+cases (47 core, 37 native library), 153 boundary tests, 53 ledger fixture cases,
+fourteen fresh bounded compiler paths, six mutants rejected in the new proof
+leaf, and eight read-path/five prefix kernel audits. The generated model exactly
+regenerates from production Rust; no handwritten extraction or whole-callback
+history is substituted. All earlier route/context/channel/entry obligations
+remain present and pass. Source changes were staged/whitespace checked before
+acceptance; no post-test code normalization was needed.
+
+Confidence is high in checked nonwrapping route/Host/port/authentication binding,
+endpoint origin, bounded complete bytes and actual channel write/flush
+composition under the local faithful buffer-view premise. Native String/header/
+JSON conversion, view/std-TLS/DNS/parser/storage and drop/close/unwind semantics,
+complete native outcome/event correspondence, selected JSON/frame/close and
+adaptive histories remain open. The encoder and endpoint result is not a
+whole-service native I/O or W5 theorem, NR-2–NR-5 exit, normative API/write parity,
+physical TPM provenance, real-provider validation or deployed isolation claim.
+Independent security review remains required. The next work must connect those
+actual primitive/event/observation contracts, not substitute another inventory.
+Every authored implementation/evidence/accounting commit has actual GPT-6
+co-authorship with unavailable exact weights/config variant stated.

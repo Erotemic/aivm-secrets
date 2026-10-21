@@ -599,3 +599,21 @@ actual route/encoder byte arguments, then selected JSON/frame/close observations
 and adaptive native histories. Compiler paths to the concrete writer and parts
 gate are complementary linkage evidence, not dominance or native I/O closure.
 NR-2–NR-5, native write assurance and normative Rust API parity remain open.
+
+### Route-bound complete bytes and endpoint (October 20–21)
+
+The [production route-bound encoder](../garrett-provider-wire.md) now derives
+Host, checked port and authentication from the supplied route. Operation Fields
+cannot supply competing destination/authentication inputs. Complete encoding
+returns a private immutable Endpoint; native TCP/TLS setup uses its getters.
+Twelve extracted obligations retain exact head/body/authentication/buffer states,
+nonwrapping port bounds, endpoint origin and bounded complete bytes. Composition
+with the actual channel constructor/submission/release derives a write of those
+bytes and successful flush under a local faithful native buffer-view contract;
+no supplied readiness, arrival or whole-callback history is needed.
+
+Native String/header/JSON conversion, zeroizing buffer view, std/TLS/DNS/parser/
+storage and drop/close/unwind remain contracts. Native outcome/event and selected
+JSON/frame/close/adaptive-history correspondence still need implementation links.
+The optional compiler encoder/getter paths are not semantic refinement or sink
+closure. NR-2–NR-5 and normative native write/API parity remain open.

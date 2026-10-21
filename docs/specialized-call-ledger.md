@@ -67,7 +67,10 @@ adds an eleventh path through the actual `Request::submit` to the native
 opaque contracts. The [owned provider channel](garrett-provider-channel.md)
 adds a twelfth path from the native receive adapter to the actual consuming
 response-parts gate; it retains the exact submission-to-native-writer path.
-The coordinator profile retains
+The [route-bound encoder](garrett-provider-wire.md) routes manifest byte
+witnesses through the core producer and adds endpoint host/port getter paths,
+for fourteen bridge witnesses. These are concrete callback links, not an
+implementation-to-byte theorem. The coordinator profile retains
 six paths. These witnesses do not establish validation dominance or mediation.
 
 The optional [native authority](native-coordinator-authority.md) has a separate

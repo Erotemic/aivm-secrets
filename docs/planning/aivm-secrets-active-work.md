@@ -244,9 +244,18 @@ including native receive to the actual response-parts gate, without a mediation
 claim. See the
 [channel validation record](../../dev/validation/2026-10-20-provider-channel.json).
 
+**Route-bound encoder update:** the [production route/byte/endpoint producer](../garrett-provider-wire.md)
+now binds Host, checked port and authentication in extracted Rust and returns
+an immutable endpoint only after complete encoding. Native TCP/TLS setup uses
+that endpoint. Twelve obligations derive exact bounded bytes and compose actual
+encoding with channel write/flush origin under the explicit local buffer-view
+contract. Validation is recorded separately for the committed source.
+
 The next implementation task remains native primitive correspondence: connect
-native setup/encoder and std/TLS writer/buffer-view semantics to the captured
-route, complete encoder bytes and extracted channel submission/release. Keep trusted TLS/DNS/Write/parser and storage semantics
+native String/header/JSON conversion, faithful zeroizing buffer view and
+std/TLS/DNS/parser/storage contracts to the now-source-derived endpoint, complete
+request bytes and channel submission/release. Relate the actual native outcomes
+to the existing all-returned event projection. Keep trusted TLS/DNS/Write/parser and storage semantics
 explicit, and connect actual source parameters and returned states rather than
 adding a whole-provider-history, fake-arrival or whole-service mediation premise.
 The JSON/frame observation and sequential-session history obligations remain in

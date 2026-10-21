@@ -1,6 +1,7 @@
 import GarrettRequestContext
 import GarrettProviderIO
 import GarrettProviderChannel
+import GarrettProviderWire
 import GarrettOwnedRequestTrace
 import GarrettCurrentAdmission
 import GarrettRequestAdapter
@@ -755,3 +756,16 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.provider_io.ChannelProofs.replay_withdraws_readiness
 #print axioms aivm_secrets_garrett_core.provider_io.ChannelProofs.released_parts_require_exact_flushed_bytes
 #print axioms aivm_secrets_garrett_core.provider_io.ChannelProofs.successful_channel_witness
+
+#print axioms aivm_secrets_garrett_core.provider_wire.Proofs.endpoint_host
+#print axioms aivm_secrets_garrett_core.provider_wire.Proofs.endpoint_port
+#print axioms aivm_secrets_garrett_core.provider_wire.Proofs.port_cast_exact
+#print axioms aivm_secrets_garrett_core.provider_wire.Proofs.head_refuses_invalid_port
+#print axioms aivm_secrets_garrett_core.provider_wire.Proofs.head_exact
+#print axioms aivm_secrets_garrett_core.provider_wire.Proofs.head_success_iff
+#print axioms aivm_secrets_garrett_core.provider_wire.Proofs.append_success_iff
+#print axioms aivm_secrets_garrett_core.provider_wire.Proofs.invalid_port_preserves_buffer
+#print axioms aivm_secrets_garrett_core.provider_wire.Proofs.successful_endpoint_origin
+#print axioms aivm_secrets_garrett_core.provider_wire.Proofs.accepted_route_exact
+#print axioms aivm_secrets_garrett_core.provider_wire.Proofs.returned_route_bytes
+#print axioms aivm_secrets_garrett_core.provider_wire.Proofs.encoded_channel_write_origin

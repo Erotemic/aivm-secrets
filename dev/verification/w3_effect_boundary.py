@@ -248,17 +248,30 @@ def review_semantics(contents: dict[str, str]) -> None:
     # W6: the exact provider bytes are validated by a pure encoder BEFORE any
     # TCP/TLS effect. This also covers OAuthSource-created Credential values.
     require(m.count('fn manifest_request_bytes(') == 1
-            and m.count('let bytes = manifest_request_bytes(route, self.secret, &self.effect, &self.headers)?;') == 1
-            and m.index('let bytes = manifest_request_bytes(') < m.index('TcpStream::connect_timeout('),
+            and ''.join(m.split()).count('let(bytes,endpoint)=manifest_request_bytes(route,self.secret,&self.effect,&self.headers)?;') == 1
+            and m.index('let (bytes, endpoint) =') < m.index('TcpStream::connect_timeout('),
             'provider socket opened before outbound wire validation')
     wire = part(m, 'fn manifest_request_bytes(', '// The standard Write contract')
-    require(wire.count('provider_request_bytes(') == 1
+    require(wire.count('provider_wire::append(') == 1
             and 'method: effect.method.as_bytes().to_vec()' in wire
             and 'target: effect.target.as_bytes().to_vec()' in wire
-            and 'host: route.host.clone()' in wire and '&route.authentication,' in wire
-            and 'body.as_ref().map(|v| v.as_slice())' in wire
+            and 'provider_wire::Fields {' in wire and 'host:' not in wire and 'port:' not in wire
+            and 'Error::CredentialSource' in wire and 'Ok((output, endpoint))' in wire
+            and 'body.as_ref().map(|value| value.as_slice())' in wire
             and 'request.extend_from_slice(' not in wire and 'format!(' not in wire,
             'manifest HTTP bypasses the shared complete request encoder')
+    routed_wire = contents['rust/crates/aivm-secrets-garrett-core/src/provider_wire.rs'].split('#[cfg(test)]', 1)[0]
+    fields = part(routed_wire, 'pub struct Fields {', 'pub struct Endpoint {')
+    require('host:' not in fields and 'port:' not in fields and 'authentication:' not in fields
+            and 'host: Vec<u8>,' in routed_wire and 'port: u16,' in routed_wire
+            and 'pub host:' not in routed_wire and 'pub port:' not in routed_wire
+            and 'if route.port <= 0 || route.port > 65535' in routed_wire
+            and 'host: route.host.clone()' in routed_wire and 'port: route.port as u16' in routed_wire
+            and 'target: fields.target' in routed_wire
+            and 'http_wire::append_request(output, &head, secret, &route.authentication, body)' in routed_wire
+            and same_order(routed_wire, 'let head = match head(route, fields)', 'http_wire::append_request(', 'Ok(Endpoint {')
+            and 'host: head.host,' in routed_wire and 'port: head.port,' in routed_wire,
+            'route/endpoint/credential bytes bypass their extracted encoder binding')
     c = contents[RUST + 'custody.rs']
     shared_wire = part(c, 'fn provider_request_bytes(', 'fn account_request_bytes(')
     require(shared_wire.count('http_wire::append_request(') == 1
@@ -317,9 +330,11 @@ def review_semantics(contents: dict[str, str]) -> None:
     setup = part(runtime, 'fn setup_route(&mut self, route: &core::Route)', 'fn manifest_response(')
     primitive = part(runtime, 'struct ProviderWriter', 'type ManifestChannel =')
     sender = part(runtime, 'fn send(&mut self, channel:', 'fn receive(&mut self, channel:')
-    require(same_order(setup, 'let bytes = manifest_request_bytes(', 'TcpStream::connect_timeout(',
+    require(same_order(setup, 'let (bytes, endpoint) =', 'TcpStream::connect_timeout(',
                        'while conn.is_handshaking()', 'StreamOwned::new(conn, socket)', 'Ok(aivm_secrets_garrett_core::provider_io::Channel::new(')
-            and 'self.executor.address,' in setup and 'ClientConnection::new(self.executor.tls.clone(), name)' in setup,
+            and 'SocketAddr::new(self.executor.address, endpoint.port())' in setup
+            and 'std::str::from_utf8(endpoint.host())' in setup
+            and 'u16::try_from(route.port)' not in setup and 'std::str::from_utf8(&route.host)' not in setup and 'ClientConnection::new(self.executor.tls.clone(), name)' in setup,
             'provider setup bypasses wire validation or host route / TLS identity')
     require('self.0.write_all(bytes)' in ''.join(primitive.split()) and 'self.0.flush()' in primitive
             and 'send_manifest_bytes(channel)' in ''.join(sender.split()),

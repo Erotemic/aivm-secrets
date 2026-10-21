@@ -286,3 +286,11 @@ response gate used before native parsing. Its eleven exact state/origin
 obligations and early/partial/flush/replay cases supplement this adapter review.
 Native encoder/setup conversions and std/TLS/buffer-view/parser/storage
 semantics still need correspondence; complete I/O mediation remains open.
+
+The [route-bound encoder](garrett-provider-wire.md) now derives complete request
+Host/port/authentication and an immutable endpoint in extracted Rust. Native
+setup consumes that endpoint, and a bounded encoder/channel composition derives
+exact bytes supplied to write and successful flush under the local faithful
+buffer-view contract. Native conversion/std-TLS/DNS/parser/storage and complete
+outcome/event correspondence remain separate; this is not whole-service I/O
+mediation or secrecy.

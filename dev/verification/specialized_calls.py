@@ -272,6 +272,10 @@ def explain(projection, profile="bridge"):
             ('aivm_secrets_garrett_core','provider_exchange','exchange'),
             ('aivm_secrets_garrett','custody','manifest_session','receive'),
             ('aivm_secrets_garrett_core','provider_io','into_parts')]),
+        *[('manifest-encoded-endpoint-' + getter, [
+            ('aivm_secrets_garrett_core','dispatch','dispatch'),
+            ('aivm_secrets_garrett','custody','manifest_session','setup_route'),
+            ('aivm_secrets_garrett_core','provider_wire',getter)]) for getter in ['host','port']],
         ('owned-context-check-factory', [
             ('aivm_secrets_garrett_core','read_transition','run_current'),
             ('aivm_secrets_garrett_core','request_adapter','dispatch'),
@@ -293,7 +297,7 @@ def explain(projection, profile="bridge"):
         ('manifest-authentication-bytes', [
             ('aivm_secrets_garrett_core','dispatch','dispatch'),
             ('aivm_secrets_garrett','custody','manifest_session','manifest_request_bytes'),
-            ('aivm_secrets_garrett','custody','provider_request_bytes'),
+            ('aivm_secrets_garrett_core','provider_wire','append'),
             ('aivm_secrets_garrett_core','http_wire','append_request'),
             ('aivm_secrets_garrett_core','http_auth','append_header'),
             ('aivm_secrets_garrett_core','http_auth','valid_credential')]),
@@ -307,14 +311,15 @@ def explain(projection, profile="bridge"):
         ('manifest-request-line', [
             ('aivm_secrets_garrett_core','dispatch','dispatch'),
             ('aivm_secrets_garrett','custody','manifest_session','manifest_request_bytes'),
-            ('aivm_secrets_garrett','custody','provider_request_bytes'),
+            ('aivm_secrets_garrett_core','provider_wire','append'),
             ('aivm_secrets_garrett_core','http_wire','append_request'),
             ('aivm_secrets_garrett_core','http_request','append_line'),
             ('aivm_secrets_garrett_core','http_request','valid_target')]),
         *[(label + '-complete-header-admission', [
             ('aivm_secrets_garrett','custody', 'exchange') if label == 'account' else
                 ('aivm_secrets_garrett_core','dispatch','dispatch'),
-            ('aivm_secrets_garrett','custody','provider_request_bytes'),
+            ('aivm_secrets_garrett','custody','provider_request_bytes') if label == 'account' else
+                ('aivm_secrets_garrett_core','provider_wire','append'),
             ('aivm_secrets_garrett_core','http_wire','append_request'),
             *[('aivm_secrets_garrett_core','http_wire', name) for name in
               ['valid_headers','valid_header','valid_name','reserved_name','ascii_equal']]])
