@@ -44,7 +44,7 @@ def test_nonzero_exit_preserves_compiler_error_and_context(monkeypatch, tmp_path
 
 
 def test_read_paths_compilation_is_reused_for_prefix_imports(monkeypatch, tmp_path):
-    """One audited compile must also produce the import object for prefixes."""
+    """One successful compilation must also produce the import object for prefixes."""
     backend = tmp_path / '.tools/aeneas/backends/lean/lakefile.lean'
     backend.parent.mkdir(parents=True)
     backend.write_text('-- fake backend: tests only')
@@ -57,18 +57,12 @@ def test_read_paths_compilation_is_reused_for_prefix_imports(monkeypatch, tmp_pa
         if 'GarrettReadPaths.lean' in command:
             idx = command.index('-o')
             Path(command[idx + 1]).write_bytes(b'mocked olean: NOT a proof')
-            return '\n'.join(
-                f"'{read_paths.MODULE}{name}' does not depend on any axioms"
-                for name in sorted(read_paths.REQUIRED)
-            )
+            return ''
         return ''
 
     def fake_prefix(command, cwd, label):
         calls.append((command, label))
-        return '\n'.join(
-            f"'{read_prefixes.MODULE}{name}' does not depend on any axioms"
-            for name in sorted(read_prefixes.REQUIRED)
-        )
+        return ''
 
     monkeypatch.setattr(read_paths, '_run', fake_read_path)
     monkeypatch.setattr(read_prefixes, '_run', fake_prefix)

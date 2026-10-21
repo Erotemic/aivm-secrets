@@ -29,7 +29,7 @@ status/reflection/metadata declassification and an adaptive two-run theorem
 candidate in `proofs/GarrettNoninterference.lean`. Run
 `python dev/verification/w5_noninterference.py prove` for quick, focused
 Lean compilation; run the separate `check` action for review provenance,
-not on every proof edit. Do not add default per-theorem axiom dumps.
+not on every proof edit.
 See `docs/verified-w5-information-flow.md`. W6 now has a source-reviewed
 provider request byte encoder, HTTP parser hardening and a native trace/test
 oracle in `docs/verified-w6-adapter-correspondence.md`. Run
@@ -62,6 +62,25 @@ HTTP, commit/reply and durability refinement. Build it only with the explicit
 `coordinator-server` feature; no ordinary AIVM or broker requirement is added.
 Focus on a useful standalone broker workflow and conditional, implementation-linked credential
 confinement; do not advertise formal VM isolation or whole-service secrecy.
+
+
+### Lean proof development and diagnostic output
+
+- **Compilation, not an axiom-print inventory, is the routine proof-development
+  check.** Keep `lake build <module>` and focused Lean commands quiet on
+  success so genuine elaboration/type errors are easy to find. Do not add
+  `#print axioms`, bulk `#check`/`#print`, or per-theorem axiom reporting to
+  proof modules, default Lake targets, automatic `prove` commands, or CI.
+- Do not repeatedly scan for `sorry` or `admit`, or advertise their absence as
+  a meaningful result. Handle actual compiler warnings and errors when they
+  occur. Do not manufacture a new proof-obligation gate merely to check that
+  contributors wrote ordinary Lean proofs.
+- Transitive axiom dependency review is a **separate, explicitly requested,
+  end-of-formalization audit**. Compare named theorem dependencies against a
+  previously reviewed baseline/allowed set, report **differences only**, and
+  keep raw `#print axioms` output captured rather than flooding stdout. The
+  opt-in `Check` and `GarrettCheck` modules are audit inputs, **never default
+  compilation targets**. An audit is not a prerequisite for every edit.
 
 - Python's normative core (including new durable coordinator decisions,
   same-session OAuth credential leases, and keyed write retries) is catalogued

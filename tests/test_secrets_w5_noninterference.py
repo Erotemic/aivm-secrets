@@ -63,7 +63,7 @@ def test_w5_guard_rejects_unsafe_claim_changes_with_updated_hash(
         w5.check(root)
 
 
-def test_w5_rejects_new_axiom_and_sorry(tmp_path):
+def test_w5_rejects_new_axiom_and_unreviewed_theorem(tmp_path):
     root = fixture(tmp_path)
     path = root / w5.PROOF
     path.write_text(path.read_text() + '\naxiom bypass : False\n')
@@ -71,9 +71,9 @@ def test_w5_rejects_new_axiom_and_sorry(tmp_path):
     with pytest.raises(w5.ContractError, match='unsupported escape'):
         w5.check(root)
     path.write_text(path.read_text().replace('axiom bypass : False',
-                                              'theorem bypass : False := by sorry'))
+                                              'theorem bypass : True := by trivial'))
     refresh(root)
-    with pytest.raises(w5.ContractError, match='unsupported escape'):
+    with pytest.raises(w5.ContractError, match='unreviewed W5 theorem'):
         w5.check(root)
 
 

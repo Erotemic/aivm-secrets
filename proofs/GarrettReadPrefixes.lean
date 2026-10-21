@@ -127,9 +127,3 @@ theorem coupled_history_noninterference (steps : List CoupledRead) :
     step.agreement
 
 end aivm_secrets_garrett_core.confinement.ReadPrefixes
-
-#print axioms aivm_secrets_garrett_core.confinement.ReadPrefixes.blocked_has_no_provider
-#print axioms aivm_secrets_garrett_core.confinement.ReadPrefixes.attempt_sound
-#print axioms aivm_secrets_garrett_core.confinement.ReadPrefixes.attempt_send_requires_admission
-#print axioms aivm_secrets_garrett_core.confinement.ReadPrefixes.history_sound
-#print axioms aivm_secrets_garrett_core.confinement.ReadPrefixes.coupled_history_noninterference

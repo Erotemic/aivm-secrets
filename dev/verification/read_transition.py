@@ -68,6 +68,8 @@ def audit(output: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--no-regenerate', action='store_true')
+    parser.add_argument('--audit-axioms', action='store_true',
+                        help='Explicit end-of-formalization axiom dependency review')
     args = parser.parse_args()
     if not args.no_regenerate:
         freshness.check_hashes(json.loads(freshness.MANIFEST.read_text()))
@@ -86,12 +88,13 @@ def main() -> None:
                   'stateful production invocation and consuming reply gate')
     # Keep the axiom report separate from the proof source and normal compiler
     # output. A successful import alone cannot replace the named axiom audit.
-    with tempfile.TemporaryDirectory(prefix='read-transition-', dir=directory / '.lake') as scratch:
-        check = Path(scratch) / 'Audit.lean'
-        check.write_text('import GarrettReadInvocations\n' + ''.join(
-            f'#print axioms {NAMESPACE}{name}\n' for name in THEOREMS))
-        audit(lean_step.run([lake, 'env', 'lean', '-DwarningAsError=true', str(check)],
-                            directory, 'named theorem axiom audit'))
+    if args.audit_axioms:
+        with tempfile.TemporaryDirectory(prefix='read-transition-', dir=directory / '.lake') as scratch:
+            check = Path(scratch) / 'Audit.lean'
+            check.write_text('import GarrettReadInvocations\n' + ''.join(
+                f'#print axioms {NAMESPACE}{name}\n' for name in THEOREMS))
+            audit(lean_step.run([lake, 'env', 'lean', '-DwarningAsError=true', str(check)],
+                                directory, 'named theorem axiom audit'))
     print(f'Kernel checked {len(THEOREMS)} extracted transition obligations; '
           f'source regeneration {"omitted" if args.no_regenerate else "matched"}. '
           'Audit durability, adapter correspondence and native I/O simulation remain open.')

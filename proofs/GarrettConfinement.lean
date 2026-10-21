@@ -400,35 +400,5 @@ theorem request_trace_sound
     | true => exact sound_append _ _ (dispatch_sound .preflight pre preAudit) (after_final_sound final finalAudit finalProviderOK completedAuditOK raw schema fuel budget)
   · simpa only [sent, ↓reduceIte] using dispatch_sound .preflight pre preAudit
 
-/- Native source-controller evidence is deliberately separate from the
-    abstract trace interpreter. The extracted `protocol::perform` requires
-    successful preparation, durable observer acknowledgement and execution
-    before it can return a public reply; this existing lemma is reused rather
-    than asserting a new unverified equivalence to `manifest_session.rs`. -/
-#check aivm_secrets_garrett_core.protocol.Proofs.perform_contract
-#check aivm_secrets_garrett_core.protocol.Proofs.perform_observer_failure
-#check aivm_secrets_garrett_core.credential_use.Proofs.unauthorized_operation_never_executes
-#check aivm_secrets_garrett_core.disclosure.Proofs.recursive_projection_noninterference
 
 end aivm_secrets_garrett_core.confinement.Proofs
-
--- These are audited separately from the recorded Garrett release theorem set.
-#print axioms aivm_secrets_garrett_core.confinement.Proofs.accepted_with_audit_dispatches
-#print axioms aivm_secrets_garrett_core.confinement.Proofs.accepted_implies_admission
-#print axioms aivm_secrets_garrett_core.confinement.Proofs.inactive_cannot_be_accepted
-#print axioms aivm_secrets_garrett_core.confinement.Proofs.dispatch_sound
-#print axioms aivm_secrets_garrett_core.confinement.Proofs.provider_requires_admission
-#print axioms aivm_secrets_garrett_core.confinement.Proofs.rejected_has_no_provider
-#print axioms aivm_secrets_garrett_core.confinement.Proofs.audit_refusal_stops_dispatch
-#print axioms aivm_secrets_garrett_core.confinement.Proofs.revoked_at_linearization_stops_dispatch
-#print axioms aivm_secrets_garrett_core.confinement.Proofs.disclose_sound
-#print axioms aivm_secrets_garrett_core.confinement.Proofs.public_reply_origin
-#print axioms aivm_secrets_garrett_core.confinement.Proofs.accepted_fact_is_allowed
-#print axioms aivm_secrets_garrett_core.confinement.Proofs.denied_at_entry_stops
-#print axioms aivm_secrets_garrett_core.confinement.Proofs.failed_preflight_stops
-#print axioms aivm_secrets_garrett_core.confinement.Proofs.refused_preflight_audit_stops
-#print axioms aivm_secrets_garrett_core.confinement.Proofs.final_provider_failure_stops_release
-#print axioms aivm_secrets_garrett_core.confinement.Proofs.completion_audit_failure_stops_release
-#print axioms aivm_secrets_garrett_core.confinement.Proofs.revoked_after_preflight_stops_final
-#print axioms aivm_secrets_garrett_core.confinement.Proofs.after_final_sound
-#print axioms aivm_secrets_garrett_core.confinement.Proofs.request_trace_sound

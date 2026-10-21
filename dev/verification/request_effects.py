@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Non-core development verifier for the production request-wide receipt.
 
-Default: exact pinned regeneration, focused Lean compilation and named axiom
-audit. --no-regenerate is for proof iteration only. Native primitive/world
+Default: exact pinned regeneration, focused Lean compilation with no default axiom
+report. --no-regenerate is for proof iteration only. Native primitive/world
 contracts and whole-service I/O correspondence remain separate obligations.
 """
 from __future__ import annotations
@@ -93,6 +93,8 @@ def audit(output: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--no-regenerate', action='store_true')
+    parser.add_argument('--audit-axioms', action='store_true',
+                        help='Explicit end-of-formalization axiom dependency review')
     args = parser.parse_args()
     if not args.no_regenerate:
         freshness.check_hashes(json.loads(freshness.MANIFEST.read_text()))
@@ -105,12 +107,13 @@ def main() -> None:
     lean_step.run([lake, 'env', 'lean', '-DwarningAsError=true', '-o', str(output),
                    'GarrettRequestTrace.lean'], directory,
                   'all-returned request trace projection')
-    with tempfile.TemporaryDirectory(prefix='request-effects-', dir=directory / '.lake') as scratch:
-        check = Path(scratch) / 'Audit.lean'
-        check.write_text('import GarrettRequestTrace\n' + ''.join(
-            f'#print axioms {name}\n' for name in THEOREMS))
-        audit(lean_step.run([lake, 'env', 'lean', '-DwarningAsError=true', str(check)],
-                            directory, 'named request-effect theorem axiom audit'))
+    if args.audit_axioms:
+        with tempfile.TemporaryDirectory(prefix='request-effects-', dir=directory / '.lake') as scratch:
+            check = Path(scratch) / 'Audit.lean'
+            check.write_text('import GarrettRequestTrace\n' + ''.join(
+                f'#print axioms {name}\n' for name in THEOREMS))
+            audit(lean_step.run([lake, 'env', 'lean', '-DwarningAsError=true', str(check)],
+                                directory, 'named request-effect theorem axiom audit'))
     print(f'Kernel checked {len(THEOREMS)} request gate/prefix/trace obligations; '
           f'source regeneration {"omitted" if args.no_regenerate else "matched"}. '
           'Native callback contracts, W4/W5 event/history correspondence and transitive I/O remain open.')

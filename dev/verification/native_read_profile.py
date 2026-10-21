@@ -7,7 +7,7 @@ isolation, complete Rust I/O reachability, or native-to-Lean simulation.
 Default: structural profile/fingerprint review only (no Rust/Lean required).
 --portable: existing quick W6 source/oracle gate.
 --native: selected real Rust + local TLS/provider witnesses; skips are fatal.
---lean: focused kernel compilation and axiom audit of read path/prefix proofs.
+--lean: focused kernel compilation of read path/prefix proofs (no axiom dump).
 --build: optional incremental native build, only with --native.
 --output: write a JSON run record even when an acceptance stage fails.
 """
@@ -310,7 +310,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--portable', action='store_true', help='Run existing quick W6 source/oracle suite')
     parser.add_argument('--native', action='store_true', help='Run real Rust/local HTTPS witnesses, no skips')
-    parser.add_argument('--lean', action='store_true', help='Compile and axiom-audit scoped Lean proofs')
+    parser.add_argument('--lean', action='store_true', help='Compile scoped Lean proofs without routine axiom auditing')
     parser.add_argument('--build', action='store_true', help='Incremental Cargo build before --native')
     parser.add_argument('--output', type=Path, help='Write machine-readable evidence JSON to this path')
     args = parser.parse_args()

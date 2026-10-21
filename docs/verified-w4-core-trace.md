@@ -97,12 +97,10 @@ for the backend before launching Lake and provides this command if it is missing
 This is a dependency setup operation, **not** a proof or a fix for potential
 Lean typechecking errors in the candidate module.
 
-`prove` builds the pre-existing proof dependencies, compiles the new Lean file
-with warnings-as-errors, parses its `#print axioms` output, and accepts only
-`propext`, `Classical.choice`, and `Quot.sound`. The W4 source is deliberately
-not added to the recorded Garrett release manifest or default Lake roots until
-this gate succeeds. That prevents a new uncompiled candidate from being
-reported as part of the historical, checked Garrett theorem inventory.
+`prove` builds the proof dependencies and compiles the W4 module with
+warnings-as-errors. It does not print or repeatedly audit axiom lists. A
+transitive axiom dependency comparison belongs to the explicitly requested
+final assurance audit, not ordinary iteration. The proof's scope is unchanged.
 
 After a successful kernel run, review whether the positive model traces match
 W1/W2 runtime outcomes, then move the Lean module into the audited release

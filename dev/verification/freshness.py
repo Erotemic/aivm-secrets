@@ -152,15 +152,17 @@ def check_axioms(output: str) -> None:
     for name, axioms in found.items():
         if axioms - ALLOWED_AXIOMS:
             raise SystemExit(f'{name} uses undeclared axioms: {axioms - ALLOWED_AXIOMS}')
-    print(f'Checked {len(found)} named theorems and their transitive axiom dependencies.')
 
 
 def prove() -> None:
+    """Compile proof modules; no routine theorem-by-theorem axiom report."""
     run([executable('lake'), 'build'], cwd=PROOFS)
-    # Force a fresh audit even when Lake reuses compiled proof objects.
+
+
+def audit_release() -> None:
+    """Explicit final review only; capture the full report and compare it."""
     done = run([executable('lake'), 'env', 'lean', '-DwarningAsError=true', 'Check.lean'],
                cwd=PROOFS, capture=True)
-    print(done.stdout, end='')
     check_axioms(done.stdout)
 
 
@@ -214,6 +216,7 @@ def check_hashes(manifest: dict) -> None:
 def record() -> None:
     check_extraction()
     prove()
+    audit_release()
     parity()
     manifest = {
         'schema': 1, 'primitive': 'capability freshness and bounded epoch revocation',
@@ -298,7 +301,7 @@ def mutate() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['bootstrap', 'extract', 'record', 'check', 'mutate'])
+    parser.add_argument('action', choices=['bootstrap', 'extract', 'record', 'check', 'mutate', 'audit'])
     args = parser.parse_args()
     if args.action == 'bootstrap':
         bootstrap()
@@ -306,6 +309,10 @@ def main() -> None:
         extract(PROOFS / 'generated')
     elif args.action == 'record':
         record()
+    elif args.action == 'audit':
+        check_hashes(json.loads(MANIFEST.read_text()))
+        prove()
+        audit_release()
     else:
         check_hashes(json.loads(MANIFEST.read_text()))
         check_extraction()

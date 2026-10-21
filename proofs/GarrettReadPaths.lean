@@ -221,11 +221,3 @@ end aivm_secrets_garrett_core.confinement.ReadPaths
 
 -- Deliberately audited as a separate optional proof slice. Compilation and
 -- axiom evidence are only authoritative when run with the pinned Lean toolchain.
-#print axioms aivm_secrets_garrett_core.confinement.ReadPaths.final_only_sound
-#print axioms aivm_secrets_garrett_core.confinement.ReadPaths.check_only_sound
-#print axioms aivm_secrets_garrett_core.confinement.ReadPaths.read_trace_sound
-#print axioms aivm_secrets_garrett_core.confinement.ReadPaths.final_only_requires_admission
-#print axioms aivm_secrets_garrett_core.confinement.ReadPaths.final_only_noninterference
-#print axioms aivm_secrets_garrett_core.confinement.ReadPaths.observe_check_only
-#print axioms aivm_secrets_garrett_core.confinement.ReadPaths.check_only_noninterference
-#print axioms aivm_secrets_garrett_core.confinement.ReadPaths.read_observation_noninterference

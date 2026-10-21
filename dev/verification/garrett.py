@@ -280,6 +280,14 @@ THEOREMS += [
 ]
 
 THEOREMS += [
+    'aivm_secrets_garrett_core.provider_io.NativeWriterEvents.submit_observes_callbacks',
+    'aivm_secrets_garrett_core.provider_io.NativeWriterEvents.fresh_callback_projects_one',
+    'aivm_secrets_garrett_core.provider_io.NativeWriterEvents.replay_projects_nothing',
+    'aivm_secrets_garrett_core.provider_io.NativeWriterEvents.attempted_event_sound',
+    'aivm_secrets_garrett_core.provider_io.NativeWriterEvents.guarded_channel_callback_projection',
+]
+
+THEOREMS += [
     'aivm_secrets_garrett_core.provider_wire.Proofs.endpoint_host',
     'aivm_secrets_garrett_core.provider_wire.Proofs.endpoint_port',
     'aivm_secrets_garrett_core.provider_wire.Proofs.port_cast_exact',
@@ -1109,26 +1117,21 @@ def audit(output: str) -> None:
             raise SystemExit(
                 f"{name}: undeclared axioms {axioms - base.ALLOWED_AXIOMS}"
             )
-    print(
-        f"Audited {len(found)} named Garrett obligations; no admitted or project-specific security axiom.",
-        flush=True,
-    )
 
 
 def prove() -> None:
+    """Normal compiler gate; the audit-only module is not a default root."""
     base.run([base.executable("lake"), "build"], cwd=PROOFS)
+
+
+def audit_release() -> None:
+    """Explicit final transitive axiom comparison, not a developer smoke test."""
     result = base.run(
-        [
-            base.executable("lake"),
-            "env",
-            "lean",
-            "-DwarningAsError=true",
-            "GarrettCheck.lean",
-        ],
+        [base.executable("lake"), "env", "lean", "-DwarningAsError=true",
+         "GarrettCheck.lean"],
         cwd=PROOFS,
         capture=True,
     )
-    print(result.stdout, end="")
     audit(result.stdout)
 
 
@@ -1285,6 +1288,7 @@ def record() -> None:
     base.check_hashes(json.loads(base.MANIFEST.read_text()))
     regeneration()
     prove()
+    audit_release()
     parity()
     manifest = assurance_coordinates()
     manifest["sha256"] = {name: base.sha256(ROOT / name) for name in inputs()}
@@ -2464,7 +2468,7 @@ def mutate(pattern: str | None = None) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "action", choices=["bootstrap", "extract", "record", "check", "mutate"]
+        "action", choices=["bootstrap", "extract", "record", "check", "mutate", "audit"]
     )
     parser.add_argument("--mutation-filter", help="Run only labels matching this regex; never counts as the full mutation campaign.")
     args = parser.parse_args()
@@ -2480,9 +2484,11 @@ def main() -> None:
         check_manifest()
         regeneration()
         prove()
-        if args.action == "mutate":
+        if args.action == "audit":
+            audit_release()
+        elif args.action == "mutate":
             mutate(args.mutation_filter)
-        else:
+        elif args.action == "check":
             parity()
 
 

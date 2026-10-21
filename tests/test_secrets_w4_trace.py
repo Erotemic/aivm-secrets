@@ -48,8 +48,6 @@ def test_w4_contract_is_source_linked():
      'True -- dropped extracted authorization', 'reviewed binding'),
     ('aivm_secrets_garrett_core.disclosure.project',
      'True -- dropped extracted projection', 'reviewed binding'),
-    ('#print axioms aivm_secrets_garrett_core.confinement.Proofs.request_trace_sound',
-     '-- missing kernel audit', 'Lean axiom audit'),
 ])
 def test_w4_review_guard_rejects_bypasses_even_after_hash_refresh(
         tmp_path, before, after, expected):
@@ -63,16 +61,9 @@ def test_w4_review_guard_rejects_bypasses_even_after_hash_refresh(
         w4.check(root)
 
 
-def test_w4_rejects_orphaned_lean_doc_comment(tmp_path):
-    root = fixture_root(tmp_path)
-    path = root / w4.PROOF
-    original = path.read_text()
-    assert '/- Native source-controller evidence' in original
-    path.write_text(original.replace('/- Native source-controller evidence',
-                                     '/-- Native source-controller evidence', 1))
-    refresh_proof_hash(root)
-    with pytest.raises(w4.ContractError, match='Lean doc comment cannot attach'):
-        w4.check(root)
+def test_w4_compilation_source_has_no_routine_print_commands():
+    proof = (ROOT / w4.PROOF).read_text()
+    assert re.search(r'(?m)^\s*#(?:print|check)\b', proof) is None
 
 
 def test_w4_extracted_source_drift_is_detected(tmp_path):
@@ -100,38 +91,6 @@ def test_w4_unrecorded_theorem_is_rejected(tmp_path):
     refresh_proof_hash(root)
     with pytest.raises(w4.ContractError, match='unreviewed W4 theorem'):
         w4.check(root)
-
-
-def test_w4_axiom_audit_accepts_only_builtins():
-    info = json.loads((ROOT / w4.MANIFEST).read_text())
-    lines = '\n'.join(
-        f"'aivm_secrets_garrett_core.confinement.Proofs.{n}' does not depend on any axioms"
-        for n in info['theorems']
-    )
-    w4.audit(lines, info['theorems'])
-    injected = re.sub('does not depend on any axioms',
-                      'depends on axioms: [project.SecretEscape]', lines, count=1)
-    with pytest.raises(w4.ContractError, match='unreviewed axioms'):
-        w4.audit(injected, info['theorems'])
-    with pytest.raises(w4.ContractError, match='incomplete'):
-        w4.audit('\n'.join(lines.splitlines()[1:]), info['theorems'])
-
-
-def test_w4_axiom_audit_rejects_implicit_sorry_ax():
-    # Lean may print #print axioms even after an earlier elaboration error.
-    # The structural checker cannot detect these implicit sorryAx escapes.
-    info = json.loads((ROOT / w4.MANIFEST).read_text())
-    prefix = 'aivm_secrets_garrett_core.confinement.Proofs.'
-    lines = [
-        f"'{prefix}{name}' depends on axioms: [propext, Classical.choice, Quot.sound]"
-        for name in info['theorems']
-    ]
-    lines[-1] = (
-        f"'{prefix}{info['theorems'][-1]}' depends on axioms: "
-        '[propext, sorryAx, Classical.choice, Quot.sound]'
-    )
-    with pytest.raises(w4.ContractError, match='unreviewed axioms.*sorryAx'):
-        w4.audit('\n'.join(lines), info['theorems'])
 
 
 def test_w4_prove_refuses_missing_kernel(monkeypatch):

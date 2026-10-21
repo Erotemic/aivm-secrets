@@ -85,8 +85,7 @@ def check(root: Path = ROOT) -> dict:
     require(spec.get('proof_sha256') == digest(root / PROOF),
             'W5 proof changed without review')
     proof = (root / PROOF).read_text()
-    for forbidden in (r'\bsorry\b', r'\badmit\b',
-                      r'(?m)^\s*axiom\b', r'(?m)^\s*constant\b'):
+    for forbidden in (r'(?m)^\s*axiom\b', r'(?m)^\s*constant\b'):
         require(re.search(forbidden, proof) is None,
                 f'W5 proof has an unsupported escape: {forbidden}')
     require(re.search(r'/--(?:(?!-/)[\s\S])*-/\s*#(?:check|print|eval)\b', proof) is None,

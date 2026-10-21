@@ -57,7 +57,7 @@ lake build +GarrettProviderSimulation +GarrettDispatch
 lake env lean -DwarningAsError=true GarrettCurrentAdmission.lean
 ```
 
-Named axiom auditing remains in `GarrettCheck`; this leaf adds no default
+Final, opt-in axiom dependency auditing remains in `GarrettCheck`; this leaf adds no default
 per-theorem axiom dumps. Targeted re-extracted mutations use:
 
 ```sh

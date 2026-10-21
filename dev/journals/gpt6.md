@@ -524,3 +524,63 @@ without rerunning the pinned Rust/Lean toolchain. Portable W0/W3/W6 and the
 quick W6 read checks passed; native Rust/Lean execution was unavailable.
 Confidence: high in the source guard/mutation coverage, pending actual Rust
 compilation and native test execution.
+
+## 2026-10-21 15:18:07 -0400 — General returned native writer callback projection
+
+Added a source-linked candidate Lean proof classifying actual extracted
+`Request::submit` / `Channel::submit` callback invocations and composing a
+checked, reachable `begin_send` receipt with one abstract W4 attempted-provider
+event. Partial `write_all` errors and flush errors contribute one attempt,
+not a success; replay contributes no new event. Kept native OS/TLS effects and
+the adapter linkage as explicit external obligations. No independent request
+controller or credential-bearing runtime output was added.
+
+Added native `Interrupted`/partial-then-`WriteZero` observations for the real
+`std::io::Write` adapter, tightened the W3 native callback source guard and
+added bypass mutants. W0/W3/W6 and quick W6 read gates passed on this source.
+The authoring environment has no Rust/Lean toolchains, so the new Rust test and
+Lean module are **uncompiled**, and the old proof provenance manifest remains
+invalid until pinned validation and re-recording. Main remaining risks are
+actual Rust/Lean typechecking, complete adapter linking and callback/OS/
+drop/unwind/transitive sink semantics. Full-suite pytest timed out in this
+environment, and its first isolated packaging test fails because the local
+Python environment does not have the `build` module installed.
+
+## 2026-10-21 15:30:50 -0400 — Native writer Lean elaboration repair
+
+Fixed the focused `GarrettNativeWriterEvents.lean` compile diagnostics reported
+by the maintainer. The `SubmitRun` constructor indices already determine the
+returned writer and result; the callback bridge now reconstructs the same
+`Observed` constructors using their existing callback equality hypotheses
+without rebinding inaccessible dependent indices. Renamed `local` (a Lean
+keyword) and its state companion in the guarded composition theorem. The
+interface, theorem names, event semantics and Rust code are unchanged.
+
+The maintainer reported the native writer regression test passed. Locally the
+W3 source guard and all 167 W3 tests pass, as do the W0/W6 source guards and
+8 W6 adapter tests. This environment lacks the pinned Lean compiler, so the
+new proof needs `lake build GarrettNativeWriterEvents` and an axiom audit on
+the maintainer's installation; no compiler pass is asserted here. The scope
+remains returned callback paths, not TLS arrival or whole-service refinement.
+
+## 2026-10-21 15:44:26 -0400 — Lean diagnostics and end-of-formalization audit policy
+
+- Updated `AGENTS.md`: normal Lean iteration means focused compilation and
+  compiler diagnostics, not per-theorem `#print axioms`/`#check` dumps or
+  repeated scans for admitted proofs. Keep transitive axiom comparison as an
+  explicitly requested final review, with the raw report captured.
+- Removed routine diagnostics from W4, read-path/prefix and native writer Lean
+  files. `Check`/`GarrettCheck` are now audit-only, excluded from default Lake
+  roots. The ordinary W4/read-path/prefix and request-provider verifier
+  scripts compile without automatically producing axiom reports. The named
+  audit commands remain available for a final release review.
+- Kept W4/W5/read proof source-hash inventories in sync with diagnostic-only
+  edits; historical validation captures and the NR-0 baseline pins were not
+  rewritten. NR-0 remains stale against prior native Track A implementation
+  edits until a separately validated acceptance checkpoint is recorded.
+- Replaced the failed dependent `SubmitRun` constructor elaboration in the
+  native writer observation proof by naming its actual callback witnesses.
+  This specific Lean repair still requires the maintainer's pinned compiler.
+- Portable source checks and focused pytest passed; neither proves the writer
+  lemma without `lake build`. No Rust implementation or external I/O
+  assumptions were modified.

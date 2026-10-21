@@ -82,7 +82,7 @@ required; the native cases use local TLS and synthetic secrets.
 # Fast: source guards, candidate proof provenance, portable mutation oracles.
 python dev/verification/quick_w6_read.py
 
-# Focused Lean compilation and axiom audit of only the new read-path module
+# Focused Lean compilation of only the new read-path module
 # and its W4/W5 dependencies; no Rust rebuild or Charon extraction.
 python dev/verification/quick_w6_read.py --lean
 

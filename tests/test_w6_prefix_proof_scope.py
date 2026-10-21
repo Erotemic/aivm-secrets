@@ -41,19 +41,19 @@ def test_proof_guard_rejects_dropped_open_obligations(tmp_path, monkeypatch):
         read_prefixes.check(root)
 
 
-def test_proof_guard_rejects_silent_theorem_or_axiom_changes(tmp_path, monkeypatch):
+def test_proof_guard_rejects_silent_theorem_changes(tmp_path, monkeypatch):
     root = _snapshot(tmp_path, monkeypatch)
     proof = root / read_prefixes.PROOF
-    proof.write_text(proof.read_text().replace(
-        '#print axioms aivm_secrets_garrett_core.confinement.ReadPrefixes.history_sound',
-        '#print axioms omitted_history_sound',
-    ))
+    original = proof.read_text()
+    assert 'theorem history_sound' in original
+    proof.write_text(original.replace('theorem history_sound',
+                                      'theorem omitted_history_sound', 1))
     with pytest.raises(read_prefixes.PrefixReviewError, match='Lean source changed'):
         read_prefixes.check(root)
-    # A reviewer updating the fingerprint must still preserve the axiom audit.
+    # Refreshing the source hash must not hide a changed theorem inventory.
     p = root / read_prefixes.SPEC
     manifest = json.loads(p.read_text())
     manifest['proof_sha256'] = read_prefixes.sha(proof)
     p.write_text(json.dumps(manifest))
-    with pytest.raises(read_prefixes.PrefixReviewError, match='kernel axiom report'):
+    with pytest.raises(read_prefixes.PrefixReviewError, match='theorems differ'):
         read_prefixes.check(root)
