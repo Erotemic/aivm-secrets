@@ -162,8 +162,15 @@ now owns coordination/clock/control/lease/identity/grant validation order in
 production Rust. Twenty-four extracted obligations derive stamp origin and
 preserve the captured context through the read provider driver, including its
 actual owned-send wrapper and failed prefixes. Native primitive semantics,
-whole-request event/history simulation and NR-2–NR-5 remain open. Validation
-for this source increment is recorded separately after the VM gates pass.
+whole-request event/history simulation and NR-2–NR-5 remain open.
+
+Source `6cfb8a6` passes 3,046 full-suite cases with zero skips, 612 named
+axiom audits, 767 release parity cases, 85 Rust workspace cases, six targeted
+source-extracted mutants, both 168-case native build-mode gates and standalone
+product workflows, all 280 archive pins and six safe installed-vTPM cases.
+The fresh optional specialized bridge capture retains nine paths and passes
+47 fixture/capture cases without a mediation claim. See the
+[current-admission validation record](../../dev/validation/2026-10-20-current-admission.json).
 
 The next NR-2 implementation task is to compose the bound driver's derived
 stamp origin with the owned dispatcher's receipt/local-send gates, across
