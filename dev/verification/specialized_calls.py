@@ -276,6 +276,10 @@ def explain(projection, profile="bridge"):
             ('aivm_secrets_garrett_core','dispatch','dispatch'),
             ('aivm_secrets_garrett','custody','manifest_session','setup_route'),
             ('aivm_secrets_garrett_core','provider_wire',getter)]) for getter in ['host','port']],
+        ('native-json-string-encoder', [
+            ('aivm_secrets_garrett','json','canonical'),
+            ('aivm_secrets_garrett','json','string'),
+            ('aivm_secrets_garrett_core','json_string','append')]),
         ('owned-context-check-factory', [
             ('aivm_secrets_garrett_core','read_transition','run_current'),
             ('aivm_secrets_garrett_core','request_adapter','dispatch'),

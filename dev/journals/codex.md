@@ -2758,3 +2758,69 @@ implementation still clean, without changing source, tests or evidence. Queue
 and roadmap advance route/byte/endpoint composition while retaining actual
 native conversion/primitive/event/observation/history obligations. Accounting
 is published separately with the actual-model co-author trailer.
+
+## 2026-10-21 01:16:31 -0400
+
+The previous goal turn made verified progress: 1b58b20/5e59345/fddfbc7 bind
+route/bytes/endpoint and freeze 3,083 cases/688 named audits. Clean tree was
+revalidated. Implemented actual native canonical string quoting in extracted
+json_string::append. It validates all Unicode scalars before touching output,
+uses exact short/lowercase UTF-16 escapes and surrogate pairs, preserves the
+prefix, and rejects invalid scalar lists without mutation. Native json::string
+maps Rust chars to u32, calls the core and appends the ASCII result; temporary
+scalar/byte vectors use Zeroizing. Existing container/number formatting is
+unchanged. No runtime dependency, wire version, authorization, Python core API
+or identity requirement changes. Python tools/tests remain non-core.
+
+All 50 core and 38 native library tests pass. The core compares every valid
+Unicode scalar against the former independent std encode_utf16/formatting
+implementation, with late invalid input/binary prefix and mixed exact bytes.
+The actual native nested JSON golden case preserves controls, BMP/non-BMP
+characters, key order and parser round trip. Both focused Lean modules compile
+with warningAsError; their 29 obligations cover exact scalar/list bytes,
+validation/refusal/positive construction, UTF-16 pair math, explicit capacity,
+printable output and absence of raw CR/LF in the appended segment. No whole
+native history or desired secrecy/mediation conclusion is assumed.
+
+Development reflections: factored shared wide escaping and used explicit scalar
+comparisons so extracted conditions remain visible instead of opaque numeric
+patterns. Exact behavior still passes the exhaustive Unicode comparison. Added
+strong local byte-push length facts to discharge finite capacity obligations;
+controlled simplification avoids cycles from equivalent cast representations.
+Fixed temporary proof indentation, private-attribute syntax, a reserved prefix
+identifier, and WP return/projection mistakes without weakening statements.
+The final proof imports are rebuilt and kernel checked; no stale proof object
+or handwritten generated model is acceptance evidence. Initial diagnostics
+remain development results, not passing gates.
+
+UTF-8/char conversion, zeroizing views, ASCII-to-String append, container/number
+rendering, parser/frame/TLS/close and native event/history semantics remain
+separate contracts. Additional scalar/byte allocation is a deliberate cost,
+zeroized on drop; allocation/reallocation/drop/unwind are not refined by these
+byte theorems. Confidence is high in byte compatibility across the full scalar
+domain and the focused source contracts; complete VM acceptance and independent
+review remain required. This does not close NR-2–NR-5, normative Rust parity,
+native write assurance, real-provider or deployed-isolation requirements.
+
+Acceptance completed: 3,095 full Python/native cases, zero failures/skips,
+557.83 seconds on the quiet VM, followed by successful wheel/sdist build.
+717 named Garrett axiom audits, 767 release parity cases, 98 Rust workspace
+cases (50 core/38 native library), all-feature Clippy, 163 source-guard cases,
+55 specialized-ledger fixtures, six selected of 277 source mutants rejected in
+actual scalar/string leaves, both 168-case native build-mode gates and both
+standalone native product workflows pass. Eight read-path and five prefix
+kernel audits pass. Fresh bounded compiler capture retains fifteen links,
+including canonical/string/core quoting, without dominance/mediation claims.
+Six safe installed-vTPM cases preserve the two pinned persistent objects and
+dictionary state; isolated wrong-auth cases stay off the shared device.
+
+Verification reflection: the first temporary source-check runner incorrectly
+supplied `check` to native_read_profile.py, whose CLI uses flags. Corrected the
+runner to call only supported check actions; the final source-check log passes.
+No production change was needed. The full suite's existing mutation test was
+slow but active and completed without restart. Full native acceptance excludes
+skips and packages the same 293 checked inputs plus the embedded manifest.
+Implementation and evidence are committed separately with actual GPT-6 Codex
+co-authorship; exact weights/config variant is unavailable. Native event,
+observation/history, parser/transport and remaining conversion contracts,
+NR-2–NR-5 and independent real/deployed tests remain open.

@@ -260,8 +260,18 @@ pass. The fresh bounded compiler capture retains fourteen paths and 53 fixture
 cases, including native endpoint getters, without a mediation claim. See the
 [route/encoder validation record](../../dev/validation/2026-10-21-provider-wire.json).
 
+**JSON string refinement update:** the [production scalar-list string encoder](../garrett-json-string.md)
+now supplies native canonical JSON string quoting. Twenty-nine extracted
+obligations establish scalar admission, lowercase escapes and surrogate pairs,
+exact bounded appended bytes, invalid-input buffer preservation and printable
+output without raw line breaks. Exhaustive Rust scalar coverage and native
+nested JSON fixtures check the preserved wire behavior. Native UTF-8/scalar and
+byte/String conversion remain explicit local contracts; this does not discharge
+JSON containers/numbers, parsing, observation or whole-service secrecy.
+
 The next implementation task remains native primitive correspondence: connect
-native String/header/JSON conversion, faithful zeroizing buffer view and
+native UTF-8/scalar and byte/String conversion, header and remaining JSON
+conversion, faithful zeroizing buffer view and
 std/TLS/DNS/parser/storage contracts to the now-source-derived endpoint, complete
 request bytes and channel submission/release. Relate the actual native outcomes
 to the existing all-returned event projection. Keep trusted TLS/DNS/Write/parser and storage semantics

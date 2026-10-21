@@ -242,5 +242,6 @@ pub mod current_admission;
 
 pub mod request_context;
 
+pub mod json_string;
 pub mod provider_io;
 pub mod provider_wire;

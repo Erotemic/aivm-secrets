@@ -5704,6 +5704,186 @@ partial_fixpoint
 
 end
 
+/-- [aivm_secrets_garrett_core::json_string::valid_scalar]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 5:0-7:1
+    Visibility: public -/
+def json_string.valid_scalar (value : Std.U32) : Result Bool := do
+  if value <= 1114111#u32
+  then if value < 55296#u32
+       then ok true
+       else ok (value > 57343#u32)
+  else ok false
+
+/-- [aivm_secrets_garrett_core::json_string::valid_text]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 10:4-17:1
+    Visibility: public -/
+@[rust_loop]
+def json_string.valid_text_loop
+  (values : alloc.vec.Vec Std.U32) (index : Std.Usize) : Result Bool := do
+  let i := alloc.vec.Vec.len values
+  if index < i
+  then
+    let i1 ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U32)
+        values index
+    let b ← json_string.valid_scalar i1
+    if b
+    then
+      let index1 ← index + 1#usize
+      json_string.valid_text_loop values index1
+    else ok false
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::json_string::valid_text]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 8:0-17:1
+    Visibility: public -/
+@[reducible]
+def json_string.valid_text (values : alloc.vec.Vec Std.U32) : Result Bool := do
+  json_string.valid_text_loop values 0#usize
+
+/-- [aivm_secrets_garrett_core::json_string::hex_digit]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 18:0-24:1 -/
+def json_string.hex_digit (value : Std.U32) : Result Std.U8 := do
+  if value < 10#u32
+  then let i ← lift (UScalar.cast .U8 value)
+       48#u8 + i
+  else let i ← value - 10#u32
+       let i1 ← lift (UScalar.cast .U8 i)
+       97#u8 + i1
+
+/-- [aivm_secrets_garrett_core::json_string::append_hex]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 25:0-31:1 -/
+def json_string.append_hex
+  (output : alloc.vec.Vec Std.U8) (value : Std.U32) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let s ← lift (Array.to_slice (Array.make 2#usize [ 92#u8, 117#u8 ]))
+  let output1 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  let i ← value / 4096#u32
+  let i1 ← i % 16#u32
+  let i2 ← json_string.hex_digit i1
+  let output2 ← alloc.vec.Vec.push output1 i2
+  let i3 ← value / 256#u32
+  let i4 ← i3 % 16#u32
+  let i5 ← json_string.hex_digit i4
+  let output3 ← alloc.vec.Vec.push output2 i5
+  let i6 ← value / 16#u32
+  let i7 ← i6 % 16#u32
+  let i8 ← json_string.hex_digit i7
+  let output4 ← alloc.vec.Vec.push output3 i8
+  let i9 ← value % 16#u32
+  let i10 ← json_string.hex_digit i9
+  alloc.vec.Vec.push output4 i10
+
+/-- [aivm_secrets_garrett_core::json_string::append_wide]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 32:0-40:1 -/
+def json_string.append_wide
+  (output : alloc.vec.Vec Std.U8) (value : Std.U32) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  if value <= 65535#u32
+  then json_string.append_hex output value
+  else
+    let remaining ← value - 65536#u32
+    let i ← remaining / 1024#u32
+    let i1 ← 55296#u32 + i
+    let output1 ← json_string.append_hex output i1
+    let i2 ← remaining % 1024#u32
+    let i3 ← 56320#u32 + i2
+    json_string.append_hex output1 i3
+
+/-- [aivm_secrets_garrett_core::json_string::append_scalar]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 41:0-61:1 -/
+def json_string.append_scalar
+  (output : alloc.vec.Vec Std.U8) (value : Std.U32) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  if value = 34#u32
+  then
+    let s ← lift (Array.to_slice (Array.make 2#usize [ 92#u8, 34#u8 ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  else
+    if value = 92#u32
+    then
+      let s ← lift (Array.to_slice (Array.make 2#usize [ 92#u8, 92#u8 ]))
+      alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+    else
+      if value = 8#u32
+      then
+        let s ← lift (Array.to_slice (Array.make 2#usize [ 92#u8, 98#u8 ]))
+        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+      else
+        if value = 12#u32
+        then
+          let s ←
+            lift (Array.to_slice (Array.make 2#usize [ 92#u8, 102#u8 ]))
+          alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+        else
+          if value = 10#u32
+          then
+            let s ←
+              lift (Array.to_slice (Array.make 2#usize [ 92#u8, 110#u8 ]))
+            alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+          else
+            if value = 13#u32
+            then
+              let s ←
+                lift (Array.to_slice (Array.make 2#usize [ 92#u8, 114#u8 ]))
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+            else
+              if value = 9#u32
+              then
+                let s ←
+                  lift (Array.to_slice (Array.make 2#usize [ 92#u8, 116#u8 ]))
+                alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+              else
+                if value >= 32#u32
+                then
+                  if value <= 126#u32
+                  then
+                    let i ← lift (UScalar.cast .U8 value)
+                    alloc.vec.Vec.push output i
+                  else json_string.append_wide output value
+                else json_string.append_wide output value
+
+/-- [aivm_secrets_garrett_core::json_string::append]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 71:4-74:5
+    Visibility: public -/
+@[rust_loop]
+def json_string.append_loop
+  (output : alloc.vec.Vec Std.U8) (values : alloc.vec.Vec Std.U32)
+  (index : Std.Usize) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let i := alloc.vec.Vec.len values
+  if index < i
+  then
+    let i1 ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U32)
+        values index
+    let output1 ← json_string.append_scalar output i1
+    let index1 ← index + 1#usize
+    json_string.append_loop output1 values index1
+  else ok output
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::json_string::append]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 65:0-77:1
+    Visibility: public -/
+def json_string.append
+  (output : alloc.vec.Vec Std.U8) (values : alloc.vec.Vec Std.U32) :
+  Result (Bool × (alloc.vec.Vec Std.U8))
+  := do
+  let b ← json_string.valid_text values
+  if b
+  then
+    let output1 ← alloc.vec.Vec.push output 34#u8
+    let output2 ← json_string.append_loop output1 values 0#usize
+    let output3 ← alloc.vec.Vec.push output2 34#u8
+    ok (true, output3)
+  else ok (false, output)
+
 /-- [aivm_secrets_garrett_core::IssueWindow]
     Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 47:0-51:1
     Visibility: public -/

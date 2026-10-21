@@ -90,27 +90,15 @@ pub fn parse(bytes: &[u8], limit: usize) -> Outcome<Value> {
     decode(&raw, 0)
 }
 fn string(out: &mut String, value: &str) {
-    use std::fmt::Write;
-    out.push('"');
-    for c in value.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\u{8}' => out.push_str("\\b"),
-            '\u{c}' => out.push_str("\\f"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            ' '..='~' => out.push(c),
-            _ => {
-                for unit in c.encode_utf16(&mut [0; 2]) {
-                    write!(out, "\\u{unit:04x}").expect("String write");
-                }
-            }
-        }
-    }
-    out.push('"');
+    let values = zeroize::Zeroizing::new(value.chars().map(u32::from).collect::<Vec<_>>());
+    let mut encoded = zeroize::Zeroizing::new(Vec::new());
+    assert!(
+        aivm_secrets_garrett_core::json_string::append(&mut encoded, &values),
+        "Rust string scalars"
+    );
+    out.push_str(std::str::from_utf8(&encoded).expect("ASCII JSON string"));
 }
+
 fn encode(out: &mut String, value: &Value) {
     match value {
         Value::Null => out.push_str("null"),
@@ -232,5 +220,17 @@ mod tests {
             let raw = serde_json::to_vec(&value).unwrap();
             assert_eq!(parse(&raw, 65536).unwrap(), value);
         }
+    }
+}
+
+#[cfg(test)]
+mod canonical_tests {
+    use super::*;
+    #[test]
+    fn native_canonical_preserves_exact_nested_unicode_and_control_bytes() {
+        let value = serde_json::json!({"text":"\u{0}\n\"\\é😀", "array":["~\u{7f}",7,true,null], "é":"\u{2028}"});
+        let bytes = canonical(&value);
+        assert_eq!(bytes, br#"{"array":["~\u007f",7,true,null],"text":"\u0000\n\"\\\u00e9\ud83d\ude00","\u00e9":"\u2028"}"#);
+        assert_eq!(serde_json::from_slice::<Value>(&bytes).unwrap(), value);
     }
 }

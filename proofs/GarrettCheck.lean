@@ -2,6 +2,7 @@ import GarrettRequestContext
 import GarrettProviderIO
 import GarrettProviderChannel
 import GarrettProviderWire
+import GarrettJsonString
 import GarrettOwnedRequestTrace
 import GarrettCurrentAdmission
 import GarrettRequestAdapter
@@ -769,3 +770,33 @@ import GarrettSecrecy
 #print axioms aivm_secrets_garrett_core.provider_wire.Proofs.accepted_route_exact
 #print axioms aivm_secrets_garrett_core.provider_wire.Proofs.returned_route_bytes
 #print axioms aivm_secrets_garrett_core.provider_wire.Proofs.encoded_channel_write_origin
+
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.nibble_value
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.nibble_printable
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.surrogate_pair_exact
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.valid_scalar_contract
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.hex_digit_contract
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.append_hex_contract
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.append_wide_contract
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.escape_length
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.append_scalar_contract
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.printable_append
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.hex4_printable
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.wide_printable
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.escape_printable
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.valid_from_step
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.valid_text_loop_contract
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.valid_text_contract
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.body_length_bound
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.body_bytes_step
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.append_loop_contract
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.quote_contract
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.invalid_text_preserves_buffer
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.success_requires_valid_text
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.accepted_quote_exact
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.returned_quote_exact
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.accepted_quote_witness
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.body_printable
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.string_printable
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.returned_quote_printable
+#print axioms aivm_secrets_garrett_core.json_string.Proofs.returned_quote_has_no_line_breaks

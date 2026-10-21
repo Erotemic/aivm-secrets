@@ -294,3 +294,12 @@ exact bytes supplied to write and successful flush under the local faithful
 buffer-view contract. Native conversion/std-TLS/DNS/parser/storage and complete
 outcome/event correspondence remain separate; this is not whole-service I/O
 mediation or secrecy.
+
+The [canonical JSON string leaf](garrett-json-string.md) now extracts the actual
+native string encoder through a scalar-list interface. Its checked bounded
+contract covers exact ASCII quoting, all valid scalar values, invalid-input
+buffer preservation and the absence of raw line breaks in the appended string.
+Native character/scalar and byte/String conversion, container/number encoding,
+parsing and full implementation-to-observation correspondence remain explicit
+obligations. The source guard and native/exhaustive tests complement that leaf;
+they do not establish whole-service mediation or secrecy.

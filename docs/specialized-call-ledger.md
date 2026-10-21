@@ -148,3 +148,9 @@ Rust projector unit tests and the Python stream/linkage regressions run through
 the ordinary usable-system gate. Full compiler regeneration is the explicit
 `--call-linkage` option; hosted CI execution of that heavier option remains
 separate evidence from a local pass.
+
+The canonical JSON string refinement adds `native-json-string-encoder`:
+`json::canonical` through the actual native string helper to extracted core
+`json_string::append`. This is a bounded compiler linkage witness; exact quoting
+is checked separately in [the string leaf](garrett-json-string.md). Neither
+establishes all JSON/parser observations or native I/O mediation.

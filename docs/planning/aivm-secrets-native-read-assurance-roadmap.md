@@ -617,3 +617,18 @@ storage and drop/close/unwind remain contracts. Native outcome/event and selecte
 JSON/frame/close/adaptive-history correspondence still need implementation links.
 The optional compiler encoder/getter paths are not semantic refinement or sink
 closure. NR-2–NR-5 and normative native write/API parity remain open.
+
+### Canonical JSON string bytes (October 21)
+
+The [actual native JSON string encoder](../garrett-json-string.md) now calls an
+extracted core scalar-list encoder. Its twenty-nine obligations derive accepted
+Unicode scalar input, exact lowercase ASCII JSON escapes, paired surrogates,
+complete quoted bytes under the explicit buffer bound, invalid-input output
+preservation and printable output without raw newline/carriage return. Rust
+checks every valid Unicode scalar against the prior standard-library encoding;
+a native nested JSON fixture checks exact bytes and parser roundtrip.
+
+Native UTF-8/scalar conversion and byte/String append remain local contracts.
+Container/number encoding, parsing, JSON/frame/close observations and native
+adaptive histories still need correspondence. This increment neither connects
+all native events nor closes NR-2–NR-5, native write assurance or API parity.

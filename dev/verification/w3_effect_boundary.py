@@ -91,6 +91,22 @@ def review_semantics(contents: dict[str, str]) -> None:
     parse = part(decoded, 'pub fn parse(', '\nfn string(')
     require('decode(&raw, 0)' in parse and 'Ok(Value::Object(' in decoded,
             'JSON objects can bypass explicit structure-preserving decoding')
+    quoted = part(decoded, 'fn string(', 'fn encode(')
+    quoted_core = contents['rust/crates/aivm-secrets-garrett-core/src/json_string.rs'].split('#[cfg(test)]', 1)[0]
+    quote_entry = quoted_core.split('pub fn append(', 1)[1]
+    require('value.chars().map(u32::from).collect::<Vec<_>>()' in quoted
+            and quoted.count('zeroize::Zeroizing::new(') == 2
+            and 'json_string::append(&mut encoded, &values)' in quoted
+            and 'out.push_str(std::str::from_utf8(&encoded).expect(' in quoted
+            and 'encode_utf16(' not in quoted and 'write!(' not in quoted
+            and 'value <= 0x10ffff && (value < 0xd800 || value > 0xdfff)' in quoted_core
+            and 'if !valid_scalar(values[index])' in quoted_core
+            and "b'a' + (value - 10) as u8" in quoted_core
+            and '55296 + remaining / 1024' in quoted_core and '56320 + remaining % 1024' in quoted_core
+            and quote_entry.count('output.push(b\'"\');') == 2
+            and same_order(quote_entry, 'if !valid_text(values)', 'return false;', 'output.push(', 'append_scalar(output, values[index])')
+            and 'index += 1;' in quote_entry,
+            'canonical JSON string bypasses scalar validation, exact escaping or native byte binding')
     # The sole native manifest call to the credential-bearing HTTP adapter is
     # after policy compilation, durable audit and current grant revalidation.
     m = contents[RUST + 'custody/manifest_session.rs']

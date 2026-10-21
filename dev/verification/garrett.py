@@ -295,6 +295,38 @@ THEOREMS += [
 ]
 
 THEOREMS += [
+    'aivm_secrets_garrett_core.json_string.Proofs.nibble_value',
+    'aivm_secrets_garrett_core.json_string.Proofs.nibble_printable',
+    'aivm_secrets_garrett_core.json_string.Proofs.surrogate_pair_exact',
+    'aivm_secrets_garrett_core.json_string.Proofs.valid_scalar_contract',
+    'aivm_secrets_garrett_core.json_string.Proofs.hex_digit_contract',
+    'aivm_secrets_garrett_core.json_string.Proofs.append_hex_contract',
+    'aivm_secrets_garrett_core.json_string.Proofs.append_wide_contract',
+    'aivm_secrets_garrett_core.json_string.Proofs.escape_length',
+    'aivm_secrets_garrett_core.json_string.Proofs.append_scalar_contract',
+    'aivm_secrets_garrett_core.json_string.Proofs.printable_append',
+    'aivm_secrets_garrett_core.json_string.Proofs.hex4_printable',
+    'aivm_secrets_garrett_core.json_string.Proofs.wide_printable',
+    'aivm_secrets_garrett_core.json_string.Proofs.escape_printable',
+    'aivm_secrets_garrett_core.json_string.Proofs.valid_from_step',
+    'aivm_secrets_garrett_core.json_string.Proofs.valid_text_loop_contract',
+    'aivm_secrets_garrett_core.json_string.Proofs.valid_text_contract',
+    'aivm_secrets_garrett_core.json_string.Proofs.body_length_bound',
+    'aivm_secrets_garrett_core.json_string.Proofs.body_bytes_step',
+    'aivm_secrets_garrett_core.json_string.Proofs.append_loop_contract',
+    'aivm_secrets_garrett_core.json_string.Proofs.quote_contract',
+    'aivm_secrets_garrett_core.json_string.Proofs.invalid_text_preserves_buffer',
+    'aivm_secrets_garrett_core.json_string.Proofs.success_requires_valid_text',
+    'aivm_secrets_garrett_core.json_string.Proofs.accepted_quote_exact',
+    'aivm_secrets_garrett_core.json_string.Proofs.returned_quote_exact',
+    'aivm_secrets_garrett_core.json_string.Proofs.accepted_quote_witness',
+    'aivm_secrets_garrett_core.json_string.Proofs.body_printable',
+    'aivm_secrets_garrett_core.json_string.Proofs.string_printable',
+    'aivm_secrets_garrett_core.json_string.Proofs.returned_quote_printable',
+    'aivm_secrets_garrett_core.json_string.Proofs.returned_quote_has_no_line_breaks',
+]
+
+THEOREMS += [
     'aivm_secrets_garrett_core.dispatch.TraceRefinement.setup_trace',
     'aivm_secrets_garrett_core.dispatch.TraceRefinement.receive_trace',
     'aivm_secrets_garrett_core.dispatch.TraceRefinement.current_trace',
@@ -955,6 +987,8 @@ def inputs() -> list[str]:
         "proofs/GarrettProviderIO.lean",
         "proofs/GarrettProviderChannel.lean",
         "proofs/GarrettProviderWire.lean",
+        "proofs/GarrettJsonStringScalar.lean",
+        "proofs/GarrettJsonString.lean",
         "proofs/GarrettRequestPrefix.lean",
         "proofs/GarrettRequestTrace.lean",
         "tests/test_rust_w6_completion.py",
@@ -1367,6 +1401,15 @@ def mutate(pattern: str | None = None) -> None:
         (provider_wire, 'provider wire replaced authentication mode', '&route.authentication, body', '&crate::credential_use::Authentication::ApiKey, body'),
         (provider_wire, 'provider wire skipped checked port', 'if route.port <= 0 || route.port > 65535', 'if false'),
         (provider_wire, 'provider wire forged returned endpoint', 'host: head.host,', 'host: route.path.clone(),'),
+    ]
+    json_string = source.with_name("json_string.rs")
+    mutations += [
+        (json_string, 'json string accepted surrogate inputs', 'value <= 0x10ffff && (value < 0xd800 || value > 0xdfff)', 'value <= 0x10ffff'),
+        (json_string, 'json string skipped full validation', 'if !valid_text(values)', 'if false'),
+        (json_string, 'json string wrote before validation', '    if !valid_text(values) {\n        return false;\n    }\n    output.push(b\'"\');', '    output.push(b\'"\');\n    if !valid_text(values) {\n        return false;\n    }'),
+        (json_string, 'json string changed hexadecimal case', "b'a' + (value - 10) as u8", "b'A' + (value - 10) as u8"),
+        (json_string, 'json string corrupted high surrogate', '55296 + remaining / 1024', '56320 + remaining / 1024'),
+        (json_string, 'json string emitted raw newline', r'output.extend_from_slice(b"\\n");', "output.push(b'\\n');"),
     ]
     admission = source.with_name("current_admission.rs")
     mutations += [
@@ -2201,6 +2244,8 @@ def mutate(pattern: str | None = None) -> None:
                 "GarrettProviderIO",
                 "GarrettProviderChannel",
                 "GarrettProviderWire",
+                "GarrettJsonStringScalar",
+                "GarrettJsonString",
                 "GarrettConfinement",
                 "GarrettProviderSimulation",
                 "GarrettRequestPrefix",
@@ -2250,6 +2295,7 @@ def mutate(pattern: str | None = None) -> None:
                 "request_context.rs": "GarrettRequestContext",
                 "provider_io.rs": "GarrettProviderIO",
                 "provider_wire.rs": "GarrettProviderWire",
+                "json_string.rs": "GarrettJsonString",
                 "approval.rs": "GarrettApproval",
                 "enrollment.rs": "GarrettEnrollment",
                 "authority.rs": "GarrettAuthority",
@@ -2304,7 +2350,7 @@ def mutate(pattern: str | None = None) -> None:
                 ]:
                     modules.remove(dependency)
                 modules[1:1] = ["GarrettLogin", "GarrettManifest", "GarrettDisclosure"]
-            if label.startswith(("trace origin ", "request context ", "provider io ", "provider channel ", "provider wire ")):
+            if label.startswith(("trace origin ", "request context ", "provider io ", "provider channel ", "provider wire ", "json string ")):
                 # Rebuild the actual local import closure against this mutant;
                 # cached proof objects are never substituted for dependencies.
                 closure: list[str] = []
@@ -2320,7 +2366,7 @@ def mutate(pattern: str | None = None) -> None:
                             visit(imported)
                     closure.append(module)
 
-                visit("GarrettProviderWire" if label.startswith("provider wire ") else "GarrettProviderChannel" if label.startswith("provider channel ") else "GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
+                visit("GarrettJsonString" if label.startswith("json string ") else "GarrettProviderWire" if label.startswith("provider wire ") else "GarrettProviderChannel" if label.startswith("provider channel ") else "GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
                 modules = closure + [module for module in modules if module not in seen]
             for module in modules:
                 proof = temporary / (module + ".lean")

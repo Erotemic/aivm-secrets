@@ -26,7 +26,7 @@ def projection():
                 translated=dict(crate_name='garrett_bridge',
                     options=dict(monomorphize=True, ullbc=True),
                     files=[dict(id=0, name={'Local':'src/main.rs'})], fun_decls=[
-        function(0, ['aivm_secrets_garrett','tls','<Impl>','answer'], [1,29]),
+        function(0, ['aivm_secrets_garrett','tls','<Impl>','answer'], [1,29,41]),
         function(1, ['aivm_secrets_garrett_core','protocol','perform'], [2]),
         function(2, ['aivm_secrets_garrett','custody','<Impl>','execute'], [3]),
         function(3, ['aivm_secrets_garrett','custody','<Impl>','exchange'], [6,8]),
@@ -67,6 +67,9 @@ def projection():
         function(38, ['aivm_secrets_garrett','custody','manifest_session','<Impl>','setup_route'], [9,39,40]),
         function(39, ['aivm_secrets_garrett_core','provider_wire','<Impl>','host']),
         function(40, ['aivm_secrets_garrett_core','provider_wire','<Impl>','port']),
+        function(41, ['aivm_secrets_garrett','json','canonical'], [42]),
+        function(42, ['aivm_secrets_garrett','json','string'], [43]),
+        function(43, ['aivm_secrets_garrett_core','json_string','append']),
     ]))
 
 
@@ -80,6 +83,7 @@ def test_compiled_paths_keep_external_and_dynamic_obligations_explicit():
         'captured-provider-response-parts':[0,29,23,4,22,34,35],
         'manifest-encoded-endpoint-host':[0,29,23,4,22,38,39],
         'manifest-encoded-endpoint-port':[0,29,23,4,22,38,40],
+        'native-json-string-encoder':[0,41,42,43],
         'account-authentication-bytes':[0,1,2,3,8,14,15,10,11],
         'manifest-authentication-bytes':[0,29,23,4,22,38,9,37,15,10,11],
         'account-request-line':[0,1,2,3,8,14,15,12,13],
@@ -94,7 +98,7 @@ def test_compiled_paths_keep_external_and_dynamic_obligations_explicit():
         'begin']['line'] == 4
 
 
-@pytest.mark.parametrize('victim', [0,1,2,3,4,8,9,10,12,14,15,16,17,18,19,21,22,23,24,25,27,28,30,32,34,35,36])
+@pytest.mark.parametrize('victim', [0,1,2,3,4,8,9,10,12,14,15,16,17,18,19,21,22,23,24,25,27,28,30,32,34,35,36,39,40])
 def test_missing_callback_link_cannot_be_rebaselined_as_a_passing_witness(victim):
     data = projection()
     data['translated']['fun_decls'][victim]['body']['blocks']['direct'] = []

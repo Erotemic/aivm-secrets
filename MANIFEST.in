@@ -62,3 +62,5 @@ include proofs/GarrettRequestContext.lean
 include proofs/GarrettProviderIO.lean
 include proofs/GarrettProviderChannel.lean
 include proofs/GarrettProviderWire.lean
+include proofs/GarrettJsonStringScalar.lean
+include proofs/GarrettJsonString.lean
