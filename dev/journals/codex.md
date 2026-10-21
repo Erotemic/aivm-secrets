@@ -2911,3 +2911,23 @@ Commit implementation, scoped evidence and resource accounting with actual
 GPT-6 Codex co-authorship (exact weights/config variant unavailable). This
 finishes the current commit task only; remaining native conversion/primitive,
 parser/event/observation/adaptive-history and NR-2–NR-5 work stays open.
+
+## 2026-10-21 12:10:05 -0400
+
+Implementation committed as e741383. Frozen acceptance is
+dev/validation/2026-10-21-json-wire.json: clean implementation snapshot, strict
+3,116-case no-skip JUnit, 296 identical archive inputs plus embedded manifest,
+exact source/binary/log hashes and scoped proof/native evidence checked. The
+first temporary freeze attempt correctly rejected a W3 guard hash changed
+after the compiler capture. Verified native/compiler/projector source pins,
+rebuilt the pinned projector, reran the final guard and reprojected the preserved
+archive; projection is identical and all seventeen real paths remain. Replay
+provenance is explicit; no new native capture or source change is claimed.
+
+The first replay precheck also found the ledger executable had been relinked
+by later workspace feature unification, despite unchanged projector source.
+Its explicit pinned package rebuild and identical projection validate the
+replay rather than silently updating a tool hash. This is evidence bookkeeping
+only; no runtime, proof, test or acceptance weakening followed full tests.
+Current commit task is complete after evidence/accounting commits. Broader
+Garrett requirements remain open and no new queue item is started in this pass.

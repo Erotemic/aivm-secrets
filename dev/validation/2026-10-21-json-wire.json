@@ -1,0 +1,5005 @@
+{
+  "schema": 1,
+  "status": "passed-for-listed-scopes",
+  "recorded_at": "2026-10-21T12:09:29.309058-04:00",
+  "source_commit": "e74138333ca91d46bf47382005b69f9a21071768",
+  "source_dirty": false,
+  "scope": "Production complete typed JSON layout and direct captured-value/encoder/guest-frame preparation. Actual recursive exact byte encoding under explicit tree-depth/scalar/capacity contracts; bounded frame admission/refusal and actual returned writer input/states. Native serde capture, Unicode conversion, numeric-token grammar/spelling, map order and parser/TLS/close/event/adaptive-history semantics remain contracts or open links.",
+  "validation_source_mode": "Committed implementation. Subsequent acceptance documentation, journal and accounting commits only.",
+  "source_sha256": {
+    ".github/workflows/garrett.yml": "8ac7afbca1609422b24aca88f3c422fbc6add2ee410fabe65f9341f2e3d134ab",
+    "MANIFEST.in": "041ea3ba05f2deed502769b81285731b90e68606cdf1bca34766f77c5d976bde",
+    "aivm_secrets/__init__.py": "7e75a2a994fb23187847f0021d3b00a0c30884828660f155425f6c436b037309",
+    "aivm_secrets/__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+    "aivm_secrets/cli.py": "383eebd07c48546463caf759e7ed5bcd313ad2b328e75e0a777605a43b2f1064",
+    "aivm_secrets/errors.py": "e659573694432f168581edfad7fc1f5f998f4e4ca52def071ff35fabae97d61b",
+    "aivm_secrets/guest.py": "9b437042effb43a9ad631471798b9a92479f7ace182030fceaa7a8f4d7f28fbd",
+    "aivm_secrets/host/__init__.py": "2bda5f945ec7bdc1aa8c61d454efc70e41c4d0ff311fbb9c6c41a01744133afd",
+    "aivm_secrets/host/audit.py": "90b91e9cbd2ba1692ec71c2093bf6bd80c1145d2b74d728eea2d99ad96d5d122",
+    "aivm_secrets/host/broker.py": "253d5af63586fb1478488d4b3329fada0f9ec2c2d7f98c9e479ca95c9e0d0de1",
+    "aivm_secrets/host/egress.py": "66060aeb9c53464b60bec2105efc496a956c3e99463a343faee95a3205da98d0",
+    "aivm_secrets/host/envelope.py": "a7e01d19a233a414da127f2fe9a14ef6c3fd4242e797719fac9575acdc53777e",
+    "aivm_secrets/host/files.py": "1f7ca672fe25b3d96bb58330e1976ce620b120acc05eb8f1a4edcf516dae56ff",
+    "aivm_secrets/host/hardening.py": "3faebebab00051dba84a884e51aa71c92b944d3617ea2c281db436c90676cad1",
+    "aivm_secrets/host/server.py": "f6e198a36cd41608406feb7dc0585dd16072b776fd87622b114a6c6371036600",
+    "aivm_secrets/host/session.py": "726e8dca5f1fb7cb671a57076b04bc309bc7b2dacd2ad5fae37d0faf625ec9f3",
+    "aivm_secrets/host/sources.py": "0439501522f25b4a34ec8c5410c27ea8b13785cb72918511f4c484e0429e0401",
+    "aivm_secrets/identity/__init__.py": "6c5bcaf7598af2b152cd9b8c8b6cb945be69c8f3f0f22b473a46d5cb0ebc9251",
+    "aivm_secrets/identity/authority_runner.py": "5607be3189939cf457bdb1a4dc5e6c22e4c1a7984b560a3732b8b0d3b7369108",
+    "aivm_secrets/identity/bundle.py": "a570755e31b8fb098cf83661a5807d9099dd41eab89f5438b9a8ed0786bd2c05",
+    "aivm_secrets/identity/certificates.py": "179f5acf777e20b3a65d3a343510bfd80d10a28d0867c4fe6c34a2fc54756333",
+    "aivm_secrets/identity/cli.py": "c6e3dcbc0e79a9281052bc14a5914c2856d801f87c82a48331697c37f6a404ba",
+    "aivm_secrets/identity/client.py": "045527ec0292378a599215f66b85ac45aa2e39969d9e3841e9b0614b30fd7e2f",
+    "aivm_secrets/identity/coordination.py": "dd66f7b089d207e79c7c49bd996dcdff1380feb1ff012a3c59171801eb918607",
+    "aivm_secrets/identity/enrollment.py": "5ad7a319d2cbf8303c3f6c39ffdf7dae6f3562aaf21538fb7d8b8c8274d18dad",
+    "aivm_secrets/identity/garrett/__init__.py": "24a0ae16afa83305139995aaf4bbc9766f6beacadba1e6b9b8752697d446a3f0",
+    "aivm_secrets/identity/garrett/authority.py": "cb5d779300d2281ff501095d788e9b8053c1f77c25432d6d3df086ae5c6d5273",
+    "aivm_secrets/identity/garrett/claims.py": "bf41baf5653fa6c3b0fb5b3d412c1adc16c2d747dc4dde0f4b964c0e899989ef",
+    "aivm_secrets/identity/garrett/key_rotation.py": "59ec9e8b691595e8bb2500c6fbc9ac620b35b006aa5900f94f88b3e76960a87d",
+    "aivm_secrets/identity/garrett/oauth_contract.py": "25b0a8231fa6981c52efbab511395de267f3fe1c89ee60161ffceaba3168ba66",
+    "aivm_secrets/identity/garrett/protocol.py": "b6cabf4eff3714eb3512aa9b4af4d113eda0eb7b3cc7b741e857b2c0927e72ab",
+    "aivm_secrets/identity/garrett/registry.py": "6922604a6e13850dc013c7ab1a326e5d7130c6e127bf3bc934f0f55479ce16e6",
+    "aivm_secrets/identity/garrett/vm.py": "7865cb474fe1c221d75a68fa78f8d0aa8b68149224753233d106eef47d438e6f",
+    "aivm_secrets/identity/garrett_runner.py": "617f00c32f4f3f75902f804ae838b63271fe411cc0fd222b586cf2dbeea39b69",
+    "aivm_secrets/identity/key_rotation_runner.py": "a8b1f9bcc18237171fa4f3cd995169279ae8368695b0190784c5d5addece6e11",
+    "aivm_secrets/identity/mtls.py": "3f7ee03bb442e3040e31cba2629be83ae8aecf8f497725819a6072e22ea41628",
+    "aivm_secrets/identity/oauth_provider.py": "4fb7cd062b6c8ed68e3a11a1a212732ee6d3f6fc35c317c45a0283ab9b40b24d",
+    "aivm_secrets/identity/oauth_runner.py": "d09a4f1382cb5d36d5240eaf167219e60695658e6f38a757e6011f0ac6ec35f1",
+    "aivm_secrets/identity/oauth_transport.py": "0bf4e13d36072ccb4eaa73b484881f9cee58d2af56a413ad90713fc4164e907c",
+    "aivm_secrets/identity/oauth_vault.py": "13f34277ea334bf14b30a299227375e1e079727a7c86690bd211d7647b040368",
+    "aivm_secrets/identity/registry_runner.py": "7303795c3a42e2d603bf000e6207b3796071a662911b8a0324fcbfeb1e8da948",
+    "aivm_secrets/identity/runner.py": "a1282247a9d0e9385c376906c1b8773ad9924367d5f9619088e9093974df96bf",
+    "aivm_secrets/identity/service.py": "d5bb33256d7a49c8e7bcb9089feeb5a60651cbd90d2ae35e77fe86c6afba6178",
+    "aivm_secrets/identity/token.py": "748a225c6fa6e4a5d3b5579e49a1ca76f8119516cf5b6cffe4c4a7e1341ebbad",
+    "aivm_secrets/identity/vm_runner.py": "611bf6ed37c3a4bda6eff9615baff9686d8932772bcf0720743a24daedb47f59",
+    "aivm_secrets/kernel/__init__.py": "784f3efd488856ae5ab7343865c1928c26dd967dc55d1227152b17fc473e7fd9",
+    "aivm_secrets/kernel/codec.py": "b766c4732f7ff6e021b51df9094143a9030471c3288a678ab2b2def7ecfa5f35",
+    "aivm_secrets/kernel/grammar.py": "e1607622a3928092ef8c3989fd050d6530c38e2f64a3a95c1eec07b9f68eabf3",
+    "aivm_secrets/kernel/graphql.py": "8b6ab0bdd9ca87d4ef4d3b689f968f5279e1e0720185d9653c8e1789a59ace25",
+    "aivm_secrets/kernel/https.py": "5d8cff483307b8e3c7b7423eeda4ada35da0c2357376cec6fe28e6bb7d859a80",
+    "aivm_secrets/kernel/machine.py": "29e230e4302f32a358b997d6a8486a83b34cb027135feec6ea063b3295b90183",
+    "aivm_secrets/kernel/model.py": "49aec9983fa861235e97aaa4f29bf00aec0ca8ef1780194c2f3215f22d1edc68",
+    "aivm_secrets/kernel/presets.py": "6dd5944933d6c328a364107e1b3f2fe5d8871df860cfee4804e470039254dcba",
+    "aivm_secrets/kernel/scope.py": "81491dd702a5ddeb5ef09ae1fb72e0b079dd149dc5c5661649ef288b9331de54",
+    "aivm_secrets/kernel/service.py": "96ed875d6ea1b08d739913a568c3f21ad7e62d2b5352f926d37e1e9bb3cda2a7",
+    "aivm_secrets/kernel/source.py": "d17ea5d1264dedfee7d301ac2b87717c32fc3a53af457498c740ca36e89aba43",
+    "aivm_secrets/kernel/trace.py": "6ab288e3a1f724691b0cecff7c4bcb0589c443418af97f504a09512dc48af01d",
+    "aivm_secrets/kernel/wire.py": "101ba6ee2c93998dc228a969c39f062f0c7f73f1c988004ef55bad2cecf721bc",
+    "aivm_secrets/primitives/__init__.py": "e896f3842afc2027a1b003c44e1192774f70e6cb649fc2ab815682626dc00e00",
+    "aivm_secrets/primitives/binding.py": "3e85f0e8b81f00350f548a1f11a8d65710c16adcdda75a82508576b6bcde9b8d",
+    "aivm_secrets/primitives/codec.py": "ddfe7b5fdeab9389c36460ca3ee7328b066592635d5a5ce53d252e10db257ff9",
+    "aivm_secrets/primitives/epochs.py": "90fc98ed48498a1bea6ea2d8fbfe58428570bfc5c72f051dcdcabd56ea591750",
+    "aivm_secrets/primitives/grammar.py": "10835d48e476c975e6470b0197b31e892638cbe31b93f7aa75c3fc139c9b8e9b",
+    "aivm_secrets/primitives/validity.py": "f64c6c115e7695d38b4d50f3029e4ec891c9453094fa1f3df48f630c02430389",
+    "aivm_secrets/primitives/wire.py": "0ffc741db2fc5e53b8cc8ff565607cf53da9fe8b23aa39569ce3c306aca401f8",
+    "aivm_secrets/primitives_runner.py": "2457841d9433787690d8bdff7234e5880a7481b9847c3c2ec42c25682e54137c",
+    "aivm_secrets/transport/__init__.py": "4553f8f9f70c2c1401d1ddc5d6acc56b1bb2724a888dad2d0ff877e7ef73bda6",
+    "aivm_secrets/transport/framing.py": "62c0ba7da18cb4a2713b45ee8a3c218d6bfb0362116d3c05719c499ce3be689f",
+    "aivm_secrets/transport/names.py": "f3fb1439a3fd26c3abb24528decca41bb4272b2a0c7e99f2d4989b3e0a6c2255",
+    "dev/verification/freshness.py": "544972fd0fef784c6566ce679aab43c27a062080d9ff7ec7cf5c341d8a377264",
+    "dev/verification/garrett.py": "230b484785031ba429692a1f9377e44b32682ad2a217048803e91567311eece5",
+    "dev/verification/provider_exchange.py": "a873b5d18d7dd4e5c7e3607051911d6f881764193c334a320dac3f7bb00bfc42",
+    "dev/verification/quick_w6_read.py": "279d41777567c8723064119c7f89b652c382829e5b0d5574b424f548773016aa",
+    "dev/verification/read_transition.py": "666095c02d9e82ef4d8d29fb37fca8da9c98ecb6eb06f1b695ecd2cc5da06a98",
+    "dev/verification/request_effects.py": "a4c7f70811611430000b8ec1fba81855e7833704a5a212f5e68a7e11d0d61c5d",
+    "proofs/Garrett.lean": "0f9e9c8560489bf1ebae07c789af41a97dd96c1ac2fc25c528bd1a03a08ac68c",
+    "proofs/GarrettApproval.lean": "b66574ffcafa7c88adbc4ef15a8af47bce682a882ab44a24d8beb53b503a9931",
+    "proofs/GarrettAuthority.lean": "9028ba4af06a597b63cb1b0c86a485025d7325fa2a9786496ba7da37aa54b6b6",
+    "proofs/GarrettBundle.lean": "2a775c0ad24b794aab4eb38c15611202dba6efb7d262783f16d310cdad934399",
+    "proofs/GarrettCheck.lean": "319a5b8daf9c08b61aa45dc8dedd74e591dd271b6df9c42b9c639280e540beba",
+    "proofs/GarrettClientMaterial.lean": "bef1980f902d225d2343531c6f7420eadf4409cf1267d066312ee5b2bc852e65",
+    "proofs/GarrettCompletion.lean": "d985d4a86105713ae6ecc999a12dba35991023d30ee1853669a2b12a9a34c513",
+    "proofs/GarrettCompletionSimulation.lean": "106ce09bb1ab2faa6fe4a44f386f54b4005434acb2447309d887fce32683ca99",
+    "proofs/GarrettCompletionTrace.lean": "06f675c03ae98b2eda15eba46487fb9d7f2a2a4fbee7e2be294b788b31a7821d",
+    "proofs/GarrettConfinement.lean": "709165a932ecab0d517080b4f36650a1f611db9db0f6ecca0905cec8ed718ad1",
+    "proofs/GarrettCoordination.lean": "040293f183a3cba6039a714ba0793cadefa7723a80dda1310b86e3cbb4d989b0",
+    "proofs/GarrettCoordinatorAuthority.lean": "6048693b413c94c1c059304c198bae8ff64b87314b89c94e2b245a732b35a26a",
+    "proofs/GarrettCoordinatorReply.lean": "0a6244ccd324ed2a878ddcaae6250e9c952c8e60571c5f85cf518665928bfbd3",
+    "proofs/GarrettCurrentAdmission.lean": "8ae677c82958bb8e7ff52998bae5cc1af7bad385e1d8893439cf61d95b52fb1e",
+    "proofs/GarrettDisclosure.lean": "5df2f2b8387c723df29f748046f7bd01bdc93c681d09184268b975fa044aa23f",
+    "proofs/GarrettDispatch.lean": "58861b4177d63bea1a0aa13b2c5c70d99a4ab89c329f41c01f6dca2d32bda06c",
+    "proofs/GarrettDispatchSimulation.lean": "4c81110f7b54642e4443e26d591d77ebc93cd1da48a64bc835bea7063c0def21",
+    "proofs/GarrettDispatchTrace.lean": "921981e97cc2c197714b8b773285ee1334dd21ca031bdef3e96be2870b57229c",
+    "proofs/GarrettEmission.lean": "bfdf0fc13e0dd170c5812ea9d562b62ab5f62437e4a560b99da50895f1df7239",
+    "proofs/GarrettEnrollment.lean": "ed58f235a8b3a455ac1c7291b91db9dc6117e8e7c3969e316ee5ab8e321e1614",
+    "proofs/GarrettFoundation.lean": "fcb5a0b57cda0bed0be5de203e858bcf8061149cdf5844a9fd87328dfcc4e9f6",
+    "proofs/GarrettGuestFrame.lean": "b156fc267b5c868ea830124ab12ca21698fee3463011e696e932517f8b0527e7",
+    "proofs/GarrettHistory.lean": "b68c9ef78658f3a0cf284e83a316844e49568aacd86270bed894efe063e23293",
+    "proofs/GarrettHttpAuth.lean": "dcfd4159d5becf4b2ecd6cff234756ac3692b1f7a6cd30699a763e6322c90030",
+    "proofs/GarrettHttpRequest.lean": "edd1aa54bd81ac15a86d4d9628f41958db08a5d09933da5994cf0b5828f8ffce",
+    "proofs/GarrettHttpWire.lean": "ff07e3cad080257e1f2d32d3fb8d36d4f1f5e90b2a32f24b9ceccc63240964b4",
+    "proofs/GarrettHttpWireDecimal.lean": "687c5076f62122da1a1f7053a78d16d64335bd840dd79fe06887d0bb327df235",
+    "proofs/GarrettHttpWireFormatting.lean": "ee6dfc3fe1baea9be4ea114d515cd54263ca87617aebd71509c82aa5cfc31e26",
+    "proofs/GarrettHttpWireHeaders.lean": "3e405c1c53ea0cc954aabd28d6fba380d5ca83f65b0a5cb8a2288757fc2cb95b",
+    "proofs/GarrettHttpWireValidation.lean": "e0f45d0fad6ed1c56ee56765d888e8ee34066537a86f6b17abb059cf060e43aa",
+    "proofs/GarrettJsonFrame.lean": "ca989045cea60f82c9d2d3ade16fa4632a26e8ad69a41ce22c5a70570d0ff012",
+    "proofs/GarrettJsonReflection.lean": "b7db183d971bf8297dc02b34a75df335a8a2b24a95ea9736ef3572d760a18378",
+    "proofs/GarrettJsonString.lean": "f942b3d91889cc04f1a2654c0e7b411703bf964a14203f36e848131c92a5d92d",
+    "proofs/GarrettJsonStringScalar.lean": "f38685625710d85f7b93aea089b030ebf1761d388785876d08ef05d0ab6c3b8a",
+    "proofs/GarrettJsonWire.lean": "c188a3c78cf53af9546772439dc95e9c10cb29ffc2b5f75647bdd5d17103dd4f",
+    "proofs/GarrettLineFrame.lean": "f70d26834c9bf8e064b6d04f175f8fbd77a116ff21ddbf893e13ad7d9d15e330",
+    "proofs/GarrettLogin.lean": "93df467806b83fb3da91ee60ba46bc78f4c1cc20238b177112f0c356847226dd",
+    "proofs/GarrettManifest.lean": "44ea8dc723634c16d2db3723f3b6421745b6b9c13eb26dfad224ea353a01ae04",
+    "proofs/GarrettOAuth.lean": "5f8e8081b317345ecefbca714a0b2fd877de5b58c0d4b16e78f2aecabdd04d5d",
+    "proofs/GarrettOwnedRequestTrace.lean": "3100049bf7ac5c823d401711207576643a6de733e35e70d79e41cbba3ef4231d",
+    "proofs/GarrettProfiles.lean": "a4aa34167828e8b48dffdaa557bc45b1635aaa421a9ce1d5b66fecc092113e53",
+    "proofs/GarrettProtocol.lean": "4c3418ff348727b48fd8ca22af0e23b2dcf37e16c06901f68220d4a0f244191d",
+    "proofs/GarrettProviderChannel.lean": "afdb72b035f9a0ed11f58fe1d929d30fca9db7cbe60bfce7be29b4f7fa40d198",
+    "proofs/GarrettProviderExchange.lean": "cfa48f19debc03d3f709cff8b48d761ab32529463ffb99bf2c15164478b5aac4",
+    "proofs/GarrettProviderIO.lean": "661ab3ddb45b01283c8b59a19f2a6f1cbcb17f399178982a6da068f7c007924c",
+    "proofs/GarrettProviderSimulation.lean": "8a7a638435533e39fda351d59d81fa422562fc8ab2a7aac8eaae7d434b299738",
+    "proofs/GarrettProviderWire.lean": "b4ea798dc76794fd564583b6c6a8285ba029093175c33d589e4d960911bad473",
+    "proofs/GarrettReadInvocations.lean": "8b01422d8349c7c262b58df78d97716cd5ddd26b8cec69d78c9a2c115b5322ab",
+    "proofs/GarrettReadPaths.lean": "9405f4896c0862f41b12b40cba79b252d57e84fa7f616a9e3bbc54031abb5bf2",
+    "proofs/GarrettReadPrefixes.lean": "1daa7f086076d1639244a066c9949b0957bde13d0944cd3c5335c30e1e7ba513",
+    "proofs/GarrettReadTransition.lean": "1a924dfaf1e5cce086743b0211e1d39a0828830b64bf0fdc64f92d8157c68b67",
+    "proofs/GarrettRebinding.lean": "6664e8426a5aa3acef2539b56f8f0121a3e353cbd3885a1464b08fa0101513b9",
+    "proofs/GarrettReflection.lean": "db994fe4f443d66ecd68def2cace5bab238a83180242ca8bdb24afdc906d9a27",
+    "proofs/GarrettRequestAdapter.lean": "d304a80c94d433c25a72d8109dc571bb84a5d3d3a24e62809f7a04aa1ec18642",
+    "proofs/GarrettRequestContext.lean": "ea48c27e49d44dd212bc82842f1d28992bc3ed62accd22e631b6f67452371be6",
+    "proofs/GarrettRequestEffects.lean": "19a5f5307602cf5dad7f7c48ed6043d1cccf8e3245b9203371d4804d00424093",
+    "proofs/GarrettRequestPrefix.lean": "d439db5a286dbf11f7359578f39d7a1c4aa353b576cd93f8c66ed62c5d67335d",
+    "proofs/GarrettRequestSimulation.lean": "e1745bdb6ecdd35dff5f01120eb1c4aaf8aebafafdd32ae7076d937779bcc604",
+    "proofs/GarrettRequestTrace.lean": "cf489d307a081f114f24b0e244da209f8492e045bcb520f3ae6d647e77bfb590",
+    "proofs/GarrettRetryKey.lean": "dfb0f6114aee1d67890ea5055e7f9fb858a637d4d1d1e4b3491bb21ec9e8f081",
+    "proofs/GarrettSecrecy.lean": "953b53599325081de488e10b21595242396b473106c86008fd1d37aec573852b",
+    "proofs/GarrettTrust.lean": "41ddc279ad584696a7db16ed65f49cee1419fbf6c2cd4cba7d8f76bd9e29be9d",
+    "proofs/generated/AivmSecretsGarrettCore.lean": "e05a7eba4add7ecf516fbd8002d9e5ffd84e0bce910de1a21db34f07d7f0558d",
+    "proofs/lake-manifest.json": "c7d460c9a3a2b982550c022e66d0bb41901f18a84c14aa6d02ff77f8b7933a4e",
+    "proofs/lakefile.lean": "d520a286483734484d1d7e8d24182dd4895ffc5c0c99c20689f2dcff4ed2079c",
+    "proofs/lean-toolchain": "ca5f1f601d34c49079e38d7e7041eb0f2a9c227fbc1df0f404820069a052330c",
+    "proofs/manifest.json": "696f88a7762f267ec9682c9c36c1c0c7c1a2a3d99207b7122c81e594bf0213c3",
+    "pyproject.toml": "754c904fed2736196345bae0c29800a0a02bddcd69a79dd84150525de07c540b",
+    "rust/Cargo.lock": "2eed9b5942894b536aa5a36c423d93f2890c7b2e956bc67d1cf68ade0c7cb1c9",
+    "rust/Cargo.toml": "7905846eac8bd4288ff6f6cc360dba8f45c7eb4122ff1711d4e3b63f97fb0cf2",
+    "rust/crates/aivm-secrets-garrett-core/Cargo.toml": "774bbbff66575d555faae67e5985db17fb84edb2e93ac678f85340f22a6dc350",
+    "rust/crates/aivm-secrets-garrett-core/src/approval.rs": "29badd4e460fd7a1ee180f47d9610594228175895621e534a01afc539b7f0da7",
+    "rust/crates/aivm-secrets-garrett-core/src/authority.rs": "fc0abeefd1ac0c349f85e9de72ec0904889dc1f1081c049a270600929e4d1ae0",
+    "rust/crates/aivm-secrets-garrett-core/src/bundle.rs": "f70c082dd72a45546b8d2f2ae12aade5b7487cccf4f54fdeba139806fcba8aa1",
+    "rust/crates/aivm-secrets-garrett-core/src/client_material.rs": "9498ec88d06c3110955d88f602c1914a41bceeac3aed8ebdd36e69126077a784",
+    "rust/crates/aivm-secrets-garrett-core/src/completion.rs": "3c114559f8c7dcd4d58c410ed2cbec0db3f6d655acc07ead7fe0147dcdda53d8",
+    "rust/crates/aivm-secrets-garrett-core/src/coordination.rs": "ef508fb25417f85d12ca86d229983a37753e835ae3596b20419203b3edf43997",
+    "rust/crates/aivm-secrets-garrett-core/src/coordinator_authority.rs": "12db1d31ef4df0561b1f6de59309c4b9de9ef3abb12187dd2917b59edf0657e9",
+    "rust/crates/aivm-secrets-garrett-core/src/credential_use.rs": "3de469b2eddc928d0ccd9ab727a0b85db97a3c4f1bdbe7732d1a4294e1469c44",
+    "rust/crates/aivm-secrets-garrett-core/src/current_admission.rs": "d22aece08bf7014a8bf2319a41a222b3c354b97a8e82ede9a759756ad4c47979",
+    "rust/crates/aivm-secrets-garrett-core/src/disclosure.rs": "dcaa7ad0db2b23158d9d75f1a650520286d9389068d3c9a7c4d9311083cc16ce",
+    "rust/crates/aivm-secrets-garrett-core/src/dispatch.rs": "35f4c62076a22f8c6a54fa0ee7afc5fac0fadf699132a6e561666b553febf8dd",
+    "rust/crates/aivm-secrets-garrett-core/src/emission.rs": "ad6bb43c32661f3dc7879ec81c49ebe2ac3138dc2b245b52f877e20d6124d3d7",
+    "rust/crates/aivm-secrets-garrett-core/src/enrollment.rs": "3fc8387c2ff7fa5afe9a897bd17a07efd7585c0ae01bea9931a76ed4f60260f1",
+    "rust/crates/aivm-secrets-garrett-core/src/guest_frame.rs": "5b8d5f03bd4011b5b373c5b6139f019b930a0b23d756f06a33e1952616f98f2e",
+    "rust/crates/aivm-secrets-garrett-core/src/http_auth.rs": "8408655a5d883ebed465afa63b4c6930f222cb4b4ce8727589ff0b00c15f96cf",
+    "rust/crates/aivm-secrets-garrett-core/src/http_request.rs": "e854be3ecf22db96e76a647f4615c67111d3a32097365ecaca3d011834c8ef1d",
+    "rust/crates/aivm-secrets-garrett-core/src/http_wire.rs": "5a3815e4a99632e99c2c99d97f763a37bcc9e77623aed6714875e7e4ec583461",
+    "rust/crates/aivm-secrets-garrett-core/src/json_reflection.rs": "1c4c4bbef69bf608c6e1989fec2b88044becbaf632b6bbded6d168fdbc5d1662",
+    "rust/crates/aivm-secrets-garrett-core/src/json_string.rs": "9fda5659e8bb02d90955f3c7de79b18237991ea24ecd0703e3d8cb4722b87d12",
+    "rust/crates/aivm-secrets-garrett-core/src/json_wire.rs": "cdf951e07130f64df9e571fd684ea372fe5927be8a0fe1e409b4b93a270315a7",
+    "rust/crates/aivm-secrets-garrett-core/src/lib.rs": "f1da075631a0c077fa5c85aba3159a4d2b07f7855b3565599c6f0dd64ba5edbd",
+    "rust/crates/aivm-secrets-garrett-core/src/line_frame.rs": "f7adcd0565f48a14f78475bc59d5171c2148dfaf19f285a39a001405bf1cff5b",
+    "rust/crates/aivm-secrets-garrett-core/src/manifest.rs": "872439b9ff63b374a300959b28fd8330e1cd19b0e3a2245a59441ee8f3fbb17a",
+    "rust/crates/aivm-secrets-garrett-core/src/oauth_login.rs": "4a4e2c05a8c3013b896e1d840e5f0253fce363a0fdd439cc6234d86cbffbd9db",
+    "rust/crates/aivm-secrets-garrett-core/src/oauth_state.rs": "c6e68fdbe82395f952f8f8bbafb5fd7ab97ec097814dfd35a171d89b5065fc5a",
+    "rust/crates/aivm-secrets-garrett-core/src/protocol.rs": "dc61bc54f800d63673a444124423dbc221849311487cf1f4b9f6567706c15b89",
+    "rust/crates/aivm-secrets-garrett-core/src/provider_exchange.rs": "05d8446b08c73905e0ceedfa34e53a2528b62e519a3c5a6d5a5c76e10ce503f7",
+    "rust/crates/aivm-secrets-garrett-core/src/provider_io.rs": "f3cec6167c3c2891048683a348258d2692b26929544f6eae4a665429999c2c49",
+    "rust/crates/aivm-secrets-garrett-core/src/provider_wire.rs": "65caf2540f8b157f3fd81f92fcd35e834b3911a99ee9e2ddd6c29d98de5eb740",
+    "rust/crates/aivm-secrets-garrett-core/src/read_transition.rs": "4e38ebdb0f8c778f43670eef62882ffba259b76a0c66745dd132894033900295",
+    "rust/crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs": "04569885859a79388d748776ab2708946fb6c2ba75905ac060920c815d137624",
+    "rust/crates/aivm-secrets-garrett-core/src/rebinding.rs": "cf36c2de18c2c79db745c19d9e694bcd36c9c1f83d047a6ab7ab0a3b80a25500",
+    "rust/crates/aivm-secrets-garrett-core/src/reflection.rs": "569953e74fc89ff411e7602716175fffadc6eabf595e0b1066131e33aafc3791",
+    "rust/crates/aivm-secrets-garrett-core/src/request_adapter.rs": "468194e3e8ebbfde89fc949221714bf3df9d12ed03f6ea11d5e3361791697a8c",
+    "rust/crates/aivm-secrets-garrett-core/src/request_context.rs": "f211275f3a2b9c4e7f73153370c10c5e99ed4551e7920fddea5d3dbd9d4fc67b",
+    "rust/crates/aivm-secrets-garrett-core/src/request_effects.rs": "1ff25eadb2cd1d5943252882ffab09dac21e3fef70225176f7b3caa91fbbf9d9",
+    "rust/crates/aivm-secrets-garrett-core/src/trust.rs": "514f14c788d87936b74c8602727a9a146f123aad1166b28db8c0cab4bfa3e963",
+    "rust/crates/aivm-secrets-garrett/Cargo.toml": "1149a33d2161f0caca6f4cfd0d9f89773896fed6bab3ae559efd94018f0b5de9",
+    "rust/crates/aivm-secrets-garrett/src/attestation.rs": "ddced5c22f8a998ff4b36c113bc87762607554a8d5ae2d96e61cc8c2f757988f",
+    "rust/crates/aivm-secrets-garrett/src/authority.rs": "402e9a67cf720f7b573c926fb1868aaf5c62ba9e29761560a2ae1eea873b723c",
+    "rust/crates/aivm-secrets-garrett/src/authority/administration.rs": "c75d94591f54fa4afe833a8bc9ab6250580da6c6daaf399fadb293d65795593e",
+    "rust/crates/aivm-secrets-garrett/src/authority/administration/tests.rs": "f1bfb72f6333c1e35c76ea1ce91d5d87c8adce1e670c05fb11640cb55c798998",
+    "rust/crates/aivm-secrets-garrett/src/authority/issuance.rs": "ac5e07b6f4d594bed45381fbdea25f1c4c027e415cd7cb0d23ccbbfe8b22f93f",
+    "rust/crates/aivm-secrets-garrett/src/authority/rebinding.rs": "7280f27e111bad116ab1a7dd810c3bf419f5c2b2511c54f40d3aad3f17d134b9",
+    "rust/crates/aivm-secrets-garrett/src/authority_main.rs": "0d2a6a4d6154f4b459cfcfa5af63da20d78d733c32a17904016d2578295cdeb0",
+    "rust/crates/aivm-secrets-garrett/src/bin/authority-conformance.rs": "ef1ea389adfc488b3f3a21a29a5b3142474fe9b1aa687598f0460b77fa6596c9",
+    "rust/crates/aivm-secrets-garrett/src/bin/identity-conformance.rs": "ef1ea389adfc488b3f3a21a29a5b3142474fe9b1aa687598f0460b77fa6596c9",
+    "rust/crates/aivm-secrets-garrett/src/bin/key-rotation-conformance.rs": "ef1ea389adfc488b3f3a21a29a5b3142474fe9b1aa687598f0460b77fa6596c9",
+    "rust/crates/aivm-secrets-garrett/src/bin/manifest-conformance.rs": "ef1ea389adfc488b3f3a21a29a5b3142474fe9b1aa687598f0460b77fa6596c9",
+    "rust/crates/aivm-secrets-garrett/src/bin/oauth-conformance.rs": "ef1ea389adfc488b3f3a21a29a5b3142474fe9b1aa687598f0460b77fa6596c9",
+    "rust/crates/aivm-secrets-garrett/src/bin/registry-conformance.rs": "ef1ea389adfc488b3f3a21a29a5b3142474fe9b1aa687598f0460b77fa6596c9",
+    "rust/crates/aivm-secrets-garrett/src/bin/vm-conformance.rs": "ef1ea389adfc488b3f3a21a29a5b3142474fe9b1aa687598f0460b77fa6596c9",
+    "rust/crates/aivm-secrets-garrett/src/bridge_main.rs": "0d8cf70218fc5a87cf241b3a83bded53e9f4570062b3736451c01d1c48e34917",
+    "rust/crates/aivm-secrets-garrett/src/certificates.rs": "396440e974352fad5315d594de38f3621f6c15c130dfa833960ce55c56906458",
+    "rust/crates/aivm-secrets-garrett/src/client.rs": "b86b0f410ff82c63dfd6f4745299683cbcdde15a2433a35b31e04acbee4b7d27",
+    "rust/crates/aivm-secrets-garrett/src/client_alias.rs": "ec8404dc612add7493980c2b221f914f2bd991bf1045cd2cb4815d6d62f03e37",
+    "rust/crates/aivm-secrets-garrett/src/client_invoke.rs": "e7975eabb5a072b254eaf48a7f06afc45c90cfb1344b5b82db9b3e79044222e8",
+    "rust/crates/aivm-secrets-garrett/src/client_main.rs": "1c64bedd585bbd9a76a6529c2f594da50c1742da512ae15f6747fc7a419d15cd",
+    "rust/crates/aivm-secrets-garrett/src/client_material.rs": "43ad008809c40c7dc6814d491046079691cdc1ee9ed98deeb65a1998bd2c0786",
+    "rust/crates/aivm-secrets-garrett/src/conformance.rs": "7f2f9838ac02ad60b8fa83a087f5938125d41de2a535842b9ba0989aa79f0508",
+    "rust/crates/aivm-secrets-garrett/src/coordination.rs": "835264c335dc07c00d5adcc955bd755d7458a4d4615f8ef5b2867fbe69c3a1f1",
+    "rust/crates/aivm-secrets-garrett/src/coordinator_admin.rs": "cd74afba0fbac682b3bd93e45ad76416428cae3e6ad32a557b900b4a2b8da64c",
+    "rust/crates/aivm-secrets-garrett/src/coordinator_authority.rs": "71a39a723316cf505003015456d69bf6d1b099da3a26a155e4dee47c35548acf",
+    "rust/crates/aivm-secrets-garrett/src/coordinator_authority/ledger.rs": "924a6319c2b02664c681d0f0864d6b1c400e75a89d7842b1deff64a5d6987643",
+    "rust/crates/aivm-secrets-garrett/src/coordinator_authority/server.rs": "bc73fa8dc3cc9fe98f3b45d7561463b4af14a85f3b0e6e448f5e62916bc1b285",
+    "rust/crates/aivm-secrets-garrett/src/coordinator_ctl_main.rs": "6e6679f0ee3b83a258b37296ce940162382b42f0818c6186d2b7c5583ff6e670",
+    "rust/crates/aivm-secrets-garrett/src/coordinator_main.rs": "fcfcfcf85596e60c06ff8bf6dd0ca703445b4d85d303e4594f6ea74480c64391",
+    "rust/crates/aivm-secrets-garrett/src/crypto.rs": "9ca666197a008e7136dc04f837165b54b3f60cea3038b332fadbabdb8340a2fd",
+    "rust/crates/aivm-secrets-garrett/src/custody.rs": "1c7d350c1eff56208f3fd766cb7e8841ea0affde8dabba1802b748822cc9c974",
+    "rust/crates/aivm-secrets-garrett/src/custody/approval.rs": "326a07270490648a7d6b13c4fd998c8f9c7cce53e97a61da1a2601302c7cc18e",
+    "rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs": "6468d1d371c052626a335fbb0affb974b5b1ba9b02fc8b912991c626e7e5487b",
+    "rust/crates/aivm-secrets-garrett/src/files.rs": "bd0230c2785151d894d0ee42e3f3ecc6283ace944054500a2bb26eaf427ef57d",
+    "rust/crates/aivm-secrets-garrett/src/host_control.rs": "0dc1b432a7518e4dc7062382b042cdd92d40d813e9262a1d760af064bfdf5206",
+    "rust/crates/aivm-secrets-garrett/src/identity_bundle.rs": "c27be08798011baad3d676e2079790cf7201211644dcedb4e3dd0eb3ee27dff6",
+    "rust/crates/aivm-secrets-garrett/src/json.rs": "097c615c3a969892d3924f76a246ec3e0b88e3257489e80dd6f84a58c08f1bcd",
+    "rust/crates/aivm-secrets-garrett/src/lib.rs": "c566159e536d2e5b4a70f74d44703c1ab98bd9274278870e0f410b70387af6b5",
+    "rust/crates/aivm-secrets-garrett/src/lifecycle.rs": "32ee516eb417f4093c36bce11e01f88819311f8edbd5145de1edaeef5f2d7066",
+    "rust/crates/aivm-secrets-garrett/src/main.rs": "862ffe25276654d7e96ff49061cb02bb9157d5d33cb8ca5daa90f4bce9e9849f",
+    "rust/crates/aivm-secrets-garrett/src/manifest.rs": "dec24a8f4fac636c1edf29e692c871864db7accb89160cbec401d59fe6cbb834",
+    "rust/crates/aivm-secrets-garrett/src/manifest/disclosure.rs": "035504551342b8de4b999a8126cc13dd9b89cc3a7a2c4d273ad116aa3c739c29",
+    "rust/crates/aivm-secrets-garrett/src/manifest/normalization.rs": "2e6af54b6d3c219db2cc8082136dc46aafb58b154d891f1318d820cce34706c0",
+    "rust/crates/aivm-secrets-garrett/src/model.rs": "f2bcc0a99f0beacc2ecb3edc2dd12491c718e315f3baaad2a0f6159df93ec451",
+    "rust/crates/aivm-secrets-garrett/src/oauth.rs": "6fa7a723559dc8d644b19bd479e5b639f272d74c59a5a0c1b1d6f770ca8ad7cc",
+    "rust/crates/aivm-secrets-garrett/src/oauth_main.rs": "f3ba201166d1484f29cdfcbd281f3f8b3bd3dc1667d7c2f5b8226e52efd41fe0",
+    "rust/crates/aivm-secrets-garrett/src/oauth_vault.rs": "5f4c98d89dcd3e569e07ecf0aa50af89a7380132f84da096260af2df4e62df06",
+    "rust/crates/aivm-secrets-garrett/src/oauth_vault/login.rs": "f95f2a1d5895f524bde78f0bf08796afd0722eab366b5a86323069c63a910b93",
+    "rust/crates/aivm-secrets-garrett/src/oauth_vault/provider.rs": "03d48a34877ec6dfd5f2427a7b464d01ecbd66fed46269eac6a7de35dd5543c9",
+    "rust/crates/aivm-secrets-garrett/src/oauth_vault/transport.rs": "0768439f0732ca327050ef5ea8261df3171f379d7e607ea5ffc78cfdac7c164b",
+    "rust/crates/aivm-secrets-garrett/src/registry.rs": "28ecd979c5b1d2c964bf9998806ce043fafdb88486ca14ac91a2c7b246f11ba0",
+    "rust/crates/aivm-secrets-garrett/src/tls.rs": "7d09518216c73f3a0ab8e1d92e99a69de038a60efd10006961916533d61f91e9",
+    "rust/crates/aivm-secrets-garrett/src/tpm.rs": "49c5036e40770a7147e25bb04a864d04da4ad1563b8991928f12312592ca91b6",
+    "rust/rust-toolchain.toml": "bc44e09ccb1e23aad0002adbb53312c6a2f577d26a209a7287635811377271ae",
+    "tests/limited_exec.py": "193273d34d09c991eedc78f9d2799901222663a049c9bd3c188cfedc2ca1540a",
+    "tests/native/completion_fsync_barrier.c": "6e92aa3805e36265afd17f9e5cae45190432cbdb301f55a51a44d8f2e2b5e808",
+    "tests/secrets_helpers.py": "2ca642afbc9cd7463c39b04ae3f52b052518b055f6e0f8dbf23d537ca78db468",
+    "tests/secrets_vectors/approval/kernel-v1.jsonl": "e4f2e72d954cca4e05eb1cff408401035bc6067d32e752fac97357a189f83b74",
+    "tests/secrets_vectors/coordination/authority-v1.jsonl": "1cfc0fc2a06dabfce053d5c7f09d6ddf35cd903c08c924ef582f6a0e1f595e22",
+    "tests/secrets_vectors/coordination/operator-replies-v1.jsonl": "5ae55ce2e3f849f2c2aa540976e9daa7b5786d02c11ab80fdb16aa638aa008ba",
+    "tests/secrets_vectors/garrett-oauth-v1.jsonl": "930919fa14e45cc600103695fdaf4d4ef89cda7f6daf90438725d0bf8e21cd50",
+    "tests/secrets_vectors/garrett-protocol-v1.jsonl": "0ddc94fa5005e6ee452dc3d3056a8f5f7cb77e6eddd5b521f6f76d7ef74bfe97",
+    "tests/secrets_vectors/identity-crypto-v1.json": "4258c3e72b5af87327fd40b069b159fbb0f049b006543563862edbca9f6e88fb",
+    "tests/secrets_vectors/identity-key-rotation-v1.jsonl": "20dbb6838a6efdd3ccae6150b46957ecb0182d1d7d67a0b396f09534ade49267",
+    "tests/secrets_vectors/identity-managed-vm-v1.jsonl": "76a0b018cab9064edddffbcb7d093f9f759186b991abf4bc51f4b37ead89f3d3",
+    "tests/secrets_vectors/identity-registry-v1.jsonl": "a1ec39e5e2dd186b9fa9c32c2c2c4e69cab9497b8bffcb27502784c45e14e1c6",
+    "tests/secrets_vectors/identity-renewal-v1.jsonl": "1d29e8396c4c3f47d06e8eb203f400ec14d825058fea39ae2d273343eca8e454",
+    "tests/secrets_vectors/identity-revoke-cas-v1.jsonl": "8163ac6dcbeda52fec3dc0b5b6200cf17c754a8463f5d1e751abaa5bc7b4b434",
+    "tests/secrets_vectors/identity-trust-generation-v1.jsonl": "4c2e44e9862796c60b0245f8b2d09d676d6327016a92d91e4173d0fe2831d8d5",
+    "tests/secrets_vectors/identity-v1.jsonl": "658806486902e326446669ad14e0e15ed987a63b1f66e1668a380bf927b6a013",
+    "tests/test_coordinator_operator.py": "6f7f0b2ad42d45785d4614a38404b5d31d648a9ee458c2a683161b0c9e1577f9",
+    "tests/test_identity_bundle.py": "4d78c7c4212148b6544363df99163d22f969c41917eadd39cd0d1f354335915b",
+    "tests/test_rust_approval.py": "622bd1c5226fd0faef45a11e33f001c610414317ecb8b99f49a8cfcc1355e817",
+    "tests/test_rust_bound_renewal.py": "751d7e304da3f5f0575028ea9cf360c647eed9a5755894616d00daea635d5e13",
+    "tests/test_rust_coordination.py": "e8c7c7f6dc0ed31462f161537a79b60995b3105a2b38f1483e52a3876078a42a",
+    "tests/test_rust_coordinator_authority.py": "1ec29153516ac8db0fa597a8839975192a30dcf746b5f2fa3afaa972126cb5cb",
+    "tests/test_rust_garrett.py": "c01b3c1ea6fe5986b8cdc4248c6d4dde16dad2cc809648db58bd64ffd3828ea9",
+    "tests/test_rust_garrett_authority.py": "117682f910b258cd94da0a9b5340df576ee2dab54281b5717d43cade565abddb",
+    "tests/test_rust_garrett_certificates.py": "ade38d3d32c45551a47e9eef397c5820eb570334fba23f2f15c8d66e2c9ec4a6",
+    "tests/test_rust_garrett_client_material.py": "38b0cdc9e2f199e3e1ad55557d70199278f234c554db6264f0016304aadd7ed8",
+    "tests/test_rust_garrett_dispatch.py": "33133e95d7186d89e2d88996ba111526131617a771ab0416c76b7b5b6ea4faea",
+    "tests/test_rust_garrett_issuance.py": "fcb00744e960e0b15b8f327b825efec63e2d3ed93d9860bb0292711577479afd",
+    "tests/test_rust_garrett_lifecycle.py": "22aba776d0e0ab0848e225e4e2744352800c3d856a6df2a8d2b287338b46c956",
+    "tests/test_rust_garrett_login.py": "d54488725c7ec276d2b557bd46312febcec69727d44517b5a35978a9604c8f7a",
+    "tests/test_rust_garrett_manifest.py": "b166641bcc9f1715e95814ddb154edbf5509ad7927366339ad247fc66fb0ecc4",
+    "tests/test_rust_garrett_oauth_vault.py": "77c68df1161167c521913ed863866921c381079b114ed70bc95c5af7ba85aa46",
+    "tests/test_rust_garrett_provider.py": "6d4a22b082294632badc81c3893c1f7713542cba5eb35dbefcd63a5a288c2940",
+    "tests/test_rust_garrett_reflection.py": "37dda272e1f4abcf14b086877310c986fd645ceecc2b0890973920854c474ed8",
+    "tests/test_rust_garrett_tpm.py": "d624314fb808f7f84e3a961add7637157d5231cb27dbc37303e1c758b3466ac1",
+    "tests/test_rust_garrett_tpm_request.py": "81ca9df0b37bac0f81206a18248fd509d8a6f2cb81f9117b87b6050d83e07d99",
+    "tests/test_rust_http_auth.py": "6e5203db348e42f87eee801d5b6395c0d24f4508ea583e89ecdef08a7049cc3a",
+    "tests/test_rust_http_request.py": "e2b79c0fc23c38f2f1ed333a6ae795b437e363975cd0fc2b1933b2cbd70007e7",
+    "tests/test_rust_http_response.py": "55115f06cdea07dcb2dc797ce2d4bb5c7b33ebc82c2313f3e42ee67ddc744601",
+    "tests/test_rust_http_wire.py": "0f5883ee8d28635aa59399e180e6eb4f25755ca4d9866757caaf5e20e373edc8",
+    "tests/test_rust_invoke.py": "a40fa78807504c0eea2d8dcdde1c9d1f036a901f86d5077463c9d83c07cb825a",
+    "tests/test_rust_json_reflection.py": "661f85849098a969b3755a964a7e948a20c5285e22ba735ffc35d4dc2db17d10",
+    "tests/test_rust_line_framing.py": "13ebbe953d729670c38afe874d9bada01efedac0e4223609eb19a43f9cf720ed",
+    "tests/test_rust_oauth_current_session.py": "532ade5fd939e1b9ec00b05b57be58b5a26ef9aa3c0c79386bb4266cbbcb4f5b",
+    "tests/test_rust_policy_normalization.py": "15a970e6862112641937f4ba68624faaeab818bfa1ccfe974142532f50af6cbd",
+    "tests/test_rust_w6_adapter.py": "0ff8bbf1d47609a9979471afdc7ee7b6a7b06bfbe9062b4da918c3b9a8ddfc4b",
+    "tests/test_rust_w6_completion.py": "d6a17f9bfbabfbdfb5dd60e2bd26f003993ffe92cb5641f139de022a4808cd72",
+    "tests/test_secrets_authority_parity.py": "580e3279fba42d03daaddc24fc412b082feb447d790eb4cc112cee65308a03ab",
+    "tests/test_secrets_coordination.py": "46d925f4c7ba12fc66f4d535e8e88c183b3ba4ca54d78692402f01d08b231c46",
+    "tests/test_secrets_garrett_modularity.py": "be5dee0aa52a19e8726a7162579be93d743ffc34e93af136f44b059b1fd87f02",
+    "tests/test_secrets_garrett_oauth_parity.py": "91b73455ca97176db31f067a32e74b58acc904e2248f2de727dc800f29f8ec10",
+    "tests/test_secrets_identity_key_rotation_parity.py": "81f367ee67af244212a75dfc10586bc9703163f58259dbd88bee79f98ccb2748",
+    "tests/test_secrets_identity_mtls.py": "112d2bc0478b0520d94cab093e07e2f92baa9c7f6b57f4e08d7356a686f5d6ea",
+    "tests/test_secrets_identity_parity.py": "7fd1f848bd680a29ceb545fd7eb04e64d3f5410cb962bf27540135241d331c86",
+    "tests/test_secrets_identity_registry_parity.py": "f608e3e96948193178c7889133d529aacf12e82f0d3e8f0d733d5242928e39e4",
+    "tests/test_secrets_identity_renewal_parity.py": "bc4200fb798d8a3b1b59176bf21d4093045a2dac8e2d9f757a49785498d41987",
+    "tests/test_secrets_identity_revoke_cas_parity.py": "21a5ddec1897a8c782589c5f2ecc12bf41dd5e267a1ccac763958060d68ba584",
+    "tests/test_secrets_vm_parity.py": "7c0600bfd4e9ca5d87b859f47d78f070327854b5a5fec011e116b239c159c796",
+    "docs/garrett-json-wire.md": "61a96406f8180ebdf851b70ed2f53e5fee192f5d83e9ae5b44f4534e0aa193ca",
+    "dev/verification/w6_error_boundary.py": "c7f7964a7828f731ac60360732424896cbe680bc6ce009371cda1910c23d648d",
+    "tests/test_w6_error_boundary.py": "e27bd33d99e9985774d8ecda4b9c69d0d6fc5572dc1ae10db8f34cc1320af991",
+    "docs/garrett-json-string.md": "f4425365c407c47a4587e551425fb6c572e1b1072ec283698edc6e75dddfcf9f",
+    "docs/garrett-provider-wire.md": "733983d3bf19bb9c8a8c540e485c9d30e5953291570c1f9e0d46ced218ca769e",
+    "docs/garrett-provider-channel.md": "0c05266fca77d262767a387139d74854a09523b094fd39635857301e357101a4",
+    "docs/garrett-provider-io.md": "202867df0798f0cb738172696a420388a8508a930f043fa5400b4c2d5f54fced",
+    "docs/garrett-request-context.md": "7376c312752236aefd1eedb363bfdcc08f75f77f90c70aa69b5f53b71fd0ed69",
+    "docs/verified-w6-adapter-correspondence.md": "db7a3c10ef8cc1316eb345d52f9cfe3c7f029a31d0f52c60020a09a2aeeed7c2",
+    "docs/planning/aivm-secrets-native-read-assurance-roadmap.md": "a9994054e803a3f14beb620e16d2e9cb1d93b431286c15104ec2f0b55054ae3f",
+    "docs/planning/aivm-secrets-native-read-nr0.json": "2651d934b0e6a1dad1ee53b9d98f775f42c255b2abca0b7019f26aa9c04579c8",
+    "docs/planning/aivm-secrets-w3-reachability.json": "a817a72f0a328cf48613ae7280f9427bc0831fd2f60bf7bc6042d91215632615",
+    "docs/planning/aivm-secrets-w4-proof-scope.json": "b6a03501939cc2bba90bbee5e963142560bb97ef1be1bf26189c02ca2dac1047",
+    "docs/planning/aivm-secrets-w5-proof-scope.json": "c39597dc4dcff28984afc163a824cd44af75b1970aae4dc97ed4a769b9cd2982",
+    "docs/planning/aivm-secrets-read-path-proof-scope.json": "26da5deb359e7a8a56cea459e9b843358c300324eed1a1079420c2b7c7ecc100",
+    "dev/verification/w3_effect_boundary.py": "97fa0c47adabfcd672e4943280505a913988f361ea0f2500de348099d2569f7e",
+    "dev/verification/w6_adapter.py": "1738762ac406a2f5ba415baa88936b8ab2a2ca96cfb32fe1536a3889dbf756d3",
+    "dev/verification/w6_pending_boundary.py": "2dc8bb6c78b04bc36ce5c88164cbda100a561260cdb76bf5b6cda3f6bed7ef4b",
+    "tests/test_secrets_w3_effect_boundary.py": "68f356fb4449630c44472ab65fdde266c6b88b038576093c1febe0ce3176afeb",
+    "tests/test_secrets_w6_adapter.py": "75bc5d60b039c315f918c915b825908d418c3bc2826c608fbe17b9df33c89cb9",
+    "tests/test_w6_pending_boundary.py": "a697373f3cc4b3d915f8d79a0a03d4868e3cc0c0b9b62f3667f8edc40caf2984",
+    "dev/verification/specialized_calls.py": "af8dffd60c93a9f6713120440b2080c048c43964b4456aca5d22a2c8d087e125",
+    "tests/test_specialized_calls.py": "5fb48c585e7ffad13a2297e9b80c2371d923f0b6af402340827dc2d053909511",
+    "docs/specialized-call-ledger.md": "0d84af6d1c90102e2db56e13c6b0db97c2c8c133f7a08bda57974ae3bd952828",
+    "proofs/garrett-manifest.json": "ba63b4f8b62e96e36a16c3ab17c68b96fcec28ebdaa04e19b56377710422f308"
+  },
+  "binary_sha256": {
+    "debug/garrett-bridge": "3f4af8a38831dd0c366684b2609ec2d53fc1fef51b306037ca3944180048a2db",
+    "debug/garrett-client": "053b24821bb7b23322d90e9939e6b716f153fb602f5445a467f56ace02dcdedf",
+    "debug/garrett-authority": "054ce4149dc0c7be2d3a120487e3be8d4d388102f95563758c805ef7bcfe59a8",
+    "debug/garrett-coordinator": "87ca9afcf1efdc2d7085ef12e1cfa2d3d52a3d9c563954516daa1b20c7a0434f",
+    "debug/garrett-coordinatorctl": "28ef86538b76e88e7cf32c6c614532658a8055878f30f429b12da4964a05ad1c",
+    "release/garrett-bridge": "062ccc764a01803474f224841ec87107c68104987cb8be959d1a96a1d97d788a",
+    "release/garrett-client": "543059a7a86410f4f7e0acade20af030894187d9f26ee8c1f0411ef35a9f3d0d",
+    "release/garrett-authority": "0b556e524fda9044a8299ce57a7d47091a3b5dc2f0030bb79a3e31141dcd7ce1",
+    "release/garrett-coordinator": "396f3bc538b564ac30190705ae24f65b7c0253d2a20881f99d64364caf55691e",
+    "release/garrett-coordinatorctl": "440b8dee19409ca42caf7faf7245012e50799ed2255f08b755b16e2f3dd6b327"
+  },
+  "binary_profiles": {
+    "debug": "pinned nightly; conformance,coordinator-server",
+    "release": "pinned nightly; no-default-features,coordinator-server; release/all-feature parity passed before ordinary rebuild"
+  },
+  "commands": {
+    "proof": "Focused GarrettJsonWire and GarrettJsonFrame compilation, freshness.py record then garrett.py record with required isolated TPM tests and shared-device override removed; 730 named audits including 13 recursive-layout/encoder/frame/writer obligations. No leaf axiom dumps.",
+    "mutants": "PYTHONPATH=dev/verification .venv/bin/python -c 'import garrett; garrett.mutate(\"^json wire \")'; eight selected re-extracted mutations with actual local import closure rebuilt; all rejected in GarrettJsonWire or GarrettJsonFrame.",
+    "rust": "cargo +nightly-2026-09-17 test --locked --manifest-path rust/Cargo.toml --workspace --features conformance,coordinator-server",
+    "full": ".venv/bin/python -m pytest -q with JUnit; all garrett.RUNNERS plus freshness/primitives explicitly mapped to debug binaries, required isolated TPM cases, shared-device override removed. Heavy compiler/proof/mutant jobs finished first. Then python -m build.",
+    "native-debug": ".venv/bin/python dev/verification/quick_w6_read.py --native",
+    "native-ordinary": "Identical six quick portable/native selector groups mapped to ordinary release; JUnit rejects skips.",
+    "ordinary-build": "cargo +nightly-2026-09-17 build --locked --release --manifest-path rust/Cargo.toml --bins --no-default-features --features coordinator-server",
+    "product": ".venv/bin/python dev/offline_native_guest.py [--bin-dir rust/target/release]",
+    "device": "sudo -n .venv/bin/python dev/verification/tpm_device.py --device /dev/tpmrm0",
+    "source-guards": "W0/W3/W6/pending/error/W4/W5/read-path/prefix/profile guards and 188 adversarial cases.",
+    "read-proofs": ".venv/bin/python dev/verification/read_prefixes.py prove",
+    "specialized": ".venv/bin/python dev/verification/specialized_calls.py; fresh bounded native capture with final guard/projection replay on unchanged Rust and an explicitly rebuilt pinned projector; projection identical, not dominance or mediation"
+  },
+  "results": {
+    "full-python-native": {
+      "passed": 3116,
+      "failed": 0,
+      "skipped": 0
+    },
+    "focused-native-login-cases": 33,
+    "named-garrett-axiom-audits": 730,
+    "new-json-wire-frame-obligations": 13,
+    "garrett-native-parity-cases": 767,
+    "targeted-rust-mutants-rejected": 8,
+    "mutation-campaign-scope": "Eight new selected of 285 total; not a complete campaign.",
+    "mutation-rejections": [
+      "json wire changed object colon",
+      "json wire changed null bytes",
+      "json wire changed number token",
+      "json wire changed array terminator",
+      "json wire omitted object key",
+      "json wire skipped recursive encoding",
+      "json wire substituted frame payload",
+      "json wire ignored frame bound"
+    ],
+    "rust-workspace-cases": 102,
+    "rust-core-cases": 53,
+    "rust-native-library-cases": 39,
+    "source-guard-cases": 188,
+    "native-read-debug-cases": 168,
+    "native-read-ordinary-cases": 168,
+    "specialized-ledger-tests": 60,
+    "optional-specialized-bridge-paths": 17,
+    "native-product-both-modes": "passed",
+    "read-path-and-prefix-kernel-audits": {
+      "read-paths": 8,
+      "read-prefixes": 5
+    },
+    "installed-device": {
+      "schema": 1,
+      "scope": "native-tpm-device-synthetic-workflow",
+      "status": "passed",
+      "device": "/dev/tpmrm0",
+      "tests": 6,
+      "existing_public_sha256": {
+        "0x81010001": "be2b11e4ebd8b35f5162b38ca6ad11768b56fefacb35246b557c62a53e037f61",
+        "0x81010016": "406374dd1cbdb93c570e35680917282ca93c414da572a920694c44827642531c"
+      },
+      "dictionary_attack_state_preserved": true,
+      "persistent_objects_preserved": true,
+      "fixture_handles_cleaned": true
+    },
+    "packaging": {
+      "status": "passed",
+      "source_archive": "aivm_secrets-0.2.0.tar.gz",
+      "manifest_inputs_identical": 296,
+      "embedded_garrett_manifest_identical": true
+    }
+  },
+  "optional-specialized-bridge": {
+    "report_path": "/home/local/KHQ/jon.crall/code/aivm-secrets/.tools/specialized-calls-replay-9ds8dhta/report.json",
+    "sha256": "47d2dd79a3d814f867997f30183886e6ae355057e703dc64f61cd484406a8f28",
+    "counts": {
+      "functions": 3830,
+      "calls": 9961,
+      "drops": 6022910,
+      "bodies": {
+        "Unstructured": 1708,
+        "Opaque": 2122
+      }
+    },
+    "witnesses": {
+      "account-controller-executor": [
+        {
+          "id": 334,
+          "name": "aivm_secrets_garrett::tls::<Impl>::serve::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 353,
+              "col": 4
+            },
+            "end": {
+              "line": 353,
+              "col": 89
+            }
+          }
+        },
+        {
+          "id": 622,
+          "name": "aivm_secrets_garrett::tls::<Impl>::answer::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 375,
+              "col": 4
+            },
+            "end": {
+              "line": 380,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 915,
+          "name": "aivm_secrets_garrett::custody::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 1164,
+              "col": 4
+            },
+            "end": {
+              "line": 1172,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1222,
+          "name": "aivm_secrets_garrett::custody::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 795,
+              "col": 4
+            },
+            "end": {
+              "line": 803,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1594,
+          "name": "aivm_secrets_garrett_core::protocol::perform::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/protocol.rs"
+            },
+            "begin": {
+              "line": 139,
+              "col": 0
+            },
+            "end": {
+              "line": 153,
+              "col": 54
+            }
+          }
+        },
+        {
+          "id": 2059,
+          "name": "aivm_secrets_garrett_core::credential_use::finish_use::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/credential_use.rs"
+            },
+            "begin": {
+              "line": 124,
+              "col": 0
+            },
+            "end": {
+              "line": 128,
+              "col": 35
+            }
+          }
+        },
+        {
+          "id": 2489,
+          "name": "aivm_secrets_garrett::custody::<Impl>::execute::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 377,
+              "col": 4
+            },
+            "end": {
+              "line": 381,
+              "col": 53
+            }
+          }
+        },
+        {
+          "id": 2761,
+          "name": "aivm_secrets_garrett::custody::<Impl>::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 310,
+              "col": 4
+            },
+            "end": {
+              "line": 315,
+              "col": 37
+            }
+          }
+        }
+      ],
+      "coordinated-manifest-executor": [
+        {
+          "id": 334,
+          "name": "aivm_secrets_garrett::tls::<Impl>::serve::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 353,
+              "col": 4
+            },
+            "end": {
+              "line": 353,
+              "col": 89
+            }
+          }
+        },
+        {
+          "id": 622,
+          "name": "aivm_secrets_garrett::tls::<Impl>::answer::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 375,
+              "col": 4
+            },
+            "end": {
+              "line": 380,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 915,
+          "name": "aivm_secrets_garrett::custody::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 1164,
+              "col": 4
+            },
+            "end": {
+              "line": 1172,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1223,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 315,
+              "col": 4
+            },
+            "end": {
+              "line": 323,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1631,
+          "name": "aivm_secrets_garrett_core::read_transition::run_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 192,
+              "col": 0
+            },
+            "end": {
+              "line": 192,
+              "col": 73
+            }
+          }
+        },
+        {
+          "id": 2102,
+          "name": "aivm_secrets_garrett_core::read_transition::request_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 184,
+              "col": 0
+            },
+            "end": {
+              "line": 184,
+              "col": 90
+            }
+          }
+        },
+        {
+          "id": 2564,
+          "name": "aivm_secrets_garrett_core::read_transition::request_facts::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 140,
+              "col": 0
+            },
+            "end": {
+              "line": 140,
+              "col": 83
+            }
+          }
+        },
+        {
+          "id": 2822,
+          "name": "aivm_secrets_garrett_core::read_transition::invocation::<Impl>::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs"
+            },
+            "begin": {
+              "line": 106,
+              "col": 4
+            },
+            "end": {
+              "line": 110,
+              "col": 35
+            }
+          }
+        },
+        {
+          "id": 3008,
+          "name": "aivm_secrets_garrett_core::request_adapter::<Impl>::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/request_adapter.rs"
+            },
+            "begin": {
+              "line": 70,
+              "col": 4
+            },
+            "end": {
+              "line": 74,
+              "col": 41
+            }
+          }
+        },
+        {
+          "id": 3274,
+          "name": "aivm_secrets_garrett_core::dispatch::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 178,
+              "col": 0
+            },
+            "end": {
+              "line": 183,
+              "col": 14
+            }
+          }
+        },
+        {
+          "id": 3469,
+          "name": "aivm_secrets_garrett_core::dispatch::run::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 141,
+              "col": 0
+            },
+            "end": {
+              "line": 145,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 3554,
+          "name": "aivm_secrets_garrett_core::dispatch::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 102,
+              "col": 0
+            },
+            "end": {
+              "line": 105,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 3608,
+          "name": "aivm_secrets_garrett_core::provider_exchange::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_exchange.rs"
+            },
+            "begin": {
+              "line": 57,
+              "col": 0
+            },
+            "end": {
+              "line": 57,
+              "col": 91
+            }
+          }
+        },
+        {
+          "id": 3663,
+          "name": "aivm_secrets_garrett_core::dispatch::<Impl>::send::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 64,
+              "col": 4
+            },
+            "end": {
+              "line": 64,
+              "col": 78
+            }
+          }
+        },
+        {
+          "id": 3695,
+          "name": "aivm_secrets_garrett_core::current_admission::<Impl>::send::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/current_admission.rs"
+            },
+            "begin": {
+              "line": 128,
+              "col": 4
+            },
+            "end": {
+              "line": 128,
+              "col": 78
+            }
+          }
+        },
+        {
+          "id": 3709,
+          "name": "aivm_secrets_garrett_core::provider_io::<Impl>::send::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_io.rs"
+            },
+            "begin": {
+              "line": 42,
+              "col": 4
+            },
+            "end": {
+              "line": 42,
+              "col": 78
+            }
+          }
+        },
+        {
+          "id": 3720,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::send::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 736,
+              "col": 4
+            },
+            "end": {
+              "line": 736,
+              "col": 68
+            }
+          }
+        },
+        {
+          "id": 3748,
+          "name": "aivm_secrets_garrett::custody::manifest_session::send_manifest_bytes::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 647,
+              "col": 0
+            },
+            "end": {
+              "line": 653,
+              "col": 16
+            }
+          }
+        }
+      ],
+      "captured-provider-writer": [
+        {
+          "id": 334,
+          "name": "aivm_secrets_garrett::tls::<Impl>::serve::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 353,
+              "col": 4
+            },
+            "end": {
+              "line": 353,
+              "col": 89
+            }
+          }
+        },
+        {
+          "id": 622,
+          "name": "aivm_secrets_garrett::tls::<Impl>::answer::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 375,
+              "col": 4
+            },
+            "end": {
+              "line": 380,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 915,
+          "name": "aivm_secrets_garrett::custody::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 1164,
+              "col": 4
+            },
+            "end": {
+              "line": 1172,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1223,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 315,
+              "col": 4
+            },
+            "end": {
+              "line": 323,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1631,
+          "name": "aivm_secrets_garrett_core::read_transition::run_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 192,
+              "col": 0
+            },
+            "end": {
+              "line": 192,
+              "col": 73
+            }
+          }
+        },
+        {
+          "id": 2102,
+          "name": "aivm_secrets_garrett_core::read_transition::request_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 184,
+              "col": 0
+            },
+            "end": {
+              "line": 184,
+              "col": 90
+            }
+          }
+        },
+        {
+          "id": 2564,
+          "name": "aivm_secrets_garrett_core::read_transition::request_facts::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 140,
+              "col": 0
+            },
+            "end": {
+              "line": 140,
+              "col": 83
+            }
+          }
+        },
+        {
+          "id": 2822,
+          "name": "aivm_secrets_garrett_core::read_transition::invocation::<Impl>::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs"
+            },
+            "begin": {
+              "line": 106,
+              "col": 4
+            },
+            "end": {
+              "line": 110,
+              "col": 35
+            }
+          }
+        },
+        {
+          "id": 3008,
+          "name": "aivm_secrets_garrett_core::request_adapter::<Impl>::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/request_adapter.rs"
+            },
+            "begin": {
+              "line": 70,
+              "col": 4
+            },
+            "end": {
+              "line": 74,
+              "col": 41
+            }
+          }
+        },
+        {
+          "id": 3274,
+          "name": "aivm_secrets_garrett_core::dispatch::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 178,
+              "col": 0
+            },
+            "end": {
+              "line": 183,
+              "col": 14
+            }
+          }
+        },
+        {
+          "id": 3469,
+          "name": "aivm_secrets_garrett_core::dispatch::run::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 141,
+              "col": 0
+            },
+            "end": {
+              "line": 145,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 3554,
+          "name": "aivm_secrets_garrett_core::dispatch::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 102,
+              "col": 0
+            },
+            "end": {
+              "line": 105,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 3608,
+          "name": "aivm_secrets_garrett_core::provider_exchange::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_exchange.rs"
+            },
+            "begin": {
+              "line": 57,
+              "col": 0
+            },
+            "end": {
+              "line": 57,
+              "col": 91
+            }
+          }
+        },
+        {
+          "id": 3663,
+          "name": "aivm_secrets_garrett_core::dispatch::<Impl>::send::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 64,
+              "col": 4
+            },
+            "end": {
+              "line": 64,
+              "col": 78
+            }
+          }
+        },
+        {
+          "id": 3695,
+          "name": "aivm_secrets_garrett_core::current_admission::<Impl>::send::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/current_admission.rs"
+            },
+            "begin": {
+              "line": 128,
+              "col": 4
+            },
+            "end": {
+              "line": 128,
+              "col": 78
+            }
+          }
+        },
+        {
+          "id": 3709,
+          "name": "aivm_secrets_garrett_core::provider_io::<Impl>::send::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_io.rs"
+            },
+            "begin": {
+              "line": 42,
+              "col": 4
+            },
+            "end": {
+              "line": 42,
+              "col": 78
+            }
+          }
+        },
+        {
+          "id": 3720,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::send::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 736,
+              "col": 4
+            },
+            "end": {
+              "line": 736,
+              "col": 68
+            }
+          }
+        },
+        {
+          "id": 3748,
+          "name": "aivm_secrets_garrett::custody::manifest_session::send_manifest_bytes::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 647,
+              "col": 0
+            },
+            "end": {
+              "line": 653,
+              "col": 16
+            }
+          }
+        },
+        {
+          "id": 3779,
+          "name": "aivm_secrets_garrett_core::provider_io::<Impl>::submit::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_io.rs"
+            },
+            "begin": {
+              "line": 134,
+              "col": 4
+            },
+            "end": {
+              "line": 134,
+              "col": 52
+            }
+          }
+        },
+        {
+          "id": 3812,
+          "name": "aivm_secrets_garrett_core::provider_io::<Impl>::submit::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_io.rs"
+            },
+            "begin": {
+              "line": 103,
+              "col": 4
+            },
+            "end": {
+              "line": 103,
+              "col": 79
+            }
+          }
+        },
+        {
+          "id": 3823,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::write_all::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 640,
+              "col": 4
+            },
+            "end": {
+              "line": 640,
+              "col": 59
+            }
+          }
+        }
+      ],
+      "captured-provider-response-parts": [
+        {
+          "id": 334,
+          "name": "aivm_secrets_garrett::tls::<Impl>::serve::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 353,
+              "col": 4
+            },
+            "end": {
+              "line": 353,
+              "col": 89
+            }
+          }
+        },
+        {
+          "id": 622,
+          "name": "aivm_secrets_garrett::tls::<Impl>::answer::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 375,
+              "col": 4
+            },
+            "end": {
+              "line": 380,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 915,
+          "name": "aivm_secrets_garrett::custody::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 1164,
+              "col": 4
+            },
+            "end": {
+              "line": 1172,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1223,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 315,
+              "col": 4
+            },
+            "end": {
+              "line": 323,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1631,
+          "name": "aivm_secrets_garrett_core::read_transition::run_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 192,
+              "col": 0
+            },
+            "end": {
+              "line": 192,
+              "col": 73
+            }
+          }
+        },
+        {
+          "id": 2102,
+          "name": "aivm_secrets_garrett_core::read_transition::request_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 184,
+              "col": 0
+            },
+            "end": {
+              "line": 184,
+              "col": 90
+            }
+          }
+        },
+        {
+          "id": 2564,
+          "name": "aivm_secrets_garrett_core::read_transition::request_facts::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 140,
+              "col": 0
+            },
+            "end": {
+              "line": 140,
+              "col": 83
+            }
+          }
+        },
+        {
+          "id": 2822,
+          "name": "aivm_secrets_garrett_core::read_transition::invocation::<Impl>::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs"
+            },
+            "begin": {
+              "line": 106,
+              "col": 4
+            },
+            "end": {
+              "line": 110,
+              "col": 35
+            }
+          }
+        },
+        {
+          "id": 3008,
+          "name": "aivm_secrets_garrett_core::request_adapter::<Impl>::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/request_adapter.rs"
+            },
+            "begin": {
+              "line": 70,
+              "col": 4
+            },
+            "end": {
+              "line": 74,
+              "col": 41
+            }
+          }
+        },
+        {
+          "id": 3274,
+          "name": "aivm_secrets_garrett_core::dispatch::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 178,
+              "col": 0
+            },
+            "end": {
+              "line": 183,
+              "col": 14
+            }
+          }
+        },
+        {
+          "id": 3469,
+          "name": "aivm_secrets_garrett_core::dispatch::run::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 141,
+              "col": 0
+            },
+            "end": {
+              "line": 145,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 3554,
+          "name": "aivm_secrets_garrett_core::dispatch::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 102,
+              "col": 0
+            },
+            "end": {
+              "line": 105,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 3608,
+          "name": "aivm_secrets_garrett_core::provider_exchange::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_exchange.rs"
+            },
+            "begin": {
+              "line": 57,
+              "col": 0
+            },
+            "end": {
+              "line": 57,
+              "col": 91
+            }
+          }
+        },
+        {
+          "id": 3664,
+          "name": "aivm_secrets_garrett_core::dispatch::<Impl>::receive::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 73,
+              "col": 4
+            },
+            "end": {
+              "line": 73,
+              "col": 86
+            }
+          }
+        },
+        {
+          "id": 3697,
+          "name": "aivm_secrets_garrett_core::current_admission::<Impl>::receive::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/current_admission.rs"
+            },
+            "begin": {
+              "line": 131,
+              "col": 4
+            },
+            "end": {
+              "line": 131,
+              "col": 86
+            }
+          }
+        },
+        {
+          "id": 3710,
+          "name": "aivm_secrets_garrett_core::provider_io::<Impl>::receive::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_io.rs"
+            },
+            "begin": {
+              "line": 45,
+              "col": 4
+            },
+            "end": {
+              "line": 45,
+              "col": 86
+            }
+          }
+        },
+        {
+          "id": 3721,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::receive::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 740,
+              "col": 4
+            },
+            "end": {
+              "line": 740,
+              "col": 69
+            }
+          }
+        },
+        {
+          "id": 3752,
+          "name": "aivm_secrets_garrett_core::provider_io::<Impl>::into_parts::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_io.rs"
+            },
+            "begin": {
+              "line": 145,
+              "col": 4
+            },
+            "end": {
+              "line": 145,
+              "col": 67
+            }
+          }
+        }
+      ],
+      "manifest-encoded-endpoint-host": [
+        {
+          "id": 334,
+          "name": "aivm_secrets_garrett::tls::<Impl>::serve::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 353,
+              "col": 4
+            },
+            "end": {
+              "line": 353,
+              "col": 89
+            }
+          }
+        },
+        {
+          "id": 622,
+          "name": "aivm_secrets_garrett::tls::<Impl>::answer::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 375,
+              "col": 4
+            },
+            "end": {
+              "line": 380,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 915,
+          "name": "aivm_secrets_garrett::custody::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 1164,
+              "col": 4
+            },
+            "end": {
+              "line": 1172,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1223,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 315,
+              "col": 4
+            },
+            "end": {
+              "line": 323,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1631,
+          "name": "aivm_secrets_garrett_core::read_transition::run_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 192,
+              "col": 0
+            },
+            "end": {
+              "line": 192,
+              "col": 73
+            }
+          }
+        },
+        {
+          "id": 2102,
+          "name": "aivm_secrets_garrett_core::read_transition::request_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 184,
+              "col": 0
+            },
+            "end": {
+              "line": 184,
+              "col": 90
+            }
+          }
+        },
+        {
+          "id": 2564,
+          "name": "aivm_secrets_garrett_core::read_transition::request_facts::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 140,
+              "col": 0
+            },
+            "end": {
+              "line": 140,
+              "col": 83
+            }
+          }
+        },
+        {
+          "id": 2822,
+          "name": "aivm_secrets_garrett_core::read_transition::invocation::<Impl>::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs"
+            },
+            "begin": {
+              "line": 106,
+              "col": 4
+            },
+            "end": {
+              "line": 110,
+              "col": 35
+            }
+          }
+        },
+        {
+          "id": 3008,
+          "name": "aivm_secrets_garrett_core::request_adapter::<Impl>::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/request_adapter.rs"
+            },
+            "begin": {
+              "line": 70,
+              "col": 4
+            },
+            "end": {
+              "line": 74,
+              "col": 41
+            }
+          }
+        },
+        {
+          "id": 3274,
+          "name": "aivm_secrets_garrett_core::dispatch::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 178,
+              "col": 0
+            },
+            "end": {
+              "line": 183,
+              "col": 14
+            }
+          }
+        },
+        {
+          "id": 3469,
+          "name": "aivm_secrets_garrett_core::dispatch::run::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 141,
+              "col": 0
+            },
+            "end": {
+              "line": 145,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 3554,
+          "name": "aivm_secrets_garrett_core::dispatch::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 102,
+              "col": 0
+            },
+            "end": {
+              "line": 105,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 3608,
+          "name": "aivm_secrets_garrett_core::provider_exchange::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_exchange.rs"
+            },
+            "begin": {
+              "line": 57,
+              "col": 0
+            },
+            "end": {
+              "line": 57,
+              "col": 91
+            }
+          }
+        },
+        {
+          "id": 3660,
+          "name": "aivm_secrets_garrett_core::dispatch::<Impl>::setup::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 48,
+              "col": 4
+            },
+            "end": {
+              "line": 48,
+              "col": 61
+            }
+          }
+        },
+        {
+          "id": 3689,
+          "name": "aivm_secrets_garrett_core::current_admission::<Impl>::setup::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/current_admission.rs"
+            },
+            "begin": {
+              "line": 122,
+              "col": 4
+            },
+            "end": {
+              "line": 122,
+              "col": 61
+            }
+          }
+        },
+        {
+          "id": 3706,
+          "name": "aivm_secrets_garrett_core::provider_io::<Impl>::setup::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_io.rs"
+            },
+            "begin": {
+              "line": 36,
+              "col": 4
+            },
+            "end": {
+              "line": 36,
+              "col": 61
+            }
+          }
+        },
+        {
+          "id": 3717,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::setup_route::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 789,
+              "col": 4
+            },
+            "end": {
+              "line": 789,
+              "col": 78
+            }
+          }
+        },
+        {
+          "id": 3735,
+          "name": "aivm_secrets_garrett_core::provider_wire::<Impl>::host",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_wire.rs"
+            },
+            "begin": {
+              "line": 19,
+              "col": 4
+            },
+            "end": {
+              "line": 19,
+              "col": 34
+            }
+          }
+        }
+      ],
+      "manifest-encoded-endpoint-port": [
+        {
+          "id": 334,
+          "name": "aivm_secrets_garrett::tls::<Impl>::serve::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 353,
+              "col": 4
+            },
+            "end": {
+              "line": 353,
+              "col": 89
+            }
+          }
+        },
+        {
+          "id": 622,
+          "name": "aivm_secrets_garrett::tls::<Impl>::answer::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 375,
+              "col": 4
+            },
+            "end": {
+              "line": 380,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 915,
+          "name": "aivm_secrets_garrett::custody::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 1164,
+              "col": 4
+            },
+            "end": {
+              "line": 1172,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1223,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 315,
+              "col": 4
+            },
+            "end": {
+              "line": 323,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1631,
+          "name": "aivm_secrets_garrett_core::read_transition::run_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 192,
+              "col": 0
+            },
+            "end": {
+              "line": 192,
+              "col": 73
+            }
+          }
+        },
+        {
+          "id": 2102,
+          "name": "aivm_secrets_garrett_core::read_transition::request_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 184,
+              "col": 0
+            },
+            "end": {
+              "line": 184,
+              "col": 90
+            }
+          }
+        },
+        {
+          "id": 2564,
+          "name": "aivm_secrets_garrett_core::read_transition::request_facts::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 140,
+              "col": 0
+            },
+            "end": {
+              "line": 140,
+              "col": 83
+            }
+          }
+        },
+        {
+          "id": 2822,
+          "name": "aivm_secrets_garrett_core::read_transition::invocation::<Impl>::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs"
+            },
+            "begin": {
+              "line": 106,
+              "col": 4
+            },
+            "end": {
+              "line": 110,
+              "col": 35
+            }
+          }
+        },
+        {
+          "id": 3008,
+          "name": "aivm_secrets_garrett_core::request_adapter::<Impl>::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/request_adapter.rs"
+            },
+            "begin": {
+              "line": 70,
+              "col": 4
+            },
+            "end": {
+              "line": 74,
+              "col": 41
+            }
+          }
+        },
+        {
+          "id": 3274,
+          "name": "aivm_secrets_garrett_core::dispatch::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 178,
+              "col": 0
+            },
+            "end": {
+              "line": 183,
+              "col": 14
+            }
+          }
+        },
+        {
+          "id": 3469,
+          "name": "aivm_secrets_garrett_core::dispatch::run::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 141,
+              "col": 0
+            },
+            "end": {
+              "line": 145,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 3554,
+          "name": "aivm_secrets_garrett_core::dispatch::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 102,
+              "col": 0
+            },
+            "end": {
+              "line": 105,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 3608,
+          "name": "aivm_secrets_garrett_core::provider_exchange::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_exchange.rs"
+            },
+            "begin": {
+              "line": 57,
+              "col": 0
+            },
+            "end": {
+              "line": 57,
+              "col": 91
+            }
+          }
+        },
+        {
+          "id": 3660,
+          "name": "aivm_secrets_garrett_core::dispatch::<Impl>::setup::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 48,
+              "col": 4
+            },
+            "end": {
+              "line": 48,
+              "col": 61
+            }
+          }
+        },
+        {
+          "id": 3689,
+          "name": "aivm_secrets_garrett_core::current_admission::<Impl>::setup::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/current_admission.rs"
+            },
+            "begin": {
+              "line": 122,
+              "col": 4
+            },
+            "end": {
+              "line": 122,
+              "col": 61
+            }
+          }
+        },
+        {
+          "id": 3706,
+          "name": "aivm_secrets_garrett_core::provider_io::<Impl>::setup::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_io.rs"
+            },
+            "begin": {
+              "line": 36,
+              "col": 4
+            },
+            "end": {
+              "line": 36,
+              "col": 61
+            }
+          }
+        },
+        {
+          "id": 3717,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::setup_route::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 789,
+              "col": 4
+            },
+            "end": {
+              "line": 789,
+              "col": 78
+            }
+          }
+        },
+        {
+          "id": 3738,
+          "name": "aivm_secrets_garrett_core::provider_wire::<Impl>::port",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_wire.rs"
+            },
+            "begin": {
+              "line": 22,
+              "col": 4
+            },
+            "end": {
+              "line": 22,
+              "col": 29
+            }
+          }
+        }
+      ],
+      "native-json-string-encoder": [
+        {
+          "id": 334,
+          "name": "aivm_secrets_garrett::tls::<Impl>::serve::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 353,
+              "col": 4
+            },
+            "end": {
+              "line": 353,
+              "col": 89
+            }
+          }
+        },
+        {
+          "id": 622,
+          "name": "aivm_secrets_garrett::tls::<Impl>::answer::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 375,
+              "col": 4
+            },
+            "end": {
+              "line": 380,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 916,
+          "name": "aivm_secrets_garrett::tls::<Impl>::forward",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 448,
+              "col": 4
+            },
+            "end": {
+              "line": 448,
+              "col": 56
+            }
+          }
+        },
+        {
+          "id": 102,
+          "name": "aivm_secrets_garrett::json::canonical",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/json.rs"
+            },
+            "begin": {
+              "line": 150,
+              "col": 0
+            },
+            "end": {
+              "line": 150,
+              "col": 42
+            }
+          }
+        },
+        {
+          "id": 278,
+          "name": "aivm_secrets_garrett_core::json_wire::encode",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/json_wire.rs"
+            },
+            "begin": {
+              "line": 74,
+              "col": 0
+            },
+            "end": {
+              "line": 74,
+              "col": 63
+            }
+          }
+        },
+        {
+          "id": 582,
+          "name": "aivm_secrets_garrett_core::json_wire::append",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/json_wire.rs"
+            },
+            "begin": {
+              "line": 18,
+              "col": 0
+            },
+            "end": {
+              "line": 18,
+              "col": 58
+            }
+          }
+        },
+        {
+          "id": 831,
+          "name": "aivm_secrets_garrett_core::json_string::append",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/json_string.rs"
+            },
+            "begin": {
+              "line": 65,
+              "col": 0
+            },
+            "end": {
+              "line": 65,
+              "col": 62
+            }
+          }
+        }
+      ],
+      "guest-json-encoding": [
+        {
+          "id": 334,
+          "name": "aivm_secrets_garrett::tls::<Impl>::serve::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 353,
+              "col": 4
+            },
+            "end": {
+              "line": 353,
+              "col": 89
+            }
+          }
+        },
+        {
+          "id": 620,
+          "name": "aivm_secrets_garrett::tls::<Impl>::from_answer",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 197,
+              "col": 4
+            },
+            "end": {
+              "line": 197,
+              "col": 59
+            }
+          }
+        },
+        {
+          "id": 870,
+          "name": "aivm_secrets_garrett::json::<Impl>::prepare",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/json.rs"
+            },
+            "begin": {
+              "line": 140,
+              "col": 4
+            },
+            "end": {
+              "line": 146,
+              "col": 5
+            }
+          }
+        },
+        {
+          "id": 1198,
+          "name": "aivm_secrets_garrett_core::json_wire::prepare",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/json_wire.rs"
+            },
+            "begin": {
+              "line": 82,
+              "col": 0
+            },
+            "end": {
+              "line": 85,
+              "col": 71
+            }
+          }
+        },
+        {
+          "id": 278,
+          "name": "aivm_secrets_garrett_core::json_wire::encode",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/json_wire.rs"
+            },
+            "begin": {
+              "line": 74,
+              "col": 0
+            },
+            "end": {
+              "line": 74,
+              "col": 63
+            }
+          }
+        }
+      ],
+      "guest-json-framing": [
+        {
+          "id": 334,
+          "name": "aivm_secrets_garrett::tls::<Impl>::serve::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 353,
+              "col": 4
+            },
+            "end": {
+              "line": 353,
+              "col": 89
+            }
+          }
+        },
+        {
+          "id": 620,
+          "name": "aivm_secrets_garrett::tls::<Impl>::from_answer",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 197,
+              "col": 4
+            },
+            "end": {
+              "line": 197,
+              "col": 59
+            }
+          }
+        },
+        {
+          "id": 870,
+          "name": "aivm_secrets_garrett::json::<Impl>::prepare",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/json.rs"
+            },
+            "begin": {
+              "line": 140,
+              "col": 4
+            },
+            "end": {
+              "line": 146,
+              "col": 5
+            }
+          }
+        },
+        {
+          "id": 1198,
+          "name": "aivm_secrets_garrett_core::json_wire::prepare",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/json_wire.rs"
+            },
+            "begin": {
+              "line": 82,
+              "col": 0
+            },
+            "end": {
+              "line": 85,
+              "col": 71
+            }
+          }
+        },
+        {
+          "id": 1559,
+          "name": "aivm_secrets_garrett_core::guest_frame::prepare",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/guest_frame.rs"
+            },
+            "begin": {
+              "line": 14,
+              "col": 0
+            },
+            "end": {
+              "line": 14,
+              "col": 80
+            }
+          }
+        }
+      ],
+      "owned-context-check-factory": [
+        {
+          "id": 334,
+          "name": "aivm_secrets_garrett::tls::<Impl>::serve::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 353,
+              "col": 4
+            },
+            "end": {
+              "line": 353,
+              "col": 89
+            }
+          }
+        },
+        {
+          "id": 622,
+          "name": "aivm_secrets_garrett::tls::<Impl>::answer::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 375,
+              "col": 4
+            },
+            "end": {
+              "line": 380,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 915,
+          "name": "aivm_secrets_garrett::custody::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 1164,
+              "col": 4
+            },
+            "end": {
+              "line": 1172,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1223,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 315,
+              "col": 4
+            },
+            "end": {
+              "line": 323,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1631,
+          "name": "aivm_secrets_garrett_core::read_transition::run_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 192,
+              "col": 0
+            },
+            "end": {
+              "line": 192,
+              "col": 73
+            }
+          }
+        },
+        {
+          "id": 2102,
+          "name": "aivm_secrets_garrett_core::read_transition::request_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 184,
+              "col": 0
+            },
+            "end": {
+              "line": 184,
+              "col": 90
+            }
+          }
+        },
+        {
+          "id": 2564,
+          "name": "aivm_secrets_garrett_core::read_transition::request_facts::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 140,
+              "col": 0
+            },
+            "end": {
+              "line": 140,
+              "col": 83
+            }
+          }
+        },
+        {
+          "id": 2822,
+          "name": "aivm_secrets_garrett_core::read_transition::invocation::<Impl>::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs"
+            },
+            "begin": {
+              "line": 106,
+              "col": 4
+            },
+            "end": {
+              "line": 110,
+              "col": 35
+            }
+          }
+        },
+        {
+          "id": 3008,
+          "name": "aivm_secrets_garrett_core::request_adapter::<Impl>::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/request_adapter.rs"
+            },
+            "begin": {
+              "line": 70,
+              "col": 4
+            },
+            "end": {
+              "line": 74,
+              "col": 41
+            }
+          }
+        },
+        {
+          "id": 3273,
+          "name": "aivm_secrets_garrett_core::request_context::<Impl>::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/request_context.rs"
+            },
+            "begin": {
+              "line": 70,
+              "col": 4
+            },
+            "end": {
+              "line": 74,
+              "col": 54
+            }
+          }
+        },
+        {
+          "id": 3462,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::checks::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 148,
+              "col": 4
+            },
+            "end": {
+              "line": 148,
+              "col": 40
+            }
+          }
+        }
+      ],
+      "owned-request-completion-audit": [
+        {
+          "id": 334,
+          "name": "aivm_secrets_garrett::tls::<Impl>::serve::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 353,
+              "col": 4
+            },
+            "end": {
+              "line": 353,
+              "col": 89
+            }
+          }
+        },
+        {
+          "id": 622,
+          "name": "aivm_secrets_garrett::tls::<Impl>::answer::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 375,
+              "col": 4
+            },
+            "end": {
+              "line": 380,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 915,
+          "name": "aivm_secrets_garrett::custody::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 1164,
+              "col": 4
+            },
+            "end": {
+              "line": 1172,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1223,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 315,
+              "col": 4
+            },
+            "end": {
+              "line": 323,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1631,
+          "name": "aivm_secrets_garrett_core::read_transition::run_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 192,
+              "col": 0
+            },
+            "end": {
+              "line": 192,
+              "col": 73
+            }
+          }
+        },
+        {
+          "id": 2102,
+          "name": "aivm_secrets_garrett_core::read_transition::request_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 184,
+              "col": 0
+            },
+            "end": {
+              "line": 184,
+              "col": 90
+            }
+          }
+        },
+        {
+          "id": 2565,
+          "name": "aivm_secrets_garrett_core::read_transition::finish_request::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 148,
+              "col": 0
+            },
+            "end": {
+              "line": 151,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 2826,
+          "name": "aivm_secrets_garrett_core::read_transition::invocation::<Impl>::complete::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs"
+            },
+            "begin": {
+              "line": 202,
+              "col": 4
+            },
+            "end": {
+              "line": 202,
+              "col": 83
+            }
+          }
+        },
+        {
+          "id": 3014,
+          "name": "aivm_secrets_garrett_core::request_adapter::<Impl>::complete::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/request_adapter.rs"
+            },
+            "begin": {
+              "line": 91,
+              "col": 4
+            },
+            "end": {
+              "line": 91,
+              "col": 81
+            }
+          }
+        },
+        {
+          "id": 3278,
+          "name": "aivm_secrets_garrett_core::completion::complete::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/completion.rs"
+            },
+            "begin": {
+              "line": 96,
+              "col": 0
+            },
+            "end": {
+              "line": 96,
+              "col": 71
+            }
+          }
+        },
+        {
+          "id": 3474,
+          "name": "aivm_secrets_garrett_core::completion::select_and_complete::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/completion.rs"
+            },
+            "begin": {
+              "line": 77,
+              "col": 0
+            },
+            "end": {
+              "line": 79,
+              "col": 43
+            }
+          }
+        },
+        {
+          "id": 3562,
+          "name": "aivm_secrets_garrett_core::read_transition::complete_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 103,
+              "col": 0
+            },
+            "end": {
+              "line": 103,
+              "col": 86
+            }
+          }
+        },
+        {
+          "id": 3620,
+          "name": "aivm_secrets_garrett_core::completion::<Impl>::audit::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/completion.rs"
+            },
+            "begin": {
+              "line": 53,
+              "col": 4
+            },
+            "end": {
+              "line": 53,
+              "col": 50
+            }
+          }
+        },
+        {
+          "id": 3672,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::audit::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 35,
+              "col": 4
+            },
+            "end": {
+              "line": 35,
+              "col": 38
+            }
+          }
+        },
+        {
+          "id": 1121,
+          "name": "aivm_secrets_garrett::custody::<Impl>::write_record",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 234,
+              "col": 4
+            },
+            "end": {
+              "line": 234,
+              "col": 56
+            }
+          }
+        }
+      ],
+      "account-authentication-bytes": [
+        {
+          "id": 334,
+          "name": "aivm_secrets_garrett::tls::<Impl>::serve::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 353,
+              "col": 4
+            },
+            "end": {
+              "line": 353,
+              "col": 89
+            }
+          }
+        },
+        {
+          "id": 622,
+          "name": "aivm_secrets_garrett::tls::<Impl>::answer::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 375,
+              "col": 4
+            },
+            "end": {
+              "line": 380,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 915,
+          "name": "aivm_secrets_garrett::custody::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 1164,
+              "col": 4
+            },
+            "end": {
+              "line": 1172,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1222,
+          "name": "aivm_secrets_garrett::custody::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 795,
+              "col": 4
+            },
+            "end": {
+              "line": 803,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1594,
+          "name": "aivm_secrets_garrett_core::protocol::perform::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/protocol.rs"
+            },
+            "begin": {
+              "line": 139,
+              "col": 0
+            },
+            "end": {
+              "line": 153,
+              "col": 54
+            }
+          }
+        },
+        {
+          "id": 2059,
+          "name": "aivm_secrets_garrett_core::credential_use::finish_use::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/credential_use.rs"
+            },
+            "begin": {
+              "line": 124,
+              "col": 0
+            },
+            "end": {
+              "line": 128,
+              "col": 35
+            }
+          }
+        },
+        {
+          "id": 2489,
+          "name": "aivm_secrets_garrett::custody::<Impl>::execute::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 377,
+              "col": 4
+            },
+            "end": {
+              "line": 381,
+              "col": 53
+            }
+          }
+        },
+        {
+          "id": 2761,
+          "name": "aivm_secrets_garrett::custody::<Impl>::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 310,
+              "col": 4
+            },
+            "end": {
+              "line": 315,
+              "col": 37
+            }
+          }
+        },
+        {
+          "id": 2950,
+          "name": "aivm_secrets_garrett::custody::account_request_bytes",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 297,
+              "col": 0
+            },
+            "end": {
+              "line": 297,
+              "col": 97
+            }
+          }
+        },
+        {
+          "id": 3212,
+          "name": "aivm_secrets_garrett::custody::provider_request_bytes",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 282,
+              "col": 0
+            },
+            "end": {
+              "line": 287,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 3432,
+          "name": "aivm_secrets_garrett_core::http_wire::append_request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_wire.rs"
+            },
+            "begin": {
+              "line": 193,
+              "col": 0
+            },
+            "end": {
+              "line": 199,
+              "col": 31
+            }
+          }
+        },
+        {
+          "id": 3540,
+          "name": "aivm_secrets_garrett_core::http_auth::append_header",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_auth.rs"
+            },
+            "begin": {
+              "line": 23,
+              "col": 0
+            },
+            "end": {
+              "line": 27,
+              "col": 29
+            }
+          }
+        },
+        {
+          "id": 1860,
+          "name": "aivm_secrets_garrett_core::http_auth::valid_credential",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_auth.rs"
+            },
+            "begin": {
+              "line": 11,
+              "col": 0
+            },
+            "end": {
+              "line": 11,
+              "col": 46
+            }
+          }
+        }
+      ],
+      "manifest-authentication-bytes": [
+        {
+          "id": 334,
+          "name": "aivm_secrets_garrett::tls::<Impl>::serve::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 353,
+              "col": 4
+            },
+            "end": {
+              "line": 353,
+              "col": 89
+            }
+          }
+        },
+        {
+          "id": 622,
+          "name": "aivm_secrets_garrett::tls::<Impl>::answer::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 375,
+              "col": 4
+            },
+            "end": {
+              "line": 380,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 915,
+          "name": "aivm_secrets_garrett::custody::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 1164,
+              "col": 4
+            },
+            "end": {
+              "line": 1172,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1223,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 315,
+              "col": 4
+            },
+            "end": {
+              "line": 323,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1631,
+          "name": "aivm_secrets_garrett_core::read_transition::run_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 192,
+              "col": 0
+            },
+            "end": {
+              "line": 192,
+              "col": 73
+            }
+          }
+        },
+        {
+          "id": 2102,
+          "name": "aivm_secrets_garrett_core::read_transition::request_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 184,
+              "col": 0
+            },
+            "end": {
+              "line": 184,
+              "col": 90
+            }
+          }
+        },
+        {
+          "id": 2564,
+          "name": "aivm_secrets_garrett_core::read_transition::request_facts::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 140,
+              "col": 0
+            },
+            "end": {
+              "line": 140,
+              "col": 83
+            }
+          }
+        },
+        {
+          "id": 2822,
+          "name": "aivm_secrets_garrett_core::read_transition::invocation::<Impl>::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs"
+            },
+            "begin": {
+              "line": 106,
+              "col": 4
+            },
+            "end": {
+              "line": 110,
+              "col": 35
+            }
+          }
+        },
+        {
+          "id": 3008,
+          "name": "aivm_secrets_garrett_core::request_adapter::<Impl>::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/request_adapter.rs"
+            },
+            "begin": {
+              "line": 70,
+              "col": 4
+            },
+            "end": {
+              "line": 74,
+              "col": 41
+            }
+          }
+        },
+        {
+          "id": 3274,
+          "name": "aivm_secrets_garrett_core::dispatch::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 178,
+              "col": 0
+            },
+            "end": {
+              "line": 183,
+              "col": 14
+            }
+          }
+        },
+        {
+          "id": 3469,
+          "name": "aivm_secrets_garrett_core::dispatch::run::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 141,
+              "col": 0
+            },
+            "end": {
+              "line": 145,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 3554,
+          "name": "aivm_secrets_garrett_core::dispatch::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 102,
+              "col": 0
+            },
+            "end": {
+              "line": 105,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 3608,
+          "name": "aivm_secrets_garrett_core::provider_exchange::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_exchange.rs"
+            },
+            "begin": {
+              "line": 57,
+              "col": 0
+            },
+            "end": {
+              "line": 57,
+              "col": 91
+            }
+          }
+        },
+        {
+          "id": 3660,
+          "name": "aivm_secrets_garrett_core::dispatch::<Impl>::setup::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 48,
+              "col": 4
+            },
+            "end": {
+              "line": 48,
+              "col": 61
+            }
+          }
+        },
+        {
+          "id": 3689,
+          "name": "aivm_secrets_garrett_core::current_admission::<Impl>::setup::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/current_admission.rs"
+            },
+            "begin": {
+              "line": 122,
+              "col": 4
+            },
+            "end": {
+              "line": 122,
+              "col": 61
+            }
+          }
+        },
+        {
+          "id": 3706,
+          "name": "aivm_secrets_garrett_core::provider_io::<Impl>::setup::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_io.rs"
+            },
+            "begin": {
+              "line": 36,
+              "col": 4
+            },
+            "end": {
+              "line": 36,
+              "col": 61
+            }
+          }
+        },
+        {
+          "id": 3717,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::setup_route::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 789,
+              "col": 4
+            },
+            "end": {
+              "line": 789,
+              "col": 78
+            }
+          }
+        },
+        {
+          "id": 3733,
+          "name": "aivm_secrets_garrett::custody::manifest_session::manifest_request_bytes",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 586,
+              "col": 0
+            },
+            "end": {
+              "line": 594,
+              "col": 2
+            }
+          }
+        },
+        {
+          "id": 3770,
+          "name": "aivm_secrets_garrett_core::provider_wire::append",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_wire.rs"
+            },
+            "begin": {
+              "line": 43,
+              "col": 0
+            },
+            "end": {
+              "line": 49,
+              "col": 48
+            }
+          }
+        },
+        {
+          "id": 3432,
+          "name": "aivm_secrets_garrett_core::http_wire::append_request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_wire.rs"
+            },
+            "begin": {
+              "line": 193,
+              "col": 0
+            },
+            "end": {
+              "line": 199,
+              "col": 31
+            }
+          }
+        },
+        {
+          "id": 3540,
+          "name": "aivm_secrets_garrett_core::http_auth::append_header",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_auth.rs"
+            },
+            "begin": {
+              "line": 23,
+              "col": 0
+            },
+            "end": {
+              "line": 27,
+              "col": 29
+            }
+          }
+        },
+        {
+          "id": 1860,
+          "name": "aivm_secrets_garrett_core::http_auth::valid_credential",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_auth.rs"
+            },
+            "begin": {
+              "line": 11,
+              "col": 0
+            },
+            "end": {
+              "line": 11,
+              "col": 46
+            }
+          }
+        }
+      ],
+      "account-request-line": [
+        {
+          "id": 334,
+          "name": "aivm_secrets_garrett::tls::<Impl>::serve::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 353,
+              "col": 4
+            },
+            "end": {
+              "line": 353,
+              "col": 89
+            }
+          }
+        },
+        {
+          "id": 622,
+          "name": "aivm_secrets_garrett::tls::<Impl>::answer::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 375,
+              "col": 4
+            },
+            "end": {
+              "line": 380,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 915,
+          "name": "aivm_secrets_garrett::custody::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 1164,
+              "col": 4
+            },
+            "end": {
+              "line": 1172,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1222,
+          "name": "aivm_secrets_garrett::custody::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 795,
+              "col": 4
+            },
+            "end": {
+              "line": 803,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1594,
+          "name": "aivm_secrets_garrett_core::protocol::perform::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/protocol.rs"
+            },
+            "begin": {
+              "line": 139,
+              "col": 0
+            },
+            "end": {
+              "line": 153,
+              "col": 54
+            }
+          }
+        },
+        {
+          "id": 2059,
+          "name": "aivm_secrets_garrett_core::credential_use::finish_use::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/credential_use.rs"
+            },
+            "begin": {
+              "line": 124,
+              "col": 0
+            },
+            "end": {
+              "line": 128,
+              "col": 35
+            }
+          }
+        },
+        {
+          "id": 2489,
+          "name": "aivm_secrets_garrett::custody::<Impl>::execute::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 377,
+              "col": 4
+            },
+            "end": {
+              "line": 381,
+              "col": 53
+            }
+          }
+        },
+        {
+          "id": 2761,
+          "name": "aivm_secrets_garrett::custody::<Impl>::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 310,
+              "col": 4
+            },
+            "end": {
+              "line": 315,
+              "col": 37
+            }
+          }
+        },
+        {
+          "id": 2950,
+          "name": "aivm_secrets_garrett::custody::account_request_bytes",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 297,
+              "col": 0
+            },
+            "end": {
+              "line": 297,
+              "col": 97
+            }
+          }
+        },
+        {
+          "id": 3212,
+          "name": "aivm_secrets_garrett::custody::provider_request_bytes",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 282,
+              "col": 0
+            },
+            "end": {
+              "line": 287,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 3432,
+          "name": "aivm_secrets_garrett_core::http_wire::append_request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_wire.rs"
+            },
+            "begin": {
+              "line": 193,
+              "col": 0
+            },
+            "end": {
+              "line": 199,
+              "col": 31
+            }
+          }
+        },
+        {
+          "id": 3534,
+          "name": "aivm_secrets_garrett_core::http_request::append_line",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_request.rs"
+            },
+            "begin": {
+              "line": 31,
+              "col": 0
+            },
+            "end": {
+              "line": 35,
+              "col": 30
+            }
+          }
+        },
+        {
+          "id": 3585,
+          "name": "aivm_secrets_garrett_core::http_request::valid_target",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_request.rs"
+            },
+            "begin": {
+              "line": 16,
+              "col": 0
+            },
+            "end": {
+              "line": 16,
+              "col": 42
+            }
+          }
+        }
+      ],
+      "manifest-request-line": [
+        {
+          "id": 334,
+          "name": "aivm_secrets_garrett::tls::<Impl>::serve::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 353,
+              "col": 4
+            },
+            "end": {
+              "line": 353,
+              "col": 89
+            }
+          }
+        },
+        {
+          "id": 622,
+          "name": "aivm_secrets_garrett::tls::<Impl>::answer::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 375,
+              "col": 4
+            },
+            "end": {
+              "line": 380,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 915,
+          "name": "aivm_secrets_garrett::custody::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 1164,
+              "col": 4
+            },
+            "end": {
+              "line": 1172,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1223,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 315,
+              "col": 4
+            },
+            "end": {
+              "line": 323,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1631,
+          "name": "aivm_secrets_garrett_core::read_transition::run_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 192,
+              "col": 0
+            },
+            "end": {
+              "line": 192,
+              "col": 73
+            }
+          }
+        },
+        {
+          "id": 2102,
+          "name": "aivm_secrets_garrett_core::read_transition::request_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 184,
+              "col": 0
+            },
+            "end": {
+              "line": 184,
+              "col": 90
+            }
+          }
+        },
+        {
+          "id": 2564,
+          "name": "aivm_secrets_garrett_core::read_transition::request_facts::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 140,
+              "col": 0
+            },
+            "end": {
+              "line": 140,
+              "col": 83
+            }
+          }
+        },
+        {
+          "id": 2822,
+          "name": "aivm_secrets_garrett_core::read_transition::invocation::<Impl>::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs"
+            },
+            "begin": {
+              "line": 106,
+              "col": 4
+            },
+            "end": {
+              "line": 110,
+              "col": 35
+            }
+          }
+        },
+        {
+          "id": 3008,
+          "name": "aivm_secrets_garrett_core::request_adapter::<Impl>::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/request_adapter.rs"
+            },
+            "begin": {
+              "line": 70,
+              "col": 4
+            },
+            "end": {
+              "line": 74,
+              "col": 41
+            }
+          }
+        },
+        {
+          "id": 3274,
+          "name": "aivm_secrets_garrett_core::dispatch::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 178,
+              "col": 0
+            },
+            "end": {
+              "line": 183,
+              "col": 14
+            }
+          }
+        },
+        {
+          "id": 3469,
+          "name": "aivm_secrets_garrett_core::dispatch::run::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 141,
+              "col": 0
+            },
+            "end": {
+              "line": 145,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 3554,
+          "name": "aivm_secrets_garrett_core::dispatch::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 102,
+              "col": 0
+            },
+            "end": {
+              "line": 105,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 3608,
+          "name": "aivm_secrets_garrett_core::provider_exchange::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_exchange.rs"
+            },
+            "begin": {
+              "line": 57,
+              "col": 0
+            },
+            "end": {
+              "line": 57,
+              "col": 91
+            }
+          }
+        },
+        {
+          "id": 3660,
+          "name": "aivm_secrets_garrett_core::dispatch::<Impl>::setup::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 48,
+              "col": 4
+            },
+            "end": {
+              "line": 48,
+              "col": 61
+            }
+          }
+        },
+        {
+          "id": 3689,
+          "name": "aivm_secrets_garrett_core::current_admission::<Impl>::setup::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/current_admission.rs"
+            },
+            "begin": {
+              "line": 122,
+              "col": 4
+            },
+            "end": {
+              "line": 122,
+              "col": 61
+            }
+          }
+        },
+        {
+          "id": 3706,
+          "name": "aivm_secrets_garrett_core::provider_io::<Impl>::setup::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_io.rs"
+            },
+            "begin": {
+              "line": 36,
+              "col": 4
+            },
+            "end": {
+              "line": 36,
+              "col": 61
+            }
+          }
+        },
+        {
+          "id": 3717,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::setup_route::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 789,
+              "col": 4
+            },
+            "end": {
+              "line": 789,
+              "col": 78
+            }
+          }
+        },
+        {
+          "id": 3733,
+          "name": "aivm_secrets_garrett::custody::manifest_session::manifest_request_bytes",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 586,
+              "col": 0
+            },
+            "end": {
+              "line": 594,
+              "col": 2
+            }
+          }
+        },
+        {
+          "id": 3770,
+          "name": "aivm_secrets_garrett_core::provider_wire::append",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_wire.rs"
+            },
+            "begin": {
+              "line": 43,
+              "col": 0
+            },
+            "end": {
+              "line": 49,
+              "col": 48
+            }
+          }
+        },
+        {
+          "id": 3432,
+          "name": "aivm_secrets_garrett_core::http_wire::append_request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_wire.rs"
+            },
+            "begin": {
+              "line": 193,
+              "col": 0
+            },
+            "end": {
+              "line": 199,
+              "col": 31
+            }
+          }
+        },
+        {
+          "id": 3534,
+          "name": "aivm_secrets_garrett_core::http_request::append_line",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_request.rs"
+            },
+            "begin": {
+              "line": 31,
+              "col": 0
+            },
+            "end": {
+              "line": 35,
+              "col": 30
+            }
+          }
+        },
+        {
+          "id": 3585,
+          "name": "aivm_secrets_garrett_core::http_request::valid_target",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_request.rs"
+            },
+            "begin": {
+              "line": 16,
+              "col": 0
+            },
+            "end": {
+              "line": 16,
+              "col": 42
+            }
+          }
+        }
+      ],
+      "account-complete-header-admission": [
+        {
+          "id": 334,
+          "name": "aivm_secrets_garrett::tls::<Impl>::serve::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 353,
+              "col": 4
+            },
+            "end": {
+              "line": 353,
+              "col": 89
+            }
+          }
+        },
+        {
+          "id": 622,
+          "name": "aivm_secrets_garrett::tls::<Impl>::answer::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 375,
+              "col": 4
+            },
+            "end": {
+              "line": 380,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 915,
+          "name": "aivm_secrets_garrett::custody::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 1164,
+              "col": 4
+            },
+            "end": {
+              "line": 1172,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1222,
+          "name": "aivm_secrets_garrett::custody::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 795,
+              "col": 4
+            },
+            "end": {
+              "line": 803,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1594,
+          "name": "aivm_secrets_garrett_core::protocol::perform::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/protocol.rs"
+            },
+            "begin": {
+              "line": 139,
+              "col": 0
+            },
+            "end": {
+              "line": 153,
+              "col": 54
+            }
+          }
+        },
+        {
+          "id": 2059,
+          "name": "aivm_secrets_garrett_core::credential_use::finish_use::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/credential_use.rs"
+            },
+            "begin": {
+              "line": 124,
+              "col": 0
+            },
+            "end": {
+              "line": 128,
+              "col": 35
+            }
+          }
+        },
+        {
+          "id": 2489,
+          "name": "aivm_secrets_garrett::custody::<Impl>::execute::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 377,
+              "col": 4
+            },
+            "end": {
+              "line": 381,
+              "col": 53
+            }
+          }
+        },
+        {
+          "id": 2761,
+          "name": "aivm_secrets_garrett::custody::<Impl>::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 310,
+              "col": 4
+            },
+            "end": {
+              "line": 315,
+              "col": 37
+            }
+          }
+        },
+        {
+          "id": 2950,
+          "name": "aivm_secrets_garrett::custody::account_request_bytes",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 297,
+              "col": 0
+            },
+            "end": {
+              "line": 297,
+              "col": 97
+            }
+          }
+        },
+        {
+          "id": 3212,
+          "name": "aivm_secrets_garrett::custody::provider_request_bytes",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 282,
+              "col": 0
+            },
+            "end": {
+              "line": 287,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 3432,
+          "name": "aivm_secrets_garrett_core::http_wire::append_request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_wire.rs"
+            },
+            "begin": {
+              "line": 193,
+              "col": 0
+            },
+            "end": {
+              "line": 199,
+              "col": 31
+            }
+          }
+        },
+        {
+          "id": 3533,
+          "name": "aivm_secrets_garrett_core::http_wire::valid_headers",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_wire.rs"
+            },
+            "begin": {
+              "line": 124,
+              "col": 0
+            },
+            "end": {
+              "line": 124,
+              "col": 48
+            }
+          }
+        },
+        {
+          "id": 3587,
+          "name": "aivm_secrets_garrett_core::http_wire::valid_header",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_wire.rs"
+            },
+            "begin": {
+              "line": 108,
+              "col": 0
+            },
+            "end": {
+              "line": 108,
+              "col": 44
+            }
+          }
+        },
+        {
+          "id": 3644,
+          "name": "aivm_secrets_garrett_core::http_wire::valid_name",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_wire.rs"
+            },
+            "begin": {
+              "line": 80,
+              "col": 0
+            },
+            "end": {
+              "line": 80,
+              "col": 38
+            }
+          }
+        },
+        {
+          "id": 3682,
+          "name": "aivm_secrets_garrett_core::http_wire::reserved_name",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_wire.rs"
+            },
+            "begin": {
+              "line": 48,
+              "col": 0
+            },
+            "end": {
+              "line": 48,
+              "col": 41
+            }
+          }
+        },
+        {
+          "id": 3646,
+          "name": "aivm_secrets_garrett_core::http_wire::ascii_equal",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_wire.rs"
+            },
+            "begin": {
+              "line": 45,
+              "col": 0
+            },
+            "end": {
+              "line": 45,
+              "col": 53
+            }
+          }
+        }
+      ],
+      "manifest-complete-header-admission": [
+        {
+          "id": 334,
+          "name": "aivm_secrets_garrett::tls::<Impl>::serve::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 353,
+              "col": 4
+            },
+            "end": {
+              "line": 353,
+              "col": 89
+            }
+          }
+        },
+        {
+          "id": 622,
+          "name": "aivm_secrets_garrett::tls::<Impl>::answer::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/tls.rs"
+            },
+            "begin": {
+              "line": 375,
+              "col": 4
+            },
+            "end": {
+              "line": 380,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 915,
+          "name": "aivm_secrets_garrett::custody::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody.rs"
+            },
+            "begin": {
+              "line": 1164,
+              "col": 4
+            },
+            "end": {
+              "line": 1172,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1223,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 315,
+              "col": 4
+            },
+            "end": {
+              "line": 323,
+              "col": 23
+            }
+          }
+        },
+        {
+          "id": 1631,
+          "name": "aivm_secrets_garrett_core::read_transition::run_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 192,
+              "col": 0
+            },
+            "end": {
+              "line": 192,
+              "col": 73
+            }
+          }
+        },
+        {
+          "id": 2102,
+          "name": "aivm_secrets_garrett_core::read_transition::request_current::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 184,
+              "col": 0
+            },
+            "end": {
+              "line": 184,
+              "col": 90
+            }
+          }
+        },
+        {
+          "id": 2564,
+          "name": "aivm_secrets_garrett_core::read_transition::request_facts::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition.rs"
+            },
+            "begin": {
+              "line": 140,
+              "col": 0
+            },
+            "end": {
+              "line": 140,
+              "col": 83
+            }
+          }
+        },
+        {
+          "id": 2822,
+          "name": "aivm_secrets_garrett_core::read_transition::invocation::<Impl>::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs"
+            },
+            "begin": {
+              "line": 106,
+              "col": 4
+            },
+            "end": {
+              "line": 110,
+              "col": 35
+            }
+          }
+        },
+        {
+          "id": 3008,
+          "name": "aivm_secrets_garrett_core::request_adapter::<Impl>::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/request_adapter.rs"
+            },
+            "begin": {
+              "line": 70,
+              "col": 4
+            },
+            "end": {
+              "line": 74,
+              "col": 41
+            }
+          }
+        },
+        {
+          "id": 3274,
+          "name": "aivm_secrets_garrett_core::dispatch::dispatch::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 178,
+              "col": 0
+            },
+            "end": {
+              "line": 183,
+              "col": 14
+            }
+          }
+        },
+        {
+          "id": 3469,
+          "name": "aivm_secrets_garrett_core::dispatch::run::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 141,
+              "col": 0
+            },
+            "end": {
+              "line": 145,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 3554,
+          "name": "aivm_secrets_garrett_core::dispatch::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 102,
+              "col": 0
+            },
+            "end": {
+              "line": 105,
+              "col": 32
+            }
+          }
+        },
+        {
+          "id": 3608,
+          "name": "aivm_secrets_garrett_core::provider_exchange::exchange::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_exchange.rs"
+            },
+            "begin": {
+              "line": 57,
+              "col": 0
+            },
+            "end": {
+              "line": 57,
+              "col": 91
+            }
+          }
+        },
+        {
+          "id": 3660,
+          "name": "aivm_secrets_garrett_core::dispatch::<Impl>::setup::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/dispatch.rs"
+            },
+            "begin": {
+              "line": 48,
+              "col": 4
+            },
+            "end": {
+              "line": 48,
+              "col": 61
+            }
+          }
+        },
+        {
+          "id": 3689,
+          "name": "aivm_secrets_garrett_core::current_admission::<Impl>::setup::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/current_admission.rs"
+            },
+            "begin": {
+              "line": 122,
+              "col": 4
+            },
+            "end": {
+              "line": 122,
+              "col": 61
+            }
+          }
+        },
+        {
+          "id": 3706,
+          "name": "aivm_secrets_garrett_core::provider_io::<Impl>::setup::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_io.rs"
+            },
+            "begin": {
+              "line": 36,
+              "col": 4
+            },
+            "end": {
+              "line": 36,
+              "col": 61
+            }
+          }
+        },
+        {
+          "id": 3717,
+          "name": "aivm_secrets_garrett::custody::manifest_session::<Impl>::setup_route::<Instantiated>",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 789,
+              "col": 4
+            },
+            "end": {
+              "line": 789,
+              "col": 78
+            }
+          }
+        },
+        {
+          "id": 3733,
+          "name": "aivm_secrets_garrett::custody::manifest_session::manifest_request_bytes",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett/src/custody/manifest_session.rs"
+            },
+            "begin": {
+              "line": 586,
+              "col": 0
+            },
+            "end": {
+              "line": 594,
+              "col": 2
+            }
+          }
+        },
+        {
+          "id": 3770,
+          "name": "aivm_secrets_garrett_core::provider_wire::append",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/provider_wire.rs"
+            },
+            "begin": {
+              "line": 43,
+              "col": 0
+            },
+            "end": {
+              "line": 49,
+              "col": 48
+            }
+          }
+        },
+        {
+          "id": 3432,
+          "name": "aivm_secrets_garrett_core::http_wire::append_request",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_wire.rs"
+            },
+            "begin": {
+              "line": 193,
+              "col": 0
+            },
+            "end": {
+              "line": 199,
+              "col": 31
+            }
+          }
+        },
+        {
+          "id": 3533,
+          "name": "aivm_secrets_garrett_core::http_wire::valid_headers",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_wire.rs"
+            },
+            "begin": {
+              "line": 124,
+              "col": 0
+            },
+            "end": {
+              "line": 124,
+              "col": 48
+            }
+          }
+        },
+        {
+          "id": 3587,
+          "name": "aivm_secrets_garrett_core::http_wire::valid_header",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_wire.rs"
+            },
+            "begin": {
+              "line": 108,
+              "col": 0
+            },
+            "end": {
+              "line": 108,
+              "col": 44
+            }
+          }
+        },
+        {
+          "id": 3644,
+          "name": "aivm_secrets_garrett_core::http_wire::valid_name",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_wire.rs"
+            },
+            "begin": {
+              "line": 80,
+              "col": 0
+            },
+            "end": {
+              "line": 80,
+              "col": 38
+            }
+          }
+        },
+        {
+          "id": 3682,
+          "name": "aivm_secrets_garrett_core::http_wire::reserved_name",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_wire.rs"
+            },
+            "begin": {
+              "line": 48,
+              "col": 0
+            },
+            "end": {
+              "line": 48,
+              "col": 41
+            }
+          }
+        },
+        {
+          "id": 3646,
+          "name": "aivm_secrets_garrett_core::http_wire::ascii_equal",
+          "source": {
+            "file": {
+              "Local": "crates/aivm-secrets-garrett-core/src/http_wire.rs"
+            },
+            "begin": {
+              "line": 45,
+              "col": 0
+            },
+            "end": {
+              "line": 45,
+              "col": 53
+            }
+          }
+        }
+      ]
+    },
+    "complete_mediation": false,
+    "capture": {
+      "schema": 1,
+      "status": "captured",
+      "command": [
+        "/home/local/KHQ/jon.crall/code/aivm-secrets/.tools/aeneas/charon",
+        "cargo",
+        "--preset=raw-mir",
+        "--sysroot",
+        "default",
+        "--monomorphize",
+        "--start-from-if-exists",
+        "crate::main",
+        "--abort-on-error",
+        "--error-on-warnings",
+        "--opaque",
+        "std",
+        "--opaque",
+        "core",
+        "--opaque",
+        "alloc",
+        "--opaque",
+        "rustls",
+        "--opaque",
+        "ring",
+        "--opaque",
+        "serde",
+        "--opaque",
+        "serde_json",
+        "--opaque",
+        "x509_parser",
+        "--opaque",
+        "rcgen",
+        "--opaque",
+        "rustix",
+        "--opaque",
+        "zeroize",
+        "--opaque",
+        "base64",
+        "--opaque",
+        "time",
+        "--dest",
+        "/home/local/KHQ/jon.crall/code/aivm-secrets/.tools/specialized-calls-qeyqtvaf",
+        "--",
+        "--bin",
+        "garrett-bridge",
+        "--locked"
+      ],
+      "artifact": "garrett_bridge.ullbc",
+      "limits": {
+        "plain": 8589934592,
+        "compressed": 536870912,
+        "compiler_seconds": 300,
+        "projector_seconds": 120
+      },
+      "plain_bytes": 4648217139,
+      "error": null,
+      "exit_code": 0,
+      "seconds": 97.172,
+      "plain_sha256": "a11840ec98c0eff3cdaa57f774923b317f0baa3a23ffa601de6f5cb317c116da",
+      "compressed_bytes": 159605510,
+      "compressed_sha256": "22ecad940846e0a9ba96aa07ce11f07dc7751e5a7e1ada9e6f9dd6123b0101bc"
+    },
+    "analysis_replay": {
+      "original_report": "/home/local/KHQ/jon.crall/code/aivm-secrets/.tools/specialized-calls-qeyqtvaf/report.json",
+      "original_report_sha256": "7c1fae3586a9b0d7b274ef4f48dfd1f60e47eded94555adecb3c18757ad58b95",
+      "compiler_archive": "/home/local/KHQ/jon.crall/code/aivm-secrets/.tools/specialized-calls-qeyqtvaf/compiler.ullbc.gz",
+      "changed_analysis_sources": [
+        "/home/local/KHQ/jon.crall/code/aivm-secrets/dev/verification/w3_effect_boundary.py"
+      ],
+      "native_inputs_unchanged": true,
+      "projection_identical": true,
+      "current_guard_checked": true,
+      "projector_explicitly_rebuilt": true,
+      "original_projector_sha256": "d3a29076bcc7b063ceec8a5b3283e3ab7e34d770a344537ce253cbc9c1852d58"
+    }
+  },
+  "findings": [
+    "Native serde capture preserves existing ordering and as_i64/number-token spelling and converts text/keys to scalar lists. The private captured tree is immutable during encoding and clears owned number/text/name buffers on normal drop. Extra allocation/traversal and partial construction/drop/unwind remain explicit costs/contracts.",
+    "Production extracted json_wire owns null, boolean, numeric-token, string, array, object and separator byte layout. Native canonical returns its vector directly, eliminating the previous recursive String builder and byte/String append seam.",
+    "Thirteen actual recursive encoder/frame obligations derive bounded exact bytes, positive encoding, returned encoding origin, frame admission/denial, newline/size/readiness and actual writer input/states including returned send failures. Mathematical tree depth is not runtime fuel; number-token grammar and map order remain local capture contracts.",
+    "GuestFrame captures the actual selected success/fixed error value and invokes core json_wire::prepare, which passes its successful encoded bytes directly to guest_frame::prepare. Encoding refusal cannot construct a frame; embedded LF in a raw numeric token fails actual frame admission.",
+    "Native compatibility compares the former independent encoder over number spellings, 4,300-digit integers, nested values, control characters and Unicode. Existing exhaustive Unicode scalar tests remain in the core suite.",
+    "All eight selected re-extracted mutants were rejected in actual JSON wire/frame leaves: null bytes, numeric token replacement, array terminator, object colon, omitted name, skipped encoding, substituted frame payload and ignored frame bound.",
+    "A diagnostic capture exposed an opaque std Result::and_then edge from serve to answer. Explicit production matches retain the same frame/parse error mapping and sole answer call. The fresh capture rooted at serve now finds seventeen required links including actual guest encoding/framing; this is not dominance, transitive reachability or I/O mediation.",
+    "Initial release parity exposed an existing test port race: retained fixture callback_port and synthetic TLS port both equaled 39331. The test helper now allocates callback after provider bind and checks distinct ports; all 33 native login cases pass without skips. Startup assertion preserves actual error diagnostics. No OAuth runtime behavior, retry, timeout or safety check was changed.",
+    "The freeze check caught the W3 guard changing after successful native capture. Verified all native/compiler/projector sources against capture, explicitly rebuilt the pinned projector, reran the current guard and projected the preserved archive. Exact projection remained identical; replay provenance is retained without claiming a new native capture.",
+    "Six safe installed-vTPM cases preserve persistent public objects, dictionary state and fixture cleanup. Wrong-auth remains isolated; no physical TPM or deployed VM isolation claim follows."
+  ],
+  "remaining-obligations": [
+    "Instantiate native startup/identity/peer/grant/policy/operation, UTF-8/scalar and serde capture, number grammar/spelling, map order and header conversion, faithful zeroizing buffer view and std/TLS/DNS/parser/storage semantics. Route/byte/endpoint/channel state is source-derived; resolver IP, delivery and complete native I/O remain contracts.",
+    "Connect actual native outcomes/events and selected JSON/frame/close observations, transitive callback/dependency/I/O, nonreturning/panic/drop/unwind effects and adaptive native histories. The 105-source W3 inventory and seventeen compiler paths are not mediation or completeness proofs.",
+    "NR-2/3/4/5 exit, native write assurance, normative Rust core API parity, independent review, real providers and deployed compartments remain open."
+  ],
+  "log_sha256": {
+    "freshness": {
+      "path": "/tmp/garrett-json-wire-freshness.log",
+      "sha256": "c977dafac03bfbb8666646db0ae41f7e972b5bd57b1f324e3129d096c89ce677"
+    },
+    "record": {
+      "path": "/tmp/garrett-json-wire-record.log",
+      "sha256": "4ca1c202e9441748fc58b23d65ea5083338d259ddd0095dd90c4183cf7d8a577"
+    },
+    "extract": {
+      "path": "/tmp/garrett-json-wire-extract.log",
+      "sha256": "c1e4c5f2c54df2b10cbbdd244e90c90114d9aa7cb8aed5ca9f8ad557eadb3425"
+    },
+    "mutants": {
+      "path": "/tmp/garrett-json-wire-mutants.log",
+      "sha256": "cc02076ada4e7fa1be96aaec42733d1f3fb685b7ef27041544edd353e31b0c56"
+    },
+    "workspace": {
+      "path": "/tmp/garrett-json-wire-workspace.log",
+      "sha256": "7705b6cbd10dc1e3a58ab9a1aa3e4f88446eecfecfbb334c71b37f045cd2644f"
+    },
+    "source-tests": {
+      "path": "/tmp/garrett-json-wire-source-tests.log",
+      "sha256": "d3751dedc28fbb10e1acd1b0c5efaa4adccf8a0a9c66298521a2cb5172c45f48"
+    },
+    "source-guards": {
+      "path": "/tmp/garrett-json-wire-source-guards.log",
+      "sha256": "05eb09ac4582e6a8658e2c44ec0a596bfbad29418c97ff0d93c2b920adc1bfdb"
+    },
+    "debug-read": {
+      "path": "/tmp/garrett-json-wire-debug-read.log",
+      "sha256": "a922f6f8feb46b9f90ef6883e30db94026fdaeeb7b9407f5dfb0cab21c7f51c6"
+    },
+    "native-ordinary": {
+      "path": "/tmp/garrett-json-wire-native-ordinary.log",
+      "sha256": "7705cabafe703d1c39286acacbfa3c1c56037dd9c9c5ac8af1a0c965a3df57bc"
+    },
+    "product-debug": {
+      "path": "/tmp/garrett-json-wire-product-debug.log",
+      "sha256": "07dbbfe5ee30aa500aa129ff377dc47249297e1651502e6612b102e7ead504e1"
+    },
+    "product-ordinary": {
+      "path": "/tmp/garrett-json-wire-product-ordinary.log",
+      "sha256": "07dbbfe5ee30aa500aa129ff377dc47249297e1651502e6612b102e7ead504e1"
+    },
+    "device": {
+      "path": "/tmp/garrett-json-wire-device.log",
+      "sha256": "32671374403e11a3d67c721b855348439a8643c5d4a72c8303ab2392da00e190"
+    },
+    "read-proofs": {
+      "path": "/tmp/garrett-json-wire-read-proofs.log",
+      "sha256": "b8e9a0372c7417538dec7d113c214421417ef3ecd7746409c285392eccbf241e"
+    },
+    "proof": {
+      "path": "/tmp/garrett-json-wire-proof.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "frame-proof": {
+      "path": "/tmp/garrett-json-wire-frame-proof.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "deps": {
+      "path": "/tmp/garrett-json-wire-deps.log",
+      "sha256": "d6f1ad1295a99163b894a84f652d6afd33464dba6b40f7b701bb941f43dc0fe5"
+    },
+    "frame-deps": {
+      "path": "/tmp/garrett-json-wire-frame-deps.log",
+      "sha256": "d805ba2b38ed675c1345edbe456a5febce6f3c3f1b3492973a1134facffe3e15"
+    },
+    "clippy": {
+      "path": "/tmp/garrett-json-wire-clippy.log",
+      "sha256": "d8ee8bb6ded493b4c4d9c07a528d631e58381a822ad5711cc959a236d557f7cf"
+    },
+    "full": {
+      "path": "/tmp/garrett-json-wire-full.log",
+      "sha256": "8eec118b51e3d9eca6604bd5923bec5db956e3e91f880e52f916cb4c571d664d"
+    },
+    "build": {
+      "path": "/tmp/garrett-json-wire-build.log",
+      "sha256": "6ae1f68fb68f9fab280aa362f2dce009b869032f9e043c26b33118aa06f47e5d"
+    },
+    "build-debug": {
+      "path": "/tmp/garrett-json-wire-build-debug.log",
+      "sha256": "0a7774a39620b5dbc98ce06b8145030ddee0cb24fc0266619335b12bb59a70ef"
+    },
+    "build-ordinary": {
+      "path": "/tmp/garrett-json-wire-build-ordinary.log",
+      "sha256": "127d275f9ccc4c59d85ea2f8013302cc775920b4ce31b60cb7e7b145a05c0460"
+    },
+    "specialized": {
+      "path": "/tmp/garrett-json-wire-specialized.log",
+      "sha256": "b30d2046f577e1724079a7ed24d250069c56eecdd96a94cc01649f836211692a"
+    },
+    "specialized-replay": {
+      "path": "/tmp/garrett-json-wire-specialized-replay.log",
+      "sha256": "30732e639929cb611d9023c3100667f3da48c4c13a5156e78330275acd418af2"
+    },
+    "specialized-tests": {
+      "path": "/tmp/garrett-json-wire-specialized-tests.log",
+      "sha256": "f85498fb8250239680daa6b0ad626c5dc616553c1a8357bc4b02f87d26b3a3d4"
+    },
+    "login-fixture": {
+      "path": "/tmp/garrett-json-wire-login-fixture.log",
+      "sha256": "49e2ac6242dd99d73b257ffd2e7ac8fbf95d9f7007f045cab0d694bc4e1da774"
+    },
+    "record-port-collision": {
+      "path": "/tmp/garrett-json-wire-record-port-collision.log",
+      "sha256": "6bea0b192444ef1b28032b1c1454c720690aff50336d66a81d0913d4c905d06c"
+    }
+  }
+}

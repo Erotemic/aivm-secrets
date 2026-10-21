@@ -289,6 +289,17 @@ before its sole answer call; the optional compiler root includes reply handling.
 This closes the native recursive String builder and its byte/String append seam,
 not native parser, transport, event or adaptive-history correspondence.
 
+Source `e741383` passes 3,116 full-suite cases with zero skips, 730 named
+axiom audits, 767 release parity cases, 102 Rust workspace cases and Clippy.
+All eight selected re-extracted encoder/frame mutations fail their actual
+leaves. Both 168-case native read modes and standalone guest workflows, all
+296 archive pins, eight read-path/five prefix kernel audits and six safe
+installed-vTPM cases pass. The corrected OAuth fixture passes all 33 native
+login cases without skips. The seventeen-path compiler capture is rooted at
+`serve`; its projection is identical when replayed with the final guard and
+pinned projector. Sixty fixtures pass; no mediation claim follows. See the
+[complete JSON/frame validation record](../../dev/validation/2026-10-21-json-wire.json).
+
 The next implementation task remains native primitive correspondence: connect
 native UTF-8/scalar and serde capture, number spelling/map order, header
 conversion, faithful zeroizing buffer view and
