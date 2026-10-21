@@ -178,8 +178,17 @@ all returned outcomes of the actual request entry. Twenty-three new obligations
 remove whole-current and whole-dispatch/completion history premises. The precise,
 state-indexed native constructor/typeclass/context-frame input contract remains
 uninstantiated; native primitive/I/O, selected JSON/frame/close and adaptive
-history correspondence and NR-2–NR-5 remain open. Validation for this source
-increment is recorded separately after the VM gates pass.
+history correspondence and NR-2–NR-5 remain open.
+
+Source `f3ba897` records 3,046 full-suite cases with zero skips, 635 named
+axiom audits, 767 release parity cases, 85 Rust workspace cases, two selected
+source-extracted mutations rejected in dispatcher prerequisites, both 168-case
+native build-mode gates, both standalone product workflows and six safe
+installed-vTPM cases. All 283 source-archive inputs and the embedded manifest
+match. The record distinguishes the final proof EOF normalization/re-audit
+from the unchanged-runtime full-suite result, and retains prior read-prefix/
+optional compiler evidence only after verifying its exact source pins. See the
+[owned-controller trace validation record](../../dev/validation/2026-10-20-owned-controller-traces.json).
 
 The next implementation seam is a source-owned native context/factory wrapper
 or equivalent exact constructor refinement that discharges the per-state
