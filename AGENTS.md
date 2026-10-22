@@ -17,7 +17,20 @@ the secrets adapter is explicitly enabled, versioned and process/wire-only.
    `docs/planning/aivm-secrets-conditional-confinement.md` and assumptions.
 4. The actual source tree: inspect `git status --short`, `git rev-parse HEAD`,
    latest commit and applicable reports; do not assume an overlay is committed
-   or the last Lean fix has been compiled unless its result was reported.
+   or overwrite user-confirmed Lean build success. In this project, moving on
+   to the next increment normally means the prior Lean change compiled; the
+   maintainer supplies compiler diagnostics when there is a failure.
+
+**OUT-2 integration evidence (2026-10-21):** the maintainer ran the
+native KVM smoke on `aivm-2404` successfully (`b21e212`, three authorized
+synthetic-provider GETs, denied write, private-path probes and revocation).
+This is a **real VM witness**, not filesystem-isolation or whole-service secrecy
+proof. The optional `--adversarial` extension in
+`dev/aivm_vm_acceptance.py` tests identity, forbidden host TCP canary, bounded
+mount metadata and application-socket disconnect/reconnect; **do not report it
+as passed until an actual operator VM run passes**. See
+`docs/aivm-vm-native-acceptance.md`. Keep real GitHub credentials out of
+these synthetic tests.
 
 **Anti-drift:** the read-only NR proof is one product gate, not the product.
 Move NR-2/3 toward concrete native primitive-to-event refinement instead of

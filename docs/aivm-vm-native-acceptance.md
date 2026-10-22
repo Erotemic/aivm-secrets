@@ -1,6 +1,8 @@
 # Native Garrett in a real AIVM VM (OUT-2 first witness)
 
-This is an **opt-in, finite integration smoke test**. It exercises actual
+This is an **opt-in, finite integration smoke test**. The `--adversarial`
+extension below adds controlled negative checks; it has not yet been run on
+the actual VM. It exercises actual
 `garrett-authority`, `garrett-bridge` and `garrett-client` binaries, with the
 client **inside a managed KVM/QEMU AIVM VM** and the authority, broker,
 synthetic HTTPS provider and newly randomized synthetic credential **only on
@@ -60,8 +62,9 @@ an automatically cleaned-up host workspace and print only the redacted report.
 ## What actually crosses the VM boundary
 
 1. AIVM supplies its selected VM's SSH destination and identity. The harness
-   requires the selected VM's `strict_firewall=yes` setting. No direct host
-   port is opened in the VM subnet.
+   requires the selected VM's `strict_firewall=yes` setting. The ordinary
+   smoke opens no direct host TCP port; the separate `--adversarial` mode
+   temporarily exposes only a credential-free host gateway canary.
 2. The native `garrett-client` binary is sent to a **guest-owned private
    directory**. It creates its own key and CSR *inside the guest*. The host
    receives only the public CSR and verifies the reported fingerprint.
@@ -111,8 +114,88 @@ It does **not** establish:
 - a persistent, independently packaged optional AIVM adapter for an actual
   agent, live GitHub interoperability, or approved write effects.
 
-Next, collect a **real run report**, then add a controlled forbidden-egress
-probe, independent guest-identity rejection, and optional AIVM adapter
-lifecycle/cleanup checks before attempting to close OUT-2. The trust claims
-in [W0](planning/aivm-secrets-conditional-confinement.md) and the
+The maintainer's original real-VM smoke run has passed. The **next** gate is
+the controlled adversarial run described below. AIVM adapter lifecycle and
+cleanup, more complete file/share reachability, and release verification are
+still open. The trust claims in
+[W0](planning/aivm-secrets-conditional-confinement.md) and the
 [product roadmap](planning/aivm-secrets-product-roadmap.md) remain bounded.
+
+## Opt-in adversarial extension (OUT-2 negative witnesses)
+
+The maintainer's **2026-10-21 host run** of the original real-VM fixture on
+`aivm-2404` passed: KVM, authorized view/diff, three observed provider GETs,
+denied write, inaccessible tested host paths and revocation. Commit `b21e212`
+contains that baseline fixture. This is a recorded operator result, not an
+assertion that a general VM-isolation theorem was proved.
+
+After building the native binaries, the additional adversarial mode is run
+**from the host** using a fresh private workspace:
+
+```bash
+cd ~/code/aivm-secrets
+python -m pytest -q tests/test_aivm_vm_acceptance.py
+
+RUN="/tmp/garrett-vm-adversarial-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+python dev/aivm_vm_acceptance.py --vm aivm-2404 --adversarial \
+  --workspace "$RUN" && python -m json.tool "$RUN/summary.json"
+```
+
+The ordinary invocation **without** `--adversarial` is unchanged. The new
+mode is explicitly opt-in because it creates a short-lived, credential-free
+TCP listener bound to the host's actual VM default-gateway interface for a
+reachability canary. It closes the listener promptly and never changes AIVM
+firewall rules, opens a provider TCP listener, mounts a host path or forwards
+an SSH agent. The VM needs `python3` for the two-second TCP probe; absent
+probe tooling causes a failed acceptance, not a silently skipped check.
+
+**Additional checks made while the native broker/provider remain live:**
+
+1. Parse the guest's real IPv4 default gateway from `/proc/net/route` and
+   connect to the host gateway at the synthetic provider's loopback-only
+   port. A direct connection must fail. A separate, actually listening host
+   gateway TCP canary on an ephemeral port must receive **no** connection,
+   and the guest must also report that the connection failed. This tests one
+   non-allowlisted guest-to-host port with the *effective* network behavior,
+   rather than trusting `strict_firewall=yes` as evidence that rules are active.
+   A local routing failure could also explain the negative result; this is
+   **not** an exhaustive firewall inspection or proof of all egress blocking.
+2. Inspect guest `/proc/self/mountinfo`, count virtiofs/9p attachment mounts,
+   and refuse an explicit reference to the host custody workspace. This is a
+   bounded mount-metadata check, **not** a search of every path reachable
+   through shared mounts or a proof of general filesystem isolation.
+3. Submit an out-of-scope repository read through native `invoke`, **past**
+   the `gh` alias parser. It must be rejected without new provider traffic.
+4. Generate a **second private key in the VM**, enroll its public CSR as a
+   *different subject* in the test authority **before the native broker
+   starts**, and attempt a read using that valid same-CA identity and the
+   original guest's capability. Also try a
+   certificate/private-key mismatch and a capability with one modified
+   signature byte. Every attempt must fail without new provider traffic.
+   A wrong-subject denial is not proof of an unregistered-certificate or
+   expired-certificate path; those are distinct outstanding cases.
+5. Terminate the SSH Unix-socket forward while the original capability is
+   still active. The disconnected guest must get no data and cause no
+   provider request. Reestablish the forward *only* to the same host-owned
+   application socket and verify another permitted read, then revoke the
+   original subject and verify denial. This tests transport reconnect and
+   revocation, **not** a guest reboot/snapshot/clone.
+
+Expected successful extended output has `ok: true`, an `adversarial` object
+with bounded network, mount, identity and lifecycle results, and **four**
+credential-substituted GET observations: the original three plus one
+permitted read after tunnel restoration. No write or rejected request may
+reach the synthetic provider. Failed attempts must produce nonzero exit
+status; a missing optional capability, missing Python, unexpected output or
+inconclusive canary causes a failed gate, not `ok: true`.
+
+The extended mode has **portable unit-test coverage only until an actual
+`--adversarial` run is reported**. Do not mark this gate accepted based on
+Python source tests or on the earlier successful non-adversarial VM run.
+
+The following remain for OUT-2: verified end-to-end AIVM firewall rules,
+full guest mount/share exposure analysis including aliases, unregistered or
+expired certificates, full guest reboot and snapshot/clone behavior, an
+independently reviewed optional adapter lifecycle, and preservation of
+normal AIVM workflows. The synthetic provider never receives a real GitHub
+credential. OUT-3 real-provider compatibility is a separate opt-in gate.

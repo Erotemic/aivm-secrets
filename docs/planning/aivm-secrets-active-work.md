@@ -19,14 +19,16 @@ separate, more demanding claim than the first read-only proof profile.
 
 ## Status at the available source boundary
 
-**Evidence basis:** the source archive `8986ce6` (2026-10-21) plus the Track A
-native audit/writer/dispatch overlays and Lean-fix overlays provided afterward.
-This is **not an assertion about an unseen local HEAD**. On resumption run
-`git status --short` and `git rev-parse HEAD`; preserve the maintainer's
-reported successful builds, but do not invent verification of subsequent code.
-The main 2026-10-21 frozen implementation record at `e741383` reports
-3,116 Python tests, 102 Rust workspace tests, and selected native/Lean gates;
-it applies to that source, not automatically to later overlays.
+**Evidence basis:** the initial source archive `8986ce6` plus the applied
+Track A/documentation/NR-0/VM overlays, and the maintainer's actual host report
+of `python dev/verification/system.py` passing and real `aivm-2404` KVM
+acceptance passing. The original OUT-2 fixture was committed as `b21e212`;
+the new `--adversarial` mode has not yet run on the VM. On resumption inspect
+`git status --short` and `git rev-parse HEAD`, but do not downgrade successful
+user-reported Lean compilation for want of a pasted success log. The older
+2026-10-21 frozen source record at `e741383` reports 3,116 Python tests and
+102 Rust workspace tests; those counts describe that source boundary, not
+new code.
 
 | Work | Current state and exact remaining boundary |
 | --- | --- |
@@ -36,19 +38,19 @@ it applies to that source, not automatically to later overlays.
 | **NR-2: request/event simulation** | **In progress**: source-linked returned traces, writer callbacks, dispatch-to-writer composition. Need actual native primitive/result instantiation, connected requests and proof of the whole scoped observation mapping. |
 | **NR-3: reachable I/O and adapter effects** | **In progress**: W3/W6 guards, route-bound bytes, zeroizing-buffer/channel seam, file-audit-before-write native witness. Need complete callback/drop/error reachability review and external std/DNS/TLS/serde/parser/storage contracts. |
 | **NR-4 / NR-5** | **Open**: guest observation/noninterference linkage including adaptive histories; then reviewed conditional claim and baseline-comparator audit. |
-| **W8 / OUT-2** | **Open, fixture available**: [opt-in real-VM native smoke](../aivm-vm-native-acceptance.md) generates guest identity inside an AIVM VM and checks approved read/denied write/revocation over an SSH Unix-socket relay. **No actual VM run is recorded yet**; forbidden egress, other identities and optional adapter acceptance remain open. |
+| **W8 / OUT-2** | **Real-VM native baseline passed**, reported by maintainer on `aivm-2404` (KVM, authenticated read/diff, 3 synthetic provider GETs, write denied, revocation, tested host paths inaccessible; fixture commit `b21e212`). [Adversarial extension](../aivm-vm-native-acceptance.md#opt-in-adversarial-extension-out-2-negative-witnesses) adds network canary, identity, mount and reconnect probes behind `--adversarial`; **that extension has no operator run reported yet**. Full guest share analysis and optional adapter remain open. |
 | **W7 / OUT-3** | **Open**: opt-in disposable-credential live GitHub compatibility; not an automatic CI or development requirement. |
 | **OUT-4** | **Open formal assurance** for precisely authorized writes, approvals, budgets, uncertain retries and normative Python/Rust semantics. Existing implementations are not covered by the read theorem. |
 | **OUT-5** | **Open**: profile-specific claims/evidence, reproducible deployment and independent review before production-use claims. |
 
-**Verification edge:** The maintainer reported that the native
-`native_read_dispatch_audit_to_writer_callback_chronology` regression passes.
-Earlier `GarrettNativeWriterEvents` compilation was also reported fixed. The
-last supplied `GarrettNativeDispatchEvents` failure was followed by a
-one-file trace-context overlay, but **a subsequent successful compilation is
-not in the supplied record**. Confirm with the focused Lean build on the actual
-checkout before declaring that increment accepted. This is a narrow reporting
-gap, not evidence that the user's current tree fails.
+**Verification edge:** The maintainer has advanced through the Track A
+native-dispatch Lean repairs and reports a successful full host usable-system
+gate. Do not claim the prior Lean increment is unverified solely because a
+successful `lake build` log was not pasted: compilation errors are reported
+when present, and continuing to the next task is confirmation of success.
+Track A's native I/O correspondence still has genuine formal and environmental
+gaps as listed under NR-2/3. The real VM positive smoke test now has an actual
+successful user report; only the new adversarial mode lacks a VM run.
 
 ## Active task queue
 
@@ -58,7 +60,7 @@ Next actions in priority order:
 | --- | --- | --- |
 | **P0 — finish current Track A increment** | On the current checkout, build `GarrettNativeDispatchEvents`; fix any actual failure without changing the security statement to hide it. Close or record remaining writer/event composition premises. | Pinned Lean build passes; report actual result and any assumptions. No routine axiom dumps. |
 | **P0 — NR-2/3 primitive-to-event link** | Connect native `Session::request` admission -> real audit-file acknowledgement -> late authorization -> provider writer/flush -> completion audit -> guest frame to existing `TraceSteps`/W4 events. Instantiate source-bound callbacks where possible; state real external I/O contracts. | Positive final/checked/two-phase read and denied/revoked/audit-failed/partial-write/flush-failed/replay witnesses; no assumed whole-provider history, fake arrival or unchecked I/O equivalence. See [Track A handoff](../native-dispatch-callback-observation.md). |
-| **P0 in parallel — W8 / OUT-2** | Run the [opt-in real AIVM VM smoke](../aivm-vm-native-acceptance.md) on the maintainer's managed guest and capture redacted evidence; then add controlled forbidden egress, other-identity rejection and unaffected normal AIVM workflows. | Actual isolated guest evidence; don't treat the offline same-UID workflow or a vTPM device as isolation proof. No default AIVM dependency. |
+| **P0 in parallel — W8 / OUT-2** | Run `python dev/aivm_vm_acceptance.py --vm aivm-2404 --adversarial` on a fresh private workspace and record its redacted result. Investigate any failed host TCP canary, wrong-subject, out-of-scope read, or tunnel-reconnection check rather than weakening it. Continue guest mount/share review and an optional adapter. | The prior baseline already passed on real KVM. The new negative tests require their own actual VM evidence; canary denial is not a proof of all forbidden egress. Normal AIVM must remain independent. |
 | **P1 in parallel — W7 / OUT-3** | Prepare an opt-in real GitHub read smoke with operator-created disposable, narrow-scope token and recorded exact requests/results. | Only run after explicit operator opt-in; never place credentials into agent logs or source. No live API calls in ordinary CI. |
 | **P1 — NR-4, then NR-5** | Tie actual JSON projection, errors, metadata, frame lengths/EOF and sequential adaptive sessions to model observations; independently review claim/assumptions/source provenance at the end. | Precisely conditional noninterference, finite reviewed I/O boundary, positive allowed action. Final comparative axiom audit only, not per build. |
 | **P2 — OUT-4** | Extend assurance to a single bounded write, approval and idempotency/uncertain-send behavior; track Python/Rust parity per operation. | Approved effect succeeds; denied effect never reaches provider; ambiguous success is never silently retried. |

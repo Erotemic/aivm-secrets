@@ -5,18 +5,22 @@ Only synthetic provider credentials.  Never mounts host custody into the VM,
 changes guest firewall rules, or forwards the host's SSH agent.  The real
 Garrett client creates its identity key inside the VM; the operator sends its
 CSR to the native host authority.  A temporary SSH StreamLocalForward relays
-only the native mTLS application socket.  This is finite evidence, not a
-proof of whole-guest isolation or source-level noninterference.
+only the native mTLS application socket.  The optional --adversarial mode
+adds controlled negative tests without changing production security policy.
+This is finite evidence, not a proof of whole-guest isolation or source-level
+noninterference.
 """
 from __future__ import annotations
 
 import argparse
 import base64
+import ipaddress
 import json
 import os
 import re
 import secrets
 import shlex
+import socket
 import subprocess
 import sys
 import tempfile
@@ -235,7 +239,190 @@ def _stop_forward(process: subprocess.Popen[bytes]) -> None:
         process.communicate(timeout=5)
 
 
-def run_vm_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path) -> dict:
+
+def _client_command(guest: str, *, config: str = 'client.json',
+                    capability: str = 'capability.jwt', words: tuple[str, ...]) -> str:
+    """Invoke the native client with one expressly selected guest-only identity."""
+    for name in (config, capability):
+        if not re.fullmatch(r'[a-z][a-z0-9._-]{0,63}', name):
+            raise DemoError('invalid guest client material filename')
+    return 'exec ' + shlex.join([
+        f'{guest}/garrett-client', '--config', f'{guest}/{config}',
+        '--capability-file', f'{guest}/{capability}', *words,
+    ])
+
+
+def _reject_without_provider_effect(ssh: GuestSSH, provider: LocalProvider,
+                                    count: int, command: str, *, label: str) -> None:
+    """Reject on the VM and verify independently that no provider I/O occurred."""
+    result = ssh.call(command)
+    if result.returncode == 0:
+        raise DemoError(f'{label}: untrusted guest request succeeded')
+    if result.stdout:
+        try:
+            public = json.loads(result.stdout)
+        except (ValueError, UnicodeError):
+            raise DemoError(f'{label}: unexpected guest output on refusal') from None
+        if not isinstance(public, dict) or public.get('ok') is not False:
+            raise DemoError(f'{label}: guest received a potentially released result')
+    if len(provider.seen()) != count:
+        raise DemoError(f'{label}: rejected request caused provider traffic')
+
+
+def _corrupt_capability(jwt: str) -> str:
+    """Change a SIGNED segment byte, not unused base64url padding bits."""
+    parts = jwt.split('.')
+    if len(parts) != 3 or len(parts[2]) < 16 or not re.fullmatch(r'[A-Za-z0-9_-]+', parts[2]):
+        raise DemoError('native capability has an unexpected compact-JWS shape')
+    first = parts[2][0]
+    parts[2] = ('A' if first != 'A' else 'B') + parts[2][1:]
+    return '.'.join(parts)
+
+
+def _parse_guest_default_gateway(routes: str) -> str:
+    """Require one IPv4 default gateway from guest /proc/net/route."""
+    gateways: set[str] = set()
+    for line in routes.splitlines()[1:]:
+        fields = line.split()
+        if len(fields) < 4 or fields[1] != '00000000':
+            continue
+        try:
+            if not (int(fields[3], 16) & 0x2):
+                continue
+            address = socket.inet_ntoa(bytes.fromhex(fields[2])[::-1])
+            parsed = ipaddress.IPv4Address(address)
+        except (ValueError, OSError):
+            raise DemoError('guest has malformed IPv4 route evidence') from None
+        if parsed.is_loopback or parsed.is_unspecified or parsed.is_multicast:
+            raise DemoError('guest has an invalid default gateway')
+        gateways.add(address)
+    if len(gateways) != 1:
+        raise DemoError('guest must report exactly one default IPv4 gateway for the canary')
+    return next(iter(gateways))
+
+
+def _guest_tcp_reachable(ssh: GuestSSH, address: str, port: int) -> bool:
+    """Use a bounded guest TCP connection probe; fail on missing guest Python."""
+    address = str(ipaddress.IPv4Address(address))
+    if not (1 <= port <= 65535):
+        raise DemoError('invalid host canary port')
+    script = (
+        'import socket,sys; '
+        's=socket.socket(socket.AF_INET,socket.SOCK_STREAM); '
+        's.settimeout(2); '
+        'rc=s.connect_ex((sys.argv[1],int(sys.argv[2]))); '
+        's.close(); sys.exit(0 if rc==0 else 17)'
+    )
+    result = ssh.call('python3 -c ' + shlex.quote(script) + ' '
+                      + shlex.quote(address) + ' ' + str(port), timeout=12)
+    if result.returncode not in {0, 17} or result.stdout:
+        raise DemoError('guest TCP probe did not return its bounded status')
+    return result.returncode == 0
+
+
+def _probe_direct_egress(ssh: GuestSSH, provider: LocalProvider) -> dict:
+    """Can a guest contact a deliberately exposed *credential-free* host canary?
+
+    Never assumes the configured strict firewall is installed: the kernel
+    behavior is tested.  Does not modify firewall state or serve credentials.
+    """
+    routes = ssh.required('cat /proc/net/route', label='inspect guest default route')
+    gateway = _parse_guest_default_gateway(routes.decode('ascii', 'strict'))
+    if _guest_tcp_reachable(ssh, gateway, provider.port):
+        raise DemoError('VM can directly contact the host-only synthetic provider port')
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as canary:
+        try:
+            canary.bind((gateway, 0))  # prove this gateway address belongs to the host
+        except OSError:
+            raise DemoError('host could not bind the guest gateway for canary verification') from None
+        canary.listen(1)
+        port = canary.getsockname()[1]
+        reached = _guest_tcp_reachable(ssh, gateway, port)
+        canary.settimeout(0.3)
+        try:
+            connection, _ = canary.accept()
+        except socket.timeout:
+            accepted = False
+        else:
+            connection.close()
+            accepted = True
+        if reached or accepted:
+            raise DemoError('VM reached a non-allowlisted host TCP canary')
+    return {
+        'host_gateway_canary_denied': True,
+        'direct_synthetic_provider_tcp_denied': True,
+        'scope': 'guest gateway TCP: one ephemeral canary and the host-loopback provider port',
+    }
+
+
+def _guest_mount_inventory(ssh: GuestSSH, host: Path) -> dict:
+    """Record attachment count; don't mistake enumeration for isolation proof."""
+    info = ssh.required('cat /proc/self/mountinfo', label='inspect guest mounts')
+    text = info.decode('utf-8', 'replace')
+    if str(host) in text:
+        raise DemoError('guest mount table mentions the host custody workspace')
+    types = [line.split(' - ', 1)[1].split()[0]
+             for line in text.splitlines() if ' - ' in line]
+    return {
+        'attachment_mounts_observed': sum(t in {'virtiofs', '9p'} for t in types),
+        'host_workspace_in_mount_table': False,
+        'scope': 'mount table metadata and known host paths; aliases not exhaustively searched',
+    }
+
+
+def _prepare_independent_identity(ssh: GuestSSH, guest: str, host: Path,
+                                  authority: Path) -> None:
+    """Enroll the *other subject* before the broker snapshots issuer state.
+
+    Its private key is generated inside the VM and never crosses to the host.
+    The broker boots with both CA-issued identities in its registry, so the
+    later wrong-subject denial is not merely a missing-enrollment rejection.
+    """
+    ssh.required('exec ' + shlex.join([
+        f'{guest}/garrett-client', 'request', '--key-mode', 'software',
+        '--key', f'{guest}/other.key', '--csr', f'{guest}/other.csr',
+    ]), label='create independent VM client identity')
+    csr = ssh.required('cat ' + shlex.quote(f'{guest}/other.csr'),
+                       label='retrieve independent public CSR')
+    fingerprint = inspect_csr(csr)
+    host_csr = write(host / 'other-guest.csr', csr)
+    authority_action(authority, host, 'enroll', subject='other-guest',
+                     csr_file=str(host_csr), approve_fingerprint=fingerprint)
+    public = authority_action(authority, host, 'public-client', subject='other-guest')
+    ssh.publish(f'{guest}/other.pem', base64.b64decode(public['certificate_pem_b64']))
+
+
+def _probe_independent_identities(
+    ssh: GuestSSH, guest: str, provider: LocalProvider,
+    count: int, client_cfg: dict, jwt: str,
+) -> dict:
+    """Attempt wrong-subject TLS, mismatched key, and corrupted JWT reads."""
+    other_cfg = {**client_cfg, 'certificate': f'{guest}/other.pem',
+                 'private_key': f'{guest}/other.key'}
+    ssh.publish(f'{guest}/other.json', json.dumps(other_cfg).encode('utf-8'))
+    read = ('gh', 'pr', 'view', str(PR), '--repo', REPOSITORY, '--json', 'number')
+    _reject_without_provider_effect(
+        ssh, provider, count,
+        _client_command(guest, config='other.json', words=read),
+        label='independently enrolled wrong-subject identity')
+    mismatch_cfg = {**client_cfg, 'private_key': f'{guest}/other.key'}
+    ssh.publish(f'{guest}/mismatch.json', json.dumps(mismatch_cfg).encode('utf-8'))
+    _reject_without_provider_effect(
+        ssh, provider, count,
+        _client_command(guest, config='mismatch.json', words=read),
+        label='certificate/private-key mismatch')
+    ssh.publish(f'{guest}/bad-capability.jwt', _corrupt_capability(jwt).encode('ascii'))
+    _reject_without_provider_effect(
+        ssh, provider, count,
+        _client_command(guest, capability='bad-capability.jwt', words=read),
+        label='tampered signed capability')
+    return {'other_enrolled_subject_rejected': True,
+            'certificate_key_mismatch_rejected': True,
+            'tampered_capability_rejected': True}
+
+
+def run_vm_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path,
+                      *, adversarial: bool = False) -> dict:
     tools = binaries(bin_dir)
     host = workspace / 'host'
     host.mkdir(mode=0o700)
@@ -283,6 +470,8 @@ def run_vm_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path) -> dict:
         public = authority_action(tools['authority'], host, 'public-client', subject='offline-guest')
         ssh.publish(f'{guest}/ca.pem', base64.b64decode(public['ca_pem_b64']))
         ssh.publish(f'{guest}/client.pem', base64.b64decode(public['certificate_pem_b64']))
+        if adversarial:
+            _prepare_independent_identity(ssh, guest, host, tools['authority'])
         # Host paths must be inaccessible *before* application-socket forwarding.
         _expect_path_not_readable(ssh, host / 'credential', label='credential')
         _expect_path_not_readable(ssh, host / 'authority', label='authority')
@@ -338,6 +527,49 @@ def run_vm_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path) -> dict:
                 raise DemoError('VM broker write was not denied')
             if len(provider.seen()) != requests_after_reads:
                 raise DemoError('VM write refusal caused provider traffic')
+            attacks: dict = {}
+            if adversarial:
+                attacks['mounts'] = _guest_mount_inventory(ssh, host)
+                attacks['network'] = _probe_direct_egress(ssh, provider)
+                _reject_without_provider_effect(
+                    ssh, provider, requests_after_reads,
+                    _client_command(guest, words=(
+                        'invoke', 'pr.view', '--arguments',
+                        json.dumps({'repository': 'attacker/elsewhere', 'pr': PR},
+                                   separators=(',', ':')))),
+                    label='out-of-scope native read operation')
+                attacks['out_of_scope_read_denied'] = True
+                attacks['identities'] = _probe_independent_identities(
+                    ssh, guest, provider, requests_after_reads,
+                    client_cfg, ready['capability'])
+                # Tear down the forward. The old capability is still active,
+                # so the request must fail for transport reasons alone.
+                _stop_forward(tunnel)
+                tunnel = None
+                _reject_without_provider_effect(
+                    ssh, provider, requests_after_reads,
+                    _guest_command(guest, 'gh', 'pr', 'view', str(PR),
+                                   '--repo', REPOSITORY, '--json', 'number'),
+                    label='disconnected application socket')
+                # AIVM/sshd may leave the disconnected Unix path behind. Only
+                # remove our own socket in the guest-owned private directory.
+                ssh.required('rm -f -- ' + shlex.quote(f'{guest}/broker.sock'),
+                             label='remove stale guest application socket')
+                tunnel = ssh.forward(remote_socket=f'{guest}/broker.sock',
+                                     host_socket=host / 'identity.sock')
+                _wait_for_forward(ssh, tunnel, f'{guest}/broker.sock')
+                recovered = _read_output(ssh.call(_guest_command(
+                    guest, 'gh', 'pr', 'view', str(PR), '--repo', REPOSITORY,
+                    '--json', 'number')), 'VM read after tunnel restoration')
+                if recovered != {'number': PR}:
+                    raise DemoError('restored VM tunnel failed an authorized read')
+                requests_after_reads += 1
+                if len(provider.seen()) != requests_after_reads:
+                    raise DemoError('restored VM tunnel caused unexpected provider effects')
+                attacks['lifecycle'] = {
+                    'no_provider_effect_with_forward_disconnected': True,
+                    'authorized_read_after_reconnect': True,
+                }
             authority_action(tools['authority'], host, 'revoke', subject='offline-guest')
             revoked = ssh.call(_guest_command(
                 guest, 'gh', 'pr', 'view', str(PR), '--repo', REPOSITORY,
@@ -349,7 +581,7 @@ def run_vm_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path) -> dict:
             audit_bytes = (host / 'provider-audit.jsonl').read_bytes()
             if offline.FAKE_TOKEN.encode() in audit_bytes or ready['capability'].encode() in audit_bytes:
                 raise DemoError('host audit contains private credential or surrogate')
-            witness = validate_sent(provider, expected_count=3)
+            witness = validate_sent(provider, expected_count=4 if adversarial else 3)
             write(host / 'provider-observations.json', {'requests': witness})
             return {
                 'ok': True, 'mode': 'native-rust/aivm-kvm/synthetic-local-https',
@@ -359,6 +591,7 @@ def run_vm_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path) -> dict:
                 'host_private_paths_unreadable_in_guest': True,
                 'application_socket_forwarding': 'ssh-remote-unix/mTLS',
                 'provider_requests': witness,
+                **({'adversarial': attacks} if adversarial else {}),
                 'filesystem_isolation_proved': False,
                 'whole_service_secrecy_proved': False,
             }
@@ -382,6 +615,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--vm', default='aivm-2404', help='existing managed AIVM VM')
     parser.add_argument('--workspace', type=Path,
                         help='new private host evidence directory under trusted ancestors')
+    parser.add_argument('--adversarial', action='store_true',
+                        help='opt-in controlled VM identity/egress/socket attack checks')
     parser.add_argument('--bin-dir', type=Path, default=REPO_ROOT / 'rust/target/debug',
                         help='directory containing native Rust executables')
     args = parser.parse_args(argv)
@@ -393,13 +628,15 @@ def main(argv: list[str] | None = None) -> int:
                 workspace = Path(temporary)
                 config = ssh_configuration(workspace, vm)
                 report = run_vm_acceptance(workspace, GuestSSH(vm, config),
-                                           args.bin_dir.absolute())
+                                           args.bin_dir.absolute(),
+                                           adversarial=args.adversarial)
         else:
             workspace = args.workspace.absolute()
             workspace.mkdir(mode=0o700, parents=True, exist_ok=False)
             config = ssh_configuration(workspace, vm)
             report = run_vm_acceptance(workspace, GuestSSH(vm, config),
-                                       args.bin_dir.absolute())
+                                       args.bin_dir.absolute(),
+                                       adversarial=args.adversarial)
             write(workspace / 'summary.json', report)
         print(json.dumps(report, sort_keys=True, indent=2))
         return 0

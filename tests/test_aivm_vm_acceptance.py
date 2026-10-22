@@ -156,3 +156,205 @@ def test_guest_json_and_failure_output_not_leaked():
     with pytest.raises(DemoError) as ex:
         _read_output(result, 'approved read')
     assert 'PRIVATE' not in str(ex.value)
+
+
+# Adversarial mode extends the *same real-VM fixture*. These tests validate
+# the probe invariants without representing themselves as a VM security result.
+from dev.aivm_vm_acceptance import (
+    _client_command,
+    _corrupt_capability,
+    _guest_mount_inventory,
+    _guest_tcp_reachable,
+    _parse_guest_default_gateway,
+    _probe_direct_egress,
+    _prepare_independent_identity,
+    _probe_independent_identities,
+    _reject_without_provider_effect,
+)
+
+
+ROUTES = '''Iface Destination Gateway Flags RefCnt Use Metric Mask MTU Window IRTT
+ens3 00000000 0102A8C0 0003 0 0 100 00000000 0 0 0
+ens3 0002A8C0 00000000 0001 0 0 100 00FFFFFF 0 0 0
+'''
+
+
+def test_default_gateway_comes_from_guest_route_not_a_hardcoded_vm_address():
+    assert _parse_guest_default_gateway(ROUTES) == '192.168.2.1'
+    with pytest.raises(DemoError, match='exactly one'):
+        _parse_guest_default_gateway(ROUTES.replace('00000000 0102A8C0', '00000001 0102A8C0'))
+    with pytest.raises(DemoError, match='exactly one'):
+        _parse_guest_default_gateway(ROUTES + 'ens4 00000000 0103A8C0 0003 0 0 100 00000000 0 0 0\n')
+    with pytest.raises(DemoError, match='malformed'):
+        _parse_guest_default_gateway(ROUTES.replace('0102A8C0', 'FFFFFFFFG'))
+    with pytest.raises(DemoError, match='invalid default gateway'):
+        _parse_guest_default_gateway(ROUTES.replace('0102A8C0', '0100007F'))
+
+
+def test_capability_tampering_alters_signed_bytes_not_padding():
+    value = 'eyJhbGciOiJub25lIn0.eyJzdWIiOiJmb28ifQ.abcdefghijklmnopABCDEFGHIJKLMNOP'
+    changed = _corrupt_capability(value)
+    assert changed != value
+    assert changed.split('.')[:2] == value.split('.')[:2]
+    assert changed.split('.')[2][1:] == value.split('.')[2][1:]
+    with pytest.raises(DemoError, match='compact-JWS'):
+        _corrupt_capability('not-a-jwt')
+
+
+def test_selected_client_material_is_strict_guest_filename_only():
+    command = _client_command('/tmp/garrett-out2.abcd1234', config='other.json',
+                              capability='bad-capability.jwt', words=('gh', 'pr', 'view', '1'))
+    assert '--config /tmp/garrett-out2.abcd1234/other.json' in command
+    assert '--capability-file /tmp/garrett-out2.abcd1234/bad-capability.jwt' in command
+    for unsafe in ('../host.key', '/tmp/x', 'foo;true', '-flag'):
+        with pytest.raises(DemoError, match='material filename'):
+            _client_command('/tmp/garrett-out2.abcd1234', config=unsafe, words=('gh',))
+
+
+class _Provider:
+    def __init__(self):
+        self.calls = []
+
+    def seen(self):
+        return list(self.calls)
+
+
+def test_rejected_guest_request_requires_failure_and_no_provider_effect(tmp_path, monkeypatch):
+    ssh = GuestSSH('aivm-2404', tmp_path / 'ssh.conf')
+    provider = _Provider()
+    monkeypatch.setattr(ssh, 'call', lambda command: subprocess.CompletedProcess(
+        [], 1, b'{"ok":false,"error":{"code":"denied"}}', b''))
+    _reject_without_provider_effect(ssh, provider, 0, 'guest-client', label='wrong identity')
+    monkeypatch.setattr(ssh, 'call', lambda command: subprocess.CompletedProcess([], 0, b'{}', b''))
+    with pytest.raises(DemoError, match='succeeded'):
+        _reject_without_provider_effect(ssh, provider, 0, 'guest-client', label='wrong identity')
+    monkeypatch.setattr(ssh, 'call', lambda command: subprocess.CompletedProcess([], 1, b'RELEASE', b''))
+    with pytest.raises(DemoError, match='unexpected guest output'):
+        _reject_without_provider_effect(ssh, provider, 0, 'guest-client', label='wrong identity')
+    monkeypatch.setattr(ssh, 'call', lambda command: subprocess.CompletedProcess([], 1, b'', b''))
+    provider.calls.append({'method': 'GET'})
+    with pytest.raises(DemoError, match='provider traffic'):
+        _reject_without_provider_effect(ssh, provider, 0, 'guest-client', label='wrong identity')
+
+
+def test_guest_tcp_probe_is_bounded_and_fails_closed(tmp_path, monkeypatch):
+    ssh = GuestSSH('aivm-2404', tmp_path / 'ssh.conf')
+    scripts = []
+
+    def response(script, **kwargs):
+        scripts.append((script, kwargs))
+        return subprocess.CompletedProcess([], 17, b'', b'')
+
+    monkeypatch.setattr(ssh, 'call', response)
+    assert not _guest_tcp_reachable(ssh, '192.168.122.1', 40123)
+    assert scripts[0][0].startswith('python3 -c ')
+    assert '192.168.122.1' in scripts[0][0]
+    assert scripts[0][1]['timeout'] == 12
+    monkeypatch.setattr(ssh, 'call', lambda *a, **k:
+                        subprocess.CompletedProcess([], 0, b'', b''))
+    assert _guest_tcp_reachable(ssh, '192.168.122.1', 40123)
+    monkeypatch.setattr(ssh, 'call', lambda *a, **k:
+                        subprocess.CompletedProcess([], 127, b'', b''))
+    with pytest.raises(DemoError, match='bounded status'):
+        _guest_tcp_reachable(ssh, '192.168.122.1', 40123)
+    with pytest.raises(DemoError, match='port'):
+        _guest_tcp_reachable(ssh, '192.168.122.1', 70000)
+
+
+def test_guest_mount_inventory_records_only_bounded_counts(tmp_path, monkeypatch):
+    ssh = GuestSSH('aivm-2404', tmp_path / 'ssh.conf')
+    mounts = b'''29 28 0:26 / /mnt/aivm-shared rw - virtiofs shared-root rw
+30 28 0:27 / /mnt/home rw - 9p host-share rw
+31 28 8:1 / / rw - ext4 /dev/vda1 rw
+'''
+    monkeypatch.setattr(ssh, 'required', lambda *a, **k: mounts)
+    result = _guest_mount_inventory(ssh, Path('/tmp/garrett-vm-secret/host'))
+    assert result['attachment_mounts_observed'] == 2
+    assert result['host_workspace_in_mount_table'] is False
+    monkeypatch.setattr(ssh, 'required', lambda *a, **k:
+                        mounts + b'/tmp/garrett-vm-secret/host\n')
+    with pytest.raises(DemoError, match='host custody workspace'):
+        _guest_mount_inventory(ssh, Path('/tmp/garrett-vm-secret/host'))
+
+
+def test_independent_identity_probe_uses_separate_guest_key_and_subject(tmp_path, monkeypatch):
+    import dev.aivm_vm_acceptance as target
+    host = tmp_path / 'host'
+    host.mkdir()
+    ssh = GuestSSH('aivm-2404', tmp_path / 'ssh.conf')
+    ssh_scripts = []
+    files = []
+    actions = []
+
+    def fake_required(script, *, label, **kwargs):
+        ssh_scripts.append(script)
+        if 'other.csr' in script and script.startswith('cat '):
+            return b'PUBLIC-CSR'
+        return b''
+
+    def fake_action(binary, host_path, action, **kwargs):
+        actions.append((action, kwargs))
+        if action == 'public-client':
+            return {'certificate_pem_b64': 'UEVNLUNFUlQ='}
+        return {}
+
+    monkeypatch.setattr(ssh, 'required', fake_required)
+    monkeypatch.setattr(ssh, 'publish', lambda name, payload, **kwargs: files.append((name, payload)))
+    monkeypatch.setattr(ssh, 'call', lambda script: subprocess.CompletedProcess([], 1, b'', b''))
+    monkeypatch.setattr(target, 'inspect_csr', lambda pem: 'fingerprint')
+    monkeypatch.setattr(target, 'authority_action', fake_action)
+    provider = _Provider()
+    config = {'schema': 1, 'certificate': '/guest/client.pem',
+              'private_key': '/guest/client.key'}
+    _prepare_independent_identity(ssh, '/guest', host, Path('/host/authority'))
+    result = _probe_independent_identities(ssh, '/guest', provider, 0, config,
+                                           'e30.e30.abcdefghijklmnop')
+    assert all(result.values())
+    assert any('other.key' in cmd and 'other.csr' in cmd for cmd in ssh_scripts)
+    assert actions[0][0] == 'enroll'
+    assert actions[0][1]['subject'] == 'other-guest'
+    assert actions[1] == ('public-client', {'subject': 'other-guest'})
+    assert (host / 'other-guest.csr').read_bytes() == b'PUBLIC-CSR'
+    names = {Path(name).name for name, _ in files}
+    assert names == {'other.pem', 'other.json', 'mismatch.json', 'bad-capability.jwt'}
+    assert all(b'HOST_CREDENTIAL' not in payload for _, payload in files)
+    assert provider.seen() == []
+
+
+def test_network_canary_reports_denial_and_raises_on_reachability(tmp_path, monkeypatch):
+    import dev.aivm_vm_acceptance as target
+    ssh = GuestSSH('aivm-2404', tmp_path / 'ssh.conf')
+    monkeypatch.setattr(ssh, 'required', lambda *a, **k: ROUTES.encode())
+    # Bind the canary only to the local loopback interface in this portable
+    # unit test. The live fixture uses the guest-discovered VM gateway.
+    monkeypatch.setattr(target, '_parse_guest_default_gateway', lambda data: '127.0.0.1')
+    monkeypatch.setattr(target, '_guest_tcp_reachable', lambda *a, **k: False)
+    outcome = _probe_direct_egress(ssh, type('LocalPort', (), {'port': 8080})())
+    assert outcome['host_gateway_canary_denied']
+    monkeypatch.setattr(target, '_guest_tcp_reachable', lambda *a, **k: True)
+    with pytest.raises(DemoError, match='host-only synthetic provider'):
+        _probe_direct_egress(ssh, type('LocalPort', (), {'port': 8080})())
+
+
+def test_host_canary_detects_actual_connection_even_if_guest_reports_failure(tmp_path, monkeypatch):
+    import socket
+    import dev.aivm_vm_acceptance as target
+    ssh = GuestSSH('aivm-2404', tmp_path / 'ssh.conf')
+    monkeypatch.setattr(ssh, 'required', lambda *a, **k: ROUTES.encode())
+    monkeypatch.setattr(target, '_parse_guest_default_gateway', lambda data: '127.0.0.1')
+    calls = 0
+
+    def a_lying_guest(_ssh, address, port):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            # Probe claims denial, but the host kernel has already queued a
+            # successful TCP handshake. Independent host observation catches it.
+            with socket.create_connection((address, port), timeout=2):
+                pass
+        return False
+
+    monkeypatch.setattr(target, '_guest_tcp_reachable', a_lying_guest)
+    with pytest.raises(DemoError, match='non-allowlisted host TCP canary'):
+        _probe_direct_egress(ssh, type('LocalPort', (), {'port': 8080})())
+    assert calls == 2
