@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from dev.verification.w6_adapter import CONTRACT, SOURCE, TESTS, CORE_ROUTE, CORE_ENCODER, CORE_DISPATCH, CORE_REQUEST, CORE_CURRENT, CORE_CONTEXT, CORE_IO, COMMON_ENCODER, ContractError, check
+from dev.verification.w6_adapter import CONTRACT, SOURCE, TESTS, CORE_ROUTE, CORE_ENCODER, CORE_DISPATCH, CORE_REQUEST, CORE_CURRENT, CORE_CONTEXT, CORE_IO, CORE_GATE, CORE_RELEASE, COMMON_ENCODER, ContractError, check
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def fixture_checkout(tmp_path):
     dst = tmp_path / 'checkout'
     contract = json.loads((ROOT / CONTRACT).read_text())
-    names = {CONTRACT, SOURCE, TESTS, CORE_ROUTE, CORE_ENCODER, CORE_DISPATCH, CORE_REQUEST, CORE_CURRENT, CORE_CONTEXT, CORE_IO, COMMON_ENCODER,
+    names = {CONTRACT, SOURCE, TESTS, CORE_ROUTE, CORE_ENCODER, CORE_DISPATCH, CORE_REQUEST, CORE_CURRENT, CORE_CONTEXT, CORE_IO, CORE_GATE, CORE_RELEASE, COMMON_ENCODER,
              'docs/planning/aivm-secrets-w0-boundaries.json',
              'docs/planning/aivm-secrets-assumptions.json'}
     names.update(channel['path'] for channel in contract['channels'])
@@ -82,9 +82,11 @@ def test_w6_new_provider_send_or_public_raw_return_is_rejected(tmp_path):
     path.write_text(body)
     with pytest.raises(ContractError, match='another provider send'):
         check(checkout)
-    body = original.replace('let result = session\n                    .disclosure\n                    .project(&op.name, &raw, &selection_secret.0)?;',
-                                    'let result = raw.clone();', 1)
-    path.write_text(body)
+    projection = ('        self.session.disclosure.project(\n'
+                  '            &self.operation.name, self.raw, &self.secret.0,\n'
+                  '        )\n')
+    assert original.count(projection) == 1
+    path.write_text(original.replace(projection, '        Ok(self.raw.clone())\n', 1))
     with pytest.raises(ContractError, match='raw provider body'):
         check(checkout)
 

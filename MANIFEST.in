@@ -9,6 +9,8 @@ include dev/offline_native_guest.py
 include rust/Cargo.toml rust/Cargo.lock rust/rust-toolchain.toml
 recursive-include rust/crates *.rs *.toml
 include proofs/lean-toolchain proofs/lakefile.lean proofs/lake-manifest.json
+# Every top-level proof module is a reproducibility input.
+include proofs/*.lean
 include proofs/manifest.json proofs/Freshness.lean proofs/Check.lean
 include proofs/garrett-manifest.json proofs/Garrett.lean proofs/GarrettSecrecy.lean proofs/GarrettCheck.lean proofs/GarrettProtocol.lean
 include proofs/GarrettHistory.lean

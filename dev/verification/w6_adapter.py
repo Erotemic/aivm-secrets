@@ -18,6 +18,8 @@ CORE_ENCODER = 'rust/crates/aivm-secrets-garrett-core/src/http_wire.rs'
 CORE_DISPATCH = 'rust/crates/aivm-secrets-garrett-core/src/dispatch.rs'
 CORE_REQUEST = 'rust/crates/aivm-secrets-garrett-core/src/request_adapter.rs'
 CORE_IO = 'rust/crates/aivm-secrets-garrett-core/src/provider_io.rs'
+CORE_GATE = 'rust/crates/aivm-secrets-garrett-core/src/response_gate.rs'
+CORE_RELEASE = 'rust/crates/aivm-secrets-garrett-core/src/selected_release.rs'
 CORE_CONTEXT = 'rust/crates/aivm-secrets-garrett-core/src/request_context.rs'
 CORE_CURRENT = 'rust/crates/aivm-secrets-garrett-core/src/current_admission.rs'
 COMMON_ENCODER = 'rust/crates/aivm-secrets-garrett/src/custody.rs'
@@ -101,9 +103,9 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and 'parser.parse(released)' in receiver
            and 'released: aivm_secrets_garrett_core::response_gate::Released<' in receiver
            and 'released.into_parts()' in receiver
-           and 'channel.into_parts()?' in (root / 'rust/crates/aivm-secrets-garrett-core/src/response_gate.rs').read_text()
-           and 'Ok(Released {' in (root / 'rust/crates/aivm-secrets-garrett-core/src/response_gate.rs').read_text()
-           and (root / 'rust/crates/aivm-secrets-garrett-core/src/response_gate.rs').read_text().split('#[cfg(test)]', 1)[0].count('Ok(Released {') == 1
+           and 'channel.into_parts()?' in (root / CORE_GATE).read_text()
+           and 'Ok(Released {' in (root / CORE_GATE).read_text()
+           and (root / CORE_GATE).read_text().split('#[cfg(test)]', 1)[0].count('Ok(Released {') == 1
            and receiver.index('aivm_secrets_garrett_core::response_gate::receive(') < receiver.index('manifest_response('),
            'captured channel or successful-flush response gate bypassed')
     admission = (root / CORE_CURRENT).read_text().split('#[cfg(test)]', 1)[0]
@@ -163,7 +165,7 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
     ensure(len(release) == 2, 'native read must have a typed public-release boundary')
     release[1] = release[1].split('let work = PendingRequest {', 1)[0]
     release[1] = ''.join(release[1].split())
-    selector = (root / 'rust/crates/aivm-secrets-garrett-core/src/selected_release.rs').read_text()
+    selector = (root / CORE_RELEASE).read_text()
     native_selector = source.split('struct ManifestSelection', 1)[1].split('// Only external observations remain native;', 1)[0]
     ensure('selected_release::select(&mutselection)' in release[1]
            and 'audit:&self.base.executor.audit,' in release[1]
