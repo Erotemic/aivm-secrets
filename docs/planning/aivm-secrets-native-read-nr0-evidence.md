@@ -1,7 +1,12 @@
 # NR-0: reproducible native-read profile and evidence freeze
 
-**2026-10-19 baseline. Status: portable snapshot checks reproduced; native/Lean
-acceptance must be rerun on the maintainer's checked-out revision.**
+**2026-10-21 source-pin review.** The originally accepted NR-0 profile is
+unchanged in scope. Five source pins have been reviewed and refreshed after
+Track A audit/writer tests and the removal of diagnostic Lean prints.
+`native_read_profile.py` remains a fail-closed source-drift guard; these
+updated fingerprints do **not** constitute a passing full system gate. Rerun
+acceptance on the maintainer's actual checkout, which may differ from the
+reviewed source archive and overlays.
 
 This is the first deliverable from the [native read assurance
 roadmap](aivm-secrets-native-read-assurance-roadmap.md). The machine-readable
@@ -32,7 +37,7 @@ configuration must remain a proof premise or be enforced by a future runtime
 profile gate. Any alternate path selectable by guest input would block the
 first confinement claim even when the nominal selected fixture passes.
 
-The source/proof/harness fingerprints pin 30 files, including native bridge,
+The source/proof/harness fingerprints pin 55 files, including native bridge,
 TLS, custody, manifest policy and disclosure, relevant core controllers,
 Cargo lock/toolchain, generated Lean core, W4/W5 model proofs, and the
 existing native witness fixtures. These hashes identify the reconstructed
@@ -67,8 +72,9 @@ The optional `--build` uses an incremental Cargo binary build with the pinned
 nightly toolchain. **Neither default nor `--portable --native --lean` runs a
 full Rust test suite, general pytest, new Aeneas extraction, or Charon's
 multi-gigabyte compiler-linkage analysis.** The focused Lean gate calls
-`read_prefixes.py prove`, which compiles and axiom-audits the read-path and
-read-prefix modules and their imports. If the command fails, the evidence
+`read_prefixes.py prove`, which compiles the read-path and read-prefix
+modules and their imports. Routine axiom dumps are forbidden; reserve the
+separate opt-in comparator audit for the final assurance review. If the command fails, the evidence
 JSON records which stage failed or was not reached; success is not printed
 when a stage failed. Native acceptance rejects **every skip** or missing
 JUnit report. Binary timestamps are an early stale-build warning; binary
@@ -120,45 +126,68 @@ exist in `aivm-secrets-assumptions.json`. Source guards and test arrival
 snapshots are evidence with different logical strengths; they cannot jointly
 replace the missing NR-2/NR-3 proof obligation.
 
-## Results recorded during this overlay round
+## Baseline evidence and October 21 source-pin refresh
 
-On the reconstructed exported source plus applied overlays, the NR-0 profile
-inventory check passed. The existing W6 portable gate passed **142 tests**,
-and **12 new NR-0 mutation/guard tests** passed. Rust binaries and the pinned
-Lean toolchain were unavailable in this environment; there was **no** new
-native or Lean acceptance here. The prior user's successful focused Lean and
-native runs are *maintainer-reported*, not a new independently reproduced
-NR-0 baseline. The evidence record on the maintainer's machine is the next
-required handoff artifact.
+The original NR-0 portable preparation recorded 142 W6 cases and 12 NR-0
+mutation/guard cases; those are historical figures for the original source.
+The October 21 native operator/guest demonstration subsequently passed on
+the maintainer's machine in a private `/tmp/garrett-acceptance-*` workspace,
+with three authorized provider-observed GETs, credential substitution, denied
+write and post-revocation denial. It uses local synthetic HTTPS and the same
+Unix user; it does **not** establish guest filesystem isolation or GitHub
+compatibility.
 
-## Exact next implementation handoff: NR-1
+The first broader `system.py` run passed the native build, Rust workspace
+unit suite, and W0/W3/W4/W5/W6/read-path/read-prefix source guards, then
+stopped at the NR-0 source-pin review. This is a **profile fingerprint
+mismatch**, not a failing guest/provider behavior witness. The reviewed source
+differences were:
 
-Do not add another hand-written abstract `Attempt` constructor as a stand-in
-for the implementation. Start at `Session::request` in
-`rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs`:
+| Updated pin | Reason |
+| --- | --- |
+| `proofs/GarrettConfinement.lean` | Removed routine `#check` and `#print axioms` diagnostics; no theorem declarations changed |
+| `proofs/GarrettReadPaths.lean` | Removed routine axiom-print diagnostics |
+| `proofs/GarrettReadPrefixes.lean` | Removed routine axiom-print diagnostics |
+| `rust/crates/aivm-secrets-garrett/src/custody.rs` | Production audit fail-stop sequencing before write, plus fault-injection regressions |
+| `rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs` | Native test-only writer callback and dispatch chronology witnesses; no production source changes |
 
-1. The guest input is normalized by `self.policy.operation`; `guards::authorize`
-   admits the operation. `fresh` samples the current host state again.
-2. `PreparedDispatch::preflight/final_effect` checks write restrictions and
-   `PreparedDispatch::audit` returns `AuditedDispatch` only after an audit write
-   acknowledgement. This is **one useful first extraction candidate**:
-   implement a small pure typed transition in `aivm-secrets-garrett-core`,
-   then have this exact production call site invoke it. It must model admitted
-   write status, phase, selected effect/write flag, and audit success with
-   explicit typed inputs. Avoid any uncalled shadow helper.
-3. The privileged `exchange_manifest` in the Rust host continues to own
-   TLS, current lease checking, and credentialed network bytes. Its accepted
-   `AuditedDispatch` alone does not prove complete mediation; account for
-   other sinks separately.
-4. `CompletedRelease::after_completion` must follow actual projection,
-   reflection checks and a completion audit; guest `GuestFrame::send` must be
-   linked to the resulting public envelope.
-5. Extract the **production-called** Rust pure step using the pinned
-   Charon/Aeneas pipeline. Record exact source/export hashes and an import
-   smoke test before writing the first Lean simulation lemma. Do not add an
-   extracted theorem only about an unrelated reimplementation.
+This refresh changes five SHA-256 entries and the manifest's description;
+all sink classifications, assumptions, witness selections, supported
+configuration, toolchain pins and open obligations are unchanged. It is a new
+*reviewed source-fingerprint baseline*, not a new theorem, binary build
+attestation or accepted system-test run. An additional local source change
+should still fail the review rather than being automatically re-pinned.
 
-NR-1 is **not completed by this overlay**. It requires a targeted Rust build,
-extraction and Lean kernel run; no production Rust code or proof statement was
-changed here. Current open proof work is listed in the roadmap's NR-1 through
-NR-5 gates.
+To confirm and then continue the system gate:
+
+```bash
+python dev/verification/native_read_profile.py
+python -m pytest -q tests/test_native_read_profile.py
+python dev/verification/system.py
+```
+
+Save the resulting `system.py` report and address any **new** workflow failures
+on their own merits. Neither the source-pin update nor a successful synthetic
+system run implies VM isolation or live-provider success. The managed AIVM
+`aivm-2404` VM has been listed with `kernel-identity` trust mode and
+`strict_firewall=yes`; the actual host/guest isolation acceptance fixture
+remains to be implemented and exercised.
+
+## Next assurance and product handoff
+
+- **NR-2 / NR-3:** Continue the production-linked dispatch event and native
+  I/O refinement, including audit acknowledgment, provider attempts,
+  completion, and guest-frame observations. Do not replace missing concrete
+  links with new shadow interpreters or assumed complete histories.
+- **W8 / OUT-2:** Use a disposable AIVM guest and synthetic provider; verify
+  guest cannot read host credentials or privileged sockets, only the approved
+  authenticated broker channel works, and direct credentialed egress cannot
+  bypass authorization. The passing same-UID demo is only a functional baseline.
+- **W7 / OUT-3:** Separately opt into a narrow-scope live GitHub read with a
+  disposable token, after validating native and VM boundaries. Never run
+  credentialed provider tests automatically in ordinary CI.
+
+For the current queue, acceptance gates, and proof assumptions, consult
+[active work](aivm-secrets-active-work.md), the
+[product roadmap](aivm-secrets-product-roadmap.md), and the
+[native assurance roadmap](aivm-secrets-native-read-assurance-roadmap.md).
