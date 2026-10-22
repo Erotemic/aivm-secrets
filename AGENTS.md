@@ -21,16 +21,24 @@ the secrets adapter is explicitly enabled, versioned and process/wire-only.
    to the next increment normally means the prior Lean change compiled; the
    maintainer supplies compiler diagnostics when there is a failure.
 
-**OUT-2 integration evidence (2026-10-21):** the maintainer ran the
-native KVM smoke on `aivm-2404` successfully (`b21e212`, three authorized
-synthetic-provider GETs, denied write, private-path probes and revocation).
-This is a **real VM witness**, not filesystem-isolation or whole-service secrecy
-proof. The optional `--adversarial` extension in
-`dev/aivm_vm_acceptance.py` tests identity, forbidden host TCP canary, bounded
-mount metadata and application-socket disconnect/reconnect; **do not report it
-as passed until an actual operator VM run passes**. See
-`docs/aivm-vm-native-acceptance.md`. Keep real GitHub credentials out of
-these synthetic tests.
+**OUT-2 integration evidence (2026-10-21):** the maintainer ran both
+native real-KVM acceptance modes on `aivm-2404`: the positive three-GET
+baseline (`b21e212`) and the opt-in adversarial extension (four synthetic
+GETs; foreign/mismatched/tampered identities, out-of-scope read, live host TCP
+canary, mount metadata, disconnected/reconnected socket and revocation). The
+adversarial real-VM run is user-confirmed, **not** a general filesystem,
+network or whole-service secrecy proof. See `docs/aivm-vm-native-acceptance.md`.
+
+**OUT-3 live read fixture:** `dev/aivm_github_live_acceptance.py` is an
+**opt-in, partially operator-executed** real-GitHub read-only test targeting
+`Erotemic/aivm-secrets` with a dedicated host-only fine-grained token. The
+first live run reached revocation after three successful reads and negative
+checks, but the harness incorrectly rejected `invoke`'s public JSON denial
+on stdout. The corrected fixture requires a durable authority revocation,
+structured identity denial and unchanged dispatch count; live rerun pending.
+Read `docs/aivm-github-live-readonly-acceptance.md` before executing it.
+Never put credentials in Git/guest files or run the live fixture in CI. Do not
+mistake authoring-time Python checks for GitHub compatibility evidence.
 
 **Anti-drift:** the read-only NR proof is one product gate, not the product.
 Move NR-2/3 toward concrete native primitive-to-event refinement instead of
