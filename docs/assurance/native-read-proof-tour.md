@@ -25,6 +25,58 @@ A successful allowed read is required as a **non-vacuity witness**. The maintain
 
 This is why **a Lean file compiling is not sufficient evidence for the broad security claim**, even though compilation is sufficient to accept that its *stated* theorem is proved: the theorem can have hypotheses that the native system has not established. The question is whether those hypotheses are precise external contracts, source-proved facts, or an accidental restatement of the security goal.
 
+## First source-owned read-driver/writer composition (new increment)
+
+**Implementation prepared; focused Lean compilation is not available in this
+artifact environment. Do not count this as accepted checked theorem until the
+maintainer's pinned `lake build GarrettNativeReadBoundary` succeeds.**
+
+[`GarrettNativeReadBoundary.lean`](../../proofs/GarrettNativeReadBoundary.lean)
+introduces two related statements using the **actual extracted**
+`provider_exchange.exchange`, bound `current_admission.Context.current`,
+`dispatch.Pending` and `provider_io.Channel.submit`:
+
+1. `rejected_before_send_keeps_receipt`: an exchange returning at `.Setup` or
+   `.Admission` leaves the request-wide receipt unchanged, keeps the fixed
+   context and reports no current stamp. The native primitives themselves may
+   still have external setup/clock/TLS effects, so this does **not** certify
+   absence of every network or filesystem effect.
+2. `returned_attempted_read_has_checked_writer`: for any *returned read
+   exchange* classified as attempted, its sound chronological receipt trace
+   and route/operation binding follow from the **source-owned** dispatcher;
+   its current stamp is issued by the bound source check; and the real native
+   writer has a `write_all` callback (with optional `flush`), projecting one
+   provider attempt. This includes returned send errors, response errors and
+   complete responses; setup/admission failures cannot satisfy the attempted
+   premise.
+
+**Premises removed compared with a caller-assembled writer segment:** no
+`beforeTrace`/`after` event lists, hand-supplied `checkedOrigin` or matching
+stamp, arbitrary marked `begin_send` success, or independent `providerReached`
+flag. The caller provides an actual returned `exchange` invocation, a reachable
+initial receipt and `Stage.attempted = true`. Two **narrow native adapter
+obligations** remain:
+
+- `SetupReturnsFresh`: an actual successful `ManifestProvider::setup_route`
+  gives a new unspent `Channel`, not a previously used channel;
+- `SendsThroughChannel`: the actual returned `ManifestProvider::send` call
+  delegates to the same `Channel.submit`, preserving its returned result and
+  post-state.
+
+Both are explicit premises pending linkage to the non-extracted Rust
+`custody/manifest_session.rs` factory and `send_manifest_bytes`, **not**
+trusted Lean axioms or assertions of whole-service mediation. The new theorem
+relates an attempted read to both a sound source receipt history and the
+corresponding source-owned callback path; it does not yet assert an exact
+position of that callback's event in the history or prove that no other
+credential-bearing I/O path exists. Actual `std::io::Write`, rustls/TCP,
+completion audit, guest frames and non-returning paths remain unclosed.
+
+**Falsifier:** if the manifest adapter can supply an already-attempted channel
+at setup, bypass `Channel.submit` from `send`, or dispatch secret bytes through
+another sink, the external contracts or the desired global guarantee fail.
+The returned-read theorem by itself cannot rule those out.
+
 ## Walk through one intended provider attempt
 
 ```text

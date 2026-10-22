@@ -1012,6 +1012,7 @@ def inputs() -> list[str]:
         "proofs/GarrettProviderChannel.lean",
         "proofs/GarrettNativeWriterEvents.lean",
         "proofs/GarrettNativeDispatchEvents.lean",
+        "proofs/GarrettNativeReadBoundary.lean",
         "proofs/GarrettProviderWire.lean",
         "proofs/GarrettJsonStringScalar.lean",
         "proofs/GarrettJsonString.lean",
