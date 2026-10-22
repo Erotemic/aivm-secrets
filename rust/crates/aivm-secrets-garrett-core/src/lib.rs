@@ -9,6 +9,7 @@
 pub mod approval;
 pub mod audit_record;
 pub mod selected_release;
+pub mod selected_conversion;
 pub mod response_gate;
 pub mod authority;
 pub mod coordination;

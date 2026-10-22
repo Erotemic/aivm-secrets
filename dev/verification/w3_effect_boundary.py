@@ -674,6 +674,25 @@ def review_semantics(contents: dict[str, str]) -> None:
     d = contents[RUST + 'manifest/disclosure.rs']
     require('filter::project_fields(' in d and 'ensure_safe(&value, credential)?;' in d,
             'native disclosure no longer selects and reflection-checks public fields')
+    # Successful selected-tree traversal has moved to the production-called,
+    # Aeneas-extractable Rust module. Its native builder only supplies serde
+    # constructors; no raw response is passed into the converter.
+    selected = contents['rust/crates/aivm-secrets-garrett-core/src/selected_conversion.rs'].split('#[cfg(test)]', 1)[0]
+    require('pub mod selected_conversion;' in contents['rust/crates/aivm-secrets-garrett-core/src/lib.rs']
+            and 'selected_conversion::render(&v, &mut SerdeBuilder)' in d
+            and 'let value = render(selected.value)?;' in d
+            and same_order(d, 'filter::project_fields(', 'let value = render(selected.value)?;',
+                           'ensure_safe(&value, credential)?;', 'core::release(')
+            and 'pub fn render<B: Builder>(selected: &Json, builder: &mut B)' in selected
+            and all(f'Json::{variant}' in selected for variant in
+                    ('Null', 'Boolean', 'Integer', 'Text', 'Array', 'Object', 'Opaque'))
+            and same_order(selected, 'let name = builder.name(&field.0)?;',
+                           'let value = render(&field.1, builder)?;',
+                           'builder.insert(&mut out, name, value)?;')
+            and 'Json::Opaque => Err(builder.invalid())' in selected
+            and 'std::str::from_utf8(bytes).map_err(|_| Error::UpstreamResponse)?' in d
+            and 'if out.insert(name, value).is_some()' in d,
+            'native selected projection no longer uses the reviewed extracted traversal')
     a = contents[RUST + 'client_alias.rs']
     require('"view" => CommandKind::View' in a
             and '"diff" => CommandKind::Diff' in a

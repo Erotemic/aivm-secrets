@@ -243,6 +243,13 @@ a single named `SelectedConversion` contract + extracted `json_wire.prepare`
 produce equal complete newline frames. The caller no longer assumes that
 the two encoded outputs were equal.
 
+A follow-on [source conversion increment](nr4-selected-source-conversion.md)
+moves the production-selected JSON tree renderer's recursive traversal into
+Aeneas-extractable Rust, invoked by the real `Disclosure::project`. This is a
+Rust/source boundary change, **not yet an additional Lean result**: the
+pinned generated module must be regenerated and its builder/serde contracts
+proved before the `SelectedConversion` hypothesis is discharged.
+
 The proof includes independent authorization/audit/sink sequences for both
 returned source reads, a fixed public denial taxonomy, and arbitrary
 feedback-dependent request strategies over offered bytes, error/outcome codes,

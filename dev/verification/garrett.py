@@ -1306,6 +1306,22 @@ def check_manifest() -> None:
             raise SystemExit(f"Garrett manifest is stale: {name}")
 
 
+def record_sources() -> None:
+    """Re-fingerprint generated source after Lean compilation, without axiom audit.
+
+    This is an ordinary development provenance refresh, not the optional
+    end-of-formalization transitive axiom baseline comparison or native I/O
+    certification. Run it only after extracting and reviewing the new Rust.
+    """
+    base.check_hashes(json.loads(base.MANIFEST.read_text()))
+    regeneration()
+    prove()
+    manifest = assurance_coordinates()
+    manifest["sha256"] = {name: base.sha256(ROOT / name) for name in inputs()}
+    MANIFEST.write_text(json.dumps(manifest, indent=2) + "\n")
+    print("Recorded Aeneas-generated source and Lean compilation coordinates (no axiom audit).")
+
+
 def record() -> None:
     base.check_hashes(json.loads(base.MANIFEST.read_text()))
     regeneration()
@@ -2490,7 +2506,7 @@ def mutate(pattern: str | None = None) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "action", choices=["bootstrap", "extract", "record", "check", "mutate", "audit"]
+        "action", choices=["bootstrap", "extract", "record-sources", "record", "check", "mutate", "audit"]
     )
     parser.add_argument("--mutation-filter", help="Run only labels matching this regex; never counts as the full mutation campaign.")
     args = parser.parse_args()
@@ -2500,6 +2516,8 @@ def main() -> None:
         base.bootstrap()
     elif args.action == "extract":
         extract(PROOFS / "generated")
+    elif args.action == "record-sources":
+        record_sources()
     elif args.action == "record":
         record()
     else:

@@ -1861,7 +1861,7 @@ def credential_use.use_credential
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::Expectation]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 43:0-48:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 44:0-49:1
     Visibility: public -/
 structure Expectation where
   issuer : alloc.vec.Vec Std.U8
@@ -1870,7 +1870,7 @@ structure Expectation where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::Claims]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 32:0-41:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 33:0-42:1
     Visibility: public -/
 structure Claims where
   issuer : alloc.vec.Vec Std.U8
@@ -1956,14 +1956,14 @@ def manifest.current
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::Denial]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 28:0-30:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 29:0-31:1
     Visibility: public -/
 @[discriminant isize]
 inductive Denial where
 | InvalidCapability : Denial
 
 /-- [aivm_secrets_garrett_core::present]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 88:0-115:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 89:0-116:1
     Visibility: public -/
 def present
   (claims : Claims) (expected : Expectation) (peer : alloc.vec.Vec Std.U8)
@@ -6139,7 +6139,7 @@ def json_wire.prepare
     ok (core.result.Result.Err guest_frame.FrameDenial.Invalid)
 
 /-- [aivm_secrets_garrett_core::IssueWindow]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 50:0-54:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 51:0-55:1
     Visibility: public -/
 structure IssueWindow where
   issued_at : Std.I64
@@ -6147,7 +6147,7 @@ structure IssueWindow where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::issue_window]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 57:0-84:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 58:0-85:1
     Visibility: public -/
 def issue_window
   (active : Bool) (epoch : Std.I64) (not_after : Std.I64) (now : Std.I64)
@@ -6191,21 +6191,21 @@ def issue_window
   else ok (core.result.Result.Err Denial.InvalidCapability)
 
 /-- [aivm_secrets_garrett_core::AuthenticatedEnvelope]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 119:0-122:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 120:0-123:1
     Visibility: public -/
 structure AuthenticatedEnvelope where
   claims : Claims
   encrypted : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::OpenedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 124:0-127:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 125:0-128:1
     Visibility: public -/
 structure OpenedSurrogate (S : Type _) where
   claims : Claims
   secret : S
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeVerifier]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 130:0-134:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 131:0-135:1
     Visibility: public -/
 structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
   verify : Self → alloc.vec.Vec Std.U8 → Result (core.result.Result
@@ -6214,7 +6214,7 @@ structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
     Self_Secret Denial)
 
 /-- [aivm_secrets_garrett_core::open_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 139:0-161:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 140:0-162:1
     Visibility: public -/
 def open_surrogate
   {V : Type _} {Clause0_Secret : Type _} (EnvelopeVerifierInst :
@@ -6238,7 +6238,7 @@ def open_surrogate
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssueInputs]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 163:0-172:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 164:0-173:1
     Visibility: public -/
 structure IssueInputs where
   issuer : alloc.vec.Vec Std.U8
@@ -6251,7 +6251,7 @@ structure IssueInputs where
   not_after : Std.I64
 
 /-- [aivm_secrets_garrett_core::prepare_issue]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 175:0-190:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 176:0-191:1
     Visibility: public -/
 def prepare_issue
   (input : IssueInputs) (now : Std.I64) (lifetime : Std.I64) :
@@ -6274,21 +6274,21 @@ def prepare_issue
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssuedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 192:0-195:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 193:0-196:1
     Visibility: public -/
 structure IssuedSurrogate where
   claims : Claims
   token : alloc.vec.Vec Std.U8
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeIssuer]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 197:0-200:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 198:0-201:1
     Visibility: public -/
 structure EnvelopeIssuer (Self : Type _) (Self_Secret : Type _) where
   «seal» : Self → Claims → Self_Secret → Result (core.result.Result
     (alloc.vec.Vec Std.U8) Denial)
 
 /-- [aivm_secrets_garrett_core::issue_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 202:0-218:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 203:0-219:1
     Visibility: public -/
 def issue_surrogate
   {I : Type _} {Clause0_Secret : Type _} (EnvelopeIssuerInst : EnvelopeIssuer I
@@ -9788,6 +9788,149 @@ def response_gate.receive
     core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
       (response_gate.Released B W M) (core.convert.FromSame Clause1_Error)
       residual
+
+/-- Trait declaration: [aivm_secrets_garrett_core::selected_conversion::Builder]
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 17:0-38:1
+    Visibility: public -/
+structure selected_conversion.Builder (Self : Type _) (Self_Value : Type _)
+  (Self_Name : Type _) (Self_Object : Type _) (Self_Error : Type _) where
+  null : Self → Result (Self_Value × Self)
+  boolean : Self → Bool → Result (Self_Value × Self)
+  integer : Self → Std.I64 → Result (Self_Value × Self)
+  text : Self → alloc.vec.Vec Std.U8 → Result ((core.result.Result
+    Self_Value Self_Error) × Self)
+  array : Self → alloc.vec.Vec Self_Value → Result (Self_Value × Self)
+  «name» : Self → alloc.vec.Vec Std.U8 → Result ((core.result.Result
+    Self_Name Self_Error) × Self)
+  empty_object : Self → Result (Self_Object × Self)
+  insert : Self → Self_Object → Self_Name → Self_Value → Result
+    ((core.result.Result Unit Self_Error) × Self × Self_Object)
+  finish_object : Self → Self_Object → Result (Self_Value × Self)
+  invalid : Self → Result (Self_Error × Self)
+
+mutual
+
+/-- [aivm_secrets_garrett_core::selected_conversion::render]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 56:12-77:1
+    Visibility: public -/
+@[rust_loop]
+def selected_conversion.render_loop0
+  {B : Type _} {Clause0_Value : Type _} {Clause0_Name : Type _} {Clause0_Object
+  : Type _} {Clause0_Error : Type _} (BuilderInst : selected_conversion.Builder
+  B Clause0_Value Clause0_Name Clause0_Object Clause0_Error)
+  (values : alloc.vec.Vec disclosure.Json) (builder : B)
+  (out : alloc.vec.Vec Clause0_Value) (index : Std.Usize) :
+  Result ((core.result.Result Clause0_Value Clause0_Error) × B)
+  := do
+  let i := alloc.vec.Vec.len values
+  if index < i
+  then
+    let j ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        disclosure.Json) values index
+    let (r, builder1) ← selected_conversion.render BuilderInst j builder
+    let cf ← core.result.Result.Insts.CoreOpsTry.branch r
+    match cf with
+    | core.ops.control_flow.ControlFlow.Continue val =>
+      let out1 ← alloc.vec.Vec.push out val
+      let index1 ← index + 1#usize
+      selected_conversion.render_loop0 BuilderInst values builder1 out1 index1
+    | core.ops.control_flow.ControlFlow.Break residual =>
+      let r1 ←
+        core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+          Clause0_Value (core.convert.FromSame Clause0_Error) residual
+      ok (r1, builder1)
+  else
+    let (t, builder1) ← BuilderInst.array builder out
+    ok (core.result.Result.Ok t, builder1)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::selected_conversion::render]: loop 1:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 66:12-77:1
+    Visibility: public -/
+@[rust_loop]
+def selected_conversion.render_loop1
+  {B : Type _} {Clause0_Value : Type _} {Clause0_Name : Type _} {Clause0_Object
+  : Type _} {Clause0_Error : Type _} (BuilderInst : selected_conversion.Builder
+  B Clause0_Value Clause0_Name Clause0_Object Clause0_Error)
+  (fields : alloc.vec.Vec ((alloc.vec.Vec Std.U8) × disclosure.Json))
+  (builder : B) (out : Clause0_Object) (index : Std.Usize) :
+  Result ((core.result.Result Clause0_Value Clause0_Error) × B)
+  := do
+  let i := alloc.vec.Vec.len fields
+  if index < i
+  then
+    let (v, j) ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        ((alloc.vec.Vec Std.U8) × disclosure.Json)) fields index
+    let (r, builder1) ← BuilderInst.«name» builder v
+    let cf ← core.result.Result.Insts.CoreOpsTry.branch r
+    match cf with
+    | core.ops.control_flow.ControlFlow.Continue val =>
+      let (r1, builder2) ← selected_conversion.render BuilderInst j builder1
+      let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
+      match cf1 with
+      | core.ops.control_flow.ControlFlow.Continue val1 =>
+        let (r2, builder3, out1) ← BuilderInst.insert builder2 out val val1
+        let cf2 ← core.result.Result.Insts.CoreOpsTry.branch r2
+        match cf2 with
+        | core.ops.control_flow.ControlFlow.Continue _ =>
+          let index1 ← index + 1#usize
+          selected_conversion.render_loop1 BuilderInst fields builder3 out1
+            index1
+        | core.ops.control_flow.ControlFlow.Break residual =>
+          let r3 ←
+            core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+              Clause0_Value (core.convert.FromSame Clause0_Error) residual
+          ok (r3, builder3)
+      | core.ops.control_flow.ControlFlow.Break residual =>
+        let r2 ←
+          core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+            Clause0_Value (core.convert.FromSame Clause0_Error) residual
+        ok (r2, builder2)
+    | core.ops.control_flow.ControlFlow.Break residual =>
+      let r1 ←
+        core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+          Clause0_Value (core.convert.FromSame Clause0_Error) residual
+      ok (r1, builder1)
+  else
+    let (t, builder1) ← BuilderInst.finish_object builder out
+    ok (core.result.Result.Ok t, builder1)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::selected_conversion::render]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 47:0-77:1
+    Visibility: public -/
+def selected_conversion.render
+  {B : Type _} {Clause0_Value : Type _} {Clause0_Name : Type _} {Clause0_Object
+  : Type _} {Clause0_Error : Type _} (BuilderInst : selected_conversion.Builder
+  B Clause0_Value Clause0_Name Clause0_Object Clause0_Error)
+  (selected : disclosure.Json) (builder : B) :
+  Result ((core.result.Result Clause0_Value Clause0_Error) × B)
+  := do
+  match selected with
+  | disclosure.Json.Null =>
+    let (t, builder1) ← BuilderInst.null builder
+    ok (core.result.Result.Ok t, builder1)
+  | disclosure.Json.Boolean value =>
+    let (t, builder1) ← BuilderInst.boolean builder value
+    ok (core.result.Result.Ok t, builder1)
+  | disclosure.Json.Integer value =>
+    let (t, builder1) ← BuilderInst.integer builder value
+    ok (core.result.Result.Ok t, builder1)
+  | disclosure.Json.Text bytes => BuilderInst.text builder bytes
+  | disclosure.Json.Array values =>
+    selected_conversion.render_loop0 BuilderInst values builder
+      (alloc.vec.Vec.new Clause0_Value) 0#usize
+  | disclosure.Json.Object fields =>
+    let (out, builder1) ← BuilderInst.empty_object builder
+    selected_conversion.render_loop1 BuilderInst fields builder1 out 0#usize
+  | disclosure.Json.Opaque =>
+    let (t, builder1) ← BuilderInst.invalid builder
+    ok (core.result.Result.Err t, builder1)
+partial_fixpoint
+
+end
 
 /-- Trait declaration: [aivm_secrets_garrett_core::selected_release::Work]
     Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 9:0-20:1

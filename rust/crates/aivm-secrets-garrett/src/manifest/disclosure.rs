@@ -2,7 +2,7 @@
 //! converts input nodes and renders the owned selected tree; it has no raw
 //! provider-document fallback.
 use super::*;
-use aivm_secrets_garrett_core::disclosure as filter;
+use aivm_secrets_garrett_core::{disclosure as filter, selected_conversion};
 
 pub struct Disclosure {
     rules: BTreeMap<String, Vec<filter::Field>>,
@@ -105,27 +105,54 @@ pub(crate) fn document(v: &Value) -> filter::Json {
         ),
     }
 }
+// The traversal is now production-called, Aeneas-targeted Rust. Only the
+// serde/UTF-8/map-construction primitives remain in this native adapter.
+struct SerdeBuilder;
+impl selected_conversion::Builder for SerdeBuilder {
+    type Value = Value;
+    type Name = String;
+    type Object = Map<String, Value>;
+    type Error = Error;
+
+    fn null(&mut self) -> Value {
+        Value::Null
+    }
+    fn boolean(&mut self, value: bool) -> Value {
+        Value::Bool(value)
+    }
+    fn integer(&mut self, value: i64) -> Value {
+        Value::Number(value.into())
+    }
+    fn text(&mut self, bytes: &Vec<u8>) -> Outcome<Value> {
+        let text = std::str::from_utf8(bytes).map_err(|_| Error::UpstreamResponse)?;
+        Ok(Value::String(text.to_owned()))
+    }
+    fn array(&mut self, values: Vec<Value>) -> Value {
+        Value::Array(values)
+    }
+    fn name(&mut self, bytes: &Vec<u8>) -> Outcome<String> {
+        Ok(std::str::from_utf8(bytes)
+            .map_err(|_| Error::UpstreamResponse)?
+            .to_owned())
+    }
+    fn empty_object(&mut self) -> Self::Object {
+        Map::new()
+    }
+    fn insert(&mut self, out: &mut Self::Object, name: String, value: Value) -> Outcome<()> {
+        if out.insert(name, value).is_some() {
+            return Err(Error::UpstreamResponse);
+        }
+        Ok(())
+    }
+    fn finish_object(&mut self, out: Self::Object) -> Value {
+        Value::Object(out)
+    }
+    fn invalid(&mut self) -> Error {
+        Error::UpstreamResponse
+    }
+}
 fn render(v: filter::Json) -> Outcome<Value> {
-    Ok(match v {
-        filter::Json::Null => Value::Null,
-        filter::Json::Boolean(b) => json!(b),
-        filter::Json::Integer(n) => json!(n),
-        filter::Json::Text(s) => json!(String::from_utf8(s).map_err(|_| Error::UpstreamResponse)?),
-        filter::Json::Array(values) => {
-            Value::Array(values.into_iter().map(render).collect::<Outcome<_>>()?)
-        }
-        filter::Json::Object(values) => {
-            let mut out = Map::new();
-            for (name, value) in values {
-                let name = String::from_utf8(name).map_err(|_| Error::UpstreamResponse)?;
-                if out.insert(name, render(value)?).is_some() {
-                    return Err(Error::UpstreamResponse);
-                }
-            }
-            Value::Object(out)
-        }
-        filter::Json::Opaque => return Err(Error::UpstreamResponse),
-    })
+    selected_conversion::render(&v, &mut SerdeBuilder)
 }
 impl Disclosure {
     pub fn parse(value: &Value, operations: &[String]) -> Outcome<Self> {
@@ -176,6 +203,49 @@ pub(crate) fn ensure_safe(v: &Value, secret: &[u8]) -> Outcome<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn extracted_selected_renderer_keeps_native_json_values_and_encoding() {
+        let selected = filter::Json::Object(vec![
+            (
+                b"letter".to_vec(),
+                filter::Json::Text("é😀\n".as_bytes().to_vec()),
+            ),
+            (
+                b"numbers".to_vec(),
+                filter::Json::Array(vec![
+                    filter::Json::Integer(i64::MIN),
+                    filter::Json::Integer(i64::MAX),
+                    filter::Json::Null,
+                    filter::Json::Boolean(true),
+                ]),
+            ),
+            (b"empty".to_vec(), filter::Json::Object(Vec::new())),
+        ]);
+        let rendered = render(selected).unwrap();
+        let expected = json!({
+            "letter":"é😀\n",
+            "numbers":[i64::MIN, i64::MAX, null, true],
+            "empty":{},
+        });
+        assert_eq!(rendered, expected);
+        assert_eq!(json::canonical(&rendered), json::canonical(&expected));
+    }
+
+    #[test]
+    fn selected_renderer_refuses_invalid_utf8_opaque_or_duplicate_fields() {
+        for selected in [
+            filter::Json::Text(vec![0xc0, 0xaf]),
+            filter::Json::Object(vec![(vec![0xff], filter::Json::Null)]),
+            filter::Json::Array(vec![filter::Json::Opaque]),
+            filter::Json::Object(vec![
+                (b"same".to_vec(), filter::Json::Null),
+                (b"same".to_vec(), filter::Json::Integer(1)),
+            ]),
+        ] {
+            assert!(matches!(render(selected), Err(Error::UpstreamResponse)));
+        }
+    }
 
     #[test]
     fn camel_case_public_projection_preserves_exact_host_selected_names() {
