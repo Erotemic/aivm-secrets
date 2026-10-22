@@ -1,15 +1,17 @@
 # OUT-3: real GitHub read-only acceptance on `aivm-2404`
 
-**Status (2026-10-21): live run reached the post-revocation check, but
-acceptance remains pending a rerun after correcting the `invoke` denial-frame
-assertion.** Three authorized GitHub reads and the preceding negative checks
-completed in the operator's first run. Its final assertion was faulty: native
-`invoke` prints a structured `{"ok":false,"error":...}` frame on stdout with
-exit status 1 when identity admission is rejected; stdout is not proof of a
-successful read. The fixed fixture requires an identity-denial code, a
-persistently inactive native authority enrollment with an incremented epoch,
-and no additional provider dispatch. The user has not yet rerun these fixed
-checks on the real VM.
+**Status (2026-10-21): scoped real-GitHub read-only acceptance PASSED** in
+the maintainer's corrected `aivm-2404` KVM run. `55 passed` focused tests;
+`summary.json` reported `ok: true`, `mode: native-rust/aivm-kvm/live-github-readonly`,
+three bounded successful authenticated GitHub reads, denied out-of-scope
+repository access and write, `revocation_fenced: true`, and a structured
+post-revocation identity denial `invalid_capability`. The correction was to
+recognize `invoke`'s public JSON denial on stdout with exit status 1, and to
+require persisted inactive authority enrollment with incremented epoch plus
+no additional native audit dispatch. Fixture and correction were committed in
+`b465c16`. This is finite operational evidence, **not** whole-service secrecy,
+independent GitHub-side request observation, general-provider compatibility,
+or proof of the AIVM host-isolation assumption.
 
 This is the *real provider* follow-up to the user-confirmed OUT-2 adversarial KVM
 acceptance in [the synthetic provider test](aivm-vm-native-acceptance.md).
@@ -83,8 +85,9 @@ The token file defaults to `$HOME/.config/aivm-secrets/github-readonly.token`.
 It is never copied into the workspace. An alternate file may be selected with
 `--token-file` if kept private outside the repository and shared VM folders.
 Use a fresh host workspace under `/tmp`, not the group-writable source tree.
-The successful result is *evidence reported by this local run*, not evidence
-that the test has already happened when this document was authored.
+The successful result is additional run-specific evidence; the initial
+accepted live result is recorded above. Never run automatically in CI or as
+part of an unattended proof campaign.
 
 ## Exact allowlist and evidence
 

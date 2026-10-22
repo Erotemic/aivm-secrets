@@ -18,6 +18,10 @@ Read in this order:
 3. [Native read assurance roadmap](aivm-secrets-native-read-assurance-roadmap.md)
    — NR-0..NR-5 technical read-only scope, actual Rust/Lean seams, assumptions
    and exit criteria. Not a substitute for the product outcome roadmap.
+   For the current proof push, use the
+   [overnight source-to-observation campaign](aivm-secrets-overnight-formalization.md),
+   [copyable agent assignment](../../dev/agent_prompts/overnight-native-read-formalization.md),
+   and [maintainer proof tour](../assurance/native-read-proof-tour.md).
 4. [W0 conditional-confinement contract](aivm-secrets-conditional-confinement.md)
    and [boundary inventory](aivm-secrets-w0-boundaries.json) — normative
    principals, adversary, allowed releases and scoped sinks.

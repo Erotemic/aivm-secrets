@@ -3,7 +3,11 @@
 **Technical read-only campaign; last reconciled 2026-10-21. NOT an assurance certificate.**
 
 **Read the [product roadmap](aivm-secrets-product-roadmap.md) and
-[current task queue](aivm-secrets-active-work.md) first.** The product is
+[current task queue](aivm-secrets-active-work.md) first.** For an extended,
+operator-comprehensible proof run, use the
+[overnight native source-to-observation campaign](aivm-secrets-overnight-formalization.md)
+with the [maintainer proof tour](../assurance/native-read-proof-tour.md).
+The product is
 useful authorized secret use by an untrusted AIVM guest; this NR-0..NR-5
 campaign addresses the *first, restricted native read assurance claim*.
 Initial NR-0 baseline and NR-1 production extraction are accepted at their
@@ -56,17 +60,20 @@ send. These distinctions must survive the proof and its public summary.
 | `GarrettConfinement`, `GarrettNoninterference`, `GarrettReadPaths`, `GarrettReadPrefixes` and newer production-extracted dispatch/writer modules | Scoped model and source-linked returned-path/event results, including actual owned request/JSON/frame controllers and partial native writer observations | Complete instantiation of native primitive contracts, all I/O/callback/drop/close effects, adaptive guest observation and service-level refinement |
 | `AuditedDispatch` and `CompletedRelease` private Rust types | Source-level restrictions on calling the native provider writer and returning success | That no other sink can be reached, or that the actual I/O matches the abstract trace |
 
-**Evidence provenance rule:** The latest available source archive for this
-documentation refresh is `8986ce6` plus the subsequently supplied Track A
-native audit/writer/dispatch and Lean-fix overlays. The user's *current HEAD*
-is not known from that archive. The frozen full-run result at `e741383`
-belongs to its exact source. The maintainer reported passing native dispatch
-chronology and earlier writer-event compilation; the final dispatch trace
-context-fix build result was not supplied. Before declaring a new gate closed,
-inspect `git rev-parse HEAD`, `git status --short`, relevant features and the
-actual focused compiler/native output. A proof-scope JSON `status` of
-`source-reviewed-kernel-verification-required` is a source-gate statement;
-it is not a contradiction of a successful scoped Lean build at another commit.
+**Evidence provenance rule:** This document derives its original proof/source
+inventory from archive `8986ce6` plus subsequent supplied Track A
+native audit/writer/dispatch and Lean-fix overlays. The maintainer has since
+accepted the focused Track A repair iterations, reported a passing full host
+gate, successful real KVM positive/adversarial acceptance, and a successful
+corrected live GitHub read-only run (fixture commit `b465c16`). Those reports
+are established evidence at their stated scopes. The frozen full-run result at
+`e741383` belongs to its exact source, not automatically the agent's current
+checkout. A new agent must inspect `git rev-parse HEAD`, `git status --short`
+and changed source/proof inputs before advancing a new claim. Do **not**
+downgrade successfully completed user-reported Lean steps to pending solely
+because their success transcript was not pasted. A proof-scope JSON `status`
+of `source-reviewed-kernel-verification-required` is a *source-gate* label,
+not a contradiction of the user's successful focused kernel compilation.
 
 ## 2. Profile boundary: what the eventual theorem quantifies over
 
@@ -465,13 +472,13 @@ close the production-to-model link first.
 
 ## 8. Immediate Track A assignment (not a new NR-0 or NR-1 campaign)
 
-**First:** on the actual checkout, confirm whether
-`lake build GarrettNativeDispatchEvents` succeeds after the final trace-context
-fix. The native `native_read_dispatch_audit_to_writer_callback_chronology` test
-was reported passing. Do not turn an unreported Lean result into either a
-failure or a verified success; report the actual build and then move on.
+**Do not restart accepted work:** the maintainer advanced beyond the
+`GarrettNativeDispatchEvents` trace-context repair after successful focused
+Lean development and reported the native callback-chronology witness passing.
+A new change must still receive its own focused compilation; do not ask for
+old green logs or make a successful prior theorem pending again.
 
-**Next substantive work:** connect the source-owned `Session::request` to
+**First substantive work:** connect the source-owned `Session::request` to
 actual native primitive callback arguments, returned states and observable
 effects: audit-file acknowledgment before the native writer, late admission,
 write/flush attempt (including partial failure), provider parsing and

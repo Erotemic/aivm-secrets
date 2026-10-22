@@ -5,7 +5,10 @@
 and [W0](aivm-secrets-conditional-confinement.md) for the normative security
 contract. This file alone orders the *next implementation work*. The detailed
 [native read roadmap](aivm-secrets-native-read-assurance-roadmap.md) specifies
-NR-0..NR-5 technical proof gates. Prior implementation/validation chronology
+NR-0..NR-5 technical proof gates. For the current extended proof run, the
+[overnight source-linked campaign](aivm-secrets-overnight-formalization.md)
+provides the ordered tasks and maintainer-readable acceptance explanation.
+Prior implementation/validation chronology
 is in the [October 21 archive](aivm-secrets-active-work-history-2026-10-21.md),
 [October 19 archive](aivm-secrets-active-work-history-2026-10-19.md), and
 `dev/validation/`; don't append long milestone narratives here.
@@ -21,9 +24,11 @@ separate, more demanding claim than the first read-only proof profile.
 
 **Evidence basis:** the initial source archive `8986ce6` plus the applied
 Track A/documentation/NR-0/VM overlays, and the maintainer's actual host report
-of `python dev/verification/system.py` passing and real `aivm-2404` KVM
-acceptance passing. The original OUT-2 fixture was committed as `b21e212`;
-the new `--adversarial` mode has also passed in the maintainer's real-VM run. On resumption inspect
+of `python dev/verification/system.py` passing, both real `aivm-2404` KVM
+acceptance modes passing and the corrected real GitHub read-only fixture
+passing with 55 focused tests. The initial OUT-2 fixture was committed as
+`b21e212`; the live OUT-3 fixture and correction were committed as `b465c16`.
+On resumption inspect
 `git status --short` and `git rev-parse HEAD`, but do not downgrade successful
 user-reported Lean compilation for want of a pasted success log. The older
 2026-10-21 frozen source record at `e741383` reports 3,116 Python tests and
@@ -39,7 +44,7 @@ new code.
 | **NR-3: reachable I/O and adapter effects** | **In progress**: W3/W6 guards, route-bound bytes, zeroizing-buffer/channel seam, file-audit-before-write native witness. Need complete callback/drop/error reachability review and external std/DNS/TLS/serde/parser/storage contracts. |
 | **NR-4 / NR-5** | **Open**: guest observation/noninterference linkage including adaptive histories; then reviewed conditional claim and baseline-comparator audit. |
 | **W8 / OUT-2** | **Real-VM native baseline passed**, reported by maintainer on `aivm-2404` (KVM, authenticated read/diff, 3 synthetic provider GETs, write denied, revocation, tested host paths inaccessible; fixture commit `b21e212`). [Adversarial extension](../aivm-vm-native-acceptance.md#opt-in-adversarial-extension-out-2-negative-witnesses) adds network canary, identity, mount and reconnect probes behind `--adversarial`; **the extension passed a maintainer-run real-VM test** (2026-10-21, four authorized synthetic provider GETs). Full guest share analysis and optional adapter remain open. |
-| **W7 / OUT-3** | **Partial live run; revocation-assertion fix awaiting rerun**: three authorized GitHub reads and preceding negative checks completed; the original fixture mistook a structured `invoke` denial on stdout for success. The corrected gate requires durable revocation, identity denial, and no new audit dispatch. Fixed `Erotemic/aivm-secrets` read-only operations and authenticated `/user` test using a host-only fine-grained token. See [OUT-3 instructions](../aivm-github-live-readonly-acceptance.md). Never run automatically in CI. |
+| **W7 / OUT-3** | **Scoped live GitHub read-only acceptance passed** (maintainer real-VM report, 2026-10-21): 55 focused tests, `ok: true`, authenticated `/user`, bounded repository/README reads for `Erotemic/aivm-secrets`, denied out-of-scope repository and write, durable identity revocation (`invalid_capability`). The real provider does not supply an independent provider-side request transcript; `whole_service_secrecy_proved` remains false. See [OUT-3 evidence and opt-in instructions](../aivm-github-live-readonly-acceptance.md). Never use a live credential in CI. |
 | **OUT-4** | **Open formal assurance** for precisely authorized writes, approvals, budgets, uncertain retries and normative Python/Rust semantics. Existing implementations are not covered by the read theorem. |
 | **OUT-5** | **Open**: profile-specific claims/evidence, reproducible deployment and independent review before production-use claims. |
 
@@ -50,10 +55,12 @@ successful `lake build` log was not pasted: compilation errors are reported
 when present, and continuing to the next task is confirmation of success.
 Track A's native I/O correspondence still has genuine formal and environmental
 gaps as listed under NR-2/3. Both real KVM test modes (ordinary and adversarial)
-have successful maintainer reports. The first live GitHub test exercised the
-three allowed reads and negative policy cases before a faulty `invoke` stdout
-assertion stopped its revocation check; full OUT-3 acceptance awaits a rerun
-with the corrected denial/state/audit assertions.
+have successful maintainer reports. The fixed live GitHub acceptance test
+also **passed** on real KVM: three approved reads, out-of-scope/write denial,
+and persisted identity revocation plus no additional broker dispatch. The
+finite live acceptance is independent of NR-2/3/4 and does not prove the
+whole service. The operator's next priority is formal assurance and personal
+understanding before unattended, credential-bearing AIVM use.
 
 ## Active task queue
 
@@ -61,17 +68,19 @@ Next actions in priority order:
 
 | Priority | Task and concrete deliverable | Acceptance / avoid |
 | --- | --- | --- |
-| **P0 — finish current Track A increment** | On the current checkout, build `GarrettNativeDispatchEvents`; fix any actual failure without changing the security statement to hide it. Close or record remaining writer/event composition premises. | Pinned Lean build passes; report actual result and any assumptions. No routine axiom dumps. |
+| **P0 — overnight formalization / operator comprehension** | Execute the [source-linked campaign](aivm-secrets-overnight-formalization.md), starting at the actual `Session::request` -> `begin_send` -> channel seam. Produce checked, source-relevant proof increments and update the [maintainer proof tour](../assurance/native-read-proof-tour.md). | Every new theorem identifies precise Rust source, removes or documents security-bearing premises and covers meaningful failures. Preserve accepted previous compilation; no theorem-count targets, axiom dumps, self-certification or live credentials. |
 | **P0 — NR-2/3 primitive-to-event link** | Connect native `Session::request` admission -> real audit-file acknowledgement -> late authorization -> provider writer/flush -> completion audit -> guest frame to existing `TraceSteps`/W4 events. Instantiate source-bound callbacks where possible; state real external I/O contracts. | Positive final/checked/two-phase read and denied/revoked/audit-failed/partial-write/flush-failed/replay witnesses; no assumed whole-provider history, fake arrival or unchecked I/O equivalence. See [Track A handoff](../native-dispatch-callback-observation.md). |
 | **P0 in parallel — W8 / OUT-2** | The adversarial VM run has **passed**. Continue guest mount/share reachability (including aliases), unregistered/expired identities and a properly optional persistent AIVM adapter; do not re-run accepted validation as a substitute for this open work. | The prior baseline already passed on real KVM. The additional negative tests **passed on real KVM**; canary denial is not a proof of all forbidden egress. Normal AIVM must remain independent. |
-| **P1 in parallel — W7 / OUT-3** | Run the authored [opt-in live GitHub harness](../aivm-github-live-readonly-acceptance.md) against `Erotemic/aivm-secrets` using a dedicated host-only fine-grained read token. Validate `/user` authentication, bounded repository/README replies, denied write and out-of-scope read, and revocation. | Live token remains host-only; no token values in chat/source/guest/logs; no real writes or live API calls in CI. Distinguish Rust host-audit dispatch from GitHub-side request transcripts. |
+| **P2 — provider independence (after core proof work)** | Exercise a second manifest-driven HTTPS service using the generic native `invoke` path, without a GitHub-specific Rust feature or broader authority. | Synthetic credential first; new real provider only with separate operator opt-in. Existing OUT-3 GitHub read acceptance is complete at its stated scope and need not be rerun. |
 | **P1 — NR-4, then NR-5** | Tie actual JSON projection, errors, metadata, frame lengths/EOF and sequential adaptive sessions to model observations; independently review claim/assumptions/source provenance at the end. | Precisely conditional noninterference, finite reviewed I/O boundary, positive allowed action. Final comparative axiom audit only, not per build. |
 | **P2 — OUT-4** | Extend assurance to a single bounded write, approval and idempotency/uncertain-send behavior; track Python/Rust parity per operation. | Approved effect succeeds; denied effect never reaches provider; ambiguous success is never silently retried. |
 
 Dependencies: NR-2 and NR-3 progress together, NR-4 requires both, NR-5
-requires NR-1..4. W8 and W7 have independent integration/authorization gates
-and should proceed without waiting for NR-5; neither substitutes for the
-formal read claim. OUT-4 is outside the first read-only proof target. See the
+requires NR-1..4. W8 and W7 have **successful finite integration gates**,
+but neither substitutes for the formal read claim. The operator chooses to
+hold unattended credential-bearing AIVM deployment until the conditional
+native claim and actual environment assumptions have been reviewed. OUT-4
+is outside the first read-only proof target. See the
 [product dependencies](aivm-secrets-product-roadmap.md#outcome-gates-and-dependencies).
 
 ## Fast feedback and handoff

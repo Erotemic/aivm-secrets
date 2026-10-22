@@ -29,16 +29,27 @@ canary, mount metadata, disconnected/reconnected socket and revocation). The
 adversarial real-VM run is user-confirmed, **not** a general filesystem,
 network or whole-service secrecy proof. See `docs/aivm-vm-native-acceptance.md`.
 
-**OUT-3 live read fixture:** `dev/aivm_github_live_acceptance.py` is an
-**opt-in, partially operator-executed** real-GitHub read-only test targeting
-`Erotemic/aivm-secrets` with a dedicated host-only fine-grained token. The
-first live run reached revocation after three successful reads and negative
-checks, but the harness incorrectly rejected `invoke`'s public JSON denial
-on stdout. The corrected fixture requires a durable authority revocation,
-structured identity denial and unchanged dispatch count; live rerun pending.
-Read `docs/aivm-github-live-readonly-acceptance.md` before executing it.
-Never put credentials in Git/guest files or run the live fixture in CI. Do not
-mistake authoring-time Python checks for GitHub compatibility evidence.
+**OUT-3 live GitHub read-only evidence (2026-10-21):** the maintainer ran
+`dev/aivm_github_live_acceptance.py` after correcting the `invoke` denial-frame
+assertion: 55 focused tests passed and real KVM/GitHub `summary.json` reported
+`ok: true`, three bounded authenticated GitHub reads, denied out-of-scope
+repository and write, and `revocation_fenced: true` with identity denial
+`invalid_capability`. This accepts the **scoped live read-only integration
+witness**, not exhaustive provider-side effects, native implementation-to-I/O
+proof, whole-service secrecy, or approval for unattended AIVM agent use. The
+host-only GitHub credential must never enter the guest, Git or ordinary CI.
+Read `docs/aivm-github-live-readonly-acceptance.md` before optional live runs.
+
+**Formalization-first overnight work:** when the operator assigns an extended
+proof campaign, follow `docs/planning/aivm-secrets-overnight-formalization.md`
+and the concise `dev/agent_prompts/overnight-native-read-formalization.md`.
+Strengthen actual source-to-trace and guest-observation correspondence in
+NR-2/3/4; update `docs/assurance/native-read-proof-tour.md` to explain exactly
+what the theorem proves and what remains trusted. Producing many standalone
+lemmas or new unchecked proof assumptions is not completion. The maintainer
+requires independently reviewable formal evidence and understood deployment
+assumptions before trusting unattended credential-bearing AIVM use. An agent
+cannot self-certify NR-5 or OUT-5, enable the live token, or deploy AIVM.
 
 **Anti-drift:** the read-only NR proof is one product gate, not the product.
 Move NR-2/3 toward concrete native primitive-to-event refinement instead of
