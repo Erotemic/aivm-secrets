@@ -243,12 +243,21 @@ a single named `SelectedConversion` contract + extracted `json_wire.prepare`
 produce equal complete newline frames. The caller no longer assumes that
 the two encoded outputs were equal.
 
+The [selected-renderer input refinement](../../proofs/GarrettSelectedConversionInput.lean)
+now derives `OpaqueFree` of the *entire* successful selected tree from
+Aeneas-extracted `disclosure.project` / `project_fields` and the existing
+`Fits` postcondition. Thus nested `Opaque` leaves cannot reach the
+production renderer after successful projection; the source filter itself
+supplies the certificate. This does **not** yet prove the extracted renderer's
+output semantics or native serde callback contracts.
+
 A follow-on [source conversion increment](nr4-selected-source-conversion.md)
 moves the production-selected JSON tree renderer's recursive traversal into
-Aeneas-extractable Rust, invoked by the real `Disclosure::project`. This is a
-Rust/source boundary change, **not yet an additional Lean result**: the
-pinned generated module must be regenerated and its builder/serde contracts
-proved before the `SelectedConversion` hypothesis is discharged.
+Aeneas-extracted Rust, invoked by the real `Disclosure::project`. The
+preceding extraction compiled on the maintainer's pinned host. The new
+`OpaqueFree` lemma addresses the extracted projection's output shape only;
+structural refinement of the extracted renderer and native builder/serde
+contracts are still needed to discharge `SelectedConversion`.
 
 The proof includes independent authorization/audit/sink sequences for both
 returned source reads, a fixed public denial taxonomy, and arbitrary

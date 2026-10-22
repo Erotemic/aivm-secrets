@@ -232,6 +232,77 @@ mod tests {
         assert_eq!(json::canonical(&rendered), json::canonical(&expected));
     }
 
+    // Aeneas treats these concrete native serde operations as builder callbacks.
+    // Exercise the callback contract separately from the recursive traversal:
+    // the callbacks may construct only public JSON from their explicit inputs.
+    #[test]
+    fn selected_serde_builder_callbacks_preserve_values_and_failures() {
+        use selected_conversion::Builder as _;
+
+        let mut builder = SerdeBuilder;
+        assert_eq!(builder.null(), Value::Null);
+        assert_eq!(builder.boolean(false), Value::Bool(false));
+        assert_eq!(builder.boolean(true), Value::Bool(true));
+        assert_eq!(builder.integer(i64::MIN), json!(i64::MIN));
+        assert_eq!(builder.integer(i64::MAX), json!(i64::MAX));
+        assert_eq!(
+            builder.text(&"é😀\n".as_bytes().to_vec()),
+            Ok(json!("é😀\n"))
+        );
+        let minus_one = builder.integer(-1);
+        let null = builder.null();
+        assert_eq!(builder.array(vec![minus_one, null]), json!([-1, null]));
+        assert_eq!(builder.text(&vec![0xff]), Err(Error::UpstreamResponse));
+        assert_eq!(builder.name(&vec![0xc0, 0xaf]), Err(Error::UpstreamResponse));
+        assert_eq!(builder.invalid(), Error::UpstreamResponse);
+
+        let mut out = builder.empty_object();
+        let name = builder.name(&"é".as_bytes().to_vec()).unwrap();
+        let seven = builder.integer(7);
+        assert_eq!(builder.insert(&mut out, name, seven), Ok(()));
+        let null = builder.null();
+        assert_eq!(
+            builder.insert(&mut out, "é".to_owned(), null),
+            Err(Error::UpstreamResponse)
+        );
+        // `Map::insert` mutates before reporting a duplicate. The renderer
+        // immediately propagates the error; it never releases this map.
+        assert_eq!(builder.finish_object(out), json!({"é": null}));
+    }
+
+    // Test the concrete selected-tree -> serde -> extracted wire encoder path,
+    // including field escaping, arrays, ordering, and the i64 boundary.
+    #[test]
+    fn selected_serde_capture_preserves_nested_public_bytes() {
+        let selected = filter::Json::Object(vec![
+            (
+                "z\n".as_bytes().to_vec(),
+                filter::Json::Text("\u{0001}é😀".as_bytes().to_vec()),
+            ),
+            (
+                b"a".to_vec(),
+                filter::Json::Array(vec![
+                    filter::Json::Object(vec![(b"n".to_vec(), filter::Json::Integer(i64::MIN))]),
+                    filter::Json::Boolean(false),
+                    filter::Json::Null,
+                ]),
+            ),
+        ]);
+        let actual = render(selected).unwrap();
+        let expected = json!({
+            "z\n": "\u{0001}é😀",
+            "a": [{"n": i64::MIN}, false, null],
+        });
+        assert_eq!(actual, expected);
+        assert_eq!(json::canonical(&actual), json::canonical(&expected));
+        let expected_wire = concat!(
+            r#"{"a":[{"n":-9223372036854775808},false,null],"#,
+            r#""z\n":"\u0001\u00e9\ud83d\ude00"}"#
+        );
+        assert_eq!(json::canonical(&actual).as_slice(), expected_wire.as_bytes());
+        assert!(json::capture(&actual).prepare(4096).is_ok());
+    }
+
     #[test]
     fn selected_renderer_refuses_invalid_utf8_opaque_or_duplicate_fields() {
         for selected in [

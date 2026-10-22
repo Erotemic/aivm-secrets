@@ -1023,6 +1023,7 @@ def inputs() -> list[str]:
         "proofs/GarrettNR23NativeRoute.lean",
         "proofs/GarrettNR23GuestObservations.lean",
         "proofs/GarrettNR23ProductionBoundary.lean",
+        "proofs/GarrettSelectedConversionInput.lean",
         "proofs/GarrettNR4ProjectedRelease.lean",
         "proofs/GarrettNR4ErrorFrames.lean",
         "proofs/GarrettNR4PairedNative.lean",

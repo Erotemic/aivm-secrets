@@ -26,16 +26,34 @@ and applies the same UTF-8 and duplicate-key errors. Inlining can eliminate
 the callback abstraction; no additional authorization or serialization pass
 is introduced.
 
+## Second increment: extracted projection guarantees renderer input shape
+
+The maintainer confirmed that the preceding Rust extraction and Lean increment
+worked on the pinned host. The follow-up
+[`GarrettSelectedConversionInput.lean`](../../proofs/GarrettSelectedConversionInput.lean)
+uses the existing Aeneas-extracted `disclosure.project` and
+`disclosure.project_fields` contracts to prove that **every successfully
+selected tree excludes `Opaque` at every depth**, rather than relying on a
+source comment or a flat top-level check. The input cannot contain an opaque
+leaf when the production `render(selected.value)` call is reached after a
+successful `project_fields`. The new module is included in Lake's focused proof
+gate and the ordinary source manifest; the generated file is not hand-edited.
+
+Native tests now exercise **each** `SerdeBuilder` callback's value/error
+behavior and compare nested selected serde output with the existing extracted
+wire encoder. This evidence is executable parity testing, **not** a Lean proof
+of the native callbacks.
+
 ## Precisely what is not proved yet
 
-- **Translation gate:** the checked-in generated Lean file predates this new
-  Rust function until Aeneas is run on the pinned host toolchain. This source
-  overlay is not a new Lean theorem or an accepted NR-4 proof. Do not manually
-  insert alleged generated definitions into `proofs/generated/`.
+- **Extracted renderer output:** `OpaqueFree` constrains its input. The next
+  theorem must establish structural output preservation from the actual
+  Aeneas-generated `selected_conversion.render` definition (including arrays,
+  object keys, and short-circuit behavior), without postulating that behavior.
 - **Builder contract:** `SerdeBuilder` is native, not itself Aeneas-extracted.
-  Its text/name UTF-8 conversion, integer/boolean/array construction,
-  duplicate-key map insertion and error semantics still need a proof or a
-  reviewed external contract tied to `selected_conversion.Builder`.
+  UTF-8 decoding, integer/boolean/array construction, duplicate-key map
+  insertion and error behavior are covered by focused native tests but are not
+  formally related to the extracted builder interface.
 - **Byte conversion:** `SelectedConversion` in
   `proofs/GarrettNR4ProjectedRelease.lean` remains a hypothesis. Linking the
   approved selected tree to `json::capture`, serde parsing, canonical byte
@@ -61,20 +79,18 @@ cd ..
 python3 dev/verification/garrett.py extract
 cd proofs
 lake exe cache get
-lake build GarrettNR4ProjectedRelease GarrettProductionSelectedRelease
+lake build GarrettSelectedConversionInput GarrettNR4ProjectedRelease
 cd ..
 
 # After reviewing generated Lean and confirming focused Rust/Lean checks:
 python3 dev/verification/garrett.py record-sources
 ```
 
-Aeneas/Charon may require a further extraction-compatibility adjustment to
-this generic recursive interface; it was not executed in the overlay-creation
-environment. Preserve the actual production traversal rather than replacing
-it with a proof-only copy. After successful extraction and focused compilation,
-review the generated `selected_conversion.render` definition and prove its
-structural preservation/no-opaque-release property, then discharge the
-specific `SerdeBuilder` callbacks before claiming that
+The previous pinned-host extraction is user-confirmed. This follow-up
+adds Lean input-invariant proofs and native parity tests without changing
+production traversal. After focused compilation of the new module, prove the generated
+`selected_conversion.render` output-refinement theorem and then discharge the
+specific `SerdeBuilder`/`json::capture` correspondence before claiming that
 `SelectedConversion` has been eliminated.
 
 `proofs/garrett-manifest.json` is intentionally **not re-fingerprinted here**:
