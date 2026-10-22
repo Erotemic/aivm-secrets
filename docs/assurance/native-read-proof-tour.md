@@ -27,9 +27,10 @@ This is why **a Lean file compiling is not sufficient evidence for the broad sec
 
 ## First source-owned read-driver/writer composition (new increment)
 
-**Implementation prepared; focused Lean compilation is not available in this
-artifact environment. Do not count this as accepted checked theorem until the
-maintainer's pinned `lake build GarrettNativeReadBoundary` succeeds.**
+**The maintainer accepted the initial `GarrettNativeReadBoundary` proof after
+its scoped-index binder correction and focused Lean build. The subsequent
+post-send/terminal-failure extension below is a new proof increment and
+requires its own focused build.**
 
 [`GarrettNativeReadBoundary.lean`](../../proofs/GarrettNativeReadBoundary.lean)
 introduces two related statements using the **actual extracted**
@@ -76,6 +77,40 @@ completion audit, guest frames and non-returning paths remain unclosed.
 at setup, bypass `Channel.submit` from `send`, or dispatch secret bytes through
 another sink, the external contracts or the desired global guarantee fail.
 The returned-read theorem by itself cannot rule those out.
+
+## Next native response and failure-boundary proof batch
+
+The extended [`GarrettNativeReadBoundary.lean`](../../proofs/GarrettNativeReadBoundary.lean)
+now contains four additional statements. They are deliberately attached to
+the same source-extracted `provider_exchange.exchange` execution rather than
+a second handcrafted trace interpreter:
+
+| New theorem | What it establishes | What it **does not** establish |
+| --- | --- | --- |
+| `constructed_setup_implies_fresh` | The extracted `Channel.new` constructor starts the captured request unspent; a returned native `setup_route` result shown equal to that constructor result discharges the original freshness premise | The unextracted native TLS factory always returns that shape; this remains a narrow implementation-to-constructor contract |
+| `constructed_setup_locks_response` | A newly returned channel cannot release its response stream before sending; `Channel.into_parts` refuses the return | The native response parser always goes through `into_parts` |
+| `returned_postsend_read_has_exact_flushed_wire` | A returned `.Response` or `.Complete` read has a sound source receipt trace, an issued current stamp and a same-state `Channel.submit` that read the exact captured bytes, succeeded at high-level `write_all`, and succeeded at `flush` before the channel became parser-eligible | Peer delivery, syscall segmentation, TLS correctness, post-send completion audit or selected guest frames |
+| `returned_send_failure_is_spent_and_cannot_retry` | A returned `.Send` failure consumes a fresh request, locks the response handoff, and a repeat `Channel.submit` has no new writer callback even if the first attempt partially emitted bytes | Exclusion of *other* native send paths or crash/snapshot rollback restoring an earlier channel |
+
+**Source inspection points:** `ManifestProvider::setup_route` ends in
+`Channel::new(request, ProviderWriter(stream), deadline)`;
+`send_manifest_bytes` calls `Channel::submit`;
+`ManifestProvider::receive` calls `into_parts` before parsing. The first two
+are still **native adapter contracts** in these theorems because the native
+TLS/`std::io::Write` layer is not in the Aeneas extraction. The `receive`
+linkage is not yet proved either. A proof of the extracted constructor does not
+by itself prove that every native setup returns through that constructor.
+
+**Falsifiers for this batch:** a native alternative setup returning a recycled
+channel; a send shim bypassing the source-owned `Channel.submit`; direct native
+parsing that bypasses `into_parts`; or an independent credential-bearing native
+socket. All would require revisiting the implementation contracts, even if
+the new extracted-core Lean proofs compile.
+
+This increment moves the request boundary forward to *eligible response bytes*
+and *failed-send replay behavior*. The next priority remains native adapter
+closure, transitive I/O sink reachability and the completion/guest-frame
+simulation. These are prerequisites to native adaptive noninterference.
 
 ## Walk through one intended provider attempt
 
