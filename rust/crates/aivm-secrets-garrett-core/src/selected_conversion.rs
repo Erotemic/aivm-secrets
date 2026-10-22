@@ -1,11 +1,10 @@
-//! Production-used traversal from an approved disclosure tree to a native
-//! public JSON value. This is the *same* Rust function called by the manifest
-//! adapter; the pinned Aeneas pipeline must extract this traversal rather
-//! than a proof-only mirror.
-//!
-//! The native builder owns UTF-8 decoding, serde value construction, map
-//! insertion, and their error behavior. Those are explicit, narrow external
-//! callbacks, not claims about arbitrary serde or guest-wire bytes.
+//! Production-used rendering of an approved disclosure tree to exact public
+//! JSON bytes. `render_wire` calls this module's generic recursive `render`
+//! with a concrete `WireBuilder` and feeds the existing extracted wire encoder.
+//! The pinned Aeneas pipeline extracts the same Rust called by the manifest
+//! adapter, not a proof-only mirror. The native `serde_json` adapter remains
+//! responsible for input parsing, host schema construction and final guest
+//! response handling, not for converting this selected tree.
 #![allow(clippy::ptr_arg)]
 
 use crate::disclosure::Json;
@@ -35,10 +34,10 @@ pub fn public_field_name(bytes: &Vec<u8>) -> bool {
     true
 }
 
-/// Each builder operation constructs public data from the already selected
-/// tree. In particular, there is no raw provider response argument or fallback.
-/// `name` precedes rendering its child, and `insert` follows that rendering,
-/// preserving the production adapter's failure/short-circuit order.
+/// Generic interface used by the extracted recursive renderer. Production
+/// instantiates it as `WireBuilder`; every operation sees only selected data,
+/// never the raw provider response. Name decoding precedes the child and
+/// insertion follows it, retaining failure/short-circuit order.
 pub trait Builder {
     type Value;
     type Name;
@@ -66,9 +65,8 @@ pub trait Builder {
 /// leaf may become a public value. Every array element and object field must
 /// be converted successfully before the enclosing value can be returned.
 ///
-/// The native `SerdeBuilder` is instantiated in `manifest/disclosure.rs`.
-/// Correspondence of builder callbacks and subsequent serde serialization
-/// remains to be proved separately, but structural selection is source-owned.
+/// The production specialization uses a concrete extracted `WireBuilder`;
+/// the final guest JSON parse/assembly/capture remains a separate proof edge.
 pub fn render<B: Builder>(selected: &Json, builder: &mut B) -> Result<B::Value, B::Error> {
     match selected {
         Json::Null => Ok(builder.null()),
@@ -99,6 +97,167 @@ pub fn render<B: Builder>(selected: &Json, builder: &mut B) -> Result<B::Value, 
         }
         Json::Opaque => Err(builder.invalid()),
     }
+}
+
+/// Construct the exact JSON-wire representation from the selected tree.
+/// This is the production renderer: UTF-8 decoding, number spelling, object
+/// insertion, and rejection are all implemented in the Aeneas-extracted crate.
+/// The native adapter no longer provides a generic serde construction callback.
+#[derive(Debug, PartialEq, Eq)]
+pub enum WireDenial {
+    InvalidText,
+    DuplicateName,
+    Opaque,
+}
+
+/// Strict Unicode scalar decoding of RFC 3629 UTF-8; rejects overlong encodings,
+/// surrogate values and scalars above U+10FFFF. Every byte is consumed once.
+/// No std::str::from_utf8 implementation is used in this production conversion.
+pub fn utf8_scalars(bytes: &Vec<u8>) -> Result<Vec<u32>, WireDenial> {
+    let mut scalars = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        let first = bytes[i];
+        if first < 0x80 {
+            scalars.push(first as u32);
+            i += 1;
+        } else if first >= 0xc2 && first <= 0xdf {
+            if bytes.len() - i < 2 {
+                return Err(WireDenial::InvalidText);
+            }
+            let second = bytes[i + 1];
+            if second < 0x80 || second > 0xbf {
+                return Err(WireDenial::InvalidText);
+            }
+            scalars.push(((first as u32 - 0xc0) * 64) + (second as u32 - 0x80));
+            i += 2;
+        } else if first >= 0xe0 && first <= 0xef {
+            if bytes.len() - i < 3 {
+                return Err(WireDenial::InvalidText);
+            }
+            let second = bytes[i + 1];
+            let third = bytes[i + 2];
+            if second < 0x80 || second > 0xbf || third < 0x80 || third > 0xbf
+                || (first == 0xe0 && second < 0xa0)
+                || (first == 0xed && second >= 0xa0)
+            {
+                return Err(WireDenial::InvalidText);
+            }
+            scalars.push(
+                (first as u32 - 0xe0) * 4096
+                    + (second as u32 - 0x80) * 64
+                    + (third as u32 - 0x80),
+            );
+            i += 3;
+        } else if first >= 0xf0 && first <= 0xf4 {
+            if bytes.len() - i < 4 {
+                return Err(WireDenial::InvalidText);
+            }
+            let second = bytes[i + 1];
+            let third = bytes[i + 2];
+            let fourth = bytes[i + 3];
+            if second < 0x80 || second > 0xbf || third < 0x80 || third > 0xbf
+                || fourth < 0x80 || fourth > 0xbf
+                || (first == 0xf0 && second < 0x90)
+                || (first == 0xf4 && second >= 0x90)
+            {
+                return Err(WireDenial::InvalidText);
+            }
+            scalars.push(
+                (first as u32 - 0xf0) * 262144
+                    + (second as u32 - 0x80) * 4096
+                    + (third as u32 - 0x80) * 64
+                    + (fourth as u32 - 0x80),
+            );
+            i += 4;
+        } else {
+            return Err(WireDenial::InvalidText);
+        }
+    }
+    Ok(scalars)
+}
+
+/// Decimal integer tokens, including i64::MIN, are spelled by extracted Rust.
+fn append_u64_decimal(output: &mut Vec<u8>, value: u64) {
+    if value >= 10 {
+        append_u64_decimal(output, value / 10);
+    }
+    output.push(b'0' + (value % 10) as u8);
+}
+pub fn integer_token(value: i64) -> Vec<u8> {
+    let mut output = Vec::new();
+    if value == i64::MIN {
+        output.extend_from_slice(b"-9223372036854775808");
+    } else if value < 0 {
+        output.push(b'-');
+        append_u64_decimal(&mut output, (-value) as u64);
+    } else {
+        append_u64_decimal(&mut output, value as u64);
+    }
+    output
+}
+
+pub struct WireBuilder;
+impl Builder for WireBuilder {
+    type Value = crate::json_wire::Value;
+    type Name = Vec<u32>;
+    type Object = Vec<(Vec<u32>, crate::json_wire::Value)>;
+    type Error = WireDenial;
+
+    fn null(&mut self) -> Self::Value {
+        crate::json_wire::Value::Null
+    }
+    fn boolean(&mut self, value: bool) -> Self::Value {
+        crate::json_wire::Value::Boolean(value)
+    }
+    fn integer(&mut self, value: i64) -> Self::Value {
+        crate::json_wire::Value::Number(integer_token(value))
+    }
+    fn text(&mut self, bytes: &Vec<u8>) -> Result<Self::Value, Self::Error> {
+        Ok(crate::json_wire::Value::Text(utf8_scalars(bytes)?))
+    }
+    fn array(&mut self, values: Vec<Self::Value>) -> Self::Value {
+        crate::json_wire::Value::Array(values)
+    }
+    fn name(&mut self, bytes: &Vec<u8>) -> Result<Self::Name, Self::Error> {
+        utf8_scalars(bytes)
+    }
+    fn empty_object(&mut self) -> Self::Object {
+        Vec::new()
+    }
+    fn insert(
+        &mut self,
+        object: &mut Self::Object,
+        name: Self::Name,
+        value: Self::Value,
+    ) -> Result<(), Self::Error> {
+        let mut i = 0;
+        while i < object.len() {
+            if object[i].0 == name {
+                return Err(WireDenial::DuplicateName);
+            }
+            i += 1;
+        }
+        // The native host constructs schema fields from its ordered serde map;
+        // extracted project_fields preserves that order, so the production
+        // input is already in canonical key order. No new sorting pass.
+        object.push((name, value));
+        Ok(())
+    }
+    fn finish_object(&mut self, object: Self::Object) -> Self::Value {
+        crate::json_wire::Value::Object(object)
+    }
+    fn invalid(&mut self) -> Self::Error {
+        WireDenial::Opaque
+    }
+}
+
+/// The production read-release path uses this specialization of the generic
+/// Aeneas-extracted renderer. The only subsequent format operation is the
+/// already-extracted json_wire::encode. Reflection is checked on this same
+/// selected tree and its emitted bytes before the native release adapter.
+pub fn render_wire(selected: &Json) -> Result<crate::json_wire::Value, WireDenial> {
+    render(selected, &mut WireBuilder)
 }
 
 #[cfg(test)]
@@ -169,6 +328,94 @@ mod tests {
         fn invalid(&mut self) -> Failure {
             Failure::Invalid
         }
+    }
+
+    #[test]
+    fn utf8_decoder_matches_rust_reference_and_rejects_malformed_encodings() {
+        for n in 0..=255_u8 {
+            for m in 0..=255_u8 {
+                let bytes = vec![n, m];
+                let reference = std::str::from_utf8(&bytes)
+                    .ok()
+                    .map(|s| s.chars().map(u32::from).collect::<Vec<_>>());
+                assert_eq!(utf8_scalars(&bytes).ok(), reference, "{bytes:?}");
+            }
+        }
+        for scalar in (0..=0x10ffff_u32).step_by(101) {
+            if let Some(c) = char::from_u32(scalar) {
+                let value = c.to_string();
+                assert_eq!(utf8_scalars(&value.into_bytes()), Ok(vec![scalar]));
+            }
+        }
+        for bytes in [
+            vec![0x80], vec![0xc0, 0x80], vec![0xc1, 0xbf],
+            vec![0xe0, 0x9f, 0xbf], vec![0xed, 0xa0, 0x80],
+            vec![0xf0, 0x8f, 0xbf, 0xbf], vec![0xf4, 0x90, 0x80, 0x80],
+            vec![0xf5, 0x80, 0x80, 0x80], vec![0xe2, 0x82],
+            vec![0xf0, 0x90, 0x80], vec![0xe2, 0x28, 0xa1],
+        ] {
+            assert_eq!(utf8_scalars(&bytes), Err(WireDenial::InvalidText));
+        }
+        for valid in ["", "ascii", "\u{0000}\n", "é", "😀", "\u{10ffff}"] {
+            assert_eq!(
+                utf8_scalars(&valid.as_bytes().to_vec()),
+                Ok(valid.chars().map(u32::from).collect()),
+            );
+        }
+    }
+
+    #[test]
+    fn i64_tokens_are_identical_to_standard_decimal_formatting() {
+        for n in [
+            i64::MIN,
+            i64::MIN + 1,
+            -100,
+            -10,
+            -1,
+            0,
+            1,
+            9,
+            10,
+            42,
+            i64::MAX,
+        ] {
+            assert_eq!(integer_token(n), n.to_string().into_bytes());
+        }
+        for n in -1000..=1000 {
+            assert_eq!(integer_token(n), n.to_string().into_bytes());
+        }
+    }
+
+    #[test]
+    fn concrete_wire_builder_preserves_selected_order_and_short_circuits() {
+        use crate::json_wire::encode;
+        let selected = Json::Object(vec![
+            (b"a".to_vec(), Json::Array(vec![Json::Integer(i64::MIN), Json::Null])),
+            (b"z".to_vec(), Json::Text("é😀".as_bytes().to_vec())),
+        ]);
+        let actual = render_wire(&selected).unwrap();
+        assert_eq!(
+            encode(&actual).ok().expect("selected wire must encode"),
+            br#"{"a":[-9223372036854775808,null],"z":"\u00e9\ud83d\ude00"}"#
+        );
+        assert!(matches!(
+            render_wire(&Json::Object(vec![
+                (b"x".to_vec(), Json::Null),
+                (b"x".to_vec(), Json::Opaque),
+            ])),
+            Err(WireDenial::Opaque)
+        ));
+        assert!(matches!(
+            render_wire(&Json::Object(vec![
+                (b"x".to_vec(), Json::Null),
+                (b"x".to_vec(), Json::Boolean(true)),
+            ])),
+            Err(WireDenial::DuplicateName)
+        ));
+        assert!(matches!(
+            render_wire(&Json::Text(vec![0xff])),
+            Err(WireDenial::InvalidText)
+        ));
     }
 
     #[test]

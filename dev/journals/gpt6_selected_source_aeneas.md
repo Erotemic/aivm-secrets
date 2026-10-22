@@ -46,3 +46,28 @@ new increment. No generated Lean or manifest hash has been fabricated.
 Next: prove the extracted public-field-name predicate's exact accepted byte
 language, then derive the structural callbacks of the actual generated
 `selected_conversion.render` with an explicit serde-builder contract.
+
+## 2026-10-22 - concrete production selected-wire builder
+
+Moved the **remaining selected-tree conversion primitives** into the same
+Aeneas-extracted core as the production recursive renderer. The new
+`selected_conversion::render_wire` calls the existing `render` with the
+concrete `WireBuilder`: strict UTF-8 scalars, signed i64 decimal token bytes,
+source-owned array/object construction and duplicate/opaque refusal. The
+selected result goes directly to extracted `json_wire::encode`. The native
+serde builder is removed, not mirrored. The selected tree and its exact
+public wire bytes are now checked for literal credential reflection **before**
+release, with no extra selected-value serde parse or re-encode. Native serde
+remains at the returned reply/final guest frame boundary.
+
+Local checks: W0 and W3 boundary checks passed; 180 W3 source-guard Python
+regression tests passed including re-fingerprinted bypass mutants. Added
+Rust parity tests for reference UTF-8 decoding, integer edge cases, nested
+selected bytes, failed fields and decoded/wire credential reflection. The
+pinned Rust/Aeneas/Lean compiler is not available in this working container;
+run the focused host gate to validate this new source and regenerate Lean.
+No generated Lean or fresh manifest fingerprint is preclaimed.
+
+The next formal target is the actual generated `selected_conversion.render_wire`
+output theorem joined to `json_wire.encode`, followed by exact native schema
+map/input correspondence and the full selected-to-assembled guest path.

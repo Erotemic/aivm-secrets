@@ -248,8 +248,7 @@ now derives `OpaqueFree` of the *entire* successful selected tree from
 Aeneas-extracted `disclosure.project` / `project_fields` and the existing
 `Fits` postcondition. Thus nested `Opaque` leaves cannot reach the
 production renderer after successful projection; the source filter itself
-supplies the certificate. This does **not** yet prove the extracted renderer's
-output semantics or native serde callback contracts.
+supplies the certificate. This does **not** yet prove the extracted renderer's output semantics.
 
 The same proof module now establishes
 `successful_project_fields_has_exact_root_keys`: successful root projection
@@ -260,15 +259,18 @@ Aeneas-extracted `project_fields` refinement. It also combines this with
 result. The native policy parser delegates output-name validation to a
 production-called Aeneas-extractable `selected_conversion::public_field_name`
 function. These narrow the output-name provenance boundary but do not establish
-serde-builder behavior or byte-level `SelectedConversion`.
+byte-level `SelectedConversion`.
 
-A follow-on [source conversion increment](nr4-selected-source-conversion.md)
-moves the production-selected JSON tree renderer's recursive traversal into
-Aeneas-extracted Rust, invoked by the real `Disclosure::project`. The
-preceding extraction compiled on the maintainer's pinned host. The new
-`OpaqueFree` lemma addresses the extracted projection's output shape only;
-structural refinement of the extracted renderer and native builder/serde
-contracts are still needed to discharge `SelectedConversion`.
+The [production selected-wire conversion increment](nr4-selected-source-conversion.md)
+now specializes the same extracted renderer with a concrete production
+`WireBuilder` **inside the Aeneas crate**, replacing the old native
+`SerdeBuilder`. UTF-8 decoding, signed decimal token construction, selected
+object insertion/duplicate rejection, and final `json_wire.encode` operate
+on the approved source tree. Before release, credential reflection is checked
+against that tree and its actual encoded bytes, with no serde parse/re-encode
+of the selected value. This narrows a real production correspondence boundary;
+it does not by itself supply the Lean output theorem, native input/map-order
+semantics or the still-open full `SelectedConversion`/guest-byte refinement.
 
 The proof includes independent authorization/audit/sink sequences for both
 returned source reads, a fixed public denial taxonomy, and arbitrary

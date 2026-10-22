@@ -672,21 +672,32 @@ def review_semantics(contents: dict[str, str]) -> None:
             and '"expected_thumbprint"' in handler and '"client_assurance"' in handler,
             'host rebinding lost private input or explicit target/assurance selection')
     d = contents[RUST + 'manifest/disclosure.rs']
-    require('filter::project_fields(' in d and 'ensure_safe(&value, credential)?;' in d,
+    require('filter::project_fields(' in d and 'ensure_selected_safe(&selected.value, &selected_bytes, credential)?;' in d,
             'native disclosure no longer selects and reflection-checks public fields')
-    # Successful selected-tree traversal has moved to the production-called,
-    # Aeneas-extractable Rust module. Its native builder only supplies serde
-    # constructors; no raw response is passed into the converter.
+    # Production release now uses the *concrete* Aeneas-extracted builder,
+    # including UTF-8 decoding, decimal integer tokens and duplicate refusal.
+    # The native adapter checks that same selected tree and its emitted bytes
+    # for reflection; it may not substitute raw provider JSON on success.
     selected = contents['rust/crates/aivm-secrets-garrett-core/src/selected_conversion.rs'].split('#[cfg(test)]', 1)[0]
+    disclosure_project = part(d, '    pub fn project(&self, operation:', '\nfn contains(')
     require('pub mod selected_conversion;' in contents['rust/crates/aivm-secrets-garrett-core/src/lib.rs']
-            and 'selected_conversion::render(&v, &mut SerdeBuilder)' in d
-            and 'let value = render(selected.value)?;' in d
-            and same_order(d, 'filter::project_fields(', 'let value = render(selected.value)?;',
-                           'ensure_safe(&value, credential)?;', 'core::release(')
             and 'pub fn render<B: Builder>(selected: &Json, builder: &mut B)' in selected
+            and 'pub fn render_wire(selected: &Json)' in selected
+            and 'render(selected, &mut WireBuilder)' in selected
+            and 'selected_conversion::render_wire(v)' in d
+            and 'json_wire::encode(&wire)' in d
+            and same_order(disclosure_project, 'filter::project_fields(',
+                           'let selected_bytes = render(&selected.value)?;',
+                           'ensure_selected_safe(&selected.value, &selected_bytes, credential)?;',
+                           'core::release(')
+            and 'selected: selected_bytes' in disclosure_project
+            and 'json_reflection::safe(v, secret, 65)' in d
+            and 'contains(wire, secret)' in d
+            and 'selected: json::canonical(&value)' not in disclosure_project
             and same_order(d, 'let name = n.as_bytes().to_vec();',
                            'if !selected_conversion::public_field_name(&name)',
                            'Ok(filter::Field {')
+            and 'm.iter()' in d
             and 'pub fn public_field_name(bytes: &Vec<u8>) -> bool' in selected
             and 'if bytes.len() == 0 || bytes.len() > 32' in selected
             and "if first < b'a' || first > b'z'" in selected
@@ -697,9 +708,18 @@ def review_semantics(contents: dict[str, str]) -> None:
                            'let value = render(&field.1, builder)?;',
                            'builder.insert(&mut out, name, value)?;')
             and 'Json::Opaque => Err(builder.invalid())' in selected
-            and 'std::str::from_utf8(bytes).map_err(|_| Error::UpstreamResponse)?' in d
-            and 'if out.insert(name, value).is_some()' in d,
-            'native selected projection no longer uses the reviewed extracted traversal')
+            and 'pub fn utf8_scalars(bytes: &Vec<u8>)' in selected
+            and 'if first < 0x80 {' in selected
+            and 'return Err(WireDenial::InvalidText)' in selected
+            and 'pub fn integer_token(value: i64)' in selected
+            and 'value == i64::MIN' in selected
+            and 'impl Builder for WireBuilder' in selected
+            and 'utf8_scalars(bytes)?' in selected
+            and same_order(selected, 'while i < object.len()',
+                           'if object[i].0 == name {',
+                           'return Err(WireDenial::DuplicateName);',
+                           'object.push((name, value));'),
+            'native selected release bypasses the source-extracted wire renderer or its checks')
     a = contents[RUST + 'client_alias.rs']
     require('"view" => CommandKind::View' in a
             and '"diff" => CommandKind::Diff' in a

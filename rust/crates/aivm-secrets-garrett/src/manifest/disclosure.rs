@@ -93,54 +93,12 @@ pub(crate) fn document(v: &Value) -> filter::Json {
         ),
     }
 }
-// The traversal is now production-called, Aeneas-targeted Rust. Only the
-// serde/UTF-8/map-construction primitives remain in this native adapter.
-struct SerdeBuilder;
-impl selected_conversion::Builder for SerdeBuilder {
-    type Value = Value;
-    type Name = String;
-    type Object = Map<String, Value>;
-    type Error = Error;
-
-    fn null(&mut self) -> Value {
-        Value::Null
-    }
-    fn boolean(&mut self, value: bool) -> Value {
-        Value::Bool(value)
-    }
-    fn integer(&mut self, value: i64) -> Value {
-        Value::Number(value.into())
-    }
-    fn text(&mut self, bytes: &Vec<u8>) -> Outcome<Value> {
-        let text = std::str::from_utf8(bytes).map_err(|_| Error::UpstreamResponse)?;
-        Ok(Value::String(text.to_owned()))
-    }
-    fn array(&mut self, values: Vec<Value>) -> Value {
-        Value::Array(values)
-    }
-    fn name(&mut self, bytes: &Vec<u8>) -> Outcome<String> {
-        Ok(std::str::from_utf8(bytes)
-            .map_err(|_| Error::UpstreamResponse)?
-            .to_owned())
-    }
-    fn empty_object(&mut self) -> Self::Object {
-        Map::new()
-    }
-    fn insert(&mut self, out: &mut Self::Object, name: String, value: Value) -> Outcome<()> {
-        if out.insert(name, value).is_some() {
-            return Err(Error::UpstreamResponse);
-        }
-        Ok(())
-    }
-    fn finish_object(&mut self, out: Self::Object) -> Value {
-        Value::Object(out)
-    }
-    fn invalid(&mut self) -> Error {
-        Error::UpstreamResponse
-    }
-}
-fn render(v: filter::Json) -> Outcome<Value> {
-    selected_conversion::render(&v, &mut SerdeBuilder)
+// The entire selected-tree -> Unicode-scalar / number-token traversal now
+// lives in production-called Aeneas-extracted Rust. The native serde adapter
+// handles provider/schema inputs and parses only the already-released result.
+fn render(v: &filter::Json) -> Outcome<Vec<u8>> {
+    let wire = selected_conversion::render_wire(v).map_err(|_| Error::UpstreamResponse)?;
+    aivm_secrets_garrett_core::json_wire::encode(&wire).map_err(|_| Error::UpstreamResponse)
 }
 impl Disclosure {
     pub fn parse(value: &Value, operations: &[String]) -> Outcome<Self> {
@@ -164,10 +122,10 @@ impl Disclosure {
             2 * 1024 * 1024 - 4096,
         )
         .map_err(|_| Error::UpstreamResponse)?;
-        let value = render(selected.value)?;
-        ensure_safe(&value, credential)?;
+        let selected_bytes = render(&selected.value)?;
+        ensure_selected_safe(&selected.value, &selected_bytes, credential)?;
         let released = core::release(core::ProviderReply {
-            selected: json::canonical(&value),
+            selected: selected_bytes,
             discarded: json::canonical(response),
         });
         json::parse(&released, 2 * 1024 * 1024).map_err(|_| Error::UpstreamResponse)
@@ -175,6 +133,17 @@ impl Disclosure {
 }
 fn contains(value: &[u8], secret: &[u8]) -> bool {
     aivm_secrets_garrett_core::reflection::contains(value, secret)
+}
+// Check the *same* source-owned selected tree and its encoded bytes. This
+// avoids a serde round trip (or a second encoding) before release. Reflection
+// of the assembled guest reply is still checked by `ensure_safe` separately.
+fn ensure_selected_safe(v: &filter::Json, wire: &[u8], secret: &[u8]) -> Outcome<()> {
+    if !aivm_secrets_garrett_core::json_reflection::safe(v, secret, 65)
+        || contains(wire, secret)
+    {
+        return Err(Error::UpstreamResponse);
+    }
+    Ok(())
 }
 pub(crate) fn ensure_safe(v: &Value, secret: &[u8]) -> Outcome<()> {
     // The parser permits at most 64 container levels. One extra step covers
@@ -193,8 +162,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn extracted_selected_renderer_keeps_native_json_values_and_encoding() {
+    fn extracted_wire_renderer_keeps_selected_value_and_exact_native_bytes() {
+        // Ordered host field schema (the native serde map supplies this order).
         let selected = filter::Json::Object(vec![
+            (b"empty".to_vec(), filter::Json::Object(vec![])),
             (
                 b"letter".to_vec(),
                 filter::Json::Text("é😀\n".as_bytes().to_vec()),
@@ -208,65 +179,20 @@ mod tests {
                     filter::Json::Boolean(true),
                 ]),
             ),
-            (b"empty".to_vec(), filter::Json::Object(Vec::new())),
         ]);
-        let rendered = render(selected).unwrap();
+        let wire = render(&selected).unwrap();
         let expected = json!({
             "letter":"é😀\n",
             "numbers":[i64::MIN, i64::MAX, null, true],
             "empty":{},
         });
-        assert_eq!(rendered, expected);
-        assert_eq!(json::canonical(&rendered), json::canonical(&expected));
+        assert_eq!(wire, json::canonical(&expected));
+        assert_eq!(json::parse(&wire, 4096).unwrap(), expected);
     }
 
-    // Aeneas treats these concrete native serde operations as builder callbacks.
-    // Exercise the callback contract separately from the recursive traversal:
-    // the callbacks may construct only public JSON from their explicit inputs.
     #[test]
-    fn selected_serde_builder_callbacks_preserve_values_and_failures() {
-        use selected_conversion::Builder as _;
-
-        let mut builder = SerdeBuilder;
-        assert_eq!(builder.null(), Value::Null);
-        assert_eq!(builder.boolean(false), Value::Bool(false));
-        assert_eq!(builder.boolean(true), Value::Bool(true));
-        assert_eq!(builder.integer(i64::MIN), json!(i64::MIN));
-        assert_eq!(builder.integer(i64::MAX), json!(i64::MAX));
-        assert_eq!(
-            builder.text(&"é😀\n".as_bytes().to_vec()),
-            Ok(json!("é😀\n"))
-        );
-        let minus_one = builder.integer(-1);
-        let null = builder.null();
-        assert_eq!(builder.array(vec![minus_one, null]), json!([-1, null]));
-        assert_eq!(builder.text(&vec![0xff]), Err(Error::UpstreamResponse));
-        assert_eq!(builder.name(&vec![0xc0, 0xaf]), Err(Error::UpstreamResponse));
-        assert_eq!(builder.invalid(), Error::UpstreamResponse);
-
-        let mut out = builder.empty_object();
-        let name = builder.name(&"é".as_bytes().to_vec()).unwrap();
-        let seven = builder.integer(7);
-        assert_eq!(builder.insert(&mut out, name, seven), Ok(()));
-        let null = builder.null();
-        assert_eq!(
-            builder.insert(&mut out, "é".to_owned(), null),
-            Err(Error::UpstreamResponse)
-        );
-        // `Map::insert` mutates before reporting a duplicate. The renderer
-        // immediately propagates the error; it never releases this map.
-        assert_eq!(builder.finish_object(out), json!({"é": null}));
-    }
-
-    // Test the concrete selected-tree -> serde -> extracted wire encoder path,
-    // including field escaping, arrays, ordering, and the i64 boundary.
-    #[test]
-    fn selected_serde_capture_preserves_nested_public_bytes() {
+    fn selected_wire_capture_preserves_nested_public_bytes() {
         let selected = filter::Json::Object(vec![
-            (
-                "z\n".as_bytes().to_vec(),
-                filter::Json::Text("\u{0001}é😀".as_bytes().to_vec()),
-            ),
             (
                 b"a".to_vec(),
                 filter::Json::Array(vec![
@@ -275,20 +201,23 @@ mod tests {
                     filter::Json::Null,
                 ]),
             ),
+            (
+                "z\n".as_bytes().to_vec(),
+                filter::Json::Text("\u{0001}é😀".as_bytes().to_vec()),
+            ),
         ]);
-        let actual = render(selected).unwrap();
+        let wire = render(&selected).unwrap();
         let expected = json!({
             "z\n": "\u{0001}é😀",
             "a": [{"n": i64::MIN}, false, null],
         });
-        assert_eq!(actual, expected);
-        assert_eq!(json::canonical(&actual), json::canonical(&expected));
         let expected_wire = concat!(
             r#"{"a":[{"n":-9223372036854775808},false,null],"#,
             r#""z\n":"\u0001\u00e9\ud83d\ude00"}"#
         );
-        assert_eq!(json::canonical(&actual).as_slice(), expected_wire.as_bytes());
-        assert!(json::capture(&actual).prepare(4096).is_ok());
+        assert_eq!(wire.as_slice(), expected_wire.as_bytes());
+        assert_eq!(wire, json::canonical(&expected));
+        assert_eq!(json::parse(&wire, 4096).unwrap(), expected);
     }
 
     #[test]
@@ -302,8 +231,64 @@ mod tests {
                 (b"same".to_vec(), filter::Json::Integer(1)),
             ]),
         ] {
-            assert!(matches!(render(selected), Err(Error::UpstreamResponse)));
+            assert_eq!(render(&selected), Err(Error::UpstreamResponse));
         }
+    }
+
+    #[test]
+    fn selected_render_matches_native_canonical_for_nested_host_schema() {
+        let disclosure = Disclosure::parse(
+            &json!({"pr.view": {
+                "title": {"at": ["title"], "type": "text"},
+                "metadata": {"at": ["details"], "type": "object", "fields": {
+                    "available": {"at": ["available"], "type": "boolean"},
+                    "tags": {"at": ["tags"], "type": "array", "max_items": 6,
+                             "items": {"at": [], "type": "text"}}
+                }},
+                "count": {"at": ["count"], "type": "integer"}
+            }}),
+            &["pr.view".to_owned()],
+        ).unwrap();
+        let raw = json!({
+            "title": "\né😀\\\"",
+            "details": {"available": true, "tags": ["two", "ñ", "\u{7f}"]},
+            "count": i64::MIN,
+            "discarded_secret": "not selected",
+        });
+        let fields = disclosure.rules.get("pr.view").unwrap();
+        let selected = filter::project_fields(&document(&raw), fields, 9, 2 * 1024 * 1024 - 4096)
+            .ok()
+            .expect("test document must project successfully");
+        let selected_wire = render(&selected.value).unwrap();
+        let expected = json!({
+            "count": i64::MIN,
+            "metadata": {"available": true, "tags": ["two", "ñ", "\u{7f}"]},
+            "title": raw["title"].clone(),
+        });
+        assert_eq!(selected_wire, json::canonical(&expected));
+        assert_eq!(json::parse(&selected_wire, 4096).unwrap(), expected);
+    }
+
+    #[test]
+    fn selected_reflection_checks_decoded_and_exact_encoded_bytes() {
+        let selected = filter::Json::Object(vec![(
+            b"name".to_vec(),
+            filter::Json::Text("é😀".as_bytes().to_vec()),
+        )]);
+        let wire = render(&selected).unwrap();
+        assert!(ensure_selected_safe(&selected, &wire, b"absent").is_ok());
+        assert_eq!(
+            ensure_selected_safe(&selected, &wire, "é".as_bytes()),
+            Err(Error::UpstreamResponse),
+        );
+        assert_eq!(
+            ensure_selected_safe(&selected, &wire, br"\u00e9"),
+            Err(Error::UpstreamResponse),
+        );
+        assert_eq!(
+            ensure_selected_safe(&selected, &wire, b"name"),
+            Err(Error::UpstreamResponse),
+        );
     }
 
     #[test]
