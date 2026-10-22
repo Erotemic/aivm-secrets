@@ -114,8 +114,8 @@ It does **not** establish:
 - a persistent, independently packaged optional AIVM adapter for an actual
   agent, live GitHub interoperability, or approved write effects.
 
-The maintainer's original real-VM smoke run has passed. The **next** gate is
-the controlled adversarial run described below. AIVM adapter lifecycle and
+The maintainer's original real-VM smoke **and the controlled adversarial
+extension** have both passed on actual `aivm-2404` KVM. AIVM adapter lifecycle and
 cleanup, more complete file/share reachability, and release verification are
 still open. The trust claims in
 [W0](planning/aivm-secrets-conditional-confinement.md) and the
@@ -189,9 +189,13 @@ reach the synthetic provider. Failed attempts must produce nonzero exit
 status; a missing optional capability, missing Python, unexpected output or
 inconclusive canary causes a failed gate, not `ok: true`.
 
-The extended mode has **portable unit-test coverage only until an actual
-`--adversarial` run is reported**. Do not mark this gate accepted based on
-Python source tests or on the earlier successful non-adversarial VM run.
+The maintainer reported an **actual successful `--adversarial` VM run** on
+2026-10-21: 23 portable tests passed; the KVM run returned `ok: true`,
+blocked the selected host gateway canary and direct provider-port probe,
+rejected foreign/mismatched/tampered client authority and out-of-scope reads,
+passed the bounded mount inventory and reconnect/revocation checks, and
+recorded exactly four authorized synthetic GETs. The report correctly keeps
+`filesystem_isolation_proved` and `whole_service_secrecy_proved` false.
 
 The following remain for OUT-2: verified end-to-end AIVM firewall rules,
 full guest mount/share exposure analysis including aliases, unregistered or
@@ -199,3 +203,5 @@ expired certificates, full guest reboot and snapshot/clone behavior, an
 independently reviewed optional adapter lifecycle, and preservation of
 normal AIVM workflows. The synthetic provider never receives a real GitHub
 credential. OUT-3 real-provider compatibility is a separate opt-in gate.
+
+The next independent service-facing test is the [opt-in real GitHub read-only fixture](aivm-github-live-readonly-acceptance.md), which targets `Erotemic/aivm-secrets` without creating a PR, issue, or repository.
