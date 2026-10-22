@@ -92,7 +92,7 @@ theorem refused_encoding_constructs_no_guest_frame
   -- `Result.ok` is coinductive in the Aeneas model, so eliminating its
   -- equality directly does not discriminate the inner `Err`/`Ok` constructors.
   -- First use the proved result-constructor injectivity lemma.
-  simpa only [denied, Result.ok.injEq, reduceCtorEq] using hypothetical
+  simp only [denied, Result.ok.injEq, reduceCtorEq] at hypothetical
 
 /-- Even when a native writer partially accepts a JSON frame and then fails,
     a second call through the same frame is refused without another callback.

@@ -214,3 +214,19 @@ number of OS writes or prove a provider received the request.
 Compile first, then review hypotheses and Rust source adjacency. The native
 scoped read-only assurance claim is **not** promoted to complete by these new
 files alone.
+
+## New NR-2/NR-3 exact-sink and writer-byte campaign (2026-10-22)
+
+The accepted five-module NR-2/NR-3 composition is now followed by a large,
+**not-yet-compiled** five-module proof increment. The critical improvement is
+multiplicity-sensitive ordered accounting for actual native credential-bearing
+attempts, captured-wire provenance at the `Channel.submit` callback, route
+preservation through the extracted native routing wrapper, and paired exact
+public-frame bytes. This is **conditional** on native adapter, sink-closure,
+conversion and external OS/TLS contracts; the exact-sink premise is a
+stronger requirement, not a proven fact about the live binary.
+
+See [the source-to-I/O theorem matrix and remaining obligations](nr23-exact-native-boundary.md).
+The first build command is `lake build GarrettNR23ProductionBoundary` after
+`lake exe cache get`. Do not treat the source-anchor regression checker as a
+proof of complete native I/O mediation.
