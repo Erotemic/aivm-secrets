@@ -173,3 +173,44 @@ For **each** proof increment, require a compact delta note in this file or the c
 5. **Remaining falsifier:** a concrete failure or attacker behavior still not covered by the statement.
 
 An overnight agent's self-review is not independent assurance. The maintainer should read the final theorem statements and attack correspondence **before** using this as an unattended credential-bearing AIVM integration. An NR-5/OUT-5 status change requires separate reviewer judgment, explicit external contracts and positive functionality, not just a passing build or enlarged proof file.
+
+## NR-2/NR-3 integrated source-to-I/O attempt (next increment)
+
+The next five Lean files are now **proposed** for the pinned toolchain; their
+focused build must precede accepting their statements. They compose existing
+source-extracted controllers instead of replacing them with an independent
+security state machine:
+
+- [`GarrettNR23Request.lean`](../../proofs/GarrettNR23Request.lean): the actual
+  returned request yields source-derived chronological and bound audit/send
+  events; successful completion requires selection, two current checks and
+  an acknowledged completion audit. A returned error yields a denial trace,
+  not a fabricated successful guest reply.
+- [`GarrettNR23Effects.lean`](../../proofs/GarrettNR23Effects.lean): exact
+  host-selected endpoint and encoded HTTP bytes, source-owned channel
+  callbacks and an **explicitly unproved** native sink-coverage contract.
+- [`GarrettNR23Failures.lean`](../../proofs/GarrettNR23Failures.lean): setup
+  denial, audited-but-unsent, post-audit freshness denial, invalid controller
+  transition, partial-write/replay failure, and response-parser failure.
+- [`GarrettNR23Guest.lean`](../../proofs/GarrettNR23Guest.lean): exact bounded
+  newline-terminated JSON frame for a **source-approved** completion, and
+  refused-encoding / failed-send replay properties. The native conversion
+  from approved `serde_json::Value` remains an explicit contract.
+- [`GarrettNR23Assurance.lean`](../../proofs/GarrettNR23Assurance.lean):
+  conditional top-level mediation and completed-audit/guest-frame statements.
+  Neither establishes unconditional **native** sink closure or observational
+  noninterference while its named native premises are not discharged.
+
+The [technical proof and risk ledger](nr23-source-to-io-attempt.md) contains
+source-path annotations, an NR-2/3 obligation matrix and a distinction between
+model-level Lean theorems and executable-level claims. The important remaining
+work is connecting actual native `Session::request`, `ManifestProvider`,
+`Audit::write_record`, `Disclosure::project`, and `Bridge::answer` callbacks
+**and all transitive sinks** to these statements. Do not treat the presence of
+`NativeSinkCoverage` as a proof that the running service satisfies it. A
+source trace counting a single logical provider attempt does not bound the
+number of OS writes or prove a provider received the request.
+
+Compile first, then review hypotheses and Rust source adjacency. The native
+scoped read-only assurance claim is **not** promoted to complete by these new
+files alone.
