@@ -258,3 +258,30 @@ guard catches selected source drift but cannot establish semantic or transitive
 I/O correspondence. Compilation of `GarrettNR4Assurance` on the pinned
 Lean toolchain is still required for this new batch; even after compilation,
 NR-4 implementation refinement and NR-5 independent review remain open.
+
+## Next Track A increment: extractable production controllers (new proof attempt)
+
+The production audit recorder, selected-result release and provider receive
+handoff now call extractable Rust controllers rather than duplicating their
+callback order in native glue. See
+[`nr-native-extracted-controllers.md`](nr-native-extracted-controllers.md) for
+precise Rust paths, failed branches, theorem-to-source mapping, extraction and
+focused build procedure, and the assumptions that **remain**. The new Lean
+entrypoint is `GarrettProductionAdapterRefinement` and requires regeneration of
+`generated/AivmSecretsGarrettCore.lean` from this Rust source. Existing
+NR-2/NR-3 and NR-4 formal results remain unchanged.
+
+## Production response-gate token (Aeneas compatibility repair)
+
+The initial extraction attempt for the native response controller failed
+inside the pinned Aeneas interpreter on the Rust `response_gate::Parser` trait
+signature. The revised production controller avoids this unsupported nested
+trait projection by exposing an **owned, sealed `response_gate::Released` token**
+in place of a generic parse callback. `ManifestProvider::receive` must obtain
+the token from the extracted readiness gate before its native parser can be
+called; the native parser consumes that token and cannot accept a raw Channel.
+
+`GarrettProductionResponseGate.lean` therefore proves the source-owned
+**token-eligibility and exact writer/flush provenance**, not a fictitious
+symbolic native parser invocation. The concrete native parse, all other native
+sinks, and OS/TLS behavior remain separate implementation obligations.

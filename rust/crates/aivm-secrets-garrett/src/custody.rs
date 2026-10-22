@@ -164,40 +164,19 @@ impl InnerEnvelope {
     }
 }
 
-// The only production implementation uses File::write_all and File::sync_all.
-// These external primitives are an explicit NR-2/NR-3 contract; sequencing,
-// denial after failure, and acknowledgement only after sync are source-owned.
-trait DurableAuditSink {
-    fn append(&mut self, bytes: &[u8]) -> Outcome<()>;
-    fn sync_record(&mut self) -> Outcome<()>;
-}
-impl DurableAuditSink for File {
-    fn append(&mut self, bytes: &[u8]) -> Outcome<()> {
-        self.write_all(bytes).map_err(|_| Error::InternalError)
+// Native File methods remain the deliberate external append/fsync primitives.
+// The entire fail-stop callback schedule is now source-owned and Aeneas-
+// extracted in `audit_record::append_durable_record`.
+struct AuditFile<'a>(&'a mut File);
+impl aivm_secrets_garrett_core::audit_record::Sink for AuditFile<'_> {
+    type Error = Error;
+    const POISONED: Error = Error::InternalError;
+    fn append(&mut self, bytes: &Vec<u8>) -> Outcome<()> {
+        self.0.write_all(bytes).map_err(|_| Error::InternalError)
     }
     fn sync_record(&mut self) -> Outcome<()> {
-        self.sync_all().map_err(|_| Error::InternalError)
+        self.0.sync_all().map_err(|_| Error::InternalError)
     }
-}
-
-// One attempt comprises a canonical record, its delimiter and a sync. Mark
-// poisoned *before* the first possible effect, so a failure or unwind cannot
-// leave this state available for an unacknowledged second record. The caller
-// holds the one session-wide mutex for the whole operation.
-fn append_durable_record<S: DurableAuditSink>(
-    sink: &mut S,
-    poisoned: &mut bool,
-    bytes: &[u8],
-) -> Outcome<()> {
-    if *poisoned {
-        return Err(Error::InternalError);
-    }
-    *poisoned = true;
-    sink.append(bytes)?;
-    sink.append(b"\n")?;
-    sink.sync_record()?;
-    *poisoned = false;
-    Ok(())
 }
 
 struct AuditState {
@@ -274,7 +253,8 @@ impl Audit {
         }
         let bytes = json::canonical(value);
         let AuditState { file, failed } = &mut *state;
-        append_durable_record(file, failed, &bytes)
+        let mut sink = AuditFile(file);
+        aivm_secrets_garrett_core::audit_record::append_durable_record(&mut sink, failed, &bytes)
     }
 }
 // This private adapter alone turns the opaque credential into provider wire
@@ -1080,9 +1060,11 @@ mod tests {
         accepted: Vec<u8>,
         fail_at: Option<&'static str>,
     }
-    impl DurableAuditSink for FaultAuditSink {
-        fn append(&mut self, bytes: &[u8]) -> Outcome<()> {
-            let step = if bytes == b"\n" { "newline" } else { "payload" };
+    impl aivm_secrets_garrett_core::audit_record::Sink for FaultAuditSink {
+        type Error = Error;
+        const POISONED: Error = Error::InternalError;
+        fn append(&mut self, bytes: &Vec<u8>) -> Outcome<()> {
+            let step = if bytes.as_slice() == b"\n" { "newline" } else { "payload" };
             self.steps.push(step);
             if self.fail_at == Some("partial") && step == "payload" {
                 self.accepted.extend_from_slice(&bytes[..bytes.len().min(3)]);
@@ -1117,18 +1099,18 @@ mod tests {
                 steps: vec![], accepted: vec![], fail_at: fault,
             };
             let mut poisoned = false;
-            let result = append_durable_record(&mut sink, &mut poisoned, b"{\"x\":1}");
+            let result = aivm_secrets_garrett_core::audit_record::append_durable_record(&mut sink, &mut poisoned, &b"{\"x\":1}".to_vec());
             assert_eq!(result.is_ok(), fault.is_none());
             assert_eq!(sink.steps, calls);
             assert_eq!(sink.accepted, accepted);
             assert_eq!(poisoned, fault.is_some());
             let steps = sink.steps.clone();
             if fault.is_some() {
-                assert!(matches!(append_durable_record(&mut sink, &mut poisoned, b"second"),
+                assert!(matches!(aivm_secrets_garrett_core::audit_record::append_durable_record(&mut sink, &mut poisoned, &b"second".to_vec()),
                     Err(Error::InternalError)));
                 assert_eq!(sink.steps, steps, "poisoned audit replayed I/O");
             } else {
-                append_durable_record(&mut sink, &mut poisoned, b"second").unwrap();
+                aivm_secrets_garrett_core::audit_record::append_durable_record(&mut sink, &mut poisoned, &b"second".to_vec()).unwrap();
                 assert!(!poisoned);
                 assert_eq!(&sink.accepted, b"{\"x\":1}\nsecond\n");
             }
@@ -1138,15 +1120,17 @@ mod tests {
     #[test]
     fn panic_during_audit_append_leaves_attempt_poisoned() {
         struct Panicking;
-        impl DurableAuditSink for Panicking {
-            fn append(&mut self, _bytes: &[u8]) -> Outcome<()> {
+        impl aivm_secrets_garrett_core::audit_record::Sink for Panicking {
+            type Error = Error;
+            const POISONED: Error = Error::InternalError;
+            fn append(&mut self, _bytes: &Vec<u8>) -> Outcome<()> {
                 panic!("synthetic sink panic")
             }
             fn sync_record(&mut self) -> Outcome<()> { unreachable!() }
         }
         let mut failed = false;
         let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            let _ = append_durable_record(&mut Panicking, &mut failed, b"private");
+            let _ = aivm_secrets_garrett_core::audit_record::append_durable_record(&mut Panicking, &mut failed, &b"private".to_vec());
         }));
         assert!(caught.is_err());
         assert!(failed);

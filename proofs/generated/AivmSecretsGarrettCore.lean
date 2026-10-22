@@ -18,7 +18,17 @@ set_option maxHeartbeats 1000000
 /- You can set the `maxRecDepth` value with the `-max-recdepth` CLI option -/
 set_option maxRecDepth 2048
 
+/- You can remove the following line by using the CLI option `-all-computable`: -/
+noncomputable section
+
 namespace aivm_secrets_garrett_core
+
+/-- [core::mem::maybe_uninit::MaybeUninit]
+    Source: '/rustc/library/core/src/mem/maybe_uninit.rs', lines 355:0-355:24
+    Name pattern: [core::mem::maybe_uninit::MaybeUninit]
+    Visibility: public -/
+@[rust_type "core::mem::maybe_uninit::MaybeUninit"]
+axiom core.mem.maybe_uninit.MaybeUninit (T : Type _) : Type
 
 /-- Trait implementation: [core::slice::cmp::{impl core::cmp::PartialEq<[U]> for [T]}]
     Source: '/rustc/library/core/src/slice/cmp.rs', lines 14:0-16:28
@@ -150,6 +160,67 @@ def approval.consume
           else ok (approval.Decision.Allowed, none)
     | approval.Mode.Allow => ok (approval.Decision.Allowed, prior)
   else ok (approval.Decision.Allowed, prior)
+
+/-- Trait declaration: [aivm_secrets_garrett_core::audit_record::Sink]
+    Source: 'crates/aivm-secrets-garrett-core/src/audit_record.rs', lines 13:0-18:1
+    Visibility: public -/
+structure audit_record.Sink (Self : Type _) (Self_Error : Type _) where
+  POISONED : Result Self_Error
+  append : Self → alloc.vec.Vec Std.U8 → Result ((core.result.Result Unit
+    Self_Error) × Self)
+  sync_record : Self → Result ((core.result.Result Unit Self_Error) × Self)
+
+/-- [aivm_secrets_garrett_core::audit_record::record_delimiter]:
+    Source: 'crates/aivm-secrets-garrett-core/src/audit_record.rs', lines 21:0-23:1
+    Visibility: public -/
+def audit_record.record_delimiter : Result (alloc.vec.Vec Std.U8) := do
+  let y ←
+    lift (Std.Array.to_slice (Array.make 1#usize [ 10#u8 ] : Array Std.U8
+      1#usize))
+  ok (alloc.slice.Slice.into_vec y)
+
+/-- [aivm_secrets_garrett_core::audit_record::append_durable_record]:
+    Source: 'crates/aivm-secrets-garrett-core/src/audit_record.rs', lines 28:0-43:1
+    Visibility: public -/
+def audit_record.append_durable_record
+  {S : Type _} {Clause0_Error : Type _} (SinkInst : audit_record.Sink S
+  Clause0_Error) (sink : S) (poisoned : Bool) (bytes : alloc.vec.Vec Std.U8) :
+  Result ((core.result.Result Unit Clause0_Error) × S × Bool)
+  := do
+  if poisoned
+  then
+    let t ← SinkInst.POISONED
+    ok (core.result.Result.Err t, sink, poisoned)
+  else
+    let (r, sink1) ← SinkInst.append sink bytes
+    let cf ← core.result.Result.Insts.CoreOpsTry.branch r
+    match cf with
+    | core.ops.control_flow.ControlFlow.Continue _ =>
+      let delimiter ← audit_record.record_delimiter
+      let (r1, sink2) ← SinkInst.append sink1 delimiter
+      let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
+      match cf1 with
+      | core.ops.control_flow.ControlFlow.Continue _ =>
+        let (r2, sink3) ← SinkInst.sync_record sink2
+        let cf2 ← core.result.Result.Insts.CoreOpsTry.branch r2
+        match cf2 with
+        | core.ops.control_flow.ControlFlow.Continue _ =>
+          ok (core.result.Result.Ok (), sink3, false)
+        | core.ops.control_flow.ControlFlow.Break residual =>
+          let r3 ←
+            core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+              Unit (core.convert.FromSame Clause0_Error) residual
+          ok (r3, sink3, true)
+      | core.ops.control_flow.ControlFlow.Break residual =>
+        let r2 ←
+          core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+            Unit (core.convert.FromSame Clause0_Error) residual
+        ok (r2, sink2, true)
+    | core.ops.control_flow.ControlFlow.Break residual =>
+      let r1 ←
+        core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+          Unit (core.convert.FromSame Clause0_Error) residual
+      ok (r1, sink1, true)
 
 /-- [aivm_secrets_garrett_core::authority::AuthorityDenial]
     Source: 'crates/aivm-secrets-garrett-core/src/authority.rs', lines 3:0-7:1
@@ -1790,7 +1861,7 @@ def credential_use.use_credential
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::Expectation]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 40:0-45:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 43:0-48:1
     Visibility: public -/
 structure Expectation where
   issuer : alloc.vec.Vec Std.U8
@@ -1799,7 +1870,7 @@ structure Expectation where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::Claims]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 29:0-38:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 32:0-41:1
     Visibility: public -/
 structure Claims where
   issuer : alloc.vec.Vec Std.U8
@@ -1885,14 +1956,14 @@ def manifest.current
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::Denial]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 25:0-27:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 28:0-30:1
     Visibility: public -/
 @[discriminant isize]
 inductive Denial where
 | InvalidCapability : Denial
 
 /-- [aivm_secrets_garrett_core::present]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 85:0-112:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 88:0-115:1
     Visibility: public -/
 def present
   (claims : Claims) (expected : Expectation) (peer : alloc.vec.Vec Std.U8)
@@ -6068,7 +6139,7 @@ def json_wire.prepare
     ok (core.result.Result.Err guest_frame.FrameDenial.Invalid)
 
 /-- [aivm_secrets_garrett_core::IssueWindow]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 47:0-51:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 50:0-54:1
     Visibility: public -/
 structure IssueWindow where
   issued_at : Std.I64
@@ -6076,7 +6147,7 @@ structure IssueWindow where
   epoch : Std.I64
 
 /-- [aivm_secrets_garrett_core::issue_window]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 54:0-81:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 57:0-84:1
     Visibility: public -/
 def issue_window
   (active : Bool) (epoch : Std.I64) (not_after : Std.I64) (now : Std.I64)
@@ -6120,21 +6191,21 @@ def issue_window
   else ok (core.result.Result.Err Denial.InvalidCapability)
 
 /-- [aivm_secrets_garrett_core::AuthenticatedEnvelope]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 116:0-119:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 119:0-122:1
     Visibility: public -/
 structure AuthenticatedEnvelope where
   claims : Claims
   encrypted : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::OpenedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 121:0-124:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 124:0-127:1
     Visibility: public -/
 structure OpenedSurrogate (S : Type _) where
   claims : Claims
   secret : S
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeVerifier]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 127:0-131:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 130:0-134:1
     Visibility: public -/
 structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
   verify : Self → alloc.vec.Vec Std.U8 → Result (core.result.Result
@@ -6143,7 +6214,7 @@ structure EnvelopeVerifier (Self : Type _) (Self_Secret : Type _) where
     Self_Secret Denial)
 
 /-- [aivm_secrets_garrett_core::open_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 136:0-158:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 139:0-161:1
     Visibility: public -/
 def open_surrogate
   {V : Type _} {Clause0_Secret : Type _} (EnvelopeVerifierInst :
@@ -6167,7 +6238,7 @@ def open_surrogate
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssueInputs]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 160:0-169:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 163:0-172:1
     Visibility: public -/
 structure IssueInputs where
   issuer : alloc.vec.Vec Std.U8
@@ -6180,7 +6251,7 @@ structure IssueInputs where
   not_after : Std.I64
 
 /-- [aivm_secrets_garrett_core::prepare_issue]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 172:0-187:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 175:0-190:1
     Visibility: public -/
 def prepare_issue
   (input : IssueInputs) (now : Std.I64) (lifetime : Std.I64) :
@@ -6203,21 +6274,21 @@ def prepare_issue
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::IssuedSurrogate]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 189:0-192:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 192:0-195:1
     Visibility: public -/
 structure IssuedSurrogate where
   claims : Claims
   token : alloc.vec.Vec Std.U8
 
 /-- Trait declaration: [aivm_secrets_garrett_core::EnvelopeIssuer]
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 194:0-197:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 197:0-200:1
     Visibility: public -/
 structure EnvelopeIssuer (Self : Type _) (Self_Secret : Type _) where
   «seal» : Self → Claims → Self_Secret → Result (core.result.Result
     (alloc.vec.Vec Std.U8) Denial)
 
 /-- [aivm_secrets_garrett_core::issue_surrogate]:
-    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 199:0-215:1
+    Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 202:0-218:1
     Visibility: public -/
 def issue_surrogate
   {I : Type _} {Clause0_Secret : Type _} (EnvelopeIssuerInst : EnvelopeIssuer I
@@ -9676,6 +9747,111 @@ def request_effects.RequestEffects.Insts.CoreDefaultDefault :
   core.default.Default request_effects.RequestEffects := {
   default := request_effects.RequestEffects.Insts.CoreDefaultDefault.default
 }
+
+/-- [aivm_secrets_garrett_core::response_gate::Released]
+    Source: 'crates/aivm-secrets-garrett-core/src/response_gate.rs', lines 18:0-22:1
+    Visibility: public -/
+structure response_gate.Released (B : Type _) (W : Type _) (M : Type _) where
+  writer : W
+  request : provider_io.Request B
+  metadata : M
+
+/-- [aivm_secrets_garrett_core::response_gate::{aivm_secrets_garrett_core::response_gate::Released<B, W, M>}::into_parts]:
+    Source: 'crates/aivm-secrets-garrett-core/src/response_gate.rs', lines 27:4-29:5
+    Visibility: public -/
+def response_gate.Released.into_parts
+  {B : Type _} {W : Type _} {M : Type _} (provider_ioWireBytesInst :
+  provider_io.WireBytes B) (self : response_gate.Released B W M) :
+  Result (W × (provider_io.Request B) × M)
+  := do
+  ok (self.writer, self.request, self.metadata)
+
+/-- [aivm_secrets_garrett_core::response_gate::receive]:
+    Source: 'crates/aivm-secrets-garrett-core/src/response_gate.rs', lines 35:0-44:1
+    Visibility: public -/
+def response_gate.receive
+  {B : Type _} {W : Type _} {M : Type _} {Clause1_Error : Type _}
+  (provider_ioWireBytesInst : provider_io.WireBytes B) (provider_ioWriterInst :
+  provider_io.Writer W Clause1_Error)
+  (channel : provider_io.Channel B W M Clause1_Error) :
+  Result (core.result.Result (response_gate.Released B W M) Clause1_Error)
+  := do
+  let r ←
+    provider_io.Channel.into_parts provider_ioWireBytesInst
+      provider_ioWriterInst channel
+  let cf ← core.result.Result.Insts.CoreOpsTry.branch r
+  match cf with
+  | core.ops.control_flow.ControlFlow.Continue val =>
+    let (writer, request, metadata) := val
+    ok (core.result.Result.Ok { writer, request, metadata })
+  | core.ops.control_flow.ControlFlow.Break residual =>
+    core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+      (response_gate.Released B W M) (core.convert.FromSame Clause1_Error)
+      residual
+
+/-- Trait declaration: [aivm_secrets_garrett_core::selected_release::Work]
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 9:0-20:1
+    Visibility: public -/
+structure selected_release.Work (Self : Type _) (Self_Metadata : Type _)
+  (Self_Selected : Type _) (Self_Reply : Type _) (Self_Error : Type _) where
+  current : Self → Result ((core.result.Result Unit Self_Error) × Self)
+  pagination : Self → Result ((core.result.Result (Option Self_Metadata)
+    Self_Error) × Self)
+  project : Self → Result ((core.result.Result Self_Selected Self_Error) ×
+    Self)
+  assemble : Self → Self_Selected → Option Self_Metadata → Result
+    (Self_Reply × Self)
+  check_safe : Self → Self_Reply → Result ((core.result.Result Unit
+    Self_Error) × Self)
+
+/-- [aivm_secrets_garrett_core::selected_release::select]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 25:0-32:1
+    Visibility: public -/
+def selected_release.select
+  {W : Type _} {Clause0_Metadata : Type _} {Clause0_Selected : Type _}
+  {Clause0_Reply : Type _} {Clause0_Error : Type _} (WorkInst :
+  selected_release.Work W Clause0_Metadata Clause0_Selected Clause0_Reply
+  Clause0_Error) (work : W) :
+  Result ((core.result.Result Clause0_Reply Clause0_Error) × W)
+  := do
+  let (r, work1) ← WorkInst.current work
+  let cf ← core.result.Result.Insts.CoreOpsTry.branch r
+  match cf with
+  | core.ops.control_flow.ControlFlow.Continue _ =>
+    let (r1, work2) ← WorkInst.pagination work1
+    let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
+    match cf1 with
+    | core.ops.control_flow.ControlFlow.Continue val =>
+      let (r2, work3) ← WorkInst.project work2
+      let cf2 ← core.result.Result.Insts.CoreOpsTry.branch r2
+      match cf2 with
+      | core.ops.control_flow.ControlFlow.Continue val1 =>
+        let (reply, work4) ← WorkInst.assemble work3 val1 val
+        let (r3, work5) ← WorkInst.check_safe work4 reply
+        let cf3 ← core.result.Result.Insts.CoreOpsTry.branch r3
+        match cf3 with
+        | core.ops.control_flow.ControlFlow.Continue _ =>
+          ok (core.result.Result.Ok reply, work5)
+        | core.ops.control_flow.ControlFlow.Break residual =>
+          let r4 ←
+            core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+              Clause0_Reply (core.convert.FromSame Clause0_Error) residual
+          ok (r4, work5)
+      | core.ops.control_flow.ControlFlow.Break residual =>
+        let r3 ←
+          core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+            Clause0_Reply (core.convert.FromSame Clause0_Error) residual
+        ok (r3, work3)
+    | core.ops.control_flow.ControlFlow.Break residual =>
+      let r2 ←
+        core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+          Clause0_Reply (core.convert.FromSame Clause0_Error) residual
+      ok (r2, work2)
+  | core.ops.control_flow.ControlFlow.Break residual =>
+    let r1 ←
+      core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+        Clause0_Reply (core.convert.FromSame Clause0_Error) residual
+    ok (r1, work1)
 
 /-- [aivm_secrets_garrett_core::trust::TrustDenial]
     Source: 'crates/aivm-secrets-garrett-core/src/trust.rs', lines 5:0-9:1

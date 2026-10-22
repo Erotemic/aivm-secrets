@@ -103,6 +103,45 @@ where
     }
 }
 
+// The production disclosure adapter supplies only the five external JSON and
+// clock/reflection primitives. The *order* and fail-stop release decision
+// live in extracted `selected_release::select`, not this callback.
+struct ManifestSelection<'a> {
+    session: &'a Session,
+    operation: &'a crate::manifest::Operation,
+    args: &'a BTreeMap<String, Value>,
+    raw: &'a Value,
+    secret: &'a Credential,
+}
+impl aivm_secrets_garrett_core::selected_release::Work for ManifestSelection<'_> {
+    type Metadata = Value;
+    type Selected = Value;
+    type Reply = Value;
+    type Error = Error;
+
+    fn current(&mut self) -> Outcome<()> {
+        self.session.require_control_active(host_time()?)
+    }
+    fn pagination(&mut self) -> Outcome<Option<Value>> {
+        self.session.policy.pagination(self.operation, self.args, self.raw)
+    }
+    fn project(&mut self) -> Outcome<Value> {
+        self.session.disclosure.project(
+            &self.operation.name, self.raw, &self.secret.0,
+        )
+    }
+    fn assemble(&mut self, selected: Value, metadata: Option<Value>) -> Value {
+        let mut reply = json!({"version":1,"ok":true,"result":selected});
+        if let Some(metadata) = metadata {
+            reply["meta"] = metadata;
+        }
+        reply
+    }
+    fn check_safe(&mut self, reply: &Value) -> Outcome<()> {
+        crate::manifest::disclosure::ensure_safe(reply, &self.secret.0)
+    }
+}
+
 // Only external observations remain native; the context and validation order
 // are owned by the extracted current-admission controller.
 struct CurrentChecks<'a, L> {
@@ -495,17 +534,14 @@ impl Session {
         let selection_secret = &secret;
         let release = |raw: Value| PendingCompletion {
             select: move || {
-                session.require_control_active(host_time()?)?;
-                let meta = session.policy.pagination(op, selection_args, &raw)?;
-                let result = session
-                    .disclosure
-                    .project(&op.name, &raw, &selection_secret.0)?;
-                let mut reply = json!({"version":1,"ok":true,"result":result});
-                if let Some(meta) = meta {
-                    reply["meta"] = meta;
-                }
-                crate::manifest::disclosure::ensure_safe(&reply, &selection_secret.0)?;
-                Ok(reply)
+                let mut selection = ManifestSelection {
+                    session,
+                    operation: op,
+                    args: selection_args,
+                    raw: &raw,
+                    secret: selection_secret,
+                };
+                aivm_secrets_garrett_core::selected_release::select(&mut selection)
             },
             audit: &self.base.executor.audit,
             operation: &op.name,
@@ -738,8 +774,29 @@ impl aivm_secrets_garrett_core::provider_exchange::Provider for ManifestProvider
         send_manifest_bytes(channel)
     }
     fn receive(&mut self, channel: ManifestChannel) -> Outcome<Value> {
-        let (ProviderWriter(stream), _request, _deadline) = channel.into_parts()?;
-        let effect = &self.effect;
+        // This source-extracted gate mints the unique parse-eligibility token
+        // only after the channel has successfully submitted and flushed.
+        let released = aivm_secrets_garrett_core::response_gate::receive(channel)?;
+        let mut parser = ManifestResponse { effect: &self.effect };
+        parser.parse(released)
+    }
+}
+// The native parser consumes a non-forgeable, non-cloneable Released token.
+// It has no Channel input and cannot construct a Released token itself.
+struct ManifestResponse<'a> {
+    effect: &'a Effect,
+}
+impl ManifestResponse<'_> {
+    fn parse(
+        &mut self,
+        released: aivm_secrets_garrett_core::response_gate::Released<
+            ManifestWire,
+            ProviderWriter<StreamOwned<ClientConnection, TcpStream>>,
+            Deadline,
+        >,
+    ) -> Outcome<Value> {
+        let (ProviderWriter(stream), _request, _deadline) = released.into_parts();
+        let effect = self.effect;
         let body = Zeroizing::new(manifest_response(BufReader::new(stream), &effect.response)?);
         if effect.response == "text" {
             Ok(json!(

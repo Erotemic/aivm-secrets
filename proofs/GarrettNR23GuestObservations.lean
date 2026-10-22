@@ -24,7 +24,7 @@ private abbrev boundAdapter {W F E O X D C V H : Type}
 
 /-- A deliberately *internal* completion fact, not a guest observation. -/
 def SourceReady {W F E O X D C V H : Type}
-    (ops : request_adapter.Work W F E O X
+    (_ops : request_adapter.Work W F E O X
       (current_admission.Bound D C H F X) V H) : Prop :=
   ∃ completed : request_adapter.Pending W F E O X
       (current_admission.Bound D C H F X) V H,

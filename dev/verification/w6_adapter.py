@@ -96,8 +96,15 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and 'self.ready = false;' in channel and 'self.request.submit(&mut self.writer)' in channel
            and 'self.ready = true;' in channel and 'if !self.ready {' in channel
            and 'Ok((self.writer, self.request, self.metadata))' in channel
-           and 'channel.into_parts()?' in receiver
-           and receiver.index('channel.into_parts()?') < receiver.index('manifest_response('),
+           and 'let released = aivm_secrets_garrett_core::response_gate::receive(channel)?;' in receiver
+           and 'let mut parser = ManifestResponse { effect: &self.effect };' in receiver
+           and 'parser.parse(released)' in receiver
+           and 'released: aivm_secrets_garrett_core::response_gate::Released<' in receiver
+           and 'released.into_parts()' in receiver
+           and 'channel.into_parts()?' in (root / 'rust/crates/aivm-secrets-garrett-core/src/response_gate.rs').read_text()
+           and 'Ok(Released {' in (root / 'rust/crates/aivm-secrets-garrett-core/src/response_gate.rs').read_text()
+           and (root / 'rust/crates/aivm-secrets-garrett-core/src/response_gate.rs').read_text().split('#[cfg(test)]', 1)[0].count('Ok(Released {') == 1
+           and receiver.index('aivm_secrets_garrett_core::response_gate::receive(') < receiver.index('manifest_response('),
            'captured channel or successful-flush response gate bypassed')
     admission = (root / CORE_CURRENT).read_text().split('#[cfg(test)]', 1)[0]
     scope = (root / CORE_CONTEXT).read_text().split('#[cfg(test)]', 1)[0]
@@ -156,12 +163,18 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
     ensure(len(release) == 2, 'native read must have a typed public-release boundary')
     release[1] = release[1].split('let work = PendingRequest {', 1)[0]
     release[1] = ''.join(release[1].split())
-    selected = 'session.disclosure.project(&op.name,&raw,&selection_secret.0)?'
-    checked = 'ensure_safe(&reply,&selection_secret.0)?'
-    finished = 'audit:&self.base.executor.audit,'
-    ensure(all(marker in release[1] for marker in (selected, checked, finished)) and
-           release[1].index(selected) < release[1].index(checked) < release[1].index(finished),
-           'raw provider body may be returned without selected/reflection-checked release')
+    selector = (root / 'rust/crates/aivm-secrets-garrett-core/src/selected_release.rs').read_text()
+    native_selector = source.split('struct ManifestSelection', 1)[1].split('// Only external observations remain native;', 1)[0]
+    ensure('selected_release::select(&mutselection)' in release[1]
+           and 'audit:&self.base.executor.audit,' in release[1]
+           and all(marker in native_selector for marker in
+                   ('fn pagination(', 'self.session.policy.pagination(', 'fn project(',
+                    'self.session.disclosure.project(', 'fn check_safe(',
+                    'ensure_safe(reply, &self.secret.0)'))
+           and all(marker in selector for marker in
+                   ('work.current()?;', 'work.pagination()?;', 'work.project()?;',
+                    'work.assemble(selected, metadata);', 'work.check_safe(&reply)?;', 'Ok(reply)')),
+           'raw provider body may be returned without extracted selection/reflection checks')
     completed = source.split("struct PendingCompletion<'a, S>", 1)[1].split('struct PendingRequest<', 1)[0]
     ensure('self.audit.write_record(' in completed and '(self.fresh)()' in completed
            and 'completion::complete(pending, self.effects)' in request_core

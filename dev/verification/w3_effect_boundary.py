@@ -207,11 +207,21 @@ def review_semantics(contents: dict[str, str]) -> None:
                            'completion::complete(pending, self.effects)',
                            'self.effects = report.effects;', 'report.outcome'),
             'completed guest release bypasses owned controller or actual audit')
-    require(same_order(''.join(release.split()), 'select:move||', 'session.policy.pagination(',
-                       'session.disclosure.project(', 'ensure_safe(&reply', 'audit:&self.base.executor.audit,')
+    selection_core = contents['rust/crates/aivm-secrets-garrett-core/src/selected_release.rs'].split('#[cfg(test)]', 1)[0]
+    selection_native = part(m, 'struct ManifestSelection', '// Only external observations remain native;')
+    require(same_order(''.join(release.split()), 'select:move||', 'ManifestSelection{',
+                       'selected_release::select(&mutselection)', 'audit:&self.base.executor.audit,')
+            and same_order(selection_core, 'work.current()?;', 'work.pagination()?;',
+                           'work.project()?;', 'work.assemble(selected, metadata)',
+                           'work.check_safe(&reply)?;', 'Ok(reply)')
+            and same_order(selection_native, 'fn current(', 'require_control_active(host_time()?)',
+                           'fn pagination(', 'self.session.policy.pagination(',
+                           'fn project(', 'self.session.disclosure.project(',
+                           'fn assemble(', '"result":selected', 'fn check_safe(',
+                           'ensure_safe(reply, &self.secret.0)')
             and 'selection_args = &args;' in request and 'selection_secret = &secret;' in request
             and 'session = &*self;' in request and 'fresh: &fresh,' in release,
-            'guest release bypasses selected disclosure/reflection/completion')
+            'guest release bypasses extracted source order / native selected/reflection callbacks')
     completion = part(transition, 'pub fn complete_current<', 'pub trait Request {')
     require(same_order(completion, 'pending.recheck(CompletionPhase::BeforeAudit)',
                        'pending.audit()', 'pending.recheck(CompletionPhase::BeforeRelease)',
@@ -446,8 +456,24 @@ def review_semantics(contents: dict[str, str]) -> None:
             and not any(marker in channel for marker in ['pub request:', 'pub writer:', 'pub metadata:', 'pub ready:'])
             and same_order(channel, 'self.ready = false;', 'self.request.submit(&mut self.writer)', 'self.ready = true;')
             and same_order(channel, 'pub fn into_parts(self)', 'if !self.ready {', 'return Err(W::INVALID_TRANSITION)', 'Ok((self.writer, self.request, self.metadata))')
-            and 'channel.into_parts()?' in receiver
-            and same_order(receiver, 'channel.into_parts()?', 'manifest_response(')
+            and same_order(receiver,
+                           'let released = aivm_secrets_garrett_core::response_gate::receive(channel)?;',
+                           'let mut parser = ManifestResponse { effect: &self.effect };',
+                           'parser.parse(released)',
+                           'struct ManifestResponse', 'fn parse(',
+                           'released: aivm_secrets_garrett_core::response_gate::Released<',
+                           'released.into_parts()',
+                           'manifest_response(BufReader::new(stream)')
+            and same_order(contents['rust/crates/aivm-secrets-garrett-core/src/response_gate.rs'],
+                           'pub struct Released', 'writer: W,', 'request: Request<B>,',
+                           'metadata: M,', 'pub fn into_parts(self)',
+                           '(self.writer, self.request, self.metadata)',
+                           'pub fn receive<B: WireBytes', 'channel.into_parts()?;',
+                           'Ok(Released {')
+            and not any(t in contents['rust/crates/aivm-secrets-garrett-core/src/response_gate.rs']
+                        for t in ('pub writer: W,', 'pub request: Request<B>,', 'pub metadata: M,'))
+            and '#[derive(Clone' not in contents['rust/crates/aivm-secrets-garrett-core/src/response_gate.rs']
+            and contents['rust/crates/aivm-secrets-garrett-core/src/response_gate.rs'].split('#[cfg(test)]', 1)[0].count('Ok(Released {') == 1
             and 'request,ProviderWriter(stream),deadline,' in ''.join(setup.split()),
             'captured native channel or successful-flush response gate bypassed')
     provider = contents['rust/crates/aivm-secrets-garrett-core/src/provider_exchange.rs'].split('#[cfg(test)]', 1)[0]
@@ -534,21 +560,22 @@ def review_semantics(contents: dict[str, str]) -> None:
     # source-owned sequence must mark an attempt before any possible I/O and
     # acknowledge it only after both record framing and sync succeed. A
     # failed append remains terminal even if the file received a byte prefix.
-    audit = part(c, 'fn append_durable_record<S: DurableAuditSink>(', 'struct AuditState {')
-    sink = part(c, 'trait DurableAuditSink {', 'struct AuditState {')
+    audit = contents['rust/crates/aivm-secrets-garrett-core/src/audit_record.rs'].split('#[cfg(test)]', 1)[0]
+    sink = part(c, "impl aivm_secrets_garrett_core::audit_record::Sink for AuditFile<'_>", 'struct AuditState {')
     audit_call = part(c, '    fn write_record(&self, value: &Value)',
                       '// This private adapter alone turns the opaque credential')
-    require('impl DurableAuditSink for File' in sink
-            and 'self.write_all(bytes).map_err(|_| Error::InternalError)' in sink
-            and 'self.sync_all().map_err(|_| Error::InternalError)' in sink
-            and same_order(audit, 'if *poisoned {', 'return Err(Error::InternalError);',
+    require("impl aivm_secrets_garrett_core::audit_record::Sink for AuditFile<'_>" in c
+            and 'self.0.write_all(bytes).map_err(|_| Error::InternalError)' in sink
+            and 'self.0.sync_all().map_err(|_| Error::InternalError)' in sink
+            and same_order(audit, 'if *poisoned {', 'return Err(S::POISONED);',
                            '*poisoned = true;', 'sink.append(bytes)?;',
-                           'sink.append(b"\\n")?;', 'sink.sync_record()?;',
+                           'let delimiter = record_delimiter();', 'sink.append(&delimiter)?;', 'sink.sync_record()?;',
                            '*poisoned = false;', 'Ok(())')
             and same_order(audit_call, 'self.state.lock()', 'if state.failed {',
                            'let bytes = json::canonical(value);',
                            'let AuditState { file, failed } = &mut *state;',
-                           'append_durable_record(file, failed, &bytes)')
+                           'let mut sink = AuditFile(file);',
+                           'aivm_secrets_garrett_core::audit_record::append_durable_record(&mut sink, failed, &bytes)')
             and audit_call.count('append_durable_record(') == 1,
             'native audit bypasses payload/delimiter/sync, fail-stop, or acknowledgement order')
     require('aivm_secrets_garrett_core::emission::emit_current(PendingEmission { check, emit })' in c

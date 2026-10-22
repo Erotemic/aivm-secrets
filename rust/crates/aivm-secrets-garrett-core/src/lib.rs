@@ -7,6 +7,9 @@
 #![allow(clippy::question_mark)]
 
 pub mod approval;
+pub mod audit_record;
+pub mod selected_release;
+pub mod response_gate;
 pub mod authority;
 pub mod coordination;
 pub mod coordinator_authority;

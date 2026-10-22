@@ -17,6 +17,8 @@ MANIFEST = 'rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs'
 CUSTODY = 'rust/crates/aivm-secrets-garrett/src/custody.rs'
 TLS = 'rust/crates/aivm-secrets-garrett/src/tls.rs'
 CORE = 'rust/crates/aivm-secrets-garrett-core/src/provider_io.rs'
+CORE_AUDIT = 'rust/crates/aivm-secrets-garrett-core/src/audit_record.rs'
+CORE_RESPONSE = 'rust/crates/aivm-secrets-garrett-core/src/response_gate.rs'
 
 
 @dataclass(frozen=True)
@@ -54,10 +56,20 @@ EDGES = (
          'fn send_manifest_bytes<W: Write, M>',
          ('fn write_all(&mut self, bytes: &Vec<u8>)',
           'self.0.write_all(bytes)', 'fn flush(&mut self)', 'self.0.flush()')),
-    Edge(MANIFEST, 'response-needs-consumed-channel-parts',
+    Edge(MANIFEST, 'native-receive-enters-extracted-response-gate',
          'fn receive(&mut self, channel: ManifestChannel)',
+         '// The native parser consumes',
+         ('let released = aivm_secrets_garrett_core::response_gate::receive(channel)?;',
+          'let mut parser = ManifestResponse { effect: &self.effect };',
+          'parser.parse(released)')),
+    Edge(CORE_RESPONSE, 'extracted-response-gate-before-token-mint',
+         'pub fn receive<B: WireBytes', '#[cfg(test)]',
+         ('channel.into_parts()?;', 'Ok(Released {', 'writer,', 'request,', 'metadata,')),
+    Edge(MANIFEST, 'native-parser-only-receives-released-parts',
+         'struct ManifestResponse',
          'impl aivm_secrets_garrett_core::provider_io::RouteWork',
-         ('channel.into_parts()?', 'manifest_response(BufReader::new(stream)',)),
+         ('fn parse(', 'response_gate::Released<',
+          'released.into_parts()', 'manifest_response(BufReader::new(stream)',)),
     Edge(MANIFEST, 'audit-route-records-request-binding',
          'fn audit_route(&mut self, route:', 'fn setup_route(&mut self, route:',
          ('audit.write_record(&json!({', '"event":"dispatch"',
@@ -66,15 +78,16 @@ EDGES = (
           '"operation":self.dispatch.operation',
           '"request_digest":self.dispatch.request_digest',
           '"route":{')),
-    Edge(CUSTODY, 'fail-stop-audit-prepoison-and-sync',
-         'fn append_durable_record<S: DurableAuditSink>', 'struct AuditState',
+    Edge(CORE_AUDIT, 'fail-stop-audit-prepoison-and-sync',
+         'pub fn append_durable_record<S: Sink>', '#[cfg(test)]',
          ('if *poisoned {', '*poisoned = true;', 'sink.append(bytes)?;',
-          'sink.append(b"\\n")?;', 'sink.sync_record()?;',
+          'let delimiter = record_delimiter();', 'sink.append(&delimiter)?;', 'sink.sync_record()?;',
           '*poisoned = false;', 'Ok(())')),
     Edge(CUSTODY, 'host-audit-requires-single-mutex-and-failed-state',
          'fn write_record(&self, value: &Value)', '// This private adapter alone',
          ('self.state.lock()', 'if state.failed {', 'json::canonical(value)',
-          'append_durable_record(file, failed, &bytes)')),
+          'let mut sink = AuditFile(file);',
+          'aivm_secrets_garrett_core::audit_record::append_durable_record(&mut sink, failed, &bytes)')),
     Edge(TLS, 'guest-frame-from-actual-answer-and-error',
          'fn from_answer(answer: Outcome<Value>)',
          'fn send(&mut self, writer: &mut impl Write)',
@@ -131,7 +144,7 @@ def scan(sources: dict[str, str]) -> list[str]:
 
 
 def read_sources(root: Path = ROOT) -> dict[str, str]:
-    return {name: (root / name).read_text() for name in (MANIFEST, CUSTODY, TLS, CORE)}
+    return {name: (root / name).read_text() for name in (MANIFEST, CUSTODY, TLS, CORE, CORE_AUDIT, CORE_RESPONSE)}
 
 
 def main() -> int:
