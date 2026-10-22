@@ -251,6 +251,17 @@ production renderer after successful projection; the source filter itself
 supplies the certificate. This does **not** yet prove the extracted renderer's
 output semantics or native serde callback contracts.
 
+The same proof module now establishes
+`successful_project_fields_has_exact_root_keys`: successful root projection
+returns an object with precisely the ordered output names from the trusted
+schema, using the preexisting independent `fieldsWith` specification and the
+Aeneas-extracted `project_fields` refinement. It also combines this with
+`OpaqueFree` into a single `successful_project_fields_has_public_shape`
+result. The native policy parser delegates output-name validation to a
+production-called Aeneas-extractable `selected_conversion::public_field_name`
+function. These narrow the output-name provenance boundary but do not establish
+serde-builder behavior or byte-level `SelectedConversion`.
+
 A follow-on [source conversion increment](nr4-selected-source-conversion.md)
 moves the production-selected JSON tree renderer's recursive traversal into
 Aeneas-extracted Rust, invoked by the real `Disclosure::project`. The

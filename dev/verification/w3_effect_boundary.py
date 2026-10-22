@@ -684,6 +684,13 @@ def review_semantics(contents: dict[str, str]) -> None:
             and same_order(d, 'filter::project_fields(', 'let value = render(selected.value)?;',
                            'ensure_safe(&value, credential)?;', 'core::release(')
             and 'pub fn render<B: Builder>(selected: &Json, builder: &mut B)' in selected
+            and same_order(d, 'let name = n.as_bytes().to_vec();',
+                           'if !selected_conversion::public_field_name(&name)',
+                           'Ok(filter::Field {')
+            and 'pub fn public_field_name(bytes: &Vec<u8>) -> bool' in selected
+            and 'if bytes.len() == 0 || bytes.len() > 32' in selected
+            and "if first < b'a' || first > b'z'" in selected
+            and "if !(lowercase || uppercase || digit || byte == b'_')" in selected
             and all(f'Json::{variant}' in selected for variant in
                     ('Null', 'Boolean', 'Integer', 'Text', 'Array', 'Object', 'Opaque'))
             and same_order(selected, 'let name = builder.name(&field.0)?;',

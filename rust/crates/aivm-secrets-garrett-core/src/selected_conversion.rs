@@ -10,6 +10,31 @@
 
 use crate::disclosure::Json;
 
+/// Validate the field names accepted by the native manifest schema parser.
+/// They are host-owned output keys, not JSON pointers or provider field names.
+/// This exact production-called byte loop is extracted by Aeneas.
+pub fn public_field_name(bytes: &Vec<u8>) -> bool {
+    if bytes.len() == 0 || bytes.len() > 32 {
+        return false;
+    }
+    let first = bytes[0];
+    if first < b'a' || first > b'z' {
+        return false;
+    }
+    let mut index = 0;
+    while index < bytes.len() {
+        let byte = bytes[index];
+        let lowercase = byte >= b'a' && byte <= b'z';
+        let uppercase = byte >= b'A' && byte <= b'Z';
+        let digit = byte >= b'0' && byte <= b'9';
+        if !(lowercase || uppercase || digit || byte == b'_') {
+            return false;
+        }
+        index += 1;
+    }
+    true
+}
+
 /// Each builder operation constructs public data from the already selected
 /// tree. In particular, there is no raw provider response argument or fallback.
 /// `name` precedes rendering its child, and `insert` follows that rendering,
@@ -143,6 +168,30 @@ mod tests {
         }
         fn invalid(&mut self) -> Failure {
             Failure::Invalid
+        }
+    }
+
+    #[test]
+    fn public_name_matches_previous_native_validator() {
+        // Exact parity against the prior native predicate, including UTF-8
+        // multibyte sequences and all possible byte values.
+        fn original(bytes: &[u8]) -> bool {
+            !bytes.is_empty()
+                && bytes.len() <= 32
+                && bytes[0].is_ascii_lowercase()
+                && bytes.iter().all(|b| b.is_ascii_alphanumeric() || *b == b'_')
+        }
+        let mut samples = vec![vec![], b"headRefOid".to_vec(), b"a_123".to_vec()];
+        for len in [1, 2, 31, 32, 33] {
+            for byte in 0..=255_u8 {
+                samples.push(vec![byte; len]);
+                let mut mixed = vec![b'a'; len];
+                mixed[len - 1] = byte;
+                samples.push(mixed);
+            }
+        }
+        for sample in samples {
+            assert_eq!(public_field_name(&sample), original(&sample), "{sample:?}");
         }
     }
 

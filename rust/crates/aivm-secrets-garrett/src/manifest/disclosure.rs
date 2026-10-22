@@ -8,23 +8,8 @@ pub struct Disclosure {
     rules: BTreeMap<String, Vec<filter::Field>>,
 }
 
-// A disclosure key names a host-selected field in the *public reply*, not
-// an input parameter or operation. JSON clients (including `gh --json`)
-// require camelCase keys such as `headRefOid`. Keep the identifier alphabet
-// bounded without loosening the policy grammar for guest-controlled names.
-fn public_field_name(value: &str) -> Outcome<()> {
-    let bytes = value.as_bytes();
-    if bytes.is_empty()
-        || bytes.len() > 32
-        || !bytes[0].is_ascii_lowercase()
-        || !bytes
-            .iter()
-            .all(|b| b.is_ascii_alphanumeric() || *b == b'_')
-    {
-        return bad();
-    }
-    Ok(())
-}
+// A disclosure key is a host-chosen output name, never a provider input path.
+// Its exact byte predicate lives in the Aeneas-extracted production core.
 struct Projection;
 impl Projection {
     fn parse(v: &Value, depth: usize) -> Outcome<filter::Projection> {
@@ -78,9 +63,12 @@ impl Projection {
         }
         m.iter()
             .map(|(n, v)| {
-                public_field_name(n)?;
+                let name = n.as_bytes().to_vec();
+                if !selected_conversion::public_field_name(&name) {
+                    return bad();
+                }
                 Ok(filter::Field {
-                    name: n.as_bytes().to_vec(),
+                    name,
                     projection: Self::parse(v, depth)?,
                 })
             })

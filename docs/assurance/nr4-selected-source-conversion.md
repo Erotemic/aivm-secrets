@@ -44,10 +44,39 @@ behavior and compare nested selected serde output with the existing extracted
 wire encoder. This evidence is executable parity testing, **not** a Lean proof
 of the native callbacks.
 
+## Third increment: source-owned public names and exact root-key provenance
+
+`manifest/disclosure.rs::Projection::fields` now validates its host-configured
+output names using `selected_conversion::public_field_name` in the same Rust
+crate as the production renderer. Its explicit byte loop has the same
+32-byte bound, lowercase-ASCII first character and ASCII alphanumeric / `_`
+continuation policy as the previous native predicate. Names are allocated
+once into the `Field` passed to `disclosure::project_fields`; no new check or
+extra pass occurs during a guest request. Rust tests exhaustively compare
+one- and two-position byte cases and the 31/32/33-byte boundaries with the
+previous predicate. The production name predicate is now an Aeneas extraction
+target; its exact boolean postcondition needs a later generated-source proof.
+
+`GarrettSelectedConversionInput.successful_project_fields_has_exact_root_keys`
+derives, from the existing Aeneas-extracted `project_fields` contract, that a
+successful result is a root `Json.Object` with *exactly* the ordered names in
+the host `Field` schema. The helper `fieldsWith_preserves_names` proves name
+preservation for successful recursive specification traversals. Together with
+`OpaqueFree`, the companion `successful_project_fields_has_public_shape`
+provides the two renderer-input facts without assuming that selected keys
+match the schema. This does not prove the native builder faithfully encodes
+those names, that recursively nested names satisfy the host name predicate,
+or that the emitted guest bytes match the selected tree.
+
+The W3 source guard now rejects production callers that bypass the extracted
+name validation, and rejects changed length/byte policy anchors. Its reviewed
+source hashes have been updated for only the two modified Rust files.
+
 ## Precisely what is not proved yet
 
-- **Extracted renderer output:** `OpaqueFree` constrains its input. The next
-  theorem must establish structural output preservation from the actual
+- **Extracted renderer output:** `OpaqueFree` and exact schema-owned root
+  keys constrain its input. The next theorem must establish structural output
+  preservation from the actual
   Aeneas-generated `selected_conversion.render` definition (including arrays,
   object keys, and short-circuit behavior), without postulating that behavior.
 - **Builder contract:** `SerdeBuilder` is native, not itself Aeneas-extracted.

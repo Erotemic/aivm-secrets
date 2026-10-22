@@ -21,3 +21,28 @@ builder or its associated types. If so, preserve production semantics and
 report the specific translator diagnostic. Confidence: source linkage and
 native failure-order design are straightforward; extractor acceptance has
 not yet been measured.
+
+## 2026-10-22 16:53:38 -0400
+
+Extended the successful extracted-root projection proof: its selected value
+must be a JSON object with exactly the host schema's ordered field names, and
+the previously proved entire-tree `OpaqueFree` invariant still holds. The
+proof reuses `project_fields_contract`, `refFields` and `fieldsWith` rather
+than constructing another execution surrogate.
+
+Moved the native policy's ASCII output-name test into the production-called
+`selected_conversion::public_field_name` Rust function to expose it to
+Aeneas. The native policy parser validates the same allocated field name
+before building the `Field`; no additional validation is added at request
+time. Rust unit regression compares the previous predicate across all bytes
+and policy-length boundaries. The W3 source anchors and two Rust fingerprints
+were refreshed following source review.
+
+Local checks: W0 and W3 source guards pass; 174 focused W3 Python tests pass.
+The pinned Rust/Charon/Aeneas/Lean toolchain is absent here, so extraction,
+Rust compilation and focused Lean compilation remain host checks for this
+new increment. No generated Lean or manifest hash has been fabricated.
+
+Next: prove the extracted public-field-name predicate's exact accepted byte
+language, then derive the structural callbacks of the actual generated
+`selected_conversion.render` with an explicit serde-builder contract.

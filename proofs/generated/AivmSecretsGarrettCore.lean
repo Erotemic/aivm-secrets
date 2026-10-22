@@ -9789,8 +9789,75 @@ def response_gate.receive
       (response_gate.Released B W M) (core.convert.FromSame Clause1_Error)
       residual
 
+/-- [aivm_secrets_garrett_core::selected_conversion::public_field_name]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 25:4-36:1
+    Visibility: public -/
+@[rust_loop]
+def selected_conversion.public_field_name_loop
+  (bytes : alloc.vec.Vec Std.U8) (index : Std.Usize) : Result Bool := do
+  let i := alloc.vec.Vec.len bytes
+  if index < i
+  then
+    let byte ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U8) bytes
+        index
+    let lowercase ← if byte >= 97#u8
+                      then ok (byte <= 122#u8)
+                      else ok false
+    let uppercase ← if byte >= 65#u8
+                      then ok (byte <= 90#u8)
+                      else ok false
+    let digit ← if byte >= 48#u8
+                  then ok (byte <= 57#u8)
+                  else ok false
+    if lowercase
+    then
+      let index1 ← index + 1#usize
+      selected_conversion.public_field_name_loop bytes index1
+    else
+      if uppercase
+      then
+        let index1 ← index + 1#usize
+        selected_conversion.public_field_name_loop bytes index1
+      else
+        if digit
+        then
+          let index1 ← index + 1#usize
+          selected_conversion.public_field_name_loop bytes index1
+        else
+          if byte = 95#u8
+          then
+            let index1 ← index + 1#usize
+            selected_conversion.public_field_name_loop bytes index1
+          else ok false
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::selected_conversion::public_field_name]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 16:0-36:1
+    Visibility: public -/
+def selected_conversion.public_field_name
+  (bytes : alloc.vec.Vec Std.U8) : Result Bool := do
+  let i := alloc.vec.Vec.len bytes
+  if i = 0#usize
+  then ok false
+  else
+    let i1 := alloc.vec.Vec.len bytes
+    if i1 > 32#usize
+    then ok false
+    else
+      let first ←
+        alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U8)
+          bytes 0#usize
+      if first < 97#u8
+      then ok false
+      else
+        if first > 122#u8
+        then ok false
+        else selected_conversion.public_field_name_loop bytes 0#usize
+
 /-- Trait declaration: [aivm_secrets_garrett_core::selected_conversion::Builder]
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 17:0-38:1
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 42:0-63:1
     Visibility: public -/
 structure selected_conversion.Builder (Self : Type _) (Self_Value : Type _)
   (Self_Name : Type _) (Self_Object : Type _) (Self_Error : Type _) where
@@ -9811,7 +9878,7 @@ structure selected_conversion.Builder (Self : Type _) (Self_Value : Type _)
 mutual
 
 /-- [aivm_secrets_garrett_core::selected_conversion::render]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 56:12-77:1
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 81:12-102:1
     Visibility: public -/
 @[rust_loop]
 def selected_conversion.render_loop0
@@ -9846,7 +9913,7 @@ def selected_conversion.render_loop0
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::selected_conversion::render]: loop 1:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 66:12-77:1
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 91:12-102:1
     Visibility: public -/
 @[rust_loop]
 def selected_conversion.render_loop1
@@ -9899,7 +9966,7 @@ def selected_conversion.render_loop1
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::selected_conversion::render]:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 47:0-77:1
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 72:0-102:1
     Visibility: public -/
 def selected_conversion.render
   {B : Type _} {Clause0_Value : Type _} {Clause0_Name : Type _} {Clause0_Object
