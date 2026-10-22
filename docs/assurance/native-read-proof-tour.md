@@ -230,3 +230,31 @@ See [the source-to-I/O theorem matrix and remaining obligations](nr23-exact-nati
 The first build command is `lake build GarrettNR23ProductionBoundary` after
 `lake exe cache get`. Do not treat the source-anchor regression checker as a
 proof of complete native I/O mediation.
+
+## NR-4: recursive declassification to native guest bytes and adaptive sessions (2026-10-22)
+
+The proposed [`GarrettNR4Assurance.lean`](../../proofs/GarrettNR4Assurance.lean)
+composes five new modules. Their goal is to close a **different** gap than
+NR-2/3: whether two private states with the same approved selected fields and
+permitted public status can give an adaptive guest distinguishable responses.
+The important improvement is a **derived equality of approved wire bytes**:
+`ProjectionAgreement` + source-extracted recursive `disclosure.project` +
+a single named `SelectedConversion` contract + extracted `json_wire.prepare`
+produce equal complete newline frames. The caller no longer assumes that
+the two encoded outputs were equal.
+
+The proof includes independent authorization/audit/sink sequences for both
+returned source reads, a fixed public denial taxonomy, and arbitrary
+feedback-dependent request strategies over offered bytes, error/outcome codes,
+and modeled metadata. Error categories, reflection-denial decisions, status,
+frame length, pagination and closure differences are explicitly observable.
+The `PairedStepCertificate` spells out the state-preserving native refinement
+required for the adaptive theorem. **Production Rust does not yet have a
+formal proof that every native step supplies this certificate.**
+
+Read the [NR-4 proof/assumption matrix](nr4-native-observation-attempt.md) before
+using any new theorem as evidence for AIVM trust. The new 8-region Rust source
+guard catches selected source drift but cannot establish semantic or transitive
+I/O correspondence. Compilation of `GarrettNR4Assurance` on the pinned
+Lean toolchain is still required for this new batch; even after compilation,
+NR-4 implementation refinement and NR-5 independent review remain open.
