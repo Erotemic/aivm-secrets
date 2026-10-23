@@ -19,16 +19,16 @@
     "non_committing_work": "requires_reconcile",
     "compaction_usage": "measured_signals_only_when_runtime_omits_usage"
   },
-  "through": "2026-10-23T10:28:41.671944+00:00",
-  "ledger_rows": 90,
-  "commits_accounted": 89,
-  "turns": 3066,
+  "through": "2026-10-23T11:47:53.879399+00:00",
+  "ledger_rows": 95,
+  "commits_accounted": 93,
+  "turns": 3189,
   "tokens": {
-    "input": 3926485,
-    "cache_write": 2123284,
-    "cache_read": 964942973,
-    "output": 2653617,
-    "billable_input": 970992742
+    "input": 3926731,
+    "cache_write": 2354475,
+    "cache_read": 1002875952,
+    "output": 2763940,
+    "billable_input": 1009157158
   },
   "by_model": {
     "gpt-6.1-sol": {
@@ -38,18 +38,18 @@
       "output": 1607585
     },
     "claude-opus-5-5": {
-      "input": 2364,
-      "cache_write": 2123284,
-      "cache_read": 549352573,
-      "output": 1046032
+      "input": 2610,
+      "cache_write": 2354475,
+      "cache_read": 587285552,
+      "output": 1156355
     }
   },
   "by_activity": {
     "unlabeled": {
-      "input": 3926485,
-      "cache_write": 2123284,
-      "cache_read": 964942973,
-      "output": 2653617
+      "input": 3926731,
+      "cache_write": 2354475,
+      "cache_read": 1002875952,
+      "output": 2763940
     }
   },
   "by_agent": {
@@ -60,10 +60,10 @@
       "output": 1607585
     },
     "claude-code": {
-      "input": 2364,
-      "cache_write": 2123284,
-      "cache_read": 549352573,
-      "output": 1046032
+      "input": 2610,
+      "cache_write": 2354475,
+      "cache_read": 587285552,
+      "output": 1156355
     }
   },
   "server_tool_calls": {
@@ -71,12 +71,12 @@
     "web_fetch": 0
   },
   "time": {
-    "wall_clock_s": 128201.6
+    "wall_clock_s": 132645.6
   },
   "compaction_signals": {
-    "events": 1,
-    "peak_context_tokens": 966328,
-    "summary_chars": 23769
+    "events": 2,
+    "peak_context_tokens": 1932470,
+    "summary_chars": 42038
   },
   "modeled_post_hoc": "inference_seconds, energy_kwh, carbon_gco2e, usd — derived from the measurements above by `estimate`; not stored here."
 }
