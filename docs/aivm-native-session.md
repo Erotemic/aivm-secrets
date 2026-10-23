@@ -40,7 +40,7 @@ then stops the forward and the bridge and removes the guest directory. Any
 failure prints `{"version":1,"ready":false,"error":CODE}` and exits 1. Codes:
 `invalid_spec`, `missing_binary`, `guest_unreachable`, `guest_key_failed`,
 `enrollment_failed`, `broker_failed`, `forward_failed`,
-`credential_exposed`. No detail text is printed.
+`credential_exposed`, `proxy_failed`. No detail text is printed.
 
 The provider credential stays in the host bridge. The guest receives only its
 own key, certificate-bound capability and client config.
@@ -62,6 +62,29 @@ The flag excludes every other `--secrets_*` option and disables agent
 forwarding for the session. It refuses before any VM preparation when the
 package is not installed. Default `aivm ssh` loads neither the adapter nor
 this package; a subprocess test in AIVM checks this.
+
+## Optional: ordinary HTTPS tools through the constrained profile
+
+Add `"constrained_proxy": {"guest_port": PORT}` (1024–65535) to the spec to
+also start the native `garrett-proxy` **inside the guest** as the
+constrained-http translator (HP-6). It holds no credential. It accepts an
+ordinary HTTPS request only if it is exactly one named operation of a public
+copy of the policy (the host policy without `egress` and with a dummy
+credential source), and sends that operation through the guest's
+`garrett-client invoke`, so the host bridge authorizes every provider
+effect on its own policy. The guest also receives:
+
+- `proxy-ca.pem` and `proxy-bundle.pem` (the guest's roots plus that CA);
+- `env`, which sets `HTTPS_PROXY` (with the translator's session token),
+  `SSL_CERT_FILE`, `CURL_CA_BUNDLE` and `REQUESTS_CA_BUNDLE`.
+
+The announcement then also carries `guest.env`. Tools that honour
+`HTTPS_PROXY` work unchanged; they see only each operation's disclosure,
+never full provider responses. `tests/test_native_session.py` drives stock
+`curl` through it: an allowed read succeeds, an out-of-scope or unmatched
+request never reaches the provider, and no guest file contains the
+credential. The translator's lifetime lease is the session: closing the
+session closes its stdin.
 
 ## Not yet covered
 

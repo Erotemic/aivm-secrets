@@ -118,6 +118,68 @@ def test_revoking_the_guest_identity_mid_session_stops_the_next_request(tmp_path
             process.stdin.close()
             assert process.wait(timeout=30) == 0
 
+
+@pytest.mark.skipif(__import__("shutil").which("curl") is None, reason="needs curl")
+def test_constrained_proxy_serves_stock_curl_without_a_guest_credential(tmp_path):
+    """HP-6 end to end: stock curl, only the published env file, through the
+    guest-side translator and the native bridge to the provider."""
+    import socket
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    with TLSService(provider_directory(tmp_path), host="api.example.org") as provider:
+        provider.routes[("GET", "/v1/tickets/7")] = {"id": 7, "private": TOKEN}
+        spec = spec_for(tmp_path, provider, constrained_proxy={"guest_port": port})
+        process, announcement = start(spec)
+        try:
+            assert announcement.get("ready") is True, announcement
+            env = announcement["guest"]["env"]
+            guest_dir = Path(announcement["guest"]["dir"])
+
+            def curl(path):
+                return subprocess.run(
+                    ["sh", "-c", ". " + env + " && exec curl -sS --max-time 20 "
+                     "-H 'Authorization: token guest-placeholder' "
+                     "-w '\\n%{http_code}' https://api.example.org" + path],
+                    capture_output=True, timeout=60)
+
+            allowed = curl("/v1/tickets/7")
+            body, _, code = allowed.stdout.rpartition(b"\n")
+            assert code == b"200", allowed
+            assert json.loads(body) == {"id": 7}
+            [sent] = provider.seen()
+            assert sent["headers"]["authorization"] == "Bearer " + TOKEN
+            denied = curl("/v1/tickets/9")
+            assert not denied.stdout.endswith(b"200"), denied
+            unmatched = curl("/v1/users/7")
+            assert unmatched.stdout.endswith(b"403"), unmatched
+            assert len(provider.seen()) == 1
+            for path in guest_dir.rglob("*"):
+                if path.is_file():
+                    assert TOKEN.encode() not in path.read_bytes(), path
+            for output in (allowed, denied, unmatched):
+                assert TOKEN.encode() not in output.stdout + output.stderr
+        finally:
+            process.stdin.close()
+            assert process.wait(timeout=30) == 0
+        assert not guest_dir.exists()
+        out, err = process.stdout.read(), process.stderr.read()
+        assert TOKEN.encode() not in out + err
+
+
+def test_native_session_refuses_a_bad_constrained_proxy_spec(tmp_path):
+    with TLSService(provider_directory(tmp_path), host="api.example.org") as provider:
+        path = spec_for(tmp_path, provider)
+        base = json.loads(path.read_text())
+        for bad in ({"guest_port": 80}, {"guest_port": "8443"}, {"port": 8443}, True):
+            path.write_text(json.dumps({**base, "constrained_proxy": bad}))
+            done = subprocess.run(
+                [sys.executable, "-m", "aivm_secrets", "native-session", "--spec", str(path)],
+                cwd=ROOT, capture_output=True, timeout=60, input=b"")
+            assert done.returncode == 1
+            assert json.loads(done.stdout) == {"version": 1, "ready": False, "error": "invalid_spec"}
+
 def test_native_session_refuses_a_spec_without_explicit_key_approval(tmp_path):
     with TLSService(provider_directory(tmp_path), host="api.example.org") as provider:
         process, announcement = start(spec_for(tmp_path, provider, approve_session_key=False))

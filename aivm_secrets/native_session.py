@@ -17,8 +17,14 @@ Lifecycle, in order:
    credential; the guest receives the bound capability and client config;
 4. the guest's broker socket is connected to the host socket (an SSH
    reverse forward of that one socket, or the same path for a local guest);
-5. one announcement line is printed; the session lasts until stdin closes;
-6. teardown stops the forward and the bridge and removes the guest directory.
+5. optionally (``constrained_proxy``), the native ``garrett-proxy`` starts
+   **inside the guest** as the constrained-http translator: it holds no
+   credential, translates ordinary HTTPS requests into named operations and
+   sends them through the guest client; the guest gets an ``env`` file
+   setting ``HTTPS_PROXY`` (HP-6);
+6. one announcement line is printed; the session lasts until stdin closes;
+7. teardown stops the translator, the forward and the bridge and removes the
+   guest directory.
 
 The spec names host-private files (credential, policy, disclosure and the
 provider CA, all mode 0600 under a private directory), as the bridge enforces.
@@ -50,6 +56,7 @@ SUBJECT = 'native-session-guest'
 CODES = frozenset({
     'invalid_spec', 'missing_binary', 'guest_unreachable', 'guest_key_failed',
     'enrollment_failed', 'broker_failed', 'forward_failed', 'credential_exposed',
+    'proxy_failed',
 })
 
 
@@ -110,6 +117,12 @@ class LocalGuest:
     def connect(self, host_socket: Path) -> subprocess.Popen | None:
         os.symlink(host_socket, self.dir / 'broker.sock')
         return None
+
+    def spawn(self, argv: list[str]) -> subprocess.Popen:
+        """A long-lived guest process whose stdin is its lifetime lease."""
+        return subprocess.Popen(argv, cwd=self.dir, stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                env=_environment(), preexec_fn=_die_with_parent)
 
     def remove(self) -> None:
         shutil.rmtree(self.dir, ignore_errors=True)
@@ -172,6 +185,13 @@ class SSHGuest:
         process.terminate()
         raise SessionError('forward_failed')
 
+    def spawn(self, argv: list[str]) -> subprocess.Popen:
+        """A long-lived guest process; closing the SSH stdin ends it."""
+        return subprocess.Popen(
+            [*self.base, 'cd ' + shlex.quote(self.dir) + ' && exec ' + shlex.join(argv)],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            env=_environment(), preexec_fn=_die_with_parent)
+
     def forward_tcp(self, guest_port: int, host_port: int) -> subprocess.Popen:
         """Forward guest loopback ``guest_port`` to host loopback ``host_port``."""
         process = subprocess.Popen(
@@ -200,7 +220,14 @@ def load_spec(path: Path) -> dict[str, Any]:
         raise SessionError('invalid_spec') from None
     required = {'version', 'bin_dir', 'workspace', 'policy_file', 'disclosure_file',
                 'credential_file', 'provider', 'binding', 'guest', 'approve_session_key'}
-    if (not isinstance(spec, dict) or set(spec) != required
+    if not isinstance(spec, dict) or set(spec) - required - {'constrained_proxy'}:
+        raise SessionError('invalid_spec')
+    proxy = spec.get('constrained_proxy')
+    if proxy is not None and (
+            not isinstance(proxy, dict) or set(proxy) != {'guest_port'}
+            or type(proxy['guest_port']) is not int or not 1024 <= proxy['guest_port'] <= 65535):
+        raise SessionError('invalid_spec')
+    if (not isinstance(spec, dict) or set(spec) - {'constrained_proxy'} != required
             or spec['version'] != SPEC_VERSION or spec['approve_session_key'] is not True):
         raise SessionError('invalid_spec')
     provider = spec['provider']
@@ -220,10 +247,12 @@ def load_spec(path: Path) -> dict[str, Any]:
     return spec
 
 
-def _binaries(directory: Path) -> dict[str, Path]:
-    paths = {role: directory / name for role, name in (
-        ('authority', 'garrett-authority'), ('bridge', 'garrett-bridge'),
-        ('client', 'garrett-client'))}
+def _binaries(directory: Path, *, proxy: bool = False) -> dict[str, Path]:
+    roles = [('authority', 'garrett-authority'), ('bridge', 'garrett-bridge'),
+             ('client', 'garrett-client')]
+    if proxy:
+        roles.append(('proxy', 'garrett-proxy'))
+    paths = {role: directory / name for role, name in roles}
     if not all(p.is_file() and os.access(p, os.X_OK) for p in paths.values()):
         raise SessionError('missing_binary')
     return paths
@@ -291,9 +320,10 @@ class Session:
 
     def __init__(self, spec: dict[str, Any]) -> None:
         self.spec = spec
-        self.tools = _binaries(Path(spec['bin_dir']))
+        self.tools = _binaries(Path(spec['bin_dir']), proxy='constrained_proxy' in spec)
         self.host = Path(spec['workspace'])
         self.guest: LocalGuest | SSHGuest | None = None
+        self.translator: subprocess.Popen | None = None
         self.bridge: subprocess.Popen | None = None
         self.forward: subprocess.Popen | None = None
         self.credential = Path(spec['credential_file']).read_bytes()
@@ -306,6 +336,15 @@ class Session:
             raise
 
     def __exit__(self, *_exc: object) -> None:
+        if self.translator is not None:
+            if self.translator.stdin and not self.translator.stdin.closed:
+                self.translator.stdin.close()
+            try:
+                self.translator.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                self.translator.kill()
+                self.translator.wait()
+            self.translator = None
         _stop(self.forward)
         _stop(self.bridge)
         if self.guest is not None:
@@ -377,9 +416,57 @@ class Session:
                       'config': guest.path('client.json'),
                       'capability': guest.path('capability.jwt')},
         }
+        if 'constrained_proxy' in spec:
+            announcement['guest']['env'] = self._start_translator()
         if self.credential and self.credential in json.dumps(announcement).encode():
             raise SessionError('credential_exposed')
         return announcement
+
+    def _start_translator(self) -> str:
+        """Start the guest-side constrained-http translator; return its env file."""
+        from .proxy_session import SYSTEM_ROOTS, environment_file
+
+        spec, guest = self.spec, self.guest
+        assert guest is not None
+        port = spec['constrained_proxy']['guest_port']
+        # The guest's route copy: the host policy without host-only detail.
+        try:
+            routes = json.loads(Path(spec['policy_file']).read_text())
+        except (OSError, ValueError):
+            raise SessionError('invalid_spec') from None
+        routes.pop('egress', None)
+        routes['credential_source'] = {'kind': 'file', 'path': '/nonexistent'}
+        host = spec['provider']['host']
+        guest.publish('garrett-proxy', self.tools['proxy'].read_bytes(), executable=True)
+        guest.publish('proxy.json', json.dumps({
+            'schema': 1, 'profile': 'constrained-http', 'lifetime_seconds': 86400,
+            'origins': [{'host': host}]}).encode())
+        guest.publish('routes.json', json.dumps(routes).encode())
+        client = [guest.path('garrett-client'), '--config', guest.path('client.json'),
+                  '--capability-file', guest.path('capability.jwt')]
+        self.translator = guest.spawn([
+            guest.path('garrett-proxy'), '--policy', guest.path('proxy.json'),
+            '--routes', guest.path('routes.json'), '--bridge-client', json.dumps(client),
+            '--audit', guest.path('proxy-audit.jsonl'), '--port', str(port)])
+        assert self.translator.stdout is not None
+        ready, _, _ = select.select([self.translator.stdout], [], [], 30)
+        try:
+            announced = json.loads(self.translator.stdout.readline()) if ready else {}
+        except ValueError:
+            announced = {}
+        if announced.get('ready') is not True or announced.get('profile') != 'constrained-http':
+            raise SessionError('proxy_failed')
+        guest.publish('proxy-ca.pem', announced['ca_pem'].encode('ascii'))
+        made = guest.run(['sh', '-c', f'if [ -r {SYSTEM_ROOTS} ]; then cat {SYSTEM_ROOTS}; fi; '
+                                      'cat proxy-ca.pem'])
+        if made.returncode:
+            raise SessionError('guest_unreachable')
+        guest.publish('proxy-bundle.pem', made.stdout)
+        url = f"http://aivm:{announced['proxy_token']}@127.0.0.1:{port}"
+        directory = guest.dir if isinstance(guest.dir, str) else str(guest.dir)
+        guest.publish('env', environment_file(url, directory, ca_name='proxy-ca.pem',
+                                              bundle_name='proxy-bundle.pem'))
+        return guest.path('env')
 
 
 def _emit(value: dict[str, Any]) -> None:

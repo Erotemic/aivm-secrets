@@ -90,9 +90,10 @@ def _proxy_command(spec: dict[str, Any], port: int) -> list[str]:
     return [str(binary), *arguments]
 
 
-def environment_file(proxy_url: str, directory: str) -> bytes:
-    ca = f'{directory}/ca.pem'
-    bundle = f'{directory}/bundle.pem'
+def environment_file(proxy_url: str, directory: str, *, ca_name: str = 'ca.pem',
+                     bundle_name: str = 'bundle.pem') -> bytes:
+    ca = f'{directory}/{ca_name}'
+    bundle = f'{directory}/{bundle_name}'
     lines = [
         f'export HTTPS_PROXY={shlex.quote(proxy_url)}',
         'export https_proxy="$HTTPS_PROXY"',

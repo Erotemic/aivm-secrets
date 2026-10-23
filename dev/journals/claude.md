@@ -443,3 +443,18 @@ constant-time token comparison. `GarrettProxyConnect` proves
 - `admit_open` states the host index is valid and equals the host slice the
   code compared; it does not (yet) tie that slice to the head bytes. The
   claim used is "only to a configured origin", which does not need it.
+
+## 2026-10-23 10:12:26 -0400
+
+Made the constrained profile usable end to end: `native-session` accepts an
+optional `constrained_proxy` and starts the native translator inside the
+guest (spawned over the same SSH config, stdin as lifetime lease), with a
+sanitized route copy (no `egress`, dummy credential source) and an env
+file. Stock `curl` reads through it in the local-guest test; out-of-scope
+and unmatched requests never reach the provider; no guest file holds the
+credential.
+
+- Not run: a real VM. The SSH spawn path is untested beyond the code shared
+  with the existing SSH transport; this is a maintainer action.
+- I reused `proxy_session.environment_file` with new name parameters
+  rather than duplicating it, since the bridge already uses `ca.pem`.
