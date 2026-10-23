@@ -588,6 +588,38 @@ pub fn framing(fields: &[Field], limit: usize) -> Result<Framing, Refusal> {
 }
 
 /// Parse one request. `Ok(None)` means more bytes are needed.
+/// The fields after the request line (none if the head is one line).
+pub fn request_fields(head: &[u8], first: usize) -> Option<Vec<Field>> {
+    if first >= head.len() {
+        Some(Vec::new())
+    } else {
+        parse_fields(head, first + 2)
+    }
+}
+
+/// The body starting at `start` and the bytes used, `None` if incomplete.
+pub fn body_of(
+    data: &[u8],
+    start: usize,
+    framed: &Framing,
+    limit: usize,
+) -> Result<Option<(Vec<u8>, usize)>, Refusal> {
+    match framed {
+        Framing::Empty => Ok(Some((Vec::new(), start))),
+        Framing::Length(length) => {
+            if data.len() - start < *length {
+                return Ok(None);
+            }
+            Ok(Some((data[start..start + *length].to_vec(), start + *length)))
+        }
+        Framing::Chunked => match decode_chunked(data, start, limit) {
+            Chunked::Done(body, used) => Ok(Some((body, used))),
+            Chunked::More => Ok(None),
+            Chunked::Bad(refusal) => Err(refusal),
+        },
+    }
+}
+
 pub fn parse_request(data: &[u8], host: &[u8], limit: usize) -> Result<Option<Parsed>, Refusal> {
     let end = match head_end(data) {
         Some(end) => end,
@@ -610,13 +642,9 @@ pub fn parse_request(data: &[u8], host: &[u8], limit: usize) -> Result<Option<Pa
         Some(line) => line,
         None => return Err(Refusal::InvalidRequest),
     };
-    let fields = if first >= head.len() {
-        Vec::new()
-    } else {
-        match parse_fields(head, first + 2) {
-            Some(fields) => fields,
-            None => return Err(Refusal::InvalidRequest),
-        }
+    let fields = match request_fields(head, first) {
+        Some(fields) => fields,
+        None => return Err(Refusal::InvalidRequest),
     };
     if any_refused_field(&fields) || count_named(&fields, b"host") != 1 {
         return Err(Refusal::InvalidRequest);
@@ -628,21 +656,14 @@ pub fn parse_request(data: &[u8], host: &[u8], limit: usize) -> Result<Option<Pa
         Some(keep) => keep,
         None => return Err(Refusal::InvalidRequest),
     };
-    let start = end + 4;
-    let (body, used) = match framing(&fields, limit) {
+    let framed = match framing(&fields, limit) {
+        Ok(framed) => framed,
         Err(refusal) => return Err(refusal),
-        Ok(Framing::Empty) => (Vec::new(), start),
-        Ok(Framing::Length(length)) => {
-            if data.len() - start < length {
-                return Ok(None);
-            }
-            (data[start..start + length].to_vec(), start + length)
-        }
-        Ok(Framing::Chunked) => match decode_chunked(data, start, limit) {
-            Chunked::Done(body, used) => (body, used),
-            Chunked::More => return Ok(None),
-            Chunked::Bad(refusal) => return Err(refusal),
-        },
+    };
+    let (body, used) = match body_of(data, end + 4, &framed, limit) {
+        Ok(Some(found)) => found,
+        Ok(None) => return Ok(None),
+        Err(refusal) => return Err(refusal),
     };
     Ok(Some(Parsed {
         request: Request {

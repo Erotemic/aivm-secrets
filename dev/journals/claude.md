@@ -593,3 +593,17 @@ pinned Charon/Aeneas. Result: **no-go**, documented in
   brief.
 - I parked my in-progress proxy-parser refactor in `git stash` to keep this
   commit focused; it resumes next.
+
+## 2026-10-23 14:22:29 -0400
+
+Resumed and finished the parser increment: `parse_request` now delegates
+to two small helpers (`request_fields`, `body_of`) so its extraction is
+linear instead of duplicating the tail per field branch (behaviour checked by
+the Python/Rust parity vectors). `GarrettProxyParse` proves
+`parse_request_bounds`: an accepted request used at most the buffered bytes
+and its body is at most the limit. Premises are size bounds only (buffer and
+limit at least 2^32 below `usize::MAX`), which the native shell's raw bound
+guarantees. Notes: `step*` applies the induction hypothesis itself, leaving
+measure goals closed by `rfl`; `‹...›` with holes plus `generalize`
+recovers inaccessible hypotheses at the end of a long inversion. Full
+`lake build`: 1,898 jobs, no warnings.
