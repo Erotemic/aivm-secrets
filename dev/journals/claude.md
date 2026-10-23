@@ -423,3 +423,23 @@ exactly one match.
   (constrained + credential, or substitution + routes, is invalid).
 - Tests: the guest-translator suite now runs on both backends (12 passed),
   including the tampered route copy.
+
+## 2026-10-23 09:54:25 -0400
+
+PROXY-NATIVE-01 narrowed again: the CONNECT decision of `garrett-proxy` is
+the extracted `proxy_connect::admit`, including base64 decoding and a
+constant-time token comparison. `GarrettProxyConnect` proves
+`same_secret_true` (bit-vector reasoning via `bv_decide`),
+`authenticated_true` and `admit_open`.
+
+- The decoder is deliberately not proved to be base64: the security claim
+  only needs "whatever it presents equals the token". Compatibility with the
+  `base64` crate (canonical padding, zero trailing bits) is checked by an
+  880-case oracle test against the replaced native code.
+- Two Aeneas pitfalls hit and avoided: `?` on `Option` extracts to
+  uninterpreted `Try` axioms (rewritten as `match`); tuple destructuring
+  extracts to a pair `let` that `simp` cannot reduce, but `bind_ok_inv`
+  sees through it by unification.
+- `admit_open` states the host index is valid and equals the host slice the
+  code compared; it does not (yet) tie that slice to the head bytes. The
+  claim used is "only to a configured origin", which does not need it.

@@ -259,4 +259,5 @@ pub mod proxy_controller;
 pub mod route;
 pub mod control;
 pub mod route_match;
+pub mod proxy_connect;
 pub mod write_gate;

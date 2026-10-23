@@ -37,7 +37,7 @@ credentials.
 | | |
 | --- | --- |
 | Claim | Only a client presenting the session token can open a tunnel, and only to a configured origin on port 443. Revocation and expiry are re-checked before every upstream request, including inside an open keep-alive tunnel. The session ends when the parent's stdin closes. |
-| Theorems | `serve_paths`: a request whose `current` callback answers false is never admitted or sent. The clock, token check and lease are tested behaviour. |
+| Theorems | `admit_open`, `authenticated_true`, `same_secret_true` ([GarrettProxyConnect](../../proofs/GarrettProxyConnect.lean)): a tunnel opens only for the session token, a configured origin and a current session. `serve_paths`: a request whose `current` callback answers false is never admitted or sent. The clock and the stdin lease are tested behaviour. |
 | Premises | `PROXY-NATIVE-01`, host process isolation (`HOST-01`) |
 | Witnesses | Tunnel-auth, revocation-in-tunnel, expiry and lease-end tests in `tests/test_proxy_substitution.py` and `tests/test_rust_proxy.py` |
 | Excluded | A guest that already holds the token can use it until the session ends |

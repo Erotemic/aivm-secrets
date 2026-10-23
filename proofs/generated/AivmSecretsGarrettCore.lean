@@ -10381,6 +10381,1220 @@ inductive proxy_http.Code where
 | CredentialSource : proxy_http.Code
 | UnsupportedRequest : proxy_http.Code
 
+/-- [aivm_secrets_garrett_core::proxy_connect::Admission]
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_connect.rs', lines 12:0-17:1
+    Visibility: public -/
+@[discriminant isize]
+inductive proxy_connect.Admission where
+| Open : Std.Usize → proxy_connect.Admission
+| Refuse : proxy_http.Code → proxy_connect.Admission
+
+/-- [aivm_secrets_garrett_core::proxy_connect::sextet]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_connect.rs', lines 20:0-34:1
+    Visibility: public -/
+def proxy_connect.sextet (byte : Std.U8) : Result Std.U8 := do
+  if byte >= 65#u8
+  then
+    if byte <= 90#u8
+    then byte - 65#u8
+    else
+      if byte >= 97#u8
+      then
+        if byte <= 122#u8
+        then let i ← byte - 97#u8
+             i + 26#u8
+        else
+          if byte >= 48#u8
+          then
+            if byte <= 57#u8
+            then let i ← byte - 48#u8
+                 i + 52#u8
+            else
+              if byte = 43#u8
+              then ok 62#u8
+              else if byte = 47#u8
+                   then ok 63#u8
+                   else ok 64#u8
+          else
+            if byte = 43#u8
+            then ok 62#u8
+            else if byte = 47#u8
+                 then ok 63#u8
+                 else ok 64#u8
+      else
+        if byte >= 48#u8
+        then
+          if byte <= 57#u8
+          then let i ← byte - 48#u8
+               i + 52#u8
+          else
+            if byte = 43#u8
+            then ok 62#u8
+            else if byte = 47#u8
+                 then ok 63#u8
+                 else ok 64#u8
+        else
+          if byte = 43#u8
+          then ok 62#u8
+          else if byte = 47#u8
+               then ok 63#u8
+               else ok 64#u8
+  else
+    if byte >= 97#u8
+    then
+      if byte <= 122#u8
+      then let i ← byte - 97#u8
+           i + 26#u8
+      else
+        if byte >= 48#u8
+        then
+          if byte <= 57#u8
+          then let i ← byte - 48#u8
+               i + 52#u8
+          else
+            if byte = 43#u8
+            then ok 62#u8
+            else if byte = 47#u8
+                 then ok 63#u8
+                 else ok 64#u8
+        else
+          if byte = 43#u8
+          then ok 62#u8
+          else if byte = 47#u8
+               then ok 63#u8
+               else ok 64#u8
+    else
+      if byte >= 48#u8
+      then
+        if byte <= 57#u8
+        then let i ← byte - 48#u8
+             i + 52#u8
+        else
+          if byte = 43#u8
+          then ok 62#u8
+          else if byte = 47#u8
+               then ok 63#u8
+               else ok 64#u8
+      else
+        if byte = 43#u8
+        then ok 62#u8
+        else if byte = 47#u8
+             then ok 63#u8
+             else ok 64#u8
+
+/-- [aivm_secrets_garrett_core::proxy_connect::decode_base64]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_connect.rs', lines 43:4-83:1
+    Visibility: public -/
+@[rust_loop]
+def proxy_connect.decode_base64_loop
+  (input : Slice Std.U8) (out : alloc.vec.Vec Std.U8) (index : Std.Usize) :
+  Result (Option (alloc.vec.Vec Std.U8))
+  := do
+  let i := Slice.len input
+  if index < i
+  then
+    let i1 := Slice.len input
+    let i2 ← i1 - index
+    let i3 ← Slice.index_usize input index
+    let a ← proxy_connect.sextet i3
+    let i4 ← index + 1#usize
+    let i5 ← Slice.index_usize input i4
+    let b ← proxy_connect.sextet i5
+    let i6 ← index + 2#usize
+    let c_byte ← Slice.index_usize input i6
+    let i7 ← index + 3#usize
+    let d_byte ← Slice.index_usize input i7
+    if a = 64#u8
+    then ok none
+    else
+      if b = 64#u8
+      then ok none
+      else
+        if i2 = 4#usize
+        then
+          if c_byte = 61#u8
+          then
+            if d_byte != 61#u8
+            then ok none
+            else
+              let i8 ← lift (b &&& 15#u8)
+              if i8 != 0#u8
+              then ok none
+              else
+                let i9 ← a <<< 2#i32
+                let i10 ← b >>> 4#i32
+                let i11 ← lift (i9 ||| i10)
+                let out1 ← alloc.vec.Vec.push out i11
+                ok (some out1)
+          else
+            let c ← proxy_connect.sextet c_byte
+            if c = 64#u8
+            then ok none
+            else
+              if i2 = 4#usize
+              then
+                if d_byte = 61#u8
+                then
+                  let i8 ← lift (c &&& 3#u8)
+                  if i8 != 0#u8
+                  then ok none
+                  else
+                    let i9 ← a <<< 2#i32
+                    let i10 ← b >>> 4#i32
+                    let i11 ← lift (i9 ||| i10)
+                    let out1 ← alloc.vec.Vec.push out i11
+                    let i12 ← lift (b &&& 15#u8)
+                    let i13 ← i12 <<< 4#i32
+                    let i14 ← c >>> 2#i32
+                    let i15 ← lift (i13 ||| i14)
+                    let out2 ← alloc.vec.Vec.push out1 i15
+                    ok (some out2)
+                else
+                  let d ← proxy_connect.sextet d_byte
+                  if d = 64#u8
+                  then ok none
+                  else
+                    let i8 ← a <<< 2#i32
+                    let i9 ← b >>> 4#i32
+                    let i10 ← lift (i8 ||| i9)
+                    let out1 ← alloc.vec.Vec.push out i10
+                    let i11 ← lift (b &&& 15#u8)
+                    let i12 ← i11 <<< 4#i32
+                    let i13 ← c >>> 2#i32
+                    let i14 ← lift (i12 ||| i13)
+                    let out2 ← alloc.vec.Vec.push out1 i14
+                    let i15 ← lift (c &&& 3#u8)
+                    let i16 ← i15 <<< 6#i32
+                    let i17 ← lift (i16 ||| d)
+                    let out3 ← alloc.vec.Vec.push out2 i17
+                    let index1 ← index + 4#usize
+                    proxy_connect.decode_base64_loop input out3 index1
+              else
+                let d ← proxy_connect.sextet d_byte
+                if d = 64#u8
+                then ok none
+                else
+                  let i8 ← a <<< 2#i32
+                  let i9 ← b >>> 4#i32
+                  let i10 ← lift (i8 ||| i9)
+                  let out1 ← alloc.vec.Vec.push out i10
+                  let i11 ← lift (b &&& 15#u8)
+                  let i12 ← i11 <<< 4#i32
+                  let i13 ← c >>> 2#i32
+                  let i14 ← lift (i12 ||| i13)
+                  let out2 ← alloc.vec.Vec.push out1 i14
+                  let i15 ← lift (c &&& 3#u8)
+                  let i16 ← i15 <<< 6#i32
+                  let i17 ← lift (i16 ||| d)
+                  let out3 ← alloc.vec.Vec.push out2 i17
+                  let index1 ← index + 4#usize
+                  proxy_connect.decode_base64_loop input out3 index1
+        else
+          let c ← proxy_connect.sextet c_byte
+          if c = 64#u8
+          then ok none
+          else
+            if i2 = 4#usize
+            then
+              if d_byte = 61#u8
+              then
+                let i8 ← lift (c &&& 3#u8)
+                if i8 != 0#u8
+                then ok none
+                else
+                  let i9 ← a <<< 2#i32
+                  let i10 ← b >>> 4#i32
+                  let i11 ← lift (i9 ||| i10)
+                  let out1 ← alloc.vec.Vec.push out i11
+                  let i12 ← lift (b &&& 15#u8)
+                  let i13 ← i12 <<< 4#i32
+                  let i14 ← c >>> 2#i32
+                  let i15 ← lift (i13 ||| i14)
+                  let out2 ← alloc.vec.Vec.push out1 i15
+                  ok (some out2)
+              else
+                let d ← proxy_connect.sextet d_byte
+                if d = 64#u8
+                then ok none
+                else
+                  let i8 ← a <<< 2#i32
+                  let i9 ← b >>> 4#i32
+                  let i10 ← lift (i8 ||| i9)
+                  let out1 ← alloc.vec.Vec.push out i10
+                  let i11 ← lift (b &&& 15#u8)
+                  let i12 ← i11 <<< 4#i32
+                  let i13 ← c >>> 2#i32
+                  let i14 ← lift (i12 ||| i13)
+                  let out2 ← alloc.vec.Vec.push out1 i14
+                  let i15 ← lift (c &&& 3#u8)
+                  let i16 ← i15 <<< 6#i32
+                  let i17 ← lift (i16 ||| d)
+                  let out3 ← alloc.vec.Vec.push out2 i17
+                  let index1 ← index + 4#usize
+                  proxy_connect.decode_base64_loop input out3 index1
+            else
+              let d ← proxy_connect.sextet d_byte
+              if d = 64#u8
+              then ok none
+              else
+                let i8 ← a <<< 2#i32
+                let i9 ← b >>> 4#i32
+                let i10 ← lift (i8 ||| i9)
+                let out1 ← alloc.vec.Vec.push out i10
+                let i11 ← lift (b &&& 15#u8)
+                let i12 ← i11 <<< 4#i32
+                let i13 ← c >>> 2#i32
+                let i14 ← lift (i12 ||| i13)
+                let out2 ← alloc.vec.Vec.push out1 i14
+                let i15 ← lift (c &&& 3#u8)
+                let i16 ← i15 <<< 6#i32
+                let i17 ← lift (i16 ||| d)
+                let out3 ← alloc.vec.Vec.push out2 i17
+                let index1 ← index + 4#usize
+                proxy_connect.decode_base64_loop input out3 index1
+  else ok (some out)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_connect::decode_base64]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_connect.rs', lines 37:0-83:1
+    Visibility: public -/
+def proxy_connect.decode_base64
+  (input : Slice Std.U8) : Result (Option (alloc.vec.Vec Std.U8)) := do
+  let i := Slice.len input
+  let i1 ← i % 4#usize
+  if i1 != 0#usize
+  then ok none
+  else
+    proxy_connect.decode_base64_loop input (alloc.vec.Vec.new Std.U8) 0#usize
+
+/-- [aivm_secrets_garrett_core::proxy_connect::scheme_is]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_connect.rs', lines 91:4-98:1
+    Visibility: public -/
+@[rust_loop]
+def proxy_connect.scheme_is_loop
+  (value : Slice Std.U8) («prefix» : Slice Std.U8) (index : Std.Usize) :
+  Result Bool
+  := do
+  let i := Slice.len «prefix»
+  if index < i
+  then
+    let i1 ← Slice.index_usize value index
+    let i2 ← http_wire.ascii_lower i1
+    let i3 ← Slice.index_usize «prefix» index
+    if i2 != i3
+    then ok false
+    else
+      let index1 ← index + 1#usize
+      proxy_connect.scheme_is_loop value «prefix» index1
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_connect::scheme_is]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_connect.rs', lines 86:0-98:1
+    Visibility: public -/
+def proxy_connect.scheme_is
+  (value : Slice Std.U8) («prefix» : Slice Std.U8) : Result Bool := do
+  let i := Slice.len value
+  let i1 := Slice.len «prefix»
+  if i <= i1
+  then ok false
+  else proxy_connect.scheme_is_loop value «prefix» 0#usize
+
+/-- [aivm_secrets_garrett_core::proxy_connect::same_secret]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_connect.rs', lines 107:4-110:5
+    Visibility: public -/
+@[rust_loop]
+def proxy_connect.same_secret_loop
+  (a : Slice Std.U8) (b : Slice Std.U8) (difference : Std.U8)
+  (index : Std.Usize) :
+  Result Std.U8
+  := do
+  let i := Slice.len a
+  if index < i
+  then
+    let i1 ← Slice.index_usize a index
+    let i2 ← Slice.index_usize b index
+    let i3 ← lift (i1 ^^^ i2)
+    let difference1 ← lift (difference ||| i3)
+    let index1 ← index + 1#usize
+    proxy_connect.same_secret_loop a b difference1 index1
+  else ok difference
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_connect::same_secret]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_connect.rs', lines 101:0-112:1
+    Visibility: public -/
+def proxy_connect.same_secret
+  (a : Slice Std.U8) (b : Slice Std.U8) : Result Bool := do
+  let i := Slice.len a
+  let i1 := Slice.len b
+  if i != i1
+  then ok false
+  else
+    let difference ← proxy_connect.same_secret_loop a b 0#u8 0#usize
+    ok (difference = 0#u8)
+
+/-- [aivm_secrets_garrett_core::proxy_connect::presented]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_connect.rs', lines 125:8-131:19
+    Visibility: public -/
+@[rust_loop]
+def proxy_connect.presented_loop
+  (decoded : alloc.vec.Vec Std.U8) (colon : Std.Usize) :
+  Result (Option (alloc.vec.Vec Std.U8))
+  := do
+  let i := alloc.vec.Vec.len decoded
+  if colon < i
+  then
+    let i1 ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U8)
+        decoded colon
+    if i1 = 58#u8
+    then
+      let i2 ← colon + 1#usize
+      let s ←
+        alloc.vec.Vec.index (core.slice.index.SliceIndexRangeFromUsizeSlice
+          Std.U8) decoded { start := i2 }
+      let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 s
+      ok (some v)
+    else
+      let colon1 ← colon + 1#usize
+      proxy_connect.presented_loop decoded colon1
+  else ok none
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_connect::presented]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_connect.rs', lines 116:0-137:1
+    Visibility: public -/
+def proxy_connect.presented
+  (value : Slice Std.U8) : Result (Option (alloc.vec.Vec Std.U8)) := do
+  let basic ←
+    lift (Array.to_slice
+      (Array.make 6#usize [ 98#u8, 97#u8, 115#u8, 105#u8, 99#u8, 32#u8 ]))
+  let bearer ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        98#u8, 101#u8, 97#u8, 114#u8, 101#u8, 114#u8, 32#u8
+        ]))
+  let b ← proxy_connect.scheme_is value basic
+  if b
+  then
+    let s ←
+      core.slice.index.Slice.index
+        (core.slice.index.SliceIndexRangeFromUsizeSlice Std.U8) value
+        { start := 6#usize }
+    let o ← proxy_connect.decode_base64 s
+    match o with
+    | none => ok none
+    | some decoded => proxy_connect.presented_loop decoded 0#usize
+  else
+    let b1 ← proxy_connect.scheme_is value bearer
+    if b1
+    then
+      let s ←
+        core.slice.index.Slice.index
+          (core.slice.index.SliceIndexRangeFromUsizeSlice Std.U8) value
+          { start := 7#usize }
+      let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 s
+      ok (some v)
+    else ok none
+
+/-- [aivm_secrets_garrett_core::proxy_http::Field]
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 27:0-32:1
+    Visibility: public -/
+structure proxy_http.Field where
+  «name» : alloc.vec.Vec Std.U8
+  value : alloc.vec.Vec Std.U8
+
+/-- [aivm_secrets_garrett_core::proxy_http::name_is]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 327:0-329:1
+    Visibility: public -/
+def proxy_http.name_is
+  (field : proxy_http.Field) («name» : Slice Std.U8) : Result Bool := do
+  let s := alloc.vec.Vec.deref field.name
+  http_wire.ascii_equal s «name»
+
+/-- [aivm_secrets_garrett_core::proxy_http::first_named]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 344:4-346:5
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.first_named_loop
+  (fields : Slice proxy_http.Field) («name» : Slice Std.U8)
+  (index : Std.Usize) :
+  Result Std.Usize
+  := do
+  let i := Slice.len fields
+  if index < i
+  then
+    let f ← Slice.index_usize fields index
+    let b ← proxy_http.name_is f «name»
+    if b
+    then ok index
+    else
+      let index1 ← index + 1#usize
+      proxy_http.first_named_loop fields «name» index1
+  else ok index
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_http::first_named]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 342:0-348:1
+    Visibility: public -/
+@[reducible]
+def proxy_http.first_named
+  (fields : Slice proxy_http.Field) («name» : Slice Std.U8) :
+  Result Std.Usize
+  := do
+  proxy_http.first_named_loop fields «name» 0#usize
+
+/-- [aivm_secrets_garrett_core::proxy_http::count_named]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 333:4-337:5
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.count_named_loop
+  (iter : core.slice.iter.Iter proxy_http.Field) («name» : Slice Std.U8)
+  (count : Std.Usize) :
+  Result Std.Usize
+  := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok count
+  | some field =>
+    let b ← proxy_http.name_is field «name»
+    if b
+    then
+      let count1 ← count + 1#usize
+      proxy_http.count_named_loop iter1 «name» count1
+    else proxy_http.count_named_loop iter1 «name» count
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_http::count_named]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 331:0-339:1
+    Visibility: public -/
+def proxy_http.count_named
+  (fields : Slice proxy_http.Field) («name» : Slice Std.U8) :
+  Result Std.Usize
+  := do
+  let iter ←
+    SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+      fields
+  proxy_http.count_named_loop iter «name» 0#usize
+
+/-- [aivm_secrets_garrett_core::proxy_connect::authenticated]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_connect.rs', lines 140:0-153:1
+    Visibility: public -/
+def proxy_connect.authenticated
+  (fields : Slice proxy_http.Field) (token : Slice Std.U8) : Result Bool := do
+  let «name» ←
+    lift (Array.to_slice
+      (Array.make 19#usize [
+        112#u8, 114#u8, 111#u8, 120#u8, 121#u8, 45#u8, 97#u8, 117#u8, 116#u8,
+        104#u8, 111#u8, 114#u8, 105#u8, 122#u8, 97#u8, 116#u8, 105#u8, 111#u8,
+        110#u8
+        ]))
+  let i ← proxy_http.count_named fields «name»
+  if i != 1#usize
+  then ok false
+  else
+    let index ← proxy_http.first_named fields «name»
+    let i1 := Slice.len fields
+    if index >= i1
+    then ok false
+    else
+      let f ← Slice.index_usize fields index
+      let s := alloc.vec.Vec.deref f.value
+      let o ← proxy_connect.presented s
+      match o with
+      | none => ok false
+      | some candidate =>
+        let s1 := alloc.vec.Vec.deref candidate
+        proxy_connect.same_secret s1 token
+
+/-- [aivm_secrets_garrett_core::proxy_connect::last_colon]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_connect.rs', lines 158:4-165:1
+    Visibility: public -/
+@[rust_loop]
+def proxy_connect.last_colon_loop
+  (authority : Slice Std.U8) (index : Std.Usize) : Result Std.Usize := do
+  if index > 0#usize
+  then
+    let i ← index - 1#usize
+    let i1 ← Slice.index_usize authority i
+    if i1 = 58#u8
+    then ok i
+    else proxy_connect.last_colon_loop authority i
+  else ok (Slice.len authority)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_connect::last_colon]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_connect.rs', lines 156:0-165:1
+    Visibility: public -/
+def proxy_connect.last_colon
+  (authority : Slice Std.U8) : Result Std.Usize := do
+  let index := Slice.len authority
+  proxy_connect.last_colon_loop authority index
+
+/-- [aivm_secrets_garrett_core::proxy_connect::origin_index]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_connect.rs', lines 170:4-178:1
+    Visibility: public -/
+@[rust_loop]
+def proxy_connect.origin_index_loop
+  (hosts : Slice (alloc.vec.Vec Std.U8)) (host : Slice Std.U8)
+  (index : Std.Usize) :
+  Result Std.Usize
+  := do
+  let i := Slice.len hosts
+  if index < i
+  then
+    let v ← Slice.index_usize hosts index
+    let candidate := alloc.vec.Vec.deref v
+    let b ←
+      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 candidate host
+    if b
+    then ok index
+    else
+      let index1 ← index + 1#usize
+      proxy_connect.origin_index_loop hosts host index1
+  else ok (Slice.len hosts)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_connect::origin_index]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_connect.rs', lines 168:0-178:1
+    Visibility: public -/
+@[reducible]
+def proxy_connect.origin_index
+  (hosts : Slice (alloc.vec.Vec Std.U8)) (host : Slice Std.U8) :
+  Result Std.Usize
+  := do
+  proxy_connect.origin_index_loop hosts host 0#usize
+
+/-- [aivm_secrets_garrett_core::proxy_connect::spaces]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_connect.rs', lines 185:4-201:1
+    Visibility: public -/
+@[rust_loop]
+def proxy_connect.spaces_loop
+  (line : Slice Std.U8) (first : Std.Usize) (second : Std.Usize)
+  (index : Std.Usize) :
+  Result (Option (Std.Usize × Std.Usize))
+  := do
+  let i := Slice.len line
+  if index < i
+  then
+    let i1 ← Slice.index_usize line index
+    if i1 = 32#u8
+    then
+      let i2 := Slice.len line
+      if first = i2
+      then
+        let index1 ← index + 1#usize
+        proxy_connect.spaces_loop line index second index1
+      else
+        let i3 := Slice.len line
+        if second = i3
+        then
+          let index1 ← index + 1#usize
+          proxy_connect.spaces_loop line first index index1
+        else ok none
+    else
+      let index1 ← index + 1#usize
+      proxy_connect.spaces_loop line first second index1
+  else
+    let i1 := Slice.len line
+    if second = i1
+    then ok none
+    else ok (some (first, second))
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_connect::spaces]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_connect.rs', lines 181:0-201:1
+    Visibility: public -/
+def proxy_connect.spaces
+  (line : Slice Std.U8) : Result (Option (Std.Usize × Std.Usize)) := do
+  let first := Slice.len line
+  let second := Slice.len line
+  proxy_connect.spaces_loop line first second 0#usize
+
+/-- [aivm_secrets_garrett_core::proxy_http::blank]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 243:0-245:1
+    Visibility: public -/
+def proxy_http.blank (byte : Std.U8) : Result Bool := do
+  if byte = 32#u8
+  then ok true
+  else ok (byte = 9#u8)
+
+/-- [aivm_secrets_garrett_core::proxy_http::visible]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 54:0-56:1
+    Visibility: public -/
+def proxy_http.visible (byte : Std.U8) : Result Bool := do
+  if byte >= 33#u8
+  then ok (byte <= 126#u8)
+  else ok false
+
+/-- [aivm_secrets_garrett_core::proxy_http::all_value]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 277:4-284:1
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.all_value_loop
+  (line : Slice Std.U8) (last : Std.Usize) (check : Std.Usize) :
+  Result Bool
+  := do
+  if check < last
+  then
+    let i ← Slice.index_usize line check
+    let b ← proxy_http.visible i
+    if b
+    then
+      let check1 ← check + 1#usize
+      proxy_http.all_value_loop line last check1
+    else
+      let b1 ← proxy_http.blank i
+      if b1
+      then
+        let check1 ← check + 1#usize
+        proxy_http.all_value_loop line last check1
+      else ok false
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_http::all_value]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 275:0-284:1
+    Visibility: public -/
+@[reducible]
+def proxy_http.all_value
+  (line : Slice Std.U8) (first : Std.Usize) (last : Std.Usize) :
+  Result Bool
+  := do
+  proxy_http.all_value_loop line last first
+
+/-- [aivm_secrets_garrett_core::proxy_http::trim_blank_end]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 269:4-271:5
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.trim_blank_end_loop
+  (line : Slice Std.U8) (first : Std.Usize) (last : Std.Usize) :
+  Result Std.Usize
+  := do
+  if last > first
+  then
+    let i ← last - 1#usize
+    let i1 ← Slice.index_usize line i
+    let b ← proxy_http.blank i1
+    if b
+    then proxy_http.trim_blank_end_loop line first i
+    else ok last
+  else ok last
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_http::trim_blank_end]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 267:0-273:1
+    Visibility: public -/
+def proxy_http.trim_blank_end
+  (line : Slice Std.U8) (first : Std.Usize) : Result Std.Usize := do
+  let last := Slice.len line
+  proxy_http.trim_blank_end_loop line first last
+
+/-- [aivm_secrets_garrett_core::proxy_http::skip_blank]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 261:4-263:5
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.skip_blank_loop
+  (line : Slice Std.U8) (first : Std.Usize) : Result Std.Usize := do
+  let i := Slice.len line
+  if first < i
+  then
+    let i1 ← Slice.index_usize line first
+    let b ← proxy_http.blank i1
+    if b
+    then let first1 ← first + 1#usize
+         proxy_http.skip_blank_loop line first1
+    else ok first
+  else ok first
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_http::skip_blank]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 259:0-265:1
+    Visibility: public -/
+@[reducible]
+def proxy_http.skip_blank
+  (line : Slice Std.U8) (start : Std.Usize) : Result Std.Usize := do
+  proxy_http.skip_blank_loop line start
+
+/-- [aivm_secrets_garrett_core::proxy_http::token_byte]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 58:0-75:1
+    Visibility: public -/
+def proxy_http.token_byte (byte : Std.U8) : Result Bool := do
+  let b ← http_wire.alphanumeric byte
+  if b
+  then ok true
+  else
+    if byte = 33#u8
+    then ok true
+    else
+      if byte = 35#u8
+      then ok true
+      else
+        if byte = 36#u8
+        then ok true
+        else
+          if byte = 37#u8
+          then ok true
+          else
+            if byte = 38#u8
+            then ok true
+            else
+              if byte = 39#u8
+              then ok true
+              else
+                if byte = 42#u8
+                then ok true
+                else
+                  if byte = 43#u8
+                  then ok true
+                  else
+                    if byte = 45#u8
+                    then ok true
+                    else
+                      if byte = 46#u8
+                      then ok true
+                      else
+                        if byte = 94#u8
+                        then ok true
+                        else
+                          if byte = 95#u8
+                          then ok true
+                          else
+                            if byte = 96#u8
+                            then ok true
+                            else
+                              if byte = 124#u8
+                              then ok true
+                              else ok (byte = 126#u8)
+
+/-- [aivm_secrets_garrett_core::proxy_http::all_token]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 249:4-257:1
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.all_token_loop
+  (line : Slice Std.U8) («end» : Std.Usize) (index : Std.Usize) :
+  Result Bool
+  := do
+  if index < «end»
+  then
+    let i ← Slice.index_usize line index
+    let b ← proxy_http.visible i
+    if b
+    then
+      let b1 ← proxy_http.token_byte i
+      if b1
+      then
+        let index1 ← index + 1#usize
+        proxy_http.all_token_loop line «end» index1
+      else ok false
+    else ok false
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_http::all_token]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 247:0-257:1
+    Visibility: public -/
+@[reducible]
+def proxy_http.all_token
+  (line : Slice Std.U8) («end» : Std.Usize) : Result Bool := do
+  proxy_http.all_token_loop line «end» 0#usize
+
+/-- [aivm_secrets_garrett_core::proxy_http::colon_at]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 237:4-239:5
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.colon_at_loop
+  (line : Slice Std.U8) (index : Std.Usize) : Result Std.Usize := do
+  let i := Slice.len line
+  if index < i
+  then
+    let i1 ← Slice.index_usize line index
+    if i1 != 58#u8
+    then let index1 ← index + 1#usize
+         proxy_http.colon_at_loop line index1
+    else ok index
+  else ok index
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_http::colon_at]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 235:0-241:1
+    Visibility: public -/
+@[reducible]
+def proxy_http.colon_at (line : Slice Std.U8) : Result Std.Usize := do
+  proxy_http.colon_at_loop line 0#usize
+
+/-- [aivm_secrets_garrett_core::proxy_http::lowered]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 229:4-231:5
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.lowered_loop
+  (iter : core.slice.iter.Iter Std.U8) (out : alloc.vec.Vec Std.U8) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok out
+  | some byte =>
+    let i ← http_wire.ascii_lower byte
+    let out1 ← alloc.vec.Vec.push out i
+    proxy_http.lowered_loop iter1 out1
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_http::lowered]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 227:0-233:1
+    Visibility: public -/
+def proxy_http.lowered
+  (bytes : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
+  let iter ←
+    SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+      bytes
+  proxy_http.lowered_loop iter (alloc.vec.Vec.new Std.U8)
+
+/-- [aivm_secrets_garrett_core::proxy_http::parse_field]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 288:0-305:1
+    Visibility: public -/
+def proxy_http.parse_field
+  (line : Slice Std.U8) : Result (Option proxy_http.Field) := do
+  let i := Slice.len line
+  if i = 0#usize
+  then ok none
+  else
+    let i1 ← Slice.index_usize line 0#usize
+    let b ← proxy_http.blank i1
+    if b
+    then ok none
+    else
+      let colon ← proxy_http.colon_at line
+      if colon = 0#usize
+      then ok none
+      else
+        let i2 := Slice.len line
+        if colon >= i2
+        then ok none
+        else
+          let b1 ← proxy_http.all_token line colon
+          if b1
+          then
+            let i3 ← colon + 1#usize
+            let first ← proxy_http.skip_blank line i3
+            let last ← proxy_http.trim_blank_end line first
+            let b2 ← proxy_http.all_value line first last
+            if b2
+            then
+              let s ←
+                core.slice.index.Slice.index
+                  (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) line
+                  { «end» := colon }
+              let v ← proxy_http.lowered s
+              let s1 ←
+                core.slice.index.Slice.index
+                  (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) line
+                  { start := first, «end» := last }
+              let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 s1
+              ok (some { «name» := v, value := v1 })
+            else ok none
+          else ok none
+
+/-- [aivm_secrets_garrett_core::proxy_http::line_end]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 221:4-223:5
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.line_end_loop
+  (head : Slice Std.U8) (index : Std.Usize) : Result Std.Usize := do
+  let i := Slice.len head
+  if index < i
+  then
+    let i1 ← Slice.index_usize head index
+    if i1 != 13#u8
+    then let index1 ← index + 1#usize
+         proxy_http.line_end_loop head index1
+    else ok index
+  else ok index
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_http::line_end]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 219:0-225:1
+    Visibility: public -/
+@[reducible]
+def proxy_http.line_end
+  (head : Slice Std.U8) (start : Std.Usize) : Result Std.Usize := do
+  proxy_http.line_end_loop head start
+
+/-- [aivm_secrets_garrett_core::proxy_http::MAX_FIELDS]
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 13:0-13:34
+    Visibility: public -/
+@[global_simps, irreducible] def proxy_http.MAX_FIELDS : Std.Usize := 100#usize
+
+/-- [aivm_secrets_garrett_core::proxy_http::parse_fields]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 311:4-323:1
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.parse_fields_loop
+  (head : Slice Std.U8) (fields : alloc.vec.Vec proxy_http.Field)
+  (position : Std.Usize) :
+  Result (Option (alloc.vec.Vec proxy_http.Field))
+  := do
+  let i := Slice.len head
+  if position < i
+  then
+    let «end» ← proxy_http.line_end head position
+    let i1 := alloc.vec.Vec.len fields
+    if i1 >= proxy_http.MAX_FIELDS
+    then ok none
+    else
+      let s ←
+        core.slice.index.Slice.index
+          (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) head
+          { start := position, «end» }
+      let o ← proxy_http.parse_field s
+      match o with
+      | none => ok none
+      | some field =>
+        let fields1 ← alloc.vec.Vec.push fields field
+        let position1 ← «end» + 2#usize
+        proxy_http.parse_fields_loop head fields1 position1
+  else ok (some fields)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_http::parse_fields]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 308:0-323:1
+    Visibility: public -/
+@[reducible]
+def proxy_http.parse_fields
+  (head : Slice Std.U8) (start : Std.Usize) :
+  Result (Option (alloc.vec.Vec proxy_http.Field))
+  := do
+  proxy_http.parse_fields_loop head (alloc.vec.Vec.new proxy_http.Field) start
+
+/-- [aivm_secrets_garrett_core::proxy_http::clean_head]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 202:4-216:1
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.clean_head_loop
+  (head : Slice Std.U8) (index : Std.Usize) : Result Bool := do
+  let i := Slice.len head
+  if index < i
+  then
+    let byte ← Slice.index_usize head index
+    if byte = 0#u8
+    then ok false
+    else
+      if byte = 13#u8
+      then
+        let i1 ← index + 1#usize
+        let i2 := Slice.len head
+        if i1 >= i2
+        then ok false
+        else
+          let i3 ← Slice.index_usize head i1
+          if i3 != 10#u8
+          then ok false
+          else
+            if byte = 10#u8
+            then
+              if index = 0#usize
+              then ok false
+              else
+                let i4 ← index - 1#usize
+                let i5 ← Slice.index_usize head i4
+                if i5 != 13#u8
+                then ok false
+                else proxy_http.clean_head_loop head i1
+            else proxy_http.clean_head_loop head i1
+      else
+        if byte = 10#u8
+        then
+          if index = 0#usize
+          then ok false
+          else
+            let i1 ← index - 1#usize
+            let i2 ← Slice.index_usize head i1
+            if i2 != 13#u8
+            then ok false
+            else
+              let index1 ← index + 1#usize
+              proxy_http.clean_head_loop head index1
+        else
+          let index1 ← index + 1#usize
+          proxy_http.clean_head_loop head index1
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_http::clean_head]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 200:0-216:1
+    Visibility: public -/
+@[reducible]
+def proxy_http.clean_head (head : Slice Std.U8) : Result Bool := do
+  proxy_http.clean_head_loop head 0#usize
+
+/-- [aivm_secrets_garrett_core::proxy_connect::admit]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_connect.rs', lines 204:0-248:1
+    Visibility: public -/
+def proxy_connect.admit
+  (head : Slice Std.U8) (token : Slice Std.U8)
+  (hosts : Slice (alloc.vec.Vec Std.U8)) (current : Bool) :
+  Result proxy_connect.Admission
+  := do
+  let first ← proxy_http.line_end head 0#usize
+  let line ←
+    core.slice.index.Slice.index (core.slice.index.SliceIndexRangeToUsizeSlice
+      Std.U8) head { «end» := first }
+  let o ← proxy_connect.spaces line
+  match o with
+  | none => ok (proxy_connect.Admission.Refuse proxy_http.Code.InvalidRequest)
+  | some found =>
+    let (one, two) := found
+    let method ←
+      core.slice.index.Slice.index
+        (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) line
+        { «end» := one }
+    let i ← two + 1#usize
+    let version ←
+      core.slice.index.Slice.index
+        (core.slice.index.SliceIndexRangeFromUsizeSlice Std.U8) line
+        { start := i }
+    let connect ←
+      lift (Array.to_slice
+        (Array.make 7#usize [
+          67#u8, 79#u8, 78#u8, 78#u8, 69#u8, 67#u8, 84#u8
+          ]))
+    let http ←
+      lift (Array.to_slice
+        (Array.make 8#usize [
+          72#u8, 84#u8, 84#u8, 80#u8, 47#u8, 49#u8, 46#u8, 49#u8
+          ]))
+    let b ← proxy_http.clean_head head
+    if b
+    then
+      let b1 ←
+        core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 method connect
+      if b1
+      then
+        let b2 ←
+          core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 version http
+        if b2
+        then
+          let i1 := Slice.len head
+          if first >= i1
+          then
+            let s := alloc.vec.Vec.deref (alloc.vec.Vec.new proxy_http.Field)
+            let b3 ← proxy_connect.authenticated s token
+            if b3
+            then
+              let i2 ← one + 1#usize
+              let authority ←
+                core.slice.index.Slice.index
+                  (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) line
+                  { start := i2, «end» := two }
+              let colon ← proxy_connect.last_colon authority
+              let host ←
+                core.slice.index.Slice.index
+                  (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
+                  authority { «end» := colon }
+              let i3 := Slice.len authority
+              let port ←
+                if colon < i3
+                then
+                  do
+                  let i4 ← colon + 1#usize
+                  core.slice.index.Slice.index
+                    (core.slice.index.SliceIndexRangeFromUsizeSlice Std.U8)
+                    authority { start := i4 }
+                else
+                  core.slice.index.Slice.index
+                    (core.slice.index.SliceIndexRangeFromUsizeSlice Std.U8)
+                    authority { start := colon }
+              let https ←
+                lift (Array.to_slice
+                  (Array.make 3#usize [ 52#u8, 52#u8, 51#u8 ]))
+              let index ← proxy_connect.origin_index hosts host
+              let i4 := Slice.len hosts
+              if index >= i4
+              then
+                ok (proxy_connect.Admission.Refuse
+                  proxy_http.Code.UnknownOrigin)
+              else
+                let b4 ←
+                  core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 port
+                    https
+                if b4
+                then
+                  if current
+                  then ok (proxy_connect.Admission.Open index)
+                  else
+                    ok (proxy_connect.Admission.Refuse proxy_http.Code.Revoked)
+                else
+                  ok (proxy_connect.Admission.Refuse
+                    proxy_http.Code.UnknownOrigin)
+            else
+              ok (proxy_connect.Admission.Refuse
+                proxy_http.Code.Unauthenticated)
+          else
+            let i2 ← first + 2#usize
+            let o1 ← proxy_http.parse_fields head i2
+            match o1 with
+            | none =>
+              ok (proxy_connect.Admission.Refuse
+                proxy_http.Code.InvalidRequest)
+            | some fields =>
+              let s := alloc.vec.Vec.deref fields
+              let b3 ← proxy_connect.authenticated s token
+              if b3
+              then
+                let i3 ← one + 1#usize
+                let authority ←
+                  core.slice.index.Slice.index
+                    (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) line
+                    { start := i3, «end» := two }
+                let colon ← proxy_connect.last_colon authority
+                let host ←
+                  core.slice.index.Slice.index
+                    (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
+                    authority { «end» := colon }
+                let i4 := Slice.len authority
+                let port ←
+                  if colon < i4
+                  then
+                    do
+                    let i5 ← colon + 1#usize
+                    core.slice.index.Slice.index
+                      (core.slice.index.SliceIndexRangeFromUsizeSlice Std.U8)
+                      authority { start := i5 }
+                  else
+                    core.slice.index.Slice.index
+                      (core.slice.index.SliceIndexRangeFromUsizeSlice Std.U8)
+                      authority { start := colon }
+                let https ←
+                  lift (Array.to_slice
+                    (Array.make 3#usize [ 52#u8, 52#u8, 51#u8 ]))
+                let index ← proxy_connect.origin_index hosts host
+                let i5 := Slice.len hosts
+                if index >= i5
+                then
+                  ok (proxy_connect.Admission.Refuse
+                    proxy_http.Code.UnknownOrigin)
+                else
+                  let b4 ←
+                    core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 port
+                      https
+                  if b4
+                  then
+                    if current
+                    then ok (proxy_connect.Admission.Open index)
+                    else
+                      ok (proxy_connect.Admission.Refuse
+                        proxy_http.Code.Revoked)
+                  else
+                    ok (proxy_connect.Admission.Refuse
+                      proxy_http.Code.UnknownOrigin)
+              else
+                ok (proxy_connect.Admission.Refuse
+                  proxy_http.Code.Unauthenticated)
+        else ok (proxy_connect.Admission.Refuse proxy_http.Code.InvalidRequest)
+      else ok (proxy_connect.Admission.Refuse proxy_http.Code.InvalidRequest)
+    else ok (proxy_connect.Admission.Refuse proxy_http.Code.InvalidRequest)
+
 /-- Trait declaration: [aivm_secrets_garrett_core::proxy_controller::Upstream]
     Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 13:0-21:1
     Visibility: public -/
@@ -10789,33 +12003,6 @@ def proxy_http.unwrapped
       data
   proxy_http.unwrapped_loop iter (alloc.vec.Vec.new Std.U8)
 
-/-- [aivm_secrets_garrett_core::proxy_http::lowered]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 229:4-231:5
-    Visibility: public -/
-@[rust_loop]
-def proxy_http.lowered_loop
-  (iter : core.slice.iter.Iter Std.U8) (out : alloc.vec.Vec Std.U8) :
-  Result (alloc.vec.Vec Std.U8)
-  := do
-  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
-  match o with
-  | none => ok out
-  | some byte =>
-    let i ← http_wire.ascii_lower byte
-    let out1 ← alloc.vec.Vec.push out i
-    proxy_http.lowered_loop iter1 out1
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::proxy_http::lowered]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 227:0-233:1
-    Visibility: public -/
-def proxy_http.lowered
-  (bytes : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
-  let iter ←
-    SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
-      bytes
-  proxy_http.lowered_loop iter (alloc.vec.Vec.new Std.U8)
-
 /-- [aivm_secrets_garrett_core::proxy_http::reflects]: loop 0:
     Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1159:4-1165:1
     Visibility: public -/
@@ -10849,13 +12036,6 @@ def proxy_http.reflects
     SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
       forms
   proxy_http.reflects_loop iter data folded_data unwrapped_data
-
-/-- [aivm_secrets_garrett_core::proxy_http::Field]
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 27:0-32:1
-    Visibility: public -/
-structure proxy_http.Field where
-  «name» : alloc.vec.Vec Std.U8
-  value : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::proxy_http::Response]
     Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 830:0-835:1
@@ -10965,14 +12145,6 @@ def proxy_http.encode_response
   else
     let s5 := alloc.vec.Vec.deref response.body
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output9 s5
-
-/-- [aivm_secrets_garrett_core::proxy_http::name_is]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 327:0-329:1
-    Visibility: public -/
-def proxy_http.name_is
-  (field : proxy_http.Field) («name» : Slice Std.U8) : Result Bool := do
-  let s := alloc.vec.Vec.deref field.name
-  http_wire.ascii_equal s «name»
 
 /-- [aivm_secrets_garrett_core::proxy_http::dropped_response]:
     Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 959:0-969:1
@@ -11209,58 +12381,6 @@ def proxy_http.digit3
   then ok none
   else proxy_http.digit3_loop line start 0#u16 start
 
-/-- [aivm_secrets_garrett_core::proxy_http::blank]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 243:0-245:1
-    Visibility: public -/
-def proxy_http.blank (byte : Std.U8) : Result Bool := do
-  if byte = 32#u8
-  then ok true
-  else ok (byte = 9#u8)
-
-/-- [aivm_secrets_garrett_core::proxy_http::visible]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 54:0-56:1
-    Visibility: public -/
-def proxy_http.visible (byte : Std.U8) : Result Bool := do
-  if byte >= 33#u8
-  then ok (byte <= 126#u8)
-  else ok false
-
-/-- [aivm_secrets_garrett_core::proxy_http::all_value]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 277:4-284:1
-    Visibility: public -/
-@[rust_loop]
-def proxy_http.all_value_loop
-  (line : Slice Std.U8) (last : Std.Usize) (check : Std.Usize) :
-  Result Bool
-  := do
-  if check < last
-  then
-    let i ← Slice.index_usize line check
-    let b ← proxy_http.visible i
-    if b
-    then
-      let check1 ← check + 1#usize
-      proxy_http.all_value_loop line last check1
-    else
-      let b1 ← proxy_http.blank i
-      if b1
-      then
-        let check1 ← check + 1#usize
-        proxy_http.all_value_loop line last check1
-      else ok false
-  else ok true
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::proxy_http::all_value]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 275:0-284:1
-    Visibility: public -/
-@[reducible]
-def proxy_http.all_value
-  (line : Slice Std.U8) (first : Std.Usize) (last : Std.Usize) :
-  Result Bool
-  := do
-  proxy_http.all_value_loop line last first
-
 /-- [aivm_secrets_garrett_core::proxy_http::status_line]:
     Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 862:0-882:1
     Visibility: public -/
@@ -11378,71 +12498,6 @@ def proxy_http.decimal (value : Slice Std.U8) : Result (Option Std.Usize) := do
         SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
           value
       proxy_http.decimal_loop iter 0#usize
-
-/-- [aivm_secrets_garrett_core::proxy_http::first_named]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 344:4-346:5
-    Visibility: public -/
-@[rust_loop]
-def proxy_http.first_named_loop
-  (fields : Slice proxy_http.Field) («name» : Slice Std.U8)
-  (index : Std.Usize) :
-  Result Std.Usize
-  := do
-  let i := Slice.len fields
-  if index < i
-  then
-    let f ← Slice.index_usize fields index
-    let b ← proxy_http.name_is f «name»
-    if b
-    then ok index
-    else
-      let index1 ← index + 1#usize
-      proxy_http.first_named_loop fields «name» index1
-  else ok index
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::proxy_http::first_named]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 342:0-348:1
-    Visibility: public -/
-@[reducible]
-def proxy_http.first_named
-  (fields : Slice proxy_http.Field) («name» : Slice Std.U8) :
-  Result Std.Usize
-  := do
-  proxy_http.first_named_loop fields «name» 0#usize
-
-/-- [aivm_secrets_garrett_core::proxy_http::count_named]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 333:4-337:5
-    Visibility: public -/
-@[rust_loop]
-def proxy_http.count_named_loop
-  (iter : core.slice.iter.Iter proxy_http.Field) («name» : Slice Std.U8)
-  (count : Std.Usize) :
-  Result Std.Usize
-  := do
-  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
-  match o with
-  | none => ok count
-  | some field =>
-    let b ← proxy_http.name_is field «name»
-    if b
-    then
-      let count1 ← count + 1#usize
-      proxy_http.count_named_loop iter1 «name» count1
-    else proxy_http.count_named_loop iter1 «name» count
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::proxy_http::count_named]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 331:0-339:1
-    Visibility: public -/
-def proxy_http.count_named
-  (fields : Slice proxy_http.Field) («name» : Slice Std.U8) :
-  Result Std.Usize
-  := do
-  let iter ←
-    SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
-      fields
-  proxy_http.count_named_loop iter «name» 0#usize
 
 /-- [aivm_secrets_garrett_core::proxy_http::framing]:
     Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 564:0-588:1
@@ -11752,343 +12807,6 @@ def proxy_http.decode_chunked
   Result proxy_http.Chunked
   := do
   proxy_http.decode_chunked_loop data limit (alloc.vec.Vec.new Std.U8) start
-
-/-- [aivm_secrets_garrett_core::proxy_http::trim_blank_end]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 269:4-271:5
-    Visibility: public -/
-@[rust_loop]
-def proxy_http.trim_blank_end_loop
-  (line : Slice Std.U8) (first : Std.Usize) (last : Std.Usize) :
-  Result Std.Usize
-  := do
-  if last > first
-  then
-    let i ← last - 1#usize
-    let i1 ← Slice.index_usize line i
-    let b ← proxy_http.blank i1
-    if b
-    then proxy_http.trim_blank_end_loop line first i
-    else ok last
-  else ok last
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::proxy_http::trim_blank_end]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 267:0-273:1
-    Visibility: public -/
-def proxy_http.trim_blank_end
-  (line : Slice Std.U8) (first : Std.Usize) : Result Std.Usize := do
-  let last := Slice.len line
-  proxy_http.trim_blank_end_loop line first last
-
-/-- [aivm_secrets_garrett_core::proxy_http::skip_blank]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 261:4-263:5
-    Visibility: public -/
-@[rust_loop]
-def proxy_http.skip_blank_loop
-  (line : Slice Std.U8) (first : Std.Usize) : Result Std.Usize := do
-  let i := Slice.len line
-  if first < i
-  then
-    let i1 ← Slice.index_usize line first
-    let b ← proxy_http.blank i1
-    if b
-    then let first1 ← first + 1#usize
-         proxy_http.skip_blank_loop line first1
-    else ok first
-  else ok first
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::proxy_http::skip_blank]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 259:0-265:1
-    Visibility: public -/
-@[reducible]
-def proxy_http.skip_blank
-  (line : Slice Std.U8) (start : Std.Usize) : Result Std.Usize := do
-  proxy_http.skip_blank_loop line start
-
-/-- [aivm_secrets_garrett_core::proxy_http::token_byte]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 58:0-75:1
-    Visibility: public -/
-def proxy_http.token_byte (byte : Std.U8) : Result Bool := do
-  let b ← http_wire.alphanumeric byte
-  if b
-  then ok true
-  else
-    if byte = 33#u8
-    then ok true
-    else
-      if byte = 35#u8
-      then ok true
-      else
-        if byte = 36#u8
-        then ok true
-        else
-          if byte = 37#u8
-          then ok true
-          else
-            if byte = 38#u8
-            then ok true
-            else
-              if byte = 39#u8
-              then ok true
-              else
-                if byte = 42#u8
-                then ok true
-                else
-                  if byte = 43#u8
-                  then ok true
-                  else
-                    if byte = 45#u8
-                    then ok true
-                    else
-                      if byte = 46#u8
-                      then ok true
-                      else
-                        if byte = 94#u8
-                        then ok true
-                        else
-                          if byte = 95#u8
-                          then ok true
-                          else
-                            if byte = 96#u8
-                            then ok true
-                            else
-                              if byte = 124#u8
-                              then ok true
-                              else ok (byte = 126#u8)
-
-/-- [aivm_secrets_garrett_core::proxy_http::all_token]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 249:4-257:1
-    Visibility: public -/
-@[rust_loop]
-def proxy_http.all_token_loop
-  (line : Slice Std.U8) («end» : Std.Usize) (index : Std.Usize) :
-  Result Bool
-  := do
-  if index < «end»
-  then
-    let i ← Slice.index_usize line index
-    let b ← proxy_http.visible i
-    if b
-    then
-      let b1 ← proxy_http.token_byte i
-      if b1
-      then
-        let index1 ← index + 1#usize
-        proxy_http.all_token_loop line «end» index1
-      else ok false
-    else ok false
-  else ok true
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::proxy_http::all_token]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 247:0-257:1
-    Visibility: public -/
-@[reducible]
-def proxy_http.all_token
-  (line : Slice Std.U8) («end» : Std.Usize) : Result Bool := do
-  proxy_http.all_token_loop line «end» 0#usize
-
-/-- [aivm_secrets_garrett_core::proxy_http::colon_at]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 237:4-239:5
-    Visibility: public -/
-@[rust_loop]
-def proxy_http.colon_at_loop
-  (line : Slice Std.U8) (index : Std.Usize) : Result Std.Usize := do
-  let i := Slice.len line
-  if index < i
-  then
-    let i1 ← Slice.index_usize line index
-    if i1 != 58#u8
-    then let index1 ← index + 1#usize
-         proxy_http.colon_at_loop line index1
-    else ok index
-  else ok index
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::proxy_http::colon_at]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 235:0-241:1
-    Visibility: public -/
-@[reducible]
-def proxy_http.colon_at (line : Slice Std.U8) : Result Std.Usize := do
-  proxy_http.colon_at_loop line 0#usize
-
-/-- [aivm_secrets_garrett_core::proxy_http::parse_field]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 288:0-305:1
-    Visibility: public -/
-def proxy_http.parse_field
-  (line : Slice Std.U8) : Result (Option proxy_http.Field) := do
-  let i := Slice.len line
-  if i = 0#usize
-  then ok none
-  else
-    let i1 ← Slice.index_usize line 0#usize
-    let b ← proxy_http.blank i1
-    if b
-    then ok none
-    else
-      let colon ← proxy_http.colon_at line
-      if colon = 0#usize
-      then ok none
-      else
-        let i2 := Slice.len line
-        if colon >= i2
-        then ok none
-        else
-          let b1 ← proxy_http.all_token line colon
-          if b1
-          then
-            let i3 ← colon + 1#usize
-            let first ← proxy_http.skip_blank line i3
-            let last ← proxy_http.trim_blank_end line first
-            let b2 ← proxy_http.all_value line first last
-            if b2
-            then
-              let s ←
-                core.slice.index.Slice.index
-                  (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) line
-                  { «end» := colon }
-              let v ← proxy_http.lowered s
-              let s1 ←
-                core.slice.index.Slice.index
-                  (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) line
-                  { start := first, «end» := last }
-              let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 s1
-              ok (some { «name» := v, value := v1 })
-            else ok none
-          else ok none
-
-/-- [aivm_secrets_garrett_core::proxy_http::line_end]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 221:4-223:5
-    Visibility: public -/
-@[rust_loop]
-def proxy_http.line_end_loop
-  (head : Slice Std.U8) (index : Std.Usize) : Result Std.Usize := do
-  let i := Slice.len head
-  if index < i
-  then
-    let i1 ← Slice.index_usize head index
-    if i1 != 13#u8
-    then let index1 ← index + 1#usize
-         proxy_http.line_end_loop head index1
-    else ok index
-  else ok index
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::proxy_http::line_end]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 219:0-225:1
-    Visibility: public -/
-@[reducible]
-def proxy_http.line_end
-  (head : Slice Std.U8) (start : Std.Usize) : Result Std.Usize := do
-  proxy_http.line_end_loop head start
-
-/-- [aivm_secrets_garrett_core::proxy_http::MAX_FIELDS]
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 13:0-13:34
-    Visibility: public -/
-@[global_simps, irreducible] def proxy_http.MAX_FIELDS : Std.Usize := 100#usize
-
-/-- [aivm_secrets_garrett_core::proxy_http::parse_fields]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 311:4-323:1
-    Visibility: public -/
-@[rust_loop]
-def proxy_http.parse_fields_loop
-  (head : Slice Std.U8) (fields : alloc.vec.Vec proxy_http.Field)
-  (position : Std.Usize) :
-  Result (Option (alloc.vec.Vec proxy_http.Field))
-  := do
-  let i := Slice.len head
-  if position < i
-  then
-    let «end» ← proxy_http.line_end head position
-    let i1 := alloc.vec.Vec.len fields
-    if i1 >= proxy_http.MAX_FIELDS
-    then ok none
-    else
-      let s ←
-        core.slice.index.Slice.index
-          (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) head
-          { start := position, «end» }
-      let o ← proxy_http.parse_field s
-      match o with
-      | none => ok none
-      | some field =>
-        let fields1 ← alloc.vec.Vec.push fields field
-        let position1 ← «end» + 2#usize
-        proxy_http.parse_fields_loop head fields1 position1
-  else ok (some fields)
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::proxy_http::parse_fields]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 308:0-323:1
-    Visibility: public -/
-@[reducible]
-def proxy_http.parse_fields
-  (head : Slice Std.U8) (start : Std.Usize) :
-  Result (Option (alloc.vec.Vec proxy_http.Field))
-  := do
-  proxy_http.parse_fields_loop head (alloc.vec.Vec.new proxy_http.Field) start
-
-/-- [aivm_secrets_garrett_core::proxy_http::clean_head]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 202:4-216:1
-    Visibility: public -/
-@[rust_loop]
-def proxy_http.clean_head_loop
-  (head : Slice Std.U8) (index : Std.Usize) : Result Bool := do
-  let i := Slice.len head
-  if index < i
-  then
-    let byte ← Slice.index_usize head index
-    if byte = 0#u8
-    then ok false
-    else
-      if byte = 13#u8
-      then
-        let i1 ← index + 1#usize
-        let i2 := Slice.len head
-        if i1 >= i2
-        then ok false
-        else
-          let i3 ← Slice.index_usize head i1
-          if i3 != 10#u8
-          then ok false
-          else
-            if byte = 10#u8
-            then
-              if index = 0#usize
-              then ok false
-              else
-                let i4 ← index - 1#usize
-                let i5 ← Slice.index_usize head i4
-                if i5 != 13#u8
-                then ok false
-                else proxy_http.clean_head_loop head i1
-            else proxy_http.clean_head_loop head i1
-      else
-        if byte = 10#u8
-        then
-          if index = 0#usize
-          then ok false
-          else
-            let i1 ← index - 1#usize
-            let i2 ← Slice.index_usize head i1
-            if i2 != 13#u8
-            then ok false
-            else
-              let index1 ← index + 1#usize
-              proxy_http.clean_head_loop head index1
-        else
-          let index1 ← index + 1#usize
-          proxy_http.clean_head_loop head index1
-  else ok true
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::proxy_http::clean_head]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 200:0-216:1
-    Visibility: public -/
-@[reducible]
-def proxy_http.clean_head (head : Slice Std.U8) : Result Bool := do
-  proxy_http.clean_head_loop head 0#usize
 
 /-- [aivm_secrets_garrett_core::proxy_http::head_end]: loop 0:
     Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 186:4-197:1

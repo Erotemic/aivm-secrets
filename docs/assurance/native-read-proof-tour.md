@@ -449,6 +449,22 @@ assumption. A Rust oracle test (`proxy_controller::tests`) checks that
 `serve` produces the same upstream and guest bytes as the composition the
 shell used before, and that callbacks run in the order the theorems state.
 
+**Who may open a tunnel** ([`GarrettProxyConnect`](../../proofs/GarrettProxyConnect.lean)).
+Before any request, the guest sends `CONNECT host:443` with the session's
+proxy token. That decision is the extracted `proxy_connect::admit`.
+
+| Theorem | Says |
+| --- | --- |
+| `admit_open` | A tunnel opens only if the session is current, the answer is a valid index into the configured origins, and the parsed fields authenticate. The native shell then connects the guest only to that origin. |
+| `authenticated_true` | Authentication succeeds only if a field named `Proxy-Authorization` (any ASCII case) presents exactly the session token, as `Bearer TOKEN` or `Basic base64(USER:TOKEN)`. |
+| `same_secret_true` | The comparison has no early exit and answers `true` only for byte-identical inputs (proved with bit-vector reasoning on the accumulated `OR` of `XOR`s). |
+
+The base64 decoder is extracted but not proved to be base64: it does not
+need to be, since whatever it decodes must still equal the token. A Rust
+oracle test checks the decision against the replaced native code and the
+`base64` crate over 880 heads, including malformed padding and trailing
+bits.
+
 **Byte parity with the Python reference.** `tests/secrets_vectors/proxy-http-v1.tsv`
 holds 76 adversarial and positive cases (and `proxy-http-response-v1.tsv` 43 response cases). The Python test checks that the
 file is exactly the Python reference's output, and the Rust test

@@ -246,6 +246,8 @@ def test_native_proxy_writes_only_core_outputs():
     writes = re.findall(r'(\w+)\.write_all\(([^)]*\)?)\)', source)
     allowed = {('tls', 'wire'), ('tls', '&reply'), ('tls', '&refusal(code)'),
                ('tls', '&refusal("too_large")'),
+               ('stream', '&core::refusal(&code)'),
+               ('stream', '&core::refusal(&core::Code::InvalidRequest)'),
                ('stream', 'b"HTTP/1.1 200 Connection established\\r\\n\\r\\n"')}
     for target, argument in writes:
         assert (target, argument) in allowed or (

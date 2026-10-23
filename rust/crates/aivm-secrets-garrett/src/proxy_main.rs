@@ -21,6 +21,7 @@
 //! bridge authorizes it on its own policy.
 use aivm_secrets_garrett::files;
 use aivm_secrets_garrett_core::credential_use::Authentication;
+use aivm_secrets_garrett_core::proxy_connect::{self as connect, Admission};
 use aivm_secrets_garrett_core::proxy_controller::{self as controller, Stage, Upstream};
 use aivm_secrets_garrett_core::proxy_http as core;
 use base64::Engine;
@@ -387,29 +388,6 @@ impl Session {
     fn current(&self) -> bool {
         !self.revoked.load(Ordering::SeqCst) && Instant::now() < self.expires
     }
-    fn authenticated(&self, fields: &[core::Field]) -> bool {
-        let values: Vec<&core::Field> = fields.iter().filter(|f| f.name == b"proxy-authorization").collect();
-        if values.len() != 1 {
-            return false;
-        }
-        let value = &values[0].value;
-        let presented = if value.len() > 6 && value[..6].eq_ignore_ascii_case(b"basic ") {
-            match base64::engine::general_purpose::STANDARD.decode(&value[6..]) {
-                Ok(decoded) => match decoded.iter().position(|b| *b == b':') {
-                    Some(colon) => decoded[colon + 1..].to_vec(),
-                    None => return false,
-                },
-                Err(_) => return false,
-            }
-        } else if value.len() > 7 && value[..7].eq_ignore_ascii_case(b"bearer ") {
-            value[7..].to_vec()
-        } else {
-            return false;
-        };
-        // Compare without an early exit on the first differing byte.
-        presented.len() == self.token.len()
-            && presented.iter().zip(&self.token).fold(0u8, |acc, (a, b)| acc | (a ^ b)) == 0
-    }
 }
 
 /// The fixed guest response for a refusal: the extracted `core::refusal`.
@@ -632,35 +610,22 @@ fn tunnel(session: &Session, mut stream: TcpStream) -> io::Result<()> {
     stream.set_write_timeout(Some(IO_TIMEOUT))?;
     let data = read_head(&mut stream)?;
     let end = core::head_end(&data).unwrap_or(0);
-    let head = &data[..end];
-    let first = core::line_end(head, 0);
-    let line = &head[..first];
-    let parts: Vec<&[u8]> = line.split(|b| *b == b' ').collect();
-    if !core::clean_head(head) || parts.len() != 3 || parts[0] != b"CONNECT" || parts[2] != b"HTTP/1.1" {
-        return stream.write_all(&refusal("invalid_request"));
-    }
-    let fields = if first >= head.len() { Some(Vec::new()) } else { core::parse_fields(head, first + 2) };
-    let fields = match fields {
-        Some(fields) => fields,
-        None => return stream.write_all(&refusal("invalid_request")),
-    };
-    if !session.authenticated(&fields) {
-        session.record("refused", json!({"code": "unauthenticated"}));
-        return stream.write_all(&refusal("unauthenticated"));
-    }
-    let authority = String::from_utf8_lossy(parts[1]).into_owned();
-    let (host, port) = authority.rsplit_once(':').unwrap_or(("", ""));
-    let origin = match session.origins.get(host) {
-        Some(origin) if port == "443" => origin,
-        _ => {
-            session.record("refused", json!({"code": "unknown_origin"}));
-            return stream.write_all(&refusal("unknown_origin"));
+    // The tunnel decision is the extracted `proxy_connect::admit`
+    // (proofs/GarrettProxyConnect.lean): session token, configured origin on
+    // port 443, current session.
+    let hosts: Vec<Vec<u8>> = session.origins.keys().map(|host| host.as_bytes().to_vec()).collect();
+    let origin = match connect::admit(&data[..end], &session.token, &hosts, session.current()) {
+        Admission::Open(index) => match session.origins.values().nth(index) {
+            Some(origin) => origin,
+            None => return stream.write_all(&core::refusal(&core::Code::InvalidRequest)),
+        },
+        Admission::Refuse(code) => {
+            if !matches!(code, core::Code::InvalidRequest) {
+                session.record("refused", json!({"code": code_name(&code)}));
+            }
+            return stream.write_all(&core::refusal(&code));
         }
     };
-    if !session.current() {
-        session.record("refused", json!({"code": "revoked", "origin": host}));
-        return stream.write_all(&refusal("revoked"));
-    }
     stream.write_all(b"HTTP/1.1 200 Connection established\r\n\r\n")?;
     let connection = ServerConnection::new(origin.guest.clone()).map_err(|_| io::Error::from(io::ErrorKind::InvalidData))?;
     let mut tls = StreamOwned::new(connection, stream);
@@ -822,4 +787,138 @@ fn main() {
     session.revoked.store(true, Ordering::SeqCst);
     session.record("session_end", json!({}));
     std::process::exit(0);
+}
+
+#[cfg(test)]
+mod connect_oracle {
+    //! Byte-equality oracle: the extracted CONNECT decision against the
+    //! native checks it replaced (base64 crate decoding included).
+    use super::*;
+
+    struct Legacy {
+        token: Vec<u8>,
+    }
+    impl Legacy {
+        fn authenticated(&self, fields: &[core::Field]) -> bool {
+            let values: Vec<&core::Field> = fields.iter().filter(|f| f.name == b"proxy-authorization").collect();
+            if values.len() != 1 {
+                return false;
+            }
+            let value = &values[0].value;
+            let presented = if value.len() > 6 && value[..6].eq_ignore_ascii_case(b"basic ") {
+                match base64::engine::general_purpose::STANDARD.decode(&value[6..]) {
+                    Ok(decoded) => match decoded.iter().position(|b| *b == b':') {
+                        Some(colon) => decoded[colon + 1..].to_vec(),
+                        None => return false,
+                    },
+                    Err(_) => return false,
+                }
+            } else if value.len() > 7 && value[..7].eq_ignore_ascii_case(b"bearer ") {
+                value[7..].to_vec()
+            } else {
+                return false;
+            };
+            // Compare without an early exit on the first differing byte.
+            presented.len() == self.token.len()
+                && presented.iter().zip(&self.token).fold(0u8, |acc, (a, b)| acc | (a ^ b)) == 0
+        }
+    }
+
+    fn legacy_admit(head: &[u8], token: &[u8], hosts: &[&str], current: bool) -> Result<usize, &'static str> {
+        let first = core::line_end(head, 0);
+        let line = &head[..first];
+        let parts: Vec<&[u8]> = line.split(|b| *b == b' ').collect();
+        if !core::clean_head(head) || parts.len() != 3 || parts[0] != b"CONNECT" || parts[2] != b"HTTP/1.1" {
+            return Err("invalid_request");
+        }
+        let fields = if first >= head.len() { Some(Vec::new()) } else { core::parse_fields(head, first + 2) };
+        let Some(fields) = fields else { return Err("invalid_request") };
+        if !(Legacy { token: token.to_vec() }).authenticated(&fields) {
+            return Err("unauthenticated");
+        }
+        let authority = String::from_utf8_lossy(parts[1]).into_owned();
+        let (host, port) = authority.rsplit_once(':').unwrap_or(("", ""));
+        match hosts.iter().position(|h| *h == host) {
+            Some(index) if port == "443" => {
+                if current { Ok(index) } else { Err("revoked") }
+            }
+            _ => Err("unknown_origin"),
+        }
+    }
+
+    fn admitted(head: &[u8], token: &[u8], hosts: &[&str], current: bool) -> Result<usize, &'static str> {
+        let owned: Vec<Vec<u8>> = hosts.iter().map(|h| h.as_bytes().to_vec()).collect();
+        match connect::admit(head, token, &owned, current) {
+            Admission::Open(index) => Ok(index),
+            Admission::Refuse(code) => Err(code_name(&code)),
+        }
+    }
+
+    #[test]
+    fn extracted_connect_decision_matches_the_native_checks() {
+        let token = b"tok3n-Value_42".to_vec();
+        let hosts = ["api.example.org", "uploads.example.org"];
+        let b64 = |text: &[u8]| base64::engine::general_purpose::STANDARD.encode(text);
+        let mut auths: Vec<String> = vec![
+            format!("Basic {}", b64(b"aivm:tok3n-Value_42")),
+            format!("basic {}", b64(b":tok3n-Value_42")),
+            format!("BASIC {}", b64(b"a:b:tok3n-Value_42")),
+            format!("Basic {}", b64(b"aivm:tok3n-Value_4")),
+            format!("Basic {}", b64(b"aivmtok3n-Value_42")),
+            format!("Basic {}", b64(b"aivm:tok3n-Value_42").trim_end_matches('=')),
+            "Basic YWl2bTp0b2szbi1WYWx1ZV80Mg==".into(),
+            "Basic YWl2bTp0b2szbi1WYWx1ZV80Mh==".into(),
+            "Basic YWl2bTp0b2szbi1WYWx1ZV80Mg=".into(),
+            "Basic ====".into(),
+            "Basic a===".into(),
+            "Basic ab=c".into(),
+            "Basic Zg==".into(),
+            "Basic Zh==".into(),
+            "Basic Zm8=".into(),
+            "Basic Zm9=".into(),
+            "Basic ".into(),
+            "Bearer tok3n-Value_42".into(),
+            "bearer tok3n-Value_42".into(),
+            "Bearer tok3n-Value_43".into(),
+            "Bearer  tok3n-Value_42".into(),
+            "Token tok3n-Value_42".into(),
+        ];
+        for (i, extra) in ["", "=", "-", "_", "*"].iter().enumerate() {
+            auths.push(format!("Basic {}{}", b64(&[b'x'; 7][..i + 1]), extra));
+        }
+        let mut checked = 0;
+        for connect_line in [
+            "CONNECT api.example.org:443 HTTP/1.1",
+            "CONNECT uploads.example.org:443 HTTP/1.1",
+            "CONNECT api.example.org:8443 HTTP/1.1",
+            "CONNECT evil.example.net:443 HTTP/1.1",
+            "CONNECT api.example.org HTTP/1.1",
+            "CONNECT api.example.org:443:443 HTTP/1.1",
+            "CONNECT  api.example.org:443 HTTP/1.1",
+            "GET api.example.org:443 HTTP/1.1",
+            "CONNECT api.example.org:443 HTTP/1.0",
+            "CONNECT api.example.org:443",
+        ] {
+            for auth in auths.iter().map(Some).chain([None]) {
+                for twice in [false, true] {
+                    for current in [true, false] {
+                        let mut head = connect_line.as_bytes().to_vec();
+                        if let Some(auth) = auth {
+                            head.extend_from_slice(format!("\r\nProxy-Authorization: {auth}").as_bytes());
+                            if twice {
+                                head.extend_from_slice(format!("\r\nproxy-authorization: {auth}").as_bytes());
+                            }
+                        }
+                        assert_eq!(
+                            admitted(&head, &token, &hosts, current),
+                            legacy_admit(&head, &token, &hosts, current),
+                            "{}", String::from_utf8_lossy(&head)
+                        );
+                        checked += 1;
+                    }
+                }
+            }
+        }
+        assert!(checked > 800);
+    }
 }
