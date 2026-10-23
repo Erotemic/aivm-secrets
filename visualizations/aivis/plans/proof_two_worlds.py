@@ -1,0 +1,48 @@
+"""EDIT HERE: noninterference as two provider worlds the guest cannot tell apart."""
+from aivis.diagram import Beat, Diagram, Knowledge, Link, Node
+
+PLAN = Diagram(
+    key='proof_two_worlds',
+    title='What the guest can and cannot learn',
+    kicker='adaptive_request_noninterference: worlds that agree on declassified data look the same to the guest.',
+    nodes=(
+        Node('world_a', 'World A provider', 'one possible response', (-5.0, 2.05), 2.8, 1.0, 'provider'),
+        Node('world_b', 'World B provider', 'another response', (-5.0, 0.55), 2.8, 1.0, 'provider'),
+        Node('release', 'Same extracted code', 'admit, status, release', (0, 1.3), 2.9, 1.12, 'proved'),
+        Node('guest', 'Adaptive guest', 'sees one history', (5.0, 1.3), 2.8, 1.12, 'guest'),
+    ),
+    links=(
+        Link('a', 'world_a', 'release', 'answer A', ((-3.59, 2.05), (-1.46, 1.55)), 'provider', label_xy=(-2.5, 2.45)),
+        Link('b', 'world_b', 'release', 'answer B', ((-3.59, 0.55), (-1.46, 1.05)), 'provider', label_xy=(-2.5, 0.25)),
+        Link('out', 'release', 'guest', 'same outcome', ((1.46, 1.3), (3.59, 1.3)), 'proved', label_xy=(2.5, 1.75)),
+    ),
+    beats=(
+        Beat('hidden', 'Responses differing only outside the selected paths give identical releases.',
+             nodes=('world_a', 'world_b', 'release', 'guest'), links=('a', 'b', 'out'), packet='out',
+             packet_label='identical frame', status='implemented',
+             knowledge=(Knowledge('world_a', (-4.6, -1.55), ('A: title "fix", private X', 'B: title "fix", private Y', 'schema selects title'), 3.4, 1.9),
+                        Knowledge('release', (0, -1.55), ('selects title only',), 3.2, 1.9),
+                        Knowledge('guest', (4.6, -1.55), ('title: "fix"', 'cannot tell X from Y'), 3.4, 1.9))),
+        Beat('rows', 'Declassified on purpose: the row count shows through possibly_more and the size refusal.',
+             focus=('release',), status='implemented',
+             knowledge=(Knowledge('world_a', (-4.6, -1.55), ('A: 30 rows, page 30', 'B: 12 rows, page 30'), 3.4, 1.9),
+                        Knowledge('release', (0, -1.55), ('possibly_more =', 'rows == per_page'), 3.2, 1.9),
+                        Knowledge('guest', (4.6, -1.55), ('learns: page full', 'or not (allowed)'), 3.4, 1.9))),
+        Beat('status', 'Status codes leak only their public class: 4xx, other non-2xx, 206 or success.',
+             focus=('release',), status='implemented',
+             knowledge=(Knowledge('world_a', (-4.6, -1.55), ('A: 403, B: 404 -> same', 'A: 403, B: 500 -> differ'), 3.4, 1.9),
+                        Knowledge('release', (0, -1.55), ('provider_status', 'manifest class'), 3.2, 1.9),
+                        Knowledge('guest', (4.6, -1.55), ('rejected vs failed', 'not the exact code'), 3.4, 1.9))),
+        Beat('adapt', 'The guest may choose each request from all earlier outcomes; histories still match.',
+             focus=('guest',), status='implemented',
+             knowledge=(Knowledge('world_a', (-4.6, -1.55), ('A and B may answer', 'each request differently'), 3.4, 1.9),
+                        Knowledge('release', (0, -1.55), ('per-step proof', 'from extracted code'), 3.2, 1.9),
+                        Knowledge('guest', (4.6, -1.55), ('same set of', 'possible histories'), 3.4, 1.9))),
+        Beat('limits', 'Out of scope: timing, transport error detail beyond its class, the body parser.',
+             focus=('release',), status='assumed',
+             knowledge=(Knowledge('world_a', (-4.6, -1.55), ('transport errors as', 'classes (MODEL-EXCHANGE-01)'), 3.4, 1.9),
+                        Knowledge('release', (0, -1.55), ('same credential', 'in both worlds'), 3.2, 1.9),
+                        Knowledge('guest', (4.6, -1.55), ('timing channels', 'not modelled'), 3.4, 1.9))),
+    ),
+    footer='Declassifications are explicit: selected JSON, pagination row count, status class, reflection refusal.',
+)

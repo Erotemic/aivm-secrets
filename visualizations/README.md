@@ -130,6 +130,23 @@ The GitHub silhouette identifies the API endpoint; its reuse and attribution
 notes are in the icon README. `Node(icon='github')` selects a specific symbol;
 otherwise roles supply defaults such as `sandbox`, `host`, and `vault`.
 
+## What the proofs say
+
+Four scenes after `evidence` explain the production-instance Lean theorems,
+each linked by `proof_anchors` to the exact theorem names (the catalog test
+fails if a named theorem disappears):
+
+- `proof_map`: which code each stage of one read runs, extracted-and-proved
+  (green) or native-and-trusted (amber), with assumption IDs from
+  `docs/planning/aivm-secrets-assumption-roadmap.md`.
+- `proof_send`: how a provider attempt's bytes are pinned to the request
+  encoded for the captured route, and what native trust remains.
+- `proof_release`: what a successful read frame is byte-for-byte, and the
+  17 fixed denial lines.
+- `proof_two_worlds`: noninterference as two provider worlds an adaptive
+  guest cannot tell apart, with the declassifications (selected JSON, row
+  count, status class) shown explicitly.
+
 ## Instant feedback (no Manim installation)
 
 From the visualization directory:

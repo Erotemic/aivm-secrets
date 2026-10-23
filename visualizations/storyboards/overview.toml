@@ -134,3 +134,49 @@ claim = "The native read-only workflow and selected Rust controllers exist; comp
 narration = "The code includes a narrow Rust GitHub operation path, subject to integration testing. The extracted controller has verified pieces; W4 and W5 are conditional trace models. W6 must connect the real network, serialization and audit effects to the model. W8 is about deployment isolation."
 sources = ["docs/verified-garrett.md", "docs/verified-composition.md", "docs/planning/aivm-secrets-assumptions.json"]
 optional_sources = ["docs/verified-w4-core-trace.md", "docs/verified-w5-information-flow.md", "docs/standalone-rust-github-workflow.md"]
+
+# --- What the proofs say (production-instance theorems, 2026-10-22) ---
+
+[[scene]]
+id = "proof_map"
+file = "aivis/scenes/proof_map.py"
+class = "ProofMapScene"
+plan = "aivis.plans.proof_map"
+status = "source-linked-controller"
+claim = "For one native read, admission, channel construction and send, status classification, release and guest frames run as Aeneas-extracted Rust with Lean proofs; TLS, sockets, HTTP framing and the body parse are trusted native code."
+narration = "Follow one read. Green is the extracted core: authorization, the channel and its send gate, the status class, the release and the frame. Amber is native code the theorems trust: clocks, the TLS connection and writer, HTTP framing and the JSON parser. Every amber item has an ID on the assumption roadmap."
+sources = ["proofs/GarrettProductionAssurance.lean", "proofs/GarrettChannelWork.lean", "proofs/GarrettProductionReadFrame.lean", "docs/planning/aivm-secrets-assumption-roadmap.md"]
+proof_anchors = ["aivm_secrets_garrett_core.production.Assurance.production_accepted_read_has_exact_attempt_accounting_and_guest_frame", "aivm_secrets_garrett_core.channel_work.Proofs.exchange_send_writes_route_body", "aivm_secrets_garrett_core.selected_release.FrameProofs.production_read_frame"]
+
+[[scene]]
+id = "proof_send"
+file = "aivis/scenes/proof_send.py"
+class = "ProofSendScene"
+plan = "aivis.plans.proof_send"
+status = "source-linked-controller"
+claim = "Every exchange that reaches the send stage writes, once, exactly the request encoded for its own captured route, after current admission and an acknowledged audit; native code making no other credential write is an assumption."
+narration = "Setup encodes the request for the route the host captured, and only then connects. The send gate needs a current admission and an acknowledged audit record. Channel submit hands those exact bytes to the native writer once; a replay is refused. What stays assumed is that native code writes credential bytes nowhere else."
+sources = ["proofs/GarrettChannelWork.lean", "proofs/GarrettNR23WriterOrigin.lean", "proofs/GarrettProductionAssurance.lean", "docs/planning/aivm-secrets-assumption-roadmap.md"]
+proof_anchors = ["aivm_secrets_garrett_core.channel_work.Proofs.setup_route_constructs", "aivm_secrets_garrett_core.channel_work.Proofs.exchange_send_writes_route_body"]
+
+[[scene]]
+id = "proof_release"
+file = "aivis/scenes/proof_release.py"
+class = "ProofReleaseScene"
+plan = "aivis.plans.proof_release"
+status = "source-linked-controller"
+claim = "A successful read frame is exactly the checked JSON encoding of the reply assembled from host-selected fields, credential-free in both decoded text and bytes for any provider document; every refusal is one of 17 fixed JSON lines."
+narration = "The release projects only the host schema's paths, adds pagination metadata and the fixed envelope, and checks the exact reply twice: no decoded key or string, and no byte of the encoding, contains the credential. The frame is that encoding and a newline. A refusal is one of seventeen fixed lines that depend only on the error class."
+sources = ["proofs/GarrettProductionReadFrame.lean", "proofs/GarrettPublicError.lean", "proofs/GarrettNR4RequestAdaptive.lean"]
+proof_anchors = ["aivm_secrets_garrett_core.selected_release.FrameProofs.production_read_frame", "aivm_secrets_garrett_core.public_error.Proofs.denial_frame_exact", "aivm_secrets_garrett_core.selected_release.ParseIndependence.read_confinement_for_every_document"]
+
+[[scene]]
+id = "proof_two_worlds"
+file = "aivis/scenes/proof_two_worlds.py"
+class = "ProofTwoWorldsScene"
+plan = "aivis.plans.proof_two_worlds"
+status = "conditional-model"
+claim = "Two provider worlds that agree, request by request, on the selected JSON, pagination row count and status class give an adaptive guest the same observable histories; these declassifications are explicit."
+narration = "Imagine two providers whose answers differ. If they agree on what the host selects, on the row count and on the status class, the guest sees exactly the same frames, even when it picks each request from what it saw before. The row count and the status class are deliberate leaks, now written down."
+sources = ["proofs/GarrettNR4ManifestRelease.lean", "proofs/GarrettNR4ExchangeAdaptive.lean", "proofs/GarrettNR4RequestAdaptive.lean"]
+proof_anchors = ["aivm_secrets_garrett_core.selected_release.Relational.manifest_release_noninterference", "aivm_secrets_garrett_core.provider_status.Proofs.manifest_classes", "aivm_secrets_garrett_core.selected_release.Admission.adaptive_request_noninterference"]
