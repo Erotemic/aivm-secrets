@@ -181,17 +181,18 @@ impl<W: Write> aivm_secrets_garrett_core::guest_frame::Writer for GuestWriter<'_
 }
 impl GuestFrame {
     fn from_answer(answer: Outcome<json::Reply>) -> Outcome<Self> {
-        // A failure frame is one of the extracted fixed public denials; no
-        // native error text or serde conversion reaches the guest. A released
-        // read reply is framed from its extracted wire value directly.
-        match answer {
-            Ok(reply) => reply.prepare(MAX_REPLY),
-            Err(error) => {
-                aivm_secrets_garrett_core::public_error::denial_frame(error.into(), MAX_REPLY)
-            }
-        }
-        .map(Self)
-        .map_err(|_| Error::InternalError)
+        // The extracted `answer_frame` chooses the frame: a reply is framed
+        // from its wire value, a failure is the fixed denial line of its
+        // public code. No native error text or serde conversion reaches the
+        // guest; this function only maps types.
+        let captured = answer.map(json::Reply::captured);
+        let public = match &captured {
+            Ok(reply) => Ok(reply.wire()),
+            Err(error) => Err((*error).into()),
+        };
+        aivm_secrets_garrett_core::public_error::answer_frame(public, MAX_REPLY)
+            .map(Self)
+            .map_err(|_| Error::InternalError)
     }
     fn send(&mut self, writer: &mut impl Write) -> Outcome<()> {
         self.0.send(&mut GuestWriter(writer))
@@ -587,6 +588,25 @@ mod guest_frame_tests {
             expected.push(b'\n');
             assert_eq!(writer.accepted, expected, "{error:?}");
         }
+    }
+
+    // A released reply is framed by the extracted `answer_frame` exactly as
+    // the extracted encoder frames its wire value (the previous native path).
+    #[test]
+    fn released_reply_frame_equals_extracted_encoding() {
+        use aivm_secrets_garrett_core::json_wire::Value as Wire;
+        let value = Wire::Object(vec![(
+            "id".chars().map(u32::from).collect(),
+            Wire::Number(b"7".to_vec()),
+        )]);
+        let mut expected = aivm_secrets_garrett_core::json_wire::encode(&value).ok().unwrap();
+        expected.push(b'\n');
+        let mut frame =
+            GuestFrame::from_answer(Ok(json::Reply::Released(json::Captured::released(value))))
+                .unwrap();
+        let mut writer = FaultWriter { accepted: Vec::new(), limit: usize::MAX, flush_error: false };
+        frame.send(&mut writer).unwrap();
+        assert_eq!(writer.accepted, expected);
     }
 
     #[test]

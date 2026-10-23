@@ -19,9 +19,10 @@ the 17 fixed lines, so per failed request the guest learns at most which of
 explicitly, in place of the assumption that native errors carry no
 provider-private data.
 
-Trusted here: the bridge applies exactly `productionFrame` (pinned by the
-NR-4 edge guard, `NATIVE-GLUE-01`), and `pub` is the native `From<Error>` for
-`PublicError`, which may be any function.
+`productionFrame` is the extracted `public_error::answer_frame`. Trusted
+here: `GuestFrame::from_answer` maps the outcome's types and calls it once
+(pinned by the NR-4 edge guard, `NATIVE-GLUE-01`), and `pub` is the native
+`From<Error>` for `PublicError`, which may be any function.
 -/
 
 open Aeneas Aeneas.Std
@@ -103,11 +104,19 @@ theorem adaptive_frame_noninterference (s : FrameSession C X Q O)
 /-- What the bridge frames for an outcome (`GuestFrame::from_answer`): the
     extracted encoding of a released value, or the extracted fixed denial
     frame of a failure's public code. -/
-def productionFrame (pub : X → public_error.PublicError) (limit : Usize) :
-    core.result.Result json_wire.Value X →
-      Result (core.result.Result guest_frame.Frame guest_frame.FrameDenial)
-  | .Ok value => json_wire.prepare value limit
-  | .Err error => public_error.denial_frame (pub error) limit
+def publicAnswer (pub : X → public_error.PublicError) :
+    core.result.Result json_wire.Value X → core.result.Result json_wire.Value public_error.PublicError
+  | .Ok value => .Ok value
+  | .Err error => .Err (pub error)
+
+/-- What the bridge frames for an outcome: the **extracted**
+    `public_error::answer_frame` applied to the outcome with each error
+    mapped to its public code. `GuestFrame::from_answer` does exactly this
+    type mapping and that one call. -/
+def productionFrame (pub : X → public_error.PublicError) (limit : Usize)
+    (answer : core.result.Result json_wire.Value X) :
+    Result (core.result.Result guest_frame.Frame guest_frame.FrameDenial) :=
+  public_error.answer_frame (publicAnswer pub answer) limit
 
 theorem production_failure_by_code (cur : selected_release.Current C X)
     (host : Q → Json → selected_release.Manifest C X)
@@ -115,7 +124,7 @@ theorem production_failure_by_code (cur : selected_release.Current C X)
     (pub : X → public_error.PublicError) (limit : Usize) :
     FailureByCode ⟨cur, host, strategy, productionFrame pub limit⟩ pub := by
   intro e₁ e₂ same
-  simp [productionFrame, same]
+  simp [productionFrame, publicAnswer, public_error.answer_frame, same]
 
 /-- **The production frame instance.** With the bridge's framing, the guest's
     frame histories agree whenever answers agree on `FrameAgree pub`; every
@@ -140,8 +149,14 @@ theorem production_failure_frame (pub : X → public_error.PublicError) (limit :
     (large : 200 ≤ limit.val) (error : X) :
     ∃ frame, productionFrame pub limit (.Err error) = Result.ok (.Ok frame) ∧
       frame.wire.val =
-        public_error.Proofs.ascii (public_error.Proofs.denialText (pub error)) ++ [10#u8] :=
-  let ⟨frame, built, wire, _⟩ := public_error.Proofs.denial_frame_exact (pub error) limit large
-  ⟨frame, built, wire⟩
+        public_error.Proofs.ascii (public_error.Proofs.denialText (pub error)) ++ [10#u8] := by
+  obtain ⟨frame, built, wire, _⟩ := public_error.Proofs.denial_frame_exact (pub error) limit large
+  exact ⟨frame, by simp [productionFrame, publicAnswer, public_error.answer_frame, built], wire⟩
+
+/-- A released value is framed by the extracted encoder, unchanged. -/
+theorem production_success_frame (pub : X → public_error.PublicError) (limit : Usize)
+    (value : json_wire.Value) :
+    productionFrame pub limit (.Ok value) = json_wire.prepare value limit := by
+  simp [productionFrame, publicAnswer, public_error.answer_frame]
 
 end aivm_secrets_garrett_core.selected_release.FrameBoundary

@@ -102,7 +102,7 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'value.as_i64()' in quoted and 'integer.to_string().into_bytes()' in quoted
             and 'value.to_string().into_bytes()' in quoted and 'Captured(convert(value))' in quoted
             and 'json_wire::encode(&capture(value).0)' in quoted
-            and 'json_wire::prepare(&self.0, limit)' in quoted
+            and 'pub(crate) fn wire(&self) -> &aivm_secrets_garrett_core::json_wire::Value {\n        &self.0\n    }' in quoted
             and 'impl Drop for Captured' in decoded and 'clear(&mut self.0)' in decoded
             and all(item + '.zeroize()' in decoded for item in ('bytes', 'scalars', 'name'))
             and 'encode_utf16(' not in quoted and 'write!(' not in quoted
@@ -545,7 +545,7 @@ def review_semantics(contents: dict[str, str]) -> None:
     answer = part(t, 'fn answer(', 'fn forward(')
     require(guest.count('.write_all(wire)') == 1
             and 'self.0.flush()' in guest
-            and 'reply.prepare(MAX_REPLY)' in guest and '.prepare(MAX_REPLY)' in guest
+            and 'aivm_secrets_garrett_core::public_error::answer_frame(public, MAX_REPLY)' in guest
             and 'self.0.send(&mut GuestWriter(writer))' in guest,
             'guest frame serializer bypasses the bounded single-attempt core')
     require(serve.count('self.answer(') == 1 and same_order(serve, 'match frame(&mut stream, MAX_FRAME)',
@@ -556,14 +556,14 @@ def review_semantics(contents: dict[str, str]) -> None:
     require('GuestFrame::from_answer(answer)?.send(&mut stream)?;' in serve
             and '.write_all(' not in serve,
             'authenticated guest writer bypasses GuestFrame')
-    require(same_order(guest, 'Ok(reply) => reply.prepare(MAX_REPLY)',
-                       'Err(error) =>', 'aivm_secrets_garrett_core::public_error::denial_frame(error.into(), MAX_REPLY)')
+    require(same_order(guest, 'Ok(reply) => Ok(reply.wire())',
+                       'Err(error) => Err((*error).into())', 'aivm_secrets_garrett_core::public_error::answer_frame(public, MAX_REPLY)')
             and 'json!(' not in guest and 'format!(' not in guest,
             'guest failure is not the extracted fixed public_error denial frame')
     reply_frame = part(contents[RUST + 'json.rs'], 'pub(crate) enum Reply {', 'pub(crate) fn capture(')
     require(reply_frame.count('Released(') == 2 and reply_frame.count('Native(') == 2
-            and 'Reply::Released(captured) => captured.prepare(limit)' in reply_frame
-            and 'Reply::Native(value) => capture(value).prepare(limit)' in reply_frame,
+            and 'Reply::Released(captured) => captured,' in reply_frame
+            and 'Reply::Native(value) => capture(&value),' in reply_frame,
             'a released read reply is not framed from its extracted wire value')
     require('verbs[0] == "delegate"' in answer
             and 'if let Backend::Provider(provider)' in answer
@@ -571,7 +571,7 @@ def review_semantics(contents: dict[str, str]) -> None:
             'backend selector/unsupported guest delegation changed')
     require(t.count('self.forward(&forwarded)') == 1,
             'additional legacy forwarding may be guest reachable')
-    require(guest.count('json::capture(') == 0 and guest.count('reply.prepare(') == 1 and t.split('#[cfg(test)]', 1)[0].count('.write_all(wire)') == 1,
+    require(guest.count('json::capture(') == 0 and guest.count('answer_frame(') == 1 and t.split('#[cfg(test)]', 1)[0].count('.write_all(wire)') == 1,
             'extra guest stream serialization outside reviewed GuestFrame')
     frame_core = contents['rust/crates/aivm-secrets-garrett-core/src/guest_frame.rs'].split('#[cfg(test)]', 1)[0]
     require(same_order(frame_core, 'pub fn prepare(', 'if payload.len() >= limit',

@@ -87,9 +87,10 @@ def check(root: Path = ROOT) -> dict:
             'guest denial schema no longer consists of fixed code/message')
     require('format!(' not in public and 'to_string(' not in public,
             'guest failure message may include nonfixed diagnostics')
-    require('Err(error) => {' in tls
-            and 'aivm_secrets_garrett_core::public_error::denial_frame(error.into(), MAX_REPLY)' in tls
-            and 'Ok(reply) => reply.prepare(MAX_REPLY)' in tls
+    require('Err(error) => Err((*error).into())' in tls
+            and 'aivm_secrets_garrett_core::public_error::answer_frame(public, MAX_REPLY)' in tls
+            and 'Ok(reply) => Ok(reply.wire())' in tls
+            and 'Err(error) => denial_frame(error, limit)' in public
             and 'self.0.send(&mut GuestWriter(writer))' in tls
             and 'write_all(wire)' in tls and 'self.0.flush()' in tls,
             'guest reply bypasses the canonical bounded single-attempt writer')

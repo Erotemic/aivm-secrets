@@ -32,7 +32,7 @@ def test_reviewed_public_denial_leaf_is_stable(tmp_path):
 
 @pytest.mark.parametrize('name,original,mutant', [
     (checker.PUBLIC_ERROR, 'b"Broker failed closed."', 'b"Provider said: "'),
-    (checker.TLS, 'aivm_secrets_garrett_core::public_error::denial_frame(error.into(), MAX_REPLY)', 'json::capture(&json!({"detail": format!("{:?}", error)})).prepare(MAX_REPLY)'),
+    (checker.TLS, 'aivm_secrets_garrett_core::public_error::answer_frame(public, MAX_REPLY)', 'json::capture(&json!({"detail": format!("{:?}", captured.as_ref().err())})).prepare(MAX_REPLY)'),
     (checker.TLS, 'write_all(wire)', 'write_all(&b"raw"[..])'),
     (checker.TLS, 'self.0.send(&mut GuestWriter(writer))',
      'unchecked_send(writer)'),

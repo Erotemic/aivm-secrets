@@ -105,6 +105,19 @@ pub fn denial_frame(
     crate::json_wire::prepare(&denial(error), limit)
 }
 
+/// The bridge's frame for one answer: a reply is framed from its wire value;
+/// a failure is the fixed denial line of its public code. This is the whole
+/// guest-visible frame choice (`GuestFrame::from_answer` only maps types).
+pub fn answer_frame(
+    answer: Result<&crate::json_wire::Value, PublicError>,
+    limit: usize,
+) -> Result<crate::guest_frame::Frame, crate::guest_frame::FrameDenial> {
+    match answer {
+        Ok(value) => crate::json_wire::prepare(value, limit),
+        Err(error) => denial_frame(error, limit),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

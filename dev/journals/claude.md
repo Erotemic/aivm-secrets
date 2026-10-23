@@ -240,3 +240,17 @@ technique: after `step*`, `simp_all` with a two-digit `Digits` lemma makes
 everything concrete, then `scalar_tac`, `rfl` or `decide` close it. This
 completes HP-5 for the credential-substitution profile's request, response
 and refusal paths. The native shell's own writes stay PROXY-NATIVE-01.
+
+## 2026-10-23 05:31:28 -0400
+
+NATIVE-GLUE-01 narrowed. The bridge's guest frame choice, a released or native
+reply versus a fixed denial, is now the extracted
+`public_error::answer_frame`. `GuestFrame::from_answer` only maps types and
+calls it once. In Lean, `productionFrame` is that extracted function rather
+than a model of native code, so `production_frame_noninterference` and
+`production_failure_frame` are about production code; there is also a new
+`production_success_frame`. Native: the dead `Reply::prepare` and
+`Captured::prepare` were removed in favour of `Reply::captured` and
+`Captured::wire`. Four guards and their mutation tests were re-anchored to
+the new shape, plus a released-reply byte-equality oracle. Existing oracles
+already cover all 17 denial frames.

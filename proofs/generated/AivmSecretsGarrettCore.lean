@@ -14171,6 +14171,18 @@ def public_error.denial_frame
   let v ← public_error.denial error
   json_wire.prepare v limit
 
+/-- [aivm_secrets_garrett_core::public_error::answer_frame]:
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 111:0-119:1
+    Visibility: public -/
+def public_error.answer_frame
+  (answer : core.result.Result json_wire.Value public_error.PublicError)
+  (limit : Std.Usize) :
+  Result (core.result.Result guest_frame.Frame guest_frame.FrameDenial)
+  := do
+  match answer with
+  | core.result.Result.Ok value => json_wire.prepare value limit
+  | core.result.Result.Err error => public_error.denial_frame error limit
+
 /-- [aivm_secrets_garrett_core::read_transition::invocation::Trace]
     Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 9:0-20:1
     Visibility: public -/

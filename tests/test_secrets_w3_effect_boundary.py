@@ -117,7 +117,7 @@ def mutate(repo, filename, before, after):
     ('rust/crates/aivm-secrets-garrett-core/src/json_string.rs', 'append_scalar(output, values[index])', 'append_scalar(output, 65)'),
     ('rust/crates/aivm-secrets-garrett/src/json.rs', 'json_wire::encode(&capture(value).0)', 'unchecked_encode(value)'),
     ('rust/crates/aivm-secrets-garrett/src/json.rs', 'value.chars().map(u32::from).collect()', 'value.chars().map(|_| 65).collect()'),
-    ('rust/crates/aivm-secrets-garrett/src/json.rs', 'json_wire::prepare(&self.0, limit)', 'guest_frame::prepare(Vec::new(), limit)'),
+    ('rust/crates/aivm-secrets-garrett/src/json.rs', '-> &aivm_secrets_garrett_core::json_wire::Value {\n        &self.0', '-> &aivm_secrets_garrett_core::json_wire::Value {\n        &UNSELECTED'),
     ('rust/crates/aivm-secrets-garrett-core/src/json_wire.rs', 'Value::Null => output.extend_from_slice(b"null")', 'Value::Null => output.extend_from_slice(b"false")'),
     ('rust/crates/aivm-secrets-garrett-core/src/json_wire.rs', 'output.extend_from_slice(b"true")', 'output.extend_from_slice(b"null")'),
     ('rust/crates/aivm-secrets-garrett-core/src/json_wire.rs', 'Value::Number(token) => output.extend_from_slice(token)', 'Value::Number(_) => output.extend_from_slice(b"0")'),
@@ -131,7 +131,7 @@ def mutate(repo, filename, before, after):
     ('rust/crates/aivm-secrets-garrett-core/src/json_wire.rs', 'crate::guest_frame::prepare(payload, limit)', 'crate::guest_frame::prepare(payload, usize::MAX)'),
     ('rust/crates/aivm-secrets-garrett/src/json.rs', 'Captured(convert(value))', 'Captured(Wire::Null)'),
     ('rust/crates/aivm-secrets-garrett/src/json.rs', 'name.chars().map(u32::from).collect()', 'name.chars().map(|_| 65).collect()'),
-    ('rust/crates/aivm-secrets-garrett/src/tls.rs', '.prepare(MAX_REPLY)', '.prepare(usize::MAX)'),
+    ('rust/crates/aivm-secrets-garrett/src/tls.rs', 'answer_frame(public, MAX_REPLY)', 'answer_frame(public, usize::MAX)'),
     ('rust/crates/aivm-secrets-garrett/src/tls.rs', 'Ok(value) => self.answer(value, &peer, &now)', 'Ok(_) => self.answer(Value::Null, &peer, &now)'),
     ('rust/crates/aivm-secrets-garrett/src/tls.rs', 'Ok(value) => self.answer(value, &peer, &now),', 'Ok(value) => { let _ = self.answer(value.clone(), &peer, &now); self.answer(value, &peer, &now) },'),
     ('rust/crates/aivm-secrets-garrett-core/src/request_context.rs', 'provider_io::Routed::new(self.context.route(), plan.work)', 'provider_io::Routed::new(other_route(), plan.work)'),
@@ -302,8 +302,8 @@ def mutate(repo, filename, before, after):
     ),
     (
         RUST + 'tls.rs',
-        'aivm_secrets_garrett_core::public_error::denial_frame(error.into(), MAX_REPLY)',
-        'json::capture(&json!({"detail": format!("{:?}", error)})).prepare(MAX_REPLY)',
+        'aivm_secrets_garrett_core::public_error::answer_frame(public, MAX_REPLY)',
+        'json::capture(&json!({"detail": format!("{:?}", captured.as_ref().err())})).prepare(MAX_REPLY)',
     ),
 ])
 def test_w3_bypass_mutants_fail_even_with_updated_source_digest(

@@ -126,16 +126,12 @@ pub(crate) enum Reply {
     Native(Value),
 }
 impl Reply {
-    pub(crate) fn prepare(
-        &self,
-        limit: usize,
-    ) -> Result<
-        aivm_secrets_garrett_core::guest_frame::Frame,
-        aivm_secrets_garrett_core::guest_frame::FrameDenial,
-    > {
+    /// The wire value a reply is framed from: the released extracted value,
+    /// or the captured native reply.
+    pub(crate) fn captured(self) -> Captured {
         match self {
-            Reply::Released(captured) => captured.prepare(limit),
-            Reply::Native(value) => capture(value).prepare(limit),
+            Reply::Released(captured) => captured,
+            Reply::Native(value) => capture(&value),
         }
     }
 }
@@ -163,14 +159,8 @@ pub(crate) fn capture(value: &Value) -> Captured {
     Captured(convert(value))
 }
 impl Captured {
-    pub(crate) fn prepare(
-        &self,
-        limit: usize,
-    ) -> Result<
-        aivm_secrets_garrett_core::guest_frame::Frame,
-        aivm_secrets_garrett_core::guest_frame::FrameDenial,
-    > {
-        aivm_secrets_garrett_core::json_wire::prepare(&self.0, limit)
+    pub(crate) fn wire(&self) -> &aivm_secrets_garrett_core::json_wire::Value {
+        &self.0
     }
 }
 pub fn canonical(value: &Value) -> Vec<u8> {
