@@ -52,6 +52,17 @@ interfaces (such as CLI aliases) do not require byte-identical ports. Rust
 parity, physical cross-host deployment, rollback protection and production
 provider validation remain open.
 
+**Optional HTTPS proxy profiles (experimental).** For stock tools such as
+`curl` or `gh`, `aivm-secrets proxy` (and the native `garrett-proxy`) substitutes a
+host-held credential for configured origins behind an ordinary `HTTPS_PROXY`
+([profile guide](docs/https-proxy-profile.md),
+[plan](docs/planning/aivm-secrets-http-proxy-profiles.md),
+[claim matrix](docs/assurance/proxy-claim-evidence-matrix.md)). The
+`credential-substitution` profile keeps the credential out of the guest. It
+does **not** confine what the guest may do with it at the origin, so use it
+only for narrowly scoped credentials. Named operations remain the default and
+strictest interface.
+
 The [extraction record](docs/extraction.md) explains the preserved authorship,
 source commit, commit map, independent checks, and remaining integration work.
 Original author and co-author attribution is retained in Git history:
