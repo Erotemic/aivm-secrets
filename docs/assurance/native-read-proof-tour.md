@@ -498,6 +498,30 @@ named operations; the host then builds the target with this function. A
 future native translator can prove its round trip against the same
 `fill_target` the host uses.
 
+## The other guest verbs: `describe` and `renounce` (2026-10-23)
+
+The guest can send three verbs. `request` is the read/write path above. The
+other two, `describe` and `renounce`, used to be answered by native code with
+serde replies. Both sessions now hand them, after the same capability check,
+to the extracted `control::control`
+([`GarrettControl`](../../proofs/GarrettControl.lean)). The native side
+supplies three callbacks: revoke the control state, record the revocation in
+the audit, deactivate the grant.
+
+| Theorem | Says |
+| --- | --- |
+| `control_paths` | For **any** callbacks, a returned call took one path. `renounce`: revoke, then record; only if the record succeeded, deactivate and reply `{"ok":true,"renounced":true,"version":1}`. If the record failed, the error comes back, no reply is sent, and the control state stays revoked (fail closed). `describe`: reply with the description, no callback. Anything else: `Denied`, no callback. The callback interface has no provider operation, so neither verb can cause a provider request. |
+| `manifest_description_exact` | The description is `{"operations":[...],"profile":"manifest-https-v1","request_limit":"unbounded","writes":MODE}`, where the array is exactly the policy's operation names in order. Those names and the write mode are the function's only inputs, so no credential, token, identity or audit data can appear in a `describe` reply. |
+
+The reply values go through the same extracted JSON frame encoder as read
+results. The `custody::control_oracle` test checks that the framed bytes
+equal the serde replies they replaced, for all write modes and several
+operation lists.
+
+**Still trusted** (`CONTROL-NATIVE-01`): that the three callbacks do what
+they say (revocation takes effect for later requests, the record is a
+durable audit append), and the capability check that precedes the call.
+
 ## OUT-4 first increment: the exact-write gate (2026-10-23)
 
 Writes and reads run through the same extracted production controller,

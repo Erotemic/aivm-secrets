@@ -430,9 +430,7 @@ impl Bridge {
             }
             // Control admission also follows any OAuth lease wait in the
             // provider; an older outer snapshot cannot authorize it.
-            return provider
-                .control(verifier, token, peer, expected, verb)
-                .map(json::Reply::Native);
+            return provider.control(verifier, token, peer, expected, verb);
         }
         let opened = verifier.open(token, peer, &expected, now)?;
         let inner =

@@ -28,6 +28,7 @@ hypotheses are on the same list as library and deployment trust.
 | `NATIVE-GLUE-01` | P1 | Move remaining native-to-core call sites into extracted wrappers where Aeneas allows |
 | `PROXY-NATIVE-01` | P2 | Native proxy shell (OUT-6): per-request controller extracted (`proxy_controller::serve`); next, the tunnel loop and byte-exact callback contracts |
 | `ROUTE-NATIVE-01` | P2 | Named-operation targets: `route::fill_target` is extracted and proved; next, template parsing and argument-to-text conversion, then a proved guest-side match (HP-6) |
+| `CONTROL-NATIVE-01` | P2 | Control verbs: `control::control` decides and replies (proved); next, tie its audit record and revocation to the read path's acknowledgement and admission relations |
 | `EMISSION-RUST-01` | P2 | Extract remaining admission sampling wrappers |
 | `APPROVAL-RUST-01` | P2 | Adapter-level single-use linearization in the write (OUT-4) campaign |
 | `COORD-RUST-01` | P2 | Extend coordinator proofs to client transport phases |

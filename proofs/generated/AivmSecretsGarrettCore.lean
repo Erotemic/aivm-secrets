@@ -4996,6 +4996,329 @@ def completion.complete
     completion.select_and_complete WorkInst { work, effects, value := none }
   ok { outcome, work := pending.work, effects := pending.effects }
 
+/-- Trait declaration: [aivm_secrets_garrett_core::control::Control]
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 11:0-19:1
+    Visibility: public -/
+structure control.Control (Self : Type _) (Self_Error : Type _) where
+  revoke : Self → Result Self
+  record_revoked : Self → Result ((core.result.Result Unit Self_Error) ×
+    Self)
+  deactivate : Self → Result Self
+
+/-- [aivm_secrets_garrett_core::control::Controlled]
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 22:0-30:1
+    Visibility: public -/
+@[discriminant isize]
+inductive control.Controlled (E : Type _) where
+| Reply : json_wire.Value → control.Controlled E
+| Failed : E → control.Controlled E
+| Denied : control.Controlled E
+
+/-- [aivm_secrets_garrett_core::control::text]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 35:4-38:5
+    Visibility: public -/
+@[rust_loop]
+def control.text_loop
+  (bytes : Slice Std.U8) (out : alloc.vec.Vec Std.U32) (index : Std.Usize) :
+  Result (alloc.vec.Vec Std.U32)
+  := do
+  let i := Slice.len bytes
+  if index < i
+  then
+    let i1 ← Slice.index_usize bytes index
+    let i2 ← lift (UScalar.cast .U32 i1)
+    let out1 ← alloc.vec.Vec.push out i2
+    let index1 ← index + 1#usize
+    control.text_loop bytes out1 index1
+  else ok out
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::control::text]:
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 32:0-40:1
+    Visibility: public -/
+def control.text (bytes : Slice Std.U8) : Result json_wire.Value := do
+  let out ← control.text_loop bytes (alloc.vec.Vec.new Std.U32) 0#usize
+  ok (json_wire.Value.Text out)
+
+/-- [aivm_secrets_garrett_core::control::text_units]:
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 60:0-65:1
+    Visibility: public -/
+def control.text_units
+  (bytes : Slice Std.U8) : Result (alloc.vec.Vec Std.U32) := do
+  let v ← control.text bytes
+  match v with
+  | json_wire.Value.Null => ok (alloc.vec.Vec.new Std.U32)
+  | json_wire.Value.Boolean _ => ok (alloc.vec.Vec.new Std.U32)
+  | json_wire.Value.Number _ => ok (alloc.vec.Vec.new Std.U32)
+  | json_wire.Value.Text units => ok units
+  | json_wire.Value.Array _ => ok (alloc.vec.Vec.new Std.U32)
+  | json_wire.Value.Object _ => ok (alloc.vec.Vec.new Std.U32)
+
+/-- [aivm_secrets_garrett_core::control::described]:
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 43:0-49:1
+    Visibility: public -/
+def control.described
+  (description : json_wire.Value) : Result json_wire.Value := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 11#usize [
+        100#u8, 101#u8, 115#u8, 99#u8, 114#u8, 105#u8, 112#u8, 116#u8, 105#u8,
+        111#u8, 110#u8
+        ]))
+  let v ← control.text_units s
+  let s1 ← lift (Array.to_slice (Array.make 2#usize [ 111#u8, 107#u8 ]))
+  let v1 ← control.text_units s1
+  let s2 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        118#u8, 101#u8, 114#u8, 115#u8, 105#u8, 111#u8, 110#u8
+        ]))
+  let v2 ← control.text_units s2
+  let s3 ← lift (Array.to_slice (Array.make 1#usize [ 49#u8 ]))
+  let v3 ← alloc.slice.Slice.to_vec core.clone.CloneU8 s3
+  let y ←
+    lift (Std.Array.to_slice
+      (Array.make 3#usize [
+         (v, description), (v1, json_wire.Value.Boolean true), (v2,
+         json_wire.Value.Number v3)
+         ] : Array ((alloc.vec.Vec Std.U32) × json_wire.Value) 3#usize))
+  let ret := alloc.slice.Slice.into_vec y
+  ok (json_wire.Value.Object ret)
+
+/-- [aivm_secrets_garrett_core::control::renounced]:
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 52:0-58:1
+    Visibility: public -/
+def control.renounced : Result json_wire.Value := do
+  let s ← lift (Array.to_slice (Array.make 2#usize [ 111#u8, 107#u8 ]))
+  let v ← control.text_units s
+  let s1 ←
+    lift (Array.to_slice
+      (Array.make 9#usize [
+        114#u8, 101#u8, 110#u8, 111#u8, 117#u8, 110#u8, 99#u8, 101#u8, 100#u8
+        ]))
+  let v1 ← control.text_units s1
+  let s2 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        118#u8, 101#u8, 114#u8, 115#u8, 105#u8, 111#u8, 110#u8
+        ]))
+  let v2 ← control.text_units s2
+  let s3 ← lift (Array.to_slice (Array.make 1#usize [ 49#u8 ]))
+  let v3 ← alloc.slice.Slice.to_vec core.clone.CloneU8 s3
+  let y ←
+    lift (Std.Array.to_slice
+      (Array.make 3#usize [
+         (v, json_wire.Value.Boolean true), (v1, json_wire.Value.Boolean true),
+         (v2, json_wire.Value.Number v3)
+         ] : Array ((alloc.vec.Vec Std.U32) × json_wire.Value) 3#usize))
+  let ret := alloc.slice.Slice.into_vec y
+  ok (json_wire.Value.Object ret)
+
+/-- [aivm_secrets_garrett_core::control::mode_name]:
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 67:0-73:1
+    Visibility: public -/
+def control.mode_name (writes : approval.Mode) : Result json_wire.Value := do
+  match writes with
+  | approval.Mode.Deny =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 4#usize [ 100#u8, 101#u8, 110#u8, 121#u8 ]))
+    control.text s
+  | approval.Mode.Approve =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 7#usize [
+          97#u8, 112#u8, 112#u8, 114#u8, 111#u8, 118#u8, 101#u8
+          ]))
+    control.text s
+  | approval.Mode.Allow =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 5#usize [ 97#u8, 108#u8, 108#u8, 111#u8, 119#u8 ]))
+    control.text s
+
+/-- [aivm_secrets_garrett_core::control::names]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 78:4-81:5 -/
+@[rust_loop]
+def control.names_loop
+  (operations : Slice (alloc.vec.Vec Std.U8))
+  (out : alloc.vec.Vec json_wire.Value) (index : Std.Usize) :
+  Result (alloc.vec.Vec json_wire.Value)
+  := do
+  let i := Slice.len operations
+  if index < i
+  then
+    let v ← Slice.index_usize operations index
+    let s := alloc.vec.Vec.deref v
+    let v1 ← control.text s
+    let out1 ← alloc.vec.Vec.push out v1
+    let index1 ← index + 1#usize
+    control.names_loop operations out1 index1
+  else ok out
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::control::names]:
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 75:0-83:1 -/
+@[reducible]
+def control.names
+  (operations : Slice (alloc.vec.Vec Std.U8)) :
+  Result (alloc.vec.Vec json_wire.Value)
+  := do
+  control.names_loop operations (alloc.vec.Vec.new json_wire.Value) 0#usize
+
+/-- [aivm_secrets_garrett_core::control::manifest_description]:
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 87:0-94:1
+    Visibility: public -/
+def control.manifest_description
+  (operations : Slice (alloc.vec.Vec Std.U8)) (writes : approval.Mode) :
+  Result json_wire.Value
+  := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 10#usize [
+        111#u8, 112#u8, 101#u8, 114#u8, 97#u8, 116#u8, 105#u8, 111#u8, 110#u8,
+        115#u8
+        ]))
+  let v ← control.text_units s
+  let v1 ← control.names operations
+  let s1 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        112#u8, 114#u8, 111#u8, 102#u8, 105#u8, 108#u8, 101#u8
+        ]))
+  let v2 ← control.text_units s1
+  let s2 ←
+    lift (Array.to_slice
+      (Array.make 17#usize [
+        109#u8, 97#u8, 110#u8, 105#u8, 102#u8, 101#u8, 115#u8, 116#u8, 45#u8,
+        104#u8, 116#u8, 116#u8, 112#u8, 115#u8, 45#u8, 118#u8, 49#u8
+        ]))
+  let v3 ← control.text s2
+  let s3 ←
+    lift (Array.to_slice
+      (Array.make 13#usize [
+        114#u8, 101#u8, 113#u8, 117#u8, 101#u8, 115#u8, 116#u8, 95#u8, 108#u8,
+        105#u8, 109#u8, 105#u8, 116#u8
+        ]))
+  let v4 ← control.text_units s3
+  let s4 ←
+    lift (Array.to_slice
+      (Array.make 9#usize [
+        117#u8, 110#u8, 98#u8, 111#u8, 117#u8, 110#u8, 100#u8, 101#u8, 100#u8
+        ]))
+  let v5 ← control.text s4
+  let s5 ←
+    lift (Array.to_slice
+      (Array.make 6#usize [ 119#u8, 114#u8, 105#u8, 116#u8, 101#u8, 115#u8 ]))
+  let v6 ← control.text_units s5
+  let v7 ← control.mode_name writes
+  let y ←
+    lift (Std.Array.to_slice
+      (Array.make 4#usize [
+         (v, json_wire.Value.Array v1), (v2, v3), (v4, v5), (v6, v7)
+         ] : Array ((alloc.vec.Vec Std.U32) × json_wire.Value) 4#usize))
+  let ret := alloc.slice.Slice.into_vec y
+  ok (json_wire.Value.Object ret)
+
+/-- [aivm_secrets_garrett_core::control::account_description]:
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 97:0-109:1
+    Visibility: public -/
+def control.account_description : Result json_wire.Value := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 10#usize [
+        111#u8, 112#u8, 101#u8, 114#u8, 97#u8, 116#u8, 105#u8, 111#u8, 110#u8,
+        115#u8
+        ]))
+  let v ← control.text_units s
+  let s1 ←
+    lift (Array.to_slice
+      (Array.make 12#usize [
+        112#u8, 114#u8, 111#u8, 102#u8, 105#u8, 108#u8, 101#u8, 46#u8, 114#u8,
+        101#u8, 97#u8, 100#u8
+        ]))
+  let v1 ← control.text s1
+  let y ←
+    lift (Std.Array.to_slice (Array.make 1#usize [ v1 ] : Array json_wire.Value
+      1#usize))
+  let ret := alloc.slice.Slice.into_vec y
+  let s2 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        112#u8, 114#u8, 111#u8, 102#u8, 105#u8, 108#u8, 101#u8
+        ]))
+  let v2 ← control.text_units s2
+  let s3 ←
+    lift (Array.to_slice
+      (Array.make 17#usize [
+        97#u8, 99#u8, 99#u8, 111#u8, 117#u8, 110#u8, 116#u8, 45#u8, 115#u8,
+        116#u8, 97#u8, 116#u8, 117#u8, 115#u8, 45#u8, 118#u8, 49#u8
+        ]))
+  let v3 ← control.text s3
+  let s4 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        114#u8, 101#u8, 108#u8, 101#u8, 97#u8, 115#u8, 101#u8
+        ]))
+  let v4 ← control.text_units s4
+  let s5 ← lift (Array.to_slice (Array.make 2#usize [ 105#u8, 100#u8 ]))
+  let v5 ← control.text s5
+  let s6 ←
+    lift (Array.to_slice
+      (Array.make 6#usize [ 97#u8, 99#u8, 116#u8, 105#u8, 118#u8, 101#u8 ]))
+  let v6 ← control.text s6
+  let y1 ←
+    lift (Std.Array.to_slice (Array.make 2#usize [ v5, v6 ] : Array
+      json_wire.Value 2#usize))
+  let ret1 := alloc.slice.Slice.into_vec y1
+  let y2 ←
+    lift (Std.Array.to_slice
+      (Array.make 3#usize [
+         (v, json_wire.Value.Array ret), (v2, v3), (v4, json_wire.Value.Array
+         ret1)
+         ] : Array ((alloc.vec.Vec Std.U32) × json_wire.Value) 3#usize))
+  let ret2 := alloc.slice.Slice.into_vec y2
+  ok (json_wire.Value.Object ret2)
+
+/-- [aivm_secrets_garrett_core::control::control]:
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 114:0-130:1
+    Visibility: public -/
+def control.control
+  {C : Type _} {Clause0_Error : Type _} (ControlInst : control.Control C
+  Clause0_Error) (io : C) (verb : Slice Std.U8) (description : json_wire.Value)
+  :
+  Result ((control.Controlled Clause0_Error) × C)
+  := do
+  let renounce ←
+    lift (Array.to_slice
+      (Array.make 8#usize [
+        114#u8, 101#u8, 110#u8, 111#u8, 117#u8, 110#u8, 99#u8, 101#u8
+        ]))
+  let describe ←
+    lift (Array.to_slice
+      (Array.make 8#usize [
+        100#u8, 101#u8, 115#u8, 99#u8, 114#u8, 105#u8, 98#u8, 101#u8
+        ]))
+  let b ← core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 verb renounce
+  if b
+  then
+    let io1 ← ControlInst.revoke io
+    let (r, io2) ← ControlInst.record_revoked io1
+    match r with
+    | core.result.Result.Ok _ =>
+      let io3 ← ControlInst.deactivate io2
+      let v ← control.renounced
+      ok (control.Controlled.Reply v, io3)
+    | core.result.Result.Err error => ok (control.Controlled.Failed error, io2)
+  else
+    let b1 ←
+      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 verb describe
+    if b1
+    then
+      let v ← control.described description
+      ok (control.Controlled.Reply v, io)
+    else ok (control.Controlled.Denied, io)
+
 /-- Trait declaration: [aivm_secrets_garrett_core::coordination::Dispatch]
     Source: 'crates/aivm-secrets-garrett-core/src/coordination.rs', lines 3:0-11:1
     Visibility: public -/

@@ -567,7 +567,7 @@ impl Session {
         peer: &crate::tls::VerifiedPeer,
         expected: Expectation,
         verb: &str,
-    ) -> Outcome<Value> {
+    ) -> Outcome<crate::json::Reply> {
         let _vault = self
             .base
             .oauth
@@ -587,21 +587,37 @@ impl Session {
                 .claims;
         core::require_use_current(&claims, &self.base.grant, now, self.base.elapsed()?)
             .map_err(use_error)?;
-        if verb == "renounce" {
-            if let Some(control) = &self.control {
-                control.state.revoke();
-            }
-
-            self.base.executor.audit.write_record(&json!({"schema":1,"event":"revoked","grant":self.base.executor.audit.grant,"policy":self.base.executor.audit.policy}))?;
-            self.base.grant.active = false;
-            return Ok(json!({"version":1,"ok":true,"renounced":true}));
+        let operations: Vec<Vec<u8>> = self
+            .policy
+            .operations()
+            .into_iter()
+            .map(String::into_bytes)
+            .collect();
+        let description =
+            aivm_secrets_garrett_core::control::manifest_description(&operations, &self.writes);
+        let mut native = ManifestControl(self);
+        super::controlled(aivm_secrets_garrett_core::control::control(
+            &mut native,
+            verb.as_bytes(),
+            description,
+        ))
+    }
+}
+/// The manifest session's control side effects (`proofs/GarrettControl.lean`).
+struct ManifestControl<'a>(&'a mut Session);
+impl aivm_secrets_garrett_core::control::Control for ManifestControl<'_> {
+    type Error = Error;
+    fn revoke(&mut self) {
+        if let Some(control) = &self.0.control {
+            control.state.revoke();
         }
-        if verb != "describe" {
-            return Err(Error::Denied);
-        }
-        Ok(
-            json!({"version":1,"ok":true,"description":{"profile":"manifest-https-v1","operations":self.policy.operations(),"writes":match self.writes { aivm_secrets_garrett_core::approval::Mode::Allow=>"allow", aivm_secrets_garrett_core::approval::Mode::Deny=>"deny", aivm_secrets_garrett_core::approval::Mode::Approve=>"approve" },"request_limit":"unbounded"}}),
-        )
+    }
+    fn record_revoked(&mut self) -> Outcome<()> {
+        let audit = &self.0.base.executor.audit;
+        audit.write_record(&json!({"schema":1,"event":"revoked","grant":audit.grant,"policy":audit.policy}))
+    }
+    fn deactivate(&mut self) {
+        self.0.base.grant.active = false;
     }
 }
 

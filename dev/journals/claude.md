@@ -379,3 +379,24 @@ ROUTE-NATIVE-01 for what stays native.
 - Pitfall noted: building bins without `--all-features` overwrites the
   conformance runner with a featureless build and makes retry-key tests fail
   spuriously.
+
+## 2026-10-23 09:02:16 -0400
+
+Work-order item C asked to account for `describe` and `renounce`. Neither
+was covered by any proof or ledger row. Both sessions now hand them to the
+extracted `control::control` after authorization. `GarrettControl`
+proves the three paths for any callbacks (`control_paths`) and the exact
+content of the manifest description (`manifest_description_exact`). New
+row CONTROL-NATIVE-01 for the three callbacks.
+
+- Behaviour preserved, checked by a byte-equality oracle against the old
+  serde replies through the same extracted frame encoder, and by the 229
+  existing native describe/renounce process tests.
+- Observation worth review: on renounce the control state is revoked
+  *before* the audit record; if the record fails the grant stays active but
+  control is revoked and no reply is sent. That is the pre-existing order,
+  now proved; it fails closed for further use but leaves the grant flag set.
+  I did not change it (security-semantics change needs review).
+- I drafted the description theorem with a placeholder `sorry` and replaced
+  it with the real statement before the first build; nothing with `sorry`
+  was compiled or committed.

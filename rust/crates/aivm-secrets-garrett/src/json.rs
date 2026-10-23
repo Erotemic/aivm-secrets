@@ -120,7 +120,7 @@ impl Captured {
     }
 }
 /// A guest reply: either the extracted wire value released by the core read
-/// pipeline, or a native serde reply (describe/renounce/approval/forward).
+/// pipeline or control verbs, or a native serde reply (approval/forward).
 pub(crate) enum Reply {
     Released(Captured),
     Native(Value),

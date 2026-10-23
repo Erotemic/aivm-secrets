@@ -257,4 +257,5 @@ pub mod provider_status;
 pub mod proxy_http;
 pub mod proxy_controller;
 pub mod route;
+pub mod control;
 pub mod write_gate;

@@ -6,6 +6,7 @@ use crate::{
     tls::Deadline,
     Error, Outcome,
 };
+use aivm_secrets_garrett_core::control;
 use aivm_secrets_garrett_core::{
     credential_use as core, http_auth, http_wire, protocol, Expectation, IssuedSurrogate,
 };
@@ -887,7 +888,7 @@ impl AccountSession {
         peer: &crate::tls::VerifiedPeer,
         expected: Expectation,
         verb: &str,
-    ) -> Outcome<Value> {
+    ) -> Outcome<crate::json::Reply> {
         let _vault_lease = self.oauth.as_ref().map(OAuthSource::active).transpose()?;
         self.check_coordination()?;
         let now = host_time()?;
@@ -910,14 +911,35 @@ impl AccountSession {
             self.elapsed()?,
         )
         .map_err(use_error)?;
-        if verb == "renounce" {
-            self.executor.audit.record("revoked")?;
-            self.grant.active = false;
-            return Ok(json!({"version":1,"ok":true,"renounced":true}));
-        }
-        Ok(
-            json!({"version":1,"ok":true,"description":{"profile":"account-status-v1","operations":["profile.read"],"release":["id","active"]}}),
-        )
+        let mut native = AccountControl(self);
+        controlled(control::control(
+            &mut native,
+            verb.as_bytes(),
+            control::account_description(),
+        ))
+    }
+}
+/// The account session's control side effects: an audit record and the
+/// grant flag; it has no separate control state to revoke.
+struct AccountControl<'a>(&'a mut AccountSession);
+impl control::Control for AccountControl<'_> {
+    type Error = Error;
+    fn revoke(&mut self) {}
+    fn record_revoked(&mut self) -> Outcome<()> {
+        self.0.executor.audit.record("revoked")
+    }
+    fn deactivate(&mut self) {
+        self.0.grant.active = false;
+    }
+}
+/// The guest reply for an extracted control outcome.
+pub(crate) fn controlled(outcome: control::Controlled<Error>) -> Outcome<crate::json::Reply> {
+    match outcome {
+        control::Controlled::Reply(value) => Ok(crate::json::Reply::Released(
+            crate::json::Captured::released(value),
+        )),
+        control::Controlled::Failed(error) => Err(error),
+        control::Controlled::Denied => Err(Error::Denied),
     }
 }
 fn use_error(error: core::UseDenial) -> Error {
@@ -1272,7 +1294,7 @@ impl ProviderSession {
         peer: &crate::tls::VerifiedPeer,
         expected: Expectation,
         verb: &str,
-    ) -> Outcome<Value> {
+    ) -> Outcome<crate::json::Reply> {
         match &mut self.0 {
             Backend::Account(s) => s.control(verifier, token, peer, expected, verb),
             Backend::Manifest(s) => s.control(verifier, token, peer, expected, verb),
@@ -1357,6 +1379,46 @@ mod target_reflection_oracle_tests {
             )]);
             let new = aivm_secrets_garrett_core::selected_release::checked(tree, &secret).is_ok();
             assert_eq!(new, old, "{target}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod control_oracle {
+    //! Byte-equality oracle: the extracted control replies against the serde
+    //! replies they replaced, framed by the same extracted JSON encoder.
+    use super::*;
+    use aivm_secrets_garrett_core::{approval::Mode, json_wire};
+
+    fn bytes(value: &json_wire::Value) -> Vec<u8> {
+        let mut out = Vec::new();
+        assert!(json_wire::append(&mut out, value));
+        out
+    }
+
+    fn native(value: &Value) -> Vec<u8> {
+        bytes(crate::json::capture(value).wire())
+    }
+
+    #[test]
+    fn extracted_control_replies_match_the_serde_replies() {
+        assert_eq!(
+            bytes(&control::renounced()),
+            native(&json!({"version":1,"ok":true,"renounced":true}))
+        );
+        assert_eq!(
+            bytes(&control::described(control::account_description())),
+            native(&json!({"version":1,"ok":true,"description":{"profile":"account-status-v1","operations":["profile.read"],"release":["id","active"]}}))
+        );
+        let lists: [&[&str]; 3] = [&[], &["issue.view"], &["a.b", "pull.diff", "repo-x.view"]];
+        for operations in lists {
+            for (mode, name) in [(Mode::Allow, "allow"), (Mode::Deny, "deny"), (Mode::Approve, "approve")] {
+                let names: Vec<Vec<u8>> = operations.iter().map(|o| o.as_bytes().to_vec()).collect();
+                assert_eq!(
+                    bytes(&control::described(control::manifest_description(&names, &mode))),
+                    native(&json!({"version":1,"ok":true,"description":{"profile":"manifest-https-v1","operations":operations,"writes":name,"request_limit":"unbounded"}}))
+                );
+            }
         }
     }
 }
