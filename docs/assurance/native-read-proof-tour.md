@@ -553,12 +553,15 @@ other two, `describe` and `renounce`, used to be answered by native code with
 serde replies. Both sessions now hand them, after the same capability check,
 to the extracted `control::control`
 ([`GarrettControl`](../../proofs/GarrettControl.lean)). The native side
-supplies three callbacks: revoke the control state, record the revocation in
-the audit, deactivate the grant.
+supplies three callbacks: revoke the control state, durably append bytes to
+the audit, deactivate the grant. Since 2026-10-23 the revocation record is
+built and encoded by extracted code; the native callback only appends it,
+through the same extracted `append_durable_record` that read-path records use.
 
 | Theorem | Says |
 | --- | --- |
 | `control_paths` | For **any** callbacks, a returned call took one path. `renounce`: revoke, then record; only if the record succeeded, deactivate and reply `{"ok":true,"renounced":true,"version":1}`. If the record failed, the error comes back, no reply is sent, and the control state stays revoked (fail closed). `describe`: reply with the description, no callback. Anything else: `Denied`, no callback. The callback interface has no provider operation, so neither verb can cause a provider request. |
+| `renounce_records_exactly`, `revoked_record_exact` | The bytes `renounce` passes to the audit are exactly the extracted encoding of `{"event":"revoked","grant":G,"policy":P,"schema":1}` (the account profile adds `"operation":"profile.read"`). Grant, policy and that operation name are the record's only inputs, so no credential or guest data can enter it. An oracle test checks these bytes equal the serde records they replaced. |
 | `manifest_description_exact` | The description is `{"operations":[...],"profile":"manifest-https-v1","request_limit":"unbounded","writes":MODE}`, where the array is exactly the policy's operation names in order. Those names and the write mode are the function's only inputs, so no credential, token, identity or audit data can appear in a `describe` reply. |
 
 The reply values go through the same extracted JSON frame encoder as read
@@ -567,8 +570,10 @@ equal the serde replies they replaced, for all write modes and several
 operation lists.
 
 **Still trusted** (`CONTROL-NATIVE-01`): that the three callbacks do what
-they say (revocation takes effect for later requests, the record is a
-durable audit append), and the capability check that precedes the call.
+they say (revocation takes effect for later requests; `deactivate` clears
+the grant flag), that `record` is the session audit's `append_bytes` (one
+native line into the extracted durable append), and the capability check that
+precedes the call.
 
 ## Host output field names, and the Anodized pilot (2026-10-23)
 

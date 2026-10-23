@@ -629,8 +629,9 @@ def review_semantics(contents: dict[str, str]) -> None:
                            '*poisoned = true;', 'sink.append(bytes)?;',
                            'let delimiter = record_delimiter();', 'sink.append(&delimiter)?;', 'sink.sync_record()?;',
                            '*poisoned = false;', 'Ok(())')
-            and same_order(audit_call, 'self.state.lock()', 'if state.failed {',
-                           'let bytes = json::canonical(value);',
+            and same_order(audit_call, 'self.append_bytes(&json::canonical(value))',
+                           'fn append_bytes(&self, bytes: &Vec<u8>)',
+                           'self.state.lock()', 'if state.failed {',
                            'let AuditState { file, failed } = &mut *state;',
                            'let mut sink = AuditFile(file);',
                            'aivm_secrets_garrett_core::audit_record::append_durable_record(&mut sink, failed, &bytes)')

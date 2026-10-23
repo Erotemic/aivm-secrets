@@ -5145,25 +5145,26 @@ def completion.complete
   ok { outcome, work := pending.work, effects := pending.effects }
 
 /-- Trait declaration: [aivm_secrets_garrett_core::control::Control]
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 11:0-19:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 11:0-20:1
     Visibility: public -/
 structure control.Control (Self : Type _) (Self_Error : Type _) where
   revoke : Self → Result Self
-  record_revoked : Self → Result ((core.result.Result Unit Self_Error) ×
-    Self)
+  record : Self → Slice Std.U8 → Result ((core.result.Result Unit
+    Self_Error) × Self)
   deactivate : Self → Result Self
 
 /-- [aivm_secrets_garrett_core::control::Controlled]
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 22:0-30:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 23:0-34:1
     Visibility: public -/
 @[discriminant isize]
 inductive control.Controlled (E : Type _) where
 | Reply : json_wire.Value → control.Controlled E
 | Failed : E → control.Controlled E
+| Unencodable : control.Controlled E
 | Denied : control.Controlled E
 
 /-- [aivm_secrets_garrett_core::control::text]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 35:4-38:5
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 39:4-42:5
     Visibility: public -/
 @[rust_loop]
 def control.text_loop
@@ -5182,14 +5183,14 @@ def control.text_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::control::text]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 32:0-40:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 36:0-44:1
     Visibility: public -/
 def control.text (bytes : Slice Std.U8) : Result json_wire.Value := do
   let out ← control.text_loop bytes (alloc.vec.Vec.new Std.U32) 0#usize
   ok (json_wire.Value.Text out)
 
 /-- [aivm_secrets_garrett_core::control::text_units]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 60:0-65:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 64:0-69:1
     Visibility: public -/
 def control.text_units
   (bytes : Slice Std.U8) : Result (alloc.vec.Vec Std.U32) := do
@@ -5203,7 +5204,7 @@ def control.text_units
   | json_wire.Value.Object _ => ok (alloc.vec.Vec.new Std.U32)
 
 /-- [aivm_secrets_garrett_core::control::described]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 43:0-49:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 47:0-53:1
     Visibility: public -/
 def control.described
   (description : json_wire.Value) : Result json_wire.Value := do
@@ -5234,7 +5235,7 @@ def control.described
   ok (json_wire.Value.Object ret)
 
 /-- [aivm_secrets_garrett_core::control::renounced]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 52:0-58:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 56:0-62:1
     Visibility: public -/
 def control.renounced : Result json_wire.Value := do
   let s ← lift (Array.to_slice (Array.make 2#usize [ 111#u8, 107#u8 ]))
@@ -5263,7 +5264,7 @@ def control.renounced : Result json_wire.Value := do
   ok (json_wire.Value.Object ret)
 
 /-- [aivm_secrets_garrett_core::control::mode_name]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 67:0-73:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 71:0-77:1
     Visibility: public -/
 def control.mode_name (writes : approval.Mode) : Result json_wire.Value := do
   match writes with
@@ -5286,7 +5287,7 @@ def control.mode_name (writes : approval.Mode) : Result json_wire.Value := do
     control.text s
 
 /-- [aivm_secrets_garrett_core::control::names]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 78:4-81:5 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 82:4-85:5 -/
 @[rust_loop]
 def control.names_loop
   (operations : Slice (alloc.vec.Vec Std.U8))
@@ -5306,7 +5307,7 @@ def control.names_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::control::names]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 75:0-83:1 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 79:0-87:1 -/
 @[reducible]
 def control.names
   (operations : Slice (alloc.vec.Vec Std.U8)) :
@@ -5315,7 +5316,7 @@ def control.names
   control.names_loop operations (alloc.vec.Vec.new json_wire.Value) 0#usize
 
 /-- [aivm_secrets_garrett_core::control::manifest_description]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 87:0-94:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 91:0-98:1
     Visibility: public -/
 def control.manifest_description
   (operations : Slice (alloc.vec.Vec Std.U8)) (writes : approval.Mode) :
@@ -5369,7 +5370,7 @@ def control.manifest_description
   ok (json_wire.Value.Object ret)
 
 /-- [aivm_secrets_garrett_core::control::account_description]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 97:0-109:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 101:0-113:1
     Visibility: public -/
 def control.account_description : Result json_wire.Value := do
   let s ←
@@ -5428,13 +5429,66 @@ def control.account_description : Result json_wire.Value := do
   let ret2 := alloc.slice.Slice.into_vec y2
   ok (json_wire.Value.Object ret2)
 
+/-- [aivm_secrets_garrett_core::control::revoked_record]:
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 118:0-130:1
+    Visibility: public -/
+def control.revoked_record
+  (grant : json_wire.Value) (policy : json_wire.Value)
+  (operation : Option json_wire.Value) :
+  Result json_wire.Value
+  := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 5#usize [ 101#u8, 118#u8, 101#u8, 110#u8, 116#u8 ]))
+  let v ← control.text_units s
+  let s1 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        114#u8, 101#u8, 118#u8, 111#u8, 107#u8, 101#u8, 100#u8
+        ]))
+  let v1 ← control.text s1
+  let s2 ←
+    lift (Array.to_slice
+      (Array.make 5#usize [ 103#u8, 114#u8, 97#u8, 110#u8, 116#u8 ]))
+  let v2 ← control.text_units s2
+  let y ←
+    lift (Std.Array.to_slice (Array.make 2#usize [ (v, v1), (v2, grant) ] :
+      Array ((alloc.vec.Vec Std.U32) × json_wire.Value) 2#usize))
+  let ret := alloc.slice.Slice.into_vec y
+  let fields ←
+    match operation with
+    | none => ok ret
+    | some «name» =>
+      do
+      let s3 ←
+        lift (Array.to_slice
+          (Array.make 9#usize [
+            111#u8, 112#u8, 101#u8, 114#u8, 97#u8, 116#u8, 105#u8, 111#u8,
+            110#u8
+            ]))
+      let v3 ← control.text_units s3
+      alloc.vec.Vec.push ret (v3, «name»)
+  let s3 ←
+    lift (Array.to_slice
+      (Array.make 6#usize [ 112#u8, 111#u8, 108#u8, 105#u8, 99#u8, 121#u8 ]))
+  let v3 ← control.text_units s3
+  let fields1 ← alloc.vec.Vec.push fields (v3, policy)
+  let s4 ←
+    lift (Array.to_slice
+      (Array.make 6#usize [ 115#u8, 99#u8, 104#u8, 101#u8, 109#u8, 97#u8 ]))
+  let v4 ← control.text_units s4
+  let s5 ← lift (Array.to_slice (Array.make 1#usize [ 49#u8 ]))
+  let v5 ← alloc.slice.Slice.to_vec core.clone.CloneU8 s5
+  let fields2 ← alloc.vec.Vec.push fields1 (v4, json_wire.Value.Number v5)
+  ok (json_wire.Value.Object fields2)
+
 /-- [aivm_secrets_garrett_core::control::control]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 114:0-130:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 136:0-161:1
     Visibility: public -/
 def control.control
   {C : Type _} {Clause0_Error : Type _} (ControlInst : control.Control C
   Clause0_Error) (io : C) (verb : Slice Std.U8) (description : json_wire.Value)
-  :
+  (revoked : json_wire.Value) :
   Result ((control.Controlled Clause0_Error) × C)
   := do
   let renounce ←
@@ -5451,13 +5505,19 @@ def control.control
   if b
   then
     let io1 ← ControlInst.revoke io
-    let (r, io2) ← ControlInst.record_revoked io1
-    match r with
-    | core.result.Result.Ok _ =>
-      let io3 ← ControlInst.deactivate io2
-      let v ← control.renounced
-      ok (control.Controlled.Reply v, io3)
-    | core.result.Result.Err error => ok (control.Controlled.Failed error, io2)
+    let (b1, bytes) ← json_wire.append (alloc.vec.Vec.new Std.U8) revoked
+    if b1
+    then
+      let s := alloc.vec.Vec.deref bytes
+      let (r, io2) ← ControlInst.record io1 s
+      match r with
+      | core.result.Result.Ok _ =>
+        let io3 ← ControlInst.deactivate io2
+        let v ← control.renounced
+        ok (control.Controlled.Reply v, io3)
+      | core.result.Result.Err error =>
+        ok (control.Controlled.Failed error, io2)
+    else ok (control.Controlled.Unencodable, io1)
   else
     let b1 ←
       core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 verb describe
@@ -12986,7 +13046,7 @@ def proxy_http.parse_request
       else ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest)
 
 /-- [aivm_secrets_garrett_core::proxy_controller::code_of]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 172:0-181:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 174:0-183:1
     Visibility: public -/
 def proxy_controller.code_of
   (refused : proxy_http.Refusal) : Result proxy_http.Code := do
@@ -13341,7 +13401,7 @@ def proxy_http.refusal
   alloc.vec.Vec.extend_from_slice core.clone.CloneU8 out6 s6
 
 /-- [aivm_secrets_garrett_core::proxy_controller::step]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 113:0-159:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 115:0-161:1
     Visibility: public -/
 def proxy_controller.step
   {G : Type _} (GuestInst : proxy_controller.Guest G) (guest : G)
@@ -13421,7 +13481,7 @@ def proxy_controller.step
       else ok ({ buffer := rest, «open» := false }, guest2)
 
 /-- [aivm_secrets_garrett_core::proxy_controller::tunnel]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 167:4-169:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 169:4-171:5
     Visibility: public -/
 @[rust_loop]
 def proxy_controller.tunnel_loop
@@ -13439,7 +13499,7 @@ def proxy_controller.tunnel_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_controller::tunnel]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 162:0-170:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 164:0-172:1
     Visibility: public -/
 @[reducible]
 def proxy_controller.tunnel
@@ -13451,7 +13511,7 @@ def proxy_controller.tunnel
     { buffer := (alloc.vec.Vec.new Std.U8), «open» := true }
 
 /-- [aivm_secrets_garrett_core::proxy_controller::stopped]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 183:0-192:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 185:0-194:1
     Visibility: public -/
 def proxy_controller.stopped
   (code : proxy_http.Code) (stage : proxy_controller.Stage) :
@@ -13461,7 +13521,7 @@ def proxy_controller.stopped
   ok { reply, keep := false, stage, code, status := 0#u16 }
 
 /-- [aivm_secrets_garrett_core::proxy_controller::is_head]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 194:0-197:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 196:0-199:1
     Visibility: public -/
 def proxy_controller.is_head (method : Slice Std.U8) : Result Bool := do
   let head ←
@@ -14278,7 +14338,7 @@ def proxy_http.parse_response
       else ok (core.result.Result.Err proxy_http.Refusal.UpstreamResponse)
 
 /-- [aivm_secrets_garrett_core::proxy_controller::release]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 200:0-218:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 202:0-220:1
     Visibility: public -/
 def proxy_controller.release
   (raw : Slice Std.U8) (request : proxy_http.Request)
@@ -15413,7 +15473,7 @@ def proxy_http.encode_upstream
   else ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest, output)
 
 /-- [aivm_secrets_garrett_core::proxy_controller::serve]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 222:0-246:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 224:0-248:1
     Visibility: public -/
 def proxy_controller.serve
   {U : Type _} (UpstreamInst : proxy_controller.Upstream U) (io : U)

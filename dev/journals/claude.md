@@ -641,3 +641,18 @@ errors now end the tunnel and still send close_notify. Aeneas: `Vec::is_empty`
 is an unmodelled axiom, so `len() == 0` with a clippy allow. Lean: pair
 bindings from trait calls are inverted only by unification
 (`bind_ok_inv`, new `ite_ok_inv`, `ok_pair_inv`); `simp` cannot reduce them.
+
+## 2026-10-23 16:12:14 -0400
+
+CONTROL-NATIVE-01 / work order B (record content): `control::revoked_record`
+builds the revocation audit record in the core; `control` encodes it with the
+extracted `json_wire::append` and hands exactly those bytes to a new
+`Control::record` callback, which both sessions implement as
+`Audit::append_bytes` -> extracted `append_durable_record` (same relation as
+read records). Proofs: `control_paths` (new Unencodable branch),
+`renounce_records_exactly`, `revoked_record_exact`. Oracle
+`extracted_revocation_records_match_the_serde_records` covers escapes, control
+chars and non-ASCII for both profiles. Deferred NATIVE-SINK-01 step 2 (opaque
+core credential type): it would retype the secret in dozens of extracted
+signatures/proofs while four native readers (envelope seal, OAuth marker,
+legacy account writer, inner-issue export) still need bytes; low payoff now.

@@ -595,11 +595,18 @@ impl Session {
             .collect();
         let description =
             aivm_secrets_garrett_core::control::manifest_description(&operations, &self.writes);
+        let audit = &self.base.executor.audit;
+        let revoked = aivm_secrets_garrett_core::control::revoked_record(
+            super::wire_text(&audit.grant),
+            super::wire_text(&audit.policy),
+            None,
+        );
         let mut native = ManifestControl(self);
         super::controlled(aivm_secrets_garrett_core::control::control(
             &mut native,
             verb.as_bytes(),
             description,
+            revoked,
         ))
     }
 }
@@ -612,9 +619,8 @@ impl aivm_secrets_garrett_core::control::Control for ManifestControl<'_> {
             control.state.revoke();
         }
     }
-    fn record_revoked(&mut self) -> Outcome<()> {
-        let audit = &self.0.base.executor.audit;
-        audit.write_record(&json!({"schema":1,"event":"revoked","grant":audit.grant,"policy":audit.policy}))
+    fn record(&mut self, record: &[u8]) -> Outcome<()> {
+        self.0.base.executor.audit.append_bytes(&record.to_vec())
     }
     fn deactivate(&mut self) {
         self.0.base.grant.active = false;

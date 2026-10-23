@@ -63,7 +63,7 @@ PLAN = Diagram(
              links=('ask', 'frame'), packet='frame', packet_label='fixed reply shape',
              status='implemented',
              knowledge=_k(('describe / renounce',),
-                          ('control::control', 'control_paths', 'manifest_description_exact'),
+                          ('control::control', 'control_paths', 'revoked_record_exact'),
                           ('revoke, audit record,', 'deactivate callbacks', '(CONTROL-NATIVE-01)'),
                           ('not contacted',))),
         Beat('trust', 'What the proofs still trust is named and on the assumption roadmap.',

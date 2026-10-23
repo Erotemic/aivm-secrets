@@ -5,15 +5,16 @@
 //! provider callback.
 
 use crate::approval::Mode;
-use crate::json_wire::Value;
+use crate::json_wire::{append, Value};
 
 /// The native session's side effects for a control verb.
 pub trait Control {
     type Error;
     /// Revoke the in-memory control state (no further use of the grant).
     fn revoke(&mut self);
-    /// Durably record the revocation in the session audit.
-    fn record_revoked(&mut self) -> Result<(), Self::Error>;
+    /// Durably append `record` (canonical JSON, without the newline) to the
+    /// session audit.
+    fn record(&mut self, record: &[u8]) -> Result<(), Self::Error>;
     /// Mark the grant inactive.
     fn deactivate(&mut self);
 }
@@ -25,6 +26,9 @@ pub enum Controlled<E> {
     /// The revocation could not be recorded; the control state is already
     /// revoked, the grant is left as it was, and no reply is sent.
     Failed(E),
+    /// The revocation record could not be encoded; as for `Failed`, the
+    /// control state is already revoked and no reply is sent.
+    Unencodable,
     /// Not a control verb.
     Denied,
 }
@@ -108,15 +112,42 @@ pub fn account_description() -> Value {
     ])
 }
 
-/// A control verb after authorization. `renounce` revokes, records the
-/// revocation, then deactivates the grant and replies; `describe` replies
+/// The audit record of a renounced grant, keys in byte order:
+/// `{"event":"revoked","grant":G,["operation":O,]"policy":P,"schema":1}`.
+/// `grant`, `policy` and `operation` are the session's captured strings.
+pub fn revoked_record(grant: Value, policy: Value, operation: Option<Value>) -> Value {
+    let mut fields = vec![
+        (text_units(b"event"), text(b"revoked")),
+        (text_units(b"grant"), grant),
+    ];
+    match operation {
+        Some(name) => fields.push((text_units(b"operation"), name)),
+        None => {}
+    }
+    fields.push((text_units(b"policy"), policy));
+    fields.push((text_units(b"schema"), Value::Number(b"1".to_vec())));
+    Value::Object(fields)
+}
+
+/// A control verb after authorization. `renounce` revokes, appends exactly
+/// the encoding of `revoked` to the audit, then deactivates the grant and
+/// replies; `describe` replies
 /// with `description` and changes nothing; anything else is denied.
-pub fn control<C: Control>(io: &mut C, verb: &[u8], description: Value) -> Controlled<C::Error> {
+pub fn control<C: Control>(
+    io: &mut C,
+    verb: &[u8],
+    description: Value,
+    revoked: Value,
+) -> Controlled<C::Error> {
     let renounce: &[u8] = b"renounce";
     let describe: &[u8] = b"describe";
     if verb == renounce {
         io.revoke();
-        match io.record_revoked() {
+        let mut bytes = Vec::new();
+        if !append(&mut bytes, &revoked) {
+            return Controlled::Unencodable;
+        }
+        match io.record(&bytes) {
             Ok(()) => (),
             Err(error) => return Controlled::Failed(error),
         }

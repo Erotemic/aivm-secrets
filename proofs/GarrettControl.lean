@@ -1,4 +1,5 @@
 import GarrettRoute
+import GarrettJsonWire
 
 /-!
 # The guest's control verbs: `describe` and `renounce`
@@ -7,17 +8,25 @@ Source: `rust/crates/aivm-secrets-garrett-core/src/control.rs`, extracted by
 Aeneas. Both native sessions (`custody.rs` account profile and
 `custody/manifest_session.rs` manifest profile) call `control::control`
 after the capability is authorized, supplying three side effects
-(`Control`: revoke the control state, record the revocation, deactivate the
-grant). The reply value is framed by the extracted JSON encoder.
+(`Control`: revoke the control state, durably append an audit record,
+deactivate the grant). The revocation record itself is built here
+(`revoked_record`) and encoded by the extracted JSON encoder; the native
+`record` callback is the session audit's `append_bytes`, which runs the
+extracted `audit_record::append_durable_record` (as read-path records do). The reply value is framed by the extracted JSON encoder.
 
 Proved here, for **any** callbacks:
 
-* `control_paths`: `renounce` revokes first, then records; only if the
+* `control_paths`: `renounce` revokes first, then passes exactly the
+  encoder's bytes for the revocation record to `record`; only if the
   record succeeds is the grant deactivated and `renounced` replied, otherwise
   the error is returned with no reply (the control state stays revoked).
   `describe` replies with the description and invokes no callback. Any
   other verb is `Denied` and invokes no callback. No path can reach a
   provider: `Control` has no provider operation.
+* `renounce_records_exactly`, `revoked_record_exact`: those bytes are the
+  encoding of `{"event":"revoked","grant":G,["operation":O,]"policy":P,
+  "schema":1}`, whose only inputs are the session's grant, policy and the
+  account profile's operation name;
 * `manifest_description_exact`: the manifest description is exactly the
   policy's operation names (as text, in order), the fixed profile name, the
   fixed request limit and the write mode's name; nothing else is an input.
@@ -87,19 +96,23 @@ variable {C E : Type}
 
 /-- **The control verbs' only paths.** Any returned `control` took exactly
     one of these, for any native callbacks:
-    1. `renounce`: `revoke`, then `record_revoked`; on success `deactivate`
-       and reply `renounced`; on failure return the error, no reply, grant
-       untouched;
+    1. `renounce`: `revoke`, then encode `revoked` with the extracted JSON
+       encoder and pass **exactly those bytes** to `record`; on success
+       `deactivate` and reply `renounced`; on failure return the error, no
+       reply, grant untouched; if encoding fails, `Unencodable`, nothing
+       recorded, grant untouched;
     2. `describe`: reply with the description, no callback;
     3. anything else: `Denied`, no callback. -/
-theorem control_paths (inst : Control C E) (io : C) (verb : Slice U8) (description : json_wire.Value)
+theorem control_paths (inst : Control C E) (io : C) (verb : Slice U8) (description revoked : json_wire.Value)
     (out : Controlled E) (after : C)
-    (h : control.control inst io verb description = Result.ok (out, after)) :
-    (verb.val = RenounceVerb ∧ ∃ io1 io2 r, inst.revoke io = Result.ok io1 ∧
-      inst.record_revoked io1 = Result.ok (r, io2) ∧
-      ((∃ io3 reply, r = .Ok () ∧ inst.deactivate io2 = Result.ok io3 ∧
-          renounced = Result.ok reply ∧ out = .Reply reply ∧ after = io3) ∨
-       (∃ error, r = .Err error ∧ out = .Failed error ∧ after = io2))) ∨
+    (h : control.control inst io verb description revoked = Result.ok (out, after)) :
+    (verb.val = RenounceVerb ∧ ∃ io1 encoded bytes, inst.revoke io = Result.ok io1 ∧
+      json_wire.append (alloc.vec.Vec.new U8) revoked = Result.ok (encoded, bytes) ∧
+      ((encoded = false ∧ out = .Unencodable ∧ after = io1) ∨
+       (encoded = true ∧ ∃ io2 r, inst.record io1 (alloc.vec.Vec.deref bytes) = Result.ok (r, io2) ∧
+        ((∃ io3 reply, r = .Ok () ∧ inst.deactivate io2 = Result.ok io3 ∧
+            renounced = Result.ok reply ∧ out = .Reply reply ∧ after = io3) ∨
+         (∃ error, r = .Err error ∧ out = .Failed error ∧ after = io2))))) ∨
     (verb.val = DescribeVerb ∧ ∃ reply, described description = Result.ok reply ∧
       out = .Reply reply ∧ after = io) ∨
     (verb.val ≠ RenounceVerb ∧ verb.val ≠ DescribeVerb ∧ out = .Denied ∧ after = io) := by
@@ -110,22 +123,31 @@ theorem control_paths (inst : Control C E) (io : C) (verb : Slice U8) (descripti
     simp only [decide_eq_true_eq] at is_renounce
     left
     refine ⟨by simpa [RenounceVerb] using is_renounce, ?_⟩
-    obtain ⟨io1, revoked, h⟩ := bind_ok_inv h
-    obtain ⟨⟨r, io2⟩, recorded, h⟩ := bind_ok_inv h
-    refine ⟨io1, io2, r, revoked, recorded, ?_⟩
-    cases r with
-    | Ok u =>
-      cases u
-      obtain ⟨io3, deactivated, h⟩ := bind_ok_inv h
-      obtain ⟨reply, replied, h⟩ := bind_ok_inv h
+    obtain ⟨io1, revoked_ok, h⟩ := bind_ok_inv h
+    obtain ⟨⟨encoded, bytes⟩, appended, h⟩ := bind_ok_inv h
+    refine ⟨io1, encoded, bytes, revoked_ok, appended, ?_⟩
+    cases encoded with
+    | false =>
+      have h : Result.ok (Controlled.Unencodable, io1) = Result.ok (out, after) := h
       simp only [Result.ok.injEq, Prod.mk.injEq] at h
-      obtain ⟨o, a⟩ := h
-      exact Or.inl ⟨io3, reply, rfl, deactivated, replied, o.symm, a.symm⟩
-    | Err error =>
-      have h : Result.ok (Controlled.Failed error, io2) = Result.ok (out, after) := h
-      simp only [Result.ok.injEq, Prod.mk.injEq] at h
-      obtain ⟨o, a⟩ := h
-      exact Or.inr ⟨error, rfl, o.symm, a.symm⟩
+      exact Or.inl ⟨rfl, h.1.symm, h.2.symm⟩
+    | true =>
+      refine Or.inr ⟨rfl, ?_⟩
+      obtain ⟨⟨r, io2⟩, recorded, h⟩ := bind_ok_inv h
+      refine ⟨io2, r, recorded, ?_⟩
+      cases r with
+      | Ok u =>
+        cases u
+        obtain ⟨io3, deactivated, h⟩ := bind_ok_inv h
+        obtain ⟨reply, replied, h⟩ := bind_ok_inv h
+        simp only [Result.ok.injEq, Prod.mk.injEq] at h
+        obtain ⟨o, a⟩ := h
+        exact Or.inl ⟨io3, reply, rfl, deactivated, replied, o.symm, a.symm⟩
+      | Err error =>
+        have h : Result.ok (Controlled.Failed error, io2) = Result.ok (out, after) := h
+        simp only [Result.ok.injEq, Prod.mk.injEq] at h
+        obtain ⟨o, a⟩ := h
+        exact Or.inr ⟨error, rfl, o.symm, a.symm⟩
   · rename_i not_renounce
     simp only [decide_eq_true_eq] at not_renounce
     split at h
@@ -141,6 +163,23 @@ theorem control_paths (inst : Control C E) (io : C) (verb : Slice U8) (descripti
       obtain ⟨o, a⟩ := h
       exact Or.inr (Or.inr ⟨by simpa [RenounceVerb] using not_renounce,
         by simpa [DescribeVerb] using not_describe, o.symm, a.symm⟩)
+
+/-- **The audit record of a renounced grant is exactly the encoding of
+    `revoked`.** Whenever `renounce` called `record`, its argument was the
+    extracted encoder's bytes for `revoked` (`json_wire.Proofs.Bytes`), for
+    any fuel that bounds the value: read it with `control_paths`, which says
+    `record` received exactly the bytes of this `append`. -/
+theorem renounce_records_exactly (revoked : json_wire.Value)
+    (fuel : Nat) (valid : json_wire.Proofs.Valid fuel revoked)
+    (room : json_wire.Proofs.Bound fuel revoked ≤ Usize.max)
+    (encoded : Bool) (bytes : alloc.vec.Vec U8)
+    (appended : json_wire.append (alloc.vec.Vec.new U8) revoked = Result.ok (encoded, bytes)) :
+    encoded = true ∧ bytes.val = json_wire.Proofs.Bytes fuel revoked := by
+  obtain ⟨result, returned, property⟩ := returned_of_spec
+    (json_wire.Proofs.append_contract fuel revoked (alloc.vec.Vec.new U8) valid (by simpa using room))
+  have same : result = (encoded, bytes) := Result.ok_injective (returned.symm.trans appended)
+  subst same
+  exact ⟨property.1, by simpa [alloc.vec.Vec.new] using property.2.1⟩
 
 /-! ## The manifest description -/
 
@@ -245,5 +284,72 @@ theorem manifest_description_exact {operations : Slice (alloc.vec.Vec U8)} {writ
   · simpa using text_units_ok h4
   · simpa [alloc.vec.Vec.new] using harr_val
   · simpa using htexts
+
+/-- **The revocation record's structure.** `{"event":"revoked","grant":G,
+    ["operation":O,]"policy":P,"schema":1}`, keys in byte order; its only
+    inputs are the session's grant, policy and (account profile) operation
+    name. -/
+theorem revoked_record_exact {grant policy : json_wire.Value} {operation : Option json_wire.Value}
+    {v : json_wire.Value} (h : revoked_record grant policy operation = Result.ok v) :
+    ∃ (fields : alloc.vec.Vec (alloc.vec.Vec U32 × json_wire.Value))
+      (kevent kgrant kpolicy kschema : alloc.vec.Vec U32) (event : json_wire.Value)
+      (one : alloc.vec.Vec U8) (middle : List (alloc.vec.Vec U32 × json_wire.Value)),
+      v = .Object fields ∧
+      fields.val = [(kevent, event), (kgrant, grant)] ++ middle ++
+        [(kpolicy, policy), (kschema, .Number one)] ∧
+      kevent.val = Units [101#u8, 118#u8, 101#u8, 110#u8, 116#u8] ∧
+      IsText event [114#u8, 101#u8, 118#u8, 111#u8, 107#u8, 101#u8, 100#u8] ∧
+      kgrant.val = Units [103#u8, 114#u8, 97#u8, 110#u8, 116#u8] ∧
+      kpolicy.val = Units [112#u8, 111#u8, 108#u8, 105#u8, 99#u8, 121#u8] ∧
+      kschema.val = Units [115#u8, 99#u8, 104#u8, 101#u8, 109#u8, 97#u8] ∧
+      one.val = [49#u8] ∧
+      (match operation with
+       | none => middle = []
+       | some op => ∃ kop : alloc.vec.Vec U32, middle = [(kop, op)] ∧
+           kop.val = Units [111#u8, 112#u8, 101#u8, 114#u8, 97#u8, 116#u8, 105#u8, 111#u8, 110#u8]) := by
+  unfold revoked_record at h
+  simp only [lift, Array.to_slice, Array.make, bind_ok] at h
+  obtain ⟨kevent, hevent, h⟩ := bind_ok_inv h
+  obtain ⟨event, hev, h⟩ := bind_ok_inv h
+  obtain ⟨kgrant, hgrant, h⟩ := bind_ok_inv h
+  obtain ⟨fields, hfields, h⟩ := bind_ok_inv h
+  obtain ⟨kpolicy, hpolicy, h⟩ := bind_ok_inv h
+  obtain ⟨fields1, hfields1, h⟩ := bind_ok_inv h
+  obtain ⟨kschema, hschema, h⟩ := bind_ok_inv h
+  obtain ⟨one, hone, h⟩ := bind_ok_inv h
+  obtain ⟨fields2, hfields2, h⟩ := bind_ok_inv h
+  simp only [Result.ok.injEq] at h
+  subst h
+  obtain ⟨eu, he, heu⟩ := text_ok hev
+  have one_val : one.val = [49#u8] := by
+    obtain ⟨w, hw, eq⟩ := returned_of_spec (alloc.slice.Slice.to_vec_spec core.clone.CloneU8 _
+      (by intro x _; rfl))
+    rw [hw] at hone
+    simp only [Result.ok.injEq] at hone
+    subst hone
+    have := congrArg (fun x : Slice U8 => x.val) eq
+    exact this.symm
+  have fields_val : fields1.val = fields.val ++ [(kpolicy, policy)] := push_ok_val hfields1
+  have fields2_val : fields2.val = fields1.val ++ [(kschema, .Number one)] := push_ok_val hfields2
+  cases operation with
+  | none =>
+    simp only [Result.ok.injEq] at hfields
+    subst hfields
+    refine ⟨fields2, kevent, kgrant, kpolicy, kschema, event, one, [], rfl, ?_,
+      by simpa using text_units_ok hevent, ⟨eu, he, by simpa using heu⟩,
+      by simpa using text_units_ok hgrant, by simpa using text_units_ok hpolicy,
+      by simpa using text_units_ok hschema, one_val, rfl⟩
+    rw [fields2_val, fields_val]
+    simp
+    rfl
+  | some op =>
+    obtain ⟨kop, hkop, hpush⟩ := bind_ok_inv hfields
+    refine ⟨fields2, kevent, kgrant, kpolicy, kschema, event, one, [(kop, op)], rfl, ?_,
+      by simpa using text_units_ok hevent, ⟨eu, he, by simpa using heu⟩,
+      by simpa using text_units_ok hgrant, by simpa using text_units_ok hpolicy,
+      by simpa using text_units_ok hschema, one_val, ⟨kop, rfl, by simpa using text_units_ok hkop⟩⟩
+    rw [fields2_val, fields_val, push_ok_val hpush]
+    simp
+    rfl
 
 end aivm_secrets_garrett_core.control.Proofs

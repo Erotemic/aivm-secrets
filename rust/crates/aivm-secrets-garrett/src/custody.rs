@@ -248,11 +248,15 @@ impl Audit {
         self.write_record(&json!({"schema":1,"event":event,"operation":"profile.read","grant":self.grant,"policy":self.policy}))
     }
     fn write_record(&self, value: &Value) -> Outcome<()> {
+        self.append_bytes(&json::canonical(value))
+    }
+    /// Durably append one canonical JSON record through the extracted
+    /// `audit_record::append_durable_record`.
+    fn append_bytes(&self, bytes: &Vec<u8>) -> Outcome<()> {
         let mut state = self.state.lock().map_err(|_| Error::InternalError)?;
         if state.failed {
             return Err(Error::InternalError);
         }
-        let bytes = json::canonical(value);
         let AuditState { file, failed } = &mut *state;
         let mut sink = AuditFile(file);
         aivm_secrets_garrett_core::audit_record::append_durable_record(&mut sink, failed, &bytes)
@@ -911,11 +915,17 @@ impl AccountSession {
             self.elapsed()?,
         )
         .map_err(use_error)?;
+        let revoked = control::revoked_record(
+            wire_text(&self.executor.audit.grant),
+            wire_text(&self.executor.audit.policy),
+            Some(wire_text("profile.read")),
+        );
         let mut native = AccountControl(self);
         controlled(control::control(
             &mut native,
             verb.as_bytes(),
             control::account_description(),
+            revoked,
         ))
     }
 }
@@ -925,20 +935,26 @@ struct AccountControl<'a>(&'a mut AccountSession);
 impl control::Control for AccountControl<'_> {
     type Error = Error;
     fn revoke(&mut self) {}
-    fn record_revoked(&mut self) -> Outcome<()> {
-        self.0.executor.audit.record("revoked")
+    fn record(&mut self, record: &[u8]) -> Outcome<()> {
+        self.0.executor.audit.append_bytes(&record.to_vec())
     }
     fn deactivate(&mut self) {
         self.0.grant.active = false;
     }
 }
 /// The guest reply for an extracted control outcome.
+/// A session string as an extracted JSON value (the native capture).
+pub(crate) fn wire_text(text: &str) -> aivm_secrets_garrett_core::json_wire::Value {
+    // Exactly `json::capture` of a JSON string.
+    aivm_secrets_garrett_core::json_wire::Value::Text(text.chars().map(u32::from).collect())
+}
 pub(crate) fn controlled(outcome: control::Controlled<Error>) -> Outcome<crate::json::Reply> {
     match outcome {
         control::Controlled::Reply(value) => Ok(crate::json::Reply::Released(
             crate::json::Captured::released(value),
         )),
         control::Controlled::Failed(error) => Err(error),
+        control::Controlled::Unencodable => Err(Error::InternalError),
         control::Controlled::Denied => Err(Error::Denied),
     }
 }
@@ -1398,6 +1414,29 @@ mod control_oracle {
 
     fn native(value: &Value) -> Vec<u8> {
         bytes(crate::json::capture(value).wire())
+    }
+
+    #[test]
+    fn extracted_revocation_records_match_the_serde_records() {
+        let texts = ["g-1", "", "quote\"back\\slash", "line\nbreak\u{1}", "é😀", "sha256:00ff"];
+        for grant in texts {
+            for policy in texts {
+                // The manifest session's record.
+                assert_eq!(
+                    bytes(&control::revoked_record(wire_text(grant), wire_text(policy), None)),
+                    crate::json::canonical(&json!({"schema":1,"event":"revoked","grant":grant,"policy":policy}))
+                );
+                // The account session's record (`Audit::record("revoked")`).
+                assert_eq!(
+                    bytes(&control::revoked_record(
+                        wire_text(grant),
+                        wire_text(policy),
+                        Some(wire_text("profile.read"))
+                    )),
+                    crate::json::canonical(&json!({"schema":1,"event":"revoked","operation":"profile.read","grant":grant,"policy":policy}))
+                );
+            }
+        }
     }
 
     #[test]
