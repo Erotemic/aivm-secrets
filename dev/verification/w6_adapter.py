@@ -21,6 +21,7 @@ CORE_IO = 'rust/crates/aivm-secrets-garrett-core/src/provider_io.rs'
 CORE_GATE = 'rust/crates/aivm-secrets-garrett-core/src/response_gate.rs'
 CORE_RELEASE = 'rust/crates/aivm-secrets-garrett-core/src/selected_release.rs'
 CORE_CHANNEL = 'rust/crates/aivm-secrets-garrett-core/src/channel_work.rs'
+CORE_STATUS = 'rust/crates/aivm-secrets-garrett-core/src/provider_status.rs'
 CORE_CONTEXT = 'rust/crates/aivm-secrets-garrett-core/src/request_context.rs'
 CORE_CURRENT = 'rust/crates/aivm-secrets-garrett-core/src/current_admission.rs'
 COMMON_ENCODER = 'rust/crates/aivm-secrets-garrett/src/custody.rs'
@@ -156,7 +157,10 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and '!reserved_name(name)' in core and '!unique_before(headers, i, &headers[i].name)' in core
            and 'append_decimal(output, bytes.len());' in core,
            'origin-form request/header override or body-length restrictions removed')
-    ensure('if status == 206 {' in source, 'partial response is no longer refused')
+    ensure('aivm_secrets_garrett_core::provider_status::manifest(status).map_err(status_error)?;' in source
+           and 'if status == 206 {' in (root / CORE_STATUS).read_text()
+           and 'return Err(StatusDenial::Partial);' in (root / CORE_STATUS).read_text(),
+           'partial response is no longer refused')
     parser = source.split('fn manifest_response(', 1)[1].split('#[cfg(test)]', 1)[0]
     branch = parser.split('(None, None) if status == 204 => {', 1)
     ensure(len(branch) == 2

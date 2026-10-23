@@ -17,6 +17,8 @@ MANIFEST = Path('docs/planning/aivm-secrets-read-failure-scope.json')
 TLS = Path('rust/crates/aivm-secrets-garrett/src/tls.rs')
 PUBLIC_ERROR = Path('rust/crates/aivm-secrets-garrett-core/src/public_error.rs')
 ERROR = Path('rust/crates/aivm-secrets-garrett/src/lib.rs')
+STATUS = Path('rust/crates/aivm-secrets-garrett-core/src/provider_status.rs')
+CUSTODY = Path('rust/crates/aivm-secrets-garrett/src/custody.rs')
 MANIFEST_SESSION = Path('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs')
 CLASSES = {
     'http-4xx': 'upstream_rejected',
@@ -98,10 +100,17 @@ def check(root: Path = ROOT) -> dict:
     ]:
         require(f'Self::{variant} => "{code}"' in error,
                 f'{variant} public error code changed')
-    require('if (400..500).contains(&status) {' in session and
-            'return Err(Error::UpstreamRejected);' in session and
-            'if !(200..300).contains(&status) {' in session and
-            'return Err(Error::UpstreamError);' in session,
+    status = (root / STATUS).read_text().split('#[cfg(test)]', 1)[0]
+    custody = (root / CUSTODY).read_text()
+    require('aivm_secrets_garrett_core::provider_status::manifest(status).map_err(status_error)?;' in session and
+            'if status >= 400 && status < 500 {' in status and
+            'return Err(StatusDenial::Rejected);' in status and
+            'if status < 200 || status >= 300 {' in status and
+            'return Err(StatusDenial::Failed);' in status and
+            'if status == 206 {' in status and 'return Err(StatusDenial::Partial);' in status and
+            'StatusDenial::Rejected => Error::UpstreamRejected,' in custody and
+            'StatusDenial::Failed => Error::UpstreamError,' in custody and
+            'StatusDenial::Malformed | StatusDenial::Partial => Error::UpstreamResponse,' in custody,
             'upstream status declassification branch changed')
     return {
         'profile': manifest['scope'],

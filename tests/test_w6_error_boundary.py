@@ -18,7 +18,8 @@ spec.loader.exec_module(checker)
 
 def _review_snapshot(tmp_path):
     for name in (checker.MANIFEST, checker.TLS, checker.ERROR,
-                 checker.MANIFEST_SESSION, checker.PUBLIC_ERROR):
+                 checker.MANIFEST_SESSION, checker.PUBLIC_ERROR, checker.STATUS,
+                 checker.CUSTODY):
         dest = tmp_path / name
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / name, dest)
@@ -37,8 +38,7 @@ def test_reviewed_public_denial_leaf_is_stable(tmp_path):
      'unchecked_send(writer)'),
     (checker.ERROR, 'Self::UpstreamRejected => "upstream_rejected"',
      'Self::UpstreamRejected => "upstream_error"'),
-    (checker.MANIFEST_SESSION, 'if (400..500).contains(&status) {',
-     'if (400..499).contains(&status) {'),
+    (checker.STATUS, 'if status >= 400 && status < 500 {', 'if status >= 400 && status < 499 {'),
 ])
 def test_public_error_mutations_are_rejected(tmp_path, name, original, mutant):
     root = _review_snapshot(tmp_path)

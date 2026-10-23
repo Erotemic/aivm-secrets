@@ -851,18 +851,9 @@ impl ManifestResponse<'_> {
 }
 fn manifest_response(mut reader: impl BufRead, format: &str) -> Outcome<Vec<u8>> {
     let status = response_status(&line(&mut reader, 4096)?)?;
-    if (400..500).contains(&status) {
-        return Err(Error::UpstreamRejected);
-    }
-    if !(200..300).contains(&status) {
-        return Err(Error::UpstreamError);
-    }
-    // A partial representation cannot be treated as a complete policy-
-    // selected JSON/text result. Range/partial-content semantics are not
-    // part of the native manifest contract.
-    if status == 206 {
-        return Err(Error::UpstreamResponse);
-    }
+    // 4xx, other non-2xx and partial (206) responses are refused by the
+    // extracted classification; partial content is never a complete result.
+    aivm_secrets_garrett_core::provider_status::manifest(status).map_err(status_error)?;
     let mut headers = BTreeMap::new();
     let mut size = 0;
     loop {

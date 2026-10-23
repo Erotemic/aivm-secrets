@@ -361,7 +361,12 @@ def review_semantics(contents: dict[str, str]) -> None:
                     ['host','authorization','x-api-key','content-length','transfer-encoding',
                      'proxy-','sec-','x-forwarded-']),
             'complete HTTP encoder lost validation, header separation or body-length framing')
-    require('if status == 206 {' in m, 'unreviewed partial response release')
+    status_core = contents['rust/crates/aivm-secrets-garrett-core/src/provider_status.rs'].split('#[cfg(test)]', 1)[0]
+    require('aivm_secrets_garrett_core::provider_status::manifest(status).map_err(status_error)?;' in m
+            and same_order(status_core, 'pub fn manifest(status: u16)', 'return Err(StatusDenial::Rejected);',
+                           'return Err(StatusDenial::Failed);', 'if status == 206 {',
+                           'return Err(StatusDenial::Partial);', 'Ok(())'),
+            'unreviewed partial response release')
     runtime = m.split('#[cfg(test)]', 1)[0]
     require(runtime.count('TcpStream::connect_timeout(') == 1 and runtime.count('.write_all(') == 1
             and runtime.count('channel.submit()') == 0

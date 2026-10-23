@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from dev.verification.w6_adapter import CONTRACT, SOURCE, TESTS, CORE_ROUTE, CORE_ENCODER, CORE_DISPATCH, CORE_REQUEST, CORE_CURRENT, CORE_CONTEXT, CORE_IO, CORE_GATE, CORE_RELEASE, CORE_CHANNEL, COMMON_ENCODER, ContractError, check
+from dev.verification.w6_adapter import CONTRACT, SOURCE, TESTS, CORE_ROUTE, CORE_ENCODER, CORE_DISPATCH, CORE_REQUEST, CORE_CURRENT, CORE_CONTEXT, CORE_IO, CORE_GATE, CORE_RELEASE, CORE_CHANNEL, CORE_STATUS, COMMON_ENCODER, ContractError, check
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def fixture_checkout(tmp_path):
     dst = tmp_path / 'checkout'
     contract = json.loads((ROOT / CONTRACT).read_text())
-    names = {CONTRACT, SOURCE, TESTS, CORE_ROUTE, CORE_ENCODER, CORE_DISPATCH, CORE_REQUEST, CORE_CURRENT, CORE_CONTEXT, CORE_IO, CORE_GATE, CORE_RELEASE, CORE_CHANNEL, COMMON_ENCODER,
+    names = {CONTRACT, SOURCE, TESTS, CORE_ROUTE, CORE_ENCODER, CORE_DISPATCH, CORE_REQUEST, CORE_CURRENT, CORE_CONTEXT, CORE_IO, CORE_GATE, CORE_RELEASE, CORE_CHANNEL, CORE_STATUS, COMMON_ENCODER,
              'docs/planning/aivm-secrets-w0-boundaries.json',
              'docs/planning/aivm-secrets-assumptions.json'}
     names.update(channel['path'] for channel in contract['channels'])

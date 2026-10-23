@@ -411,20 +411,18 @@ fn line(reader: &mut impl BufRead, limit: usize) -> Outcome<Vec<u8>> {
     line.truncate(line.len() - 2);
     Ok(line)
 }
-fn response_status(raw: &[u8]) -> Outcome<u16> {
-    // Keep the native HTTP profile octet-based: integer parsing and Unicode
-    // whitespace must not normalize malformed provider framing into success.
-    if raw.len() < 13
-        || !matches!(&raw[..8], b"HTTP/1.1" | b"HTTP/1.0")
-        || raw[8] != b' '
-        || raw[12] != b' '
-        || !raw[9..12].iter().all(u8::is_ascii_digit)
-        || raw[13..].iter().any(|b| *b < 32 && *b != 9 || *b == 127)
-        || std::str::from_utf8(raw).is_err()
-    {
-        return Err(Error::UpstreamResponse);
+// The octet-exact status line parser and manifest status classes are the
+// extracted `provider_status` module; only the error mapping is native.
+pub(super) fn status_error(denial: aivm_secrets_garrett_core::provider_status::StatusDenial) -> Error {
+    use aivm_secrets_garrett_core::provider_status::StatusDenial;
+    match denial {
+        StatusDenial::Malformed | StatusDenial::Partial => Error::UpstreamResponse,
+        StatusDenial::Rejected => Error::UpstreamRejected,
+        StatusDenial::Failed => Error::UpstreamError,
     }
-    Ok(u16::from(raw[9] - b'0') * 100 + u16::from(raw[10] - b'0') * 10 + u16::from(raw[11] - b'0'))
+}
+fn response_status(raw: &[u8]) -> Outcome<u16> {
+    aivm_secrets_garrett_core::provider_status::parse(&raw.to_vec()).map_err(status_error)
 }
 
 fn response_ows(value: &str) -> &str {
@@ -1278,6 +1276,64 @@ impl ProviderSession {
         match &mut self.0 {
             Backend::Account(s) => s.control(verifier, token, peer, expected, verb),
             Backend::Manifest(s) => s.control(verifier, token, peer, expected, verb),
+        }
+    }
+}
+
+#[cfg(test)]
+mod status_oracle_tests {
+    use super::*;
+    // The previous native status parser and manifest classification, kept
+    // as an oracle for the extracted `provider_status` module.
+    fn old_status(raw: &[u8]) -> Outcome<u16> {
+        // Keep the native HTTP profile octet-based: integer parsing and Unicode
+        // whitespace must not normalize malformed provider framing into success.
+        if raw.len() < 13
+            || !matches!(&raw[..8], b"HTTP/1.1" | b"HTTP/1.0")
+            || raw[8] != b' '
+            || raw[12] != b' '
+            || !raw[9..12].iter().all(u8::is_ascii_digit)
+            || raw[13..].iter().any(|b| *b < 32 && *b != 9 || *b == 127)
+            || std::str::from_utf8(raw).is_err()
+        {
+            return Err(Error::UpstreamResponse);
+        }
+        Ok(u16::from(raw[9] - b'0') * 100 + u16::from(raw[10] - b'0') * 10 + u16::from(raw[11] - b'0'))
+    }
+    fn old_manifest(status: u16) -> Outcome<()> {
+        if (400..500).contains(&status) {
+            return Err(Error::UpstreamRejected);
+        }
+        if !(200..300).contains(&status) {
+            return Err(Error::UpstreamError);
+        }
+        if status == 206 {
+            return Err(Error::UpstreamResponse);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn extracted_status_equals_previous_native_status() {
+        let mut lines: Vec<Vec<u8>> = Vec::new();
+        for code in 0..1000 {
+            lines.push(format!("HTTP/1.1 {code:03} OK").into_bytes());
+            lines.push(format!("HTTP/1.0 {code:03} ").into_bytes());
+        }
+        for bad in [
+            &b"HTTP/1.1 200"[..], b"HTTP/2.0 200 OK", b"HTTP/1.1  200 OK", b"HTTP/1.1 2x0 OK",
+            b"http/1.1 200 OK", b"HTTP/1.1 200\tOK", b"HTTP/1.1 200 O\x01K", b"HTTP/1.1 200 O\x7fK",
+            b"HTTP/1.1 200 \xff", b"HTTP/1.1 200 \xc3\xa9", b"HTTP/1.1 200 tab\tok", b"",
+        ] {
+            lines.push(bad.to_vec());
+        }
+        for line in lines {
+            assert_eq!(response_status(&line), old_status(&line), "{line:?}");
+            if let Ok(status) = old_status(&line) {
+                let new = aivm_secrets_garrett_core::provider_status::manifest(status)
+                    .map_err(status_error);
+                assert_eq!(new, old_manifest(status), "{status}");
+            }
         }
     }
 }
