@@ -13,6 +13,39 @@ The first part is a one-run, all-events property; the second compares two possib
 
 A successful allowed read is required as a **non-vacuity witness**. The maintainer has already run host native, synthetic and adversarial real KVM, and real GitHub read-only scenarios successfully. Those are strong integration tests, but sampled runs do not replace the quantified source-to-I/O theorem.
 
+## Strongest production-instance statements (2026-10-22)
+
+These theorems are about the request type and release pipeline that
+`custody/manifest_session.rs` and `tls.rs` actually run, not a generic adapter.
+Each removes premises that earlier statements took as given.
+
+| Theorem | What it says, plainly | Premises removed | Still trusted |
+| --- | --- | --- | --- |
+| [`production_accepted_read_has_exact_attempt_accounting_and_guest_frame`](../../proofs/GarrettProductionAssurance.lean) and `production_denial_attempts_are_authorized_and_bound` | Every accounted provider attempt of a returned request was currently authorized, audit-acknowledged and bound to the context passed to `ScopedRequest::new` | `NativeContext`, the caller-chosen `capture` function | `ExactNativeSinkCoverage` (below) |
+| [`denial_frame_exact`, `production_denial_has_authorized_attempts_and_fixed_guest_frame`](../../proofs/GarrettPublicError.lean) | A guest denial frame is exactly `{"error":{"code":C,"message":M},"ok":false,"version":1}` plus newline, for one of 17 fixed `(C, M)` pairs; it depends on nothing but which public error occurred | `denialJson`, its `Valid`/`Bound` and `prepared` premises | that `from_answer`'s error branch calls `denial_frame` (W3 guard) |
+| [`manifest_release_noninterference`](../../proofs/GarrettNR4ManifestRelease.lean) | Two provider responses that agree on the JSON at every host-selected path and on the pagination row count release the same value or the same refusal, for any current-control callback | `toJson`, `SelectedConversion`, unlinked `raw`/`selected`; exposes the row-count channel those premises hid | parse of provider bytes into the document; same credential in both runs |
+| [`production_read_frame`](../../proofs/GarrettProductionReadFrame.lean) | A successful read sends exactly the JSON encoding of `{meta?,ok:true,result:<projection of this response>,version:1}` plus newline, and the credential occurs in neither those bytes nor any decoded key or string | `toCapturedJson`, `Valid`, `Bound` | two-line `Reply::Released` framing glue (W3 guard), guest writer I/O |
+
+**Declassifications made explicit.** A successful read reveals (a) the selected
+fields, by design; (b) the length of the pagination row array, through
+`possibly_more` and the oversize refusal; (c) whether the selected reply would
+contain the credential, through the reflection refusal. (b) was previously
+hidden inside the `SelectedConversion` premise.
+
+**Remaining NR-3 premise, stated honestly.** `ExactNativeSinkCoverage` says the
+native process makes credential-bearing writes exactly at the source's
+`providerSend` events. Its `attempts` list carries model fields, so it is a
+reachability assumption about native code, not an observation. Shrinking it
+means having the extracted core own the `Channel::submit` call and stating the
+theorem over a log of `Writer::write_all` calls.
+
+**Verification for these increments:** fresh pinned Aeneas extraction (committed
+module byte-identical), full `lake build` (1882 jobs, no warnings),
+`dev/verification/system.py --full-tests` (3210 tests, no skips with `swtpm`
+installed), all W0/W3/W4/W5/W6/NR source guards with updated mutation tests,
+and byte-equality oracle tests for the moved Rust (17 denial frames;
+30 document/page release combinations including every refusal).
+
 ## Existing proof chain, in ordinary language
 
 | Proof | How to read its implication | Important condition still external |
