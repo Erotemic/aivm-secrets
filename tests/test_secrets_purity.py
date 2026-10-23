@@ -262,7 +262,14 @@ def test_only_one_module_runs_a_program_and_never_through_a_shell():
         assert 'os.popen' not in source and 'pty.' not in source, path.name
         if 'subprocess' in source:
             runners.add(str(path.relative_to(PACKAGE)))
-    assert runners == {'host/sources.py'}
+    # host/sources.py runs the operator's credential resolver. native_session
+    # is the optional integrator launcher: it runs ssh and the native Garrett
+    # binaries from the spec's bin_dir, never a resolver or a shell, and it is
+    # not imported by the broker.
+    assert runners == {'host/sources.py', 'native_session.py'}
+    launcher = (PACKAGE / 'native_session.py').read_text(encoding='utf-8')
+    assert "['ssh'," in launcher and 'shlex.join(' in launcher
+    assert 'native_session' not in (PACKAGE / 'host' / 'broker.py').read_text(encoding='utf-8')
 
 
 @pytest.mark.parametrize(

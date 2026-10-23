@@ -8,6 +8,7 @@
   deny DIGEST               discard a pending write
   revoke [SESSION]          end a session's authority now
   audit-verify FILE...      check an audit file's hash chain
+  native-session --spec F  hold one native Rust broker session for a guest
 
 ``invoke``, ``operations``, ``delegate``, ``renounce`` and ``as`` are the
 guest client's verbs and are passed straight through to it.
@@ -542,6 +543,11 @@ def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else list(argv)
     if _is_guest_invocation(argv):
         return guest.main(argv)
+    if argv[:1] == ['native-session']:
+        # Optional native-broker lifecycle for an integrator (see module doc).
+        from .native_session import main as native_session
+
+        return native_session(argv[1:])
     args = _parser().parse_args(argv)
     announce = getattr(args, 'announce', 'text')
     try:
