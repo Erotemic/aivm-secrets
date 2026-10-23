@@ -33,3 +33,29 @@ Risks: guards are source-shape checks; I tightened one anchor that a mutation
 showed was a substring of its bypass. Confidence: high that behaviour is
 unchanged (oracle tests + 3210-test gate); the remaining NR-3 sink premise is
 the largest open gap.
+
+## 2026-10-22 22:19:17 -0400
+
+Continued removing premises after the maintainer's goal check.
+
+- `PayloadCorresponds`: core `channel_work::Submitting` now owns channel
+  construction (encode for the captured route, then connect), the send
+  (`Channel::submit`) and the response gate. Proved every read exchange
+  reaching send wrote exactly its own route's encoded body.
+- Status classification: core `provider_status` (strict line parser,
+  manifest classes) with an oracle over all 1000 codes; proved the exact
+  class table and extended the adaptive theorem to whole exchanges
+  (transport failure / status refusal / release).
+
+Decision: did not extract the provider JSON body parser. NI over documents
+already carries to bytes for any deterministic parser, and responses never
+contain the credential; the cost of a second JSON parser in core outweighs
+the assurance gain. Recorded in the proof tour.
+
+Remaining honest gap: `ExactNativeSinkCoverage`, now narrowed to "native
+primitives and the rest of the crate make no other credential write". That is
+native reachability, guarded by W3/W6 source checks, not Lean.
+
+Lesson: a guard clause I wrote had an `and ... or` precedence bug that made
+it vacuous; caught on review and replaced with an exact equality check.
+Confidence: high on behaviour preservation (oracles + 3213-test gate).

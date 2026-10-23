@@ -25,6 +25,8 @@ Each removes premises that earlier statements took as given.
 | [`denial_frame_exact`, `production_denial_has_authorized_attempts_and_fixed_guest_frame`](../../proofs/GarrettPublicError.lean) | A guest denial frame is exactly `{"error":{"code":C,"message":M},"ok":false,"version":1}` plus newline, for one of 17 fixed `(C, M)` pairs; it depends on nothing but which public error occurred | `denialJson`, its `Valid`/`Bound` and `prepared` premises | that `from_answer`'s error branch calls `denial_frame` (W3 guard) |
 | [`manifest_release_noninterference`](../../proofs/GarrettNR4ManifestRelease.lean) | Two provider responses that agree on the JSON at every host-selected path and on the pagination row count release the same value or the same refusal, for any current-control callback | `toJson`, `SelectedConversion`, unlinked `raw`/`selected`; exposes the row-count channel those premises hid | parse of provider bytes into the document; same credential in both runs |
 | [`adaptive_release_same_histories`](../../proofs/GarrettNR4AdaptiveRelease.lean) | A guest choosing each request from all earlier outcomes sees the same release histories in two worlds whose provider responses agree, request by request, on the declassified data | `step_preserves` / `PairedStepCertificate` for the release stage | admission/dispatch-stage outcomes are outside this step model |
+| [`exchange_send_writes_route_body`](../../proofs/GarrettChannelWork.lean) | Every read exchange that reaches the send stage called the native writer with exactly the encoded body produced for its own captured route, on a fresh channel holding that body | `PayloadCorresponds` (the written channel was an arbitrary input) | native `request_body`/`connect`/`parse` primitives and writer I/O |
+| [`manifest_classes`, `adaptive_exchange_noninterference`](../../proofs/GarrettNR4ExchangeAdaptive.lean) | Each status code's public class is exact (4xx rejected, other non-2xx failed, 206 partial); a guest adapting across whole exchanges (transport failure, status refusal or release) sees the same histories when the two worlds agree on transport failures, status classes and selected data | status classification as a native assumption; transport/status outcomes absent from the adaptive model | the `Answer` abstraction (transport error mapping, body parse) |
 | [`production_read_frame`](../../proofs/GarrettProductionReadFrame.lean) | A successful read sends exactly the JSON encoding of `{meta?,ok:true,result:<projection of this response>,version:1}` plus newline, and the credential occurs in neither those bytes nor any decoded key or string | `toCapturedJson`, `Valid`, `Bound` | two-line `Reply::Released` framing glue (W3 guard), guest writer I/O |
 
 **Declassifications made explicit.** A successful read reveals (a) the selected
@@ -34,18 +36,27 @@ contain the credential, through the reflection refusal. (b) was previously
 hidden inside the `SelectedConversion` premise.
 
 **Remaining NR-3 premise, stated honestly.** `ExactNativeSinkCoverage` says the
-native process makes credential-bearing writes exactly at the source's
-`providerSend` events. Its `attempts` list carries model fields, so it is a
-reachability assumption about native code, not an observation. Shrinking it
-means having the extracted core own the `Channel::submit` call and stating the
-theorem over a log of `Writer::write_all` calls.
+native process makes credential-bearing writes only at the source's
+`providerSend` events. The core now owns channel construction, the send
+(`Channel::submit`) and the response gate, so the premise has narrowed to: the
+native primitives (`request_body`, `connect`, `parse`, audit/coordination
+callbacks) and the rest of the native crate perform no *other* write of
+credential bytes. That is a reachability property of native code, checked by
+the W3/W6 source guards and their mutation tests, not by Lean.
+
+**Not extracted, by decision.** The provider body parse into the `Json`
+document stays native serde: any deterministic, effect-free parser maps
+responses to documents, so noninterference over documents carries to bytes
+whenever the parsed documents agree, and responses never contain the
+credential.
 
 **Verification for these increments:** fresh pinned Aeneas extraction (committed
-module byte-identical), full `lake build` (1882 jobs, no warnings),
-`dev/verification/system.py --full-tests` (3210 tests, no skips with `swtpm`
+module byte-identical), full `lake build` (1886 jobs, no warnings),
+`dev/verification/system.py --full-tests` (3213 tests, no skips with `swtpm`
 installed), all W0/W3/W4/W5/W6/NR source guards with updated mutation tests,
 and byte-equality oracle tests for the moved Rust (17 denial frames;
-30 document/page release combinations including every refusal).
+30 document/page release combinations including every refusal; 2000 status
+lines plus malformed ones).
 
 ## Existing proof chain, in ordinary language
 
