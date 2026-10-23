@@ -169,3 +169,19 @@ the env file is sourced. Tools that ignore `HTTPS_PROXY` are not mediated
 connection is then dropped, while the proxy keeps working because it rides
 the host-initiated SSH session. This is unit-tested in AIVM; a real-VM check
 is a maintainer action.
+
+## Real-VM check (maintainer, opt-in)
+
+```
+python dev/aivm_proxy_acceptance.py --vm aivm-2404 [--python] [--egress-check]
+```
+
+The script runs `proxy-session` against a synthetic loopback provider and a
+synthetic credential, using the VM's own SSH configuration. It checks five
+things: stock `curl` in the guest reads an allowed path through the
+published env file; the provider sees exactly one substituted credential;
+an unlisted origin is refused with no provider traffic; no guest session
+file contains the credential; and teardown removes the guest directory.
+`--egress-check` also reports whether direct public egress is reachable. It
+should be `false` only with AIVM's `firewall.public_egress = false`. The
+summary always states `authority_confinement_claimed: false`.
