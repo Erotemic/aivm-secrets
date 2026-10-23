@@ -822,12 +822,20 @@ theorem bad_escape_at_spec (value : Slice U8) (start : Usize) :
   unfold bad_escape_at
   repeat (first | step | split | simp)
 
+/-- A byte an accepted target may hold at position `k`: visible ASCII, not
+    `#`, `\\` or `;`, and the extracted escape check found no refused escape
+    starting there (malformed, or escaping an unreserved byte, `/`, `\\`, NUL
+    or `;`). -/
+def PlainAt (target : Slice U8) (k : Nat) (hk : k < target.length) : Prop :=
+  Visible target.val[k] ∧ target.val[k] ≠ 35#u8 ∧ target.val[k] ≠ 92#u8 ∧ target.val[k] ≠ 59#u8 ∧
+    ∃ position : Usize, position.val = k ∧ bad_escape_at target position = Result.ok false
+
 theorem plain_target_bytes_loop_spec (target : Slice U8) (index : Usize) :
     plain_target_bytes_loop target index ⦃ t => t = true →
-      ∀ k (hk : k < target.length), index.val ≤ k → Visible target.val[k] ⦄ := by
+      ∀ k (hk : k < target.length), index.val ≤ k → PlainAt target k hk ⦄ := by
   suffices ∀ n (index : Usize), target.length - index.val = n →
       plain_target_bytes_loop target index ⦃ t => t = true →
-        ∀ k (hk : k < target.length), index.val ≤ k → Visible target.val[k] ⦄ from
+        ∀ k (hk : k < target.length), index.val ≤ k → PlainAt target k hk ⦄ from
     this _ index rfl
   intro n
   induction n using Nat.strong_induction_on with
@@ -843,20 +851,30 @@ theorem plain_target_bytes_loop_spec (target : Slice U8) (index : Usize) :
       · rename_i seen
         split
         · simp
-        · split
+        · rename_i not_hash
+          split
           · simp
-          · split
+          · rename_i not_backslash
+            split
             · simp
-            · step as ⟨escaped⟩
+            · rename_i not_semicolon
+              obtain ⟨escaped, escape_eq, _⟩ := returned_of_spec (bad_escape_at_spec target index)
+              rw [escape_eq]
+              simp only [bind_ok]
               split
               · simp
-              · step as ⟨next, hnext⟩
+              · rename_i fine
+                step as ⟨next, hnext⟩
                 refine WP.spec_mono (ih (target.length - next.val) (by scalar_tac) next rfl) ?_
                 intro r hr ok k hk lo
                 by_cases same : k = index.val
                 · subst same
                   simp only [decide_eq_true_eq] at seen
-                  simpa [hbyte] using seen
+                  have nofail : escaped = false := by simpa using fine
+                  refine ⟨by simpa [hbyte] using seen, ?_, ?_, ?_, index, rfl, by rw [escape_eq, nofail]⟩
+                  · intro e; apply not_hash; simp [hbyte, e]
+                  · intro e; apply not_backslash; simp [hbyte, e]
+                  · intro e; apply not_semicolon; simp [hbyte, e]
                 · exact hr ok k hk (by scalar_tac)
       · simp
     · simp only [WP.spec_ok]
@@ -894,10 +912,11 @@ theorem segments_ok_loop_spec (path : Slice U8) (start index : Usize)
         exact ih (path.length - next.val) (by scalar_tac) start next rfl (by scalar_tac) (by scalar_tac)
     · step*
 
-/-- An accepted target is visible ASCII only: no SP, CR, LF or NUL. -/
-@[step]
-theorem check_target_spec (target : Slice U8) :
-    check_target target ⦃ t => t = true → ∀ byte ∈ target.val, Visible byte ⦄ := by
+/-- **An accepted target's bytes.** Every position holds a visible ASCII
+    byte other than `#`, `\\` and `;`, and no refused escape starts there
+    (`PlainAt`). -/
+theorem check_target_plain (target : Slice U8) :
+    check_target target ⦃ t => t = true → ∀ k (hk : k < target.length), PlainAt target k hk ⦄ := by
   unfold check_target
   dsimp only
   split
@@ -926,11 +945,19 @@ theorem check_target_spec (target : Slice U8) :
             exact absurd q (by decide)
           refine WP.spec_mono (segments_ok_loop_spec path 1#usize 1#usize (le_refl _)
             (by scalar_tac)) ?_
-          intro _ _ _
-          apply mem_all
-          intro k hk
+          intro _ _ _ k hk
           exact hplain accepted k hk (Nat.zero_le _)
         · simp
+
+/-- An accepted target is visible ASCII only: no SP, CR, LF or NUL. -/
+@[step]
+theorem check_target_spec (target : Slice U8) :
+    check_target target ⦃ t => t = true → ∀ byte ∈ target.val, Visible byte ⦄ := by
+  refine WP.spec_mono (check_target_plain target) ?_
+  intro t ht accepted
+  apply mem_all
+  intro k hk
+  exact (ht accepted k hk).1
 
 @[step]
 theorem valid_method_spec (method : Slice U8) : valid_method method ⦃ _ => True ⦄ := by

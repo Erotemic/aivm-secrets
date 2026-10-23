@@ -725,3 +725,12 @@ length <= 4 over {a,/}, all method pairs) against the old matcher.
 (`RuleMatches`/`PathMatches`) instead of totality. A splice error of mine
 briefly duplicated part of GarrettProxyHttp.lean; reconstructed and re-spliced
 before any build/commit.
+
+## 2026-10-23 19:30:28 -0400
+
+`check_target_plain`: byte-level refusals of the proxy target check proved
+(visible, not #/\\/;, no refused escape at any position — the escape fact is
+stated as the extracted `bad_escape_at` returning false there, not as a
+handwritten escape grammar). `check_target_spec` (visible only, @[step]) is
+now derived from it. Dot/empty segment refusal still tested only: a
+splitOn-based segment invariant for `segments_ok_loop` is the next proof.
