@@ -16,7 +16,7 @@ credentials.
 
 | | |
 | --- | --- |
-| Claim | The credential is written upstream only as one authentication line, after every guest field, on a request for a configured origin. No guest field named `Authorization`, `X-Api-Key`, `Proxy-Authorization` or `Cookie` (any ASCII case) is forwarded. A guest cannot add a header line. |
+| Claim | The credential is written upstream only as one authentication line, after every guest field, on a request for a configured origin. No guest field named `Authorization`, `X-Api-Key`, `Proxy-Authorization`, `Cookie`, a method-override field, `Range` or `If-Range` (19 names, any ASCII case) is forwarded. A guest cannot add a header line. |
 | Theorems | `encode_upstream_contract`, `forwarded_drops`, `dropped_eq`, `clean_field_single_line` ([GarrettProxyHttp](../../proofs/GarrettProxyHttp.lean)); `accepted_header_exact` ([GarrettHttpAuth](../../proofs/GarrettHttpAuth.lean)) |
 | Premises | `PROXY-NATIVE-01` (the native shell writes only the encoder's buffer upstream), `PROXY-TLS-01`, `PROXY-PARSE-01` (provider routing semantics), `RUST-COMPILER-01` |
 | Witnesses | `tests/test_proxy_substitution.py`, `tests/test_rust_proxy.py` (native, stock curl), byte parity `tests/secrets_vectors/proxy-http-v1.tsv` checked by Python and Rust |
@@ -26,8 +26,8 @@ credentials.
 
 | | |
 | --- | --- |
-| Claim | A response released to the guest never contains the credential's exact bytes. Listed percent, hex and base64 forms are also refused. Every refusal is one of eleven fixed responses that name only a code. |
-| Theorems | `guest_response_contract`, `reflects_spec`, `reflection_forms_include_raw`, `refusal_exact` ([GarrettProxyResponse](../../proofs/GarrettProxyResponse.lean)) |
+| Claim | A response released to the guest never contains the credential's exact bytes. Listed percent, hex, base64 and JSON-`\/` forms are also refused, and case-sensitive forms are also searched with line breaks removed (MIME-wrapped base64). Every refusal is one of eleven fixed responses that name only a code. |
+| Theorems | `guest_response_contract`, `reflects_spec`, `unwrapped_spec`, `reflection_forms_include_raw`, `refusal_exact` ([GarrettProxyResponse](../../proofs/GarrettProxyResponse.lean)) |
 | Premises | `PROXY-REFLECT-01` (other encodings and freshly minted credentials are not detected), `PROXY-NATIVE-01` |
 | Witnesses | Reflection, compression and redirect tests in both suites; response and refusal parity vectors |
 | Excluded | Credential amplification (`PROXY-AUTHORITY-01`), timing |

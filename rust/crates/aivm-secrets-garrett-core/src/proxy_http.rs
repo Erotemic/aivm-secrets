@@ -91,30 +91,36 @@ pub fn valid_method(method: &[u8]) -> bool {
         || method == options
 }
 
-/// `true` when `value[start..]` begins with the escape `%` `a` `b`, compared
-/// without regard to the case of the two hex digits.
-pub fn escape_at(value: &[u8], start: usize, a: u8, b: u8) -> bool {
-    // Written without `start + 3` so it cannot overflow.
-    start <= value.len()
-        && value.len() - start >= 3
-        && value[start] == b'%'
-        && http_wire::ascii_lower(value[start + 1]) == a
-        && http_wire::ascii_lower(value[start + 2]) == b
+/// A percent-escape the strict subset refuses: malformed (not two hex
+/// digits), or one that encodes an unreserved character (an alternate
+/// spelling of a plain path), `/`, `\\`, NUL or `;`. Refusing these keeps
+/// every accepted target in one canonical spelling, so deny rules cannot be
+/// bypassed with an equivalent encoding.
+pub fn bad_escape_at(value: &[u8], start: usize) -> bool {
+    if start >= value.len() || value[start] != b'%' {
+        return false;
+    }
+    if value.len() - start < 3 {
+        return true;
+    }
+    let high = match hex_digit(value[start + 1]) {
+        Some(digit) => digit,
+        None => return true,
+    };
+    let low = match hex_digit(value[start + 2]) {
+        Some(digit) => digit,
+        None => return true,
+    };
+    let byte = (high * 16 + low) as u8;
+    unreserved(byte) || byte == b'/' || byte == b'\\' || byte == 0 || byte == b';'
 }
 
-pub fn forbidden_escape_at(value: &[u8], start: usize) -> bool {
-    escape_at(value, start, b'2', b'e')
-        || escape_at(value, start, b'2', b'f')
-        || escape_at(value, start, b'5', b'c')
-        || escape_at(value, start, b'0', b'0')
-}
-
-/// Visible ASCII without `#`, backslash or a forbidden escape.
+/// Visible ASCII without `#`, backslash, `;` or a refused escape.
 pub fn plain_target_bytes(target: &[u8]) -> bool {
     let mut index = 0;
     while index < target.len() {
         let byte = target[index];
-        if !visible(byte) || byte == b'#' || byte == b'\\' || forbidden_escape_at(target, index) {
+        if !visible(byte) || byte == b'#' || byte == b'\\' || byte == b';' || bad_escape_at(target, index) {
             return false;
         }
         index += 1;
@@ -651,7 +657,9 @@ pub fn parse_request(data: &[u8], host: &[u8], limit: usize) -> Result<Option<Pa
 }
 
 /// Guest fields never forwarded: credentials of any scheme, proxy and
-/// hop-by-hop fields, framing, and negotiation the proxy owns.
+/// hop-by-hop fields, framing, negotiation the proxy owns, method overrides
+/// (which could route around method-specific deny rules) and ranges (which
+/// could fetch an echoed credential in pieces).
 pub fn dropped(field: &Field) -> bool {
     name_is(field, b"authorization")
         || name_is(field, b"x-api-key")
@@ -667,6 +675,11 @@ pub fn dropped(field: &Field) -> bool {
         || name_is(field, b"host")
         || name_is(field, b"accept-encoding")
         || name_is(field, b"cookie")
+        || name_is(field, b"x-http-method-override")
+        || name_is(field, b"x-method-override")
+        || name_is(field, b"x-http-method")
+        || name_is(field, b"range")
+        || name_is(field, b"if-range")
 }
 
 pub fn forwarded(fields: &[Field]) -> Vec<Field> {
@@ -682,7 +695,9 @@ pub fn forwarded(fields: &[Field]) -> Vec<Field> {
     out
 }
 
-/// A rule matches an exact path, or any path under a `/`-ending prefix.
+/// A rule matches its exact path, the same path with a trailing slash, or,
+/// for a `/`-ending prefix, the prefix without its slash and everything
+/// under it.
 #[allow(clippy::len_zero)]
 pub fn rule_matches(rule: &DenyRule, method: &[u8], path: &[u8]) -> bool {
     let rule_method: &[u8] = &rule.method;
@@ -693,10 +708,23 @@ pub fn rule_matches(rule: &DenyRule, method: &[u8], path: &[u8]) -> bool {
     if path == rule_path {
         return true;
     }
-    rule_path.len() != 0
-        && rule_path[rule_path.len() - 1] == b'/'
-        && path.len() >= rule_path.len()
+    if path.len() > rule_path.len()
+        && path.len() - rule_path.len() == 1
+        && path[rule_path.len()] == b'/'
         && &path[..rule_path.len()] == rule_path
+    {
+        return true;
+    }
+    if rule_path.len() == 0 || rule_path[rule_path.len() - 1] != b'/' {
+        return false;
+    }
+    if rule_path.len() > path.len()
+        && rule_path.len() - path.len() == 1
+        && path == &rule_path[..path.len()]
+    {
+        return true;
+    }
+    path.len() >= rule_path.len() && &path[..rule_path.len()] == rule_path
 }
 
 pub fn denied(rules: &[DenyRule], method: &[u8], path: &[u8]) -> bool {
@@ -1068,9 +1096,25 @@ pub fn aligned_base64(secret: &[u8], shift: usize, url: bool) -> Vec<u8> {
 }
 
 /// Every encoding of the credential the guest must never receive.
+/// The credential as a JSON string body escapes it (`/` as `\\/`).
+pub fn json_slashes(secret: &[u8]) -> Vec<u8> {
+    let mut out = Vec::new();
+    for byte in secret {
+        if *byte == b'/' {
+            out.push(b'\\');
+        }
+        out.push(*byte);
+    }
+    out
+}
+
 pub fn reflection_forms(secret: &[u8]) -> Vec<Form> {
     let mut forms = Vec::new();
     forms.push(Form { bytes: secret.to_vec(), folded: false });
+    let escaped = json_slashes(secret);
+    if escaped.len() != secret.len() {
+        forms.push(Form { bytes: escaped, folded: false });
+    }
     forms.push(Form { bytes: percent_lower(secret), folded: true });
     forms.push(Form { bytes: hex_bytes(secret), folded: true });
     let mut shift = 0;
@@ -1088,19 +1132,32 @@ pub fn reflection_forms(secret: &[u8]) -> Vec<Form> {
     forms
 }
 
-/// Whether one form occurs: folded forms are searched in the lowercased data.
-pub fn form_present(data: &[u8], folded_data: &[u8], form: &Form) -> bool {
+/// `data` without CR and LF, so line-wrapped (MIME-style) base64 is found.
+pub fn unwrapped(data: &[u8]) -> Vec<u8> {
+    let mut out = Vec::new();
+    for byte in data {
+        if *byte != b'\r' && *byte != b'\n' {
+            out.push(*byte);
+        }
+    }
+    out
+}
+
+/// Whether one form occurs: folded forms are searched in the lowercased
+/// data; the others in the data and in the data without line breaks.
+pub fn form_present(data: &[u8], folded_data: &[u8], unwrapped_data: &[u8], form: &Form) -> bool {
     if form.folded {
         reflection::contains(folded_data, &form.bytes)
     } else {
-        reflection::contains(data, &form.bytes)
+        reflection::contains(data, &form.bytes) || reflection::contains(unwrapped_data, &form.bytes)
     }
 }
 
 pub fn reflects(data: &[u8], forms: &[Form]) -> bool {
     let folded_data = lowered(data);
+    let unwrapped_data = unwrapped(data);
     for form in forms {
-        if form_present(data, &folded_data, form) {
+        if form_present(data, &folded_data, &unwrapped_data, form) {
             return true;
         }
     }

@@ -25,7 +25,7 @@ from tests.test_rust_garrett import executable
 class NativeWorld(World):
     """``World``'s raw tunnel helper, driving the native binary."""
 
-    def __init__(self, tmp_path, service, **policy_changes):
+    def __init__(self, tmp_path, service, *, secret: str = TOKEN, **policy_changes):
         self.service = service
         policy = dict(
             schema=1, profile='credential-substitution', lifetime_seconds=600,
@@ -37,7 +37,7 @@ class NativeWorld(World):
         self.directory = tmp_path / 'native'
         self.directory.mkdir(mode=0o700)
         self.policy_path = write_private(self.directory / 'proxy.json', json.dumps(policy).encode())
-        self.credential = write_private(self.directory / 'credential', (TOKEN + '\n').encode())
+        self.credential = write_private(self.directory / 'credential', (secret + '\n').encode())
         self.audit_path = self.directory / 'audit.jsonl'
         self.ca_path = tmp_path / 'native-ca.pem'
 
@@ -243,6 +243,7 @@ def test_native_proxy_writes_only_core_outputs():
               / 'rust/crates/aivm-secrets-garrett/src/proxy_main.rs').read_text()
     writes = re.findall(r'(\w+)\.write_all\(([^)]*\)?)\)', source)
     allowed = {('tls', 'wire'), ('tls', '&reply'), ('tls', '&refusal(code)'),
+               ('tls', '&refusal("too_large")'),
                ('stream', 'b"HTTP/1.1 200 Connection established\\r\\n\\r\\n"')}
     for target, argument in writes:
         assert (target, argument) in allowed or (

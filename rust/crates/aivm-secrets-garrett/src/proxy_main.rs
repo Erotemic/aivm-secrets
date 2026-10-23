@@ -25,7 +25,7 @@ use std::collections::BTreeMap;
 use std::io::{self, Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -33,6 +33,12 @@ const IO_TIMEOUT: Duration = Duration::from_secs(15);
 const TOTAL_DEADLINE: Duration = Duration::from_secs(45);
 const MAX_POLICY: usize = 65536;
 const MAX_CA: usize = 1 << 20;
+/// Concurrent guest connections; extra connections are closed at once.
+const MAX_CONNECTIONS: usize = 32;
+/// Whole-head and whole-request deadlines, so a slow guest cannot hold a
+/// thread indefinitely.
+const HEAD_DEADLINE: Duration = Duration::from_secs(30);
+const REQUEST_DEADLINE: Duration = Duration::from_secs(120);
 
 struct Origin {
     host: String,
@@ -53,7 +59,16 @@ struct Session {
     token: Vec<u8>,
     expires: Instant,
     revoked: AtomicBool,
-    audit: Mutex<std::fs::File>,
+    audit: Mutex<Audit>,
+    connections: AtomicUsize,
+}
+
+/// Hash-chained JSONL like the Python reference: `seq` and the SHA-256 of
+/// the previous line, so truncation or edits are detectable.
+struct Audit {
+    file: std::fs::File,
+    seq: u64,
+    head: String,
 }
 
 fn fail(code: &str) -> String {
@@ -240,9 +255,12 @@ fn load(policy_path: &Path, credential_path: &Path, audit_path: &Path) -> Result
     let mut random = [0u8; 32];
     SystemRandom::new().fill(&mut random).map_err(|_| fail("proxy_failed"))?;
     let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(random).into_bytes();
+    use std::os::unix::fs::OpenOptionsExt;
     let audit = std::fs::OpenOptions::new()
         .create_new(true)
         .append(true)
+        .mode(0o600)
+        .custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32)
         .open(audit_path)
         .map_err(|_| fail("proxy_failed"))?;
     let forms = core::reflection_forms(&secret);
@@ -257,7 +275,8 @@ fn load(policy_path: &Path, credential_path: &Path, audit_path: &Path) -> Result
             token,
             expires: Instant::now() + Duration::from_secs(lifetime),
             revoked: AtomicBool::new(false),
-            audit: Mutex::new(audit),
+            audit: Mutex::new(Audit { file: audit, seq: 0, head: "0".repeat(64) }),
+            connections: AtomicUsize::new(0),
         },
         ca_pem,
     ))
@@ -266,15 +285,23 @@ fn load(policy_path: &Path, credential_path: &Path, audit_path: &Path) -> Result
 impl Session {
     fn record(&self, event: &str, detail: Value) {
         let stamp = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
-        let mut row = json!({"schema": "proxy-audit-1", "event": event, "timestamp": stamp});
-        if let (Some(row), Some(detail)) = (row.as_object_mut(), detail.as_object()) {
-            for (k, v) in detail {
-                row.insert(k.clone(), v.clone());
+        if let Ok(mut audit) = self.audit.lock() {
+            let mut row = json!({"schema": "proxy-audit-1", "seq": audit.seq, "prev": audit.head,
+                                 "event": event, "timestamp": stamp});
+            if let (Some(row), Some(detail)) = (row.as_object_mut(), detail.as_object()) {
+                for (k, v) in detail {
+                    row.insert(k.clone(), v.clone());
+                }
             }
-        }
-        if let Ok(mut file) = self.audit.lock() {
-            let _ = writeln!(file, "{row}");
-            let _ = file.sync_data();
+            let line = row.to_string();
+            if writeln!(audit.file, "{line}").is_ok() && audit.file.sync_data().is_ok() {
+                audit.head = ring::digest::digest(&ring::digest::SHA256, line.as_bytes())
+                    .as_ref()
+                    .iter()
+                    .map(|b| format!("{b:02x}"))
+                    .collect();
+                audit.seq += 1;
+            }
         }
     }
     fn current(&self) -> bool {
@@ -334,11 +361,15 @@ fn refusal_code(refusal: &core::Refusal) -> &'static str {
 }
 
 fn read_head(stream: &mut TcpStream) -> io::Result<Vec<u8>> {
+    let started = Instant::now();
     let mut data = Vec::new();
     let mut byte = [0u8; 1];
     // Byte-wise so nothing after the CONNECT head is consumed before TLS.
     while core::head_end(&data).is_none() {
-        if data.len() > core::MAX_HEAD || stream.read(&mut byte)? == 0 {
+        if started.elapsed() > HEAD_DEADLINE
+            || data.len() > core::MAX_HEAD
+            || stream.read(&mut byte)? == 0
+        {
             return Err(io::ErrorKind::InvalidData.into());
         }
         data.push(byte[0]);
@@ -472,7 +503,19 @@ fn tunnel(session: &Session, mut stream: TcpStream) -> io::Result<()> {
     let mut tls = StreamOwned::new(connection, stream);
     let mut buffer = Vec::new();
     let mut chunk = [0u8; 65536];
+    // Raw bytes allowed for one request: the body limit with room for chunk
+    // framing, plus the head. This also bounds re-parsing an incomplete body.
+    let raw_limit = 2 * session.request_limit + core::MAX_HEAD + 65536;
+    let mut started = Instant::now();
     loop {
+        if buffer.len() > raw_limit {
+            session.record("refused", json!({"code": "too_large", "origin": origin.host}));
+            tls.write_all(&refusal("too_large"))?;
+            break;
+        }
+        if !buffer.is_empty() && started.elapsed() > REQUEST_DEADLINE {
+            break;
+        }
         match core::parse_request(&buffer, origin.host.as_bytes(), session.request_limit) {
             Err(refused) => {
                 let code = refusal_code(&refused);
@@ -489,6 +532,7 @@ fn tunnel(session: &Session, mut stream: TcpStream) -> io::Result<()> {
             }
             Ok(Some(parsed)) => {
                 buffer.drain(..parsed.used);
+                started = Instant::now();
                 let (reply, keep) = serve_one(session, origin, &parsed.request);
                 tls.write_all(&reply)?;
                 tls.flush()?;
@@ -571,9 +615,15 @@ fn main() {
     let acceptor = session.clone();
     std::thread::spawn(move || {
         for stream in listener.incoming().flatten() {
+            if acceptor.connections.fetch_add(1, Ordering::SeqCst) >= MAX_CONNECTIONS {
+                acceptor.connections.fetch_sub(1, Ordering::SeqCst);
+                drop(stream);
+                continue;
+            }
             let session = acceptor.clone();
             std::thread::spawn(move || {
                 let _ = tunnel(&session, stream);
+                session.connections.fetch_sub(1, Ordering::SeqCst);
             });
         }
     });

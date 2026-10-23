@@ -38,10 +38,10 @@ def policy_for(service, **changes):
 
 
 class World:
-    def __init__(self, tmp_path, service, **policy_changes):
+    def __init__(self, tmp_path, service, *, secret: str = TOKEN, **policy_changes):
         self.service = service
         self.audit_path = tmp_path / 'proxy-audit.jsonl'
-        self.session = ProxySession(policy_for(service, **policy_changes), TOKEN.encode(),
+        self.session = ProxySession(policy_for(service, **policy_changes), secret.encode(),
                                     audit=ProxyAudit(self.audit_path))
         self.ca_path = tmp_path / 'session-ca.pem'
         self.ca_path.write_bytes(self.session.ca.pem)

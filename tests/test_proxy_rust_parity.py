@@ -105,6 +105,19 @@ def corpus() -> list[tuple[bytes, bytes, str]]:
         head(b'POST / HTTP/1.1', h, b'Content-Length: 65') + b'x' * 65,
         head(b'POST / HTTP/1.1', h, b'Transfer-Encoding: chunked') + b'41\r\n' + b'x' * 65 + b'\r\n0\r\n\r\n',
         head(b'GET / HTTP/1.1', h, *[b'X-%d: v' % i for i in range(101)]),
+        # Review findings: equivalent spellings and overrides.
+        head(b'POST /v1/tokens/ HTTP/1.1', h, b'Content-Length: 0'),
+        head(b'POST /v1/%74okens HTTP/1.1', h, b'Content-Length: 0'),
+        head(b'GET /v1/%61dmin/x HTTP/1.1', h),
+        head(b'GET /v1/admin HTTP/1.1', h),
+        head(b'GET /v1/admin;x/y HTTP/1.1', h),
+        head(b'POST /v1/tokens; HTTP/1.1', h, b'Content-Length: 0'),
+        head(b'GET /a%2 HTTP/1.1', h),
+        head(b'GET /a%zz HTTP/1.1', h),
+        head(b'GET /a%20b%25 HTTP/1.1', h),
+        head(b'GET /v1/issues HTTP/1.1', h, b'X-HTTP-Method-Override: DELETE',
+             b'x-method-override: DELETE', b'X-Http-Method: DELETE', b'Range: bytes=0-9',
+             b'If-Range: x'),
         # Deny list.
         head(b'POST /v1/tokens HTTP/1.1', h, b'Content-Length: 0'),
         head(b'GET /v1/tokens HTTP/1.1', h),
@@ -184,7 +197,10 @@ def response_corpus() -> list[tuple[bytes, bool, bool, bytes]]:
         r(b'HTTP/1.1 200 ' + secret, cl(b'')),
         r(b'HTTP/1.1 200 OK', cl(b'')) + b'',
     ]
-    encodings = [base64.b64encode(b'x-access-token:' + secret),
+    plain64 = base64.b64encode(b'pad' + secret)
+    wrapped = b'\r\n'.join(plain64[i:i + 16] for i in range(0, len(plain64), 16))
+    encodings = [wrapped,
+                 base64.b64encode(b'x-access-token:' + secret),
                  base64.urlsafe_b64encode(b'ab' + secret),
                  base64.b64encode(b'a' + secret),
                  quote(secret + b'/', safe='').upper().encode(),
@@ -194,6 +210,9 @@ def response_corpus() -> list[tuple[bytes, bool, bool, bytes]]:
         body = b'{"e":"' + form + b'"}'
         cases.append(r(b'HTTP/1.1 200 OK', cl(body), body=body))
     rows = [(raw, False, False, secret) for raw in cases]
+    slashed = b'AKIA/EXAMPLE/KEY_1'
+    for body in (b'{"k":"AKIA\\/EXAMPLE\\/KEY_1"}', b'{"k":"AKIA/EXAMPLE/KEY_1"}'):
+        rows.append((r(b'HTTP/1.1 200 OK', cl(body), body=body), False, False, slashed))
     rows += [(cases[0], True, False, secret), (cases[0], False, True, secret),
              (cases[1], True, True, secret), (cases[0], False, False, b'abc')]
     return rows

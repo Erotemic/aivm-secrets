@@ -8,8 +8,9 @@ unambiguous subset and refuses the rest; it never guesses. Refusals are
 Accepted request subset (inside an already-authorized CONNECT tunnel):
 
 * request line ``METHOD SP origin-form SP HTTP/1.1``; methods in ``METHODS``;
-* origin-form target of visible ASCII without ``#``, backslash, empty or dot
-  segments, or percent-encoded ``.``, ``/`` or ``\\``;
+* origin-form target of visible ASCII without ``#``, backslash, ``;``,
+  empty or dot segments, or a malformed escape or one that encodes an
+  unreserved character, ``/``, ``\\``, NUL or ``;``;
 * header fields ``token ":" OWS value OWS`` with visible ASCII/SP/HTAB
   values; no obs-fold, bare CR or LF, NUL, or duplicate framing fields;
 * framing by one decimal ``Content-Length`` or ``Transfer-Encoding: chunked``
@@ -25,7 +26,20 @@ METHODS = frozenset({b'GET', b'HEAD', b'POST', b'PUT', b'PATCH', b'DELETE', b'OP
 MAX_HEAD = 32 * 1024
 MAX_FIELDS = 100
 _TOKEN = frozenset(b"!#$%&'*+-.^_`|~0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
-_FORBIDDEN_ESCAPES = (b'%2e', b'%2f', b'%5c', b'%00')
+_HEX = frozenset(b'0123456789abcdefABCDEF')
+_UNRESERVED = frozenset(b'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~')
+
+
+def bad_escape(target: bytes, index: int) -> bool:
+    """A refused percent-escape: malformed, or encoding an unreserved
+    character (an alternate spelling of a plain path), ``/``, ``\\``, NUL
+    or ``;``. Every accepted target then has one canonical spelling."""
+    if target[index] != 0x25:
+        return False
+    if len(target) - index < 3 or target[index + 1] not in _HEX or target[index + 2] not in _HEX:
+        return True
+    byte = int(target[index + 1:index + 3], 16)
+    return byte in _UNRESERVED or byte in b'/\\;' or byte == 0
 # Fields a request may never carry into the tunnel: they change framing or
 # protocol in ways this proxy does not model.
 _REFUSED_REQUEST_FIELDS = frozenset({b'upgrade', b'expect', b'te', b'trailer'})
@@ -74,10 +88,9 @@ def _visible(byte: int) -> bool:
 def check_target(target: bytes) -> None:
     if not target.startswith(b'/') or len(target) > 8192:
         raise Refused('invalid_request')
-    if any(not _visible(b) or b in b'#\\' for b in target):
+    if any(not _visible(b) or b in b'#\\;' for b in target):
         raise Refused('invalid_request')
-    lowered = target.lower()
-    if any(escape in lowered for escape in _FORBIDDEN_ESCAPES):
+    if any(bad_escape(target, index) for index in range(len(target))):
         raise Refused('invalid_request')
     path = target.split(b'?', 1)[0]
     segments = path.split(b'/')[1:]

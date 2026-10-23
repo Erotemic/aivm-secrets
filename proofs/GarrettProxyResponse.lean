@@ -11,7 +11,9 @@ Python reference: `aivm_secrets/proxy/policy.py` (`guest_response`).
 Proved here (HP-5(c) in `docs/planning/aivm-secrets-http-proxy-profiles.md`):
 
 * `reflects_spec`: when the extracted check answers `false`, no
-  case-sensitive form occurs anywhere in the checked bytes;
+  case-sensitive form occurs anywhere in the checked bytes, nor in those
+  bytes with every CR and LF removed (`unwrapped_spec`), which catches
+  line-wrapped base64;
 * `guest_response_contract`: an accepted response appends bytes to the guest
   buffer in which **no case-sensitive form occurs**, including for `HEAD`,
   whose bytes are a prefix of the checked ones; a refused response appends
@@ -92,10 +94,81 @@ theorem lowered_spec (bytes : Slice U8) : lowered bytes ⦃ r => r.length = byte
   intro r h
   simpa [alloc.vec.Vec.new, alloc.vec.Vec.length] using h
 
+/-- A byte that `unwrapped` keeps (anything but CR and LF). -/
+def Kept (byte : U8) : Bool := byte != 13#u8 && byte != 10#u8
+
+theorem unwrapped_loop_spec (it : core.slice.iter.Iter U8) (out : alloc.vec.Vec U8)
+    (room : out.length + (it.slice.length - it.i) ≤ Usize.max) :
+    unwrapped_loop it out ⦃ r => r.val = out.val ++ (it.slice.val.drop it.i).filter Kept ⦄ := by
+  suffices ∀ n (it : core.slice.iter.Iter U8) (out : alloc.vec.Vec U8),
+      it.slice.length - it.i = n → out.length + n ≤ Usize.max →
+      unwrapped_loop it out ⦃ r => r.val = out.val ++ (it.slice.val.drop it.i).filter Kept ⦄ from
+    this _ it out rfl room
+  intro n
+  induction n using Nat.strong_induction_on with
+  | h n ih =>
+    intro it out measure space
+    rw [unwrapped_loop.eq_def]
+    by_cases inside : it.i < it.slice.length
+    · have cons : it.slice.val.drop it.i = it.slice.val[it.i] :: it.slice.val.drop (it.i + 1) :=
+        List.drop_eq_getElem_cons (by scalar_tac)
+      rw [iter_next_inside it inside]
+      simp only [bind_ok]
+      change (if (it.slice[it.i] != 13#u8) = true then
+          (if (it.slice[it.i] != 10#u8) = true then
+            (do let out1 ← alloc.vec.Vec.push out it.slice[it.i]
+                unwrapped_loop { slice := it.slice, i := it.i + 1 } out1)
+          else unwrapped_loop { slice := it.slice, i := it.i + 1 } out)
+        else unwrapped_loop { slice := it.slice, i := it.i + 1 } out) ⦃ r => _ ⦄
+      split
+      · split
+        · rename_i cr lf
+          step as ⟨pushed, hpushed⟩
+          refine WP.spec_mono (ih (it.slice.length - (it.i + 1)) (by scalar_tac)
+            { it with i := it.i + 1 } pushed rfl
+            (by simp [alloc.vec.Vec.length, hpushed]; scalar_tac)) ?_
+          intro r hr
+          rw [hr, hpushed, cons, List.filter_cons]
+          split <;> simp_all [Kept]
+        · rename_i cr lf
+          refine WP.spec_mono (ih (it.slice.length - (it.i + 1)) (by scalar_tac)
+            { it with i := it.i + 1 } out rfl (by scalar_tac)) ?_
+          intro r hr
+          rw [hr, cons, List.filter_cons]
+          split <;> simp_all [Kept]
+      · refine WP.spec_mono (ih (it.slice.length - (it.i + 1)) (by scalar_tac)
+          { it with i := it.i + 1 } out rfl (by scalar_tac)) ?_
+        intro r hr
+        rw [hr, cons, List.filter_cons]
+        split <;> simp_all [Kept]
+    · simp only [iter_next_done it inside, bind_ok]
+      change (Result.ok out : Result (alloc.vec.Vec U8)) ⦃ r => _ ⦄
+      simp only [WP.spec_ok]
+      have : it.slice.val.drop it.i = [] := List.drop_eq_nil_of_le (by scalar_tac)
+      simp [this]
+
+/-- `unwrapped` is `data` with every CR and LF removed. -/
 @[step]
-theorem form_present_spec (data folded : Slice U8) (form : proxy_http.Form) :
-    form_present data folded form ⦃ b => b = false → form.folded = false →
-      ¬ Occurs data.val form.bytes.val ⦄ := by
+theorem unwrapped_spec (data : Slice U8) :
+    unwrapped data ⦃ r => r.val = data.val.filter Kept ⦄ := by
+  unfold unwrapped
+  simp only [SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter, bind_ok]
+  refine WP.spec_mono (unwrapped_loop_spec ⟨data, 0⟩ (alloc.vec.Vec.new U8)
+    (by simp [alloc.vec.Vec.new, alloc.vec.Vec.length])) ?_
+  intro r h
+  exact h
+
+theorem absent_of_contains {haystack needle : Slice U8} {found : Bool}
+    (iff : found = true ↔ LiteralOccurs haystack needle) (absent : found = false) :
+    ¬ Occurs haystack.val needle.val := by
+  intro occurs
+  have : LiteralOccurs haystack needle := (literal_occurs_iff _ _).mpr occurs
+  simp_all
+
+@[step]
+theorem form_present_spec (data folded unwrappedData : Slice U8) (form : proxy_http.Form) :
+    form_present data folded unwrappedData form ⦃ b => b = false → form.folded = false →
+      ¬ Occurs data.val form.bytes.val ∧ ¬ Occurs unwrappedData.val form.bytes.val ⦄ := by
   unfold form_present
   split
   · obtain ⟨found, returned, _⟩ := returned_of_spec
@@ -104,24 +177,38 @@ theorem form_present_spec (data folded : Slice U8) (form : proxy_http.Form) :
     apply (WP.spec_ok _).mpr
     intro _ plain
     simp_all
-  · rename_i plain_form
-    obtain ⟨found, returned, iff⟩ := returned_of_spec
+  · obtain ⟨found, returned, iff⟩ := returned_of_spec
       (contains_contract data (alloc.vec.Vec.deref form.bytes))
+    dsimp only
     rw [returned]
-    apply (WP.spec_ok _).mpr
-    intro absent _ occurs
-    have : LiteralOccurs data (alloc.vec.Vec.deref form.bytes) := by
-      rw [literal_occurs_iff]
-      simpa [aivm_secrets_garrett_core.http_wire.Proofs.vec_deref_val] using occurs
-    simp_all
+    simp only [bind_ok]
+    split
+    · simp
+    · rename_i first
+      obtain ⟨found2, returned2, iff2⟩ := returned_of_spec
+        (contains_contract unwrappedData (alloc.vec.Vec.deref form.bytes))
+      rw [returned2]
+      apply (WP.spec_ok _).mpr
+      intro absent _
+      have first' : found = false := by simpa using first
+      exact ⟨by simpa [aivm_secrets_garrett_core.http_wire.Proofs.vec_deref_val] using
+          absent_of_contains iff first',
+        by simpa [aivm_secrets_garrett_core.http_wire.Proofs.vec_deref_val] using
+          absent_of_contains iff2 absent⟩
+
+/-- What `reflects` answering `false` excludes for one case-sensitive form:
+    it occurs neither in the data nor in the data with line breaks removed
+    (so MIME-wrapped base64 is caught). -/
+def Unreflected (data : List U8) (form : proxy_http.Form) : Prop :=
+  ¬ Occurs data form.bytes.val ∧ ¬ Occurs (data.filter Kept) form.bytes.val
 
 theorem reflects_loop_spec (it : core.slice.iter.Iter proxy_http.Form) (data : Slice U8)
-    (folded : alloc.vec.Vec U8) :
-    reflects_loop it data folded ⦃ b => b = false →
-      ∀ form ∈ it.slice.val.drop it.i, form.folded = false → ¬ Occurs data.val form.bytes.val ⦄ := by
+    (folded unwrappedData : alloc.vec.Vec U8) (same : unwrappedData.val = data.val.filter Kept) :
+    reflects_loop it data folded unwrappedData ⦃ b => b = false →
+      ∀ form ∈ it.slice.val.drop it.i, form.folded = false → Unreflected data.val form ⦄ := by
   suffices ∀ n (it : core.slice.iter.Iter proxy_http.Form), it.slice.length - it.i = n →
-      reflects_loop it data folded ⦃ b => b = false →
-        ∀ form ∈ it.slice.val.drop it.i, form.folded = false → ¬ Occurs data.val form.bytes.val ⦄ from
+      reflects_loop it data folded unwrappedData ⦃ b => b = false →
+        ∀ form ∈ it.slice.val.drop it.i, form.folded = false → Unreflected data.val form ⦄ from
     this _ it rfl
   intro n
   induction n using Nat.strong_induction_on with
@@ -141,8 +228,13 @@ theorem reflects_loop_spec (it : core.slice.iter.Iter proxy_http.Form) (data : S
           { it with i := it.i + 1 } rfl) ?_
         intro b hb no form mem plain
         rw [split_list] at mem
-        rcases List.mem_cons.mp mem with same | rest
-        · subst same; exact hpresent (by simp_all) plain
+        rcases List.mem_cons.mp mem with here | rest
+        · subst here
+          have := hpresent (by simp_all) plain
+          refine ⟨this.1, ?_⟩
+          have h2 := this.2
+          simp only [aivm_secrets_garrett_core.http_wire.Proofs.vec_deref_val] at h2
+          rwa [same] at h2
         · exact hb no form rest plain
     · simp only [iter_next_done it inside, bind_ok]
       apply (WP.spec_ok _).mpr
@@ -152,15 +244,17 @@ theorem reflects_loop_spec (it : core.slice.iter.Iter proxy_http.Form) (data : S
       cases mem
 
 /-- **The extracted reflection check.** If it answers `false`, no
-    case-sensitive form occurs anywhere in `data`. -/
+    case-sensitive form occurs anywhere in `data`, nor in `data` with its
+    line breaks removed. -/
 @[step]
 theorem reflects_spec (data : Slice U8) (forms : Slice proxy_http.Form) :
     reflects data forms ⦃ b => b = false →
-      ∀ form ∈ forms.val, form.folded = false → ¬ Occurs data.val form.bytes.val ⦄ := by
+      ∀ form ∈ forms.val, form.folded = false → Unreflected data.val form ⦄ := by
   unfold reflects
   step as ⟨folded⟩
+  step as ⟨unwrappedData, hunwrapped⟩
   simp only [SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter, bind_ok]
-  refine WP.spec_mono (reflects_loop_spec ⟨forms, 0⟩ data folded) ?_
+  refine WP.spec_mono (reflects_loop_spec ⟨forms, 0⟩ data folded unwrappedData hunwrapped) ?_
   intro b h no
   simpa using h no
 
@@ -348,7 +442,7 @@ theorem guest_response_contract (output : alloc.vec.Vec U8) (response : proxy_ht
     left
     refine ⟨trivial, _, hwritten, ?_⟩
     intro form mem plain occurs
-    have none := hfound (by simpa using absent) form mem plain
+    have none := (hfound (by simpa using absent) form mem plain).1
     apply none
     rw [aivm_secrets_garrett_core.http_wire.Proofs.vec_deref_val, full_bytes]
     simp only [aivm_secrets_garrett_core.http_wire.Proofs.vec_deref_val] at occurs
@@ -420,7 +514,10 @@ theorem reflection_forms_include_raw (secret : Slice U8) (forms : alloc.vec.Vec 
   obtain ⟨forms1, pushed1, after⟩ := bind_ok_inv after
   obtain ⟨_, _, after⟩ := bind_ok_inv after
   obtain ⟨forms2, pushed2, after⟩ := bind_ok_inv after
-  obtain ⟨rest, final⟩ := reflection_forms_loop_prefix secret _ forms2 forms 0#usize rfl after
+  obtain ⟨_, _, after⟩ := bind_ok_inv after
+  obtain ⟨forms3, pushed3, after⟩ := bind_ok_inv after
+  obtain ⟨rest, final⟩ := reflection_forms_loop_prefix secret _ forms3 forms 0#usize rfl after
+  obtain ⟨rest1, h1⟩ := push_or_keep pushed1
   have same : v.slice = secret := by
     obtain ⟨w, hw, eq⟩ := returned_of_spec (alloc.slice.Slice.to_vec_spec core.clone.CloneU8 secret
       (by intro x _; rfl))
@@ -429,7 +526,7 @@ theorem reflection_forms_include_raw (secret : Slice U8) (forms : alloc.vec.Vec 
     subst copied
     exact eq.symm
   refine ⟨{ bytes := v, folded := false }, ?_, rfl, ?_⟩
-  · rw [final, push_ok_val pushed2, push_ok_val pushed1, push_ok_val pushed0]
+  · rw [final, push_ok_val pushed3, push_ok_val pushed2, h1, push_ok_val pushed0]
     simp
   · simp [alloc.vec.Vec.val, ← same]
 

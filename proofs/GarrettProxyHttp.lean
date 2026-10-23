@@ -15,7 +15,7 @@ The Python reference is `aivm_secrets/proxy/{http1,policy}.py`.
 
 Proved here, for the extracted upstream encoder `encode_upstream`:
 
-* `dropped_contract`: the extracted field filter drops exactly the fourteen
+* `dropped_contract`: the extracted field filter drops exactly the nineteen
   names in `DroppedNames`, which include every credential-bearing guest field
   (`authorization`, `x-api-key`, `proxy-authorization`, `cookie`);
 * `forwarded_contract`: the forwarded guest fields are the guest fields in
@@ -54,7 +54,8 @@ def ascii (s : String) : List U8 := s.toList.map (fun c => ⟨BitVec.ofNat 8 c.t
 def DroppedNames : List (List U8) :=
   ["authorization", "x-api-key", "proxy-authorization", "proxy-connection",
    "connection", "keep-alive", "transfer-encoding", "content-length", "te",
-   "trailer", "upgrade", "host", "accept-encoding", "cookie"].map ascii
+   "trailer", "upgrade", "host", "accept-encoding", "cookie",
+   "x-http-method-override", "x-method-override", "x-http-method", "range", "if-range"].map ascii
 
 /-- Bytes compared without regard to ASCII case. -/
 def fold (bytes : List U8) : List Nat := bytes.map (fun b => CaseFold b.val)
@@ -107,7 +108,12 @@ theorem dropped_names_bytes : DroppedNames = [
    [117#u8, 112#u8, 103#u8, 114#u8, 97#u8, 100#u8, 101#u8],
    [104#u8, 111#u8, 115#u8, 116#u8],
    [97#u8, 99#u8, 99#u8, 101#u8, 112#u8, 116#u8, 45#u8, 101#u8, 110#u8, 99#u8, 111#u8, 100#u8, 105#u8, 110#u8, 103#u8],
-   [99#u8, 111#u8, 111#u8, 107#u8, 105#u8, 101#u8]] := by rfl
+   [99#u8, 111#u8, 111#u8, 107#u8, 105#u8, 101#u8],
+   [120#u8, 45#u8, 104#u8, 116#u8, 116#u8, 112#u8, 45#u8, 109#u8, 101#u8, 116#u8, 104#u8, 111#u8, 100#u8, 45#u8, 111#u8, 118#u8, 101#u8, 114#u8, 114#u8, 105#u8, 100#u8, 101#u8],
+   [120#u8, 45#u8, 109#u8, 101#u8, 116#u8, 104#u8, 111#u8, 100#u8, 45#u8, 111#u8, 118#u8, 101#u8, 114#u8, 114#u8, 105#u8, 100#u8, 101#u8],
+   [120#u8, 45#u8, 104#u8, 116#u8, 116#u8, 112#u8, 45#u8, 109#u8, 101#u8, 116#u8, 104#u8, 111#u8, 100#u8],
+   [114#u8, 97#u8, 110#u8, 103#u8, 101#u8],
+   [105#u8, 102#u8, 45#u8, 114#u8, 97#u8, 110#u8, 103#u8, 101#u8]] := by rfl
 
 theorem array_slice_val {k : Usize} (l : List U8) (h : l.length = k.val) :
     (Array.make k l h).to_slice.val = l := by
@@ -601,16 +607,21 @@ theorem clean_fields_spec (fields : Slice proxy_http.Field) :
   simpa using h ok
 
 @[step]
-theorem escape_at_spec (value : Slice U8) (start : Usize) (a b : U8) :
-    escape_at value start a b ⦃ _ => True ⦄ := by
-  unfold escape_at
+theorem hex_digit_spec (byte : U8) :
+    hex_digit byte ⦃ o => ∀ d, o = some d → d.val < 16 ⦄ := by
+  unfold hex_digit
+  repeat (first | step | split | simp_all | scalar_tac)
+
+@[step]
+theorem unreserved_spec (byte : U8) : unreserved byte ⦃ _ => True ⦄ := by
+  unfold unreserved
   step*
 
 @[step]
-theorem forbidden_escape_at_spec (value : Slice U8) (start : Usize) :
-    forbidden_escape_at value start ⦃ _ => True ⦄ := by
-  unfold forbidden_escape_at
-  step*
+theorem bad_escape_at_spec (value : Slice U8) (start : Usize) :
+    bad_escape_at value start ⦃ _ => True ⦄ := by
+  unfold bad_escape_at
+  repeat (first | step | split | simp | scalar_tac)
 
 theorem plain_target_bytes_loop_spec (target : Slice U8) (index : Usize) :
     plain_target_bytes_loop target index ⦃ t => t = true →
@@ -635,17 +646,19 @@ theorem plain_target_bytes_loop_spec (target : Slice U8) (index : Usize) :
         · simp
         · split
           · simp
-          · step as ⟨escaped⟩
-            split
+          · split
             · simp
-            · step as ⟨next, hnext⟩
-              refine WP.spec_mono (ih (target.length - next.val) (by scalar_tac) next rfl) ?_
-              intro r hr ok k hk lo
-              by_cases same : k = index.val
-              · subst same
-                simp only [decide_eq_true_eq] at seen
-                simpa [hbyte] using seen
-              · exact hr ok k hk (by scalar_tac)
+            · step as ⟨escaped⟩
+              split
+              · simp
+              · step as ⟨next, hnext⟩
+                refine WP.spec_mono (ih (target.length - next.val) (by scalar_tac) next rfl) ?_
+                intro r hr ok k hk lo
+                by_cases same : k = index.val
+                · subst same
+                  simp only [decide_eq_true_eq] at seen
+                  simpa [hbyte] using seen
+                · exact hr ok k hk (by scalar_tac)
       · simp
     · simp only [WP.spec_ok]
       intro _ k hk lo

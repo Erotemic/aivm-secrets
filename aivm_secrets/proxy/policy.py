@@ -38,6 +38,9 @@ DROPPED = frozenset({
     b'authorization', b'x-api-key', b'proxy-authorization', b'proxy-connection',
     b'connection', b'keep-alive', b'transfer-encoding', b'content-length', b'te',
     b'trailer', b'upgrade', b'host', b'accept-encoding', b'cookie',
+    # Method overrides could route around method-specific deny rules, and
+    # ranges could fetch an echoed credential in pieces.
+    b'x-http-method-override', b'x-method-override', b'x-http-method', b'range', b'if-range',
 })
 # Upstream fields never returned to the guest.
 DROPPED_RESPONSE = frozenset({
@@ -147,16 +150,23 @@ def load_policy(path: Path) -> ProxyPolicy:
 
 
 def denied(policy: ProxyPolicy, method: bytes, path: bytes) -> bool:
-    """A deny row matches an exact path, or any path under a ``/``-ending prefix.
+    """A deny row matches its exact path, the same path with a trailing slash,
+    or, for a ``/``-ending prefix, the prefix without its slash and everything
+    under it.
 
-    Matching is on the strict parser's path, which has no dot segments or
-    encoded separators, and is case-sensitive like provider routing; a
-    case-variant path that a provider would also route is a known limit.
+    Matching is on the strict parser's path, which has one canonical spelling
+    (no dot segments, ``;`` or alternate escapes). It is case-sensitive like
+    provider routing; a case-variant path a provider would also route is a
+    known limit, as are provider-specific overrides such as a ``_method``
+    query parameter.
     """
     for rule in policy.deny:
         if rule.method not in (b'*', method):
             continue
-        if path == rule.prefix or (rule.prefix.endswith(b'/') and path.startswith(rule.prefix)):
+        prefix = rule.prefix
+        if path == prefix or path == prefix + b'/':
+            return True
+        if prefix.endswith(b'/') and (path == prefix[:-1] or path.startswith(prefix)):
             return True
     return False
 
@@ -209,14 +219,21 @@ def reflection_forms(secret: bytes) -> list[tuple[bytes, bool]]:
 
     forms = {(secret, False), (quote(secret, safe='').encode('ascii').lower(), True),
              (secret.hex().encode(), True)}
+    if b'/' in secret:
+        # As a JSON string body may escape it.
+        forms.add((secret.replace(b'/', b'\\/'), False))
     for alphabet in ('std', 'url'):
         forms.update((form, False) for form in _aligned_base64(secret, alphabet))
     return sorted(forms)
 
 
 def reflects(data: bytes, forms: list[tuple[bytes, bool]]) -> bool:
+    """Folded forms are searched in the lowercased data; the others in the
+    data and in the data without line breaks (MIME-wrapped base64)."""
     lowered = data.lower()
-    return any((form in lowered) if folded else (form in data) for form, folded in forms)
+    unwrapped = data.replace(b'\r', b'').replace(b'\n', b'')
+    return any((form in lowered) if folded else (form in data or form in unwrapped)
+               for form, folded in forms)
 
 
 def guest_response(

@@ -287,3 +287,28 @@ returning. Five guards were re-anchored, and a new mutant that forces
 `Decision::Allowed` is detected. APPROVAL-RUST-01 is narrowed to "the
 session passes this request's own decision". A new visual scene,
 `proof_write_gate`, was added.
+
+## 2026-10-23 07:02:00 -0400
+
+Proxy security-review fixes (all six findings of the independent review),
+in the extracted core, the Python reference and the native shell, with
+proofs, parity vectors and both-backend tests
+(`tests/test_proxy_review_hardening.py`).
+
+- Deny-list spellings now fail closed in the encoder: `;`, malformed
+  escapes and escapes of unreserved characters, `/`, `\\`, NUL or `;` are
+  refused; rules match trailing-slash variants. Only totality of
+  `rule_matches` is proved; I rewrote its `len + 1` comparisons as guarded
+  subtractions so the extraction has no overflow obligations. I chose not to
+  prove deny semantics: it is a host filter, and claiming more would invite
+  reading it as confinement.
+- Method-override and Range/If-Range fields join the dropped set (19 names);
+  `dropped_eq` restated over the new list. `_method` in query/body remains
+  a documented limit in PROXY-AUTHORITY-01, not a fix.
+- Reflection: `unwrapped_spec` gives the exact CR/LF-filtered bytes, and
+  `reflects_spec` now also excludes each case-sensitive form there
+  (`Unreflected`). JSON `\/` form is listed when the secret has `/`.
+- Native DoS bounds (connection cap, deadlines, raw buffer) and the 0600
+  hash-chained audit are tested, not proved; recorded in PROXY-NATIVE-01.
+- Confidence: high for the proofs as stated; medium for completeness of the
+  spelling list against real provider normalizers (PROXY-PARSE-01 stays).

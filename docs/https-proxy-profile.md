@@ -48,7 +48,8 @@ origin. The guest never receives it.
 
 `authentication` is `bearer` (`Authorization: Bearer …`) or `x-api-key` (`X-API-Key: …`). The
 upstream address and trust anchor are pinned; nothing is resolved from what
-the guest sends. A `deny` path ending in `/` covers everything below it.
+the guest sends. A `deny` path ending in `/` covers everything below it and
+the path without the slash; any rule also matches its path plus a trailing `/`.
 
 ## What is enforced (tested in `tests/test_proxy_substitution.py`)
 
@@ -59,27 +60,37 @@ the guest sends. A `deny` path ending in `/` covers everything below it.
 - Requests must fit a strict HTTP/1.1 subset. Refused: `Content-Length`
   together with `Transfer-Encoding`; duplicate lengths; non-chunked codings;
   obs-fold; bare CR or LF; a `Host` mismatch or duplicate; dot or empty
-  segments; encoded `.`, `/` or `\`; `Upgrade`; `Expect`; HTTP/1.0;
+  segments; `#`, `\` or `;`; malformed `%` escapes and escapes of unreserved
+  characters, `/`, `\`, NUL or `;` (so `/%61dmin` cannot dodge `/admin/`);
+  `Upgrade`; `Expect`; HTTP/1.0;
   absolute-form; and methods outside GET/HEAD/POST/PUT/PATCH/DELETE/OPTIONS.
 - The upstream request is the proxy's own canonical re-encoding:
   `Accept-Encoding: identity`, one connection, and an exact
-  `Content-Length`.
+  `Content-Length`. Guest credential, hop-by-hop, cookie, method-override
+  (`X-HTTP-Method-Override`, `X-Method-Override`, `X-HTTP-Method`) and
+  `Range`/`If-Range` fields are dropped (19 names, any case).
 - Deny-listed requests and revoked or expired sessions are refused before
   egress. Revocation is re-checked on every request, including inside an
   open keep-alive tunnel.
-- Responses are refused if they contain the credential raw, percent-encoded,
-  hex, or base64/base64url at any offset, or if they are compressed.
+- Responses are refused if they contain the credential raw, JSON-escaped
+  (`\/`), percent-encoded, hex, or base64/base64url at any offset (also with
+  line breaks removed, so MIME-wrapped base64 is caught), or if they are
+  compressed.
   Redirects are returned, never followed.
 - Refusals are fixed JSON bodies. The audit is a hash-chained JSONL of
   decisions (origin, method, path, status, code) with no header values or
-  bodies.
+  bodies, opened `0600` without following symlinks.
+- Resource bounds: at most 32 concurrent connections, a 30 s deadline for
+  the request head and 120 s per request, and a bounded raw buffer.
 
 ## What it does not do
 
 - **No authority confinement.** The guest can do whatever the credential
   can do at a configured origin, except deny-listed requests. That includes
   minting new credentials, which the reflection check cannot recognise
-  (`PROXY-AUTHORITY-01`). Use it only for narrowly scoped credentials.
+  (`PROXY-AUTHORITY-01`), and a provider that honours a method override in
+  the query or body (such as `_method`) can still reach a denied action.
+  Use it only for narrowly scoped credentials.
 - **No network mediation.** Only tools that honour `HTTPS_PROXY` go through
   it, and AIVM's default firewall allows other public egress
   (`PROXY-EGRESS-01`). The credential still cannot leave by another path.

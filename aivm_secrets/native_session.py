@@ -69,6 +69,15 @@ def _environment() -> dict[str, str]:
     return env
 
 
+def _die_with_parent() -> None:
+    """In the forward child: exit when this session process dies, even by
+    SIGKILL, so no forward outlives the proxy that owned its host port."""
+    import ctypes
+
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.prctl(1, signal.SIGTERM, 0, 0, 0)  # PR_SET_PDEATHSIG
+
+
 def _private_write(path: Path, data: bytes) -> Path:
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, 'wb') as stream:
@@ -168,7 +177,7 @@ class SSHGuest:
         process = subprocess.Popen(
             [*self.forward_base, '-R', f'127.0.0.1:{guest_port}:127.0.0.1:{host_port}'],
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            env=_environment())
+            env=_environment(), preexec_fn=_die_with_parent)
         probe = f"bash -c 'exec 3<>/dev/tcp/127.0.0.1/{int(guest_port)}'"
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline:

@@ -39,6 +39,12 @@ from .policy import (Origin, PolicyError, ProxyPolicy, guest_response, reflectio
                      upstream_request)
 
 IO_TIMEOUT = 15.0
+# Concurrent guest connections; extra connections are closed at once.
+MAX_CONNECTIONS = 32
+# Whole-head and whole-request deadlines, so a slow guest cannot hold a
+# thread indefinitely.
+HEAD_DEADLINE = 30.0
+REQUEST_DEADLINE = 120.0
 TOTAL_DEADLINE = 45.0
 MAX_CA_BYTES = 1 << 20
 
@@ -190,7 +196,10 @@ class _Handler(socketserver.BaseRequestHandler):
 
     def _read_head(self, stream) -> tuple[list[bytes], bytes] | None:
         data = b''
+        started = time.monotonic()
         while True:
+            if time.monotonic() - started > HEAD_DEADLINE:
+                return None
             split = http1.split_head(data)
             if split is not None:
                 return split
@@ -202,6 +211,14 @@ class _Handler(socketserver.BaseRequestHandler):
     def handle(self) -> None:
         session = self.server.session
         connection: socket.socket = self.request
+        if not self.server.slots.acquire(blocking=False):
+            return
+        try:
+            self._handle(session, connection)
+        finally:
+            self.server.slots.release()
+
+    def _handle(self, session: ProxySession, connection: socket.socket) -> None:
         connection.settimeout(IO_TIMEOUT)
         try:
             self._tunnel(session, connection)
@@ -240,11 +257,21 @@ class _Handler(socketserver.BaseRequestHandler):
             self._serve_requests(session, origin, tls)
 
     def _serve_requests(self, session: ProxySession, origin: Origin, tls: ssl.SSLSocket) -> None:
-        buffer = b''
+        buffer = bytearray()
         host = origin.host.encode('ascii')
+        # Raw bytes allowed for one request: the body limit with room for
+        # chunk framing, plus the head. This also bounds re-parsing.
+        raw_limit = 2 * session.policy.request_body + http1.MAX_HEAD + 65536
+        started = time.monotonic()
         while True:
+            if len(buffer) > raw_limit:
+                session.record('refused', code='too_large', origin=origin.host)
+                tls.sendall(http1.refusal('too_large'))
+                return
+            if buffer and time.monotonic() - started > REQUEST_DEADLINE:
+                return
             try:
-                parsed = http1.parse_request(buffer, host=host,
+                parsed = http1.parse_request(bytes(buffer), host=host,
                                              body_limit=session.policy.request_body)
             except Refused as refused:
                 session.record('refused', code=refused.code, origin=origin.host)
@@ -256,7 +283,9 @@ class _Handler(socketserver.BaseRequestHandler):
                     return
                 buffer += chunk
                 continue
-            request, buffer = parsed
+            request, rest = parsed
+            buffer = bytearray(rest)
+            started = time.monotonic()
             reply, keep = self._one(session, origin, request)
             tls.sendall(reply)
             if not keep:
@@ -326,11 +355,13 @@ class _Server(socketserver.ThreadingMixIn, socketserver.TCPServer):
     daemon_threads = True
     allow_reuse_address = True
     session: ProxySession
+    slots: threading.BoundedSemaphore
 
 
 class _UnixServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
     daemon_threads = True
     session: ProxySession
+    slots: threading.BoundedSemaphore
 
 
 class ProxyServer:
@@ -346,6 +377,7 @@ class ProxyServer:
             self._server = _Server(('127.0.0.1', port), _Handler)
             self.address = '127.0.0.1:%d' % self._server.server_address[1]
         self._server.session = session  # type: ignore[attr-defined]
+        self._server.slots = threading.BoundedSemaphore(MAX_CONNECTIONS)  # type: ignore[attr-defined]
         self.session = session
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
 

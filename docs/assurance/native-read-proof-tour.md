@@ -387,7 +387,7 @@ other than the one authentication line? Can a guest-supplied
 
 | Theorem | Says |
 | --- | --- |
-| `dropped_eq` | The extracted filter drops a guest field exactly when its name equals one of 14 names **ignoring ASCII case**, including `authorization`, `x-api-key`, `proxy-authorization` and `cookie`. |
+| `dropped_eq` | The extracted filter drops a guest field exactly when its name equals one of 19 names **ignoring ASCII case**: credential fields (`authorization`, `x-api-key`, `proxy-authorization`, `cookie`), hop-by-hop and framing fields, the three method-override fields (`x-http-method-override`, `x-method-override`, `x-http-method`) and `range`/`if-range`. |
 | `forwarded_contract`, `forwarded_drops` | The forwarded fields are the guest fields in their original order, minus those names. No forwarded field has a dropped name. |
 | `append_fields_contract` | Each forwarded field is written as `name: value` CRLF, and nothing else. |
 | `encode_upstream_contract` | For **every** guest request, host, deny list and credential, the encoder either refuses and leaves the output buffer unchanged, or it has checked that the credential is valid, the target is visible ASCII and every forwarded field is one clean header line, and it appends exactly `UpstreamPrefix ++ HeaderPrefix a ++ secret ++ CRLF ++ UpstreamSuffix`. |
@@ -398,6 +398,14 @@ other than the one authentication line? Can a guest-supplied
 body. Both are defined without the secret. So the secret appears in the
 upstream bytes as the one verified authentication line
 (`http_auth.Proofs.accepted_header_exact`), placed after every guest field.
+
+**The deny list is a host filter, not a proof.** Only totality of
+`rule_matches`/`denied` is proved. To make spelling tricks fail closed, the
+encoder refuses targets containing `#`, `\`, `;`, a malformed `%` escape, or
+an escape of an unreserved character, `/`, `\`, NUL or `;` (so `/%61dmin/`
+and `/admin%2F` are refused rather than matched). A `/x/` rule also matches
+`/x`, and a rule matches the path with a trailing `/`. The provider's own
+path normalization stays assumed (`PROXY-PARSE-01`).
 
 **Read the conclusion carefully.** These theorems describe the *encoder*,
 which re-checks method, target and every forwarded field itself, so header
@@ -410,10 +418,10 @@ does not know the credential.
 
 | Theorem | Says |
 | --- | --- |
-| `reflects_spec` | When the extracted check answers "not reflected", no case-sensitive form occurs anywhere in the checked bytes. |
+| `reflects_spec` | When the extracted check answers "not reflected", no case-sensitive form occurs anywhere in the checked bytes, nor in those bytes with line breaks removed. |
 | `guest_response_contract` | For any upstream response, the proxy either refuses and appends nothing, or appends bytes in which no case-sensitive form occurs. For `HEAD`, the appended bytes are a prefix of the checked ones (`response_head_prefix`), so the same holds. |
 | `reflection_forms_include_raw` | Whenever the form list is built, it contains the credential's exact bytes as a case-sensitive form. |
-
+| `unwrapped_spec` | The extracted `unwrapped` is the checked bytes with every CR and LF removed; `reflects_spec` also rules out each case-sensitive form there, so line-wrapped (MIME-style) base64 is caught. |
 | `refusal_exact` | Every refusal the proxy sends is exactly one of eleven fixed responses, which depend on nothing but the refusal code. No request, provider or credential bytes appear in a refusal. |
 
 Together: **a released response never contains the credential's exact
@@ -422,7 +430,7 @@ covers them only as listed byte strings. Any other derived value, such as a
 freshly minted token, is outside it (`PROXY-REFLECT-01`, `PROXY-AUTHORITY-01`).
 
 **Byte parity with the Python reference.** `tests/secrets_vectors/proxy-http-v1.tsv`
-holds 64 adversarial and positive cases. The Python test checks that the
+holds 76 adversarial and positive cases (and `proxy-http-response-v1.tsv` 43 response cases). The Python test checks that the
 file is exactly the Python reference's output, and the Rust test
 `python_reference_vectors` checks the extracted code against every line. A
 mutant that forwarded `Cookie` fails it.
@@ -433,8 +441,8 @@ mutant that forwarded `Cookie` fails it.
   encoding) could route around a deny-list entry (`PROXY-PARSE-01`).
 - Encodings of the credential other than the listed forms (`PROXY-REFLECT-01`).
 - TLS and the session CA (`PROXY-TLS-01`).
-- That the native proxy, which does not exist yet (only the Python server
-  does), writes exactly these bytes.
+- That the native shell `garrett-proxy` writes exactly these bytes upstream
+  and only released or refusal bytes to the guest (`PROXY-NATIVE-01`).
 - **The profile grants the credential's full authority at the origin**
   (`PROXY-AUTHORITY-01`). None of this is authority confinement.
 
