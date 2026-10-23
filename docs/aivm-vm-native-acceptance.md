@@ -164,6 +164,18 @@ probe tooling causes a failed acceptance, not a silently skipped check.
    and refuse an explicit reference to the host custody workspace. This is a
    bounded mount-metadata check, **not** a search of every path reachable
    through shared mounts or a proof of general filesystem isolation.
+   **(Added 2026-10-23, not yet run on a VM.)** The inventory now groups
+   share mounts by device and root and reports `attachment_devices`,
+   `whole_share_root_mounts` and `aliased_mounts`. A mount is an alias when
+   another mount of the same device has the same or an enclosing root, as with
+   AIVM's persistent share root and its per-directory bind mounts (an AIVM
+   guest's own table gives 1 device, 1 whole-share root, 24 aliases). The run
+   also writes a random `aivm-secrets-canary-*` file into the host custody
+   workspace and searches every share mount point for that name
+   (`find -xdev -maxdepth 4`, 20 s cap). A hit fails the run. A timeout is
+   reported as `complete: false`, never as absence. Depth and time are capped
+   because a whole-tree walk of a large virtiofs share can exhaust the host
+   daemon's file handles.
 3. Submit an out-of-scope repository read through native `invoke`, **past**
    the `gh` alias parser. It must be rejected without new provider traffic.
 4. Generate a **second private key in the VM**, enroll its public CSR as a

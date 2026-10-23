@@ -355,19 +355,81 @@ def _probe_direct_egress(ssh: GuestSSH, provider: LocalProvider) -> dict:
     }
 
 
-def _guest_mount_inventory(ssh: GuestSSH, host: Path) -> dict:
-    """Record attachment count; don't mistake enumeration for isolation proof."""
+def _parse_share_mounts(text: str) -> list[dict]:
+    """virtiofs/9p entries of a mountinfo table: device, root within the
+    share, and mount point (octal escapes decoded)."""
+    def unescape(field: str) -> str:
+        return re.sub(r'\\([0-7]{3})', lambda m: chr(int(m.group(1), 8)), field)
+    shares = []
+    for line in text.splitlines():
+        if ' - ' not in line:
+            continue
+        before, after = line.split(' - ', 1)
+        fields, tail = before.split(), after.split()
+        if len(fields) < 5 or not tail or tail[0] not in {'virtiofs', '9p'}:
+            continue
+        shares.append({'device': fields[2], 'root': unescape(fields[3]),
+                       'mount_point': unescape(fields[4]), 'type': tail[0]})
+    return shares
+
+
+def _share_aliases(shares: list[dict]) -> dict:
+    """Group share mounts by device. A mount is an alias when another mount
+    of the same device has the same or an enclosing root, so the same host
+    files are reachable at two guest paths (e.g. AIVM's persistent root plus
+    its per-directory bind mounts)."""
+    def within(inner: str, outer: str) -> bool:
+        return outer == '/' or inner == outer or inner.startswith(outer.rstrip('/') + '/')
+    aliased = 0
+    for index, mount in enumerate(shares):
+        if any(other['device'] == mount['device'] and within(mount['root'], other['root'])
+               for position, other in enumerate(shares) if position != index):
+            aliased += 1
+    return {
+        'attachment_devices': len({mount['device'] for mount in shares}),
+        'whole_share_root_mounts': sum(mount['root'] == '/' for mount in shares),
+        'aliased_mounts': aliased,
+    }
+
+
+def _guest_canary_search(ssh: GuestSSH, mount_points: list[str], marker: str) -> dict:
+    """Bounded search of the guest's share mount points for the host canary
+    file name. Depth and time are capped (a whole-tree walk of a large
+    virtiofs share can exhaust the host daemon's file handles), so a
+    timeout is reported as incomplete, never as absence."""
+    if not mount_points:
+        return {'found': False, 'complete': True, 'mount_points_searched': 0}
+    script = ('timeout 20 find ' + ' '.join(shlex.quote(m) for m in mount_points)
+              + ' -xdev -maxdepth 4 -name ' + shlex.quote(marker) + ' -print -quit 2>/dev/null; '
+              'echo "status=$?"')
+    result = ssh.call(script)
+    text = result.stdout.decode('utf-8', 'replace')
+    if marker in text:
+        raise DemoError('host custody canary is reachable through a guest share')
+    status = re.search(r'status=(\d+)', text)
+    return {'found': False, 'complete': bool(status) and status.group(1) == '0',
+            'mount_points_searched': len(mount_points), 'max_depth': 4}
+
+
+def _guest_mount_inventory(ssh: GuestSSH, host: Path, marker: str | None = None) -> dict:
+    """Record share attachments and their aliases; don't mistake enumeration
+    for an isolation proof."""
     info = ssh.required('cat /proc/self/mountinfo', label='inspect guest mounts')
     text = info.decode('utf-8', 'replace')
     if str(host) in text:
         raise DemoError('guest mount table mentions the host custody workspace')
-    types = [line.split(' - ', 1)[1].split()[0]
-             for line in text.splitlines() if ' - ' in line]
-    return {
-        'attachment_mounts_observed': sum(t in {'virtiofs', '9p'} for t in types),
+    shares = _parse_share_mounts(text)
+    result = {
+        'attachment_mounts_observed': len(shares),
+        **_share_aliases(shares),
         'host_workspace_in_mount_table': False,
-        'scope': 'mount table metadata and known host paths; aliases not exhaustively searched',
+        'scope': ('mount table metadata, alias grouping and a depth-4 search for the '
+                  'host canary name; not an exhaustive reachability proof'),
     }
+    if marker is not None:
+        result['canary_search'] = _guest_canary_search(
+            ssh, sorted({mount['mount_point'] for mount in shares}), marker)
+    return result
 
 
 def _prepare_independent_identity(ssh: GuestSSH, guest: str, host: Path,
@@ -554,7 +616,11 @@ def run_vm_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path,
                 raise DemoError('VM write refusal caused provider traffic')
             attacks: dict = {}
             if adversarial:
-                attacks['mounts'] = _guest_mount_inventory(ssh, host)
+                # A random file name in the host custody workspace: if any
+                # guest share exposes the workspace, the search finds it.
+                marker = 'aivm-secrets-canary-' + secrets.token_hex(12)
+                write(host / marker, 'canary')
+                attacks['mounts'] = _guest_mount_inventory(ssh, host, marker)
                 attacks['network'] = _probe_direct_egress(ssh, provider)
                 _reject_without_provider_effect(
                     ssh, provider, requests_after_reads,

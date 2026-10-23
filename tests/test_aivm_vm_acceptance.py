@@ -277,6 +277,45 @@ def test_guest_mount_inventory_records_only_bounded_counts(tmp_path, monkeypatch
         _guest_mount_inventory(ssh, Path('/tmp/garrett-vm-secret/host'))
 
 
+def test_share_aliases_follow_device_and_root_like_aivm_persistent_mounts():
+    import dev.aivm_vm_acceptance as target
+    # Shape of a real AIVM guest: the persistent share's root, two of its
+    # subdirectories bind-mounted elsewhere (one twice), and an unrelated share.
+    table = '''53 30 0:42 / /mnt/aivm-persistent rw - virtiofs aivm-persistent-root rw
+58 30 0:42 /hostcode-tools-e2 /data/tools rw - virtiofs aivm-persistent-root rw
+256 28 0:42 /hostcode-tools-e2 /run/aivm-persistent-mounts/b9 rw - virtiofs aivm-persistent-root rw
+89 30 0:42 /hostcode-cache-47 /home/u/.cache/q rw - virtiofs aivm-persistent-root rw
+70 30 0:50 /export /mnt/other\\040share rw - 9p other rw
+31 28 8:1 / / rw - ext4 /dev/vda1 rw
+'''
+    shares = target._parse_share_mounts(table)
+    assert [m['mount_point'] for m in shares][-1] == '/mnt/other share'
+    assert target._share_aliases(shares) == {
+        'attachment_devices': 2, 'whole_share_root_mounts': 1, 'aliased_mounts': 3}
+
+
+def test_canary_search_is_bounded_and_fails_on_a_hit(tmp_path, monkeypatch):
+    import dev.aivm_vm_acceptance as target
+    ssh = GuestSSH('aivm-2404', tmp_path / 'ssh.conf')
+    scripts = []
+
+    def answer(stdout):
+        def call(script):
+            scripts.append(script)
+            return subprocess.CompletedProcess([], 0, stdout, b'')
+        return call
+
+    monkeypatch.setattr(ssh, 'call', answer(b'status=0\n'))
+    result = target._guest_canary_search(ssh, ['/mnt/a', '/mnt/b c'], 'aivm-secrets-canary-x')
+    assert result == {'found': False, 'complete': True, 'mount_points_searched': 2, 'max_depth': 4}
+    assert 'timeout 20 find' in scripts[0] and '-maxdepth 4' in scripts[0] and "'/mnt/b c'" in scripts[0]
+    monkeypatch.setattr(ssh, 'call', answer(b'status=124\n'))
+    assert target._guest_canary_search(ssh, ['/mnt/a'], 'aivm-secrets-canary-x')['complete'] is False
+    monkeypatch.setattr(ssh, 'call', answer(b'/mnt/a/x/aivm-secrets-canary-x\nstatus=0\n'))
+    with pytest.raises(DemoError, match='canary is reachable'):
+        target._guest_canary_search(ssh, ['/mnt/a'], 'aivm-secrets-canary-x')
+
+
 def test_independent_identity_probe_uses_separate_guest_key_and_subject(tmp_path, monkeypatch):
     import dev.aivm_vm_acceptance as target
     host = tmp_path / 'host'

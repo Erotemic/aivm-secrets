@@ -668,3 +668,13 @@ enroll, 12 s window); forget refuses active and revoked subjects (so
 "unregistered" is unreachable for a live identity in this mode). Added the
 re-enrollment probe as the last --adversarial VM step (portable test; not run
 on a VM). Uncertainty: the 12 s expiry window could flake on a very slow host.
+
+## 2026-10-23 16:56:20 -0400
+
+W8 mount aliases: `--adversarial` mount inventory now parses share mounts by
+device/root and counts whole-share roots and aliases (validated against this
+AIVM guest's own mountinfo: 1 device, 1 root, 24 aliases), plus a bounded
+canary-name search of share mount points (depth 4, 20 s; timeout = incomplete,
+not absence). Chose bounds after exhausting virtiofsd fds earlier today with an
+unbounded find. Not run on a VM; the maintainer run decides whether depth 4
+is meaningful for their shares.
