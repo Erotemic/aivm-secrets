@@ -15,6 +15,9 @@ Read in this order:
 2. [Active implementation queue](aivm-secrets-active-work.md) — **the current
    ordered next tasks**, open blockers, evidence basis and focused commands.
    This is the only rolling task queue; do not treat dated histories as tasks.
+   **New priority (2026-10-23):** [HTTPS proxy profiles](aivm-secrets-http-proxy-profiles.md)
+   — optional Docker-style `credential-substitution` and `constrained-http`
+   frontends beside named operations (OUT-6, HP-0..HP-7).
 3. [Native read assurance roadmap](aivm-secrets-native-read-assurance-roadmap.md)
    — NR-0..NR-5 technical read-only scope, actual Rust/Lean seams, assumptions
    and exit criteria. Not a substitute for the product outcome roadmap.
