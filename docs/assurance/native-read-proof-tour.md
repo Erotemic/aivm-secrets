@@ -515,9 +515,15 @@ as `-` (if negative) and its decimal digits (`decimal_value_exact` reads them
 back as the number; the integer case assumes a 64-bit `usize`). An oracle
 test compares it with Rust's own formatting, including `i64::MIN`.
 
-**Still trusted** (`ROUTE-NATIVE-01`): parsing the policy into templates, and
-mapping JSON arguments to strings or `i64`s. Both are checked by the manifest
-parity tests against the Python reference, not proved.
+The templates themselves are parsed by extracted code as well:
+`parse_template_some` shows a parsed path template is `/` followed by its
+pieces written back with `/` between them (a parameter written `{name}`),
+and every piece is a valid segment or name; `parse_piece_spec` is the same
+for one part (query values).
+
+**Still trusted** (`ROUTE-NATIVE-01`): the JSON layer, reading the template
+strings from the policy and mapping JSON arguments to strings or `i64`s.
+Checked by the manifest parity tests against the Python reference.
 
 **The guest-side translator (HP-6).** The constrained proxy can run inside
 the guest, untrusted, with no credential (`garrett-proxy --routes ...

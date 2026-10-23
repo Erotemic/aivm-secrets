@@ -771,3 +771,359 @@ theorem scalar_text_integer (number : I64) (fits : number.val.natAbs + 2 ≤ Usi
       simp [ScalarText, this, alloc.vec.Vec.new]
 
 end aivm_secrets_garrett_core.route.Proofs
+
+/-! ## Parsing a path template (policy load) -/
+
+namespace aivm_secrets_garrett_core.route.Proofs
+
+/-- A parameter name: 1..32 bytes, a lowercase letter first, then lowercase
+    letters, digits or `_`. -/
+def NameByte (byte : U8) : Prop :=
+  (97 ≤ byte.val ∧ byte.val ≤ 122) ∨ (48 ≤ byte.val ∧ byte.val ≤ 57) ∨ byte = 95#u8
+
+def Name (value : List U8) : Prop :=
+  value ≠ [] ∧ value.length ≤ 32 ∧ ∀ byte ∈ value, NameByte byte
+
+/-- How a piece is written in a template. -/
+def PieceText : Piece → List U8
+  | .Literal text => text.val
+  | .Parameter label => 123#u8 :: label.val ++ [125#u8]
+
+def ValidPiece : Piece → Prop
+  | .Literal text => Seg text.val
+  | .Parameter label => Name label.val
+
+/-- Pieces written back with `/` between them. -/
+def Joined : List Piece → List U8
+  | [] => []
+  | [piece] => PieceText piece
+  | piece :: rest => PieceText piece ++ 47#u8 :: Joined rest
+
+theorem parameter_name_loop_contract (value : Slice U8) (index : Usize) :
+    parameter_name_loop value index ⦃ r => r = true →
+      ∀ k (hk : k < value.length), index.val ≤ k → NameByte value.val[k] ⦄ := by
+  suffices ∀ n (index : Usize), value.length - index.val = n →
+      parameter_name_loop value index ⦃ r => r = true →
+        ∀ k (hk : k < value.length), index.val ≤ k → NameByte value.val[k] ⦄ from
+    this _ index rfl
+  intro n
+  induction n using Nat.strong_induction_on with
+  | h n ih =>
+    intro index measure
+    rw [parameter_name_loop.eq_def]
+    dsimp only
+    split
+    · step as ⟨byte, hbyte⟩
+      have step_ok : ∀ next : Usize, next.val = index.val + 1 → NameByte byte →
+          parameter_name_loop value next ⦃ r => r = true →
+            ∀ k (hk : k < value.length), index.val ≤ k → NameByte value.val[k] ⦄ := by
+        intro next hnext good
+        refine WP.spec_mono (ih (value.length - next.val) (by scalar_tac) next rfl) ?_
+        intro r hr ok k hk lo
+        by_cases same : k = index.val
+        · subst same; rw [← hbyte]; exact good
+        · exact hr ok k hk (by scalar_tac)
+      repeat' split
+      all_goals first
+        | (exfalso; scalar_tac)
+        | (step as ⟨next, hnext⟩; exact step_ok next hnext (by unfold NameByte; scalar_tac))
+        | simp
+    · simp only [WP.spec_ok]
+      intro _ k hk lo
+      scalar_tac
+
+theorem parameter_name_true {value : Slice U8} {r : Bool}
+    (h : parameter_name value = Result.ok r) (yes : r = true) : Name value.val := by
+  unfold parameter_name at h
+  simp only [core.slice.Slice.is_empty, bind_ok] at h
+  split at h
+  · simp_all
+  · rename_i nonempty
+    split at h
+    · simp_all
+    · rename_i short
+      obtain ⟨first, hfirst, h⟩ := bind_ok_inv h
+      split at h
+      · split at h
+        · obtain ⟨r', loop, post⟩ := returned_of_spec (parameter_name_loop_contract value 0#usize)
+          rw [loop] at h
+          simp only [Result.ok.injEq] at h
+          subst h
+          refine ⟨?_, ?_, ?_⟩
+          · intro empty; apply nonempty; simp [Slice.length, empty]
+          · simp only [gt_iff_lt, not_lt] at short; scalar_tac
+          · intro byte mem
+            obtain ⟨k, hk, at_k⟩ := List.getElem_of_mem mem
+            rw [← at_k]
+            exact post yes k hk (by simp)
+        · simp_all
+      · simp_all
+
+
+@[step]
+theorem segment_ok_step (value : Slice U8) :
+    segment_ok value ⦃ r => r = true → Seg value.val ⦄ := segment_ok_contract value
+
+@[step]
+theorem parameter_name_step (value : Slice U8) :
+    parameter_name value ⦃ r => r = true → Name value.val ⦄ := by
+  obtain ⟨r, h, _⟩ : ∃ r, parameter_name value = Result.ok r ∧ True := by
+    unfold parameter_name
+    simp only [core.slice.Slice.is_empty, bind_ok]
+    split
+    · exact ⟨_, rfl, trivial⟩
+    · split
+      · exact ⟨_, rfl, trivial⟩
+      · rw [index_usize_eq value 0#usize (by scalar_tac)]
+        simp only [bind_ok]
+        split
+        · split
+          · obtain ⟨r, hr, _⟩ := returned_of_spec (parameter_name_loop_contract value 0#usize)
+            exact ⟨r, hr, trivial⟩
+          · exact ⟨_, rfl, trivial⟩
+        · exact ⟨_, rfl, trivial⟩
+  rw [h]
+  simp only [WP.spec_ok]
+  exact parameter_name_true h
+
+theorem braces (text : List U8) (two : 2 ≤ text.length)
+    (opens : text[0]'(by omega) = 123#u8) (closes : text[text.length - 1]'(by omega) = 125#u8) :
+    123#u8 :: text.slice 1 (text.length - 1) ++ [125#u8] = text := by
+  match text, two, opens, closes with
+  | x :: rest, two, opens, closes =>
+    have nonempty : rest ≠ [] := by intro e; subst e; simp at two
+    have split := List.dropLast_append_getLast nonempty
+    simp only [List.getElem_cons_zero] at opens
+    subst opens
+    have last : rest.getLast nonempty = 125#u8 := by
+      rw [List.getLast_eq_getElem]
+      have hl : rest.length ≠ 0 := by simpa using nonempty
+      simpa [List.getElem_cons, hl] using closes
+    rw [← split, last]
+    simp [List.slice]
+
+/-- **One template part.** A parsed piece is written exactly as the part's
+    text (`{name}` for a parameter) and is a valid segment or name. -/
+@[step]
+theorem parse_piece_spec (text : Slice U8) :
+    parse_piece text ⦃ o => ∀ piece, o = some piece →
+      PieceText piece = text.val ∧ ValidPiece piece ⦄ := by
+  unfold parse_piece
+  step*
+  all_goals (intro piece hp; cases hp)
+  · refine ⟨?_, ?_⟩
+    · simp only [PieceText]
+      have : v.val = inner.val := by rw [inner_post]; rfl
+      rw [this, ‹(↑inner : List U8) = List.slice 1 ↑i6 ↑text›]
+      have hlen : (↑text.len : Nat) = text.val.length := rfl
+      simp only [i6_post, hlen]
+      apply braces text.val (by scalar_tac)
+      · simpa [← i1_post] using ‹i1 = 123#u8›
+      · have : (↑i3 : Nat) = text.val.length - 1 := by rw [i3_post]; rfl
+        simp only [this] at i4_post
+        simpa [← i4_post] using ‹i4 = 125#u8›
+    · simp only [ValidPiece]
+      have : v.val = inner.val := by rw [inner_post]; rfl
+      rw [this]
+      exact b_post ‹b = true›
+  all_goals
+    refine ⟨?_, ?_⟩
+    · simp only [PieceText]; rw [text_post]; rfl
+    · simp only [ValidPiece]
+      have : v.val = text.val := by rw [text_post]; rfl
+      rw [this]
+      exact b_post ‹b = true›
+
+
+@[step]
+theorem next_slash_spec (text : Slice U8) (start : Usize) (inside : start.val ≤ text.length) :
+    next_slash text start ⦃ stop => start.val ≤ stop.val ∧ stop.val ≤ text.length ∧
+      (∀ k (hk : k < text.length), start.val ≤ k → k < stop.val → text.val[k] ≠ 47#u8) ∧
+      (∀ (h : stop.val < text.length), text.val[stop.val] = 47#u8) ⦄ := by
+  unfold next_slash
+  suffices ∀ n (index : Usize), text.length - index.val = n → start.val ≤ index.val →
+      index.val ≤ text.length →
+      (∀ k (hk : k < text.length), start.val ≤ k → k < index.val → text.val[k] ≠ 47#u8) →
+      next_slash_loop text index ⦃ stop => start.val ≤ stop.val ∧ stop.val ≤ text.length ∧
+        (∀ k (hk : k < text.length), start.val ≤ k → k < stop.val → text.val[k] ≠ 47#u8) ∧
+        (∀ (h : stop.val < text.length), text.val[stop.val] = 47#u8) ⦄ from
+    this _ start rfl (le_refl _) inside (fun k _ lo hi => absurd hi (by omega))
+  intro n
+  induction n using Nat.strong_induction_on with
+  | h n ih =>
+    intro index measure lo hi before
+    rw [next_slash_loop.eq_def]
+    dsimp only
+    split
+    · step as ⟨byte, hbyte⟩
+      split
+      · rename_i slash
+        simp only [WP.spec_ok]
+        exact ⟨lo, by scalar_tac, before, fun _ => by rw [← hbyte]; exact slash⟩
+      · rename_i other
+        step as ⟨next, hnext⟩
+        apply ih (text.length - next.val) (by scalar_tac) next rfl (by scalar_tac) (by scalar_tac)
+        intro k hk klo khi
+        by_cases same : k = index.val
+        · subst same; rw [← hbyte]; exact other
+        · exact before k hk klo (by scalar_tac)
+    · simp only [WP.spec_ok]
+      refine ⟨by scalar_tac, by scalar_tac, fun k hk klo khi => before k hk klo (by scalar_tac),
+        fun h => by scalar_tac⟩
+
+/-- `text` from `begin`: the part up to the next `/`, then (if there was
+    one) `/` and the rest. -/
+theorem drop_at_slash (text : List U8) (begin stop : Nat) (order : begin ≤ stop) :
+    text.drop begin = text.slice begin stop ++ text.drop stop := by
+  simp only [List.slice]
+  conv_lhs => rw [← List.take_append_drop (stop - begin) (text.drop begin)]
+  rw [List.drop_drop]
+  congr 2
+  omega
+
+theorem drop_slash (text : List U8) (stop : Nat) (inside : stop < text.length)
+    (slash : text[stop] = 47#u8) : text.drop stop = 47#u8 :: text.drop (stop + 1) := by
+  rw [List.drop_eq_getElem_cons inside, slash]
+
+theorem joined_cons (piece : Piece) (rest : List Piece) (nonempty : rest ≠ []) :
+    Joined (piece :: rest) = PieceText piece ++ 47#u8 :: Joined rest := by
+  cases rest with
+  | nil => exact absurd rfl nonempty
+  | cons _ _ => rfl
+
+theorem parse_parts_stopped {text : Slice U8} {pieces out : alloc.vec.Vec Piece} {begin : Usize}
+    {going done : Bool} (beyond : text.length < begin.val)
+    (h : parse_parts_loop text pieces begin going = Result.ok (done, out)) :
+    done = going ∧ out = pieces := by
+  rw [parse_parts_loop.eq_def] at h
+  dsimp only at h
+  split at h
+  · split at h
+    · exfalso; scalar_tac
+    · simp only [Result.ok.injEq, Prod.mk.injEq] at h; exact ⟨h.1.symm, h.2.symm⟩
+  · simp only [Result.ok.injEq, Prod.mk.injEq] at h; exact ⟨h.1.symm, h.2.symm⟩
+
+theorem parse_parts_false {text : Slice U8} {pieces out : alloc.vec.Vec Piece} {begin : Usize}
+    {done : Bool} (h : parse_parts_loop text pieces begin false = Result.ok (done, out)) :
+    done = false := by
+  rw [parse_parts_loop.eq_def] at h
+  simp only [Bool.false_eq_true, ↓reduceIte, Result.ok.injEq, Prod.mk.injEq] at h
+  exact h.1.symm
+
+theorem parse_parts_loop_ok (text : Slice U8) (small : text.length < Usize.max) :
+    ∀ n (pieces out : alloc.vec.Vec Piece) (begin : Usize) (going : Bool),
+      text.length + 1 - begin.val = n → begin.val ≤ text.length →
+      parse_parts_loop text pieces begin going = Result.ok (true, out) →
+      ∃ parts, parts ≠ [] ∧ out.val = pieces.val ++ parts ∧ (∀ p ∈ parts, ValidPiece p) ∧
+        text.val.drop begin.val = Joined parts := by
+  intro n
+  induction n using Nat.strong_induction_on with
+  | h n ih =>
+    intro pieces out begin going measure inside h
+    rw [parse_parts_loop.eq_def] at h
+    dsimp only at h
+    split at h
+    · split at h
+      · obtain ⟨stop, hstop, h⟩ := bind_ok_inv h
+        obtain ⟨s', hs', post⟩ := returned_of_spec (next_slash_spec text begin inside)
+        rw [hs'] at hstop
+        simp only [Result.ok.injEq] at hstop
+        subst hstop
+        obtain ⟨lo, hi, before, at_stop⟩ := post
+        obtain ⟨part, hpart, h⟩ := bind_ok_inv h
+        obtain ⟨part', hpart', part_val, _⟩ := returned_of_spec
+          (core.slice.index.SliceIndexRangeUsizeSlice.index.step_spec
+            (s := text) (r := {start := begin, «end» := s'}) lo hi)
+        have : part' = part := by
+          have e : core.slice.index.Slice.index (core.slice.index.SliceIndexRangeUsizeSlice U8) text
+              { start := begin, «end» := s' } = Result.ok part' := hpart'
+          rw [e] at hpart; simpa using hpart
+        subst this
+        obtain ⟨o, ho, h⟩ := bind_ok_inv h
+        obtain ⟨o', ho', opost⟩ := returned_of_spec (parse_piece_spec part')
+        rw [ho'] at ho; simp only [Result.ok.injEq] at ho; subst ho
+        cases o' with
+        | none =>
+          obtain ⟨⟨pieces1, ok2⟩, hm, h⟩ := bind_ok_inv h
+          simp only [Result.ok.injEq, Prod.mk.injEq] at hm
+          obtain ⟨_, hok⟩ := hm
+          subst hok
+          obtain ⟨next, added, value⟩ := add_one_eq s' (by scalar_tac)
+          simp only [added, bind_ok] at h
+          -- `ok` is now false, so the loop answers `false`, not `true`.
+          exact absurd (parse_parts_false h) (by simp)
+        | some piece =>
+          obtain ⟨⟨pieces1, ok2⟩, hpush, h⟩ := bind_ok_inv h
+          obtain ⟨pushed, pushed_ok, hp⟩ := bind_ok_inv hpush
+          simp only [Result.ok.injEq, Prod.mk.injEq] at hp
+          obtain ⟨hp1, hp2⟩ := hp
+          subst hp1 hp2
+          obtain ⟨text_eq, valid⟩ := opost piece rfl
+          obtain ⟨next, added, value⟩ := add_one_eq s' (by scalar_tac)
+          simp only [added, bind_ok] at h
+          have split_here := drop_at_slash text.val begin.val s'.val lo
+          by_cases more : s'.val < text.length
+          · obtain ⟨parts, nonempty, out_eq, valid_rest, rest_eq⟩ :=
+              ih (text.length + 1 - next.val) (by scalar_tac) pushed out next _ rfl (by scalar_tac) h
+            refine ⟨piece :: parts, by simp, ?_, ?_, ?_⟩
+            · rw [out_eq, push_ok_val pushed_ok]; simp
+            · intro p mem
+              rcases List.mem_cons.mp mem with here | rest
+              · subst here; exact valid
+              · exact valid_rest p rest
+            · rw [joined_cons piece parts nonempty, split_here, ← part_val, ← text_eq,
+                drop_slash text.val s'.val more (at_stop more), ← value, rest_eq]
+          · have last : s'.val = text.length := by scalar_tac
+            obtain ⟨done, same⟩ := parse_parts_stopped (by scalar_tac) h
+            refine ⟨[piece], by simp, ?_, ?_, ?_⟩
+            · rw [same, push_ok_val pushed_ok]
+            · intro p mem; simp at mem; subst mem; exact valid
+            · rw [split_here, ← part_val, ← text_eq]
+              simp [Joined, last, Slice.length]
+      · exfalso; scalar_tac
+    · simp_all
+
+/-- **A path template (policy load).** A parsed template is `/` followed
+    by its pieces written back with `/` between them; every piece is a
+    valid segment or `{name}`, and there is at least one. -/
+theorem parse_template_some {text : Slice U8} {pieces : alloc.vec.Vec Piece}
+    (small : text.length < Usize.max)
+    (h : parse_template text = Result.ok (some pieces)) :
+    text.val = 47#u8 :: Joined pieces.val ∧ pieces.val ≠ [] ∧ ∀ p ∈ pieces.val, ValidPiece p := by
+  unfold parse_template at h
+  simp only [core.slice.Slice.is_empty, bind_ok] at h
+  split at h
+  · simp at h
+  · rename_i nonempty
+    have inside : 0 < text.length := by
+      have : text.val ≠ [] := by intro e; apply nonempty; simp [Slice.length, e]
+      exact List.length_pos_iff.mpr this
+    rw [index_usize_eq text 0#usize (by scalar_tac)] at h
+    simp only [bind_ok] at h
+    split at h
+    · simp at h
+    · rename_i slash
+      obtain ⟨⟨done, out⟩, parsed, h⟩ := bind_ok_inv h
+      cases done with
+      | false =>
+        have h : Result.ok (none : Option (alloc.vec.Vec Piece)) = Result.ok (some pieces) := h
+        simp at h
+      | true =>
+        have h : Result.ok (some out) = Result.ok (some pieces) := h
+        simp only [Result.ok.injEq, Option.some.injEq] at h
+        subst h
+        obtain ⟨parts, nonempty_parts, out_eq, valid, rest⟩ :=
+          parse_parts_loop_ok text small _ (alloc.vec.Vec.new Piece) out 1#usize true rfl (by scalar_tac)
+            (by simpa [parse_parts] using parsed)
+        have out_parts : out.val = parts := by simpa [alloc.vec.Vec.new] using out_eq
+        refine ⟨?_, by rw [out_parts]; exact nonempty_parts, by rw [out_parts]; exact valid⟩
+        rw [out_parts]
+        simp only [bne_iff_ne, ne_eq, Decidable.not_not] at slash
+        have e : text.val = text.val[0]'inside :: text.val.drop 1 := by
+          have := List.drop_eq_getElem_cons (l := text.val) (i := 0) inside
+          simpa using this
+        have slash' : text.val[0]'inside = 47#u8 := by simpa using slash
+        rw [e, slash']
+        congr 1
+
+end aivm_secrets_garrett_core.route.Proofs

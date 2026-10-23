@@ -18275,8 +18275,222 @@ partial_fixpoint
 def route.segments_ok (value : Slice Std.U8) : Result Bool := do
   route.segments_ok_loop value 0#usize 0#usize
 
+/-- [aivm_secrets_garrett_core::route::parameter_name]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 82:4-90:1
+    Visibility: public -/
+@[rust_loop]
+def route.parameter_name_loop
+  (value : Slice Std.U8) (index : Std.Usize) : Result Bool := do
+  let i := Slice.len value
+  if index < i
+  then
+    let byte ← Slice.index_usize value index
+    if byte >= 97#u8
+    then
+      if byte <= 122#u8
+      then
+        let index1 ← index + 1#usize
+        route.parameter_name_loop value index1
+      else
+        if byte >= 48#u8
+        then
+          if byte <= 57#u8
+          then
+            let index1 ← index + 1#usize
+            route.parameter_name_loop value index1
+          else
+            if byte = 95#u8
+            then
+              let index1 ← index + 1#usize
+              route.parameter_name_loop value index1
+            else ok false
+        else
+          if byte = 95#u8
+          then
+            let index1 ← index + 1#usize
+            route.parameter_name_loop value index1
+          else ok false
+    else
+      if byte >= 48#u8
+      then
+        if byte <= 57#u8
+        then
+          let index1 ← index + 1#usize
+          route.parameter_name_loop value index1
+        else
+          if byte = 95#u8
+          then
+            let index1 ← index + 1#usize
+            route.parameter_name_loop value index1
+          else ok false
+      else
+        if byte = 95#u8
+        then
+          let index1 ← index + 1#usize
+          route.parameter_name_loop value index1
+        else ok false
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::route::parameter_name]:
+    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 77:0-90:1
+    Visibility: public -/
+def route.parameter_name (value : Slice Std.U8) : Result Bool := do
+  let b ← core.slice.Slice.is_empty value
+  if b
+  then ok false
+  else
+    let i := Slice.len value
+    if i > 32#usize
+    then ok false
+    else
+      let i1 ← Slice.index_usize value 0#usize
+      if i1 >= 97#u8
+      then
+        if i1 <= 122#u8
+        then route.parameter_name_loop value 0#usize
+        else ok false
+      else ok false
+
+/-- [aivm_secrets_garrett_core::route::parse_piece]:
+    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 94:0-107:1
+    Visibility: public -/
+def route.parse_piece (text : Slice Std.U8) : Result (Option route.Piece) := do
+  let i := Slice.len text
+  if i >= 2#usize
+  then
+    let i1 ← Slice.index_usize text 0#usize
+    if i1 = 123#u8
+    then
+      let i2 := Slice.len text
+      let i3 ← i2 - 1#usize
+      let i4 ← Slice.index_usize text i3
+      if i4 = 125#u8
+      then
+        let i5 := Slice.len text
+        let i6 ← i5 - 1#usize
+        let inner ←
+          core.slice.index.Slice.index
+            (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) text
+            { start := 1#usize, «end» := i6 }
+        let b ← route.parameter_name inner
+        if b
+        then
+          let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 inner
+          ok (some (route.Piece.Parameter v))
+        else ok none
+      else
+        let b ← route.segment_ok text
+        if b
+        then
+          let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 text
+          ok (some (route.Piece.Literal v))
+        else ok none
+    else
+      let b ← route.segment_ok text
+      if b
+      then
+        let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 text
+        ok (some (route.Piece.Literal v))
+      else ok none
+  else
+    let b ← route.segment_ok text
+    if b
+    then
+      let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 text
+      ok (some (route.Piece.Literal v))
+    else ok none
+
+/-- [aivm_secrets_garrett_core::route::next_slash]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 112:4-119:1
+    Visibility: public -/
+@[rust_loop]
+def route.next_slash_loop
+  (text : Slice Std.U8) (index : Std.Usize) : Result Std.Usize := do
+  let i := Slice.len text
+  if index < i
+  then
+    let i1 ← Slice.index_usize text index
+    if i1 = 47#u8
+    then ok index
+    else let index1 ← index + 1#usize
+         route.next_slash_loop text index1
+  else ok (Slice.len text)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::route::next_slash]:
+    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 110:0-119:1
+    Visibility: public -/
+@[reducible]
+def route.next_slash
+  (text : Slice Std.U8) («from» : Std.Usize) : Result Std.Usize := do
+  route.next_slash_loop text «from»
+
+/-- [aivm_secrets_garrett_core::route::parse_parts]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 125:4-132:5
+    Visibility: public -/
+@[rust_loop]
+def route.parse_parts_loop
+  (text : Slice Std.U8) (pieces : alloc.vec.Vec route.Piece)
+  (begin : Std.Usize) (ok1 : Bool) :
+  Result (Bool × (alloc.vec.Vec route.Piece))
+  := do
+  if ok1
+  then
+    let i := Slice.len text
+    if begin <= i
+    then
+      let stop ← route.next_slash text begin
+      let s ←
+        core.slice.index.Slice.index
+          (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) text
+          { start := begin, «end» := stop }
+      let o ← route.parse_piece s
+      let (pieces1, ok2) ←
+        match o with
+        | none => ok (pieces, false)
+        | some piece =>
+          do
+          let pieces2 ← alloc.vec.Vec.push pieces piece
+          ok (pieces2, ok1)
+      let begin1 ← stop + 1#usize
+      route.parse_parts_loop text pieces1 begin1 ok2
+    else ok (ok1, pieces)
+  else ok (ok1, pieces)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::route::parse_parts]:
+    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 122:0-134:1
+    Visibility: public -/
+@[reducible]
+def route.parse_parts
+  (text : Slice Std.U8) (start : Std.Usize)
+  (pieces : alloc.vec.Vec route.Piece) :
+  Result (Bool × (alloc.vec.Vec route.Piece))
+  := do
+  route.parse_parts_loop text pieces start true
+
+/-- [aivm_secrets_garrett_core::route::parse_template]:
+    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 138:0-148:1
+    Visibility: public -/
+def route.parse_template
+  (text : Slice Std.U8) : Result (Option (alloc.vec.Vec route.Piece)) := do
+  let b ← core.slice.Slice.is_empty text
+  if b
+  then ok none
+  else
+    let i ← Slice.index_usize text 0#usize
+    if i != 47#u8
+    then ok none
+    else
+      let (b1, pieces) ←
+        route.parse_parts text 1#usize (alloc.vec.Vec.new route.Piece)
+      if b1
+      then ok (some pieces)
+      else ok none
+
 /-- [aivm_secrets_garrett_core::route::scalar_text]:
-    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 77:0-92:1
+    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 152:0-167:1
     Visibility: public -/
 def route.scalar_text
   (value : manifest.Scalar) : Result (alloc.vec.Vec Std.U8) := do
@@ -18299,7 +18513,7 @@ def route.scalar_text
       Std.U8) s
 
 /-- [aivm_secrets_garrett_core::route::scalar_binding]:
-    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 95:0-100:1
+    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 170:0-175:1
     Visibility: public -/
 def route.scalar_binding
   («name» : Slice Std.U8) (value : manifest.Scalar) :
@@ -18310,7 +18524,7 @@ def route.scalar_binding
   ok { «name» := v, value := v1 }
 
 /-- [aivm_secrets_garrett_core::route::lookup]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 105:4-113:1
+    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 180:4-188:1
     Visibility: public -/
 @[rust_loop]
 def route.lookup_loop
@@ -18334,7 +18548,7 @@ def route.lookup_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::route::lookup]:
-    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 103:0-113:1
+    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 178:0-188:1
     Visibility: public -/
 @[reducible]
 def route.lookup
@@ -18344,14 +18558,14 @@ def route.lookup
   route.lookup_loop bindings «name» 0#usize
 
 /-- [aivm_secrets_garrett_core::route::RouteDenial]
-    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 117:0-119:1
+    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 192:0-194:1
     Visibility: public -/
 @[discriminant isize]
 inductive route.RouteDenial where
 | Denied : route.RouteDenial
 
 /-- [aivm_secrets_garrett_core::route::fill_piece]:
-    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 122:0-147:1
+    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 197:0-222:1
     Visibility: public -/
 def route.fill_piece
   (output : alloc.vec.Vec Std.U8) (piece : route.Piece)
@@ -18387,7 +18601,7 @@ def route.fill_piece
       else ok (core.result.Result.Err route.RouteDenial.Denied, output)
 
 /-- [aivm_secrets_garrett_core::route::fill_path]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 157:4-163:5
+    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 232:4-238:5
     Visibility: public -/
 @[rust_loop]
 def route.fill_path_loop
@@ -18414,7 +18628,7 @@ def route.fill_path_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::route::fill_path]:
-    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 150:0-168:1
+    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 225:0-243:1
     Visibility: public -/
 def route.fill_path
   (output : alloc.vec.Vec Std.U8) (path : Slice route.Piece)
@@ -18436,7 +18650,7 @@ def route.fill_path
   else ok (core.result.Result.Err route.RouteDenial.Denied, output1)
 
 /-- [aivm_secrets_garrett_core::route::fill_query_entry]:
-    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 171:0-196:1
+    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 246:0-271:1
     Visibility: public -/
 def route.fill_query_entry
   (output : alloc.vec.Vec Std.U8) (entry : route.QueryPiece) (first : Bool)
@@ -18471,7 +18685,7 @@ def route.fill_query_entry
   else ok (core.result.Result.Err route.RouteDenial.Denied, output)
 
 /-- [aivm_secrets_garrett_core::route::fill_target]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 212:4-217:5
+    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 287:4-292:5
     Visibility: public -/
 @[rust_loop]
 def route.fill_target_loop
@@ -18498,7 +18712,7 @@ def route.fill_target_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::route::fill_target]:
-    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 200:0-222:1
+    Source: 'crates/aivm-secrets-garrett-core/src/route.rs', lines 275:0-297:1
     Visibility: public -/
 def route.fill_target
   (path : Slice route.Piece) (query : Slice route.QueryPiece)

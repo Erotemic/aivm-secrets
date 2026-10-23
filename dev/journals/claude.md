@@ -498,3 +498,18 @@ extracted core; what remains native in PROXY-NATIVE-01 is socket/TLS I/O,
 deadlines and the session clock. The strict parser itself is still tested,
 not proved; the encoder re-checks everything it writes, so framing safety
 does not depend on it.
+
+## 2026-10-23 11:42:34 -0400
+
+Template parsing moved into the core (`route::parse_template`,
+`parse_piece`) and proved: a parsed template writes back to exactly its
+text and every piece is a valid segment or `{name}`. I restructured the
+loop (single branch over a `next_slash` helper) because the first version
+extracted with duplicated branches; the oracle test (1,700+ templates)
+confirms the restructure matches the old native parser. The loop theorem
+carries a size premise (template shorter than `usize::MAX`; policy limits it
+to 1024). ROUTE-NATIVE-01 is now only the JSON layer.
+
+Proof-engineering notes for the next agent: `step*` shadows hypothesis names
+(`inner_post✝`); refer to them by type with `‹...›`. Contradictory
+`if` branches from extraction need an explicit `exfalso; scalar_tac` first.

@@ -177,6 +177,8 @@ enum Part {
     Parameter(String),
 }
 impl Part {
+    /// The native parser `route::parse_piece` replaced; kept for the oracle test.
+    #[cfg(test)]
     fn parse(v: &str) -> Outcome<Self> {
         if let Some(p) = v.strip_prefix('{').and_then(|p| p.strip_suffix('}')) {
             name(p, false)?;
@@ -201,11 +203,23 @@ impl Part {
         }
     }
 }
+/// A template part from the extracted parser (ASCII by construction).
+fn part_of(piece: route::Piece) -> Outcome<Part> {
+    match piece {
+        route::Piece::Literal(bytes) => String::from_utf8(bytes).map(Part::Literal),
+        route::Piece::Parameter(bytes) => String::from_utf8(bytes).map(Part::Parameter),
+    }
+    .map_err(|_| Error::InvalidPolicy)
+}
+/// A path template, parsed by the extracted `route::parse_template`
+/// (proofs/GarrettRoute.lean: the pieces render back to the template).
 fn template(value: &Value) -> Outcome<Vec<Part>> {
-    let s = text(value, 1024)?
-        .strip_prefix('/')
-        .ok_or(Error::InvalidPolicy)?;
-    s.split('/').map(Part::parse).collect()
+    let pieces = route::parse_template(text(value, 1024)?.as_bytes()).ok_or(Error::InvalidPolicy)?;
+    pieces.into_iter().map(part_of).collect()
+}
+/// One query value template (`{name}` or a literal segment).
+fn query_part(value: &str) -> Outcome<Part> {
+    part_of(route::parse_piece(value.as_bytes()).ok_or(Error::InvalidPolicy)?)
 }
 fn references(parts: &[Part]) -> BTreeSet<String> {
     parts
@@ -591,7 +605,7 @@ impl Operation {
         let mut in_query = BTreeSet::new();
         for (n, v) in raw_query {
             name(n, false)?;
-            let p = Part::parse(text(v, 128)?)?;
+            let p = query_part(text(v, 128)?)?;
             if let Some(r) = p.reference() {
                 in_query.insert(r.to_owned());
             }
@@ -1386,6 +1400,42 @@ mod route_oracle {
 
     fn outcome(result: Outcome<String>) -> Result<String, String> {
         result.map_err(|error| format!("{error:?}"))
+    }
+
+    fn legacy_template(text: &str) -> Option<Vec<String>> {
+        let rest = text.strip_prefix('/')?;
+        rest.split('/')
+            .map(|piece| Part::parse(piece).ok().map(|part| describe(&part)))
+            .collect()
+    }
+
+    fn describe(part: &Part) -> String {
+        match part {
+            Part::Literal(v) => format!("L:{v}"),
+            Part::Parameter(n) => format!("P:{n}"),
+        }
+    }
+
+    #[test]
+    fn extracted_template_parser_matches_the_native_parser() {
+        let pieces = ["repos", "{owner}", "{repo_2}", "a.b", "~x", "-", "_", ".", "..", "", "{}",
+                      "{A}", "{1a}", "{a-b}", "{a", "a}", "a b", "%2e", "é", "{abcdefghijklmnopqrstuvwxyz_0123456}",
+                      "{abcdefghijklmnopqrstuvwxyz_01234}"];
+        let mut checked = 0;
+        for a in pieces {
+            for b in pieces {
+                for text in [format!("/{a}"), format!("/{a}/{b}"), format!("{a}/{b}"), format!("/{a}/{b}/")] {
+                    let new = route::parse_template(text.as_bytes()).map(|pieces| {
+                        pieces.into_iter().map(|p| describe(&part_of(p).expect("ascii"))).collect::<Vec<_>>()
+                    });
+                    assert_eq!(new, legacy_template(&text), "{text}");
+                    checked += 1;
+                }
+                let new = route::parse_piece(a.as_bytes()).map(|p| describe(&part_of(p).expect("ascii")));
+                assert_eq!(new, Part::parse(a).ok().map(|p| describe(&p)), "{a}");
+            }
+        }
+        assert!(checked > 1500);
     }
 
     #[test]
