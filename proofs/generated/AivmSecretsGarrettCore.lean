@@ -448,6 +448,13 @@ inductive read_transition.Phase where
 | Preflight : read_transition.Phase
 | Final : read_transition.Phase
 
+/-- [aivm_secrets_garrett_core::provider_wire::Endpoint]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_wire.rs', lines 14:0-17:1
+    Visibility: public -/
+structure provider_wire.Endpoint where
+  host : alloc.vec.Vec Std.U8
+  port : Std.U16
+
 /-- Trait declaration: [aivm_secrets_garrett_core::provider_io::Writer]
     Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 80:0-85:1
     Visibility: public -/
@@ -462,6 +469,14 @@ structure provider_io.Writer (Self : Type _) (Self_Error : Type _) where
     Visibility: public -/
 structure provider_io.WireBytes (Self : Type _) where
   bytes : Self → Result (alloc.vec.Vec Std.U8)
+
+/-- [aivm_secrets_garrett_core::http_wire::EncodingDenial]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 20:0-23:1
+    Visibility: public -/
+@[discriminant isize]
+inductive http_wire.EncodingDenial where
+| InvalidRequest : http_wire.EncodingDenial
+| InvalidCredential : http_wire.EncodingDenial
 
 /-- [aivm_secrets_garrett_core::credential_use::Authentication]
     Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 11:0-14:1
@@ -480,8 +495,31 @@ structure credential_use.Route where
   path : alloc.vec.Vec Std.U8
   authentication : credential_use.Authentication
 
+/-- [aivm_secrets_garrett_core::http_wire::Header]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 8:0-11:1
+    Visibility: public -/
+structure http_wire.Header where
+  «name» : alloc.vec.Vec Std.U8
+  value : alloc.vec.Vec Std.U8
+
+/-- [aivm_secrets_garrett_core::provider_wire::Fields]
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_wire.rs', lines 6:0-11:1
+    Visibility: public -/
+structure provider_wire.Fields where
+  method : alloc.vec.Vec Std.U8
+  target : alloc.vec.Vec Std.U8
+  accept : alloc.vec.Vec Std.U8
+  headers : alloc.vec.Vec http_wire.Header
+
+/-- [aivm_secrets_garrett_core::channel_work::RequestParts]
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 56:0-59:1
+    Visibility: public -/
+structure channel_work.RequestParts where
+  fields : provider_wire.Fields
+  body : Option (alloc.vec.Vec Std.U8)
+
 /-- Trait declaration: [aivm_secrets_garrett_core::channel_work::ChannelWork]
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 16:0-42:1
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 21:0-54:1
     Visibility: public -/
 structure channel_work.ChannelWork (Self : Type _) (Self_Body : Type _)
   (Self_Writer : Type _) (Self_Meta : Type _) (Self_Output : Type _)
@@ -489,6 +527,7 @@ structure channel_work.ChannelWork (Self : Type _) (Self_Body : Type _)
   INVALID_TRANSITION : Result Self_Error
   INVALID_POLICY : Result Self_Error
   OUTCOME_UNKNOWN : Result Self_Error
+  REFLECTED : Result Self_Error
   provider_ioWireBytesInst : provider_io.WireBytes Self_Body
   provider_ioWriterInst : provider_io.Writer Self_Writer Self_Error
   effect_write : Self → Result Bool
@@ -500,33 +539,1209 @@ structure channel_work.ChannelWork (Self : Type _) (Self_Body : Type _)
   finish : Self → Result ((core.result.Result Unit Self_Error) × Self)
   audit_route : Self → credential_use.Route → read_transition.Phase →
     Result ((core.result.Result Unit Self_Error) × Self)
-  request_body : Self → credential_use.Route → Result ((core.result.Result
-    Self_Body Self_Error) × Self)
-  connect : Self → credential_use.Route → Result ((core.result.Result
+  request_fields : Self → Result ((core.result.Result
+    channel_work.RequestParts Self_Error) × Self)
+  target : Self → Result (alloc.vec.Vec Std.U8)
+  wrap_body : Self → alloc.vec.Vec Std.U8 → Result (Self_Body × Self)
+  encoding_error : Self → http_wire.EncodingDenial → Result (Self_Error ×
+    Self)
+  connect : Self → provider_wire.Endpoint → Result ((core.result.Result
     (Self_Writer × Self_Meta) Self_Error) × Self)
   parse : Self → response_gate.Released Self_Body Self_Writer Self_Meta →
     Result ((core.result.Result Self_Output Self_Error) × Self)
 
+/-- [aivm_secrets_garrett_core::http_wire::Head]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 12:0-19:1
+    Visibility: public -/
+structure http_wire.Head where
+  method : alloc.vec.Vec Std.U8
+  target : alloc.vec.Vec Std.U8
+  host : alloc.vec.Vec Std.U8
+  port : Std.U16
+  accept : alloc.vec.Vec Std.U8
+  headers : alloc.vec.Vec http_wire.Header
+
+/-- [aivm_secrets_garrett_core::provider_wire::head]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_wire.rs', lines 27:0-39:1 -/
+def provider_wire.head
+  (route : credential_use.Route) (fields : provider_wire.Fields) :
+  Result (core.result.Result http_wire.Head http_wire.EncodingDenial)
+  := do
+  if route.port <= 0#i64
+  then ok (core.result.Result.Err http_wire.EncodingDenial.InvalidRequest)
+  else
+    if route.port > 65535#i64
+    then ok (core.result.Result.Err http_wire.EncodingDenial.InvalidRequest)
+    else
+      let v ← alloc.vec.CloneVec.clone core.clone.CloneU8 route.host
+      let i ← lift (IScalar.hcast .U16 route.port)
+      ok (core.result.Result.Ok
+        {
+          method := fields.method,
+          target := fields.target,
+          host := v,
+          port := i,
+          accept := fields.accept,
+          headers := fields.headers
+        })
+
+/-- [aivm_secrets_garrett_core::http_wire::append_request::{closure#1}]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 226:17-226:54 -/
+@[reducible]
+def http_wire.append_request.closure_1 := Unit
+
+/-- [aivm_secrets_garrett_core::http_auth::HeaderDenial]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_auth.rs', lines 5:0-7:1
+    Visibility: public -/
+@[discriminant isize]
+inductive http_auth.HeaderDenial where
+| InvalidCredential : http_auth.HeaderDenial
+
+/-- [aivm_secrets_garrett_core::http_wire::append_request::{impl core::ops::function::FnOnce<(aivm_secrets_garrett_core::http_auth::HeaderDenial,), aivm_secrets_garrett_core::http_wire::EncodingDenial> for aivm_secrets_garrett_core::http_wire::append_request::{closure#1}}::call_once]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 226:17-226:54 -/
+def
+  http_wire.append_request.closure_1.Insts.CoreOpsFunctionFnOnceTupleHeaderDenialEncodingDenial.call_once
+  (c : http_wire.append_request.closure_1)
+  (tupled_args : http_auth.HeaderDenial) :
+  Result http_wire.EncodingDenial
+  := do
+  ok http_wire.EncodingDenial.InvalidCredential
+
+/-- Trait implementation: [aivm_secrets_garrett_core::http_wire::append_request::{impl core::ops::function::FnOnce<(aivm_secrets_garrett_core::http_auth::HeaderDenial,), aivm_secrets_garrett_core::http_wire::EncodingDenial> for aivm_secrets_garrett_core::http_wire::append_request::{closure#1}}]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 226:17-226:54 -/
+@[reducible]
+def
+  http_wire.append_request.closure_1.Insts.CoreOpsFunctionFnOnceTupleHeaderDenialEncodingDenial
+  : core.ops.function.FnOnce http_wire.append_request.closure_1
+  http_auth.HeaderDenial http_wire.EncodingDenial := {
+  call_once :=
+    http_wire.append_request.closure_1.Insts.CoreOpsFunctionFnOnceTupleHeaderDenialEncodingDenial.call_once
+}
+
+/-- [aivm_secrets_garrett_core::http_wire::append_request::{closure}]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 214:17-214:51 -/
+@[reducible]
+def http_wire.append_request.closure := Unit
+
+/-- [aivm_secrets_garrett_core::http_request::RequestDenial]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_request.rs', lines 3:0-5:1
+    Visibility: public -/
+@[discriminant isize]
+inductive http_request.RequestDenial where
+| InvalidLine : http_request.RequestDenial
+
+/-- [aivm_secrets_garrett_core::http_wire::append_request::{impl core::ops::function::FnOnce<(aivm_secrets_garrett_core::http_request::RequestDenial,), aivm_secrets_garrett_core::http_wire::EncodingDenial> for aivm_secrets_garrett_core::http_wire::append_request::{closure}}::call_once]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 214:17-214:51 -/
+def
+  http_wire.append_request.closure.Insts.CoreOpsFunctionFnOnceTupleRequestDenialEncodingDenial.call_once
+  (c : http_wire.append_request.closure)
+  (tupled_args : http_request.RequestDenial) :
+  Result http_wire.EncodingDenial
+  := do
+  ok http_wire.EncodingDenial.InvalidRequest
+
+/-- Trait implementation: [aivm_secrets_garrett_core::http_wire::append_request::{impl core::ops::function::FnOnce<(aivm_secrets_garrett_core::http_request::RequestDenial,), aivm_secrets_garrett_core::http_wire::EncodingDenial> for aivm_secrets_garrett_core::http_wire::append_request::{closure}}]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 214:17-214:51 -/
+@[reducible]
+def
+  http_wire.append_request.closure.Insts.CoreOpsFunctionFnOnceTupleRequestDenialEncodingDenial
+  : core.ops.function.FnOnce http_wire.append_request.closure
+  http_request.RequestDenial http_wire.EncodingDenial := {
+  call_once :=
+    http_wire.append_request.closure.Insts.CoreOpsFunctionFnOnceTupleRequestDenialEncodingDenial.call_once
+}
+
+/-- [aivm_secrets_garrett_core::http_wire::append_headers]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 185:4-190:5
+    Visibility: public -/
+@[rust_loop]
+def http_wire.append_headers_loop
+  (iter : core.slice.iter.Iter http_wire.Header)
+  (output : alloc.vec.Vec Std.U8) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok output
+  | some header =>
+    let s := alloc.vec.Vec.deref header.name
+    let output1 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+    let s1 ← lift (Array.to_slice (Array.make 2#usize [ 58#u8, 32#u8 ]))
+    let output2 ←
+      alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output1 s1
+    let s2 := alloc.vec.Vec.deref header.value
+    let output3 ←
+      alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output2 s2
+    let s3 ← lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
+    let output4 ←
+      alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output3 s3
+    http_wire.append_headers_loop iter1 output4
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_wire::append_headers]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 184:0-191:1
+    Visibility: public -/
+def http_wire.append_headers
+  (output : alloc.vec.Vec Std.U8) (headers : Slice http_wire.Header) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let iter ←
+    SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+      headers
+  http_wire.append_headers_loop iter output
+
+/-- [aivm_secrets_garrett_core::http_wire::MAX_BODY]
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 6:0-6:44
+    Visibility: public -/
+@[global_simps, irreducible]
+def http_wire.MAX_BODY : Result Std.Usize := do
+  let i ← 2#usize * 1024#usize
+  i * 1024#usize
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_body]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 178:0-183:1
+    Visibility: public -/
+def http_wire.valid_body (body : Option (Slice Std.U8)) : Result Bool := do
+  match body with
+  | none => ok true
+  | some bytes =>
+    let i := Slice.len bytes
+    let i1 ← http_wire.MAX_BODY
+    ok (i <= i1)
+
+/-- [aivm_secrets_garrett_core::http_wire::append_decimal]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 171:0-176:1
+    Visibility: public -/
+def http_wire.append_decimal
+  (output : alloc.vec.Vec Std.U8) (value : Std.Usize) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let output1 ←
+    if value >= 10#usize
+    then do
+         let i ← value / 10#usize
+         http_wire.append_decimal output i
+    else ok output
+  let i ← value % 10#usize
+  let i1 ← lift (UScalar.cast .U8 i)
+  let i2 ← 48#u8 + i1
+  alloc.vec.Vec.push output1 i2
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_accept]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 154:4-160:1
+    Visibility: public -/
+@[rust_loop]
+def http_wire.valid_accept_loop
+  (iter : core.slice.iter.Iter Std.U8) : Result Bool := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok true
+  | some byte =>
+    if byte < 33#u8
+    then ok false
+    else if byte > 126#u8
+         then ok false
+         else http_wire.valid_accept_loop iter1
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_accept]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 150:0-160:1
+    Visibility: public -/
+def http_wire.valid_accept (accept : Slice Std.U8) : Result Bool := do
+  let i := Slice.len accept
+  if i = 0#usize
+  then ok false
+  else
+    let i1 := Slice.len accept
+    if i1 > 96#usize
+    then ok false
+    else
+      let iter ←
+        SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+          accept
+      http_wire.valid_accept_loop iter
+
+/-- [aivm_secrets_garrett_core::http_wire::alphanumeric]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 74:0-78:1
+    Visibility: public -/
+def http_wire.alphanumeric (byte : Std.U8) : Result Bool := do
+  if byte >= 97#u8
+  then
+    if byte <= 122#u8
+    then ok true
+    else
+      if byte >= 65#u8
+      then
+        if byte <= 90#u8
+        then ok true
+        else if byte >= 48#u8
+             then ok (byte <= 57#u8)
+             else ok false
+      else if byte >= 48#u8
+           then ok (byte <= 57#u8)
+           else ok false
+  else
+    if byte >= 65#u8
+    then
+      if byte <= 90#u8
+      then ok true
+      else if byte >= 48#u8
+           then ok (byte <= 57#u8)
+           else ok false
+    else if byte >= 48#u8
+         then ok (byte <= 57#u8)
+         else ok false
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_host]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 142:4-148:1
+    Visibility: public -/
+@[rust_loop]
+def http_wire.valid_host_loop
+  (iter : core.slice.iter.Iter Std.U8) : Result Bool := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok true
+  | some byte =>
+    let b ← http_wire.alphanumeric byte
+    if b
+    then http_wire.valid_host_loop iter1
+    else
+      if byte != 46#u8
+      then if byte != 45#u8
+           then ok false
+           else http_wire.valid_host_loop iter1
+      else http_wire.valid_host_loop iter1
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_host]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 138:0-148:1
+    Visibility: public -/
+def http_wire.valid_host (host : Slice Std.U8) : Result Bool := do
+  let i := Slice.len host
+  if i = 0#usize
+  then ok false
+  else
+    let i1 := Slice.len host
+    if i1 > 253#usize
+    then ok false
+    else
+      let iter ←
+        SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+          host
+      http_wire.valid_host_loop iter
+
+/-- [aivm_secrets_garrett_core::http_request::valid_target]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_request.rs', lines 23:4-29:1
+    Visibility: public -/
+@[rust_loop]
+def http_request.valid_target_loop0
+  (iter : core.slice.iter.Iter Std.U8) : Result Bool := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok true
+  | some byte =>
+    if byte < 33#u8
+    then ok false
+    else
+      if byte > 126#u8
+      then ok false
+      else
+        if byte = 35#u8
+        then ok false
+        else http_request.valid_target_loop0 iter1
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_request::valid_target]: loop 1:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_request.rs', lines 23:4-29:1
+    Visibility: public -/
+@[rust_loop]
+def http_request.valid_target_loop1
+  (iter : core.slice.iter.Iter Std.U8) : Result Bool := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok true
+  | some byte =>
+    if byte < 33#u8
+    then ok false
+    else
+      if byte > 126#u8
+      then ok false
+      else
+        if byte = 35#u8
+        then ok false
+        else http_request.valid_target_loop1 iter1
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_request::valid_target]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_request.rs', lines 16:0-29:1
+    Visibility: public -/
+def http_request.valid_target (target : Slice Std.U8) : Result Bool := do
+  let i := Slice.len target
+  if i = 0#usize
+  then ok false
+  else
+    let i1 := Slice.len target
+    if i1 > 8192#usize
+    then ok false
+    else
+      let i2 ← Slice.index_usize target 0#usize
+      if i2 != 47#u8
+      then ok false
+      else
+        let i3 := Slice.len target
+        if i3 > 1#usize
+        then
+          let i4 ← Slice.index_usize target 1#usize
+          if i4 = 47#u8
+          then ok false
+          else
+            let iter ←
+              SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+                target
+            http_request.valid_target_loop0 iter
+        else
+          let iter ←
+            SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+              target
+          http_request.valid_target_loop1 iter
+
+/-- [aivm_secrets_garrett_core::http_request::valid_method]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_request.rs', lines 7:0-12:1
+    Visibility: public -/
+def http_request.valid_method (method : Slice Std.U8) : Result Bool := do
+  let get ←
+    lift (Array.to_slice (Array.make 3#usize [ 71#u8, 69#u8, 84#u8 ]))
+  let post ←
+    lift (Array.to_slice (Array.make 4#usize [ 80#u8, 79#u8, 83#u8, 84#u8 ]))
+  let patch ←
+    lift (Array.to_slice
+      (Array.make 5#usize [ 80#u8, 65#u8, 84#u8, 67#u8, 72#u8 ]))
+  let b ← core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 method get
+  if b
+  then ok true
+  else
+    let b1 ←
+      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 method post
+    if b1
+    then ok true
+    else core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 method patch
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_start]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 161:0-167:1
+    Visibility: public -/
+def http_wire.valid_start (head : http_wire.Head) : Result Bool := do
+  let s := alloc.vec.Vec.deref head.host
+  let b ← http_wire.valid_host s
+  if b
+  then
+    if head.port != 0#u16
+    then
+      let s1 := alloc.vec.Vec.deref head.accept
+      let b1 ← http_wire.valid_accept s1
+      if b1
+      then
+        let s2 := alloc.vec.Vec.deref head.method
+        let b2 ← http_request.valid_method s2
+        if b2
+        then
+          let s3 := alloc.vec.Vec.deref head.target
+          http_request.valid_target s3
+        else ok false
+      else ok false
+    else ok false
+  else ok false
+
+/-- [aivm_secrets_garrett_core::http_wire::ascii_lower]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 25:0-31:1
+    Visibility: public -/
+def http_wire.ascii_lower (byte : Std.U8) : Result Std.U8 := do
+  if byte >= 65#u8
+  then if byte <= 90#u8
+       then byte + 32#u8
+       else ok byte
+  else ok byte
+
+/-- [aivm_secrets_garrett_core::http_wire::ascii_prefix]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 37:4-44:1
+    Visibility: public -/
+@[rust_loop]
+def http_wire.ascii_prefix_loop
+  («name» : Slice Std.U8) («prefix» : Slice Std.U8) (i : Std.Usize) :
+  Result Bool
+  := do
+  let i1 := Slice.len «prefix»
+  if i < i1
+  then
+    let i2 ← Slice.index_usize «name» i
+    let i3 ← http_wire.ascii_lower i2
+    let i4 ← Slice.index_usize «prefix» i
+    let i5 ← http_wire.ascii_lower i4
+    if i3 != i5
+    then ok false
+    else
+      let i6 ← i + 1#usize
+      http_wire.ascii_prefix_loop «name» «prefix» i6
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_wire::ascii_prefix]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 32:0-44:1
+    Visibility: public -/
+def http_wire.ascii_prefix
+  («name» : Slice Std.U8) («prefix» : Slice Std.U8) : Result Bool := do
+  let i := Slice.len «name»
+  let i1 := Slice.len «prefix»
+  if i < i1
+  then ok false
+  else http_wire.ascii_prefix_loop «name» «prefix» 0#usize
+
+/-- [aivm_secrets_garrett_core::http_wire::ascii_equal]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 45:0-47:1
+    Visibility: public -/
+def http_wire.ascii_equal
+  («name» : Slice Std.U8) (other : Slice Std.U8) : Result Bool := do
+  let i := Slice.len «name»
+  let i1 := Slice.len other
+  if i = i1
+  then http_wire.ascii_prefix «name» other
+  else ok false
+
+/-- [aivm_secrets_garrett_core::http_wire::unique_before]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 116:4-123:1
+    Visibility: public -/
+@[rust_loop]
+def http_wire.unique_before_loop
+  (headers : Slice http_wire.Header) («end» : Std.Usize)
+  («name» : Slice Std.U8) (j : Std.Usize) :
+  Result Bool
+  := do
+  if j < «end»
+  then
+    let h ← Slice.index_usize headers j
+    let s := alloc.vec.Vec.deref h.name
+    let b ← http_wire.ascii_equal s «name»
+    if b
+    then ok false
+    else
+      let j1 ← j + 1#usize
+      http_wire.unique_before_loop headers «end» «name» j1
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_wire::unique_before]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 111:0-123:1
+    Visibility: public -/
+def http_wire.unique_before
+  (headers : Slice http_wire.Header) («end» : Std.Usize)
+  («name» : Slice Std.U8) :
+  Result Bool
+  := do
+  let i := Slice.len headers
+  if «end» > i
+  then ok false
+  else http_wire.unique_before_loop headers «end» «name» 0#usize
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_value]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 101:4-107:1
+    Visibility: public -/
+@[rust_loop]
+def http_wire.valid_value_loop
+  (iter : core.slice.iter.Iter Std.U8) : Result Bool := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok true
+  | some byte =>
+    if byte < 32#u8
+    then ok false
+    else if byte > 126#u8
+         then ok false
+         else http_wire.valid_value_loop iter1
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_value]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 94:0-107:1
+    Visibility: public -/
+def http_wire.valid_value (value : Slice Std.U8) : Result Bool := do
+  let i := Slice.len value
+  if i = 0#usize
+  then ok false
+  else
+    let i1 := Slice.len value
+    if i1 > 256#usize
+    then ok false
+    else
+      let i2 ← Slice.index_usize value 0#usize
+      if i2 = 32#u8
+      then ok false
+      else
+        let i3 := Slice.len value
+        let i4 ← i3 - 1#usize
+        let i5 ← Slice.index_usize value i4
+        if i5 = 32#u8
+        then ok false
+        else
+          let iter ←
+            SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+              value
+          http_wire.valid_value_loop iter
+
+/-- [aivm_secrets_garrett_core::http_wire::reserved_name]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 48:0-73:1
+    Visibility: public -/
+def http_wire.reserved_name («name» : Slice Std.U8) : Result Bool := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 6#usize [ 97#u8, 99#u8, 99#u8, 101#u8, 112#u8, 116#u8 ]))
+  let b ← http_wire.ascii_equal «name» s
+  if b
+  then ok true
+  else
+    let s1 ←
+      lift (Array.to_slice
+        (Array.make 15#usize [
+          97#u8, 99#u8, 99#u8, 101#u8, 112#u8, 116#u8, 45#u8, 101#u8, 110#u8,
+          99#u8, 111#u8, 100#u8, 105#u8, 110#u8, 103#u8
+          ]))
+    let b1 ← http_wire.ascii_equal «name» s1
+    if b1
+    then ok true
+    else
+      let s2 ←
+        lift (Array.to_slice
+          (Array.make 13#usize [
+            97#u8, 117#u8, 116#u8, 104#u8, 111#u8, 114#u8, 105#u8, 122#u8,
+            97#u8, 116#u8, 105#u8, 111#u8, 110#u8
+            ]))
+      let b2 ← http_wire.ascii_equal «name» s2
+      if b2
+      then ok true
+      else
+        let s3 ←
+          lift (Array.to_slice
+            (Array.make 10#usize [
+              99#u8, 111#u8, 110#u8, 110#u8, 101#u8, 99#u8, 116#u8, 105#u8,
+              111#u8, 110#u8
+              ]))
+        let b3 ← http_wire.ascii_equal «name» s3
+        if b3
+        then ok true
+        else
+          let s4 ←
+            lift (Array.to_slice
+              (Array.make 16#usize [
+                99#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8, 45#u8,
+                101#u8, 110#u8, 99#u8, 111#u8, 100#u8, 105#u8, 110#u8, 103#u8
+                ]))
+          let b4 ← http_wire.ascii_equal «name» s4
+          if b4
+          then ok true
+          else
+            let s5 ←
+              lift (Array.to_slice
+                (Array.make 14#usize [
+                  99#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8, 45#u8,
+                  108#u8, 101#u8, 110#u8, 103#u8, 116#u8, 104#u8
+                  ]))
+            let b5 ← http_wire.ascii_equal «name» s5
+            if b5
+            then ok true
+            else
+              let s6 ←
+                lift (Array.to_slice
+                  (Array.make 12#usize [
+                    99#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8,
+                    45#u8, 116#u8, 121#u8, 112#u8, 101#u8
+                    ]))
+              let b6 ← http_wire.ascii_equal «name» s6
+              if b6
+              then ok true
+              else
+                let s7 ←
+                  lift (Array.to_slice
+                    (Array.make 6#usize [
+                      99#u8, 111#u8, 111#u8, 107#u8, 105#u8, 101#u8
+                      ]))
+                let b7 ← http_wire.ascii_equal «name» s7
+                if b7
+                then ok true
+                else
+                  let s8 ←
+                    lift (Array.to_slice
+                      (Array.make 6#usize [
+                        101#u8, 120#u8, 112#u8, 101#u8, 99#u8, 116#u8
+                        ]))
+                  let b8 ← http_wire.ascii_equal «name» s8
+                  if b8
+                  then ok true
+                  else
+                    let s9 ←
+                      lift (Array.to_slice
+                        (Array.make 9#usize [
+                          102#u8, 111#u8, 114#u8, 119#u8, 97#u8, 114#u8,
+                          100#u8, 101#u8, 100#u8
+                          ]))
+                    let b9 ← http_wire.ascii_equal «name» s9
+                    if b9
+                    then ok true
+                    else
+                      let s10 ←
+                        lift (Array.to_slice
+                          (Array.make 4#usize [
+                            104#u8, 111#u8, 115#u8, 116#u8
+                            ]))
+                      let b10 ← http_wire.ascii_equal «name» s10
+                      if b10
+                      then ok true
+                      else
+                        let s11 ←
+                          lift (Array.to_slice
+                            (Array.make 10#usize [
+                              107#u8, 101#u8, 101#u8, 112#u8, 45#u8, 97#u8,
+                              108#u8, 105#u8, 118#u8, 101#u8
+                              ]))
+                        let b11 ← http_wire.ascii_equal «name» s11
+                        if b11
+                        then ok true
+                        else
+                          let s12 ←
+                            lift (Array.to_slice
+                              (Array.make 19#usize [
+                                112#u8, 114#u8, 111#u8, 120#u8, 121#u8, 45#u8,
+                                97#u8, 117#u8, 116#u8, 104#u8, 111#u8, 114#u8,
+                                105#u8, 122#u8, 97#u8, 116#u8, 105#u8, 111#u8,
+                                110#u8
+                                ]))
+                          let b12 ← http_wire.ascii_equal «name» s12
+                          if b12
+                          then ok true
+                          else
+                            let s13 ←
+                              lift (Array.to_slice
+                                (Array.make 16#usize [
+                                  112#u8, 114#u8, 111#u8, 120#u8, 121#u8,
+                                  45#u8, 99#u8, 111#u8, 110#u8, 110#u8, 101#u8,
+                                  99#u8, 116#u8, 105#u8, 111#u8, 110#u8
+                                  ]))
+                            let b13 ← http_wire.ascii_equal «name» s13
+                            if b13
+                            then ok true
+                            else
+                              let s14 ←
+                                lift (Array.to_slice
+                                  (Array.make 2#usize [ 116#u8, 101#u8 ]))
+                              let b14 ← http_wire.ascii_equal «name» s14
+                              if b14
+                              then ok true
+                              else
+                                let s15 ←
+                                  lift (Array.to_slice
+                                    (Array.make 7#usize [
+                                      116#u8, 114#u8, 97#u8, 105#u8, 108#u8,
+                                      101#u8, 114#u8
+                                      ]))
+                                let b15 ← http_wire.ascii_equal «name» s15
+                                if b15
+                                then ok true
+                                else
+                                  let s16 ←
+                                    lift (Array.to_slice
+                                      (Array.make 17#usize [
+                                        116#u8, 114#u8, 97#u8, 110#u8, 115#u8,
+                                        102#u8, 101#u8, 114#u8, 45#u8, 101#u8,
+                                        110#u8, 99#u8, 111#u8, 100#u8, 105#u8,
+                                        110#u8, 103#u8
+                                        ]))
+                                  let b16 ←
+                                    http_wire.ascii_equal «name» s16
+                                  if b16
+                                  then ok true
+                                  else
+                                    let s17 ←
+                                      lift (Array.to_slice
+                                        (Array.make 7#usize [
+                                          117#u8, 112#u8, 103#u8, 114#u8,
+                                          97#u8, 100#u8, 101#u8
+                                          ]))
+                                    let b17 ←
+                                      http_wire.ascii_equal «name» s17
+                                    if b17
+                                    then ok true
+                                    else
+                                      let s18 ←
+                                        lift (Array.to_slice
+                                          (Array.make 10#usize [
+                                            117#u8, 115#u8, 101#u8, 114#u8,
+                                            45#u8, 97#u8, 103#u8, 101#u8,
+                                            110#u8, 116#u8
+                                            ]))
+                                      let b18 ←
+                                        http_wire.ascii_equal «name» s18
+                                      if b18
+                                      then ok true
+                                      else
+                                        let s19 ←
+                                          lift (Array.to_slice
+                                            (Array.make 3#usize [
+                                              118#u8, 105#u8, 97#u8
+                                              ]))
+                                        let b19 ←
+                                          http_wire.ascii_equal «name» s19
+                                        if b19
+                                        then ok true
+                                        else
+                                          let s20 ←
+                                            lift (Array.to_slice
+                                              (Array.make 9#usize [
+                                                120#u8, 45#u8, 97#u8, 112#u8,
+                                                105#u8, 45#u8, 107#u8, 101#u8,
+                                                121#u8
+                                                ]))
+                                          let b20 ←
+                                            http_wire.ascii_equal «name» s20
+                                          if b20
+                                          then ok true
+                                          else
+                                            let s21 ←
+                                              lift (Array.to_slice
+                                                (Array.make 6#usize [
+                                                  112#u8, 114#u8, 111#u8,
+                                                  120#u8, 121#u8, 45#u8
+                                                  ]))
+                                            let b21 ←
+                                              http_wire.ascii_prefix «name»
+                                                s21
+                                            if b21
+                                            then ok true
+                                            else
+                                              let s22 ←
+                                                lift (Array.to_slice
+                                                  (Array.make 4#usize [
+                                                    115#u8, 101#u8, 99#u8,
+                                                    45#u8
+                                                    ]))
+                                              let b22 ←
+                                                http_wire.ascii_prefix «name»
+                                                  s22
+                                              if b22
+                                              then ok true
+                                              else
+                                                let s23 ←
+                                                  lift (Array.to_slice
+                                                    (Array.make 12#usize [
+                                                      120#u8, 45#u8, 102#u8,
+                                                      111#u8, 114#u8, 119#u8,
+                                                      97#u8, 114#u8, 100#u8,
+                                                      101#u8, 100#u8, 45#u8
+                                                      ]))
+                                                http_wire.ascii_prefix «name»
+                                                  s23
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_name]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 85:4-92:1
+    Visibility: public -/
+@[rust_loop]
+def http_wire.valid_name_loop
+  («name» : Slice Std.U8) (i : Std.Usize) : Result Bool := do
+  let i1 := Slice.len «name»
+  if i < i1
+  then
+    let i2 ← Slice.index_usize «name» i
+    let b ← http_wire.alphanumeric i2
+    if b
+    then let i3 ← i + 1#usize
+         http_wire.valid_name_loop «name» i3
+    else
+      if i = 0#usize
+      then ok false
+      else
+        if i2 != 45#u8
+        then ok false
+        else let i3 ← i + 1#usize
+             http_wire.valid_name_loop «name» i3
+  else let b ← http_wire.reserved_name «name»
+       ok (¬ b)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_name]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 80:0-92:1
+    Visibility: public -/
+def http_wire.valid_name («name» : Slice Std.U8) : Result Bool := do
+  let i := Slice.len «name»
+  if i = 0#usize
+  then ok false
+  else
+    let i1 := Slice.len «name»
+    if i1 > 64#usize
+    then ok false
+    else http_wire.valid_name_loop «name» 0#usize
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_header]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 108:0-110:1
+    Visibility: public -/
+def http_wire.valid_header (header : http_wire.Header) : Result Bool := do
+  let s := alloc.vec.Vec.deref header.name
+  let b ← http_wire.valid_name s
+  if b
+  then let s1 := alloc.vec.Vec.deref header.value
+       http_wire.valid_value s1
+  else ok false
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_headers]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 129:4-136:1
+    Visibility: public -/
+@[rust_loop]
+def http_wire.valid_headers_loop
+  (headers : Slice http_wire.Header) (i : Std.Usize) : Result Bool := do
+  let i1 := Slice.len headers
+  if i < i1
+  then
+    let h ← Slice.index_usize headers i
+    let b ← http_wire.valid_header h
+    if b
+    then
+      let s := alloc.vec.Vec.deref h.name
+      let b1 ← http_wire.unique_before headers i s
+      if b1
+      then let i2 ← i + 1#usize
+           http_wire.valid_headers_loop headers i2
+      else ok false
+    else ok false
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_wire::valid_headers]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 124:0-136:1
+    Visibility: public -/
+def http_wire.valid_headers
+  (headers : Slice http_wire.Header) : Result Bool := do
+  let i := Slice.len headers
+  if i > 9#usize
+  then ok false
+  else http_wire.valid_headers_loop headers 0#usize
+
+/-- [aivm_secrets_garrett_core::http_request::append_line]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_request.rs', lines 31:0-44:1
+    Visibility: public -/
+def http_request.append_line
+  (output : alloc.vec.Vec Std.U8) (method : Slice Std.U8)
+  (target : Slice Std.U8) :
+  Result ((core.result.Result Unit http_request.RequestDenial) ×
+    (alloc.vec.Vec Std.U8))
+  := do
+  let b ← http_request.valid_method method
+  if b
+  then
+    let b1 ← http_request.valid_target target
+    if b1
+    then
+      let output1 ←
+        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output method
+      let s ← lift (Array.to_slice (Array.make 1#usize [ 32#u8 ]))
+      let output2 ←
+        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output1 s
+      let output3 ←
+        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output2 target
+      let s1 ←
+        lift (Array.to_slice
+          (Array.make 11#usize [
+            32#u8, 72#u8, 84#u8, 84#u8, 80#u8, 47#u8, 49#u8, 46#u8, 49#u8,
+            13#u8, 10#u8
+            ]))
+      let output4 ←
+        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output3 s1
+      ok (core.result.Result.Ok (), output4)
+    else
+      ok (core.result.Result.Err http_request.RequestDenial.InvalidLine,
+        output)
+  else
+    ok (core.result.Result.Err http_request.RequestDenial.InvalidLine, output)
+
+/-- [aivm_secrets_garrett_core::http_auth::valid_credential]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_auth.rs', lines 15:4-21:1
+    Visibility: public -/
+@[rust_loop]
+def http_auth.valid_credential_loop
+  (iter : core.slice.iter.Iter Std.U8) : Result Bool := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok true
+  | some byte =>
+    if byte < 33#u8
+    then ok false
+    else
+      if byte > 126#u8
+      then ok false
+      else http_auth.valid_credential_loop iter1
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::http_auth::valid_credential]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_auth.rs', lines 11:0-21:1
+    Visibility: public -/
+def http_auth.valid_credential (secret : Slice Std.U8) : Result Bool := do
+  let i := Slice.len secret
+  if i = 0#usize
+  then ok false
+  else
+    let i1 := Slice.len secret
+    if i1 > 4096#usize
+    then ok false
+    else
+      let iter ←
+        SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+          secret
+      http_auth.valid_credential_loop iter
+
+/-- [aivm_secrets_garrett_core::http_auth::append_header]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_auth.rs', lines 23:0-38:1
+    Visibility: public -/
+def http_auth.append_header
+  (output : alloc.vec.Vec Std.U8) (secret : Slice Std.U8)
+  (authentication : credential_use.Authentication) :
+  Result ((core.result.Result Unit http_auth.HeaderDenial) × (alloc.vec.Vec
+    Std.U8))
+  := do
+  let b ← http_auth.valid_credential secret
+  if b
+  then
+    let output1 ←
+      match authentication with
+      | credential_use.Authentication.Bearer =>
+        do
+        let s ←
+          lift (Array.to_slice
+            (Array.make 22#usize [
+              65#u8, 117#u8, 116#u8, 104#u8, 111#u8, 114#u8, 105#u8, 122#u8,
+              97#u8, 116#u8, 105#u8, 111#u8, 110#u8, 58#u8, 32#u8, 66#u8,
+              101#u8, 97#u8, 114#u8, 101#u8, 114#u8, 32#u8
+              ]))
+        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+      | credential_use.Authentication.ApiKey =>
+        do
+        let s ←
+          lift (Array.to_slice
+            (Array.make 11#usize [
+              88#u8, 45#u8, 65#u8, 80#u8, 73#u8, 45#u8, 75#u8, 101#u8, 121#u8,
+              58#u8, 32#u8
+              ]))
+        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+    let output2 ←
+      alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output1 secret
+    let s ← lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
+    let output3 ←
+      alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output2 s
+    ok (core.result.Result.Ok (), output3)
+  else
+    ok (core.result.Result.Err http_auth.HeaderDenial.InvalidCredential,
+      output)
+
+/-- [aivm_secrets_garrett_core::http_wire::append_request]:
+    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 193:0-237:1
+    Visibility: public -/
+def http_wire.append_request
+  (output : alloc.vec.Vec Std.U8) (head : http_wire.Head)
+  (secret : Slice Std.U8) (authentication : credential_use.Authentication)
+  (body : Option (Slice Std.U8)) :
+  Result ((core.result.Result Unit http_wire.EncodingDenial) × (alloc.vec.Vec
+    Std.U8))
+  := do
+  let b ← http_wire.valid_start head
+  if b
+  then
+    let b1 ← http_auth.valid_credential secret
+    if b1
+    then
+      let b2 ← http_wire.valid_body body
+      if b2
+      then
+        let s := alloc.vec.Vec.deref head.headers
+        let b3 ← http_wire.valid_headers s
+        if b3
+        then
+          let s1 := alloc.vec.Vec.deref head.method
+          let s2 := alloc.vec.Vec.deref head.target
+          let (r, output1) ← http_request.append_line output s1 s2
+          let r1 ←
+            core.result.Result.map_err
+              http_wire.append_request.closure.Insts.CoreOpsFunctionFnOnceTupleRequestDenialEncodingDenial
+              r ()
+          let cf ← core.result.Result.Insts.CoreOpsTry.branch r1
+          match cf with
+          | core.ops.control_flow.ControlFlow.Continue _ =>
+            let s3 ←
+              lift (Array.to_slice
+                (Array.make 6#usize [
+                  72#u8, 111#u8, 115#u8, 116#u8, 58#u8, 32#u8
+                  ]))
+            let output2 ←
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output1 s3
+            let s4 := alloc.vec.Vec.deref head.host
+            let output3 ←
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output2 s4
+            let s5 ← lift (Array.to_slice (Array.make 1#usize [ 58#u8 ]))
+            let output4 ←
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output3 s5
+            let i ← lift (UScalar.cast .Usize head.port)
+            let output5 ← http_wire.append_decimal output4 i
+            let s6 ←
+              lift (Array.to_slice
+                (Array.make 10#usize [
+                  13#u8, 10#u8, 65#u8, 99#u8, 99#u8, 101#u8, 112#u8, 116#u8,
+                  58#u8, 32#u8
+                  ]))
+            let output6 ←
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output5 s6
+            let s7 := alloc.vec.Vec.deref head.accept
+            let output7 ←
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output6 s7
+            let s8 ←
+              lift (Array.to_slice
+                (Array.make 76#usize [
+                  13#u8, 10#u8, 65#u8, 99#u8, 99#u8, 101#u8, 112#u8, 116#u8,
+                  45#u8, 69#u8, 110#u8, 99#u8, 111#u8, 100#u8, 105#u8, 110#u8,
+                  103#u8, 58#u8, 32#u8, 105#u8, 100#u8, 101#u8, 110#u8, 116#u8,
+                  105#u8, 116#u8, 121#u8, 13#u8, 10#u8, 85#u8, 115#u8, 101#u8,
+                  114#u8, 45#u8, 65#u8, 103#u8, 101#u8, 110#u8, 116#u8, 58#u8,
+                  32#u8, 97#u8, 105#u8, 118#u8, 109#u8, 45#u8, 115#u8, 101#u8,
+                  99#u8, 114#u8, 101#u8, 116#u8, 115#u8, 47#u8, 49#u8, 13#u8,
+                  10#u8, 67#u8, 111#u8, 110#u8, 110#u8, 101#u8, 99#u8, 116#u8,
+                  105#u8, 111#u8, 110#u8, 58#u8, 32#u8, 99#u8, 108#u8, 111#u8,
+                  115#u8, 101#u8, 13#u8, 10#u8
+                  ]))
+            let output8 ←
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output7 s8
+            let s9 := alloc.vec.Vec.deref head.headers
+            let output9 ← http_wire.append_headers output8 s9
+            let (r2, output10) ←
+              http_auth.append_header output9 secret authentication
+            let r3 ←
+              core.result.Result.map_err
+                http_wire.append_request.closure_1.Insts.CoreOpsFunctionFnOnceTupleHeaderDenialEncodingDenial
+                r2 ()
+            let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r3
+            match cf1 with
+            | core.ops.control_flow.ControlFlow.Continue _ =>
+              let output11 ←
+                match body with
+                | none => ok output10
+                | some bytes =>
+                  do
+                  let s10 ←
+                    lift (Array.to_slice
+                      (Array.make 48#usize [
+                        67#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8,
+                        45#u8, 84#u8, 121#u8, 112#u8, 101#u8, 58#u8, 32#u8,
+                        97#u8, 112#u8, 112#u8, 108#u8, 105#u8, 99#u8, 97#u8,
+                        116#u8, 105#u8, 111#u8, 110#u8, 47#u8, 106#u8, 115#u8,
+                        111#u8, 110#u8, 13#u8, 10#u8, 67#u8, 111#u8, 110#u8,
+                        116#u8, 101#u8, 110#u8, 116#u8, 45#u8, 76#u8, 101#u8,
+                        110#u8, 103#u8, 116#u8, 104#u8, 58#u8, 32#u8
+                        ]))
+                  let output12 ←
+                    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output10
+                      s10
+                  let i1 := Slice.len bytes
+                  let output13 ← http_wire.append_decimal output12 i1
+                  let s11 ←
+                    lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
+                  alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output13
+                    s11
+              let s10 ←
+                lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
+              let output12 ←
+                alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output11 s10
+              match body with
+              | none => ok (core.result.Result.Ok (), output12)
+              | some bytes =>
+                let output13 ←
+                  alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output12
+                    bytes
+                ok (core.result.Result.Ok (), output13)
+            | core.ops.control_flow.ControlFlow.Break residual =>
+              let r4 ←
+                core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+                  Unit (core.convert.FromSame http_wire.EncodingDenial)
+                  residual
+              ok (r4, output10)
+          | core.ops.control_flow.ControlFlow.Break residual =>
+            let r2 ←
+              core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+                Unit (core.convert.FromSame http_wire.EncodingDenial) residual
+            ok (r2, output1)
+        else
+          ok (core.result.Result.Err http_wire.EncodingDenial.InvalidRequest,
+            output)
+      else
+        ok (core.result.Result.Err http_wire.EncodingDenial.InvalidRequest,
+          output)
+    else
+      ok (core.result.Result.Err http_wire.EncodingDenial.InvalidCredential,
+        output)
+  else
+    ok (core.result.Result.Err http_wire.EncodingDenial.InvalidRequest, output)
+
+/-- [aivm_secrets_garrett_core::provider_wire::append]:
+    Source: 'crates/aivm-secrets-garrett-core/src/provider_wire.rs', lines 43:0-62:1
+    Visibility: public -/
+def provider_wire.append
+  (output : alloc.vec.Vec Std.U8) (route : credential_use.Route)
+  (fields : provider_wire.Fields) (secret : Slice Std.U8)
+  (body : Option (Slice Std.U8)) :
+  Result ((core.result.Result provider_wire.Endpoint http_wire.EncodingDenial)
+    × (alloc.vec.Vec Std.U8))
+  := do
+  let r ← provider_wire.head route fields
+  match r with
+  | core.result.Result.Ok head =>
+    let (r1, output1) ←
+      http_wire.append_request output head secret route.authentication body
+    match r1 with
+    | core.result.Result.Ok _ =>
+      ok (core.result.Result.Ok { host := head.host, port := head.port },
+        output1)
+    | core.result.Result.Err error =>
+      ok (core.result.Result.Err error, output1)
+  | core.result.Result.Err error => ok (core.result.Result.Err error, output)
+
+/-- [aivm_secrets_garrett_core::channel_work::encode]:
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 62:0-72:1
+    Visibility: public -/
+def channel_work.encode
+  (output : alloc.vec.Vec Std.U8) (route : credential_use.Route)
+  (parts : channel_work.RequestParts) (secret : alloc.vec.Vec Std.U8) :
+  Result ((core.result.Result provider_wire.Endpoint http_wire.EncodingDenial)
+    × (alloc.vec.Vec Std.U8))
+  := do
+  match parts.body with
+  | none =>
+    let s := alloc.vec.Vec.deref secret
+    provider_wire.append output route parts.fields s none
+  | some bytes =>
+    let s := alloc.vec.Vec.deref secret
+    let s1 := alloc.vec.Vec.deref bytes
+    provider_wire.append output route parts.fields s (some s1)
+
 /-- [aivm_secrets_garrett_core::channel_work::Submitting]
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 44:0-46:1
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 74:0-77:1
     Visibility: public -/
 structure channel_work.Submitting (W : Type _) (Clause0_Body : Type _)
   (Clause0_Writer : Type _) (Clause0_Meta : Type _) (Clause0_Output : Type _)
   (Clause0_Error : Type _) where
   work : W
+  secret : alloc.vec.Vec Std.U8
 
-/-- [aivm_secrets_garrett_core::channel_work::{aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::new]:
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 48:4-50:5
+/-- [aivm_secrets_garrett_core::channel_work::{aivm_secrets_garrett_core::channel_work::Submitting<'a, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::new]:
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 79:4-81:5
     Visibility: public -/
 def channel_work.Submitting.new
   {W : Type _} {Clause0_Body : Type _} {Clause0_Writer : Type _} {Clause0_Meta
   : Type _} {Clause0_Output : Type _} {Clause0_Error : Type _} (ChannelWorkInst
   : channel_work.ChannelWork W Clause0_Body Clause0_Writer Clause0_Meta
-  Clause0_Output Clause0_Error) (work : W) :
+  Clause0_Output Clause0_Error) (work : W) (secret : alloc.vec.Vec Std.U8) :
   Result (channel_work.Submitting W Clause0_Body Clause0_Writer Clause0_Meta
     Clause0_Output Clause0_Error)
   := do
-  ok { work }
+  ok { work, secret }
 
 /-- [aivm_secrets_garrett_core::provider_io::Channel]
     Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 119:0-124:1
@@ -599,8 +1814,8 @@ def response_gate.receive
       (response_gate.Released B W M) (core.convert.FromSame Clause1_Error)
       residual
 
-/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_exchange::Provider<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::receive]:
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 71:4-76:5
+/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_exchange::Provider<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<'_0, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::receive]:
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 102:4-107:5
     Visibility: public -/
 def
   channel_work.Submitting.Insts.Aivm_secrets_garrett_coreProvider_exchangeProviderChannelClause0_OutputClause0_Error.receive
@@ -622,7 +1837,7 @@ def
   match r with
   | core.result.Result.Ok released =>
     let (r1, t) ← ChannelWorkInst.parse self.work released
-    ok (r1, { work := t })
+    ok (r1, { self with work := t })
   | core.result.Result.Err error => ok (core.result.Result.Err error, self)
 
 /-- [aivm_secrets_garrett_core::provider_io::{aivm_secrets_garrett_core::provider_io::Request<B>}::submit]:
@@ -669,8 +1884,8 @@ def provider_io.Channel.submit
   | core.result.Result.Err _ =>
     ok (r, { self with request := r1, writer := t, ready := false })
 
-/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_exchange::Provider<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::send]:
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 68:4-70:5
+/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_exchange::Provider<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<'_0, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::send]:
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 99:4-101:5
     Visibility: public -/
 def
   channel_work.Submitting.Insts.Aivm_secrets_garrett_coreProvider_exchangeProviderChannelClause0_OutputClause0_Error.send
@@ -692,8 +1907,8 @@ def
       ChannelWorkInst.provider_ioWriterInst channel
   ok (r, self, channel1)
 
-/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_exchange::Provider<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::recheck]:
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 65:4-67:5
+/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_exchange::Provider<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<'_0, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::recheck]:
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 96:4-98:5
     Visibility: public -/
 def
   channel_work.Submitting.Insts.Aivm_secrets_garrett_coreProvider_exchangeProviderChannelClause0_OutputClause0_Error.recheck
@@ -710,8 +1925,8 @@ def
   let t ← ChannelWorkInst.INVALID_TRANSITION
   ok (core.result.Result.Err t, self)
 
-/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_exchange::Provider<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::setup]:
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 61:4-63:5
+/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_exchange::Provider<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<'_0, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::setup]:
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 92:4-94:5
     Visibility: public -/
 def
   channel_work.Submitting.Insts.Aivm_secrets_garrett_coreProvider_exchangeProviderChannelClause0_OutputClause0_Error.setup
@@ -728,8 +1943,8 @@ def
   let t ← ChannelWorkInst.INVALID_TRANSITION
   ok (core.result.Result.Err t, self)
 
-/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_exchange::Provider<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::OUTCOME_UNKNOWN]
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 58:4-58:60
+/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_exchange::Provider<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<'_0, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::OUTCOME_UNKNOWN]
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 89:4-89:60
     Visibility: public -/
 @[global_simps, irreducible]
 def
@@ -740,8 +1955,8 @@ def
   Clause0_Output Clause0_Error) : Result Clause0_Error :=
   ChannelWorkInst.OUTCOME_UNKNOWN
 
-/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_exchange::Provider<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::INVALID_POLICY]
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 57:4-57:58
+/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_exchange::Provider<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<'_0, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::INVALID_POLICY]
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 88:4-88:58
     Visibility: public -/
 @[global_simps, irreducible]
 def
@@ -752,8 +1967,8 @@ def
   Clause0_Output Clause0_Error) : Result Clause0_Error :=
   ChannelWorkInst.INVALID_POLICY
 
-/-- Trait implementation: [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_exchange::Provider<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}]
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 53:0-77:1 -/
+/-- Trait implementation: [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_exchange::Provider<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<'_0, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}]
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 84:0-108:1 -/
 @[reducible]
 def
   channel_work.Submitting.Insts.Aivm_secrets_garrett_coreProvider_exchangeProviderChannelClause0_OutputClause0_Error
@@ -806,8 +2021,8 @@ structure dispatch.Work (Self : Type _) (Self_Clause0_Channel : Type _)
   finish : Self → Result ((core.result.Result Unit Self_Clause0_Error) ×
     Self)
 
-/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::dispatch::Work<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::finish]:
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 100:4-102:5
+/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::dispatch::Work<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<'_0, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::finish]:
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 140:4-142:5
     Visibility: public -/
 def
   channel_work.Submitting.Insts.Aivm_secrets_garrett_coreDispatchWorkChannelClause0_OutputClause0_Error.finish
@@ -821,10 +2036,10 @@ def
     Clause0_Body Clause0_Writer Clause0_Meta Clause0_Output Clause0_Error))
   := do
   let (r, t) ← ChannelWorkInst.finish self.work
-  ok (r, { work := t })
+  ok (r, { self with work := t })
 
-/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::dispatch::Work<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::reserve]:
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 97:4-99:5
+/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::dispatch::Work<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<'_0, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::reserve]:
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 137:4-139:5
     Visibility: public -/
 def
   channel_work.Submitting.Insts.Aivm_secrets_garrett_coreDispatchWorkChannelClause0_OutputClause0_Error.reserve
@@ -838,10 +2053,10 @@ def
     Clause0_Body Clause0_Writer Clause0_Meta Clause0_Output Clause0_Error))
   := do
   let (r, t) ← ChannelWorkInst.reserve self.work
-  ok (r, { work := t })
+  ok (r, { self with work := t })
 
-/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::dispatch::Work<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::check]:
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 94:4-96:5
+/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::dispatch::Work<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<'_0, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::check]:
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 134:4-136:5
     Visibility: public -/
 def
   channel_work.Submitting.Insts.Aivm_secrets_garrett_coreDispatchWorkChannelClause0_OutputClause0_Error.check
@@ -855,10 +2070,10 @@ def
     Clause0_Body Clause0_Writer Clause0_Meta Clause0_Output Clause0_Error))
   := do
   let (r, t) ← ChannelWorkInst.check self.work
-  ok (r, { work := t })
+  ok (r, { self with work := t })
 
-/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::dispatch::Work<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::configure]:
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 91:4-93:5
+/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::dispatch::Work<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<'_0, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::configure]:
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 131:4-133:5
     Visibility: public -/
 def
   channel_work.Submitting.Insts.Aivm_secrets_garrett_coreDispatchWorkChannelClause0_OutputClause0_Error.configure
@@ -872,10 +2087,10 @@ def
     Clause0_Body Clause0_Writer Clause0_Meta Clause0_Output Clause0_Error))
   := do
   let (r, t) ← ChannelWorkInst.configure self.work keyed_write
-  ok (r, { work := t })
+  ok (r, { self with work := t })
 
-/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::dispatch::Work<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::audit]:
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 88:4-90:5
+/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::dispatch::Work<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<'_0, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::audit]:
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 128:4-130:5
     Visibility: public -/
 def
   channel_work.Submitting.Insts.Aivm_secrets_garrett_coreDispatchWorkChannelClause0_OutputClause0_Error.audit
@@ -891,8 +2106,1930 @@ def
   let t ← ChannelWorkInst.INVALID_TRANSITION
   ok (core.result.Result.Err t, self)
 
-/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::dispatch::Work<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::prepare]:
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 84:4-86:5
+/-- [aivm_secrets_garrett_core::selected_release::Denial]
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 41:0-45:1
+    Visibility: public -/
+@[discriminant isize]
+inductive selected_release.Denial where
+| Denied : selected_release.Denial
+| UpstreamResponse : selected_release.Denial
+| InvalidRequest : selected_release.Denial
+
+/-- [aivm_secrets_garrett_core::selected_conversion::WireBuilder]
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 200:0-200:23
+    Visibility: public -/
+@[reducible]
+def selected_conversion.WireBuilder := Unit
+
+/-- [aivm_secrets_garrett_core::selected_conversion::WireDenial]
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 107:0-111:1
+    Visibility: public -/
+@[discriminant isize]
+inductive selected_conversion.WireDenial where
+| InvalidText : selected_conversion.WireDenial
+| DuplicateName : selected_conversion.WireDenial
+| Opaque : selected_conversion.WireDenial
+
+/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::invalid]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 250:4-252:5
+    Visibility: public -/
+def
+  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.invalid
+  (self : selected_conversion.WireBuilder) :
+  Result (selected_conversion.WireDenial × selected_conversion.WireBuilder)
+  := do
+  ok (selected_conversion.WireDenial.Opaque, self)
+
+/-- [aivm_secrets_garrett_core::json_wire::Value]
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 6:0-13:1
+    Visibility: public -/
+@[discriminant isize]
+inductive json_wire.Value where
+| Null : json_wire.Value
+| Boolean : Bool → json_wire.Value
+| Number : alloc.vec.Vec Std.U8 → json_wire.Value
+| Text : alloc.vec.Vec Std.U32 → json_wire.Value
+| Array : alloc.vec.Vec json_wire.Value → json_wire.Value
+| Object :
+  alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value) →
+  json_wire.Value
+
+/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::finish_object]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 247:4-249:5
+    Visibility: public -/
+def
+  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.finish_object
+  (self : selected_conversion.WireBuilder)
+  (object : alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value)) :
+  Result (json_wire.Value × selected_conversion.WireBuilder)
+  := do
+  ok (json_wire.Value.Object object, self)
+
+/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::insert]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 235:8-246:5
+    Visibility: public -/
+@[rust_loop]
+def
+  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.insert_loop
+  (object : alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value))
+  («name» : alloc.vec.Vec Std.U32) (value : json_wire.Value) (i : Std.Usize)
+  :
+  Result ((core.result.Result Unit selected_conversion.WireDenial) ×
+    (alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value)))
+  := do
+  let i1 := alloc.vec.Vec.len object
+  if i < i1
+  then
+    let (v, _) ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        ((alloc.vec.Vec Std.U32) × json_wire.Value)) object i
+    let b ←
+      alloc.vec.partial_eq.PartialEqVec.eq core.cmp.PartialEqU32 v «name»
+    if b
+    then
+      ok (core.result.Result.Err selected_conversion.WireDenial.DuplicateName,
+        object)
+    else
+      let i2 ← i + 1#usize
+      selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.insert_loop
+        object «name» value i2
+  else
+    let object1 ← alloc.vec.Vec.push object («name», value)
+    ok (core.result.Result.Ok (), object1)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::insert]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 228:4-246:5
+    Visibility: public -/
+def
+  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.insert
+  (self : selected_conversion.WireBuilder)
+  (object : alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value))
+  («name» : alloc.vec.Vec Std.U32) (value : json_wire.Value) :
+  Result ((core.result.Result Unit selected_conversion.WireDenial) ×
+    selected_conversion.WireBuilder × (alloc.vec.Vec ((alloc.vec.Vec Std.U32)
+    × json_wire.Value)))
+  := do
+  let (r, object1) ←
+    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.insert_loop
+      object «name» value 0#usize
+  ok (r, self, object1)
+
+/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::empty_object]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 225:4-227:5
+    Visibility: public -/
+def
+  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.empty_object
+  (self : selected_conversion.WireBuilder) :
+  Result ((alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value)) ×
+    selected_conversion.WireBuilder)
+  := do
+  ok (alloc.vec.Vec.new ((alloc.vec.Vec Std.U32) × json_wire.Value), self)
+
+/-- [aivm_secrets_garrett_core::selected_conversion::utf8_scalars]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 119:4-178:1
+    Visibility: public -/
+@[rust_loop]
+def selected_conversion.utf8_scalars_loop
+  (bytes : alloc.vec.Vec Std.U8) (scalars : alloc.vec.Vec Std.U32)
+  (i : Std.Usize) :
+  Result (core.result.Result (alloc.vec.Vec Std.U32)
+    selected_conversion.WireDenial)
+  := do
+  let i1 := alloc.vec.Vec.len bytes
+  if i < i1
+  then
+    let first ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U8) bytes
+        i
+    if first < 128#u8
+    then
+      let i2 ← lift (UScalar.cast .U32 first)
+      let scalars1 ← alloc.vec.Vec.push scalars i2
+      let i3 ← i + 1#usize
+      selected_conversion.utf8_scalars_loop bytes scalars1 i3
+    else
+      if first >= 194#u8
+      then
+        if first <= 223#u8
+        then
+          let i2 := alloc.vec.Vec.len bytes
+          let i3 ← i2 - i
+          if i3 < 2#usize
+          then
+            ok (core.result.Result.Err
+              selected_conversion.WireDenial.InvalidText)
+          else
+            let i4 ← i + 1#usize
+            let second ←
+              alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+                Std.U8) bytes i4
+            if second < 128#u8
+            then
+              ok (core.result.Result.Err
+                selected_conversion.WireDenial.InvalidText)
+            else
+              if second > 191#u8
+              then
+                ok (core.result.Result.Err
+                  selected_conversion.WireDenial.InvalidText)
+              else
+                let i5 ← lift (UScalar.cast .U32 first)
+                let i6 ← i5 - 192#u32
+                let i7 ← i6 * 64#u32
+                let i8 ← lift (UScalar.cast .U32 second)
+                let i9 ← i8 - 128#u32
+                let i10 ← i7 + i9
+                let scalars1 ← alloc.vec.Vec.push scalars i10
+                let i11 ← i + 2#usize
+                selected_conversion.utf8_scalars_loop bytes scalars1 i11
+        else
+          if first >= 224#u8
+          then
+            if first <= 239#u8
+            then
+              let i2 := alloc.vec.Vec.len bytes
+              let i3 ← i2 - i
+              if i3 < 3#usize
+              then
+                ok (core.result.Result.Err
+                  selected_conversion.WireDenial.InvalidText)
+              else
+                let i4 ← i + 1#usize
+                let second ←
+                  alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+                    Std.U8) bytes i4
+                let i5 ← i + 2#usize
+                let third ←
+                  alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+                    Std.U8) bytes i5
+                if second < 128#u8
+                then
+                  ok (core.result.Result.Err
+                    selected_conversion.WireDenial.InvalidText)
+                else
+                  if second > 191#u8
+                  then
+                    ok (core.result.Result.Err
+                      selected_conversion.WireDenial.InvalidText)
+                  else
+                    if third < 128#u8
+                    then
+                      ok (core.result.Result.Err
+                        selected_conversion.WireDenial.InvalidText)
+                    else
+                      if third > 191#u8
+                      then
+                        ok (core.result.Result.Err
+                          selected_conversion.WireDenial.InvalidText)
+                      else
+                        if first = 224#u8
+                        then
+                          if second < 160#u8
+                          then
+                            ok (core.result.Result.Err
+                              selected_conversion.WireDenial.InvalidText)
+                          else
+                            if first = 237#u8
+                            then
+                              if second >= 160#u8
+                              then
+                                ok (core.result.Result.Err
+                                  selected_conversion.WireDenial.InvalidText)
+                              else
+                                let i6 ← lift (UScalar.cast .U32 first)
+                                let i7 ← i6 - 224#u32
+                                let i8 ← i7 * 4096#u32
+                                let i9 ← lift (UScalar.cast .U32 second)
+                                let i10 ← i9 - 128#u32
+                                let i11 ← i10 * 64#u32
+                                let i12 ← i8 + i11
+                                let i13 ← lift (UScalar.cast .U32 third)
+                                let i14 ← i13 - 128#u32
+                                let i15 ← i12 + i14
+                                let scalars1 ← alloc.vec.Vec.push scalars i15
+                                let i16 ← i + 3#usize
+                                selected_conversion.utf8_scalars_loop bytes
+                                  scalars1 i16
+                            else
+                              let i6 ← lift (UScalar.cast .U32 first)
+                              let i7 ← i6 - 224#u32
+                              let i8 ← i7 * 4096#u32
+                              let i9 ← lift (UScalar.cast .U32 second)
+                              let i10 ← i9 - 128#u32
+                              let i11 ← i10 * 64#u32
+                              let i12 ← i8 + i11
+                              let i13 ← lift (UScalar.cast .U32 third)
+                              let i14 ← i13 - 128#u32
+                              let i15 ← i12 + i14
+                              let scalars1 ← alloc.vec.Vec.push scalars i15
+                              let i16 ← i + 3#usize
+                              selected_conversion.utf8_scalars_loop bytes
+                                scalars1 i16
+                        else
+                          if first = 237#u8
+                          then
+                            if second >= 160#u8
+                            then
+                              ok (core.result.Result.Err
+                                selected_conversion.WireDenial.InvalidText)
+                            else
+                              let i6 ← lift (UScalar.cast .U32 first)
+                              let i7 ← i6 - 224#u32
+                              let i8 ← i7 * 4096#u32
+                              let i9 ← lift (UScalar.cast .U32 second)
+                              let i10 ← i9 - 128#u32
+                              let i11 ← i10 * 64#u32
+                              let i12 ← i8 + i11
+                              let i13 ← lift (UScalar.cast .U32 third)
+                              let i14 ← i13 - 128#u32
+                              let i15 ← i12 + i14
+                              let scalars1 ← alloc.vec.Vec.push scalars i15
+                              let i16 ← i + 3#usize
+                              selected_conversion.utf8_scalars_loop bytes
+                                scalars1 i16
+                          else
+                            let i6 ← lift (UScalar.cast .U32 first)
+                            let i7 ← i6 - 224#u32
+                            let i8 ← i7 * 4096#u32
+                            let i9 ← lift (UScalar.cast .U32 second)
+                            let i10 ← i9 - 128#u32
+                            let i11 ← i10 * 64#u32
+                            let i12 ← i8 + i11
+                            let i13 ← lift (UScalar.cast .U32 third)
+                            let i14 ← i13 - 128#u32
+                            let i15 ← i12 + i14
+                            let scalars1 ← alloc.vec.Vec.push scalars i15
+                            let i16 ← i + 3#usize
+                            selected_conversion.utf8_scalars_loop bytes
+                              scalars1 i16
+            else
+              if first >= 240#u8
+              then
+                if first <= 244#u8
+                then
+                  let i2 := alloc.vec.Vec.len bytes
+                  let i3 ← i2 - i
+                  if i3 < 4#usize
+                  then
+                    ok (core.result.Result.Err
+                      selected_conversion.WireDenial.InvalidText)
+                  else
+                    let i4 ← i + 1#usize
+                    let second ←
+                      alloc.vec.Vec.index
+                        (core.slice.index.SliceIndexUsizeSlice Std.U8) bytes i4
+                    let i5 ← i + 2#usize
+                    let third ←
+                      alloc.vec.Vec.index
+                        (core.slice.index.SliceIndexUsizeSlice Std.U8) bytes i5
+                    let i6 ← i + 3#usize
+                    let fourth ←
+                      alloc.vec.Vec.index
+                        (core.slice.index.SliceIndexUsizeSlice Std.U8) bytes i6
+                    if second < 128#u8
+                    then
+                      ok (core.result.Result.Err
+                        selected_conversion.WireDenial.InvalidText)
+                    else
+                      if second > 191#u8
+                      then
+                        ok (core.result.Result.Err
+                          selected_conversion.WireDenial.InvalidText)
+                      else
+                        if third < 128#u8
+                        then
+                          ok (core.result.Result.Err
+                            selected_conversion.WireDenial.InvalidText)
+                        else
+                          if third > 191#u8
+                          then
+                            ok (core.result.Result.Err
+                              selected_conversion.WireDenial.InvalidText)
+                          else
+                            if fourth < 128#u8
+                            then
+                              ok (core.result.Result.Err
+                                selected_conversion.WireDenial.InvalidText)
+                            else
+                              if fourth > 191#u8
+                              then
+                                ok (core.result.Result.Err
+                                  selected_conversion.WireDenial.InvalidText)
+                              else
+                                if first = 240#u8
+                                then
+                                  if second < 144#u8
+                                  then
+                                    ok (core.result.Result.Err
+                                      selected_conversion.WireDenial.InvalidText)
+                                  else
+                                    if first = 244#u8
+                                    then
+                                      if second >= 144#u8
+                                      then
+                                        ok (core.result.Result.Err
+                                          selected_conversion.WireDenial.InvalidText)
+                                      else
+                                        let i7 ←
+                                          lift (UScalar.cast .U32 first)
+                                        let i8 ← i7 - 240#u32
+                                        let i9 ← i8 * 262144#u32
+                                        let i10 ←
+                                          lift (UScalar.cast .U32 second)
+                                        let i11 ← i10 - 128#u32
+                                        let i12 ← i11 * 4096#u32
+                                        let i13 ← i9 + i12
+                                        let i14 ←
+                                          lift (UScalar.cast .U32 third)
+                                        let i15 ← i14 - 128#u32
+                                        let i16 ← i15 * 64#u32
+                                        let i17 ← i13 + i16
+                                        let i18 ←
+                                          lift (UScalar.cast .U32 fourth)
+                                        let i19 ← i18 - 128#u32
+                                        let i20 ← i17 + i19
+                                        let scalars1 ←
+                                          alloc.vec.Vec.push scalars i20
+                                        let i21 ← i + 4#usize
+                                        selected_conversion.utf8_scalars_loop
+                                          bytes scalars1 i21
+                                    else
+                                      let i7 ← lift (UScalar.cast .U32 first)
+                                      let i8 ← i7 - 240#u32
+                                      let i9 ← i8 * 262144#u32
+                                      let i10 ←
+                                        lift (UScalar.cast .U32 second)
+                                      let i11 ← i10 - 128#u32
+                                      let i12 ← i11 * 4096#u32
+                                      let i13 ← i9 + i12
+                                      let i14 ←
+                                        lift (UScalar.cast .U32 third)
+                                      let i15 ← i14 - 128#u32
+                                      let i16 ← i15 * 64#u32
+                                      let i17 ← i13 + i16
+                                      let i18 ←
+                                        lift (UScalar.cast .U32 fourth)
+                                      let i19 ← i18 - 128#u32
+                                      let i20 ← i17 + i19
+                                      let scalars1 ←
+                                        alloc.vec.Vec.push scalars i20
+                                      let i21 ← i + 4#usize
+                                      selected_conversion.utf8_scalars_loop
+                                        bytes scalars1 i21
+                                else
+                                  if first = 244#u8
+                                  then
+                                    if second >= 144#u8
+                                    then
+                                      ok (core.result.Result.Err
+                                        selected_conversion.WireDenial.InvalidText)
+                                    else
+                                      let i7 ← lift (UScalar.cast .U32 first)
+                                      let i8 ← i7 - 240#u32
+                                      let i9 ← i8 * 262144#u32
+                                      let i10 ←
+                                        lift (UScalar.cast .U32 second)
+                                      let i11 ← i10 - 128#u32
+                                      let i12 ← i11 * 4096#u32
+                                      let i13 ← i9 + i12
+                                      let i14 ←
+                                        lift (UScalar.cast .U32 third)
+                                      let i15 ← i14 - 128#u32
+                                      let i16 ← i15 * 64#u32
+                                      let i17 ← i13 + i16
+                                      let i18 ←
+                                        lift (UScalar.cast .U32 fourth)
+                                      let i19 ← i18 - 128#u32
+                                      let i20 ← i17 + i19
+                                      let scalars1 ←
+                                        alloc.vec.Vec.push scalars i20
+                                      let i21 ← i + 4#usize
+                                      selected_conversion.utf8_scalars_loop
+                                        bytes scalars1 i21
+                                  else
+                                    let i7 ← lift (UScalar.cast .U32 first)
+                                    let i8 ← i7 - 240#u32
+                                    let i9 ← i8 * 262144#u32
+                                    let i10 ← lift (UScalar.cast .U32 second)
+                                    let i11 ← i10 - 128#u32
+                                    let i12 ← i11 * 4096#u32
+                                    let i13 ← i9 + i12
+                                    let i14 ← lift (UScalar.cast .U32 third)
+                                    let i15 ← i14 - 128#u32
+                                    let i16 ← i15 * 64#u32
+                                    let i17 ← i13 + i16
+                                    let i18 ← lift (UScalar.cast .U32 fourth)
+                                    let i19 ← i18 - 128#u32
+                                    let i20 ← i17 + i19
+                                    let scalars1 ←
+                                      alloc.vec.Vec.push scalars i20
+                                    let i21 ← i + 4#usize
+                                    selected_conversion.utf8_scalars_loop bytes
+                                      scalars1 i21
+                else
+                  ok (core.result.Result.Err
+                    selected_conversion.WireDenial.InvalidText)
+              else
+                ok (core.result.Result.Err
+                  selected_conversion.WireDenial.InvalidText)
+          else
+            if first >= 240#u8
+            then
+              if first <= 244#u8
+              then
+                let i2 := alloc.vec.Vec.len bytes
+                let i3 ← i2 - i
+                if i3 < 4#usize
+                then
+                  ok (core.result.Result.Err
+                    selected_conversion.WireDenial.InvalidText)
+                else
+                  let i4 ← i + 1#usize
+                  let second ←
+                    alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+                      Std.U8) bytes i4
+                  let i5 ← i + 2#usize
+                  let third ←
+                    alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+                      Std.U8) bytes i5
+                  let i6 ← i + 3#usize
+                  let fourth ←
+                    alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+                      Std.U8) bytes i6
+                  if second < 128#u8
+                  then
+                    ok (core.result.Result.Err
+                      selected_conversion.WireDenial.InvalidText)
+                  else
+                    if second > 191#u8
+                    then
+                      ok (core.result.Result.Err
+                        selected_conversion.WireDenial.InvalidText)
+                    else
+                      if third < 128#u8
+                      then
+                        ok (core.result.Result.Err
+                          selected_conversion.WireDenial.InvalidText)
+                      else
+                        if third > 191#u8
+                        then
+                          ok (core.result.Result.Err
+                            selected_conversion.WireDenial.InvalidText)
+                        else
+                          if fourth < 128#u8
+                          then
+                            ok (core.result.Result.Err
+                              selected_conversion.WireDenial.InvalidText)
+                          else
+                            if fourth > 191#u8
+                            then
+                              ok (core.result.Result.Err
+                                selected_conversion.WireDenial.InvalidText)
+                            else
+                              if first = 240#u8
+                              then
+                                if second < 144#u8
+                                then
+                                  ok (core.result.Result.Err
+                                    selected_conversion.WireDenial.InvalidText)
+                                else
+                                  if first = 244#u8
+                                  then
+                                    if second >= 144#u8
+                                    then
+                                      ok (core.result.Result.Err
+                                        selected_conversion.WireDenial.InvalidText)
+                                    else
+                                      let i7 ← lift (UScalar.cast .U32 first)
+                                      let i8 ← i7 - 240#u32
+                                      let i9 ← i8 * 262144#u32
+                                      let i10 ←
+                                        lift (UScalar.cast .U32 second)
+                                      let i11 ← i10 - 128#u32
+                                      let i12 ← i11 * 4096#u32
+                                      let i13 ← i9 + i12
+                                      let i14 ←
+                                        lift (UScalar.cast .U32 third)
+                                      let i15 ← i14 - 128#u32
+                                      let i16 ← i15 * 64#u32
+                                      let i17 ← i13 + i16
+                                      let i18 ←
+                                        lift (UScalar.cast .U32 fourth)
+                                      let i19 ← i18 - 128#u32
+                                      let i20 ← i17 + i19
+                                      let scalars1 ←
+                                        alloc.vec.Vec.push scalars i20
+                                      let i21 ← i + 4#usize
+                                      selected_conversion.utf8_scalars_loop
+                                        bytes scalars1 i21
+                                  else
+                                    let i7 ← lift (UScalar.cast .U32 first)
+                                    let i8 ← i7 - 240#u32
+                                    let i9 ← i8 * 262144#u32
+                                    let i10 ← lift (UScalar.cast .U32 second)
+                                    let i11 ← i10 - 128#u32
+                                    let i12 ← i11 * 4096#u32
+                                    let i13 ← i9 + i12
+                                    let i14 ← lift (UScalar.cast .U32 third)
+                                    let i15 ← i14 - 128#u32
+                                    let i16 ← i15 * 64#u32
+                                    let i17 ← i13 + i16
+                                    let i18 ← lift (UScalar.cast .U32 fourth)
+                                    let i19 ← i18 - 128#u32
+                                    let i20 ← i17 + i19
+                                    let scalars1 ←
+                                      alloc.vec.Vec.push scalars i20
+                                    let i21 ← i + 4#usize
+                                    selected_conversion.utf8_scalars_loop bytes
+                                      scalars1 i21
+                              else
+                                if first = 244#u8
+                                then
+                                  if second >= 144#u8
+                                  then
+                                    ok (core.result.Result.Err
+                                      selected_conversion.WireDenial.InvalidText)
+                                  else
+                                    let i7 ← lift (UScalar.cast .U32 first)
+                                    let i8 ← i7 - 240#u32
+                                    let i9 ← i8 * 262144#u32
+                                    let i10 ← lift (UScalar.cast .U32 second)
+                                    let i11 ← i10 - 128#u32
+                                    let i12 ← i11 * 4096#u32
+                                    let i13 ← i9 + i12
+                                    let i14 ← lift (UScalar.cast .U32 third)
+                                    let i15 ← i14 - 128#u32
+                                    let i16 ← i15 * 64#u32
+                                    let i17 ← i13 + i16
+                                    let i18 ← lift (UScalar.cast .U32 fourth)
+                                    let i19 ← i18 - 128#u32
+                                    let i20 ← i17 + i19
+                                    let scalars1 ←
+                                      alloc.vec.Vec.push scalars i20
+                                    let i21 ← i + 4#usize
+                                    selected_conversion.utf8_scalars_loop bytes
+                                      scalars1 i21
+                                else
+                                  let i7 ← lift (UScalar.cast .U32 first)
+                                  let i8 ← i7 - 240#u32
+                                  let i9 ← i8 * 262144#u32
+                                  let i10 ← lift (UScalar.cast .U32 second)
+                                  let i11 ← i10 - 128#u32
+                                  let i12 ← i11 * 4096#u32
+                                  let i13 ← i9 + i12
+                                  let i14 ← lift (UScalar.cast .U32 third)
+                                  let i15 ← i14 - 128#u32
+                                  let i16 ← i15 * 64#u32
+                                  let i17 ← i13 + i16
+                                  let i18 ← lift (UScalar.cast .U32 fourth)
+                                  let i19 ← i18 - 128#u32
+                                  let i20 ← i17 + i19
+                                  let scalars1 ←
+                                    alloc.vec.Vec.push scalars i20
+                                  let i21 ← i + 4#usize
+                                  selected_conversion.utf8_scalars_loop bytes
+                                    scalars1 i21
+              else
+                ok (core.result.Result.Err
+                  selected_conversion.WireDenial.InvalidText)
+            else
+              ok (core.result.Result.Err
+                selected_conversion.WireDenial.InvalidText)
+      else
+        if first >= 224#u8
+        then
+          if first <= 239#u8
+          then
+            let i2 := alloc.vec.Vec.len bytes
+            let i3 ← i2 - i
+            if i3 < 3#usize
+            then
+              ok (core.result.Result.Err
+                selected_conversion.WireDenial.InvalidText)
+            else
+              let i4 ← i + 1#usize
+              let second ←
+                alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+                  Std.U8) bytes i4
+              let i5 ← i + 2#usize
+              let third ←
+                alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+                  Std.U8) bytes i5
+              if second < 128#u8
+              then
+                ok (core.result.Result.Err
+                  selected_conversion.WireDenial.InvalidText)
+              else
+                if second > 191#u8
+                then
+                  ok (core.result.Result.Err
+                    selected_conversion.WireDenial.InvalidText)
+                else
+                  if third < 128#u8
+                  then
+                    ok (core.result.Result.Err
+                      selected_conversion.WireDenial.InvalidText)
+                  else
+                    if third > 191#u8
+                    then
+                      ok (core.result.Result.Err
+                        selected_conversion.WireDenial.InvalidText)
+                    else
+                      if first = 224#u8
+                      then
+                        if second < 160#u8
+                        then
+                          ok (core.result.Result.Err
+                            selected_conversion.WireDenial.InvalidText)
+                        else
+                          if first = 237#u8
+                          then
+                            if second >= 160#u8
+                            then
+                              ok (core.result.Result.Err
+                                selected_conversion.WireDenial.InvalidText)
+                            else
+                              let i6 ← lift (UScalar.cast .U32 first)
+                              let i7 ← i6 - 224#u32
+                              let i8 ← i7 * 4096#u32
+                              let i9 ← lift (UScalar.cast .U32 second)
+                              let i10 ← i9 - 128#u32
+                              let i11 ← i10 * 64#u32
+                              let i12 ← i8 + i11
+                              let i13 ← lift (UScalar.cast .U32 third)
+                              let i14 ← i13 - 128#u32
+                              let i15 ← i12 + i14
+                              let scalars1 ← alloc.vec.Vec.push scalars i15
+                              let i16 ← i + 3#usize
+                              selected_conversion.utf8_scalars_loop bytes
+                                scalars1 i16
+                          else
+                            let i6 ← lift (UScalar.cast .U32 first)
+                            let i7 ← i6 - 224#u32
+                            let i8 ← i7 * 4096#u32
+                            let i9 ← lift (UScalar.cast .U32 second)
+                            let i10 ← i9 - 128#u32
+                            let i11 ← i10 * 64#u32
+                            let i12 ← i8 + i11
+                            let i13 ← lift (UScalar.cast .U32 third)
+                            let i14 ← i13 - 128#u32
+                            let i15 ← i12 + i14
+                            let scalars1 ← alloc.vec.Vec.push scalars i15
+                            let i16 ← i + 3#usize
+                            selected_conversion.utf8_scalars_loop bytes
+                              scalars1 i16
+                      else
+                        if first = 237#u8
+                        then
+                          if second >= 160#u8
+                          then
+                            ok (core.result.Result.Err
+                              selected_conversion.WireDenial.InvalidText)
+                          else
+                            let i6 ← lift (UScalar.cast .U32 first)
+                            let i7 ← i6 - 224#u32
+                            let i8 ← i7 * 4096#u32
+                            let i9 ← lift (UScalar.cast .U32 second)
+                            let i10 ← i9 - 128#u32
+                            let i11 ← i10 * 64#u32
+                            let i12 ← i8 + i11
+                            let i13 ← lift (UScalar.cast .U32 third)
+                            let i14 ← i13 - 128#u32
+                            let i15 ← i12 + i14
+                            let scalars1 ← alloc.vec.Vec.push scalars i15
+                            let i16 ← i + 3#usize
+                            selected_conversion.utf8_scalars_loop bytes
+                              scalars1 i16
+                        else
+                          let i6 ← lift (UScalar.cast .U32 first)
+                          let i7 ← i6 - 224#u32
+                          let i8 ← i7 * 4096#u32
+                          let i9 ← lift (UScalar.cast .U32 second)
+                          let i10 ← i9 - 128#u32
+                          let i11 ← i10 * 64#u32
+                          let i12 ← i8 + i11
+                          let i13 ← lift (UScalar.cast .U32 third)
+                          let i14 ← i13 - 128#u32
+                          let i15 ← i12 + i14
+                          let scalars1 ← alloc.vec.Vec.push scalars i15
+                          let i16 ← i + 3#usize
+                          selected_conversion.utf8_scalars_loop bytes scalars1
+                            i16
+          else
+            if first >= 240#u8
+            then
+              if first <= 244#u8
+              then
+                let i2 := alloc.vec.Vec.len bytes
+                let i3 ← i2 - i
+                if i3 < 4#usize
+                then
+                  ok (core.result.Result.Err
+                    selected_conversion.WireDenial.InvalidText)
+                else
+                  let i4 ← i + 1#usize
+                  let second ←
+                    alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+                      Std.U8) bytes i4
+                  let i5 ← i + 2#usize
+                  let third ←
+                    alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+                      Std.U8) bytes i5
+                  let i6 ← i + 3#usize
+                  let fourth ←
+                    alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+                      Std.U8) bytes i6
+                  if second < 128#u8
+                  then
+                    ok (core.result.Result.Err
+                      selected_conversion.WireDenial.InvalidText)
+                  else
+                    if second > 191#u8
+                    then
+                      ok (core.result.Result.Err
+                        selected_conversion.WireDenial.InvalidText)
+                    else
+                      if third < 128#u8
+                      then
+                        ok (core.result.Result.Err
+                          selected_conversion.WireDenial.InvalidText)
+                      else
+                        if third > 191#u8
+                        then
+                          ok (core.result.Result.Err
+                            selected_conversion.WireDenial.InvalidText)
+                        else
+                          if fourth < 128#u8
+                          then
+                            ok (core.result.Result.Err
+                              selected_conversion.WireDenial.InvalidText)
+                          else
+                            if fourth > 191#u8
+                            then
+                              ok (core.result.Result.Err
+                                selected_conversion.WireDenial.InvalidText)
+                            else
+                              if first = 240#u8
+                              then
+                                if second < 144#u8
+                                then
+                                  ok (core.result.Result.Err
+                                    selected_conversion.WireDenial.InvalidText)
+                                else
+                                  if first = 244#u8
+                                  then
+                                    if second >= 144#u8
+                                    then
+                                      ok (core.result.Result.Err
+                                        selected_conversion.WireDenial.InvalidText)
+                                    else
+                                      let i7 ← lift (UScalar.cast .U32 first)
+                                      let i8 ← i7 - 240#u32
+                                      let i9 ← i8 * 262144#u32
+                                      let i10 ←
+                                        lift (UScalar.cast .U32 second)
+                                      let i11 ← i10 - 128#u32
+                                      let i12 ← i11 * 4096#u32
+                                      let i13 ← i9 + i12
+                                      let i14 ←
+                                        lift (UScalar.cast .U32 third)
+                                      let i15 ← i14 - 128#u32
+                                      let i16 ← i15 * 64#u32
+                                      let i17 ← i13 + i16
+                                      let i18 ←
+                                        lift (UScalar.cast .U32 fourth)
+                                      let i19 ← i18 - 128#u32
+                                      let i20 ← i17 + i19
+                                      let scalars1 ←
+                                        alloc.vec.Vec.push scalars i20
+                                      let i21 ← i + 4#usize
+                                      selected_conversion.utf8_scalars_loop
+                                        bytes scalars1 i21
+                                  else
+                                    let i7 ← lift (UScalar.cast .U32 first)
+                                    let i8 ← i7 - 240#u32
+                                    let i9 ← i8 * 262144#u32
+                                    let i10 ← lift (UScalar.cast .U32 second)
+                                    let i11 ← i10 - 128#u32
+                                    let i12 ← i11 * 4096#u32
+                                    let i13 ← i9 + i12
+                                    let i14 ← lift (UScalar.cast .U32 third)
+                                    let i15 ← i14 - 128#u32
+                                    let i16 ← i15 * 64#u32
+                                    let i17 ← i13 + i16
+                                    let i18 ← lift (UScalar.cast .U32 fourth)
+                                    let i19 ← i18 - 128#u32
+                                    let i20 ← i17 + i19
+                                    let scalars1 ←
+                                      alloc.vec.Vec.push scalars i20
+                                    let i21 ← i + 4#usize
+                                    selected_conversion.utf8_scalars_loop bytes
+                                      scalars1 i21
+                              else
+                                if first = 244#u8
+                                then
+                                  if second >= 144#u8
+                                  then
+                                    ok (core.result.Result.Err
+                                      selected_conversion.WireDenial.InvalidText)
+                                  else
+                                    let i7 ← lift (UScalar.cast .U32 first)
+                                    let i8 ← i7 - 240#u32
+                                    let i9 ← i8 * 262144#u32
+                                    let i10 ← lift (UScalar.cast .U32 second)
+                                    let i11 ← i10 - 128#u32
+                                    let i12 ← i11 * 4096#u32
+                                    let i13 ← i9 + i12
+                                    let i14 ← lift (UScalar.cast .U32 third)
+                                    let i15 ← i14 - 128#u32
+                                    let i16 ← i15 * 64#u32
+                                    let i17 ← i13 + i16
+                                    let i18 ← lift (UScalar.cast .U32 fourth)
+                                    let i19 ← i18 - 128#u32
+                                    let i20 ← i17 + i19
+                                    let scalars1 ←
+                                      alloc.vec.Vec.push scalars i20
+                                    let i21 ← i + 4#usize
+                                    selected_conversion.utf8_scalars_loop bytes
+                                      scalars1 i21
+                                else
+                                  let i7 ← lift (UScalar.cast .U32 first)
+                                  let i8 ← i7 - 240#u32
+                                  let i9 ← i8 * 262144#u32
+                                  let i10 ← lift (UScalar.cast .U32 second)
+                                  let i11 ← i10 - 128#u32
+                                  let i12 ← i11 * 4096#u32
+                                  let i13 ← i9 + i12
+                                  let i14 ← lift (UScalar.cast .U32 third)
+                                  let i15 ← i14 - 128#u32
+                                  let i16 ← i15 * 64#u32
+                                  let i17 ← i13 + i16
+                                  let i18 ← lift (UScalar.cast .U32 fourth)
+                                  let i19 ← i18 - 128#u32
+                                  let i20 ← i17 + i19
+                                  let scalars1 ←
+                                    alloc.vec.Vec.push scalars i20
+                                  let i21 ← i + 4#usize
+                                  selected_conversion.utf8_scalars_loop bytes
+                                    scalars1 i21
+              else
+                ok (core.result.Result.Err
+                  selected_conversion.WireDenial.InvalidText)
+            else
+              ok (core.result.Result.Err
+                selected_conversion.WireDenial.InvalidText)
+        else
+          if first >= 240#u8
+          then
+            if first <= 244#u8
+            then
+              let i2 := alloc.vec.Vec.len bytes
+              let i3 ← i2 - i
+              if i3 < 4#usize
+              then
+                ok (core.result.Result.Err
+                  selected_conversion.WireDenial.InvalidText)
+              else
+                let i4 ← i + 1#usize
+                let second ←
+                  alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+                    Std.U8) bytes i4
+                let i5 ← i + 2#usize
+                let third ←
+                  alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+                    Std.U8) bytes i5
+                let i6 ← i + 3#usize
+                let fourth ←
+                  alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+                    Std.U8) bytes i6
+                if second < 128#u8
+                then
+                  ok (core.result.Result.Err
+                    selected_conversion.WireDenial.InvalidText)
+                else
+                  if second > 191#u8
+                  then
+                    ok (core.result.Result.Err
+                      selected_conversion.WireDenial.InvalidText)
+                  else
+                    if third < 128#u8
+                    then
+                      ok (core.result.Result.Err
+                        selected_conversion.WireDenial.InvalidText)
+                    else
+                      if third > 191#u8
+                      then
+                        ok (core.result.Result.Err
+                          selected_conversion.WireDenial.InvalidText)
+                      else
+                        if fourth < 128#u8
+                        then
+                          ok (core.result.Result.Err
+                            selected_conversion.WireDenial.InvalidText)
+                        else
+                          if fourth > 191#u8
+                          then
+                            ok (core.result.Result.Err
+                              selected_conversion.WireDenial.InvalidText)
+                          else
+                            if first = 240#u8
+                            then
+                              if second < 144#u8
+                              then
+                                ok (core.result.Result.Err
+                                  selected_conversion.WireDenial.InvalidText)
+                              else
+                                if first = 244#u8
+                                then
+                                  if second >= 144#u8
+                                  then
+                                    ok (core.result.Result.Err
+                                      selected_conversion.WireDenial.InvalidText)
+                                  else
+                                    let i7 ← lift (UScalar.cast .U32 first)
+                                    let i8 ← i7 - 240#u32
+                                    let i9 ← i8 * 262144#u32
+                                    let i10 ← lift (UScalar.cast .U32 second)
+                                    let i11 ← i10 - 128#u32
+                                    let i12 ← i11 * 4096#u32
+                                    let i13 ← i9 + i12
+                                    let i14 ← lift (UScalar.cast .U32 third)
+                                    let i15 ← i14 - 128#u32
+                                    let i16 ← i15 * 64#u32
+                                    let i17 ← i13 + i16
+                                    let i18 ← lift (UScalar.cast .U32 fourth)
+                                    let i19 ← i18 - 128#u32
+                                    let i20 ← i17 + i19
+                                    let scalars1 ←
+                                      alloc.vec.Vec.push scalars i20
+                                    let i21 ← i + 4#usize
+                                    selected_conversion.utf8_scalars_loop bytes
+                                      scalars1 i21
+                                else
+                                  let i7 ← lift (UScalar.cast .U32 first)
+                                  let i8 ← i7 - 240#u32
+                                  let i9 ← i8 * 262144#u32
+                                  let i10 ← lift (UScalar.cast .U32 second)
+                                  let i11 ← i10 - 128#u32
+                                  let i12 ← i11 * 4096#u32
+                                  let i13 ← i9 + i12
+                                  let i14 ← lift (UScalar.cast .U32 third)
+                                  let i15 ← i14 - 128#u32
+                                  let i16 ← i15 * 64#u32
+                                  let i17 ← i13 + i16
+                                  let i18 ← lift (UScalar.cast .U32 fourth)
+                                  let i19 ← i18 - 128#u32
+                                  let i20 ← i17 + i19
+                                  let scalars1 ←
+                                    alloc.vec.Vec.push scalars i20
+                                  let i21 ← i + 4#usize
+                                  selected_conversion.utf8_scalars_loop bytes
+                                    scalars1 i21
+                            else
+                              if first = 244#u8
+                              then
+                                if second >= 144#u8
+                                then
+                                  ok (core.result.Result.Err
+                                    selected_conversion.WireDenial.InvalidText)
+                                else
+                                  let i7 ← lift (UScalar.cast .U32 first)
+                                  let i8 ← i7 - 240#u32
+                                  let i9 ← i8 * 262144#u32
+                                  let i10 ← lift (UScalar.cast .U32 second)
+                                  let i11 ← i10 - 128#u32
+                                  let i12 ← i11 * 4096#u32
+                                  let i13 ← i9 + i12
+                                  let i14 ← lift (UScalar.cast .U32 third)
+                                  let i15 ← i14 - 128#u32
+                                  let i16 ← i15 * 64#u32
+                                  let i17 ← i13 + i16
+                                  let i18 ← lift (UScalar.cast .U32 fourth)
+                                  let i19 ← i18 - 128#u32
+                                  let i20 ← i17 + i19
+                                  let scalars1 ←
+                                    alloc.vec.Vec.push scalars i20
+                                  let i21 ← i + 4#usize
+                                  selected_conversion.utf8_scalars_loop bytes
+                                    scalars1 i21
+                              else
+                                let i7 ← lift (UScalar.cast .U32 first)
+                                let i8 ← i7 - 240#u32
+                                let i9 ← i8 * 262144#u32
+                                let i10 ← lift (UScalar.cast .U32 second)
+                                let i11 ← i10 - 128#u32
+                                let i12 ← i11 * 4096#u32
+                                let i13 ← i9 + i12
+                                let i14 ← lift (UScalar.cast .U32 third)
+                                let i15 ← i14 - 128#u32
+                                let i16 ← i15 * 64#u32
+                                let i17 ← i13 + i16
+                                let i18 ← lift (UScalar.cast .U32 fourth)
+                                let i19 ← i18 - 128#u32
+                                let i20 ← i17 + i19
+                                let scalars1 ← alloc.vec.Vec.push scalars i20
+                                let i21 ← i + 4#usize
+                                selected_conversion.utf8_scalars_loop bytes
+                                  scalars1 i21
+            else
+              ok (core.result.Result.Err
+                selected_conversion.WireDenial.InvalidText)
+          else
+            ok (core.result.Result.Err
+              selected_conversion.WireDenial.InvalidText)
+  else ok (core.result.Result.Ok scalars)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::selected_conversion::utf8_scalars]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 116:0-178:1
+    Visibility: public -/
+@[reducible]
+def selected_conversion.utf8_scalars
+  (bytes : alloc.vec.Vec Std.U8) :
+  Result (core.result.Result (alloc.vec.Vec Std.U32)
+    selected_conversion.WireDenial)
+  := do
+  selected_conversion.utf8_scalars_loop bytes (alloc.vec.Vec.new Std.U32)
+    0#usize
+
+/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::name]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 222:4-224:5
+    Visibility: public -/
+def
+  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.name
+  (self : selected_conversion.WireBuilder) (bytes : alloc.vec.Vec Std.U8) :
+  Result ((core.result.Result (alloc.vec.Vec Std.U32)
+    selected_conversion.WireDenial) × selected_conversion.WireBuilder)
+  := do
+  let r ← selected_conversion.utf8_scalars bytes
+  ok (r, self)
+
+/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::array]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 219:4-221:5
+    Visibility: public -/
+def
+  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.array
+  (self : selected_conversion.WireBuilder)
+  (values : alloc.vec.Vec json_wire.Value) :
+  Result (json_wire.Value × selected_conversion.WireBuilder)
+  := do
+  ok (json_wire.Value.Array values, self)
+
+/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::text]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 216:4-218:5
+    Visibility: public -/
+def
+  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.text
+  (self : selected_conversion.WireBuilder) (bytes : alloc.vec.Vec Std.U8) :
+  Result ((core.result.Result json_wire.Value selected_conversion.WireDenial)
+    × selected_conversion.WireBuilder)
+  := do
+  let r ← selected_conversion.utf8_scalars bytes
+  let cf ← core.result.Result.Insts.CoreOpsTry.branch r
+  match cf with
+  | core.ops.control_flow.ControlFlow.Continue val =>
+    ok (core.result.Result.Ok (json_wire.Value.Text val), self)
+  | core.ops.control_flow.ControlFlow.Break residual =>
+    let r1 ←
+      core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+        json_wire.Value (core.convert.FromSame selected_conversion.WireDenial)
+        residual
+    ok (r1, self)
+
+/-- [aivm_secrets_garrett_core::selected_conversion::append_u64_decimal]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 181:0-186:1 -/
+def selected_conversion.append_u64_decimal
+  (output : alloc.vec.Vec Std.U8) (value : Std.U64) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let output1 ←
+    if value >= 10#u64
+    then
+      do
+      let i ← value / 10#u64
+      selected_conversion.append_u64_decimal output i
+    else ok output
+  let i ← value % 10#u64
+  let i1 ← lift (UScalar.cast .U8 i)
+  let i2 ← 48#u8 + i1
+  alloc.vec.Vec.push output1 i2
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::selected_conversion::integer_token]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 187:0-198:1
+    Visibility: public -/
+def selected_conversion.integer_token
+  (value : Std.I64) : Result (alloc.vec.Vec Std.U8) := do
+  if value = core.num.I64.MIN
+  then
+    let s ←
+      lift (Array.to_slice
+        (Array.make 20#usize [
+          45#u8, 57#u8, 50#u8, 50#u8, 51#u8, 51#u8, 55#u8, 50#u8, 48#u8, 51#u8,
+          54#u8, 56#u8, 53#u8, 52#u8, 55#u8, 55#u8, 53#u8, 56#u8, 48#u8, 56#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  else
+    if value < 0#i64
+    then
+      let output ← alloc.vec.Vec.push (alloc.vec.Vec.new Std.U8) 45#u8
+      let i ← -. value
+      let i1 ← lift (IScalar.hcast .U64 i)
+      selected_conversion.append_u64_decimal output i1
+    else
+      let i ← lift (IScalar.hcast .U64 value)
+      selected_conversion.append_u64_decimal (alloc.vec.Vec.new Std.U8) i
+
+/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::integer]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 213:4-215:5
+    Visibility: public -/
+def
+  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.integer
+  (self : selected_conversion.WireBuilder) (value : Std.I64) :
+  Result (json_wire.Value × selected_conversion.WireBuilder)
+  := do
+  let v ← selected_conversion.integer_token value
+  ok (json_wire.Value.Number v, self)
+
+/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::boolean]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 210:4-212:5
+    Visibility: public -/
+def
+  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.boolean
+  (self : selected_conversion.WireBuilder) (value : Bool) :
+  Result (json_wire.Value × selected_conversion.WireBuilder)
+  := do
+  ok (json_wire.Value.Boolean value, self)
+
+/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::null]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 207:4-209:5
+    Visibility: public -/
+def
+  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.null
+  (self : selected_conversion.WireBuilder) :
+  Result (json_wire.Value × selected_conversion.WireBuilder)
+  := do
+  ok (json_wire.Value.Null, self)
+
+/-- Trait declaration: [aivm_secrets_garrett_core::selected_conversion::Builder]
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 41:0-62:1
+    Visibility: public -/
+structure selected_conversion.Builder (Self : Type _) (Self_Value : Type _)
+  (Self_Name : Type _) (Self_Object : Type _) (Self_Error : Type _) where
+  null : Self → Result (Self_Value × Self)
+  boolean : Self → Bool → Result (Self_Value × Self)
+  integer : Self → Std.I64 → Result (Self_Value × Self)
+  text : Self → alloc.vec.Vec Std.U8 → Result ((core.result.Result
+    Self_Value Self_Error) × Self)
+  array : Self → alloc.vec.Vec Self_Value → Result (Self_Value × Self)
+  «name» : Self → alloc.vec.Vec Std.U8 → Result ((core.result.Result
+    Self_Name Self_Error) × Self)
+  empty_object : Self → Result (Self_Object × Self)
+  insert : Self → Self_Object → Self_Name → Self_Value → Result
+    ((core.result.Result Unit Self_Error) × Self × Self_Object)
+  finish_object : Self → Self_Object → Result (Self_Value × Self)
+  invalid : Self → Result (Self_Error × Self)
+
+/-- Trait implementation: [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}]
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 201:0-253:1 -/
+@[reducible]
+def
+  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial
+  : selected_conversion.Builder selected_conversion.WireBuilder json_wire.Value
+  (alloc.vec.Vec Std.U32) (alloc.vec.Vec ((alloc.vec.Vec Std.U32) ×
+  json_wire.Value)) selected_conversion.WireDenial := {
+  null :=
+    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.null
+  boolean :=
+    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.boolean
+  integer :=
+    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.integer
+  text :=
+    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.text
+  array :=
+    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.array
+  «name» :=
+    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.name
+  empty_object :=
+    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.empty_object
+  insert :=
+    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.insert
+  finish_object :=
+    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.finish_object
+  invalid :=
+    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.invalid
+}
+
+/-- [aivm_secrets_garrett_core::disclosure::Json]
+    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 6:0-14:1
+    Visibility: public -/
+@[discriminant isize]
+inductive disclosure.Json where
+| Null : disclosure.Json
+| Boolean : Bool → disclosure.Json
+| Integer : Std.I64 → disclosure.Json
+| Text : alloc.vec.Vec Std.U8 → disclosure.Json
+| Array : alloc.vec.Vec disclosure.Json → disclosure.Json
+| Object :
+  alloc.vec.Vec ((alloc.vec.Vec Std.U8) × disclosure.Json) →
+  disclosure.Json
+| Opaque : disclosure.Json
+
+mutual
+
+/-- [aivm_secrets_garrett_core::selected_conversion::render]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 79:12-100:1
+    Visibility: public -/
+@[rust_loop]
+def selected_conversion.render_loop0
+  {B : Type _} {Clause0_Value : Type _} {Clause0_Name : Type _} {Clause0_Object
+  : Type _} {Clause0_Error : Type _} (BuilderInst : selected_conversion.Builder
+  B Clause0_Value Clause0_Name Clause0_Object Clause0_Error)
+  (values : alloc.vec.Vec disclosure.Json) (builder : B)
+  (out : alloc.vec.Vec Clause0_Value) (index : Std.Usize) :
+  Result ((core.result.Result Clause0_Value Clause0_Error) × B)
+  := do
+  let i := alloc.vec.Vec.len values
+  if index < i
+  then
+    let j ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        disclosure.Json) values index
+    let (r, builder1) ← selected_conversion.render BuilderInst j builder
+    let cf ← core.result.Result.Insts.CoreOpsTry.branch r
+    match cf with
+    | core.ops.control_flow.ControlFlow.Continue val =>
+      let out1 ← alloc.vec.Vec.push out val
+      let index1 ← index + 1#usize
+      selected_conversion.render_loop0 BuilderInst values builder1 out1 index1
+    | core.ops.control_flow.ControlFlow.Break residual =>
+      let r1 ←
+        core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+          Clause0_Value (core.convert.FromSame Clause0_Error) residual
+      ok (r1, builder1)
+  else
+    let (t, builder1) ← BuilderInst.array builder out
+    ok (core.result.Result.Ok t, builder1)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::selected_conversion::render]: loop 1:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 89:12-100:1
+    Visibility: public -/
+@[rust_loop]
+def selected_conversion.render_loop1
+  {B : Type _} {Clause0_Value : Type _} {Clause0_Name : Type _} {Clause0_Object
+  : Type _} {Clause0_Error : Type _} (BuilderInst : selected_conversion.Builder
+  B Clause0_Value Clause0_Name Clause0_Object Clause0_Error)
+  (fields : alloc.vec.Vec ((alloc.vec.Vec Std.U8) × disclosure.Json))
+  (builder : B) (out : Clause0_Object) (index : Std.Usize) :
+  Result ((core.result.Result Clause0_Value Clause0_Error) × B)
+  := do
+  let i := alloc.vec.Vec.len fields
+  if index < i
+  then
+    let (v, j) ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        ((alloc.vec.Vec Std.U8) × disclosure.Json)) fields index
+    let (r, builder1) ← BuilderInst.«name» builder v
+    let cf ← core.result.Result.Insts.CoreOpsTry.branch r
+    match cf with
+    | core.ops.control_flow.ControlFlow.Continue val =>
+      let (r1, builder2) ← selected_conversion.render BuilderInst j builder1
+      let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
+      match cf1 with
+      | core.ops.control_flow.ControlFlow.Continue val1 =>
+        let (r2, builder3, out1) ← BuilderInst.insert builder2 out val val1
+        let cf2 ← core.result.Result.Insts.CoreOpsTry.branch r2
+        match cf2 with
+        | core.ops.control_flow.ControlFlow.Continue _ =>
+          let index1 ← index + 1#usize
+          selected_conversion.render_loop1 BuilderInst fields builder3 out1
+            index1
+        | core.ops.control_flow.ControlFlow.Break residual =>
+          let r3 ←
+            core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+              Clause0_Value (core.convert.FromSame Clause0_Error) residual
+          ok (r3, builder3)
+      | core.ops.control_flow.ControlFlow.Break residual =>
+        let r2 ←
+          core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+            Clause0_Value (core.convert.FromSame Clause0_Error) residual
+        ok (r2, builder2)
+    | core.ops.control_flow.ControlFlow.Break residual =>
+      let r1 ←
+        core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+          Clause0_Value (core.convert.FromSame Clause0_Error) residual
+      ok (r1, builder1)
+  else
+    let (t, builder1) ← BuilderInst.finish_object builder out
+    ok (core.result.Result.Ok t, builder1)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::selected_conversion::render]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 70:0-100:1
+    Visibility: public -/
+def selected_conversion.render
+  {B : Type _} {Clause0_Value : Type _} {Clause0_Name : Type _} {Clause0_Object
+  : Type _} {Clause0_Error : Type _} (BuilderInst : selected_conversion.Builder
+  B Clause0_Value Clause0_Name Clause0_Object Clause0_Error)
+  (selected : disclosure.Json) (builder : B) :
+  Result ((core.result.Result Clause0_Value Clause0_Error) × B)
+  := do
+  match selected with
+  | disclosure.Json.Null =>
+    let (t, builder1) ← BuilderInst.null builder
+    ok (core.result.Result.Ok t, builder1)
+  | disclosure.Json.Boolean value =>
+    let (t, builder1) ← BuilderInst.boolean builder value
+    ok (core.result.Result.Ok t, builder1)
+  | disclosure.Json.Integer value =>
+    let (t, builder1) ← BuilderInst.integer builder value
+    ok (core.result.Result.Ok t, builder1)
+  | disclosure.Json.Text bytes => BuilderInst.text builder bytes
+  | disclosure.Json.Array values =>
+    selected_conversion.render_loop0 BuilderInst values builder
+      (alloc.vec.Vec.new Clause0_Value) 0#usize
+  | disclosure.Json.Object fields =>
+    let (out, builder1) ← BuilderInst.empty_object builder
+    selected_conversion.render_loop1 BuilderInst fields builder1 out 0#usize
+  | disclosure.Json.Opaque =>
+    let (t, builder1) ← BuilderInst.invalid builder
+    ok (core.result.Result.Err t, builder1)
+partial_fixpoint
+
+end
+
+/-- [aivm_secrets_garrett_core::selected_conversion::render_wire]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 259:0-261:1
+    Visibility: public -/
+def selected_conversion.render_wire
+  (selected : disclosure.Json) :
+  Result (core.result.Result json_wire.Value selected_conversion.WireDenial)
+  := do
+  let (r, _) ←
+    selected_conversion.render
+      selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial
+      selected ()
+  ok r
+
+/-- [aivm_secrets_garrett_core::reflection::matches_at]:
+    Source: 'crates/aivm-secrets-garrett-core/src/reflection.rs', lines 5:0-10:1
+    Visibility: public -/
+def reflection.matches_at
+  (value : Slice Std.U8) (secret : Slice Std.U8) (start : Std.Usize) :
+  Result Bool
+  := do
+  let i := Slice.len value
+  if start > i
+  then ok false
+  else
+    let i1 := Slice.len secret
+    let i2 := Slice.len value
+    let i3 ← i2 - start
+    if i1 > i3
+    then ok false
+    else
+      let i4 := Slice.len secret
+      let i5 ← start + i4
+      let s ←
+        core.slice.index.Slice.index
+          (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) value
+          { start, «end» := i5 }
+      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s secret
+
+/-- [aivm_secrets_garrett_core::reflection::contains]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/reflection.rs', lines 20:4-27:1
+    Visibility: public -/
+@[rust_loop]
+def reflection.contains_loop
+  (value : Slice Std.U8) (secret : Slice Std.U8) (last : Std.Usize)
+  (start : Std.Usize) :
+  Result Bool
+  := do
+  if start <= last
+  then
+    let b ← reflection.matches_at value secret start
+    if b
+    then ok true
+    else
+      let start1 ← start + 1#usize
+      reflection.contains_loop value secret last start1
+  else ok false
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::reflection::contains]:
+    Source: 'crates/aivm-secrets-garrett-core/src/reflection.rs', lines 14:0-27:1
+    Visibility: public -/
+def reflection.contains
+  (value : Slice Std.U8) (secret : Slice Std.U8) : Result Bool := do
+  let i := Slice.len secret
+  if i = 0#usize
+  then ok false
+  else
+    let i1 := Slice.len secret
+    let i2 := Slice.len value
+    if i1 > i2
+    then ok false
+    else
+      let i3 := Slice.len value
+      let i4 := Slice.len secret
+      let last ← i3 - i4
+      reflection.contains_loop value secret last 0#usize
+
+/-- [aivm_secrets_garrett_core::json_string::hex_digit]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 18:0-24:1 -/
+def json_string.hex_digit (value : Std.U32) : Result Std.U8 := do
+  if value < 10#u32
+  then let i ← lift (UScalar.cast .U8 value)
+       48#u8 + i
+  else let i ← value - 10#u32
+       let i1 ← lift (UScalar.cast .U8 i)
+       97#u8 + i1
+
+/-- [aivm_secrets_garrett_core::json_string::append_hex]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 25:0-31:1 -/
+def json_string.append_hex
+  (output : alloc.vec.Vec Std.U8) (value : Std.U32) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let s ← lift (Array.to_slice (Array.make 2#usize [ 92#u8, 117#u8 ]))
+  let output1 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  let i ← value / 4096#u32
+  let i1 ← i % 16#u32
+  let i2 ← json_string.hex_digit i1
+  let output2 ← alloc.vec.Vec.push output1 i2
+  let i3 ← value / 256#u32
+  let i4 ← i3 % 16#u32
+  let i5 ← json_string.hex_digit i4
+  let output3 ← alloc.vec.Vec.push output2 i5
+  let i6 ← value / 16#u32
+  let i7 ← i6 % 16#u32
+  let i8 ← json_string.hex_digit i7
+  let output4 ← alloc.vec.Vec.push output3 i8
+  let i9 ← value % 16#u32
+  let i10 ← json_string.hex_digit i9
+  alloc.vec.Vec.push output4 i10
+
+/-- [aivm_secrets_garrett_core::json_string::append_wide]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 32:0-40:1 -/
+def json_string.append_wide
+  (output : alloc.vec.Vec Std.U8) (value : Std.U32) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  if value <= 65535#u32
+  then json_string.append_hex output value
+  else
+    let remaining ← value - 65536#u32
+    let i ← remaining / 1024#u32
+    let i1 ← 55296#u32 + i
+    let output1 ← json_string.append_hex output i1
+    let i2 ← remaining % 1024#u32
+    let i3 ← 56320#u32 + i2
+    json_string.append_hex output1 i3
+
+/-- [aivm_secrets_garrett_core::json_string::append_scalar]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 41:0-61:1 -/
+def json_string.append_scalar
+  (output : alloc.vec.Vec Std.U8) (value : Std.U32) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  if value = 34#u32
+  then
+    let s ← lift (Array.to_slice (Array.make 2#usize [ 92#u8, 34#u8 ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  else
+    if value = 92#u32
+    then
+      let s ← lift (Array.to_slice (Array.make 2#usize [ 92#u8, 92#u8 ]))
+      alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+    else
+      if value = 8#u32
+      then
+        let s ← lift (Array.to_slice (Array.make 2#usize [ 92#u8, 98#u8 ]))
+        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+      else
+        if value = 12#u32
+        then
+          let s ←
+            lift (Array.to_slice (Array.make 2#usize [ 92#u8, 102#u8 ]))
+          alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+        else
+          if value = 10#u32
+          then
+            let s ←
+              lift (Array.to_slice (Array.make 2#usize [ 92#u8, 110#u8 ]))
+            alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+          else
+            if value = 13#u32
+            then
+              let s ←
+                lift (Array.to_slice (Array.make 2#usize [ 92#u8, 114#u8 ]))
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+            else
+              if value = 9#u32
+              then
+                let s ←
+                  lift (Array.to_slice (Array.make 2#usize [ 92#u8, 116#u8 ]))
+                alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+              else
+                if value >= 32#u32
+                then
+                  if value <= 126#u32
+                  then
+                    let i ← lift (UScalar.cast .U8 value)
+                    alloc.vec.Vec.push output i
+                  else json_string.append_wide output value
+                else json_string.append_wide output value
+
+/-- [aivm_secrets_garrett_core::json_string::valid_scalar]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 5:0-7:1
+    Visibility: public -/
+def json_string.valid_scalar (value : Std.U32) : Result Bool := do
+  if value <= 1114111#u32
+  then if value < 55296#u32
+       then ok true
+       else ok (value > 57343#u32)
+  else ok false
+
+/-- [aivm_secrets_garrett_core::json_string::valid_text]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 10:4-17:1
+    Visibility: public -/
+@[rust_loop]
+def json_string.valid_text_loop
+  (values : alloc.vec.Vec Std.U32) (index : Std.Usize) : Result Bool := do
+  let i := alloc.vec.Vec.len values
+  if index < i
+  then
+    let i1 ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U32)
+        values index
+    let b ← json_string.valid_scalar i1
+    if b
+    then
+      let index1 ← index + 1#usize
+      json_string.valid_text_loop values index1
+    else ok false
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::json_string::valid_text]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 8:0-17:1
+    Visibility: public -/
+@[reducible]
+def json_string.valid_text (values : alloc.vec.Vec Std.U32) : Result Bool := do
+  json_string.valid_text_loop values 0#usize
+
+/-- [aivm_secrets_garrett_core::json_string::append]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 71:4-74:5
+    Visibility: public -/
+@[rust_loop]
+def json_string.append_loop
+  (output : alloc.vec.Vec Std.U8) (values : alloc.vec.Vec Std.U32)
+  (index : Std.Usize) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let i := alloc.vec.Vec.len values
+  if index < i
+  then
+    let i1 ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U32)
+        values index
+    let output1 ← json_string.append_scalar output i1
+    let index1 ← index + 1#usize
+    json_string.append_loop output1 values index1
+  else ok output
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::json_string::append]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 65:0-77:1
+    Visibility: public -/
+def json_string.append
+  (output : alloc.vec.Vec Std.U8) (values : alloc.vec.Vec Std.U32) :
+  Result (Bool × (alloc.vec.Vec Std.U8))
+  := do
+  let b ← json_string.valid_text values
+  if b
+  then
+    let output1 ← alloc.vec.Vec.push output 34#u8
+    let output2 ← json_string.append_loop output1 values 0#usize
+    let output3 ← alloc.vec.Vec.push output2 34#u8
+    ok (true, output3)
+  else ok (false, output)
+
+mutual
+
+/-- [aivm_secrets_garrett_core::json_wire::append]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 18:0-34:1
+    Visibility: public -/
+def json_wire.append
+  (output : alloc.vec.Vec Std.U8) (value : json_wire.Value) :
+  Result (Bool × (alloc.vec.Vec Std.U8))
+  := do
+  match value with
+  | json_wire.Value.Null =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 4#usize [ 110#u8, 117#u8, 108#u8, 108#u8 ]))
+    let output1 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+    ok (true, output1)
+  | json_wire.Value.Boolean value1 =>
+    if value1
+    then
+      let s ←
+        lift (Array.to_slice
+          (Array.make 4#usize [ 116#u8, 114#u8, 117#u8, 101#u8 ]))
+      let output1 ←
+        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+      ok (true, output1)
+    else
+      let s ←
+        lift (Array.to_slice
+          (Array.make 5#usize [ 102#u8, 97#u8, 108#u8, 115#u8, 101#u8 ]))
+      let output1 ←
+        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+      ok (true, output1)
+  | json_wire.Value.Number token =>
+    let s := alloc.vec.Vec.deref token
+    let output1 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+    ok (true, output1)
+  | json_wire.Value.Text scalars => json_string.append output scalars
+  | json_wire.Value.Array values => json_wire.append_array output values
+  | json_wire.Value.Object fields => json_wire.append_fields output fields
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::json_wire::append_array]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 39:4-50:1 -/
+@[rust_loop]
+def json_wire.append_array_loop
+  (output : alloc.vec.Vec Std.U8) (values : alloc.vec.Vec json_wire.Value)
+  (index : Std.Usize) :
+  Result (Bool × (alloc.vec.Vec Std.U8))
+  := do
+  let i := alloc.vec.Vec.len values
+  if index < i
+  then
+    let output1 ←
+      if index > 0#usize
+      then alloc.vec.Vec.push output 44#u8
+      else ok output
+    let v ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        json_wire.Value) values index
+    let (b, output2) ← json_wire.append output1 v
+    if b
+    then
+      let index1 ← index + 1#usize
+      json_wire.append_array_loop output2 values index1
+    else ok (false, output2)
+  else let output1 ← alloc.vec.Vec.push output 93#u8
+       ok (true, output1)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::json_wire::append_array]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 36:0-50:1 -/
+def json_wire.append_array
+  (output : alloc.vec.Vec Std.U8) (values : alloc.vec.Vec json_wire.Value) :
+  Result (Bool × (alloc.vec.Vec Std.U8))
+  := do
+  let output1 ← alloc.vec.Vec.push output 91#u8
+  json_wire.append_array_loop output1 values 0#usize
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::json_wire::append_field]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 51:0-57:1 -/
+def json_wire.append_field
+  (output : alloc.vec.Vec Std.U8)
+  (field : ((alloc.vec.Vec Std.U32) × json_wire.Value)) :
+  Result (Bool × (alloc.vec.Vec Std.U8))
+  := do
+  let (v, v1) := field
+  let (b, output1) ← json_string.append output v
+  if b
+  then
+    let output2 ← alloc.vec.Vec.push output1 58#u8
+    json_wire.append output2 v1
+  else ok (false, output1)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::json_wire::append_fields]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 61:4-72:1 -/
+@[rust_loop]
+def json_wire.append_fields_loop
+  (output : alloc.vec.Vec Std.U8)
+  (fields : alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value))
+  (index : Std.Usize) :
+  Result (Bool × (alloc.vec.Vec Std.U8))
+  := do
+  let i := alloc.vec.Vec.len fields
+  if index < i
+  then
+    let output1 ←
+      if index > 0#usize
+      then alloc.vec.Vec.push output 44#u8
+      else ok output
+    let p ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        ((alloc.vec.Vec Std.U32) × json_wire.Value)) fields index
+    let (b, output2) ← json_wire.append_field output1 p
+    if b
+    then
+      let index1 ← index + 1#usize
+      json_wire.append_fields_loop output2 fields index1
+    else ok (false, output2)
+  else let output1 ← alloc.vec.Vec.push output 125#u8
+       ok (true, output1)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::json_wire::append_fields]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 58:0-72:1 -/
+def json_wire.append_fields
+  (output : alloc.vec.Vec Std.U8)
+  (fields : alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value)) :
+  Result (Bool × (alloc.vec.Vec Std.U8))
+  := do
+  let output1 ← alloc.vec.Vec.push output 123#u8
+  json_wire.append_fields_loop output1 fields 0#usize
+partial_fixpoint
+
+end
+
+/-- [aivm_secrets_garrett_core::json_wire::EncodingDenial]
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 14:0-16:1
+    Visibility: public -/
+@[discriminant isize]
+inductive json_wire.EncodingDenial where
+| InvalidText : json_wire.EncodingDenial
+
+/-- [aivm_secrets_garrett_core::json_wire::encode]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 74:0-80:1
+    Visibility: public -/
+def json_wire.encode
+  (value : json_wire.Value) :
+  Result (core.result.Result (alloc.vec.Vec Std.U8) json_wire.EncodingDenial)
+  := do
+  let (b, output) ← json_wire.append (alloc.vec.Vec.new Std.U8) value
+  if b
+  then ok (core.result.Result.Ok output)
+  else ok (core.result.Result.Err json_wire.EncodingDenial.InvalidText)
+
+mutual
+
+/-- [aivm_secrets_garrett_core::json_reflection::safe]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_reflection.rs', lines 14:12-37:1
+    Visibility: public -/
+@[rust_loop]
+def json_reflection.safe_loop0
+  (values : alloc.vec.Vec disclosure.Json) (secret : Slice Std.U8)
+  (fuel : Std.Usize) (i : Std.Usize) :
+  Result Bool
+  := do
+  let i1 := alloc.vec.Vec.len values
+  if i < i1
+  then
+    let j ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        disclosure.Json) values i
+    let i2 ← fuel - 1#usize
+    let b ← json_reflection.safe j secret i2
+    if b
+    then
+      let i3 ← i + 1#usize
+      json_reflection.safe_loop0 values secret fuel i3
+    else ok false
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::json_reflection::safe]: loop 1:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_reflection.rs', lines 24:12-37:1
+    Visibility: public -/
+@[rust_loop]
+def json_reflection.safe_loop1
+  (fields : alloc.vec.Vec ((alloc.vec.Vec Std.U8) × disclosure.Json))
+  (secret : Slice Std.U8) (fuel : Std.Usize) (i : Std.Usize) :
+  Result Bool
+  := do
+  let i1 := alloc.vec.Vec.len fields
+  if i < i1
+  then
+    let (v, j) ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        ((alloc.vec.Vec Std.U8) × disclosure.Json)) fields i
+    let s := alloc.vec.Vec.deref v
+    let b ← reflection.contains s secret
+    if b
+    then ok false
+    else
+      let i2 ← fuel - 1#usize
+      let b1 ← json_reflection.safe j secret i2
+      if b1
+      then
+        let i3 ← i + 1#usize
+        json_reflection.safe_loop1 fields secret fuel i3
+      else ok false
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::json_reflection::safe]:
+    Source: 'crates/aivm-secrets-garrett-core/src/json_reflection.rs', lines 6:0-37:1
+    Visibility: public -/
+def json_reflection.safe
+  (value : disclosure.Json) (secret : Slice Std.U8) (fuel : Std.Usize) :
+  Result Bool
+  := do
+  if fuel = 0#usize
+  then ok false
+  else
+    match value with
+    | disclosure.Json.Null => ok true
+    | disclosure.Json.Boolean _ => ok true
+    | disclosure.Json.Integer _ => ok true
+    | disclosure.Json.Text text =>
+      let s := alloc.vec.Vec.deref text
+      let b ← reflection.contains s secret
+      ok (¬ b)
+    | disclosure.Json.Array values =>
+      json_reflection.safe_loop0 values secret fuel 0#usize
+    | disclosure.Json.Object fields =>
+      json_reflection.safe_loop1 fields secret fuel 0#usize
+    | disclosure.Json.Opaque => ok true
+partial_fixpoint
+
+end
+
+/-- [aivm_secrets_garrett_core::selected_release::checked]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 127:0-143:1
+    Visibility: public -/
+def selected_release.checked
+  (reply : disclosure.Json) (secret : alloc.vec.Vec Std.U8) :
+  Result (core.result.Result json_wire.Value selected_release.Denial)
+  := do
+  let s := alloc.vec.Vec.deref secret
+  let b ← json_reflection.safe reply s 65#usize
+  if b
+  then
+    let r ← selected_conversion.render_wire reply
+    match r with
+    | core.result.Result.Ok wire =>
+      let r1 ← json_wire.encode wire
+      match r1 with
+      | core.result.Result.Ok bytes =>
+        let s1 := alloc.vec.Vec.deref bytes
+        let s2 := alloc.vec.Vec.deref secret
+        let b1 ← reflection.contains s1 s2
+        if b1
+        then
+          ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+        else ok (core.result.Result.Ok wire)
+      | core.result.Result.Err _ =>
+        ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+    | core.result.Result.Err _ =>
+      ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+  else ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+
+/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::dispatch::Work<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<'_0, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::prepare]:
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 116:4-126:5
     Visibility: public -/
 def
   channel_work.Submitting.Insts.Aivm_secrets_garrett_coreDispatchWorkChannelClause0_OutputClause0_Error.prepare
@@ -906,10 +4043,30 @@ def
     Clause0_Body Clause0_Writer Clause0_Meta Clause0_Output Clause0_Error))
   := do
   let (r, t) ← ChannelWorkInst.prepare self.work
-  ok (r, { work := t })
+  match r with
+  | core.result.Result.Ok _ =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 6#usize [ 116#u8, 97#u8, 114#u8, 103#u8, 101#u8, 116#u8 ]))
+    let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 s
+    let v1 ← ChannelWorkInst.target t
+    let y ←
+      lift (Std.Array.to_slice
+        (Array.make 1#usize [ (v, disclosure.Json.Text v1) ] : Array
+        ((alloc.vec.Vec Std.U8) × disclosure.Json) 1#usize))
+    let ret := alloc.slice.Slice.into_vec y
+    let r1 ←
+      selected_release.checked (disclosure.Json.Object ret) self.secret
+    match r1 with
+    | core.result.Result.Ok _ =>
+      ok (core.result.Result.Ok (), { self with work := t })
+    | core.result.Result.Err _ =>
+      let t1 ← ChannelWorkInst.REFLECTED
+      ok (core.result.Result.Err t1, { self with work := t })
+  | core.result.Result.Err _ => ok (r, { self with work := t })
 
-/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::dispatch::Work<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::effect_write]:
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 81:4-83:5
+/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::dispatch::Work<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<'_0, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::effect_write]:
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 112:4-114:5
     Visibility: public -/
 def
   channel_work.Submitting.Insts.Aivm_secrets_garrett_coreDispatchWorkChannelClause0_OutputClause0_Error.effect_write
@@ -923,8 +4080,8 @@ def
   := do
   ChannelWorkInst.effect_write self.work
 
-/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::dispatch::Work<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::INVALID_TRANSITION]
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 80:4-80:66
+/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::dispatch::Work<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<'_0, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::INVALID_TRANSITION]
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 111:4-111:66
     Visibility: public -/
 @[global_simps, irreducible]
 def
@@ -935,8 +4092,8 @@ def
   Clause0_Output Clause0_Error) : Result Clause0_Error :=
   ChannelWorkInst.INVALID_TRANSITION
 
-/-- Trait implementation: [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::dispatch::Work<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}]
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 79:0-103:1 -/
+/-- Trait implementation: [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::dispatch::Work<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Output, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<'_0, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}]
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 110:0-143:1 -/
 @[reducible]
 def
   channel_work.Submitting.Insts.Aivm_secrets_garrett_coreDispatchWorkChannelClause0_OutputClause0_Error
@@ -985,8 +4142,8 @@ structure provider_io.RouteWork (Self : Type _) (C : Type _) (E : Type _) where
   audit_route : Self → credential_use.Route → read_transition.Phase →
     Result ((core.result.Result Unit E) × Self)
 
-/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_io::RouteWork<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::audit_route]:
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 121:4-123:5
+/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_io::RouteWork<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<'_0, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::audit_route]:
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 170:4-172:5
     Visibility: public -/
 def
   channel_work.Submitting.Insts.Aivm_secrets_garrett_coreProvider_ioRouteWorkChannelClause0_Error.audit_route
@@ -1001,7 +4158,7 @@ def
     Clause0_Body Clause0_Writer Clause0_Meta Clause0_Output Clause0_Error))
   := do
   let (r, t) ← ChannelWorkInst.audit_route self.work route phase
-  ok (r, { work := t })
+  ok (r, { self with work := t })
 
 /-- [aivm_secrets_garrett_core::provider_io::{aivm_secrets_garrett_core::provider_io::Request<B>}::new]:
     Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 94:4-99:5
@@ -1024,8 +4181,8 @@ def provider_io.Channel.new
   let r ← provider_io.Request.new WireBytesInst body
   ok { request := r, writer, metadata, ready := false }
 
-/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_io::RouteWork<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::setup_route]:
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 107:4-120:5
+/-- [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_io::RouteWork<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<'_0, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}::setup_route]:
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 150:4-169:5
     Visibility: public -/
 def
   channel_work.Submitting.Insts.Aivm_secrets_garrett_coreProvider_ioRouteWorkChannelClause0_Error.setup_route
@@ -1039,24 +4196,32 @@ def
     Clause0_Meta Clause0_Error) Clause0_Error) × (channel_work.Submitting W
     Clause0_Body Clause0_Writer Clause0_Meta Clause0_Output Clause0_Error))
   := do
-  let (r, t) ← ChannelWorkInst.request_body self.work route
+  let (r, t) ← ChannelWorkInst.request_fields self.work
   match r with
-  | core.result.Result.Ok body =>
-    let (r1, t1) ← ChannelWorkInst.connect t route
+  | core.result.Result.Ok parts =>
+    let (r1, encoded) ←
+      channel_work.encode (alloc.vec.Vec.new Std.U8) route parts self.secret
     match r1 with
-    | core.result.Result.Ok parts =>
-      let (writer, «meta») := parts
-      let c ←
-        provider_io.Channel.new ChannelWorkInst.provider_ioWireBytesInst
-          ChannelWorkInst.provider_ioWriterInst body writer «meta»
-      ok (core.result.Result.Ok c, { work := t1 })
-    | core.result.Result.Err error =>
-      ok (core.result.Result.Err error, { work := t1 })
+    | core.result.Result.Ok endpoint =>
+      let (body, t1) ← ChannelWorkInst.wrap_body t encoded
+      let (r2, t2) ← ChannelWorkInst.connect t1 endpoint
+      match r2 with
+      | core.result.Result.Ok parts1 =>
+        let (writer, «meta») := parts1
+        let c ←
+          provider_io.Channel.new ChannelWorkInst.provider_ioWireBytesInst
+            ChannelWorkInst.provider_ioWriterInst body writer «meta»
+        ok (core.result.Result.Ok c, { self with work := t2 })
+      | core.result.Result.Err error =>
+        ok (core.result.Result.Err error, { self with work := t2 })
+    | core.result.Result.Err denial =>
+      let (t1, t2) ← ChannelWorkInst.encoding_error t denial
+      ok (core.result.Result.Err t1, { self with work := t2 })
   | core.result.Result.Err error =>
-    ok (core.result.Result.Err error, { work := t })
+    ok (core.result.Result.Err error, { self with work := t })
 
-/-- Trait implementation: [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_io::RouteWork<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}]
-    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 105:0-124:1 -/
+/-- Trait implementation: [aivm_secrets_garrett_core::channel_work::{impl aivm_secrets_garrett_core::provider_io::RouteWork<aivm_secrets_garrett_core::provider_io::Channel<Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Error>, Clause0_Error> for aivm_secrets_garrett_core::channel_work::Submitting<'_0, W, Clause0_Body, Clause0_Writer, Clause0_Meta, Clause0_Output, Clause0_Error>}]
+    Source: 'crates/aivm-secrets-garrett-core/src/channel_work.rs', lines 145:0-173:1 -/
 @[reducible]
 def
   channel_work.Submitting.Insts.Aivm_secrets_garrett_coreProvider_ioRouteWorkChannelClause0_Error
@@ -3060,21 +6225,6 @@ def current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork {W :
     current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.finish
     dispatchWorkInst ChecksInst
 }
-
-/-- [aivm_secrets_garrett_core::disclosure::Json]
-    Source: 'crates/aivm-secrets-garrett-core/src/disclosure.rs', lines 6:0-14:1
-    Visibility: public -/
-@[discriminant isize]
-inductive disclosure.Json where
-| Null : disclosure.Json
-| Boolean : Bool → disclosure.Json
-| Integer : Std.I64 → disclosure.Json
-| Text : alloc.vec.Vec Std.U8 → disclosure.Json
-| Array : alloc.vec.Vec disclosure.Json → disclosure.Json
-| Object :
-  alloc.vec.Vec ((alloc.vec.Vec Std.U8) × disclosure.Json) →
-  disclosure.Json
-| Opaque : disclosure.Json
 
 mutual
 
@@ -5093,1625 +8243,6 @@ def guest_frame.Frame.send
     let (r, writer1) ← WriterInst.write_frame writer s
     ok (r, { self with attempted := true }, writer1)
 
-/-- [aivm_secrets_garrett_core::http_auth::HeaderDenial]
-    Source: 'crates/aivm-secrets-garrett-core/src/http_auth.rs', lines 5:0-7:1
-    Visibility: public -/
-@[discriminant isize]
-inductive http_auth.HeaderDenial where
-| InvalidCredential : http_auth.HeaderDenial
-
-/-- [aivm_secrets_garrett_core::http_auth::valid_credential]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_auth.rs', lines 15:4-21:1
-    Visibility: public -/
-@[rust_loop]
-def http_auth.valid_credential_loop
-  (iter : core.slice.iter.Iter Std.U8) : Result Bool := do
-  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
-  match o with
-  | none => ok true
-  | some byte =>
-    if byte < 33#u8
-    then ok false
-    else
-      if byte > 126#u8
-      then ok false
-      else http_auth.valid_credential_loop iter1
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::http_auth::valid_credential]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_auth.rs', lines 11:0-21:1
-    Visibility: public -/
-def http_auth.valid_credential (secret : Slice Std.U8) : Result Bool := do
-  let i := Slice.len secret
-  if i = 0#usize
-  then ok false
-  else
-    let i1 := Slice.len secret
-    if i1 > 4096#usize
-    then ok false
-    else
-      let iter ←
-        SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
-          secret
-      http_auth.valid_credential_loop iter
-
-/-- [aivm_secrets_garrett_core::http_auth::append_header]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_auth.rs', lines 23:0-38:1
-    Visibility: public -/
-def http_auth.append_header
-  (output : alloc.vec.Vec Std.U8) (secret : Slice Std.U8)
-  (authentication : credential_use.Authentication) :
-  Result ((core.result.Result Unit http_auth.HeaderDenial) × (alloc.vec.Vec
-    Std.U8))
-  := do
-  let b ← http_auth.valid_credential secret
-  if b
-  then
-    let output1 ←
-      match authentication with
-      | credential_use.Authentication.Bearer =>
-        do
-        let s ←
-          lift (Array.to_slice
-            (Array.make 22#usize [
-              65#u8, 117#u8, 116#u8, 104#u8, 111#u8, 114#u8, 105#u8, 122#u8,
-              97#u8, 116#u8, 105#u8, 111#u8, 110#u8, 58#u8, 32#u8, 66#u8,
-              101#u8, 97#u8, 114#u8, 101#u8, 114#u8, 32#u8
-              ]))
-        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-      | credential_use.Authentication.ApiKey =>
-        do
-        let s ←
-          lift (Array.to_slice
-            (Array.make 11#usize [
-              88#u8, 45#u8, 65#u8, 80#u8, 73#u8, 45#u8, 75#u8, 101#u8, 121#u8,
-              58#u8, 32#u8
-              ]))
-        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-    let output2 ←
-      alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output1 secret
-    let s ← lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
-    let output3 ←
-      alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output2 s
-    ok (core.result.Result.Ok (), output3)
-  else
-    ok (core.result.Result.Err http_auth.HeaderDenial.InvalidCredential,
-      output)
-
-/-- [aivm_secrets_garrett_core::http_request::RequestDenial]
-    Source: 'crates/aivm-secrets-garrett-core/src/http_request.rs', lines 3:0-5:1
-    Visibility: public -/
-@[discriminant isize]
-inductive http_request.RequestDenial where
-| InvalidLine : http_request.RequestDenial
-
-/-- [aivm_secrets_garrett_core::http_request::valid_method]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_request.rs', lines 7:0-12:1
-    Visibility: public -/
-def http_request.valid_method (method : Slice Std.U8) : Result Bool := do
-  let get ←
-    lift (Array.to_slice (Array.make 3#usize [ 71#u8, 69#u8, 84#u8 ]))
-  let post ←
-    lift (Array.to_slice (Array.make 4#usize [ 80#u8, 79#u8, 83#u8, 84#u8 ]))
-  let patch ←
-    lift (Array.to_slice
-      (Array.make 5#usize [ 80#u8, 65#u8, 84#u8, 67#u8, 72#u8 ]))
-  let b ← core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 method get
-  if b
-  then ok true
-  else
-    let b1 ←
-      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 method post
-    if b1
-    then ok true
-    else core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 method patch
-
-/-- [aivm_secrets_garrett_core::http_request::valid_target]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_request.rs', lines 23:4-29:1
-    Visibility: public -/
-@[rust_loop]
-def http_request.valid_target_loop0
-  (iter : core.slice.iter.Iter Std.U8) : Result Bool := do
-  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
-  match o with
-  | none => ok true
-  | some byte =>
-    if byte < 33#u8
-    then ok false
-    else
-      if byte > 126#u8
-      then ok false
-      else
-        if byte = 35#u8
-        then ok false
-        else http_request.valid_target_loop0 iter1
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::http_request::valid_target]: loop 1:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_request.rs', lines 23:4-29:1
-    Visibility: public -/
-@[rust_loop]
-def http_request.valid_target_loop1
-  (iter : core.slice.iter.Iter Std.U8) : Result Bool := do
-  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
-  match o with
-  | none => ok true
-  | some byte =>
-    if byte < 33#u8
-    then ok false
-    else
-      if byte > 126#u8
-      then ok false
-      else
-        if byte = 35#u8
-        then ok false
-        else http_request.valid_target_loop1 iter1
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::http_request::valid_target]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_request.rs', lines 16:0-29:1
-    Visibility: public -/
-def http_request.valid_target (target : Slice Std.U8) : Result Bool := do
-  let i := Slice.len target
-  if i = 0#usize
-  then ok false
-  else
-    let i1 := Slice.len target
-    if i1 > 8192#usize
-    then ok false
-    else
-      let i2 ← Slice.index_usize target 0#usize
-      if i2 != 47#u8
-      then ok false
-      else
-        let i3 := Slice.len target
-        if i3 > 1#usize
-        then
-          let i4 ← Slice.index_usize target 1#usize
-          if i4 = 47#u8
-          then ok false
-          else
-            let iter ←
-              SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
-                target
-            http_request.valid_target_loop0 iter
-        else
-          let iter ←
-            SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
-              target
-          http_request.valid_target_loop1 iter
-
-/-- [aivm_secrets_garrett_core::http_request::append_line]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_request.rs', lines 31:0-44:1
-    Visibility: public -/
-def http_request.append_line
-  (output : alloc.vec.Vec Std.U8) (method : Slice Std.U8)
-  (target : Slice Std.U8) :
-  Result ((core.result.Result Unit http_request.RequestDenial) ×
-    (alloc.vec.Vec Std.U8))
-  := do
-  let b ← http_request.valid_method method
-  if b
-  then
-    let b1 ← http_request.valid_target target
-    if b1
-    then
-      let output1 ←
-        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output method
-      let s ← lift (Array.to_slice (Array.make 1#usize [ 32#u8 ]))
-      let output2 ←
-        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output1 s
-      let output3 ←
-        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output2 target
-      let s1 ←
-        lift (Array.to_slice
-          (Array.make 11#usize [
-            32#u8, 72#u8, 84#u8, 84#u8, 80#u8, 47#u8, 49#u8, 46#u8, 49#u8,
-            13#u8, 10#u8
-            ]))
-      let output4 ←
-        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output3 s1
-      ok (core.result.Result.Ok (), output4)
-    else
-      ok (core.result.Result.Err http_request.RequestDenial.InvalidLine,
-        output)
-  else
-    ok (core.result.Result.Err http_request.RequestDenial.InvalidLine, output)
-
-/-- [aivm_secrets_garrett_core::http_wire::MAX_BODY]
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 6:0-6:44
-    Visibility: public -/
-@[global_simps, irreducible]
-def http_wire.MAX_BODY : Result Std.Usize := do
-  let i ← 2#usize * 1024#usize
-  i * 1024#usize
-
-/-- [aivm_secrets_garrett_core::http_wire::Header]
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 8:0-11:1
-    Visibility: public -/
-structure http_wire.Header where
-  «name» : alloc.vec.Vec Std.U8
-  value : alloc.vec.Vec Std.U8
-
-/-- [aivm_secrets_garrett_core::http_wire::Head]
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 12:0-19:1
-    Visibility: public -/
-structure http_wire.Head where
-  method : alloc.vec.Vec Std.U8
-  target : alloc.vec.Vec Std.U8
-  host : alloc.vec.Vec Std.U8
-  port : Std.U16
-  accept : alloc.vec.Vec Std.U8
-  headers : alloc.vec.Vec http_wire.Header
-
-/-- [aivm_secrets_garrett_core::http_wire::EncodingDenial]
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 20:0-23:1
-    Visibility: public -/
-@[discriminant isize]
-inductive http_wire.EncodingDenial where
-| InvalidRequest : http_wire.EncodingDenial
-| InvalidCredential : http_wire.EncodingDenial
-
-/-- [aivm_secrets_garrett_core::http_wire::ascii_lower]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 25:0-31:1
-    Visibility: public -/
-def http_wire.ascii_lower (byte : Std.U8) : Result Std.U8 := do
-  if byte >= 65#u8
-  then if byte <= 90#u8
-       then byte + 32#u8
-       else ok byte
-  else ok byte
-
-/-- [aivm_secrets_garrett_core::http_wire::ascii_prefix]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 37:4-44:1
-    Visibility: public -/
-@[rust_loop]
-def http_wire.ascii_prefix_loop
-  («name» : Slice Std.U8) («prefix» : Slice Std.U8) (i : Std.Usize) :
-  Result Bool
-  := do
-  let i1 := Slice.len «prefix»
-  if i < i1
-  then
-    let i2 ← Slice.index_usize «name» i
-    let i3 ← http_wire.ascii_lower i2
-    let i4 ← Slice.index_usize «prefix» i
-    let i5 ← http_wire.ascii_lower i4
-    if i3 != i5
-    then ok false
-    else
-      let i6 ← i + 1#usize
-      http_wire.ascii_prefix_loop «name» «prefix» i6
-  else ok true
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::http_wire::ascii_prefix]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 32:0-44:1
-    Visibility: public -/
-def http_wire.ascii_prefix
-  («name» : Slice Std.U8) («prefix» : Slice Std.U8) : Result Bool := do
-  let i := Slice.len «name»
-  let i1 := Slice.len «prefix»
-  if i < i1
-  then ok false
-  else http_wire.ascii_prefix_loop «name» «prefix» 0#usize
-
-/-- [aivm_secrets_garrett_core::http_wire::ascii_equal]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 45:0-47:1
-    Visibility: public -/
-def http_wire.ascii_equal
-  («name» : Slice Std.U8) (other : Slice Std.U8) : Result Bool := do
-  let i := Slice.len «name»
-  let i1 := Slice.len other
-  if i = i1
-  then http_wire.ascii_prefix «name» other
-  else ok false
-
-/-- [aivm_secrets_garrett_core::http_wire::reserved_name]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 48:0-73:1
-    Visibility: public -/
-def http_wire.reserved_name («name» : Slice Std.U8) : Result Bool := do
-  let s ←
-    lift (Array.to_slice
-      (Array.make 6#usize [ 97#u8, 99#u8, 99#u8, 101#u8, 112#u8, 116#u8 ]))
-  let b ← http_wire.ascii_equal «name» s
-  if b
-  then ok true
-  else
-    let s1 ←
-      lift (Array.to_slice
-        (Array.make 15#usize [
-          97#u8, 99#u8, 99#u8, 101#u8, 112#u8, 116#u8, 45#u8, 101#u8, 110#u8,
-          99#u8, 111#u8, 100#u8, 105#u8, 110#u8, 103#u8
-          ]))
-    let b1 ← http_wire.ascii_equal «name» s1
-    if b1
-    then ok true
-    else
-      let s2 ←
-        lift (Array.to_slice
-          (Array.make 13#usize [
-            97#u8, 117#u8, 116#u8, 104#u8, 111#u8, 114#u8, 105#u8, 122#u8,
-            97#u8, 116#u8, 105#u8, 111#u8, 110#u8
-            ]))
-      let b2 ← http_wire.ascii_equal «name» s2
-      if b2
-      then ok true
-      else
-        let s3 ←
-          lift (Array.to_slice
-            (Array.make 10#usize [
-              99#u8, 111#u8, 110#u8, 110#u8, 101#u8, 99#u8, 116#u8, 105#u8,
-              111#u8, 110#u8
-              ]))
-        let b3 ← http_wire.ascii_equal «name» s3
-        if b3
-        then ok true
-        else
-          let s4 ←
-            lift (Array.to_slice
-              (Array.make 16#usize [
-                99#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8, 45#u8,
-                101#u8, 110#u8, 99#u8, 111#u8, 100#u8, 105#u8, 110#u8, 103#u8
-                ]))
-          let b4 ← http_wire.ascii_equal «name» s4
-          if b4
-          then ok true
-          else
-            let s5 ←
-              lift (Array.to_slice
-                (Array.make 14#usize [
-                  99#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8, 45#u8,
-                  108#u8, 101#u8, 110#u8, 103#u8, 116#u8, 104#u8
-                  ]))
-            let b5 ← http_wire.ascii_equal «name» s5
-            if b5
-            then ok true
-            else
-              let s6 ←
-                lift (Array.to_slice
-                  (Array.make 12#usize [
-                    99#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8,
-                    45#u8, 116#u8, 121#u8, 112#u8, 101#u8
-                    ]))
-              let b6 ← http_wire.ascii_equal «name» s6
-              if b6
-              then ok true
-              else
-                let s7 ←
-                  lift (Array.to_slice
-                    (Array.make 6#usize [
-                      99#u8, 111#u8, 111#u8, 107#u8, 105#u8, 101#u8
-                      ]))
-                let b7 ← http_wire.ascii_equal «name» s7
-                if b7
-                then ok true
-                else
-                  let s8 ←
-                    lift (Array.to_slice
-                      (Array.make 6#usize [
-                        101#u8, 120#u8, 112#u8, 101#u8, 99#u8, 116#u8
-                        ]))
-                  let b8 ← http_wire.ascii_equal «name» s8
-                  if b8
-                  then ok true
-                  else
-                    let s9 ←
-                      lift (Array.to_slice
-                        (Array.make 9#usize [
-                          102#u8, 111#u8, 114#u8, 119#u8, 97#u8, 114#u8,
-                          100#u8, 101#u8, 100#u8
-                          ]))
-                    let b9 ← http_wire.ascii_equal «name» s9
-                    if b9
-                    then ok true
-                    else
-                      let s10 ←
-                        lift (Array.to_slice
-                          (Array.make 4#usize [
-                            104#u8, 111#u8, 115#u8, 116#u8
-                            ]))
-                      let b10 ← http_wire.ascii_equal «name» s10
-                      if b10
-                      then ok true
-                      else
-                        let s11 ←
-                          lift (Array.to_slice
-                            (Array.make 10#usize [
-                              107#u8, 101#u8, 101#u8, 112#u8, 45#u8, 97#u8,
-                              108#u8, 105#u8, 118#u8, 101#u8
-                              ]))
-                        let b11 ← http_wire.ascii_equal «name» s11
-                        if b11
-                        then ok true
-                        else
-                          let s12 ←
-                            lift (Array.to_slice
-                              (Array.make 19#usize [
-                                112#u8, 114#u8, 111#u8, 120#u8, 121#u8, 45#u8,
-                                97#u8, 117#u8, 116#u8, 104#u8, 111#u8, 114#u8,
-                                105#u8, 122#u8, 97#u8, 116#u8, 105#u8, 111#u8,
-                                110#u8
-                                ]))
-                          let b12 ← http_wire.ascii_equal «name» s12
-                          if b12
-                          then ok true
-                          else
-                            let s13 ←
-                              lift (Array.to_slice
-                                (Array.make 16#usize [
-                                  112#u8, 114#u8, 111#u8, 120#u8, 121#u8,
-                                  45#u8, 99#u8, 111#u8, 110#u8, 110#u8, 101#u8,
-                                  99#u8, 116#u8, 105#u8, 111#u8, 110#u8
-                                  ]))
-                            let b13 ← http_wire.ascii_equal «name» s13
-                            if b13
-                            then ok true
-                            else
-                              let s14 ←
-                                lift (Array.to_slice
-                                  (Array.make 2#usize [ 116#u8, 101#u8 ]))
-                              let b14 ← http_wire.ascii_equal «name» s14
-                              if b14
-                              then ok true
-                              else
-                                let s15 ←
-                                  lift (Array.to_slice
-                                    (Array.make 7#usize [
-                                      116#u8, 114#u8, 97#u8, 105#u8, 108#u8,
-                                      101#u8, 114#u8
-                                      ]))
-                                let b15 ← http_wire.ascii_equal «name» s15
-                                if b15
-                                then ok true
-                                else
-                                  let s16 ←
-                                    lift (Array.to_slice
-                                      (Array.make 17#usize [
-                                        116#u8, 114#u8, 97#u8, 110#u8, 115#u8,
-                                        102#u8, 101#u8, 114#u8, 45#u8, 101#u8,
-                                        110#u8, 99#u8, 111#u8, 100#u8, 105#u8,
-                                        110#u8, 103#u8
-                                        ]))
-                                  let b16 ←
-                                    http_wire.ascii_equal «name» s16
-                                  if b16
-                                  then ok true
-                                  else
-                                    let s17 ←
-                                      lift (Array.to_slice
-                                        (Array.make 7#usize [
-                                          117#u8, 112#u8, 103#u8, 114#u8,
-                                          97#u8, 100#u8, 101#u8
-                                          ]))
-                                    let b17 ←
-                                      http_wire.ascii_equal «name» s17
-                                    if b17
-                                    then ok true
-                                    else
-                                      let s18 ←
-                                        lift (Array.to_slice
-                                          (Array.make 10#usize [
-                                            117#u8, 115#u8, 101#u8, 114#u8,
-                                            45#u8, 97#u8, 103#u8, 101#u8,
-                                            110#u8, 116#u8
-                                            ]))
-                                      let b18 ←
-                                        http_wire.ascii_equal «name» s18
-                                      if b18
-                                      then ok true
-                                      else
-                                        let s19 ←
-                                          lift (Array.to_slice
-                                            (Array.make 3#usize [
-                                              118#u8, 105#u8, 97#u8
-                                              ]))
-                                        let b19 ←
-                                          http_wire.ascii_equal «name» s19
-                                        if b19
-                                        then ok true
-                                        else
-                                          let s20 ←
-                                            lift (Array.to_slice
-                                              (Array.make 9#usize [
-                                                120#u8, 45#u8, 97#u8, 112#u8,
-                                                105#u8, 45#u8, 107#u8, 101#u8,
-                                                121#u8
-                                                ]))
-                                          let b20 ←
-                                            http_wire.ascii_equal «name» s20
-                                          if b20
-                                          then ok true
-                                          else
-                                            let s21 ←
-                                              lift (Array.to_slice
-                                                (Array.make 6#usize [
-                                                  112#u8, 114#u8, 111#u8,
-                                                  120#u8, 121#u8, 45#u8
-                                                  ]))
-                                            let b21 ←
-                                              http_wire.ascii_prefix «name»
-                                                s21
-                                            if b21
-                                            then ok true
-                                            else
-                                              let s22 ←
-                                                lift (Array.to_slice
-                                                  (Array.make 4#usize [
-                                                    115#u8, 101#u8, 99#u8,
-                                                    45#u8
-                                                    ]))
-                                              let b22 ←
-                                                http_wire.ascii_prefix «name»
-                                                  s22
-                                              if b22
-                                              then ok true
-                                              else
-                                                let s23 ←
-                                                  lift (Array.to_slice
-                                                    (Array.make 12#usize [
-                                                      120#u8, 45#u8, 102#u8,
-                                                      111#u8, 114#u8, 119#u8,
-                                                      97#u8, 114#u8, 100#u8,
-                                                      101#u8, 100#u8, 45#u8
-                                                      ]))
-                                                http_wire.ascii_prefix «name»
-                                                  s23
-
-/-- [aivm_secrets_garrett_core::http_wire::alphanumeric]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 74:0-78:1
-    Visibility: public -/
-def http_wire.alphanumeric (byte : Std.U8) : Result Bool := do
-  if byte >= 97#u8
-  then
-    if byte <= 122#u8
-    then ok true
-    else
-      if byte >= 65#u8
-      then
-        if byte <= 90#u8
-        then ok true
-        else if byte >= 48#u8
-             then ok (byte <= 57#u8)
-             else ok false
-      else if byte >= 48#u8
-           then ok (byte <= 57#u8)
-           else ok false
-  else
-    if byte >= 65#u8
-    then
-      if byte <= 90#u8
-      then ok true
-      else if byte >= 48#u8
-           then ok (byte <= 57#u8)
-           else ok false
-    else if byte >= 48#u8
-         then ok (byte <= 57#u8)
-         else ok false
-
-/-- [aivm_secrets_garrett_core::http_wire::valid_name]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 85:4-92:1
-    Visibility: public -/
-@[rust_loop]
-def http_wire.valid_name_loop
-  («name» : Slice Std.U8) (i : Std.Usize) : Result Bool := do
-  let i1 := Slice.len «name»
-  if i < i1
-  then
-    let i2 ← Slice.index_usize «name» i
-    let b ← http_wire.alphanumeric i2
-    if b
-    then let i3 ← i + 1#usize
-         http_wire.valid_name_loop «name» i3
-    else
-      if i = 0#usize
-      then ok false
-      else
-        if i2 != 45#u8
-        then ok false
-        else let i3 ← i + 1#usize
-             http_wire.valid_name_loop «name» i3
-  else let b ← http_wire.reserved_name «name»
-       ok (¬ b)
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::http_wire::valid_name]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 80:0-92:1
-    Visibility: public -/
-def http_wire.valid_name («name» : Slice Std.U8) : Result Bool := do
-  let i := Slice.len «name»
-  if i = 0#usize
-  then ok false
-  else
-    let i1 := Slice.len «name»
-    if i1 > 64#usize
-    then ok false
-    else http_wire.valid_name_loop «name» 0#usize
-
-/-- [aivm_secrets_garrett_core::http_wire::valid_value]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 101:4-107:1
-    Visibility: public -/
-@[rust_loop]
-def http_wire.valid_value_loop
-  (iter : core.slice.iter.Iter Std.U8) : Result Bool := do
-  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
-  match o with
-  | none => ok true
-  | some byte =>
-    if byte < 32#u8
-    then ok false
-    else if byte > 126#u8
-         then ok false
-         else http_wire.valid_value_loop iter1
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::http_wire::valid_value]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 94:0-107:1
-    Visibility: public -/
-def http_wire.valid_value (value : Slice Std.U8) : Result Bool := do
-  let i := Slice.len value
-  if i = 0#usize
-  then ok false
-  else
-    let i1 := Slice.len value
-    if i1 > 256#usize
-    then ok false
-    else
-      let i2 ← Slice.index_usize value 0#usize
-      if i2 = 32#u8
-      then ok false
-      else
-        let i3 := Slice.len value
-        let i4 ← i3 - 1#usize
-        let i5 ← Slice.index_usize value i4
-        if i5 = 32#u8
-        then ok false
-        else
-          let iter ←
-            SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
-              value
-          http_wire.valid_value_loop iter
-
-/-- [aivm_secrets_garrett_core::http_wire::valid_header]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 108:0-110:1
-    Visibility: public -/
-def http_wire.valid_header (header : http_wire.Header) : Result Bool := do
-  let s := alloc.vec.Vec.deref header.name
-  let b ← http_wire.valid_name s
-  if b
-  then let s1 := alloc.vec.Vec.deref header.value
-       http_wire.valid_value s1
-  else ok false
-
-/-- [aivm_secrets_garrett_core::http_wire::unique_before]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 116:4-123:1
-    Visibility: public -/
-@[rust_loop]
-def http_wire.unique_before_loop
-  (headers : Slice http_wire.Header) («end» : Std.Usize)
-  («name» : Slice Std.U8) (j : Std.Usize) :
-  Result Bool
-  := do
-  if j < «end»
-  then
-    let h ← Slice.index_usize headers j
-    let s := alloc.vec.Vec.deref h.name
-    let b ← http_wire.ascii_equal s «name»
-    if b
-    then ok false
-    else
-      let j1 ← j + 1#usize
-      http_wire.unique_before_loop headers «end» «name» j1
-  else ok true
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::http_wire::unique_before]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 111:0-123:1
-    Visibility: public -/
-def http_wire.unique_before
-  (headers : Slice http_wire.Header) («end» : Std.Usize)
-  («name» : Slice Std.U8) :
-  Result Bool
-  := do
-  let i := Slice.len headers
-  if «end» > i
-  then ok false
-  else http_wire.unique_before_loop headers «end» «name» 0#usize
-
-/-- [aivm_secrets_garrett_core::http_wire::valid_headers]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 129:4-136:1
-    Visibility: public -/
-@[rust_loop]
-def http_wire.valid_headers_loop
-  (headers : Slice http_wire.Header) (i : Std.Usize) : Result Bool := do
-  let i1 := Slice.len headers
-  if i < i1
-  then
-    let h ← Slice.index_usize headers i
-    let b ← http_wire.valid_header h
-    if b
-    then
-      let s := alloc.vec.Vec.deref h.name
-      let b1 ← http_wire.unique_before headers i s
-      if b1
-      then let i2 ← i + 1#usize
-           http_wire.valid_headers_loop headers i2
-      else ok false
-    else ok false
-  else ok true
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::http_wire::valid_headers]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 124:0-136:1
-    Visibility: public -/
-def http_wire.valid_headers
-  (headers : Slice http_wire.Header) : Result Bool := do
-  let i := Slice.len headers
-  if i > 9#usize
-  then ok false
-  else http_wire.valid_headers_loop headers 0#usize
-
-/-- [aivm_secrets_garrett_core::http_wire::valid_host]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 142:4-148:1
-    Visibility: public -/
-@[rust_loop]
-def http_wire.valid_host_loop
-  (iter : core.slice.iter.Iter Std.U8) : Result Bool := do
-  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
-  match o with
-  | none => ok true
-  | some byte =>
-    let b ← http_wire.alphanumeric byte
-    if b
-    then http_wire.valid_host_loop iter1
-    else
-      if byte != 46#u8
-      then if byte != 45#u8
-           then ok false
-           else http_wire.valid_host_loop iter1
-      else http_wire.valid_host_loop iter1
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::http_wire::valid_host]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 138:0-148:1
-    Visibility: public -/
-def http_wire.valid_host (host : Slice Std.U8) : Result Bool := do
-  let i := Slice.len host
-  if i = 0#usize
-  then ok false
-  else
-    let i1 := Slice.len host
-    if i1 > 253#usize
-    then ok false
-    else
-      let iter ←
-        SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
-          host
-      http_wire.valid_host_loop iter
-
-/-- [aivm_secrets_garrett_core::http_wire::valid_accept]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 154:4-160:1
-    Visibility: public -/
-@[rust_loop]
-def http_wire.valid_accept_loop
-  (iter : core.slice.iter.Iter Std.U8) : Result Bool := do
-  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
-  match o with
-  | none => ok true
-  | some byte =>
-    if byte < 33#u8
-    then ok false
-    else if byte > 126#u8
-         then ok false
-         else http_wire.valid_accept_loop iter1
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::http_wire::valid_accept]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 150:0-160:1
-    Visibility: public -/
-def http_wire.valid_accept (accept : Slice Std.U8) : Result Bool := do
-  let i := Slice.len accept
-  if i = 0#usize
-  then ok false
-  else
-    let i1 := Slice.len accept
-    if i1 > 96#usize
-    then ok false
-    else
-      let iter ←
-        SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
-          accept
-      http_wire.valid_accept_loop iter
-
-/-- [aivm_secrets_garrett_core::http_wire::valid_start]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 161:0-167:1
-    Visibility: public -/
-def http_wire.valid_start (head : http_wire.Head) : Result Bool := do
-  let s := alloc.vec.Vec.deref head.host
-  let b ← http_wire.valid_host s
-  if b
-  then
-    if head.port != 0#u16
-    then
-      let s1 := alloc.vec.Vec.deref head.accept
-      let b1 ← http_wire.valid_accept s1
-      if b1
-      then
-        let s2 := alloc.vec.Vec.deref head.method
-        let b2 ← http_request.valid_method s2
-        if b2
-        then
-          let s3 := alloc.vec.Vec.deref head.target
-          http_request.valid_target s3
-        else ok false
-      else ok false
-    else ok false
-  else ok false
-
-/-- [aivm_secrets_garrett_core::http_wire::append_decimal]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 171:0-176:1
-    Visibility: public -/
-def http_wire.append_decimal
-  (output : alloc.vec.Vec Std.U8) (value : Std.Usize) :
-  Result (alloc.vec.Vec Std.U8)
-  := do
-  let output1 ←
-    if value >= 10#usize
-    then do
-         let i ← value / 10#usize
-         http_wire.append_decimal output i
-    else ok output
-  let i ← value % 10#usize
-  let i1 ← lift (UScalar.cast .U8 i)
-  let i2 ← 48#u8 + i1
-  alloc.vec.Vec.push output1 i2
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::http_wire::valid_body]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 178:0-183:1
-    Visibility: public -/
-def http_wire.valid_body (body : Option (Slice Std.U8)) : Result Bool := do
-  match body with
-  | none => ok true
-  | some bytes =>
-    let i := Slice.len bytes
-    let i1 ← http_wire.MAX_BODY
-    ok (i <= i1)
-
-/-- [aivm_secrets_garrett_core::http_wire::append_headers]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 185:4-190:5
-    Visibility: public -/
-@[rust_loop]
-def http_wire.append_headers_loop
-  (iter : core.slice.iter.Iter http_wire.Header)
-  (output : alloc.vec.Vec Std.U8) :
-  Result (alloc.vec.Vec Std.U8)
-  := do
-  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
-  match o with
-  | none => ok output
-  | some header =>
-    let s := alloc.vec.Vec.deref header.name
-    let output1 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-    let s1 ← lift (Array.to_slice (Array.make 2#usize [ 58#u8, 32#u8 ]))
-    let output2 ←
-      alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output1 s1
-    let s2 := alloc.vec.Vec.deref header.value
-    let output3 ←
-      alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output2 s2
-    let s3 ← lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
-    let output4 ←
-      alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output3 s3
-    http_wire.append_headers_loop iter1 output4
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::http_wire::append_headers]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 184:0-191:1
-    Visibility: public -/
-def http_wire.append_headers
-  (output : alloc.vec.Vec Std.U8) (headers : Slice http_wire.Header) :
-  Result (alloc.vec.Vec Std.U8)
-  := do
-  let iter ←
-    SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
-      headers
-  http_wire.append_headers_loop iter output
-
-/-- [aivm_secrets_garrett_core::http_wire::append_request::{closure#1}]
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 226:17-226:54 -/
-@[reducible]
-def http_wire.append_request.closure_1 := Unit
-
-/-- [aivm_secrets_garrett_core::http_wire::append_request::{impl core::ops::function::FnOnce<(aivm_secrets_garrett_core::http_auth::HeaderDenial,), aivm_secrets_garrett_core::http_wire::EncodingDenial> for aivm_secrets_garrett_core::http_wire::append_request::{closure#1}}::call_once]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 226:17-226:54 -/
-def
-  http_wire.append_request.closure_1.Insts.CoreOpsFunctionFnOnceTupleHeaderDenialEncodingDenial.call_once
-  (c : http_wire.append_request.closure_1)
-  (tupled_args : http_auth.HeaderDenial) :
-  Result http_wire.EncodingDenial
-  := do
-  ok http_wire.EncodingDenial.InvalidCredential
-
-/-- Trait implementation: [aivm_secrets_garrett_core::http_wire::append_request::{impl core::ops::function::FnOnce<(aivm_secrets_garrett_core::http_auth::HeaderDenial,), aivm_secrets_garrett_core::http_wire::EncodingDenial> for aivm_secrets_garrett_core::http_wire::append_request::{closure#1}}]
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 226:17-226:54 -/
-@[reducible]
-def
-  http_wire.append_request.closure_1.Insts.CoreOpsFunctionFnOnceTupleHeaderDenialEncodingDenial
-  : core.ops.function.FnOnce http_wire.append_request.closure_1
-  http_auth.HeaderDenial http_wire.EncodingDenial := {
-  call_once :=
-    http_wire.append_request.closure_1.Insts.CoreOpsFunctionFnOnceTupleHeaderDenialEncodingDenial.call_once
-}
-
-/-- [aivm_secrets_garrett_core::http_wire::append_request::{closure}]
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 214:17-214:51 -/
-@[reducible]
-def http_wire.append_request.closure := Unit
-
-/-- [aivm_secrets_garrett_core::http_wire::append_request::{impl core::ops::function::FnOnce<(aivm_secrets_garrett_core::http_request::RequestDenial,), aivm_secrets_garrett_core::http_wire::EncodingDenial> for aivm_secrets_garrett_core::http_wire::append_request::{closure}}::call_once]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 214:17-214:51 -/
-def
-  http_wire.append_request.closure.Insts.CoreOpsFunctionFnOnceTupleRequestDenialEncodingDenial.call_once
-  (c : http_wire.append_request.closure)
-  (tupled_args : http_request.RequestDenial) :
-  Result http_wire.EncodingDenial
-  := do
-  ok http_wire.EncodingDenial.InvalidRequest
-
-/-- Trait implementation: [aivm_secrets_garrett_core::http_wire::append_request::{impl core::ops::function::FnOnce<(aivm_secrets_garrett_core::http_request::RequestDenial,), aivm_secrets_garrett_core::http_wire::EncodingDenial> for aivm_secrets_garrett_core::http_wire::append_request::{closure}}]
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 214:17-214:51 -/
-@[reducible]
-def
-  http_wire.append_request.closure.Insts.CoreOpsFunctionFnOnceTupleRequestDenialEncodingDenial
-  : core.ops.function.FnOnce http_wire.append_request.closure
-  http_request.RequestDenial http_wire.EncodingDenial := {
-  call_once :=
-    http_wire.append_request.closure.Insts.CoreOpsFunctionFnOnceTupleRequestDenialEncodingDenial.call_once
-}
-
-/-- [aivm_secrets_garrett_core::http_wire::append_request]:
-    Source: 'crates/aivm-secrets-garrett-core/src/http_wire.rs', lines 193:0-237:1
-    Visibility: public -/
-def http_wire.append_request
-  (output : alloc.vec.Vec Std.U8) (head : http_wire.Head)
-  (secret : Slice Std.U8) (authentication : credential_use.Authentication)
-  (body : Option (Slice Std.U8)) :
-  Result ((core.result.Result Unit http_wire.EncodingDenial) × (alloc.vec.Vec
-    Std.U8))
-  := do
-  let b ← http_wire.valid_start head
-  if b
-  then
-    let b1 ← http_auth.valid_credential secret
-    if b1
-    then
-      let b2 ← http_wire.valid_body body
-      if b2
-      then
-        let s := alloc.vec.Vec.deref head.headers
-        let b3 ← http_wire.valid_headers s
-        if b3
-        then
-          let s1 := alloc.vec.Vec.deref head.method
-          let s2 := alloc.vec.Vec.deref head.target
-          let (r, output1) ← http_request.append_line output s1 s2
-          let r1 ←
-            core.result.Result.map_err
-              http_wire.append_request.closure.Insts.CoreOpsFunctionFnOnceTupleRequestDenialEncodingDenial
-              r ()
-          let cf ← core.result.Result.Insts.CoreOpsTry.branch r1
-          match cf with
-          | core.ops.control_flow.ControlFlow.Continue _ =>
-            let s3 ←
-              lift (Array.to_slice
-                (Array.make 6#usize [
-                  72#u8, 111#u8, 115#u8, 116#u8, 58#u8, 32#u8
-                  ]))
-            let output2 ←
-              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output1 s3
-            let s4 := alloc.vec.Vec.deref head.host
-            let output3 ←
-              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output2 s4
-            let s5 ← lift (Array.to_slice (Array.make 1#usize [ 58#u8 ]))
-            let output4 ←
-              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output3 s5
-            let i ← lift (UScalar.cast .Usize head.port)
-            let output5 ← http_wire.append_decimal output4 i
-            let s6 ←
-              lift (Array.to_slice
-                (Array.make 10#usize [
-                  13#u8, 10#u8, 65#u8, 99#u8, 99#u8, 101#u8, 112#u8, 116#u8,
-                  58#u8, 32#u8
-                  ]))
-            let output6 ←
-              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output5 s6
-            let s7 := alloc.vec.Vec.deref head.accept
-            let output7 ←
-              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output6 s7
-            let s8 ←
-              lift (Array.to_slice
-                (Array.make 76#usize [
-                  13#u8, 10#u8, 65#u8, 99#u8, 99#u8, 101#u8, 112#u8, 116#u8,
-                  45#u8, 69#u8, 110#u8, 99#u8, 111#u8, 100#u8, 105#u8, 110#u8,
-                  103#u8, 58#u8, 32#u8, 105#u8, 100#u8, 101#u8, 110#u8, 116#u8,
-                  105#u8, 116#u8, 121#u8, 13#u8, 10#u8, 85#u8, 115#u8, 101#u8,
-                  114#u8, 45#u8, 65#u8, 103#u8, 101#u8, 110#u8, 116#u8, 58#u8,
-                  32#u8, 97#u8, 105#u8, 118#u8, 109#u8, 45#u8, 115#u8, 101#u8,
-                  99#u8, 114#u8, 101#u8, 116#u8, 115#u8, 47#u8, 49#u8, 13#u8,
-                  10#u8, 67#u8, 111#u8, 110#u8, 110#u8, 101#u8, 99#u8, 116#u8,
-                  105#u8, 111#u8, 110#u8, 58#u8, 32#u8, 99#u8, 108#u8, 111#u8,
-                  115#u8, 101#u8, 13#u8, 10#u8
-                  ]))
-            let output8 ←
-              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output7 s8
-            let s9 := alloc.vec.Vec.deref head.headers
-            let output9 ← http_wire.append_headers output8 s9
-            let (r2, output10) ←
-              http_auth.append_header output9 secret authentication
-            let r3 ←
-              core.result.Result.map_err
-                http_wire.append_request.closure_1.Insts.CoreOpsFunctionFnOnceTupleHeaderDenialEncodingDenial
-                r2 ()
-            let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r3
-            match cf1 with
-            | core.ops.control_flow.ControlFlow.Continue _ =>
-              let output11 ←
-                match body with
-                | none => ok output10
-                | some bytes =>
-                  do
-                  let s10 ←
-                    lift (Array.to_slice
-                      (Array.make 48#usize [
-                        67#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8,
-                        45#u8, 84#u8, 121#u8, 112#u8, 101#u8, 58#u8, 32#u8,
-                        97#u8, 112#u8, 112#u8, 108#u8, 105#u8, 99#u8, 97#u8,
-                        116#u8, 105#u8, 111#u8, 110#u8, 47#u8, 106#u8, 115#u8,
-                        111#u8, 110#u8, 13#u8, 10#u8, 67#u8, 111#u8, 110#u8,
-                        116#u8, 101#u8, 110#u8, 116#u8, 45#u8, 76#u8, 101#u8,
-                        110#u8, 103#u8, 116#u8, 104#u8, 58#u8, 32#u8
-                        ]))
-                  let output12 ←
-                    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output10
-                      s10
-                  let i1 := Slice.len bytes
-                  let output13 ← http_wire.append_decimal output12 i1
-                  let s11 ←
-                    lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
-                  alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output13
-                    s11
-              let s10 ←
-                lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
-              let output12 ←
-                alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output11 s10
-              match body with
-              | none => ok (core.result.Result.Ok (), output12)
-              | some bytes =>
-                let output13 ←
-                  alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output12
-                    bytes
-                ok (core.result.Result.Ok (), output13)
-            | core.ops.control_flow.ControlFlow.Break residual =>
-              let r4 ←
-                core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
-                  Unit (core.convert.FromSame http_wire.EncodingDenial)
-                  residual
-              ok (r4, output10)
-          | core.ops.control_flow.ControlFlow.Break residual =>
-            let r2 ←
-              core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
-                Unit (core.convert.FromSame http_wire.EncodingDenial) residual
-            ok (r2, output1)
-        else
-          ok (core.result.Result.Err http_wire.EncodingDenial.InvalidRequest,
-            output)
-      else
-        ok (core.result.Result.Err http_wire.EncodingDenial.InvalidRequest,
-          output)
-    else
-      ok (core.result.Result.Err http_wire.EncodingDenial.InvalidCredential,
-        output)
-  else
-    ok (core.result.Result.Err http_wire.EncodingDenial.InvalidRequest, output)
-
-/-- [aivm_secrets_garrett_core::reflection::matches_at]:
-    Source: 'crates/aivm-secrets-garrett-core/src/reflection.rs', lines 5:0-10:1
-    Visibility: public -/
-def reflection.matches_at
-  (value : Slice Std.U8) (secret : Slice Std.U8) (start : Std.Usize) :
-  Result Bool
-  := do
-  let i := Slice.len value
-  if start > i
-  then ok false
-  else
-    let i1 := Slice.len secret
-    let i2 := Slice.len value
-    let i3 ← i2 - start
-    if i1 > i3
-    then ok false
-    else
-      let i4 := Slice.len secret
-      let i5 ← start + i4
-      let s ←
-        core.slice.index.Slice.index
-          (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) value
-          { start, «end» := i5 }
-      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s secret
-
-/-- [aivm_secrets_garrett_core::reflection::contains]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/reflection.rs', lines 20:4-27:1
-    Visibility: public -/
-@[rust_loop]
-def reflection.contains_loop
-  (value : Slice Std.U8) (secret : Slice Std.U8) (last : Std.Usize)
-  (start : Std.Usize) :
-  Result Bool
-  := do
-  if start <= last
-  then
-    let b ← reflection.matches_at value secret start
-    if b
-    then ok true
-    else
-      let start1 ← start + 1#usize
-      reflection.contains_loop value secret last start1
-  else ok false
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::reflection::contains]:
-    Source: 'crates/aivm-secrets-garrett-core/src/reflection.rs', lines 14:0-27:1
-    Visibility: public -/
-def reflection.contains
-  (value : Slice Std.U8) (secret : Slice Std.U8) : Result Bool := do
-  let i := Slice.len secret
-  if i = 0#usize
-  then ok false
-  else
-    let i1 := Slice.len secret
-    let i2 := Slice.len value
-    if i1 > i2
-    then ok false
-    else
-      let i3 := Slice.len value
-      let i4 := Slice.len secret
-      let last ← i3 - i4
-      reflection.contains_loop value secret last 0#usize
-
-mutual
-
-/-- [aivm_secrets_garrett_core::json_reflection::safe]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/json_reflection.rs', lines 14:12-37:1
-    Visibility: public -/
-@[rust_loop]
-def json_reflection.safe_loop0
-  (values : alloc.vec.Vec disclosure.Json) (secret : Slice Std.U8)
-  (fuel : Std.Usize) (i : Std.Usize) :
-  Result Bool
-  := do
-  let i1 := alloc.vec.Vec.len values
-  if i < i1
-  then
-    let j ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-        disclosure.Json) values i
-    let i2 ← fuel - 1#usize
-    let b ← json_reflection.safe j secret i2
-    if b
-    then
-      let i3 ← i + 1#usize
-      json_reflection.safe_loop0 values secret fuel i3
-    else ok false
-  else ok true
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::json_reflection::safe]: loop 1:
-    Source: 'crates/aivm-secrets-garrett-core/src/json_reflection.rs', lines 24:12-37:1
-    Visibility: public -/
-@[rust_loop]
-def json_reflection.safe_loop1
-  (fields : alloc.vec.Vec ((alloc.vec.Vec Std.U8) × disclosure.Json))
-  (secret : Slice Std.U8) (fuel : Std.Usize) (i : Std.Usize) :
-  Result Bool
-  := do
-  let i1 := alloc.vec.Vec.len fields
-  if i < i1
-  then
-    let (v, j) ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-        ((alloc.vec.Vec Std.U8) × disclosure.Json)) fields i
-    let s := alloc.vec.Vec.deref v
-    let b ← reflection.contains s secret
-    if b
-    then ok false
-    else
-      let i2 ← fuel - 1#usize
-      let b1 ← json_reflection.safe j secret i2
-      if b1
-      then
-        let i3 ← i + 1#usize
-        json_reflection.safe_loop1 fields secret fuel i3
-      else ok false
-  else ok true
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::json_reflection::safe]:
-    Source: 'crates/aivm-secrets-garrett-core/src/json_reflection.rs', lines 6:0-37:1
-    Visibility: public -/
-def json_reflection.safe
-  (value : disclosure.Json) (secret : Slice Std.U8) (fuel : Std.Usize) :
-  Result Bool
-  := do
-  if fuel = 0#usize
-  then ok false
-  else
-    match value with
-    | disclosure.Json.Null => ok true
-    | disclosure.Json.Boolean _ => ok true
-    | disclosure.Json.Integer _ => ok true
-    | disclosure.Json.Text text =>
-      let s := alloc.vec.Vec.deref text
-      let b ← reflection.contains s secret
-      ok (¬ b)
-    | disclosure.Json.Array values =>
-      json_reflection.safe_loop0 values secret fuel 0#usize
-    | disclosure.Json.Object fields =>
-      json_reflection.safe_loop1 fields secret fuel 0#usize
-    | disclosure.Json.Opaque => ok true
-partial_fixpoint
-
-end
-
-/-- [aivm_secrets_garrett_core::json_string::valid_scalar]:
-    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 5:0-7:1
-    Visibility: public -/
-def json_string.valid_scalar (value : Std.U32) : Result Bool := do
-  if value <= 1114111#u32
-  then if value < 55296#u32
-       then ok true
-       else ok (value > 57343#u32)
-  else ok false
-
-/-- [aivm_secrets_garrett_core::json_string::valid_text]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 10:4-17:1
-    Visibility: public -/
-@[rust_loop]
-def json_string.valid_text_loop
-  (values : alloc.vec.Vec Std.U32) (index : Std.Usize) : Result Bool := do
-  let i := alloc.vec.Vec.len values
-  if index < i
-  then
-    let i1 ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U32)
-        values index
-    let b ← json_string.valid_scalar i1
-    if b
-    then
-      let index1 ← index + 1#usize
-      json_string.valid_text_loop values index1
-    else ok false
-  else ok true
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::json_string::valid_text]:
-    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 8:0-17:1
-    Visibility: public -/
-@[reducible]
-def json_string.valid_text (values : alloc.vec.Vec Std.U32) : Result Bool := do
-  json_string.valid_text_loop values 0#usize
-
-/-- [aivm_secrets_garrett_core::json_string::hex_digit]:
-    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 18:0-24:1 -/
-def json_string.hex_digit (value : Std.U32) : Result Std.U8 := do
-  if value < 10#u32
-  then let i ← lift (UScalar.cast .U8 value)
-       48#u8 + i
-  else let i ← value - 10#u32
-       let i1 ← lift (UScalar.cast .U8 i)
-       97#u8 + i1
-
-/-- [aivm_secrets_garrett_core::json_string::append_hex]:
-    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 25:0-31:1 -/
-def json_string.append_hex
-  (output : alloc.vec.Vec Std.U8) (value : Std.U32) :
-  Result (alloc.vec.Vec Std.U8)
-  := do
-  let s ← lift (Array.to_slice (Array.make 2#usize [ 92#u8, 117#u8 ]))
-  let output1 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  let i ← value / 4096#u32
-  let i1 ← i % 16#u32
-  let i2 ← json_string.hex_digit i1
-  let output2 ← alloc.vec.Vec.push output1 i2
-  let i3 ← value / 256#u32
-  let i4 ← i3 % 16#u32
-  let i5 ← json_string.hex_digit i4
-  let output3 ← alloc.vec.Vec.push output2 i5
-  let i6 ← value / 16#u32
-  let i7 ← i6 % 16#u32
-  let i8 ← json_string.hex_digit i7
-  let output4 ← alloc.vec.Vec.push output3 i8
-  let i9 ← value % 16#u32
-  let i10 ← json_string.hex_digit i9
-  alloc.vec.Vec.push output4 i10
-
-/-- [aivm_secrets_garrett_core::json_string::append_wide]:
-    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 32:0-40:1 -/
-def json_string.append_wide
-  (output : alloc.vec.Vec Std.U8) (value : Std.U32) :
-  Result (alloc.vec.Vec Std.U8)
-  := do
-  if value <= 65535#u32
-  then json_string.append_hex output value
-  else
-    let remaining ← value - 65536#u32
-    let i ← remaining / 1024#u32
-    let i1 ← 55296#u32 + i
-    let output1 ← json_string.append_hex output i1
-    let i2 ← remaining % 1024#u32
-    let i3 ← 56320#u32 + i2
-    json_string.append_hex output1 i3
-
-/-- [aivm_secrets_garrett_core::json_string::append_scalar]:
-    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 41:0-61:1 -/
-def json_string.append_scalar
-  (output : alloc.vec.Vec Std.U8) (value : Std.U32) :
-  Result (alloc.vec.Vec Std.U8)
-  := do
-  if value = 34#u32
-  then
-    let s ← lift (Array.to_slice (Array.make 2#usize [ 92#u8, 34#u8 ]))
-    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  else
-    if value = 92#u32
-    then
-      let s ← lift (Array.to_slice (Array.make 2#usize [ 92#u8, 92#u8 ]))
-      alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-    else
-      if value = 8#u32
-      then
-        let s ← lift (Array.to_slice (Array.make 2#usize [ 92#u8, 98#u8 ]))
-        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-      else
-        if value = 12#u32
-        then
-          let s ←
-            lift (Array.to_slice (Array.make 2#usize [ 92#u8, 102#u8 ]))
-          alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-        else
-          if value = 10#u32
-          then
-            let s ←
-              lift (Array.to_slice (Array.make 2#usize [ 92#u8, 110#u8 ]))
-            alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-          else
-            if value = 13#u32
-            then
-              let s ←
-                lift (Array.to_slice (Array.make 2#usize [ 92#u8, 114#u8 ]))
-              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-            else
-              if value = 9#u32
-              then
-                let s ←
-                  lift (Array.to_slice (Array.make 2#usize [ 92#u8, 116#u8 ]))
-                alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-              else
-                if value >= 32#u32
-                then
-                  if value <= 126#u32
-                  then
-                    let i ← lift (UScalar.cast .U8 value)
-                    alloc.vec.Vec.push output i
-                  else json_string.append_wide output value
-                else json_string.append_wide output value
-
-/-- [aivm_secrets_garrett_core::json_string::append]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 71:4-74:5
-    Visibility: public -/
-@[rust_loop]
-def json_string.append_loop
-  (output : alloc.vec.Vec Std.U8) (values : alloc.vec.Vec Std.U32)
-  (index : Std.Usize) :
-  Result (alloc.vec.Vec Std.U8)
-  := do
-  let i := alloc.vec.Vec.len values
-  if index < i
-  then
-    let i1 ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U32)
-        values index
-    let output1 ← json_string.append_scalar output i1
-    let index1 ← index + 1#usize
-    json_string.append_loop output1 values index1
-  else ok output
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::json_string::append]:
-    Source: 'crates/aivm-secrets-garrett-core/src/json_string.rs', lines 65:0-77:1
-    Visibility: public -/
-def json_string.append
-  (output : alloc.vec.Vec Std.U8) (values : alloc.vec.Vec Std.U32) :
-  Result (Bool × (alloc.vec.Vec Std.U8))
-  := do
-  let b ← json_string.valid_text values
-  if b
-  then
-    let output1 ← alloc.vec.Vec.push output 34#u8
-    let output2 ← json_string.append_loop output1 values 0#usize
-    let output3 ← alloc.vec.Vec.push output2 34#u8
-    ok (true, output3)
-  else ok (false, output)
-
-/-- [aivm_secrets_garrett_core::json_wire::Value]
-    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 6:0-13:1
-    Visibility: public -/
-@[discriminant isize]
-inductive json_wire.Value where
-| Null : json_wire.Value
-| Boolean : Bool → json_wire.Value
-| Number : alloc.vec.Vec Std.U8 → json_wire.Value
-| Text : alloc.vec.Vec Std.U32 → json_wire.Value
-| Array : alloc.vec.Vec json_wire.Value → json_wire.Value
-| Object :
-  alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value) →
-  json_wire.Value
-
-/-- [aivm_secrets_garrett_core::json_wire::EncodingDenial]
-    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 14:0-16:1
-    Visibility: public -/
-@[discriminant isize]
-inductive json_wire.EncodingDenial where
-| InvalidText : json_wire.EncodingDenial
-
-mutual
-
-/-- [aivm_secrets_garrett_core::json_wire::append]:
-    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 18:0-34:1
-    Visibility: public -/
-def json_wire.append
-  (output : alloc.vec.Vec Std.U8) (value : json_wire.Value) :
-  Result (Bool × (alloc.vec.Vec Std.U8))
-  := do
-  match value with
-  | json_wire.Value.Null =>
-    let s ←
-      lift (Array.to_slice
-        (Array.make 4#usize [ 110#u8, 117#u8, 108#u8, 108#u8 ]))
-    let output1 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-    ok (true, output1)
-  | json_wire.Value.Boolean value1 =>
-    if value1
-    then
-      let s ←
-        lift (Array.to_slice
-          (Array.make 4#usize [ 116#u8, 114#u8, 117#u8, 101#u8 ]))
-      let output1 ←
-        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-      ok (true, output1)
-    else
-      let s ←
-        lift (Array.to_slice
-          (Array.make 5#usize [ 102#u8, 97#u8, 108#u8, 115#u8, 101#u8 ]))
-      let output1 ←
-        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-      ok (true, output1)
-  | json_wire.Value.Number token =>
-    let s := alloc.vec.Vec.deref token
-    let output1 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-    ok (true, output1)
-  | json_wire.Value.Text scalars => json_string.append output scalars
-  | json_wire.Value.Array values => json_wire.append_array output values
-  | json_wire.Value.Object fields => json_wire.append_fields output fields
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::json_wire::append_array]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 39:4-50:1 -/
-@[rust_loop]
-def json_wire.append_array_loop
-  (output : alloc.vec.Vec Std.U8) (values : alloc.vec.Vec json_wire.Value)
-  (index : Std.Usize) :
-  Result (Bool × (alloc.vec.Vec Std.U8))
-  := do
-  let i := alloc.vec.Vec.len values
-  if index < i
-  then
-    let output1 ←
-      if index > 0#usize
-      then alloc.vec.Vec.push output 44#u8
-      else ok output
-    let v ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-        json_wire.Value) values index
-    let (b, output2) ← json_wire.append output1 v
-    if b
-    then
-      let index1 ← index + 1#usize
-      json_wire.append_array_loop output2 values index1
-    else ok (false, output2)
-  else let output1 ← alloc.vec.Vec.push output 93#u8
-       ok (true, output1)
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::json_wire::append_array]:
-    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 36:0-50:1 -/
-def json_wire.append_array
-  (output : alloc.vec.Vec Std.U8) (values : alloc.vec.Vec json_wire.Value) :
-  Result (Bool × (alloc.vec.Vec Std.U8))
-  := do
-  let output1 ← alloc.vec.Vec.push output 91#u8
-  json_wire.append_array_loop output1 values 0#usize
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::json_wire::append_field]:
-    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 51:0-57:1 -/
-def json_wire.append_field
-  (output : alloc.vec.Vec Std.U8)
-  (field : ((alloc.vec.Vec Std.U32) × json_wire.Value)) :
-  Result (Bool × (alloc.vec.Vec Std.U8))
-  := do
-  let (v, v1) := field
-  let (b, output1) ← json_string.append output v
-  if b
-  then
-    let output2 ← alloc.vec.Vec.push output1 58#u8
-    json_wire.append output2 v1
-  else ok (false, output1)
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::json_wire::append_fields]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 61:4-72:1 -/
-@[rust_loop]
-def json_wire.append_fields_loop
-  (output : alloc.vec.Vec Std.U8)
-  (fields : alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value))
-  (index : Std.Usize) :
-  Result (Bool × (alloc.vec.Vec Std.U8))
-  := do
-  let i := alloc.vec.Vec.len fields
-  if index < i
-  then
-    let output1 ←
-      if index > 0#usize
-      then alloc.vec.Vec.push output 44#u8
-      else ok output
-    let p ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-        ((alloc.vec.Vec Std.U32) × json_wire.Value)) fields index
-    let (b, output2) ← json_wire.append_field output1 p
-    if b
-    then
-      let index1 ← index + 1#usize
-      json_wire.append_fields_loop output2 fields index1
-    else ok (false, output2)
-  else let output1 ← alloc.vec.Vec.push output 125#u8
-       ok (true, output1)
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::json_wire::append_fields]:
-    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 58:0-72:1 -/
-def json_wire.append_fields
-  (output : alloc.vec.Vec Std.U8)
-  (fields : alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value)) :
-  Result (Bool × (alloc.vec.Vec Std.U8))
-  := do
-  let output1 ← alloc.vec.Vec.push output 123#u8
-  json_wire.append_fields_loop output1 fields 0#usize
-partial_fixpoint
-
-end
-
-/-- [aivm_secrets_garrett_core::json_wire::encode]:
-    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 74:0-80:1
-    Visibility: public -/
-def json_wire.encode
-  (value : json_wire.Value) :
-  Result (core.result.Result (alloc.vec.Vec Std.U8) json_wire.EncodingDenial)
-  := do
-  let (b, output) ← json_wire.append (alloc.vec.Vec.new Std.U8) value
-  if b
-  then ok (core.result.Result.Ok output)
-  else ok (core.result.Result.Err json_wire.EncodingDenial.InvalidText)
-
 /-- [aivm_secrets_garrett_core::json_wire::prepare]:
     Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 82:0-90:1
     Visibility: public -/
@@ -8214,982 +9745,6 @@ def provider_status.StatusDenial.Insts.CoreCmpEq : core.cmp.Eq
     provider_status.StatusDenial.Insts.CoreCmpPartialEqStatusDenial
 }
 
-/-- [aivm_secrets_garrett_core::selected_conversion::WireDenial]
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 107:0-111:1
-    Visibility: public -/
-@[discriminant isize]
-inductive selected_conversion.WireDenial where
-| InvalidText : selected_conversion.WireDenial
-| DuplicateName : selected_conversion.WireDenial
-| Opaque : selected_conversion.WireDenial
-
-/-- [aivm_secrets_garrett_core::selected_conversion::utf8_scalars]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 119:4-178:1
-    Visibility: public -/
-@[rust_loop]
-def selected_conversion.utf8_scalars_loop
-  (bytes : alloc.vec.Vec Std.U8) (scalars : alloc.vec.Vec Std.U32)
-  (i : Std.Usize) :
-  Result (core.result.Result (alloc.vec.Vec Std.U32)
-    selected_conversion.WireDenial)
-  := do
-  let i1 := alloc.vec.Vec.len bytes
-  if i < i1
-  then
-    let first ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U8) bytes
-        i
-    if first < 128#u8
-    then
-      let i2 ← lift (UScalar.cast .U32 first)
-      let scalars1 ← alloc.vec.Vec.push scalars i2
-      let i3 ← i + 1#usize
-      selected_conversion.utf8_scalars_loop bytes scalars1 i3
-    else
-      if first >= 194#u8
-      then
-        if first <= 223#u8
-        then
-          let i2 := alloc.vec.Vec.len bytes
-          let i3 ← i2 - i
-          if i3 < 2#usize
-          then
-            ok (core.result.Result.Err
-              selected_conversion.WireDenial.InvalidText)
-          else
-            let i4 ← i + 1#usize
-            let second ←
-              alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-                Std.U8) bytes i4
-            if second < 128#u8
-            then
-              ok (core.result.Result.Err
-                selected_conversion.WireDenial.InvalidText)
-            else
-              if second > 191#u8
-              then
-                ok (core.result.Result.Err
-                  selected_conversion.WireDenial.InvalidText)
-              else
-                let i5 ← lift (UScalar.cast .U32 first)
-                let i6 ← i5 - 192#u32
-                let i7 ← i6 * 64#u32
-                let i8 ← lift (UScalar.cast .U32 second)
-                let i9 ← i8 - 128#u32
-                let i10 ← i7 + i9
-                let scalars1 ← alloc.vec.Vec.push scalars i10
-                let i11 ← i + 2#usize
-                selected_conversion.utf8_scalars_loop bytes scalars1 i11
-        else
-          if first >= 224#u8
-          then
-            if first <= 239#u8
-            then
-              let i2 := alloc.vec.Vec.len bytes
-              let i3 ← i2 - i
-              if i3 < 3#usize
-              then
-                ok (core.result.Result.Err
-                  selected_conversion.WireDenial.InvalidText)
-              else
-                let i4 ← i + 1#usize
-                let second ←
-                  alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-                    Std.U8) bytes i4
-                let i5 ← i + 2#usize
-                let third ←
-                  alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-                    Std.U8) bytes i5
-                if second < 128#u8
-                then
-                  ok (core.result.Result.Err
-                    selected_conversion.WireDenial.InvalidText)
-                else
-                  if second > 191#u8
-                  then
-                    ok (core.result.Result.Err
-                      selected_conversion.WireDenial.InvalidText)
-                  else
-                    if third < 128#u8
-                    then
-                      ok (core.result.Result.Err
-                        selected_conversion.WireDenial.InvalidText)
-                    else
-                      if third > 191#u8
-                      then
-                        ok (core.result.Result.Err
-                          selected_conversion.WireDenial.InvalidText)
-                      else
-                        if first = 224#u8
-                        then
-                          if second < 160#u8
-                          then
-                            ok (core.result.Result.Err
-                              selected_conversion.WireDenial.InvalidText)
-                          else
-                            if first = 237#u8
-                            then
-                              if second >= 160#u8
-                              then
-                                ok (core.result.Result.Err
-                                  selected_conversion.WireDenial.InvalidText)
-                              else
-                                let i6 ← lift (UScalar.cast .U32 first)
-                                let i7 ← i6 - 224#u32
-                                let i8 ← i7 * 4096#u32
-                                let i9 ← lift (UScalar.cast .U32 second)
-                                let i10 ← i9 - 128#u32
-                                let i11 ← i10 * 64#u32
-                                let i12 ← i8 + i11
-                                let i13 ← lift (UScalar.cast .U32 third)
-                                let i14 ← i13 - 128#u32
-                                let i15 ← i12 + i14
-                                let scalars1 ← alloc.vec.Vec.push scalars i15
-                                let i16 ← i + 3#usize
-                                selected_conversion.utf8_scalars_loop bytes
-                                  scalars1 i16
-                            else
-                              let i6 ← lift (UScalar.cast .U32 first)
-                              let i7 ← i6 - 224#u32
-                              let i8 ← i7 * 4096#u32
-                              let i9 ← lift (UScalar.cast .U32 second)
-                              let i10 ← i9 - 128#u32
-                              let i11 ← i10 * 64#u32
-                              let i12 ← i8 + i11
-                              let i13 ← lift (UScalar.cast .U32 third)
-                              let i14 ← i13 - 128#u32
-                              let i15 ← i12 + i14
-                              let scalars1 ← alloc.vec.Vec.push scalars i15
-                              let i16 ← i + 3#usize
-                              selected_conversion.utf8_scalars_loop bytes
-                                scalars1 i16
-                        else
-                          if first = 237#u8
-                          then
-                            if second >= 160#u8
-                            then
-                              ok (core.result.Result.Err
-                                selected_conversion.WireDenial.InvalidText)
-                            else
-                              let i6 ← lift (UScalar.cast .U32 first)
-                              let i7 ← i6 - 224#u32
-                              let i8 ← i7 * 4096#u32
-                              let i9 ← lift (UScalar.cast .U32 second)
-                              let i10 ← i9 - 128#u32
-                              let i11 ← i10 * 64#u32
-                              let i12 ← i8 + i11
-                              let i13 ← lift (UScalar.cast .U32 third)
-                              let i14 ← i13 - 128#u32
-                              let i15 ← i12 + i14
-                              let scalars1 ← alloc.vec.Vec.push scalars i15
-                              let i16 ← i + 3#usize
-                              selected_conversion.utf8_scalars_loop bytes
-                                scalars1 i16
-                          else
-                            let i6 ← lift (UScalar.cast .U32 first)
-                            let i7 ← i6 - 224#u32
-                            let i8 ← i7 * 4096#u32
-                            let i9 ← lift (UScalar.cast .U32 second)
-                            let i10 ← i9 - 128#u32
-                            let i11 ← i10 * 64#u32
-                            let i12 ← i8 + i11
-                            let i13 ← lift (UScalar.cast .U32 third)
-                            let i14 ← i13 - 128#u32
-                            let i15 ← i12 + i14
-                            let scalars1 ← alloc.vec.Vec.push scalars i15
-                            let i16 ← i + 3#usize
-                            selected_conversion.utf8_scalars_loop bytes
-                              scalars1 i16
-            else
-              if first >= 240#u8
-              then
-                if first <= 244#u8
-                then
-                  let i2 := alloc.vec.Vec.len bytes
-                  let i3 ← i2 - i
-                  if i3 < 4#usize
-                  then
-                    ok (core.result.Result.Err
-                      selected_conversion.WireDenial.InvalidText)
-                  else
-                    let i4 ← i + 1#usize
-                    let second ←
-                      alloc.vec.Vec.index
-                        (core.slice.index.SliceIndexUsizeSlice Std.U8) bytes i4
-                    let i5 ← i + 2#usize
-                    let third ←
-                      alloc.vec.Vec.index
-                        (core.slice.index.SliceIndexUsizeSlice Std.U8) bytes i5
-                    let i6 ← i + 3#usize
-                    let fourth ←
-                      alloc.vec.Vec.index
-                        (core.slice.index.SliceIndexUsizeSlice Std.U8) bytes i6
-                    if second < 128#u8
-                    then
-                      ok (core.result.Result.Err
-                        selected_conversion.WireDenial.InvalidText)
-                    else
-                      if second > 191#u8
-                      then
-                        ok (core.result.Result.Err
-                          selected_conversion.WireDenial.InvalidText)
-                      else
-                        if third < 128#u8
-                        then
-                          ok (core.result.Result.Err
-                            selected_conversion.WireDenial.InvalidText)
-                        else
-                          if third > 191#u8
-                          then
-                            ok (core.result.Result.Err
-                              selected_conversion.WireDenial.InvalidText)
-                          else
-                            if fourth < 128#u8
-                            then
-                              ok (core.result.Result.Err
-                                selected_conversion.WireDenial.InvalidText)
-                            else
-                              if fourth > 191#u8
-                              then
-                                ok (core.result.Result.Err
-                                  selected_conversion.WireDenial.InvalidText)
-                              else
-                                if first = 240#u8
-                                then
-                                  if second < 144#u8
-                                  then
-                                    ok (core.result.Result.Err
-                                      selected_conversion.WireDenial.InvalidText)
-                                  else
-                                    if first = 244#u8
-                                    then
-                                      if second >= 144#u8
-                                      then
-                                        ok (core.result.Result.Err
-                                          selected_conversion.WireDenial.InvalidText)
-                                      else
-                                        let i7 ←
-                                          lift (UScalar.cast .U32 first)
-                                        let i8 ← i7 - 240#u32
-                                        let i9 ← i8 * 262144#u32
-                                        let i10 ←
-                                          lift (UScalar.cast .U32 second)
-                                        let i11 ← i10 - 128#u32
-                                        let i12 ← i11 * 4096#u32
-                                        let i13 ← i9 + i12
-                                        let i14 ←
-                                          lift (UScalar.cast .U32 third)
-                                        let i15 ← i14 - 128#u32
-                                        let i16 ← i15 * 64#u32
-                                        let i17 ← i13 + i16
-                                        let i18 ←
-                                          lift (UScalar.cast .U32 fourth)
-                                        let i19 ← i18 - 128#u32
-                                        let i20 ← i17 + i19
-                                        let scalars1 ←
-                                          alloc.vec.Vec.push scalars i20
-                                        let i21 ← i + 4#usize
-                                        selected_conversion.utf8_scalars_loop
-                                          bytes scalars1 i21
-                                    else
-                                      let i7 ← lift (UScalar.cast .U32 first)
-                                      let i8 ← i7 - 240#u32
-                                      let i9 ← i8 * 262144#u32
-                                      let i10 ←
-                                        lift (UScalar.cast .U32 second)
-                                      let i11 ← i10 - 128#u32
-                                      let i12 ← i11 * 4096#u32
-                                      let i13 ← i9 + i12
-                                      let i14 ←
-                                        lift (UScalar.cast .U32 third)
-                                      let i15 ← i14 - 128#u32
-                                      let i16 ← i15 * 64#u32
-                                      let i17 ← i13 + i16
-                                      let i18 ←
-                                        lift (UScalar.cast .U32 fourth)
-                                      let i19 ← i18 - 128#u32
-                                      let i20 ← i17 + i19
-                                      let scalars1 ←
-                                        alloc.vec.Vec.push scalars i20
-                                      let i21 ← i + 4#usize
-                                      selected_conversion.utf8_scalars_loop
-                                        bytes scalars1 i21
-                                else
-                                  if first = 244#u8
-                                  then
-                                    if second >= 144#u8
-                                    then
-                                      ok (core.result.Result.Err
-                                        selected_conversion.WireDenial.InvalidText)
-                                    else
-                                      let i7 ← lift (UScalar.cast .U32 first)
-                                      let i8 ← i7 - 240#u32
-                                      let i9 ← i8 * 262144#u32
-                                      let i10 ←
-                                        lift (UScalar.cast .U32 second)
-                                      let i11 ← i10 - 128#u32
-                                      let i12 ← i11 * 4096#u32
-                                      let i13 ← i9 + i12
-                                      let i14 ←
-                                        lift (UScalar.cast .U32 third)
-                                      let i15 ← i14 - 128#u32
-                                      let i16 ← i15 * 64#u32
-                                      let i17 ← i13 + i16
-                                      let i18 ←
-                                        lift (UScalar.cast .U32 fourth)
-                                      let i19 ← i18 - 128#u32
-                                      let i20 ← i17 + i19
-                                      let scalars1 ←
-                                        alloc.vec.Vec.push scalars i20
-                                      let i21 ← i + 4#usize
-                                      selected_conversion.utf8_scalars_loop
-                                        bytes scalars1 i21
-                                  else
-                                    let i7 ← lift (UScalar.cast .U32 first)
-                                    let i8 ← i7 - 240#u32
-                                    let i9 ← i8 * 262144#u32
-                                    let i10 ← lift (UScalar.cast .U32 second)
-                                    let i11 ← i10 - 128#u32
-                                    let i12 ← i11 * 4096#u32
-                                    let i13 ← i9 + i12
-                                    let i14 ← lift (UScalar.cast .U32 third)
-                                    let i15 ← i14 - 128#u32
-                                    let i16 ← i15 * 64#u32
-                                    let i17 ← i13 + i16
-                                    let i18 ← lift (UScalar.cast .U32 fourth)
-                                    let i19 ← i18 - 128#u32
-                                    let i20 ← i17 + i19
-                                    let scalars1 ←
-                                      alloc.vec.Vec.push scalars i20
-                                    let i21 ← i + 4#usize
-                                    selected_conversion.utf8_scalars_loop bytes
-                                      scalars1 i21
-                else
-                  ok (core.result.Result.Err
-                    selected_conversion.WireDenial.InvalidText)
-              else
-                ok (core.result.Result.Err
-                  selected_conversion.WireDenial.InvalidText)
-          else
-            if first >= 240#u8
-            then
-              if first <= 244#u8
-              then
-                let i2 := alloc.vec.Vec.len bytes
-                let i3 ← i2 - i
-                if i3 < 4#usize
-                then
-                  ok (core.result.Result.Err
-                    selected_conversion.WireDenial.InvalidText)
-                else
-                  let i4 ← i + 1#usize
-                  let second ←
-                    alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-                      Std.U8) bytes i4
-                  let i5 ← i + 2#usize
-                  let third ←
-                    alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-                      Std.U8) bytes i5
-                  let i6 ← i + 3#usize
-                  let fourth ←
-                    alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-                      Std.U8) bytes i6
-                  if second < 128#u8
-                  then
-                    ok (core.result.Result.Err
-                      selected_conversion.WireDenial.InvalidText)
-                  else
-                    if second > 191#u8
-                    then
-                      ok (core.result.Result.Err
-                        selected_conversion.WireDenial.InvalidText)
-                    else
-                      if third < 128#u8
-                      then
-                        ok (core.result.Result.Err
-                          selected_conversion.WireDenial.InvalidText)
-                      else
-                        if third > 191#u8
-                        then
-                          ok (core.result.Result.Err
-                            selected_conversion.WireDenial.InvalidText)
-                        else
-                          if fourth < 128#u8
-                          then
-                            ok (core.result.Result.Err
-                              selected_conversion.WireDenial.InvalidText)
-                          else
-                            if fourth > 191#u8
-                            then
-                              ok (core.result.Result.Err
-                                selected_conversion.WireDenial.InvalidText)
-                            else
-                              if first = 240#u8
-                              then
-                                if second < 144#u8
-                                then
-                                  ok (core.result.Result.Err
-                                    selected_conversion.WireDenial.InvalidText)
-                                else
-                                  if first = 244#u8
-                                  then
-                                    if second >= 144#u8
-                                    then
-                                      ok (core.result.Result.Err
-                                        selected_conversion.WireDenial.InvalidText)
-                                    else
-                                      let i7 ← lift (UScalar.cast .U32 first)
-                                      let i8 ← i7 - 240#u32
-                                      let i9 ← i8 * 262144#u32
-                                      let i10 ←
-                                        lift (UScalar.cast .U32 second)
-                                      let i11 ← i10 - 128#u32
-                                      let i12 ← i11 * 4096#u32
-                                      let i13 ← i9 + i12
-                                      let i14 ←
-                                        lift (UScalar.cast .U32 third)
-                                      let i15 ← i14 - 128#u32
-                                      let i16 ← i15 * 64#u32
-                                      let i17 ← i13 + i16
-                                      let i18 ←
-                                        lift (UScalar.cast .U32 fourth)
-                                      let i19 ← i18 - 128#u32
-                                      let i20 ← i17 + i19
-                                      let scalars1 ←
-                                        alloc.vec.Vec.push scalars i20
-                                      let i21 ← i + 4#usize
-                                      selected_conversion.utf8_scalars_loop
-                                        bytes scalars1 i21
-                                  else
-                                    let i7 ← lift (UScalar.cast .U32 first)
-                                    let i8 ← i7 - 240#u32
-                                    let i9 ← i8 * 262144#u32
-                                    let i10 ← lift (UScalar.cast .U32 second)
-                                    let i11 ← i10 - 128#u32
-                                    let i12 ← i11 * 4096#u32
-                                    let i13 ← i9 + i12
-                                    let i14 ← lift (UScalar.cast .U32 third)
-                                    let i15 ← i14 - 128#u32
-                                    let i16 ← i15 * 64#u32
-                                    let i17 ← i13 + i16
-                                    let i18 ← lift (UScalar.cast .U32 fourth)
-                                    let i19 ← i18 - 128#u32
-                                    let i20 ← i17 + i19
-                                    let scalars1 ←
-                                      alloc.vec.Vec.push scalars i20
-                                    let i21 ← i + 4#usize
-                                    selected_conversion.utf8_scalars_loop bytes
-                                      scalars1 i21
-                              else
-                                if first = 244#u8
-                                then
-                                  if second >= 144#u8
-                                  then
-                                    ok (core.result.Result.Err
-                                      selected_conversion.WireDenial.InvalidText)
-                                  else
-                                    let i7 ← lift (UScalar.cast .U32 first)
-                                    let i8 ← i7 - 240#u32
-                                    let i9 ← i8 * 262144#u32
-                                    let i10 ← lift (UScalar.cast .U32 second)
-                                    let i11 ← i10 - 128#u32
-                                    let i12 ← i11 * 4096#u32
-                                    let i13 ← i9 + i12
-                                    let i14 ← lift (UScalar.cast .U32 third)
-                                    let i15 ← i14 - 128#u32
-                                    let i16 ← i15 * 64#u32
-                                    let i17 ← i13 + i16
-                                    let i18 ← lift (UScalar.cast .U32 fourth)
-                                    let i19 ← i18 - 128#u32
-                                    let i20 ← i17 + i19
-                                    let scalars1 ←
-                                      alloc.vec.Vec.push scalars i20
-                                    let i21 ← i + 4#usize
-                                    selected_conversion.utf8_scalars_loop bytes
-                                      scalars1 i21
-                                else
-                                  let i7 ← lift (UScalar.cast .U32 first)
-                                  let i8 ← i7 - 240#u32
-                                  let i9 ← i8 * 262144#u32
-                                  let i10 ← lift (UScalar.cast .U32 second)
-                                  let i11 ← i10 - 128#u32
-                                  let i12 ← i11 * 4096#u32
-                                  let i13 ← i9 + i12
-                                  let i14 ← lift (UScalar.cast .U32 third)
-                                  let i15 ← i14 - 128#u32
-                                  let i16 ← i15 * 64#u32
-                                  let i17 ← i13 + i16
-                                  let i18 ← lift (UScalar.cast .U32 fourth)
-                                  let i19 ← i18 - 128#u32
-                                  let i20 ← i17 + i19
-                                  let scalars1 ←
-                                    alloc.vec.Vec.push scalars i20
-                                  let i21 ← i + 4#usize
-                                  selected_conversion.utf8_scalars_loop bytes
-                                    scalars1 i21
-              else
-                ok (core.result.Result.Err
-                  selected_conversion.WireDenial.InvalidText)
-            else
-              ok (core.result.Result.Err
-                selected_conversion.WireDenial.InvalidText)
-      else
-        if first >= 224#u8
-        then
-          if first <= 239#u8
-          then
-            let i2 := alloc.vec.Vec.len bytes
-            let i3 ← i2 - i
-            if i3 < 3#usize
-            then
-              ok (core.result.Result.Err
-                selected_conversion.WireDenial.InvalidText)
-            else
-              let i4 ← i + 1#usize
-              let second ←
-                alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-                  Std.U8) bytes i4
-              let i5 ← i + 2#usize
-              let third ←
-                alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-                  Std.U8) bytes i5
-              if second < 128#u8
-              then
-                ok (core.result.Result.Err
-                  selected_conversion.WireDenial.InvalidText)
-              else
-                if second > 191#u8
-                then
-                  ok (core.result.Result.Err
-                    selected_conversion.WireDenial.InvalidText)
-                else
-                  if third < 128#u8
-                  then
-                    ok (core.result.Result.Err
-                      selected_conversion.WireDenial.InvalidText)
-                  else
-                    if third > 191#u8
-                    then
-                      ok (core.result.Result.Err
-                        selected_conversion.WireDenial.InvalidText)
-                    else
-                      if first = 224#u8
-                      then
-                        if second < 160#u8
-                        then
-                          ok (core.result.Result.Err
-                            selected_conversion.WireDenial.InvalidText)
-                        else
-                          if first = 237#u8
-                          then
-                            if second >= 160#u8
-                            then
-                              ok (core.result.Result.Err
-                                selected_conversion.WireDenial.InvalidText)
-                            else
-                              let i6 ← lift (UScalar.cast .U32 first)
-                              let i7 ← i6 - 224#u32
-                              let i8 ← i7 * 4096#u32
-                              let i9 ← lift (UScalar.cast .U32 second)
-                              let i10 ← i9 - 128#u32
-                              let i11 ← i10 * 64#u32
-                              let i12 ← i8 + i11
-                              let i13 ← lift (UScalar.cast .U32 third)
-                              let i14 ← i13 - 128#u32
-                              let i15 ← i12 + i14
-                              let scalars1 ← alloc.vec.Vec.push scalars i15
-                              let i16 ← i + 3#usize
-                              selected_conversion.utf8_scalars_loop bytes
-                                scalars1 i16
-                          else
-                            let i6 ← lift (UScalar.cast .U32 first)
-                            let i7 ← i6 - 224#u32
-                            let i8 ← i7 * 4096#u32
-                            let i9 ← lift (UScalar.cast .U32 second)
-                            let i10 ← i9 - 128#u32
-                            let i11 ← i10 * 64#u32
-                            let i12 ← i8 + i11
-                            let i13 ← lift (UScalar.cast .U32 third)
-                            let i14 ← i13 - 128#u32
-                            let i15 ← i12 + i14
-                            let scalars1 ← alloc.vec.Vec.push scalars i15
-                            let i16 ← i + 3#usize
-                            selected_conversion.utf8_scalars_loop bytes
-                              scalars1 i16
-                      else
-                        if first = 237#u8
-                        then
-                          if second >= 160#u8
-                          then
-                            ok (core.result.Result.Err
-                              selected_conversion.WireDenial.InvalidText)
-                          else
-                            let i6 ← lift (UScalar.cast .U32 first)
-                            let i7 ← i6 - 224#u32
-                            let i8 ← i7 * 4096#u32
-                            let i9 ← lift (UScalar.cast .U32 second)
-                            let i10 ← i9 - 128#u32
-                            let i11 ← i10 * 64#u32
-                            let i12 ← i8 + i11
-                            let i13 ← lift (UScalar.cast .U32 third)
-                            let i14 ← i13 - 128#u32
-                            let i15 ← i12 + i14
-                            let scalars1 ← alloc.vec.Vec.push scalars i15
-                            let i16 ← i + 3#usize
-                            selected_conversion.utf8_scalars_loop bytes
-                              scalars1 i16
-                        else
-                          let i6 ← lift (UScalar.cast .U32 first)
-                          let i7 ← i6 - 224#u32
-                          let i8 ← i7 * 4096#u32
-                          let i9 ← lift (UScalar.cast .U32 second)
-                          let i10 ← i9 - 128#u32
-                          let i11 ← i10 * 64#u32
-                          let i12 ← i8 + i11
-                          let i13 ← lift (UScalar.cast .U32 third)
-                          let i14 ← i13 - 128#u32
-                          let i15 ← i12 + i14
-                          let scalars1 ← alloc.vec.Vec.push scalars i15
-                          let i16 ← i + 3#usize
-                          selected_conversion.utf8_scalars_loop bytes scalars1
-                            i16
-          else
-            if first >= 240#u8
-            then
-              if first <= 244#u8
-              then
-                let i2 := alloc.vec.Vec.len bytes
-                let i3 ← i2 - i
-                if i3 < 4#usize
-                then
-                  ok (core.result.Result.Err
-                    selected_conversion.WireDenial.InvalidText)
-                else
-                  let i4 ← i + 1#usize
-                  let second ←
-                    alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-                      Std.U8) bytes i4
-                  let i5 ← i + 2#usize
-                  let third ←
-                    alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-                      Std.U8) bytes i5
-                  let i6 ← i + 3#usize
-                  let fourth ←
-                    alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-                      Std.U8) bytes i6
-                  if second < 128#u8
-                  then
-                    ok (core.result.Result.Err
-                      selected_conversion.WireDenial.InvalidText)
-                  else
-                    if second > 191#u8
-                    then
-                      ok (core.result.Result.Err
-                        selected_conversion.WireDenial.InvalidText)
-                    else
-                      if third < 128#u8
-                      then
-                        ok (core.result.Result.Err
-                          selected_conversion.WireDenial.InvalidText)
-                      else
-                        if third > 191#u8
-                        then
-                          ok (core.result.Result.Err
-                            selected_conversion.WireDenial.InvalidText)
-                        else
-                          if fourth < 128#u8
-                          then
-                            ok (core.result.Result.Err
-                              selected_conversion.WireDenial.InvalidText)
-                          else
-                            if fourth > 191#u8
-                            then
-                              ok (core.result.Result.Err
-                                selected_conversion.WireDenial.InvalidText)
-                            else
-                              if first = 240#u8
-                              then
-                                if second < 144#u8
-                                then
-                                  ok (core.result.Result.Err
-                                    selected_conversion.WireDenial.InvalidText)
-                                else
-                                  if first = 244#u8
-                                  then
-                                    if second >= 144#u8
-                                    then
-                                      ok (core.result.Result.Err
-                                        selected_conversion.WireDenial.InvalidText)
-                                    else
-                                      let i7 ← lift (UScalar.cast .U32 first)
-                                      let i8 ← i7 - 240#u32
-                                      let i9 ← i8 * 262144#u32
-                                      let i10 ←
-                                        lift (UScalar.cast .U32 second)
-                                      let i11 ← i10 - 128#u32
-                                      let i12 ← i11 * 4096#u32
-                                      let i13 ← i9 + i12
-                                      let i14 ←
-                                        lift (UScalar.cast .U32 third)
-                                      let i15 ← i14 - 128#u32
-                                      let i16 ← i15 * 64#u32
-                                      let i17 ← i13 + i16
-                                      let i18 ←
-                                        lift (UScalar.cast .U32 fourth)
-                                      let i19 ← i18 - 128#u32
-                                      let i20 ← i17 + i19
-                                      let scalars1 ←
-                                        alloc.vec.Vec.push scalars i20
-                                      let i21 ← i + 4#usize
-                                      selected_conversion.utf8_scalars_loop
-                                        bytes scalars1 i21
-                                  else
-                                    let i7 ← lift (UScalar.cast .U32 first)
-                                    let i8 ← i7 - 240#u32
-                                    let i9 ← i8 * 262144#u32
-                                    let i10 ← lift (UScalar.cast .U32 second)
-                                    let i11 ← i10 - 128#u32
-                                    let i12 ← i11 * 4096#u32
-                                    let i13 ← i9 + i12
-                                    let i14 ← lift (UScalar.cast .U32 third)
-                                    let i15 ← i14 - 128#u32
-                                    let i16 ← i15 * 64#u32
-                                    let i17 ← i13 + i16
-                                    let i18 ← lift (UScalar.cast .U32 fourth)
-                                    let i19 ← i18 - 128#u32
-                                    let i20 ← i17 + i19
-                                    let scalars1 ←
-                                      alloc.vec.Vec.push scalars i20
-                                    let i21 ← i + 4#usize
-                                    selected_conversion.utf8_scalars_loop bytes
-                                      scalars1 i21
-                              else
-                                if first = 244#u8
-                                then
-                                  if second >= 144#u8
-                                  then
-                                    ok (core.result.Result.Err
-                                      selected_conversion.WireDenial.InvalidText)
-                                  else
-                                    let i7 ← lift (UScalar.cast .U32 first)
-                                    let i8 ← i7 - 240#u32
-                                    let i9 ← i8 * 262144#u32
-                                    let i10 ← lift (UScalar.cast .U32 second)
-                                    let i11 ← i10 - 128#u32
-                                    let i12 ← i11 * 4096#u32
-                                    let i13 ← i9 + i12
-                                    let i14 ← lift (UScalar.cast .U32 third)
-                                    let i15 ← i14 - 128#u32
-                                    let i16 ← i15 * 64#u32
-                                    let i17 ← i13 + i16
-                                    let i18 ← lift (UScalar.cast .U32 fourth)
-                                    let i19 ← i18 - 128#u32
-                                    let i20 ← i17 + i19
-                                    let scalars1 ←
-                                      alloc.vec.Vec.push scalars i20
-                                    let i21 ← i + 4#usize
-                                    selected_conversion.utf8_scalars_loop bytes
-                                      scalars1 i21
-                                else
-                                  let i7 ← lift (UScalar.cast .U32 first)
-                                  let i8 ← i7 - 240#u32
-                                  let i9 ← i8 * 262144#u32
-                                  let i10 ← lift (UScalar.cast .U32 second)
-                                  let i11 ← i10 - 128#u32
-                                  let i12 ← i11 * 4096#u32
-                                  let i13 ← i9 + i12
-                                  let i14 ← lift (UScalar.cast .U32 third)
-                                  let i15 ← i14 - 128#u32
-                                  let i16 ← i15 * 64#u32
-                                  let i17 ← i13 + i16
-                                  let i18 ← lift (UScalar.cast .U32 fourth)
-                                  let i19 ← i18 - 128#u32
-                                  let i20 ← i17 + i19
-                                  let scalars1 ←
-                                    alloc.vec.Vec.push scalars i20
-                                  let i21 ← i + 4#usize
-                                  selected_conversion.utf8_scalars_loop bytes
-                                    scalars1 i21
-              else
-                ok (core.result.Result.Err
-                  selected_conversion.WireDenial.InvalidText)
-            else
-              ok (core.result.Result.Err
-                selected_conversion.WireDenial.InvalidText)
-        else
-          if first >= 240#u8
-          then
-            if first <= 244#u8
-            then
-              let i2 := alloc.vec.Vec.len bytes
-              let i3 ← i2 - i
-              if i3 < 4#usize
-              then
-                ok (core.result.Result.Err
-                  selected_conversion.WireDenial.InvalidText)
-              else
-                let i4 ← i + 1#usize
-                let second ←
-                  alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-                    Std.U8) bytes i4
-                let i5 ← i + 2#usize
-                let third ←
-                  alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-                    Std.U8) bytes i5
-                let i6 ← i + 3#usize
-                let fourth ←
-                  alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-                    Std.U8) bytes i6
-                if second < 128#u8
-                then
-                  ok (core.result.Result.Err
-                    selected_conversion.WireDenial.InvalidText)
-                else
-                  if second > 191#u8
-                  then
-                    ok (core.result.Result.Err
-                      selected_conversion.WireDenial.InvalidText)
-                  else
-                    if third < 128#u8
-                    then
-                      ok (core.result.Result.Err
-                        selected_conversion.WireDenial.InvalidText)
-                    else
-                      if third > 191#u8
-                      then
-                        ok (core.result.Result.Err
-                          selected_conversion.WireDenial.InvalidText)
-                      else
-                        if fourth < 128#u8
-                        then
-                          ok (core.result.Result.Err
-                            selected_conversion.WireDenial.InvalidText)
-                        else
-                          if fourth > 191#u8
-                          then
-                            ok (core.result.Result.Err
-                              selected_conversion.WireDenial.InvalidText)
-                          else
-                            if first = 240#u8
-                            then
-                              if second < 144#u8
-                              then
-                                ok (core.result.Result.Err
-                                  selected_conversion.WireDenial.InvalidText)
-                              else
-                                if first = 244#u8
-                                then
-                                  if second >= 144#u8
-                                  then
-                                    ok (core.result.Result.Err
-                                      selected_conversion.WireDenial.InvalidText)
-                                  else
-                                    let i7 ← lift (UScalar.cast .U32 first)
-                                    let i8 ← i7 - 240#u32
-                                    let i9 ← i8 * 262144#u32
-                                    let i10 ← lift (UScalar.cast .U32 second)
-                                    let i11 ← i10 - 128#u32
-                                    let i12 ← i11 * 4096#u32
-                                    let i13 ← i9 + i12
-                                    let i14 ← lift (UScalar.cast .U32 third)
-                                    let i15 ← i14 - 128#u32
-                                    let i16 ← i15 * 64#u32
-                                    let i17 ← i13 + i16
-                                    let i18 ← lift (UScalar.cast .U32 fourth)
-                                    let i19 ← i18 - 128#u32
-                                    let i20 ← i17 + i19
-                                    let scalars1 ←
-                                      alloc.vec.Vec.push scalars i20
-                                    let i21 ← i + 4#usize
-                                    selected_conversion.utf8_scalars_loop bytes
-                                      scalars1 i21
-                                else
-                                  let i7 ← lift (UScalar.cast .U32 first)
-                                  let i8 ← i7 - 240#u32
-                                  let i9 ← i8 * 262144#u32
-                                  let i10 ← lift (UScalar.cast .U32 second)
-                                  let i11 ← i10 - 128#u32
-                                  let i12 ← i11 * 4096#u32
-                                  let i13 ← i9 + i12
-                                  let i14 ← lift (UScalar.cast .U32 third)
-                                  let i15 ← i14 - 128#u32
-                                  let i16 ← i15 * 64#u32
-                                  let i17 ← i13 + i16
-                                  let i18 ← lift (UScalar.cast .U32 fourth)
-                                  let i19 ← i18 - 128#u32
-                                  let i20 ← i17 + i19
-                                  let scalars1 ←
-                                    alloc.vec.Vec.push scalars i20
-                                  let i21 ← i + 4#usize
-                                  selected_conversion.utf8_scalars_loop bytes
-                                    scalars1 i21
-                            else
-                              if first = 244#u8
-                              then
-                                if second >= 144#u8
-                                then
-                                  ok (core.result.Result.Err
-                                    selected_conversion.WireDenial.InvalidText)
-                                else
-                                  let i7 ← lift (UScalar.cast .U32 first)
-                                  let i8 ← i7 - 240#u32
-                                  let i9 ← i8 * 262144#u32
-                                  let i10 ← lift (UScalar.cast .U32 second)
-                                  let i11 ← i10 - 128#u32
-                                  let i12 ← i11 * 4096#u32
-                                  let i13 ← i9 + i12
-                                  let i14 ← lift (UScalar.cast .U32 third)
-                                  let i15 ← i14 - 128#u32
-                                  let i16 ← i15 * 64#u32
-                                  let i17 ← i13 + i16
-                                  let i18 ← lift (UScalar.cast .U32 fourth)
-                                  let i19 ← i18 - 128#u32
-                                  let i20 ← i17 + i19
-                                  let scalars1 ←
-                                    alloc.vec.Vec.push scalars i20
-                                  let i21 ← i + 4#usize
-                                  selected_conversion.utf8_scalars_loop bytes
-                                    scalars1 i21
-                              else
-                                let i7 ← lift (UScalar.cast .U32 first)
-                                let i8 ← i7 - 240#u32
-                                let i9 ← i8 * 262144#u32
-                                let i10 ← lift (UScalar.cast .U32 second)
-                                let i11 ← i10 - 128#u32
-                                let i12 ← i11 * 4096#u32
-                                let i13 ← i9 + i12
-                                let i14 ← lift (UScalar.cast .U32 third)
-                                let i15 ← i14 - 128#u32
-                                let i16 ← i15 * 64#u32
-                                let i17 ← i13 + i16
-                                let i18 ← lift (UScalar.cast .U32 fourth)
-                                let i19 ← i18 - 128#u32
-                                let i20 ← i17 + i19
-                                let scalars1 ← alloc.vec.Vec.push scalars i20
-                                let i21 ← i + 4#usize
-                                selected_conversion.utf8_scalars_loop bytes
-                                  scalars1 i21
-            else
-              ok (core.result.Result.Err
-                selected_conversion.WireDenial.InvalidText)
-          else
-            ok (core.result.Result.Err
-              selected_conversion.WireDenial.InvalidText)
-  else ok (core.result.Result.Ok scalars)
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::selected_conversion::utf8_scalars]:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 116:0-178:1
-    Visibility: public -/
-@[reducible]
-def selected_conversion.utf8_scalars
-  (bytes : alloc.vec.Vec Std.U8) :
-  Result (core.result.Result (alloc.vec.Vec Std.U32)
-    selected_conversion.WireDenial)
-  := do
-  selected_conversion.utf8_scalars_loop bytes (alloc.vec.Vec.new Std.U32)
-    0#usize
-
 /-- [aivm_secrets_garrett_core::provider_status::reason]: loop 0:
     Source: 'crates/aivm-secrets-garrett-core/src/provider_status.rs', lines 56:4-64:1 -/
 @[rust_loop]
@@ -9472,22 +10027,6 @@ def provider_status.manifest
         then ok (core.result.Result.Err provider_status.StatusDenial.Partial)
         else ok (core.result.Result.Ok ())
 
-/-- [aivm_secrets_garrett_core::provider_wire::Fields]
-    Source: 'crates/aivm-secrets-garrett-core/src/provider_wire.rs', lines 6:0-11:1
-    Visibility: public -/
-structure provider_wire.Fields where
-  method : alloc.vec.Vec Std.U8
-  target : alloc.vec.Vec Std.U8
-  accept : alloc.vec.Vec Std.U8
-  headers : alloc.vec.Vec http_wire.Header
-
-/-- [aivm_secrets_garrett_core::provider_wire::Endpoint]
-    Source: 'crates/aivm-secrets-garrett-core/src/provider_wire.rs', lines 14:0-17:1
-    Visibility: public -/
-structure provider_wire.Endpoint where
-  host : alloc.vec.Vec Std.U8
-  port : Std.U16
-
 /-- [aivm_secrets_garrett_core::provider_wire::{aivm_secrets_garrett_core::provider_wire::Endpoint}::host]:
     Source: 'crates/aivm-secrets-garrett-core/src/provider_wire.rs', lines 19:4-21:5
     Visibility: public -/
@@ -9501,53 +10040,6 @@ def provider_wire.Endpoint.impl.host
 def provider_wire.Endpoint.impl.port
   (self : provider_wire.Endpoint) : Result Std.U16 := do
   ok self.port
-
-/-- [aivm_secrets_garrett_core::provider_wire::head]:
-    Source: 'crates/aivm-secrets-garrett-core/src/provider_wire.rs', lines 27:0-39:1 -/
-def provider_wire.head
-  (route : credential_use.Route) (fields : provider_wire.Fields) :
-  Result (core.result.Result http_wire.Head http_wire.EncodingDenial)
-  := do
-  if route.port <= 0#i64
-  then ok (core.result.Result.Err http_wire.EncodingDenial.InvalidRequest)
-  else
-    if route.port > 65535#i64
-    then ok (core.result.Result.Err http_wire.EncodingDenial.InvalidRequest)
-    else
-      let v ← alloc.vec.CloneVec.clone core.clone.CloneU8 route.host
-      let i ← lift (IScalar.hcast .U16 route.port)
-      ok (core.result.Result.Ok
-        {
-          method := fields.method,
-          target := fields.target,
-          host := v,
-          port := i,
-          accept := fields.accept,
-          headers := fields.headers
-        })
-
-/-- [aivm_secrets_garrett_core::provider_wire::append]:
-    Source: 'crates/aivm-secrets-garrett-core/src/provider_wire.rs', lines 43:0-62:1
-    Visibility: public -/
-def provider_wire.append
-  (output : alloc.vec.Vec Std.U8) (route : credential_use.Route)
-  (fields : provider_wire.Fields) (secret : Slice Std.U8)
-  (body : Option (Slice Std.U8)) :
-  Result ((core.result.Result provider_wire.Endpoint http_wire.EncodingDenial)
-    × (alloc.vec.Vec Std.U8))
-  := do
-  let r ← provider_wire.head route fields
-  match r with
-  | core.result.Result.Ok head =>
-    let (r1, output1) ←
-      http_wire.append_request output head secret route.authentication body
-    match r1 with
-    | core.result.Result.Ok _ =>
-      ok (core.result.Result.Ok { host := head.host, port := head.port },
-        output1)
-    | core.result.Result.Err error =>
-      ok (core.result.Result.Err error, output1)
-  | core.result.Result.Err error => ok (core.result.Result.Err error, output)
 
 /-- [aivm_secrets_garrett_core::public_error::PublicError]
     Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 10:0-28:1
@@ -12210,149 +12702,6 @@ def selected_conversion.public_field_name
         then ok false
         else selected_conversion.public_field_name_loop bytes 0#usize
 
-/-- Trait declaration: [aivm_secrets_garrett_core::selected_conversion::Builder]
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 41:0-62:1
-    Visibility: public -/
-structure selected_conversion.Builder (Self : Type _) (Self_Value : Type _)
-  (Self_Name : Type _) (Self_Object : Type _) (Self_Error : Type _) where
-  null : Self → Result (Self_Value × Self)
-  boolean : Self → Bool → Result (Self_Value × Self)
-  integer : Self → Std.I64 → Result (Self_Value × Self)
-  text : Self → alloc.vec.Vec Std.U8 → Result ((core.result.Result
-    Self_Value Self_Error) × Self)
-  array : Self → alloc.vec.Vec Self_Value → Result (Self_Value × Self)
-  «name» : Self → alloc.vec.Vec Std.U8 → Result ((core.result.Result
-    Self_Name Self_Error) × Self)
-  empty_object : Self → Result (Self_Object × Self)
-  insert : Self → Self_Object → Self_Name → Self_Value → Result
-    ((core.result.Result Unit Self_Error) × Self × Self_Object)
-  finish_object : Self → Self_Object → Result (Self_Value × Self)
-  invalid : Self → Result (Self_Error × Self)
-
-mutual
-
-/-- [aivm_secrets_garrett_core::selected_conversion::render]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 79:12-100:1
-    Visibility: public -/
-@[rust_loop]
-def selected_conversion.render_loop0
-  {B : Type _} {Clause0_Value : Type _} {Clause0_Name : Type _} {Clause0_Object
-  : Type _} {Clause0_Error : Type _} (BuilderInst : selected_conversion.Builder
-  B Clause0_Value Clause0_Name Clause0_Object Clause0_Error)
-  (values : alloc.vec.Vec disclosure.Json) (builder : B)
-  (out : alloc.vec.Vec Clause0_Value) (index : Std.Usize) :
-  Result ((core.result.Result Clause0_Value Clause0_Error) × B)
-  := do
-  let i := alloc.vec.Vec.len values
-  if index < i
-  then
-    let j ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-        disclosure.Json) values index
-    let (r, builder1) ← selected_conversion.render BuilderInst j builder
-    let cf ← core.result.Result.Insts.CoreOpsTry.branch r
-    match cf with
-    | core.ops.control_flow.ControlFlow.Continue val =>
-      let out1 ← alloc.vec.Vec.push out val
-      let index1 ← index + 1#usize
-      selected_conversion.render_loop0 BuilderInst values builder1 out1 index1
-    | core.ops.control_flow.ControlFlow.Break residual =>
-      let r1 ←
-        core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
-          Clause0_Value (core.convert.FromSame Clause0_Error) residual
-      ok (r1, builder1)
-  else
-    let (t, builder1) ← BuilderInst.array builder out
-    ok (core.result.Result.Ok t, builder1)
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::selected_conversion::render]: loop 1:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 89:12-100:1
-    Visibility: public -/
-@[rust_loop]
-def selected_conversion.render_loop1
-  {B : Type _} {Clause0_Value : Type _} {Clause0_Name : Type _} {Clause0_Object
-  : Type _} {Clause0_Error : Type _} (BuilderInst : selected_conversion.Builder
-  B Clause0_Value Clause0_Name Clause0_Object Clause0_Error)
-  (fields : alloc.vec.Vec ((alloc.vec.Vec Std.U8) × disclosure.Json))
-  (builder : B) (out : Clause0_Object) (index : Std.Usize) :
-  Result ((core.result.Result Clause0_Value Clause0_Error) × B)
-  := do
-  let i := alloc.vec.Vec.len fields
-  if index < i
-  then
-    let (v, j) ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-        ((alloc.vec.Vec Std.U8) × disclosure.Json)) fields index
-    let (r, builder1) ← BuilderInst.«name» builder v
-    let cf ← core.result.Result.Insts.CoreOpsTry.branch r
-    match cf with
-    | core.ops.control_flow.ControlFlow.Continue val =>
-      let (r1, builder2) ← selected_conversion.render BuilderInst j builder1
-      let cf1 ← core.result.Result.Insts.CoreOpsTry.branch r1
-      match cf1 with
-      | core.ops.control_flow.ControlFlow.Continue val1 =>
-        let (r2, builder3, out1) ← BuilderInst.insert builder2 out val val1
-        let cf2 ← core.result.Result.Insts.CoreOpsTry.branch r2
-        match cf2 with
-        | core.ops.control_flow.ControlFlow.Continue _ =>
-          let index1 ← index + 1#usize
-          selected_conversion.render_loop1 BuilderInst fields builder3 out1
-            index1
-        | core.ops.control_flow.ControlFlow.Break residual =>
-          let r3 ←
-            core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
-              Clause0_Value (core.convert.FromSame Clause0_Error) residual
-          ok (r3, builder3)
-      | core.ops.control_flow.ControlFlow.Break residual =>
-        let r2 ←
-          core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
-            Clause0_Value (core.convert.FromSame Clause0_Error) residual
-        ok (r2, builder2)
-    | core.ops.control_flow.ControlFlow.Break residual =>
-      let r1 ←
-        core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
-          Clause0_Value (core.convert.FromSame Clause0_Error) residual
-      ok (r1, builder1)
-  else
-    let (t, builder1) ← BuilderInst.finish_object builder out
-    ok (core.result.Result.Ok t, builder1)
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::selected_conversion::render]:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 70:0-100:1
-    Visibility: public -/
-def selected_conversion.render
-  {B : Type _} {Clause0_Value : Type _} {Clause0_Name : Type _} {Clause0_Object
-  : Type _} {Clause0_Error : Type _} (BuilderInst : selected_conversion.Builder
-  B Clause0_Value Clause0_Name Clause0_Object Clause0_Error)
-  (selected : disclosure.Json) (builder : B) :
-  Result ((core.result.Result Clause0_Value Clause0_Error) × B)
-  := do
-  match selected with
-  | disclosure.Json.Null =>
-    let (t, builder1) ← BuilderInst.null builder
-    ok (core.result.Result.Ok t, builder1)
-  | disclosure.Json.Boolean value =>
-    let (t, builder1) ← BuilderInst.boolean builder value
-    ok (core.result.Result.Ok t, builder1)
-  | disclosure.Json.Integer value =>
-    let (t, builder1) ← BuilderInst.integer builder value
-    ok (core.result.Result.Ok t, builder1)
-  | disclosure.Json.Text bytes => BuilderInst.text builder bytes
-  | disclosure.Json.Array values =>
-    selected_conversion.render_loop0 BuilderInst values builder
-      (alloc.vec.Vec.new Clause0_Value) 0#usize
-  | disclosure.Json.Object fields =>
-    let (out, builder1) ← BuilderInst.empty_object builder
-    selected_conversion.render_loop1 BuilderInst fields builder1 out 0#usize
-  | disclosure.Json.Opaque =>
-    let (t, builder1) ← BuilderInst.invalid builder
-    ok (core.result.Result.Err t, builder1)
-partial_fixpoint
-
-end
-
 /-- [aivm_secrets_garrett_core::selected_conversion::{impl core::fmt::Debug for aivm_secrets_garrett_core::selected_conversion::WireDenial}::fmt]:
     Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 106:9-106:14
     Visibility: public -/
@@ -12415,257 +12764,6 @@ def selected_conversion.WireDenial.Insts.CoreCmpEq : core.cmp.Eq
     selected_conversion.WireDenial.Insts.CoreCmpPartialEqWireDenial
 }
 
-/-- [aivm_secrets_garrett_core::selected_conversion::append_u64_decimal]:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 181:0-186:1 -/
-def selected_conversion.append_u64_decimal
-  (output : alloc.vec.Vec Std.U8) (value : Std.U64) :
-  Result (alloc.vec.Vec Std.U8)
-  := do
-  let output1 ←
-    if value >= 10#u64
-    then
-      do
-      let i ← value / 10#u64
-      selected_conversion.append_u64_decimal output i
-    else ok output
-  let i ← value % 10#u64
-  let i1 ← lift (UScalar.cast .U8 i)
-  let i2 ← 48#u8 + i1
-  alloc.vec.Vec.push output1 i2
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::selected_conversion::integer_token]:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 187:0-198:1
-    Visibility: public -/
-def selected_conversion.integer_token
-  (value : Std.I64) : Result (alloc.vec.Vec Std.U8) := do
-  if value = core.num.I64.MIN
-  then
-    let s ←
-      lift (Array.to_slice
-        (Array.make 20#usize [
-          45#u8, 57#u8, 50#u8, 50#u8, 51#u8, 51#u8, 55#u8, 50#u8, 48#u8, 51#u8,
-          54#u8, 56#u8, 53#u8, 52#u8, 55#u8, 55#u8, 53#u8, 56#u8, 48#u8, 56#u8
-          ]))
-    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
-      Std.U8) s
-  else
-    if value < 0#i64
-    then
-      let output ← alloc.vec.Vec.push (alloc.vec.Vec.new Std.U8) 45#u8
-      let i ← -. value
-      let i1 ← lift (IScalar.hcast .U64 i)
-      selected_conversion.append_u64_decimal output i1
-    else
-      let i ← lift (IScalar.hcast .U64 value)
-      selected_conversion.append_u64_decimal (alloc.vec.Vec.new Std.U8) i
-
-/-- [aivm_secrets_garrett_core::selected_conversion::WireBuilder]
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 200:0-200:23
-    Visibility: public -/
-@[reducible]
-def selected_conversion.WireBuilder := Unit
-
-/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::invalid]:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 250:4-252:5
-    Visibility: public -/
-def
-  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.invalid
-  (self : selected_conversion.WireBuilder) :
-  Result (selected_conversion.WireDenial × selected_conversion.WireBuilder)
-  := do
-  ok (selected_conversion.WireDenial.Opaque, self)
-
-/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::finish_object]:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 247:4-249:5
-    Visibility: public -/
-def
-  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.finish_object
-  (self : selected_conversion.WireBuilder)
-  (object : alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value)) :
-  Result (json_wire.Value × selected_conversion.WireBuilder)
-  := do
-  ok (json_wire.Value.Object object, self)
-
-/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::insert]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 235:8-246:5
-    Visibility: public -/
-@[rust_loop]
-def
-  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.insert_loop
-  (object : alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value))
-  («name» : alloc.vec.Vec Std.U32) (value : json_wire.Value) (i : Std.Usize)
-  :
-  Result ((core.result.Result Unit selected_conversion.WireDenial) ×
-    (alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value)))
-  := do
-  let i1 := alloc.vec.Vec.len object
-  if i < i1
-  then
-    let (v, _) ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-        ((alloc.vec.Vec Std.U32) × json_wire.Value)) object i
-    let b ←
-      alloc.vec.partial_eq.PartialEqVec.eq core.cmp.PartialEqU32 v «name»
-    if b
-    then
-      ok (core.result.Result.Err selected_conversion.WireDenial.DuplicateName,
-        object)
-    else
-      let i2 ← i + 1#usize
-      selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.insert_loop
-        object «name» value i2
-  else
-    let object1 ← alloc.vec.Vec.push object («name», value)
-    ok (core.result.Result.Ok (), object1)
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::insert]:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 228:4-246:5
-    Visibility: public -/
-def
-  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.insert
-  (self : selected_conversion.WireBuilder)
-  (object : alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value))
-  («name» : alloc.vec.Vec Std.U32) (value : json_wire.Value) :
-  Result ((core.result.Result Unit selected_conversion.WireDenial) ×
-    selected_conversion.WireBuilder × (alloc.vec.Vec ((alloc.vec.Vec Std.U32)
-    × json_wire.Value)))
-  := do
-  let (r, object1) ←
-    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.insert_loop
-      object «name» value 0#usize
-  ok (r, self, object1)
-
-/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::empty_object]:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 225:4-227:5
-    Visibility: public -/
-def
-  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.empty_object
-  (self : selected_conversion.WireBuilder) :
-  Result ((alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value)) ×
-    selected_conversion.WireBuilder)
-  := do
-  ok (alloc.vec.Vec.new ((alloc.vec.Vec Std.U32) × json_wire.Value), self)
-
-/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::name]:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 222:4-224:5
-    Visibility: public -/
-def
-  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.name
-  (self : selected_conversion.WireBuilder) (bytes : alloc.vec.Vec Std.U8) :
-  Result ((core.result.Result (alloc.vec.Vec Std.U32)
-    selected_conversion.WireDenial) × selected_conversion.WireBuilder)
-  := do
-  let r ← selected_conversion.utf8_scalars bytes
-  ok (r, self)
-
-/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::array]:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 219:4-221:5
-    Visibility: public -/
-def
-  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.array
-  (self : selected_conversion.WireBuilder)
-  (values : alloc.vec.Vec json_wire.Value) :
-  Result (json_wire.Value × selected_conversion.WireBuilder)
-  := do
-  ok (json_wire.Value.Array values, self)
-
-/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::text]:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 216:4-218:5
-    Visibility: public -/
-def
-  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.text
-  (self : selected_conversion.WireBuilder) (bytes : alloc.vec.Vec Std.U8) :
-  Result ((core.result.Result json_wire.Value selected_conversion.WireDenial)
-    × selected_conversion.WireBuilder)
-  := do
-  let r ← selected_conversion.utf8_scalars bytes
-  let cf ← core.result.Result.Insts.CoreOpsTry.branch r
-  match cf with
-  | core.ops.control_flow.ControlFlow.Continue val =>
-    ok (core.result.Result.Ok (json_wire.Value.Text val), self)
-  | core.ops.control_flow.ControlFlow.Break residual =>
-    let r1 ←
-      core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
-        json_wire.Value (core.convert.FromSame selected_conversion.WireDenial)
-        residual
-    ok (r1, self)
-
-/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::integer]:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 213:4-215:5
-    Visibility: public -/
-def
-  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.integer
-  (self : selected_conversion.WireBuilder) (value : Std.I64) :
-  Result (json_wire.Value × selected_conversion.WireBuilder)
-  := do
-  let v ← selected_conversion.integer_token value
-  ok (json_wire.Value.Number v, self)
-
-/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::boolean]:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 210:4-212:5
-    Visibility: public -/
-def
-  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.boolean
-  (self : selected_conversion.WireBuilder) (value : Bool) :
-  Result (json_wire.Value × selected_conversion.WireBuilder)
-  := do
-  ok (json_wire.Value.Boolean value, self)
-
-/-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::null]:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 207:4-209:5
-    Visibility: public -/
-def
-  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.null
-  (self : selected_conversion.WireBuilder) :
-  Result (json_wire.Value × selected_conversion.WireBuilder)
-  := do
-  ok (json_wire.Value.Null, self)
-
-/-- Trait implementation: [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}]
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 201:0-253:1 -/
-@[reducible]
-def
-  selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial
-  : selected_conversion.Builder selected_conversion.WireBuilder json_wire.Value
-  (alloc.vec.Vec Std.U32) (alloc.vec.Vec ((alloc.vec.Vec Std.U32) ×
-  json_wire.Value)) selected_conversion.WireDenial := {
-  null :=
-    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.null
-  boolean :=
-    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.boolean
-  integer :=
-    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.integer
-  text :=
-    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.text
-  array :=
-    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.array
-  «name» :=
-    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.name
-  empty_object :=
-    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.empty_object
-  insert :=
-    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.insert
-  finish_object :=
-    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.finish_object
-  invalid :=
-    selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial.invalid
-}
-
-/-- [aivm_secrets_garrett_core::selected_conversion::render_wire]:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 259:0-261:1
-    Visibility: public -/
-def selected_conversion.render_wire
-  (selected : disclosure.Json) :
-  Result (core.result.Result json_wire.Value selected_conversion.WireDenial)
-  := do
-  let (r, _) ←
-    selected_conversion.render
-      selected_conversion.WireBuilder.Insts.Aivm_secrets_garrett_coreSelected_conversionBuilderValueVecU32VecPairVecU32ValueWireDenial
-      selected ()
-  ok r
-
 /-- Trait declaration: [aivm_secrets_garrett_core::selected_release::Work]
     Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 13:0-25:1
     Visibility: public -/
@@ -12721,15 +12819,6 @@ def selected_release.select
       core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
         Clause0_Released (core.convert.FromSame Clause0_Error) residual
     ok (r1, work1)
-
-/-- [aivm_secrets_garrett_core::selected_release::Denial]
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 41:0-45:1
-    Visibility: public -/
-@[discriminant isize]
-inductive selected_release.Denial where
-| Denied : selected_release.Denial
-| UpstreamResponse : selected_release.Denial
-| InvalidRequest : selected_release.Denial
 
 /-- [aivm_secrets_garrett_core::selected_release::{impl core::fmt::Debug for aivm_secrets_garrett_core::selected_release::Denial}::fmt]:
     Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 40:9-40:14
@@ -13047,36 +13136,6 @@ def selected_release.assemble
   let fields3 ←
     alloc.vec.Vec.push fields2 (v2, disclosure.Json.Integer 1#i64)
   ok (disclosure.Json.Object fields3)
-
-/-- [aivm_secrets_garrett_core::selected_release::checked]:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 127:0-143:1
-    Visibility: public -/
-def selected_release.checked
-  (reply : disclosure.Json) (secret : alloc.vec.Vec Std.U8) :
-  Result (core.result.Result json_wire.Value selected_release.Denial)
-  := do
-  let s := alloc.vec.Vec.deref secret
-  let b ← json_reflection.safe reply s 65#usize
-  if b
-  then
-    let r ← selected_conversion.render_wire reply
-    match r with
-    | core.result.Result.Ok wire =>
-      let r1 ← json_wire.encode wire
-      match r1 with
-      | core.result.Result.Ok bytes =>
-        let s1 := alloc.vec.Vec.deref bytes
-        let s2 := alloc.vec.Vec.deref secret
-        let b1 ← reflection.contains s1 s2
-        if b1
-        then
-          ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
-        else ok (core.result.Result.Ok wire)
-      | core.result.Result.Err _ =>
-        ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
-    | core.result.Result.Err _ =>
-      ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
-  else ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
 
 /-- [aivm_secrets_garrett_core::selected_release::Manifest]
     Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 146:0-152:1

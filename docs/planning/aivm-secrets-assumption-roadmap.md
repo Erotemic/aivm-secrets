@@ -24,7 +24,7 @@ hypotheses are on the same list as library and deployment trust.
 
 | ID | Priority | Next step |
 | --- | --- | --- |
-| `NATIVE-SINK-01` | P1 | Request primitives stop receiving the credential; core-owned opaque credential outside custody/unsealing; independent review of the remaining native call graph |
+| `NATIVE-SINK-01` | P1 | Done: request primitives no longer receive the credential (core encodes). Next: core-owned opaque credential outside custody/unsealing; independent review of the remaining native call graph |
 | `NATIVE-GLUE-01` | P1 | Move remaining native-to-core call sites into extracted wrappers where Aeneas allows |
 | `MODEL-EXCHANGE-01` | P2 | Extract transport error classification (status classes already extracted) |
 | `EMISSION-RUST-01` | P2 | Extract remaining admission sampling wrappers |

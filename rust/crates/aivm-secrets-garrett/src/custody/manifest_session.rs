@@ -493,7 +493,6 @@ impl Session {
                 && self.base.coordinator.is_some();
             let work = ManifestProvider {
                 executor: &self.base.executor,
-                secret: &secret,
                 effect,
                 headers: BTreeMap::new(),
                 dispatch: ManifestDispatch {
@@ -509,10 +508,9 @@ impl Session {
                         .map(|(key, fingerprint)| (key.as_str(), fingerprint.as_str())),
                     idempotency_header: op.idempotency_header,
                 },
-                endpoint: None,
             };
             request_adapter::DispatchPlan {
-                work: aivm_secrets_garrett_core::channel_work::Submitting::new(work),
+                work: aivm_secrets_garrett_core::channel_work::Submitting::new(work, &secret.0),
                 keyed_write,
             }
         };
@@ -610,16 +608,12 @@ impl Session {
 // preserved those checks. In particular OAuthSource can construct Credential
 // directly rather than calling credential_at_least. Reject CR/LF in the final
 // bytes, before a single provider write, to prevent HTTP request injection.
-fn manifest_request_bytes(
-    route: &core::Route,
-    secret: &Credential,
+// Host-selected request fields; the extracted encoder adds the credential.
+fn manifest_fields(
     effect: &Effect,
     headers: &BTreeMap<String, String>,
-) -> Outcome<(
-    Zeroizing<Vec<u8>>,
-    aivm_secrets_garrett_core::provider_wire::Endpoint,
-)> {
-    let fields = aivm_secrets_garrett_core::provider_wire::Fields {
+) -> aivm_secrets_garrett_core::provider_wire::Fields {
+    aivm_secrets_garrett_core::provider_wire::Fields {
         method: effect.method.as_bytes().to_vec(),
         target: effect.target.as_bytes().to_vec(),
         accept: effect.accept.as_bytes().to_vec(),
@@ -632,24 +626,13 @@ fn manifest_request_bytes(
                 value: value.as_bytes().to_vec(),
             })
             .collect(),
-    };
-    let body = effect
-        .body
-        .as_ref()
-        .map(|value| Zeroizing::new(json::canonical(value)));
-    let mut output = Zeroizing::new(Vec::new());
-    let endpoint = aivm_secrets_garrett_core::provider_wire::append(
-        &mut output,
-        route,
-        fields,
-        &secret.0,
-        body.as_ref().map(|value| value.as_slice()),
-    )
-    .map_err(|error| match error {
+    }
+}
+fn encoding_error(error: http_wire::EncodingDenial) -> Error {
+    match error {
         http_wire::EncodingDenial::InvalidRequest => Error::InvalidPolicy,
         http_wire::EncodingDenial::InvalidCredential => Error::CredentialSource,
-    })?;
-    Ok((output, endpoint))
+    }
 }
 
 // The standard Write contract includes partial acceptance before an error.
@@ -683,17 +666,15 @@ struct ManifestDispatch<'a> {
     reservation: Option<(&'a str, &'a str)>,
     idempotency_header: bool,
 }
+// Holds no credential: the extracted `channel_work::Submitting` owns it, the
+// request encoding, the target reflection check, the channel construction,
+// the send (`Channel::submit`) and the response gate.
 struct ManifestProvider<'a> {
     executor: &'a Executor,
-    secret: &'a Credential,
     effect: Effect,
     headers: BTreeMap<String, String>,
     dispatch: ManifestDispatch<'a>,
-    // The encoded request's endpoint, carried from request_body to connect.
-    endpoint: Option<aivm_secrets_garrett_core::provider_wire::Endpoint>,
 }
-// Native primitives only: the extracted `channel_work::Submitting` owns the
-// channel construction, the send (`Channel::submit`) and the response gate.
 impl aivm_secrets_garrett_core::channel_work::ChannelWork for ManifestProvider<'_> {
     type Body = ManifestWire;
     type Writer = ProviderWriter<StreamOwned<ClientConnection, TcpStream>>;
@@ -703,16 +684,17 @@ impl aivm_secrets_garrett_core::channel_work::ChannelWork for ManifestProvider<'
     const INVALID_TRANSITION: Error = Error::InternalError;
     const INVALID_POLICY: Error = Error::InvalidPolicy;
     const OUTCOME_UNKNOWN: Error = Error::OutcomeUnknown;
+    const REFLECTED: Error = Error::UpstreamResponse;
 
     fn effect_write(&self) -> bool {
         self.effect.write
     }
     fn prepare(&mut self) -> Outcome<()> {
         self.dispatch.identity = Some(crate::model::claims_json(self.dispatch.claims)?);
-        crate::manifest::disclosure::ensure_safe(
-            &json!({"target":self.effect.target}),
-            &self.secret.0,
-        )
+        Ok(())
+    }
+    fn target(&self) -> Vec<u8> {
+        self.effect.target.as_bytes().to_vec()
     }
     fn configure(&mut self, keyed_write: bool) -> Outcome<()> {
         self.headers = self.dispatch.policy.headers.clone();
@@ -769,17 +751,22 @@ impl aivm_secrets_garrett_core::channel_work::ChannelWork for ManifestProvider<'
             }
         }))
     }
-    fn request_body(&mut self, route: &core::Route) -> Outcome<ManifestWire> {
-        let (bytes, endpoint) =
-            manifest_request_bytes(route, self.secret, &self.effect, &self.headers)?;
-        self.endpoint = Some(endpoint);
-        Ok(ManifestWire(bytes))
+    fn request_fields(&mut self) -> Outcome<aivm_secrets_garrett_core::channel_work::RequestParts> {
+        Ok(aivm_secrets_garrett_core::channel_work::RequestParts {
+            fields: manifest_fields(&self.effect, &self.headers),
+            body: self.effect.body.as_ref().map(json::canonical),
+        })
+    }
+    fn wrap_body(&mut self, encoded: Vec<u8>) -> ManifestWire {
+        ManifestWire(Zeroizing::new(encoded))
+    }
+    fn encoding_error(&mut self, denial: http_wire::EncodingDenial) -> Error {
+        encoding_error(denial)
     }
     fn connect(
         &mut self,
-        _route: &core::Route,
+        endpoint: &aivm_secrets_garrett_core::provider_wire::Endpoint,
     ) -> Outcome<(ProviderWriter<StreamOwned<ClientConnection, TcpStream>>, Deadline)> {
-        let endpoint = self.endpoint.take().ok_or(Error::InternalError)?;
         let host = std::str::from_utf8(endpoint.host()).map_err(|_| Error::InvalidPolicy)?;
         let mut socket = TcpStream::connect_timeout(
             &SocketAddr::new(self.executor.address, endpoint.port()),
@@ -970,6 +957,32 @@ fn manifest_response(mut reader: impl BufRead, format: &str) -> Outcome<Vec<u8>>
 #[cfg(test)]
 mod wire_tests {
     use super::*;
+    // Test oracle: production encodes in `channel_work::Submitting`.
+    fn manifest_request_bytes(
+        route: &core::Route,
+        secret: &Credential,
+        effect: &Effect,
+        headers: &BTreeMap<String, String>,
+    ) -> Outcome<(
+        Zeroizing<Vec<u8>>,
+        aivm_secrets_garrett_core::provider_wire::Endpoint,
+    )> {
+        let fields = manifest_fields(effect, headers);
+        let body = effect
+            .body
+            .as_ref()
+            .map(|value| Zeroizing::new(json::canonical(value)));
+        let mut output = Zeroizing::new(Vec::new());
+        let endpoint = aivm_secrets_garrett_core::provider_wire::append(
+            &mut output,
+            route,
+            fields,
+            &secret.0,
+            body.as_ref().map(|value| value.as_slice()),
+        )
+        .map_err(encoding_error)?;
+        Ok((output, endpoint))
+    }
     use aivm_secrets_garrett_core::request_effects::RequestEffects;
 
     #[test]

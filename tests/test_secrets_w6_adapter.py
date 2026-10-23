@@ -46,14 +46,16 @@ def test_w6_drop_any_channel_is_rejected(tmp_path):
 
 def test_w6_moving_wire_validation_after_connect_is_rejected(tmp_path):
     checkout = fixture_checkout(tmp_path)
-    path = checkout / SOURCE
+    # Move the real connect ahead of the credential-bearing encoding.
+    path = checkout / CORE_CHANNEL
     body = path.read_text()
-    line = '        let (bytes, endpoint) =\n            manifest_request_bytes(route, self.secret, &self.effect, &self.headers)?;\n'
-    assert line in body
-    body = body.replace(line, '', 1)
-    marker = '        let stream = StreamOwned::new(conn, socket);\n'
-    assert marker in body
-    body = body.replace(marker, marker + line, 1)
+    connect = ('        let (writer, meta) = match self.work.connect(&endpoint) {\n'
+               '            Ok(parts) => parts,\n'
+               '            Err(error) => return Err(error),\n'
+               '        };\n')
+    encode = '        let mut encoded = Vec::new();\n'
+    assert body.count(connect) == 1 and body.count(encode) == 1
+    body = body.replace(connect, '', 1).replace(encode, connect + encode, 1)
     path.write_text(body)
     with pytest.raises(ContractError, match='TCP effect before'):
         check(checkout)

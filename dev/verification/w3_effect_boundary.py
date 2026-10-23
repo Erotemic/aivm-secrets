@@ -143,7 +143,7 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'self.session.require_control_active(now)' in m
             and 'fresh: &fresh,' in request,
             'approval identity or late revocation fencing bypassed')
-    control = part(m, 'pub(super) fn control(', '\nfn manifest_request_bytes(')
+    control = part(m, 'pub(super) fn control(', '\nfn manifest_fields(')
     dispatch = part(request, 'let dispatch = |phase: DispatchPhase, effect: Effect|', 'let release = |raw: Value|')
     release = part(request, 'let release = |raw: Value| PendingCompletion {', 'let work = PendingRequest {')
     plan = part(request, 'let work = PendingRequest {', 'read_transition::run_current(pending)')
@@ -170,7 +170,7 @@ def review_semantics(contents: dict[str, str]) -> None:
                        'self.effects = report.effects;', 'report.outcome')
             and same_order(dispatch, 'let keyed_write =', 'let work = ManifestProvider {',
                            'request_adapter::DispatchPlan {',
-                           'work: aivm_secrets_garrett_core::channel_work::Submitting::new(work),',
+                           'work: aivm_secrets_garrett_core::channel_work::Submitting::new(work, &secret.0),',
                            'keyed_write,')
             and 'matches!(phase, DispatchPhase::Final)' in dispatch
             and '&& effect.write' in dispatch and '&& self.base.coordinator.is_some()' in dispatch
@@ -312,18 +312,27 @@ def review_semantics(contents: dict[str, str]) -> None:
             'effectful callbacks lost their actual post-state or completed-value gate')
     # W6: the exact provider bytes are validated by a pure encoder BEFORE any
     # TCP/TLS effect. This also covers OAuthSource-created Credential values.
-    require(m.count('fn manifest_request_bytes(') == 1
-            and ''.join(m.split()).count('let(bytes,endpoint)=manifest_request_bytes(route,self.secret,&self.effect,&self.headers)?;') == 1
-            and m.index('let (bytes, endpoint) =') < m.index('TcpStream::connect_timeout('),
+    channel_core = contents['rust/crates/aivm-secrets-garrett-core/src/channel_work.rs'].split('#[cfg(test)]', 1)[0]
+    native_runtime = m.split('#[cfg(test)]', 1)[0]
+    require(same_order(part(channel_core, 'fn setup_route(', 'fn audit_route('),
+                       'self.work.request_fields()', 'encode(&mut encoded, route, parts, self.secret)',
+                       'self.work.wrap_body(encoded)', 'self.work.connect(&endpoint)',
+                       'Ok(Channel::new(body, writer, meta))')
+            and part(channel_core, 'pub fn encode(', 'pub struct Submitting').count('crate::provider_wire::append(') == 2
+            and 'fn manifest_request_bytes(' in m.split('mod wire_tests {', 1)[1]
+            and native_runtime.count('provider_wire::append(') == 0,
             'provider socket opened before outbound wire validation')
-    wire = part(m, 'fn manifest_request_bytes(', '// The standard Write contract')
-    require(wire.count('provider_wire::append(') == 1
-            and 'method: effect.method.as_bytes().to_vec()' in wire
+    provider_struct = part(native_runtime, "struct ManifestProvider<'a> {", '\n}\n')
+    require('secret' not in provider_struct and 'Credential' not in provider_struct,
+            'native provider primitives regained access to the raw credential')
+    wire = part(native_runtime, 'fn manifest_fields(', 'fn encoding_error(')
+    require('method: effect.method.as_bytes().to_vec()' in wire
             and 'target: effect.target.as_bytes().to_vec()' in wire
             and 'provider_wire::Fields {' in wire and 'host:' not in wire and 'port:' not in wire
-            and 'Error::CredentialSource' in wire and 'Ok((output, endpoint))' in wire
-            and 'body.as_ref().map(|value| value.as_slice())' in wire
-            and 'request.extend_from_slice(' not in wire and 'format!(' not in wire,
+            and 'request.extend_from_slice(' not in wire and 'format!(' not in wire
+            and 'http_wire::EncodingDenial::InvalidCredential => Error::CredentialSource,'
+                in part(native_runtime, 'fn encoding_error(', '\n}\n')
+            and 'body: self.effect.body.as_ref().map(json::canonical),' in native_runtime,
             'manifest HTTP bypasses the shared complete request encoder')
     routed_wire = contents['rust/crates/aivm-secrets-garrett-core/src/provider_wire.rs'].split('#[cfg(test)]', 1)[0]
     fields = part(routed_wire, 'pub struct Fields {', 'pub struct Endpoint {')
@@ -370,15 +379,19 @@ def review_semantics(contents: dict[str, str]) -> None:
     runtime = m.split('#[cfg(test)]', 1)[0]
     require(runtime.count('TcpStream::connect_timeout(') == 1 and runtime.count('.write_all(') == 1
             and runtime.count('channel.submit()') == 0
-            and runtime.count('channel_work::Submitting::new(work)') == 1
+            and runtime.count('channel_work::Submitting::new(work, &secret.0)') == 1
             and runtime.count('request_adapter::Pending::new(work)') == 1
             and 'dispatch::dispatch(' not in runtime,
             'native module added a credentialed socket or alternate HTTP writer')
     provider_work = part(runtime, "struct ManifestDispatch<'a>", 'fn manifest_response(')
     require('aivm_secrets_garrett_core::channel_work::ChannelWorkforManifestProvider' in ''.join(provider_work.split())
             and 'effects: EffectsCell' not in provider_work and 'send_state:' not in provider_work
-            and same_order(provider_work, 'fn prepare(', 'claims_json(self.dispatch.claims)', 'ensure_safe(',
+            and same_order(provider_work, 'fn prepare(', 'claims_json(self.dispatch.claims)',
                            'fn audit_route(', 'audit.write_record(')
+            and 'const REFLECTED: Error = Error::UpstreamResponse;' in provider_work
+            and same_order(part(channel_core, 'fn prepare(&mut self)', 'fn audit('),
+                           'self.work.prepare()', 'self.work.target()',
+                           'crate::selected_release::checked(target, self.secret)', 'Err(W::REFLECTED)')
             and 'self.dispatch.identity.as_ref().ok_or(Error::InternalError)?' in provider_work
             and 'phase.as_str()' in provider_work,
             'native primitive audit lost identity/phase/reflection or retained receipt mutation')
@@ -398,17 +411,17 @@ def review_semantics(contents: dict[str, str]) -> None:
             and same_order(part(dispatch_core, 'fn send(&mut self,', 'fn receive(&mut self,'),
                            '.begin_send(self.phase, &mut self.local, self.write)', 'self.work.send(channel)'),
             'provider/current/raw-write receipt gates detached from the source-owned controller')
-    setup = part(runtime, 'fn request_body(&mut self, route: &core::Route)', 'fn manifest_response(')
+    setup = part(runtime, 'fn request_fields(&mut self)', 'fn manifest_response(')
     primitive = part(runtime, 'struct ProviderWriter', "struct ManifestDispatch<'a>")
     channel_work = contents['rust/crates/aivm-secrets-garrett-core/src/channel_work.rs'].split('#[cfg(test)]', 1)[0]
     sender = part(channel_work, 'fn send(&mut self, channel: &mut Self::Channel)', 'fn receive(')
-    require(same_order(setup, 'let (bytes, endpoint) =', 'self.endpoint = Some(endpoint);',
-                       'Ok(ManifestWire(bytes))', 'fn connect(', 'self.endpoint.take()',
-                       'TcpStream::connect_timeout(',
+    require(same_order(setup, 'manifest_fields(&self.effect, &self.headers)',
+                       'fn wrap_body(', 'ManifestWire(Zeroizing::new(encoded))',
+                       'fn connect(', 'TcpStream::connect_timeout(',
                        'while conn.is_handshaking()', 'StreamOwned::new(conn, socket)',
                        'Ok((ProviderWriter(stream), deadline))')
             and same_order(part(channel_work, 'fn setup_route(', 'fn audit_route('),
-                           'self.work.request_body(route)', 'self.work.connect(route)',
+                           'self.work.request_fields()', 'self.work.connect(&endpoint)',
                            'Ok(Channel::new(body, writer, meta))')
             and 'SocketAddr::new(self.executor.address, endpoint.port())' in setup
             and 'std::str::from_utf8(endpoint.host())' in setup
@@ -473,7 +486,7 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'body: B,' in io and 'pub body:' not in io
             and same_order(io, 'if self.attempted {', 'self.attempted = true;',
                            'writer.write_all(bytes)', 'writer.flush()')
-            and 'Ok(ManifestWire(bytes))' in setup
+            and 'ManifestWire(Zeroizing::new(encoded))' in setup
             and 'Err(W::INVALID_TRANSITION)' in part(channel_work, 'fn setup(&mut self)', 'fn recheck(&mut self)')
             and 'Err(W::INVALID_TRANSITION)' in part(channel_work, 'fn recheck(&mut self)', 'fn send(&mut self,')
             and 'Err(W::INVALID_TRANSITION)' in part(channel_work, 'fn audit(&mut self', 'fn configure(&mut self,')

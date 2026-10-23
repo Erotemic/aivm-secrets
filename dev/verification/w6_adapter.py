@@ -59,11 +59,14 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
     ensure(len(contract['remaining_obligations']) >= 5,
            'W6 silently removed outstanding correspondence obligations')
     source = (root / SOURCE).read_text()
-    request = source.index('        let (bytes, endpoint) =')
-    connect = source.index('TcpStream::connect_timeout(')
-    ensure(request < connect, 'TCP effect before request-byte validation')
-    ensure(source.count('fn manifest_request_bytes(') == 1
-           and ''.join(source.split()).count('let(bytes,endpoint)=manifest_request_bytes(route,self.secret,&self.effect,&self.headers)?;') == 1,
+    channel_core = (root / CORE_CHANNEL).read_text().split('#[cfg(test)]', 1)[0]
+    setup_core = channel_core.split('fn setup_route(', 1)[1].split('fn audit_route(', 1)[0]
+    ensure(setup_core.index('encode(&mut encoded, route, parts, self.secret)')
+           < setup_core.index('self.work.connect(&endpoint)'),
+           'TCP effect before request-byte validation')
+    native = source.split('mod wire_tests {', 1)[0]
+    ensure(native.count('provider_wire::append(') == 0
+           and channel_core.split('pub fn encode(', 1)[1].split('pub struct Submitting', 1)[0].count('crate::provider_wire::append(') == 2,
            'native manifest adapter has additional unreviewed encoder')
     # The real credential-bearing executor only accepts the type constructed
     # after durable audit. This checks the reviewed source topology; it cannot
@@ -93,8 +96,8 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and io.index('self.attempted = true;') < io.index('writer.write_all(bytes)')
            and 'writer.flush()' in io
            and 'channel.submit()' in (root / CORE_CHANNEL).read_text().split('fn receive(', 1)[0]
-           and 'Ok(ManifestWire(bytes))' in source
-           and 'channel_work::Submitting::new(work)' in source,
+           and 'ManifestWire(Zeroizing::new(encoded))' in source
+           and 'channel_work::Submitting::new(work, &secret.0)' in source,
            'captured route/buffer submission bypassed')
     channel = io.split('pub struct Channel<', 1)[1]
     receiver = source.split('fn parse(\n        &mut self,\n        released:', 1)[1].split('fn manifest_response(', 1)[0]
@@ -131,7 +134,7 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and runtime.count('TcpStream::connect_timeout(') == 1,
            'native manifest adapter has another provider send')
     routed_wire = (root / CORE_ROUTE).read_text().split('#[cfg(test)]', 1)[0]
-    setup = source.split('fn request_body(&mut self, route: &core::Route)', 1)[1].split('fn manifest_response(', 1)[0]
+    setup = source.split('fn request_fields(&mut self)', 1)[1].split('fn manifest_response(', 1)[0]
     ensure('host: route.host.clone()' in routed_wire and 'port: route.port as u16' in routed_wire
            and 'if route.port <= 0 || route.port > 65535' in routed_wire
            and 'http_wire::append_request(output, &head, secret, &route.authentication, body)' in routed_wire
@@ -140,7 +143,8 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and 'std::str::from_utf8(endpoint.host())' in setup
            and 'SocketAddr::new(self.executor.address, endpoint.port())' in setup,
            'route-bound encoder/endpoint bypassed')
-    encoder = source.split('fn manifest_request_bytes(', 1)[1].split('// The standard Write contract', 1)[0]
+    encoder = source.split('fn manifest_fields(', 1)[1].split('fn encoding_error(', 1)[0]
+    channel_encode = (root / CORE_CHANNEL).read_text().split('pub fn encode(', 1)[1].split('pub struct Submitting', 1)[0]
     shared = (root / COMMON_ENCODER).read_text().split('fn provider_request_bytes(', 1)[1].split('fn account_request_bytes(', 1)[0]
     core = (root / CORE_ENCODER).read_text().split('#[cfg(test)]', 1)[0]
     ensure('!http_auth::valid_credential(secret)' in core
@@ -148,10 +152,10 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and '&secret.0,' in shared and 'Error::CredentialSource' in shared
            and 'request.extend_from_slice(&secret.0)' not in shared,
            'HTTP header may contain unvalidated OAuth/credential bytes')
-    ensure(encoder.count('provider_wire::append(') == 1
+    ensure(channel_encode.count('crate::provider_wire::append(') == 2
            and 'method: effect.method.as_bytes().to_vec()' in encoder
            and 'target: effect.target.as_bytes().to_vec()' in encoder
-           and 'body.as_ref().map(|value| value.as_slice())' in encoder
+           and 'Some(bytes) => crate::provider_wire::append(output, route, parts.fields, secret, Some(&bytes))' in channel_encode
            and core.count('http_request::append_line(') == 1
            and 'ascii_equal(name, b"authorization")' in core
            and '!reserved_name(name)' in core and '!unique_before(headers, i, &headers[i].name)' in core

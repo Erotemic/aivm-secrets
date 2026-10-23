@@ -1,12 +1,17 @@
-//! Source-owned provider channel lifecycle around three native primitives.
+//! Source-owned provider channel lifecycle around native primitives.
 //!
 //! `Submitting` is the provider work the production dispatch actually runs.
-//! It constructs the provider channel from the encoded request and the
-//! connection, sends with the extracted `Channel::submit`, and mints the
-//! response-gate token before the native parser sees anything. The native
-//! work supplies only the request body, the connection and the parser, plus
-//! the dispatch callbacks it already owned (audit, freshness, reservation).
+//! It holds the credential; native request primitives never receive it. It
+//! encodes the request with the extracted `provider_wire::append`, checks the
+//! target for credential reflection, constructs the channel, sends with the
+//! extracted `Channel::submit`, and mints the response-gate token before the
+//! native parser sees anything. The native work supplies the request fields,
+//! a zeroizing wrapper for the encoded bytes, the connection and the parser,
+//! plus the dispatch callbacks it already owned (audit, freshness, reservation).
 use crate::credential_use::Route;
+use crate::disclosure::Json;
+use crate::http_wire::EncodingDenial;
+use crate::provider_wire::{Endpoint, Fields};
 use crate::manifest::AdmissionStamp;
 use crate::provider_io::{Channel, RouteWork, WireBytes, Writer};
 use crate::read_transition::Phase;
@@ -22,6 +27,8 @@ pub trait ChannelWork {
     const INVALID_TRANSITION: Self::Error;
     const INVALID_POLICY: Self::Error;
     const OUTCOME_UNKNOWN: Self::Error;
+    /// The provider target would reflect the credential.
+    const REFLECTED: Self::Error;
 
     fn effect_write(&self) -> bool;
     fn prepare(&mut self) -> Result<(), Self::Error>;
@@ -30,10 +37,15 @@ pub trait ChannelWork {
     fn reserve(&mut self) -> Result<(), Self::Error>;
     fn finish(&mut self) -> Result<(), Self::Error>;
     fn audit_route(&mut self, route: &Route, phase: Phase) -> Result<(), Self::Error>;
-    /// The credential-bearing request bytes for this route.
-    fn request_body(&mut self, route: &Route) -> Result<Self::Body, Self::Error>;
-    /// The authenticated connection the request will be written to.
-    fn connect(&mut self, route: &Route) -> Result<(Self::Writer, Self::Meta), Self::Error>;
+    /// Host-selected request fields and optional JSON body (no credential).
+    fn request_fields(&mut self) -> Result<RequestParts, Self::Error>;
+    /// The provider target, for the credential-reflection check.
+    fn target(&self) -> Vec<u8>;
+    /// Take ownership of the encoded request (zeroized when dropped).
+    fn wrap_body(&mut self, encoded: Vec<u8>) -> Self::Body;
+    fn encoding_error(&mut self, denial: EncodingDenial) -> Self::Error;
+    /// The authenticated connection to the encoder's endpoint.
+    fn connect(&mut self, endpoint: &Endpoint) -> Result<(Self::Writer, Self::Meta), Self::Error>;
     /// Parse a response; the token exists only after a successful submit.
     fn parse(
         &mut self,
@@ -41,16 +53,35 @@ pub trait ChannelWork {
     ) -> Result<Self::Output, Self::Error>;
 }
 
-pub struct Submitting<W: ChannelWork> {
-    work: W,
+pub struct RequestParts {
+    pub fields: Fields,
+    pub body: Option<Vec<u8>>,
 }
-impl<W: ChannelWork> Submitting<W> {
-    pub fn new(work: W) -> Self {
-        Self { work }
+
+/// The extracted request encoder over the host fields, route and credential.
+pub fn encode(
+    output: &mut Vec<u8>,
+    route: &Route,
+    parts: RequestParts,
+    secret: &Vec<u8>,
+) -> Result<Endpoint, EncodingDenial> {
+    match parts.body {
+        Some(bytes) => crate::provider_wire::append(output, route, parts.fields, secret, Some(&bytes)),
+        None => crate::provider_wire::append(output, route, parts.fields, secret, None),
     }
 }
 
-impl<W: ChannelWork> provider_exchange::Provider for Submitting<W> {
+pub struct Submitting<'a, W: ChannelWork> {
+    work: W,
+    secret: &'a Vec<u8>,
+}
+impl<'a, W: ChannelWork> Submitting<'a, W> {
+    pub fn new(work: W, secret: &'a Vec<u8>) -> Self {
+        Self { work, secret }
+    }
+}
+
+impl<W: ChannelWork> provider_exchange::Provider for Submitting<'_, W> {
     type Channel = Channel<W::Body, W::Writer, W::Meta>;
     type Output = W::Output;
     type Error = W::Error;
@@ -76,13 +107,22 @@ impl<W: ChannelWork> provider_exchange::Provider for Submitting<W> {
     }
 }
 
-impl<W: ChannelWork> dispatch::Work for Submitting<W> {
+impl<W: ChannelWork> dispatch::Work for Submitting<'_, W> {
     const INVALID_TRANSITION: Self::Error = W::INVALID_TRANSITION;
     fn effect_write(&self) -> bool {
         self.work.effect_write()
     }
+    /// Native preparation, then the extracted target reflection check.
     fn prepare(&mut self) -> Result<(), Self::Error> {
-        self.work.prepare()
+        match self.work.prepare() {
+            Ok(()) => (),
+            Err(error) => return Err(error),
+        }
+        let target = Json::Object(vec![(b"target".to_vec(), Json::Text(self.work.target()))]);
+        match crate::selected_release::checked(target, self.secret) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(W::REFLECTED),
+        }
     }
     /// Unrouted audit is refused; `Routed` audits through `audit_route`.
     fn audit(&mut self, _phase: Phase) -> Result<(), Self::Error> {
@@ -102,17 +142,26 @@ impl<W: ChannelWork> dispatch::Work for Submitting<W> {
     }
 }
 
-impl<W: ChannelWork> RouteWork<Channel<W::Body, W::Writer, W::Meta>, W::Error> for Submitting<W> {
-    /// Encode the request before connecting; the channel owns both.
+impl<W: ChannelWork> RouteWork<Channel<W::Body, W::Writer, W::Meta>, W::Error>
+    for Submitting<'_, W>
+{
+    /// Encode the request for the captured route with the credential, then
+    /// connect to the encoder's endpoint; the channel owns both.
     fn setup_route(
         &mut self,
         route: &Route,
     ) -> Result<Channel<W::Body, W::Writer, W::Meta>, W::Error> {
-        let body = match self.work.request_body(route) {
-            Ok(body) => body,
+        let parts = match self.work.request_fields() {
+            Ok(parts) => parts,
             Err(error) => return Err(error),
         };
-        let (writer, meta) = match self.work.connect(route) {
+        let mut encoded = Vec::new();
+        let endpoint = match encode(&mut encoded, route, parts, self.secret) {
+            Ok(endpoint) => endpoint,
+            Err(denial) => return Err(self.work.encoding_error(denial)),
+        };
+        let body = self.work.wrap_body(encoded);
+        let (writer, meta) = match self.work.connect(&endpoint) {
             Ok(parts) => parts,
             Err(error) => return Err(error),
         };

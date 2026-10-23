@@ -1337,3 +1337,26 @@ mod status_oracle_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod target_reflection_oracle_tests {
+    use super::*;
+    // The provider-target reflection check moved from native ensure_safe to
+    // the extracted `selected_release::checked`; both must refuse alike.
+    #[test]
+    fn extracted_target_check_equals_previous_native_check() {
+        let secret = b"SYNTHETIC_TOKEN_abc123".to_vec();
+        for target in [
+            "/repos/o/r/pulls/1", "/search?q=SYNTHETIC_TOKEN_abc123", "/x/SYNTHETIC_TOKEN_abc12",
+            "/\u{e9}/caf\u{e9}", "/q?a=\"quoted\"", "", "/SYNTHETIC_TOKEN_abc123SYNTHETIC",
+        ] {
+            let old = crate::manifest::disclosure::ensure_safe(&json!({"target": target}), &secret).is_ok();
+            let tree = aivm_secrets_garrett_core::disclosure::Json::Object(vec![(
+                b"target".to_vec(),
+                aivm_secrets_garrett_core::disclosure::Json::Text(target.as_bytes().to_vec()),
+            )]);
+            let new = aivm_secrets_garrett_core::selected_release::checked(tree, &secret).is_ok();
+            assert_eq!(new, old, "{target}");
+        }
+    }
+}
