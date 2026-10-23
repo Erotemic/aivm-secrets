@@ -19961,7 +19961,7 @@ def
 }
 
 /-- [aivm_secrets_garrett_core::session_audit::event_record]:
-    Source: 'crates/aivm-secrets-garrett-core/src/session_audit.rs', lines 10:0-29:1
+    Source: 'crates/aivm-secrets-garrett-core/src/session_audit.rs', lines 11:0-30:1
     Visibility: public -/
 def session_audit.event_record
   (event : json_wire.Value) (grant : json_wire.Value)
@@ -20022,7 +20022,7 @@ def session_audit.event_record
   ok (json_wire.Value.Object fields3)
 
 /-- [aivm_secrets_garrett_core::session_audit::dispatch_record]:
-    Source: 'crates/aivm-secrets-garrett-core/src/session_audit.rs', lines 37:0-66:1
+    Source: 'crates/aivm-secrets-garrett-core/src/session_audit.rs', lines 38:0-67:1
     Visibility: public -/
 def session_audit.dispatch_record
   (phase : json_wire.Value) (grant : json_wire.Value)
@@ -20113,6 +20113,242 @@ def session_audit.dispatch_record
          ] : Array ((alloc.vec.Vec Std.U32) × json_wire.Value) 9#usize))
   let ret1 := alloc.slice.Slice.into_vec y1
   ok (json_wire.Value.Object ret1)
+
+/-- [aivm_secrets_garrett_core::session_audit::opened_record]:
+    Source: 'crates/aivm-secrets-garrett-core/src/session_audit.rs', lines 71:0-79:1
+    Visibility: public -/
+def session_audit.opened_record
+  (profile : json_wire.Value) (grant : json_wire.Value)
+  (policy : json_wire.Value) :
+  Result json_wire.Value
+  := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 5#usize [ 101#u8, 118#u8, 101#u8, 110#u8, 116#u8 ]))
+  let v ← control.text_units s
+  let s1 ←
+    lift (Array.to_slice
+      (Array.make 12#usize [
+        115#u8, 101#u8, 115#u8, 115#u8, 105#u8, 111#u8, 110#u8, 95#u8, 111#u8,
+        112#u8, 101#u8, 110#u8
+        ]))
+  let v1 ← control.text s1
+  let s2 ←
+    lift (Array.to_slice
+      (Array.make 5#usize [ 103#u8, 114#u8, 97#u8, 110#u8, 116#u8 ]))
+  let v2 ← control.text_units s2
+  let s3 ←
+    lift (Array.to_slice
+      (Array.make 6#usize [ 112#u8, 111#u8, 108#u8, 105#u8, 99#u8, 121#u8 ]))
+  let v3 ← control.text_units s3
+  let s4 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        112#u8, 114#u8, 111#u8, 102#u8, 105#u8, 108#u8, 101#u8
+        ]))
+  let v4 ← control.text_units s4
+  let s5 ←
+    lift (Array.to_slice
+      (Array.make 6#usize [ 115#u8, 99#u8, 104#u8, 101#u8, 109#u8, 97#u8 ]))
+  let v5 ← control.text_units s5
+  let s6 ← lift (Array.to_slice (Array.make 1#usize [ 49#u8 ]))
+  let v6 ← alloc.slice.Slice.to_vec core.clone.CloneU8 s6
+  let y ←
+    lift (Std.Array.to_slice
+      (Array.make 5#usize [
+         (v, v1), (v2, grant), (v3, policy), (v4, profile), (v5,
+         json_wire.Value.Number v6)
+         ] : Array ((alloc.vec.Vec Std.U32) × json_wire.Value) 5#usize))
+  let ret := alloc.slice.Slice.into_vec y
+  ok (json_wire.Value.Object ret)
+
+/-- [aivm_secrets_garrett_core::session_audit::issued_record]:
+    Source: 'crates/aivm-secrets-garrett-core/src/session_audit.rs', lines 83:0-91:1
+    Visibility: public -/
+def session_audit.issued_record
+  (identity : json_wire.Value) (grant : json_wire.Value)
+  (policy : json_wire.Value) :
+  Result json_wire.Value
+  := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 5#usize [ 101#u8, 118#u8, 101#u8, 110#u8, 116#u8 ]))
+  let v ← control.text_units s
+  let s1 ←
+    lift (Array.to_slice
+      (Array.make 6#usize [ 105#u8, 115#u8, 115#u8, 117#u8, 101#u8, 100#u8 ]))
+  let v1 ← control.text s1
+  let s2 ←
+    lift (Array.to_slice
+      (Array.make 5#usize [ 103#u8, 114#u8, 97#u8, 110#u8, 116#u8 ]))
+  let v2 ← control.text_units s2
+  let s3 ←
+    lift (Array.to_slice
+      (Array.make 8#usize [
+        105#u8, 100#u8, 101#u8, 110#u8, 116#u8, 105#u8, 116#u8, 121#u8
+        ]))
+  let v3 ← control.text_units s3
+  let s4 ←
+    lift (Array.to_slice
+      (Array.make 6#usize [ 112#u8, 111#u8, 108#u8, 105#u8, 99#u8, 121#u8 ]))
+  let v4 ← control.text_units s4
+  let s5 ←
+    lift (Array.to_slice
+      (Array.make 6#usize [ 115#u8, 99#u8, 104#u8, 101#u8, 109#u8, 97#u8 ]))
+  let v5 ← control.text_units s5
+  let s6 ← lift (Array.to_slice (Array.make 1#usize [ 49#u8 ]))
+  let v6 ← alloc.slice.Slice.to_vec core.clone.CloneU8 s6
+  let y ←
+    lift (Std.Array.to_slice
+      (Array.make 5#usize [
+         (v, v1), (v2, grant), (v3, identity), (v4, policy), (v5,
+         json_wire.Value.Number v6)
+         ] : Array ((alloc.vec.Vec Std.U32) × json_wire.Value) 5#usize))
+  let ret := alloc.slice.Slice.into_vec y
+  ok (json_wire.Value.Object ret)
+
+/-- [aivm_secrets_garrett_core::session_audit::authentication_name]:
+    Source: 'crates/aivm-secrets-garrett-core/src/session_audit.rs', lines 94:0-99:1
+    Visibility: public -/
+def session_audit.authentication_name
+  (authentication : credential_use.Authentication) :
+  Result json_wire.Value
+  := do
+  match authentication with
+  | credential_use.Authentication.Bearer =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 6#usize [ 98#u8, 101#u8, 97#u8, 114#u8, 101#u8, 114#u8 ]))
+    control.text s
+  | credential_use.Authentication.ApiKey =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 9#usize [
+          120#u8, 45#u8, 97#u8, 112#u8, 105#u8, 45#u8, 107#u8, 101#u8, 121#u8
+          ]))
+    control.text s
+
+/-- [aivm_secrets_garrett_core::session_audit::account_dispatch_record]:
+    Source: 'crates/aivm-secrets-garrett-core/src/session_audit.rs', lines 106:0-144:1
+    Visibility: public -/
+def session_audit.account_dispatch_record
+  (grant : json_wire.Value) (policy : json_wire.Value)
+  (identity : json_wire.Value) (operation : json_wire.Value)
+  (binding : json_wire.Value) (issued_at : json_wire.Value)
+  (expires_at : json_wire.Value) (host : json_wire.Value)
+  (port : json_wire.Value) (path : json_wire.Value)
+  (authentication : credential_use.Authentication) :
+  Result json_wire.Value
+  := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        98#u8, 105#u8, 110#u8, 100#u8, 105#u8, 110#u8, 103#u8
+        ]))
+  let v ← control.text_units s
+  let s1 ←
+    lift (Array.to_slice
+      (Array.make 10#usize [
+        101#u8, 120#u8, 112#u8, 105#u8, 114#u8, 101#u8, 115#u8, 95#u8, 97#u8,
+        116#u8
+        ]))
+  let v1 ← control.text_units s1
+  let s2 ←
+    lift (Array.to_slice
+      (Array.make 9#usize [
+        105#u8, 115#u8, 115#u8, 117#u8, 101#u8, 100#u8, 95#u8, 97#u8, 116#u8
+        ]))
+  let v2 ← control.text_units s2
+  let y ←
+    lift (Std.Array.to_slice
+      (Array.make 3#usize [ (v, binding), (v1, expires_at), (v2, issued_at) ] :
+      Array ((alloc.vec.Vec Std.U32) × json_wire.Value) 3#usize))
+  let ret := alloc.slice.Slice.into_vec y
+  let s3 ←
+    lift (Array.to_slice
+      (Array.make 14#usize [
+        97#u8, 117#u8, 116#u8, 104#u8, 101#u8, 110#u8, 116#u8, 105#u8, 99#u8,
+        97#u8, 116#u8, 105#u8, 111#u8, 110#u8
+        ]))
+  let v3 ← control.text_units s3
+  let v4 ← session_audit.authentication_name authentication
+  let s4 ←
+    lift (Array.to_slice
+      (Array.make 4#usize [ 104#u8, 111#u8, 115#u8, 116#u8 ]))
+  let v5 ← control.text_units s4
+  let s5 ←
+    lift (Array.to_slice
+      (Array.make 6#usize [ 109#u8, 101#u8, 116#u8, 104#u8, 111#u8, 100#u8 ]))
+  let v6 ← control.text_units s5
+  let s6 ← lift (Array.to_slice (Array.make 3#usize [ 71#u8, 69#u8, 84#u8 ]))
+  let v7 ← control.text s6
+  let s7 ←
+    lift (Array.to_slice
+      (Array.make 4#usize [ 112#u8, 97#u8, 116#u8, 104#u8 ]))
+  let v8 ← control.text_units s7
+  let s8 ←
+    lift (Array.to_slice
+      (Array.make 4#usize [ 112#u8, 111#u8, 114#u8, 116#u8 ]))
+  let v9 ← control.text_units s8
+  let y1 ←
+    lift (Std.Array.to_slice
+      (Array.make 5#usize [
+         (v3, v4), (v5, host), (v6, v7), (v8, path), (v9, port)
+         ] : Array ((alloc.vec.Vec Std.U32) × json_wire.Value) 5#usize))
+  let ret1 := alloc.slice.Slice.into_vec y1
+  let s9 ←
+    lift (Array.to_slice
+      (Array.make 5#usize [ 101#u8, 118#u8, 101#u8, 110#u8, 116#u8 ]))
+  let v10 ← control.text_units s9
+  let s10 ←
+    lift (Array.to_slice
+      (Array.make 8#usize [
+        100#u8, 105#u8, 115#u8, 112#u8, 97#u8, 116#u8, 99#u8, 104#u8
+        ]))
+  let v11 ← control.text s10
+  let s11 ←
+    lift (Array.to_slice
+      (Array.make 5#usize [ 103#u8, 114#u8, 97#u8, 110#u8, 116#u8 ]))
+  let v12 ← control.text_units s11
+  let s12 ←
+    lift (Array.to_slice
+      (Array.make 8#usize [
+        105#u8, 100#u8, 101#u8, 110#u8, 116#u8, 105#u8, 116#u8, 121#u8
+        ]))
+  let v13 ← control.text_units s12
+  let s13 ←
+    lift (Array.to_slice
+      (Array.make 5#usize [ 105#u8, 110#u8, 110#u8, 101#u8, 114#u8 ]))
+  let v14 ← control.text_units s13
+  let s14 ←
+    lift (Array.to_slice
+      (Array.make 9#usize [
+        111#u8, 112#u8, 101#u8, 114#u8, 97#u8, 116#u8, 105#u8, 111#u8, 110#u8
+        ]))
+  let v15 ← control.text_units s14
+  let s15 ←
+    lift (Array.to_slice
+      (Array.make 6#usize [ 112#u8, 111#u8, 108#u8, 105#u8, 99#u8, 121#u8 ]))
+  let v16 ← control.text_units s15
+  let s16 ←
+    lift (Array.to_slice
+      (Array.make 5#usize [ 114#u8, 111#u8, 117#u8, 116#u8, 101#u8 ]))
+  let v17 ← control.text_units s16
+  let s17 ←
+    lift (Array.to_slice
+      (Array.make 6#usize [ 115#u8, 99#u8, 104#u8, 101#u8, 109#u8, 97#u8 ]))
+  let v18 ← control.text_units s17
+  let s18 ← lift (Array.to_slice (Array.make 1#usize [ 49#u8 ]))
+  let v19 ← alloc.slice.Slice.to_vec core.clone.CloneU8 s18
+  let y2 ←
+    lift (Std.Array.to_slice
+      (Array.make 8#usize [
+         (v10, v11), (v12, grant), (v13, identity), (v14,
+         json_wire.Value.Object ret), (v15, operation), (v16, policy), (v17,
+         json_wire.Value.Object ret1), (v18, json_wire.Value.Number v19)
+         ] : Array ((alloc.vec.Vec Std.U32) × json_wire.Value) 8#usize))
+  let ret2 := alloc.slice.Slice.into_vec y2
+  ok (json_wire.Value.Object ret2)
 
 /-- [aivm_secrets_garrett_core::trust::TrustDenial]
     Source: 'crates/aivm-secrets-garrett-core/src/trust.rs', lines 5:0-9:1

@@ -699,3 +699,10 @@ print before the dispatch audit still trips the guard). Manifest dispatch and
 completion records now have core-built content; still native: the manifest
 `session_open` (with profile), `issued`, and the account-profile dispatch
 record (custody.rs:750, 1013, 1079).
+
+## 2026-10-23 17:58:59 -0400
+
+Remaining session records moved: `opened_record`, `issued_record`,
+`account_dispatch_record` (+ `authentication_name`), each with an exact
+theorem and a byte oracle. Every audit record both sessions write is now
+core-built; the approval extension's three host-control records remain native.

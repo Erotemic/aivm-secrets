@@ -579,8 +579,9 @@ precedes the call.
 
 The account session's audit events (`session_open`, `completed`, `failed`,
 `revoked`) and the manifest session's completion record are now built by the
-extracted `session_audit::event_record`, and the manifest dispatch record by
-`session_audit::dispatch_record`. They are encoded by the extracted JSON
+extracted `session_audit::event_record`; the manifest dispatch, opening and
+issuance records and the account dispatch record by their own functions in
+`session_audit`. They are encoded by the extracted JSON
 encoder, and the native audit appends exactly those bytes through the
 extracted `append_durable_record`
 ([`GarrettSessionAudit`](../../proofs/GarrettSessionAudit.lean)).
@@ -591,6 +592,11 @@ extracted `append_durable_record`
 
 | `dispatch_record_exact` | The manifest dispatch record, written and acknowledged before every provider send, is `{"event":"dispatch","grant":G,"identity":I,"operation":O,"phase":PH,"policy":P,"request_digest":D,"route":{"host":H,"method":M,"path":T,"port":N},"schema":1}`; the ten values the session passes are its only inputs. |
 
+| `opened_record_exact`, `issued_record_exact`, `account_dispatch_record_exact` | The manifest `session_open` record, the capability `issued` record and the account profile's dispatch record have the same kind of exact statement. In the account dispatch record the method is the fixed `GET`, and the authentication name (`bearer` or `x-api-key`) is decided by the scheme (`AuthenticationName`). |
+
+With these, every audit record the two sessions write is built by extracted
+code; only the approval extension's records (`approval_requested`,
+`approved`, `revoked` on the host control socket) are still native `json!`.
 Oracle tests check the encoded bytes against the serde records they replaced
 (including nested, escaped identity claims). **Still native:** the values the
 sessions pass in (the identity claims are captured from the session's claims

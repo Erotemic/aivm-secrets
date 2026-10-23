@@ -747,7 +747,11 @@ impl AccountSession {
         if profile == "account-status-v1" {
             executor.audit.record("session_open")?;
         } else {
-            executor.audit.write_record(&json!({"schema":1,"event":"session_open","profile":profile,"grant":executor.audit.grant,"policy":executor.audit.policy}))?;
+            executor.audit.append_value(&aivm_secrets_garrett_core::session_audit::opened_record(
+                wire_text(profile),
+                wire_text(&executor.audit.grant),
+                wire_text(&executor.audit.policy),
+            ))?;
         }
         let coordinator = m
             .get("coordination_file")
@@ -1010,8 +1014,12 @@ impl protocol::IssuanceObserver for Audit {
     ) -> Result<(), aivm_secrets_garrett_core::Denial> {
         let identity = crate::model::claims_json(claims)
             .map_err(|_| aivm_secrets_garrett_core::Denial::InvalidCapability)?;
-        self.write_record(&json!({"schema":1,"event":"issued","grant":self.grant,"policy":self.policy,"identity":identity}))
-            .map_err(|_| aivm_secrets_garrett_core::Denial::InvalidCapability)
+        self.append_value(&aivm_secrets_garrett_core::session_audit::issued_record(
+            crate::json::capture(&identity).into_wire(),
+            wire_text(&self.grant),
+            wire_text(&self.policy),
+        ))
+        .map_err(|_| aivm_secrets_garrett_core::Denial::InvalidCapability)
     }
 }
 struct SessionOpener<'a> {
@@ -1067,16 +1075,26 @@ impl protocol::DispatchObserver for Audit {
         route: &core::Route,
         operation: &Vec<u8>,
     ) -> Result<(), core::UseDenial> {
-        let prepare = || -> Outcome<Value> {
-            Ok(
-                json!({"schema":1,"event":"dispatch","operation":std::str::from_utf8(operation).map_err(|_|Error::InternalError)?,"grant":self.grant,"policy":self.policy,
-                    "identity":crate::model::claims_json(identity)?,
-                    "inner":{"binding":json::parse(&claims.binding,4096)?,"issued_at":claims.issued_at,"expires_at":claims.expires_at},
-                    "route":{"host":std::str::from_utf8(&route.host).map_err(|_|Error::InternalError)?,"port":route.port,"method":"GET","path":std::str::from_utf8(&route.path).map_err(|_|Error::InternalError)?,"authentication":match route.authentication {core::Authentication::Bearer=>"bearer",core::Authentication::ApiKey=>"x-api-key"}}
-                }),
-            )
+        // The record's shape is the extracted `session_audit::account_dispatch_record`.
+        let prepare = || -> Outcome<aivm_secrets_garrett_core::json_wire::Value> {
+            let integer = |value: i64| {
+                aivm_secrets_garrett_core::json_wire::Value::Number(value.to_string().into_bytes())
+            };
+            Ok(aivm_secrets_garrett_core::session_audit::account_dispatch_record(
+                wire_text(&self.grant),
+                wire_text(&self.policy),
+                crate::json::capture(&crate::model::claims_json(identity)?).into_wire(),
+                wire_text(std::str::from_utf8(operation).map_err(|_| Error::InternalError)?),
+                crate::json::capture(&json::parse(&claims.binding, 4096)?).into_wire(),
+                integer(claims.issued_at),
+                integer(claims.expires_at),
+                wire_text(std::str::from_utf8(&route.host).map_err(|_| Error::InternalError)?),
+                integer(route.port),
+                wire_text(std::str::from_utf8(&route.path).map_err(|_| Error::InternalError)?),
+                &route.authentication,
+            ))
         };
-        self.write_record(&prepare().map_err(|_| core::UseDenial::Upstream)?)
+        self.append_value(&prepare().map_err(|_| core::UseDenial::Upstream)?)
             .map_err(|_| core::UseDenial::Upstream)
     }
 }
@@ -1469,6 +1487,38 @@ mod control_oracle {
                     wire_text("GET"), wire_text("/repos/o/r?a=b&c=%20"),
                 ));
                 assert_eq!(new, old);
+            }
+        }
+    }
+
+    #[test]
+    fn extracted_open_issue_and_account_dispatch_records_match_the_serde_records() {
+        use aivm_secrets_garrett_core::session_audit as audit;
+        let identity = json!({"sub":"vm-1","nested":{"list":[1,-2,"x\u{7f}"]},"é":"😀"});
+        let binding = json!({"vm":"v","channel":"c\"","owner_uid":1000});
+        let number = |value: i64| aivm_secrets_garrett_core::json_wire::Value::Number(value.to_string().into_bytes());
+        for text in ["g", "", "quote\"\\", "é😀"] {
+            assert_eq!(
+                bytes(&audit::opened_record(wire_text("manifest-https-v1"), wire_text(text), wire_text("p"))),
+                crate::json::canonical(&json!({"schema":1,"event":"session_open","profile":"manifest-https-v1","grant":text,"policy":"p"}))
+            );
+            assert_eq!(
+                bytes(&audit::issued_record(crate::json::capture(&identity).into_wire(), wire_text(text), wire_text("p"))),
+                crate::json::canonical(&json!({"schema":1,"event":"issued","grant":text,"policy":"p","identity":identity}))
+            );
+            for (authentication, name) in [(core::Authentication::Bearer, "bearer"), (core::Authentication::ApiKey, "x-api-key")] {
+                assert_eq!(
+                    bytes(&audit::account_dispatch_record(
+                        wire_text(text), wire_text("p"), crate::json::capture(&identity).into_wire(),
+                        wire_text("profile.read"), crate::json::capture(&binding).into_wire(),
+                        number(1_700_000_000), number(-5), wire_text(text), number(443), wire_text("/v1/account"),
+                        &authentication,
+                    )),
+                    crate::json::canonical(&json!({"schema":1,"event":"dispatch","operation":"profile.read","grant":text,"policy":"p",
+                        "identity":identity,
+                        "inner":{"binding":binding,"issued_at":1_700_000_000i64,"expires_at":-5},
+                        "route":{"host":text,"port":443,"method":"GET","path":"/v1/account","authentication":name}}))
+                );
             }
         }
     }
