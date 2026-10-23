@@ -132,3 +132,26 @@ def test_the_connection_cap_refuses_extra_clients_and_recovers(world):
             break
         time.sleep(0.2)
     assert status(reply) == 200, reply
+
+
+def test_only_canonical_base64_authenticates_a_tunnel(world):
+    """`Basic` credentials must be canonical base64 in both backends."""
+    import base64 as b64
+
+    token = world.session.token.encode()
+    raw = b'ab:' + token                       # 46 bytes: the encoding ends in "=="
+    canonical = b64.b64encode(raw)
+    assert canonical.endswith(b'==')
+    alphabet = b'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+    last = alphabet.index(canonical[-3:-2])
+    assert last & 15 == 0                      # the four discarded bits are zero
+    noncanonical = canonical[:-3] + alphabet[last + 1:last + 2] + b'=='
+    assert b64.b64decode(noncanonical) == raw  # same bytes, non-zero trailing bits
+
+    def tunnel(encoded):
+        connect = (b'CONNECT ' + HOST.encode() + b':443 HTTP/1.1\r\n'
+                   b'Proxy-Authorization: Basic ' + encoded + b'\r\n')
+        return world.raw(get(), connect=connect, auth=b'')
+
+    assert status(tunnel(canonical)) == 200
+    assert status(tunnel(noncanonical)) == 407

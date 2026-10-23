@@ -121,6 +121,10 @@ class ProxySession:
                 decoded = base64.b64decode(credential, validate=True)
             except ValueError:
                 return False
+            # Canonical encodings only (padding, zero trailing bits), as the
+            # extracted native decoder requires.
+            if base64.b64encode(decoded) != credential:
+                return False
             presented = decoded.partition(b':')[2]
         elif scheme.lower() == b'bearer':
             presented = credential
