@@ -283,7 +283,10 @@ def mutate(repo, filename, before, after):
     ),
     ('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs', 'operation_write: op.write,', 'operation_write: true,'),
     ('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs', '(self.dispatch.fresh)()', 'Ok(())'),
-    ('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs', 'self.session.disclosure.project(', 'Ok(self.raw.clone()) // unsafe raw projection'),
+    ('rust/crates/aivm-secrets-garrett-core/src/selected_release.rs', 'crate::disclosure::project_fields(self.document, fields, 9,', 'unchecked_raw_projection(self.document, fields, 9,'),
+    ('rust/crates/aivm-secrets-garrett-core/src/selected_release.rs', 'if crate::reflection::contains(&bytes, secret) {', 'if false {'),
+    ('rust/crates/aivm-secrets-garrett-core/src/selected_release.rs', 'match checked(reply, self.secret) {', 'match unchecked(reply, self.secret) {'),
+    ('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs', 'aivm_secrets_garrett_core::selected_release::select(&mut selection)', 'Ok(raw_wire(&raw)) // unsafe raw release'),
     (
         RUST + 'custody/manifest_session.rs',
         '        audit.write_record(&json!({',

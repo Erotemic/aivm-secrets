@@ -45,9 +45,9 @@ EDGES = (
         'crate::json_wire::prepare(&denial(error), limit)',
     )),
     Edge('answer-conversion', TLS,
-         'fn from_answer(answer: Outcome<Value>)',
+         'fn from_answer(answer: Outcome<json::Reply>)',
          'fn send(&mut self, writer: &mut impl Write)', (
-             'Ok(value) => json::capture(&value).prepare(MAX_REPLY)',
+             'Ok(reply) => reply.prepare(MAX_REPLY)',
              'Err(error) =>',
              'aivm_secrets_garrett_core::public_error::denial_frame(error.into(), MAX_REPLY)',
          )),

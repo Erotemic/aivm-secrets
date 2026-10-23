@@ -113,6 +113,32 @@ impl Drop for Captured {
         clear(&mut self.0);
     }
 }
+impl Captured {
+    /// Wrap an already-extracted public wire value (zeroized on drop).
+    pub(crate) fn released(value: aivm_secrets_garrett_core::json_wire::Value) -> Self {
+        Self(value)
+    }
+}
+/// A guest reply: either the extracted wire value released by the core read
+/// pipeline, or a native serde reply (describe/renounce/approval/forward).
+pub(crate) enum Reply {
+    Released(Captured),
+    Native(Value),
+}
+impl Reply {
+    pub(crate) fn prepare(
+        &self,
+        limit: usize,
+    ) -> Result<
+        aivm_secrets_garrett_core::guest_frame::Frame,
+        aivm_secrets_garrett_core::guest_frame::FrameDenial,
+    > {
+        match self {
+            Reply::Released(captured) => captured.prepare(limit),
+            Reply::Native(value) => capture(value).prepare(limit),
+        }
+    }
+}
 pub(crate) fn capture(value: &Value) -> Captured {
     use aivm_secrets_garrett_core::json_wire::Value as Wire;
     fn convert(value: &Value) -> Wire {

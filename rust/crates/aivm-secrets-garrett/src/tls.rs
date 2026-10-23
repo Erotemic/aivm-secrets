@@ -180,11 +180,12 @@ impl<W: Write> aivm_secrets_garrett_core::guest_frame::Writer for GuestWriter<'_
     }
 }
 impl GuestFrame {
-    fn from_answer(answer: Outcome<Value>) -> Outcome<Self> {
+    fn from_answer(answer: Outcome<json::Reply>) -> Outcome<Self> {
         // A failure frame is one of the extracted fixed public denials; no
-        // native error text or serde conversion reaches the guest.
+        // native error text or serde conversion reaches the guest. A released
+        // read reply is framed from its extracted wire value directly.
         match answer {
-            Ok(value) => json::capture(&value).prepare(MAX_REPLY),
+            Ok(reply) => reply.prepare(MAX_REPLY),
             Err(error) => {
                 aivm_secrets_garrett_core::public_error::denial_frame(error.into(), MAX_REPLY)
             }
@@ -368,7 +369,7 @@ impl Bridge {
         value: Value,
         peer: &VerifiedPeer,
         clock: &impl Fn() -> i64,
-    ) -> Outcome<Value> {
+    ) -> Outcome<json::Reply> {
         let object = value.as_object().ok_or(Error::InvalidRequest)?;
         let verbs: Vec<_> = ["request", "describe", "renounce", "delegate"]
             .into_iter()
@@ -428,13 +429,15 @@ impl Bridge {
             }
             // Control admission also follows any OAuth lease wait in the
             // provider; an older outer snapshot cannot authorize it.
-            return provider.control(verifier, token, peer, expected, verb);
+            return provider
+                .control(verifier, token, peer, expected, verb)
+                .map(json::Reply::Native);
         }
         let opened = verifier.open(token, peer, &expected, now)?;
         let inner =
             std::str::from_utf8(opened.inner.bytes()).map_err(|_| Error::InvalidCapability)?;
         let forwarded = json!({"version":1,"capability":inner,verb:m[verb]});
-        self.forward(&forwarded)
+        self.forward(&forwarded).map(json::Reply::Native)
     }
     fn forward(&self, request: &Value) -> Outcome<Value> {
         let Backend::Socket(broker) = &self.backend else {
@@ -529,7 +532,7 @@ mod guest_frame_tests {
             (usize::MAX, true),
             (usize::MAX, false),
         ] {
-            let mut frame = GuestFrame::from_answer(Ok(value.clone())).unwrap();
+            let mut frame = GuestFrame::from_answer(Ok(json::Reply::Native(value.clone()))).unwrap();
             let mut writer = FaultWriter {
                 accepted: Vec::new(),
                 limit,
@@ -599,7 +602,7 @@ mod guest_frame_tests {
         assert_eq!(value, old_failure(Error::Revoked));
         assert_eq!(writer.accepted.iter().filter(|b| **b == b'\n').count(), 1);
         assert!(matches!(
-            GuestFrame::from_answer(Ok(json!({"result":"x".repeat(MAX_REPLY)}))),
+            GuestFrame::from_answer(Ok(json::Reply::Native(json!({"result":"x".repeat(MAX_REPLY)})))),
             Err(Error::InternalError)
         ));
     }

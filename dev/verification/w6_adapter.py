@@ -166,23 +166,30 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
     release[1] = release[1].split('let work = PendingRequest {', 1)[0]
     release[1] = ''.join(release[1].split())
     selector = (root / CORE_RELEASE).read_text()
-    native_selector = source.split('struct ManifestSelection', 1)[1].split('// Only external observations remain native;', 1)[0]
+    native_selector = source.split('struct ManifestCurrent', 1)[1].split('// Only external observations remain native;', 1)[0]
     ensure('selected_release::select(&mutselection)' in release[1]
            and 'audit:&self.base.executor.audit,' in release[1]
+           and 'selected_release::Manifest{' in release[1]
+           and 'document:&document,' in release[1]
+           and 'fields:selection_fields,' in release[1]
            and all(marker in native_selector for marker in
-                   ('fn pagination(', 'self.session.policy.pagination(', 'fn project(',
-                    'self.session.disclosure.project(', 'fn check_safe(',
-                    'ensure_safe(reply, &self.secret.0)'))
+                   ('fn current(', 'require_control_active(host_time()?)', 'fn refuse('))
+           and 'fn pagination(' not in native_selector and 'fn project(' not in native_selector
            and all(marker in selector for marker in
                    ('work.current()?;', 'work.pagination()?;', 'work.project()?;',
-                    'work.assemble(selected, metadata);', 'work.check_safe(&reply)?;', 'Ok(reply)')),
+                    'work.assemble(selected, metadata);', 'work.check_safe(reply)',
+                    'metadata(self.document, page)',
+                    'crate::disclosure::project_fields(self.document, fields, 9,',
+                    'match checked(reply, self.secret) {',
+                    'crate::json_reflection::safe(&reply, secret, 65)',
+                    'crate::reflection::contains(&bytes, secret)')),
            'raw provider body may be returned without extracted selection/reflection checks')
     completed = source.split("struct PendingCompletion<'a, S>", 1)[1].split('struct PendingRequest<', 1)[0]
     ensure('self.audit.write_record(' in completed and '(self.fresh)()' in completed
            and 'completion::complete(pending, self.effects)' in request_core
            and 'let pending = self.work.complete(raw);' in request_core
            and 'fresh:&fresh,' in release[1]
-           and 'read_transition::run_current(pending).map(aivm_secrets_garrett_core::completion::Completed::into_value)' in ''.join(entry.split()),
+           and 'read_transition::run_current(pending).map(aivm_secrets_garrett_core::completion::Completed::into_value).map(|wire|json::Reply::Released(json::Captured::released(wire)))' in ''.join(entry.split()),
            'native success can reach guest without completion audit')
     return {'channels': len(channels), 'remaining': len(contract['remaining_obligations']),
             'status': 'review guard only; runtime/formal gates are separate'}

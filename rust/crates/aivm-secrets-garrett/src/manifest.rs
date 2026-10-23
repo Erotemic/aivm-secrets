@@ -1174,28 +1174,26 @@ impl Policy {
             op.effect(&given).map(Some)
         }
     }
-    pub(crate) fn pagination(
+    /// Host pagination policy and the guest's validated page argument, for
+    /// the extracted `selected_release::metadata`.
+    pub(crate) fn page(
         &self,
         op: &Operation,
         args: &BTreeMap<String, Value>,
-        result: &Value,
-    ) -> Outcome<Option<Value>> {
-        op.page
-            .as_ref()
-            .map(|p| {
-                let rows = lookup(result, &p.at, Error::UpstreamResponse)?
-                    .as_array()
-                    .ok_or(Error::UpstreamResponse)?;
-                if rows.len() > p.size {
-                    return Err(Error::UpstreamResponse);
-                }
-                let mut meta = json!({"per_page":p.size,"possibly_more":rows.len()==p.size});
-                if let Some(n) = &p.parameter {
-                    meta["page"] = args.get(n).cloned().ok_or(Error::InvalidRequest)?;
-                }
-                Ok(json!({"pagination":meta}))
-            })
-            .transpose()
+    ) -> Option<aivm_secrets_garrett_core::selected_release::Page> {
+        use aivm_secrets_garrett_core::selected_release::{Page as Input, PageArgument};
+        op.page.as_ref().map(|p| Input {
+            at: p.at.iter().map(|key| key.as_bytes().to_vec()).collect(),
+            size: p.size as i64,
+            argument: match &p.parameter {
+                None => PageArgument::Unused,
+                // Policy admits only integer rules for a page parameter.
+                Some(n) => match args.get(n).and_then(Value::as_i64) {
+                    Some(value) => PageArgument::Value(value),
+                    None => PageArgument::Missing,
+                },
+            },
+        })
     }
     /// Independent compiler runner; facts are test inputs here, never remotely
     /// supplied evidence to the live credentialed execution path.

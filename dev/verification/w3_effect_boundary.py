@@ -201,27 +201,40 @@ def review_semantics(contents: dict[str, str]) -> None:
             'coordinated request no longer uses normalized policy identity')
     completed = part(m, "struct PendingCompletion<'a, S>", 'struct PendingRequest<')
     core_completion = part(core_callbacks, '    fn complete(&mut self, raw:', '    fn outcome_unknown(')
-    require('impl<S: FnMut() -> Outcome<Value>>' in completed
+    require('impl<O, S: FnMut() -> Outcome<O>>' in completed
             and same_order(completed, 'fn recheck(', '(self.fresh)()', 'fn audit(', 'self.audit.write_record(')
             and same_order(core_completion, 'self.work.complete(raw)',
                            'completion::complete(pending, self.effects)',
                            'self.effects = report.effects;', 'report.outcome'),
             'completed guest release bypasses owned controller or actual audit')
     selection_core = contents['rust/crates/aivm-secrets-garrett-core/src/selected_release.rs'].split('#[cfg(test)]', 1)[0]
-    selection_native = part(m, 'struct ManifestSelection', '// Only external observations remain native;')
-    require(same_order(''.join(release.split()), 'select:move||', 'ManifestSelection{',
+    selection_native = part(m, 'struct ManifestCurrent', '// Only external observations remain native;')
+    manifest_work = part(selection_core, "impl<'a, C: Current> Work for Manifest<'a, C>", '\n}\n')
+    checked = part(selection_core, 'pub fn checked(', '\n}\n')
+    require(same_order(''.join(release.split()), 'select:move||',
+                       'letdocument=crate::manifest::disclosure::document(&raw);',
+                       'selected_release::Manifest{', 'current:ManifestCurrent{session},',
+                       'document:&document,', 'fields:selection_fields,', 'page:selection_page,',
+                       'secret:&selection_secret.0,',
                        'selected_release::select(&mutselection)', 'audit:&self.base.executor.audit,')
             and same_order(selection_core, 'work.current()?;', 'work.pagination()?;',
                            'work.project()?;', 'work.assemble(selected, metadata)',
-                           'work.check_safe(&reply)?;', 'Ok(reply)')
+                           'work.check_safe(reply)')
+            and same_order(manifest_work, 'fn current(', 'self.current.current()',
+                           'fn pagination(', 'metadata(self.document, page)',
+                           'fn project(', 'crate::disclosure::project_fields(self.document, fields, 9,',
+                           'fn assemble(', 'assemble(selected, metadata)',
+                           'fn check_safe(', 'match checked(reply, self.secret) {')
+            and same_order(checked, 'crate::json_reflection::safe(&reply, secret, 65)',
+                           'render_wire(&reply)', 'json_wire::encode(&wire)',
+                           'crate::reflection::contains(&bytes, secret)')
+            and checked.rstrip().endswith('Ok(wire)')
             and same_order(selection_native, 'fn current(', 'require_control_active(host_time()?)',
-                           'fn pagination(', 'self.session.policy.pagination(',
-                           'fn project(', 'self.session.disclosure.project(',
-                           'fn assemble(', '"result":selected', 'fn check_safe(',
-                           'ensure_safe(reply, &self.secret.0)')
-            and 'selection_args = &args;' in request and 'selection_secret = &secret;' in request
+                           'fn refuse(')
+            and 'selection_fields = self.disclosure.fields(&op.name);' in request
+            and 'selection_secret = &secret;' in request
             and 'session = &*self;' in request and 'fresh: &fresh,' in release,
-            'guest release bypasses extracted source order / native selected/reflection callbacks')
+            'guest release bypasses the extracted selected_release::Manifest pipeline')
     completion = part(transition, 'pub fn complete_current<', 'pub trait Request {')
     require(same_order(completion, 'pending.recheck(CompletionPhase::BeforeAudit)',
                        'pending.audit()', 'pending.recheck(CompletionPhase::BeforeRelease)',
@@ -290,7 +303,8 @@ def review_semantics(contents: dict[str, str]) -> None:
             'completion receipt bypasses source-owned selection/check/audit/release gates')
     require('self.work.recheck()' in part(core_callbacks, '    fn recheck(&mut self)', '    fn complete(&mut self, raw:')
             and 'DP: aivm_secrets_garrett_core::dispatch::Work<Output = Value, Error = Error>' in adapter
-            and 'CP: aivm_secrets_garrett_core::completion::Work<Output = Value, Error = Error>' in adapter
+            and 'CP: aivm_secrets_garrett_core::completion::Work<Error = Error>,' in adapter
+            and 'type Output = CP::Output;' in adapter
             and 'self.operation_write' in adapter
             and 'aivm_secrets_garrett_core::completion::Completed::into_value' in request,
             'effectful callbacks lost their actual post-state or completed-value gate')
@@ -501,7 +515,7 @@ def review_semantics(contents: dict[str, str]) -> None:
     answer = part(t, 'fn answer(', 'fn forward(')
     require(guest.count('.write_all(wire)') == 1
             and 'self.0.flush()' in guest
-            and 'json::capture(&value)' in guest and '.prepare(MAX_REPLY)' in guest
+            and 'reply.prepare(MAX_REPLY)' in guest and '.prepare(MAX_REPLY)' in guest
             and 'self.0.send(&mut GuestWriter(writer))' in guest,
             'guest frame serializer bypasses the bounded single-attempt core')
     require(serve.count('self.answer(') == 1 and same_order(serve, 'match frame(&mut stream, MAX_FRAME)',
@@ -512,17 +526,22 @@ def review_semantics(contents: dict[str, str]) -> None:
     require('GuestFrame::from_answer(answer)?.send(&mut stream)?;' in serve
             and '.write_all(' not in serve,
             'authenticated guest writer bypasses GuestFrame')
-    require(same_order(guest, 'Ok(value) => json::capture(&value).prepare(MAX_REPLY)',
+    require(same_order(guest, 'Ok(reply) => reply.prepare(MAX_REPLY)',
                        'Err(error) =>', 'aivm_secrets_garrett_core::public_error::denial_frame(error.into(), MAX_REPLY)')
             and 'json!(' not in guest and 'format!(' not in guest,
             'guest failure is not the extracted fixed public_error denial frame')
+    reply_frame = part(contents[RUST + 'json.rs'], 'pub(crate) enum Reply {', 'pub(crate) fn capture(')
+    require(reply_frame.count('Released(') == 2 and reply_frame.count('Native(') == 2
+            and 'Reply::Released(captured) => captured.prepare(limit)' in reply_frame
+            and 'Reply::Native(value) => capture(value).prepare(limit)' in reply_frame,
+            'a released read reply is not framed from its extracted wire value')
     require('verbs[0] == "delegate"' in answer
             and 'if let Backend::Provider(provider)' in answer
             and 'return provider.request(' in answer,
             'backend selector/unsupported guest delegation changed')
     require(t.count('self.forward(&forwarded)') == 1,
             'additional legacy forwarding may be guest reachable')
-    require(guest.count('json::capture(') == 1 and t.split('#[cfg(test)]', 1)[0].count('.write_all(wire)') == 1,
+    require(guest.count('json::capture(') == 0 and guest.count('reply.prepare(') == 1 and t.split('#[cfg(test)]', 1)[0].count('.write_all(wire)') == 1,
             'extra guest stream serialization outside reviewed GuestFrame')
     frame_core = contents['rust/crates/aivm-secrets-garrett-core/src/guest_frame.rs'].split('#[cfg(test)]', 1)[0]
     require(same_order(frame_core, 'pub fn prepare(', 'if payload.len() >= limit',

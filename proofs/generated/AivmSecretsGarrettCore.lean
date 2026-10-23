@@ -11850,10 +11850,11 @@ def selected_conversion.render_wire
   ok r
 
 /-- Trait declaration: [aivm_secrets_garrett_core::selected_release::Work]
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 9:0-20:1
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 13:0-25:1
     Visibility: public -/
 structure selected_release.Work (Self : Type _) (Self_Metadata : Type _)
-  (Self_Selected : Type _) (Self_Reply : Type _) (Self_Error : Type _) where
+  (Self_Selected : Type _) (Self_Reply : Type _) (Self_Released : Type _)
+  (Self_Error : Type _) where
   current : Self → Result ((core.result.Result Unit Self_Error) × Self)
   pagination : Self → Result ((core.result.Result (Option Self_Metadata)
     Self_Error) × Self)
@@ -11861,18 +11862,18 @@ structure selected_release.Work (Self : Type _) (Self_Metadata : Type _)
     Self)
   assemble : Self → Self_Selected → Option Self_Metadata → Result
     (Self_Reply × Self)
-  check_safe : Self → Self_Reply → Result ((core.result.Result Unit
-    Self_Error) × Self)
+  check_safe : Self → Self_Reply → Result ((core.result.Result
+    Self_Released Self_Error) × Self)
 
 /-- [aivm_secrets_garrett_core::selected_release::select]:
-    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 25:0-32:1
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 30:0-36:1
     Visibility: public -/
 def selected_release.select
   {W : Type _} {Clause0_Metadata : Type _} {Clause0_Selected : Type _}
-  {Clause0_Reply : Type _} {Clause0_Error : Type _} (WorkInst :
-  selected_release.Work W Clause0_Metadata Clause0_Selected Clause0_Reply
-  Clause0_Error) (work : W) :
-  Result ((core.result.Result Clause0_Reply Clause0_Error) × W)
+  {Clause0_Reply : Type _} {Clause0_Released : Type _} {Clause0_Error : Type _}
+  (WorkInst : selected_release.Work W Clause0_Metadata Clause0_Selected
+  Clause0_Reply Clause0_Released Clause0_Error) (work : W) :
+  Result ((core.result.Result Clause0_Released Clause0_Error) × W)
   := do
   let (r, work1) ← WorkInst.current work
   let cf ← core.result.Result.Insts.CoreOpsTry.branch r
@@ -11887,31 +11888,508 @@ def selected_release.select
       match cf2 with
       | core.ops.control_flow.ControlFlow.Continue val1 =>
         let (reply, work4) ← WorkInst.assemble work3 val1 val
-        let (r3, work5) ← WorkInst.check_safe work4 reply
-        let cf3 ← core.result.Result.Insts.CoreOpsTry.branch r3
-        match cf3 with
-        | core.ops.control_flow.ControlFlow.Continue _ =>
-          ok (core.result.Result.Ok reply, work5)
-        | core.ops.control_flow.ControlFlow.Break residual =>
-          let r4 ←
-            core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
-              Clause0_Reply (core.convert.FromSame Clause0_Error) residual
-          ok (r4, work5)
+        WorkInst.check_safe work4 reply
       | core.ops.control_flow.ControlFlow.Break residual =>
         let r3 ←
           core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
-            Clause0_Reply (core.convert.FromSame Clause0_Error) residual
+            Clause0_Released (core.convert.FromSame Clause0_Error) residual
         ok (r3, work3)
     | core.ops.control_flow.ControlFlow.Break residual =>
       let r2 ←
         core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
-          Clause0_Reply (core.convert.FromSame Clause0_Error) residual
+          Clause0_Released (core.convert.FromSame Clause0_Error) residual
       ok (r2, work2)
   | core.ops.control_flow.ControlFlow.Break residual =>
     let r1 ←
       core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
-        Clause0_Reply (core.convert.FromSame Clause0_Error) residual
+        Clause0_Released (core.convert.FromSame Clause0_Error) residual
     ok (r1, work1)
+
+/-- [aivm_secrets_garrett_core::selected_release::Denial]
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 41:0-45:1
+    Visibility: public -/
+@[discriminant isize]
+inductive selected_release.Denial where
+| Denied : selected_release.Denial
+| UpstreamResponse : selected_release.Denial
+| InvalidRequest : selected_release.Denial
+
+/-- [aivm_secrets_garrett_core::selected_release::{impl core::fmt::Debug for aivm_secrets_garrett_core::selected_release::Denial}::fmt]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 40:9-40:14
+    Visibility: public -/
+def selected_release.Denial.Insts.CoreFmtDebug.fmt
+  (self : selected_release.Denial) (f : core.fmt.Formatter) :
+  Result ((core.result.Result Unit core.fmt.Error) × core.fmt.Formatter)
+  := do
+  match self with
+  | selected_release.Denial.Denied =>
+    core.fmt.Formatter.write_str f (toStr "Denied")
+  | selected_release.Denial.UpstreamResponse =>
+    core.fmt.Formatter.write_str f (toStr "UpstreamResponse")
+  | selected_release.Denial.InvalidRequest =>
+    core.fmt.Formatter.write_str f (toStr "InvalidRequest")
+
+/-- Trait implementation: [aivm_secrets_garrett_core::selected_release::{impl core::fmt::Debug for aivm_secrets_garrett_core::selected_release::Denial}]
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 40:9-40:14 -/
+@[reducible]
+def selected_release.Denial.Insts.CoreFmtDebug : core.fmt.Debug
+  selected_release.Denial := {
+  fmt := selected_release.Denial.Insts.CoreFmtDebug.fmt
+}
+
+/-- [aivm_secrets_garrett_core::selected_release::{impl core::clone::Clone for aivm_secrets_garrett_core::selected_release::Denial}::clone]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 40:16-40:21
+    Visibility: public -/
+def selected_release.Denial.Insts.CoreCloneClone.clone
+  (self : selected_release.Denial) : Result selected_release.Denial := do
+  ok self
+
+/-- Trait implementation: [aivm_secrets_garrett_core::selected_release::{impl core::clone::Clone for aivm_secrets_garrett_core::selected_release::Denial}]
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 40:16-40:21 -/
+@[reducible]
+def selected_release.Denial.Insts.CoreCloneClone : core.clone.Clone
+  selected_release.Denial := {
+  clone := selected_release.Denial.Insts.CoreCloneClone.clone
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::selected_release::{impl core::marker::Copy for aivm_secrets_garrett_core::selected_release::Denial}]
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 40:23-40:27 -/
+@[reducible]
+def selected_release.Denial.Insts.CoreMarkerCopy : core.marker.Copy
+  selected_release.Denial := {
+  cloneInst := selected_release.Denial.Insts.CoreCloneClone
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::selected_release::{impl core::marker::StructuralPartialEq for aivm_secrets_garrett_core::selected_release::Denial}]
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 40:29-40:38 -/
+@[reducible]
+def selected_release.Denial.Insts.CoreMarkerStructuralPartialEq :
+  core.marker.StructuralPartialEq selected_release.Denial := {
+}
+
+/-- [aivm_secrets_garrett_core::selected_release::{impl core::cmp::PartialEq<aivm_secrets_garrett_core::selected_release::Denial> for aivm_secrets_garrett_core::selected_release::Denial}::eq]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 40:29-40:38
+    Visibility: public -/
+def selected_release.Denial.Insts.CoreCmpPartialEqDenial.eq
+  (self : selected_release.Denial) (other : selected_release.Denial) :
+  Result Bool
+  := do
+  let self1 := read_discriminant self
+  let other1 := read_discriminant other
+  ok (self1 = other1)
+
+/-- Trait implementation: [aivm_secrets_garrett_core::selected_release::{impl core::cmp::PartialEq<aivm_secrets_garrett_core::selected_release::Denial> for aivm_secrets_garrett_core::selected_release::Denial}]
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 40:29-40:38 -/
+@[reducible]
+impl_def selected_release.Denial.Insts.CoreCmpPartialEqDenial :
+  core.cmp.PartialEq selected_release.Denial selected_release.Denial := {
+  eq := selected_release.Denial.Insts.CoreCmpPartialEqDenial.eq
+  ne := core.cmp.PartialEq.ne.trait_default
+    selected_release.Denial.Insts.CoreCmpPartialEqDenial
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::selected_release::{impl core::cmp::Eq for aivm_secrets_garrett_core::selected_release::Denial}]
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 40:40-40:42 -/
+@[reducible]
+def selected_release.Denial.Insts.CoreCmpEq : core.cmp.Eq
+  selected_release.Denial := {
+  partialEqInst := selected_release.Denial.Insts.CoreCmpPartialEqDenial
+}
+
+/-- [aivm_secrets_garrett_core::selected_release::PageArgument]
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 48:0-52:1
+    Visibility: public -/
+@[discriminant isize]
+inductive selected_release.PageArgument where
+| Unused : selected_release.PageArgument
+| Missing : selected_release.PageArgument
+| Value : Std.I64 → selected_release.PageArgument
+
+/-- [aivm_secrets_garrett_core::selected_release::Page]
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 55:0-59:1
+    Visibility: public -/
+structure selected_release.Page where
+  «at» : alloc.vec.Vec (alloc.vec.Vec Std.U8)
+  size : Std.I64
+  argument : selected_release.PageArgument
+
+/-- Trait declaration: [aivm_secrets_garrett_core::selected_release::Current]
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 62:0-66:1
+    Visibility: public -/
+structure selected_release.Current (Self : Type _) (Self_Error : Type _) where
+  current : Self → Result ((core.result.Result Unit Self_Error) × Self)
+  refuse : Self → selected_release.Denial → Result (Self_Error × Self)
+
+mutual
+
+/-- [aivm_secrets_garrett_core::selected_release::rows_at]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 81:12-91:1
+    Visibility: public -/
+@[rust_loop]
+def selected_release.rows_at_loop
+  (fields : alloc.vec.Vec ((alloc.vec.Vec Std.U8) × disclosure.Json))
+  («at» : alloc.vec.Vec (alloc.vec.Vec Std.U8)) (depth : Std.Usize)
+  (i : Std.Usize) :
+  Result (core.result.Result Std.Usize selected_release.Denial)
+  := do
+  let i1 := alloc.vec.Vec.len fields
+  if i < i1
+  then
+    let (v, j) ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        ((alloc.vec.Vec Std.U8) × disclosure.Json)) fields i
+    let v1 ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice (alloc.vec.Vec
+        Std.U8)) «at» depth
+    let b ← alloc.vec.partial_eq.PartialEqVec.eq core.cmp.PartialEqU8 v v1
+    if b
+    then let i2 ← depth + 1#usize
+         selected_release.rows_at j «at» i2
+    else
+      let i2 ← i + 1#usize
+      selected_release.rows_at_loop fields «at» depth i2
+  else ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::selected_release::rows_at]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 71:0-91:1
+    Visibility: public -/
+def selected_release.rows_at
+  (value : disclosure.Json) («at» : alloc.vec.Vec (alloc.vec.Vec Std.U8))
+  (depth : Std.Usize) :
+  Result (core.result.Result Std.Usize selected_release.Denial)
+  := do
+  let i := alloc.vec.Vec.len «at»
+  if depth >= i
+  then
+    match value with
+    | disclosure.Json.Null =>
+      ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+    | disclosure.Json.Boolean _ =>
+      ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+    | disclosure.Json.Integer _ =>
+      ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+    | disclosure.Json.Text _ =>
+      ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+    | disclosure.Json.Array rows =>
+      let i1 := alloc.vec.Vec.len rows
+      ok (core.result.Result.Ok i1)
+    | disclosure.Json.Object _ =>
+      ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+    | disclosure.Json.Opaque =>
+      ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+  else
+    match value with
+    | disclosure.Json.Null =>
+      ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+    | disclosure.Json.Boolean _ =>
+      ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+    | disclosure.Json.Integer _ =>
+      ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+    | disclosure.Json.Text _ =>
+      ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+    | disclosure.Json.Array _ =>
+      ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+    | disclosure.Json.Object fields =>
+      selected_release.rows_at_loop fields «at» depth 0#usize
+    | disclosure.Json.Opaque =>
+      ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+partial_fixpoint
+
+end
+
+/-- [aivm_secrets_garrett_core::selected_release::metadata]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 96:0-110:1
+    Visibility: public -/
+def selected_release.metadata
+  (document : disclosure.Json) (page : selected_release.Page) :
+  Result (core.result.Result disclosure.Json selected_release.Denial)
+  := do
+  let r ← selected_release.rows_at document page.at 0#usize
+  let cf ← core.result.Result.Insts.CoreOpsTry.branch r
+  match cf with
+  | core.ops.control_flow.ControlFlow.Continue val =>
+    let i ← lift (UScalar.hcast .I64 val)
+    if i > page.size
+    then ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+    else
+      match page.argument with
+      | selected_release.PageArgument.Unused =>
+        let s ←
+          lift (Array.to_slice
+            (Array.make 8#usize [
+              112#u8, 101#u8, 114#u8, 95#u8, 112#u8, 97#u8, 103#u8, 101#u8
+              ]))
+        let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 s
+        let fields ←
+          alloc.vec.Vec.push (alloc.vec.Vec.new ((alloc.vec.Vec Std.U8) ×
+            disclosure.Json)) (v, disclosure.Json.Integer page.size)
+        let s1 ←
+          lift (Array.to_slice
+            (Array.make 13#usize [
+              112#u8, 111#u8, 115#u8, 115#u8, 105#u8, 98#u8, 108#u8, 121#u8,
+              95#u8, 109#u8, 111#u8, 114#u8, 101#u8
+              ]))
+        let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 s1
+        let i1 ← lift (UScalar.hcast .I64 val)
+        let fields1 ←
+          alloc.vec.Vec.push fields (v1, disclosure.Json.Boolean (i1 =
+            page.size))
+        let s2 ←
+          lift (Array.to_slice
+            (Array.make 10#usize [
+              112#u8, 97#u8, 103#u8, 105#u8, 110#u8, 97#u8, 116#u8, 105#u8,
+              111#u8, 110#u8
+              ]))
+        let v2 ← alloc.slice.Slice.to_vec core.clone.CloneU8 s2
+        let y ←
+          lift (Std.Array.to_slice
+            (Array.make 1#usize [ (v2, disclosure.Json.Object fields1) ] :
+            Array ((alloc.vec.Vec Std.U8) × disclosure.Json) 1#usize))
+        let ret := alloc.slice.Slice.into_vec y
+        ok (core.result.Result.Ok (disclosure.Json.Object ret))
+      | selected_release.PageArgument.Missing =>
+        ok (core.result.Result.Err selected_release.Denial.InvalidRequest)
+      | selected_release.PageArgument.Value value =>
+        let s ←
+          lift (Array.to_slice
+            (Array.make 4#usize [ 112#u8, 97#u8, 103#u8, 101#u8 ]))
+        let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 s
+        let fields ←
+          alloc.vec.Vec.push (alloc.vec.Vec.new ((alloc.vec.Vec Std.U8) ×
+            disclosure.Json)) (v, disclosure.Json.Integer value)
+        let s1 ←
+          lift (Array.to_slice
+            (Array.make 8#usize [
+              112#u8, 101#u8, 114#u8, 95#u8, 112#u8, 97#u8, 103#u8, 101#u8
+              ]))
+        let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 s1
+        let fields1 ←
+          alloc.vec.Vec.push fields (v1, disclosure.Json.Integer page.size)
+        let s2 ←
+          lift (Array.to_slice
+            (Array.make 13#usize [
+              112#u8, 111#u8, 115#u8, 115#u8, 105#u8, 98#u8, 108#u8, 121#u8,
+              95#u8, 109#u8, 111#u8, 114#u8, 101#u8
+              ]))
+        let v2 ← alloc.slice.Slice.to_vec core.clone.CloneU8 s2
+        let i1 ← lift (UScalar.hcast .I64 val)
+        let fields2 ←
+          alloc.vec.Vec.push fields1 (v2, disclosure.Json.Boolean (i1 =
+            page.size))
+        let s3 ←
+          lift (Array.to_slice
+            (Array.make 10#usize [
+              112#u8, 97#u8, 103#u8, 105#u8, 110#u8, 97#u8, 116#u8, 105#u8,
+              111#u8, 110#u8
+              ]))
+        let v3 ← alloc.slice.Slice.to_vec core.clone.CloneU8 s3
+        let y ←
+          lift (Std.Array.to_slice
+            (Array.make 1#usize [ (v3, disclosure.Json.Object fields2) ] :
+            Array ((alloc.vec.Vec Std.U8) × disclosure.Json) 1#usize))
+        let ret := alloc.slice.Slice.into_vec y
+        ok (core.result.Result.Ok (disclosure.Json.Object ret))
+  | core.ops.control_flow.ControlFlow.Break residual =>
+    core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual
+      disclosure.Json (core.convert.FromSame selected_release.Denial) residual
+
+/-- [aivm_secrets_garrett_core::selected_release::assemble]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 113:0-122:1
+    Visibility: public -/
+def selected_release.assemble
+  (selected : disclosure.Json) (metadata : Option disclosure.Json) :
+  Result disclosure.Json
+  := do
+  let fields ←
+    match metadata with
+    | none =>
+      ok (alloc.vec.Vec.new ((alloc.vec.Vec Std.U8) × disclosure.Json))
+    | some metadata1 =>
+      do
+      let s ←
+        lift (Array.to_slice
+          (Array.make 4#usize [ 109#u8, 101#u8, 116#u8, 97#u8 ]))
+      let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 s
+      alloc.vec.Vec.push (alloc.vec.Vec.new ((alloc.vec.Vec Std.U8) ×
+        disclosure.Json)) (v, metadata1)
+  let s ← lift (Array.to_slice (Array.make 2#usize [ 111#u8, 107#u8 ]))
+  let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 s
+  let fields1 ← alloc.vec.Vec.push fields (v, disclosure.Json.Boolean true)
+  let s1 ←
+    lift (Array.to_slice
+      (Array.make 6#usize [ 114#u8, 101#u8, 115#u8, 117#u8, 108#u8, 116#u8 ]))
+  let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 s1
+  let fields2 ← alloc.vec.Vec.push fields1 (v1, selected)
+  let s2 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        118#u8, 101#u8, 114#u8, 115#u8, 105#u8, 111#u8, 110#u8
+        ]))
+  let v2 ← alloc.slice.Slice.to_vec core.clone.CloneU8 s2
+  let fields3 ←
+    alloc.vec.Vec.push fields2 (v2, disclosure.Json.Integer 1#i64)
+  ok (disclosure.Json.Object fields3)
+
+/-- [aivm_secrets_garrett_core::selected_release::checked]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 127:0-143:1
+    Visibility: public -/
+def selected_release.checked
+  (reply : disclosure.Json) (secret : alloc.vec.Vec Std.U8) :
+  Result (core.result.Result json_wire.Value selected_release.Denial)
+  := do
+  let s := alloc.vec.Vec.deref secret
+  let b ← json_reflection.safe reply s 65#usize
+  if b
+  then
+    let r ← selected_conversion.render_wire reply
+    match r with
+    | core.result.Result.Ok wire =>
+      let r1 ← json_wire.encode wire
+      match r1 with
+      | core.result.Result.Ok bytes =>
+        let s1 := alloc.vec.Vec.deref bytes
+        let s2 := alloc.vec.Vec.deref secret
+        let b1 ← reflection.contains s1 s2
+        if b1
+        then
+          ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+        else ok (core.result.Result.Ok wire)
+      | core.result.Result.Err _ =>
+        ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+    | core.result.Result.Err _ =>
+      ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+  else ok (core.result.Result.Err selected_release.Denial.UpstreamResponse)
+
+/-- [aivm_secrets_garrett_core::selected_release::Manifest]
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 146:0-152:1
+    Visibility: public -/
+structure selected_release.Manifest (C : Type _) (Clause0_Error : Type _) where
+  current : C
+  document : disclosure.Json
+  fields : Option (alloc.vec.Vec disclosure.Field)
+  page : Option selected_release.Page
+  secret : alloc.vec.Vec Std.U8
+
+/-- [aivm_secrets_garrett_core::selected_release::{impl aivm_secrets_garrett_core::selected_release::Work<aivm_secrets_garrett_core::disclosure::Json, aivm_secrets_garrett_core::disclosure::Json, aivm_secrets_garrett_core::disclosure::Json, aivm_secrets_garrett_core::json_wire::Value, Clause0_Error> for aivm_secrets_garrett_core::selected_release::Manifest<'a, C, Clause0_Error>}::check_safe]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 186:4-191:5
+    Visibility: public -/
+def
+  selected_release.Manifest.Insts.Aivm_secrets_garrett_coreSelected_releaseWorkJsonJsonJsonValueClause0_Error.check_safe
+  {C : Type _} {Clause0_Error : Type _} (CurrentInst : selected_release.Current
+  C Clause0_Error) (self : selected_release.Manifest C Clause0_Error)
+  (reply : disclosure.Json) :
+  Result ((core.result.Result json_wire.Value Clause0_Error) ×
+    (selected_release.Manifest C Clause0_Error))
+  := do
+  let r ← selected_release.checked reply self.secret
+  match r with
+  | core.result.Result.Ok wire => ok (core.result.Result.Ok wire, self)
+  | core.result.Result.Err denial =>
+    let (t, t1) ← CurrentInst.refuse self.current denial
+    ok (core.result.Result.Err t, { self with current := t1 })
+
+/-- [aivm_secrets_garrett_core::selected_release::{impl aivm_secrets_garrett_core::selected_release::Work<aivm_secrets_garrett_core::disclosure::Json, aivm_secrets_garrett_core::disclosure::Json, aivm_secrets_garrett_core::disclosure::Json, aivm_secrets_garrett_core::json_wire::Value, Clause0_Error> for aivm_secrets_garrett_core::selected_release::Manifest<'a, C, Clause0_Error>}::assemble]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 183:4-185:5
+    Visibility: public -/
+def
+  selected_release.Manifest.Insts.Aivm_secrets_garrett_coreSelected_releaseWorkJsonJsonJsonValueClause0_Error.assemble
+  {C : Type _} {Clause0_Error : Type _} (CurrentInst : selected_release.Current
+  C Clause0_Error) (self : selected_release.Manifest C Clause0_Error)
+  (selected : disclosure.Json) (metadata : Option disclosure.Json) :
+  Result (disclosure.Json × (selected_release.Manifest C Clause0_Error))
+  := do
+  let j ← selected_release.assemble selected metadata
+  ok (j, self)
+
+/-- [aivm_secrets_garrett_core::selected_release::{impl aivm_secrets_garrett_core::selected_release::Work<aivm_secrets_garrett_core::disclosure::Json, aivm_secrets_garrett_core::disclosure::Json, aivm_secrets_garrett_core::disclosure::Json, aivm_secrets_garrett_core::json_wire::Value, Clause0_Error> for aivm_secrets_garrett_core::selected_release::Manifest<'a, C, Clause0_Error>}::project]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 173:4-182:5
+    Visibility: public -/
+def
+  selected_release.Manifest.Insts.Aivm_secrets_garrett_coreSelected_releaseWorkJsonJsonJsonValueClause0_Error.project
+  {C : Type _} {Clause0_Error : Type _} (CurrentInst : selected_release.Current
+  C Clause0_Error) (self : selected_release.Manifest C Clause0_Error) :
+  Result ((core.result.Result disclosure.Json Clause0_Error) ×
+    (selected_release.Manifest C Clause0_Error))
+  := do
+  match self.fields with
+  | none =>
+    let (t, t1) ←
+      CurrentInst.refuse self.current selected_release.Denial.Denied
+    ok (core.result.Result.Err t, { self with current := t1 })
+  | some fields =>
+    let i ← 2#usize * 1024#usize
+    let i1 ← i * 1024#usize
+    let i2 ← i1 - 4096#usize
+    let r ← disclosure.project_fields self.document fields 9#usize i2
+    match r with
+    | core.result.Result.Ok selected =>
+      ok (core.result.Result.Ok selected.value, self)
+    | core.result.Result.Err _ =>
+      let (t, t1) ←
+        CurrentInst.refuse self.current
+          selected_release.Denial.UpstreamResponse
+      ok (core.result.Result.Err t, { self with current := t1 })
+
+/-- [aivm_secrets_garrett_core::selected_release::{impl aivm_secrets_garrett_core::selected_release::Work<aivm_secrets_garrett_core::disclosure::Json, aivm_secrets_garrett_core::disclosure::Json, aivm_secrets_garrett_core::disclosure::Json, aivm_secrets_garrett_core::json_wire::Value, Clause0_Error> for aivm_secrets_garrett_core::selected_release::Manifest<'a, C, Clause0_Error>}::pagination]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 164:4-172:5
+    Visibility: public -/
+def
+  selected_release.Manifest.Insts.Aivm_secrets_garrett_coreSelected_releaseWorkJsonJsonJsonValueClause0_Error.pagination
+  {C : Type _} {Clause0_Error : Type _} (CurrentInst : selected_release.Current
+  C Clause0_Error) (self : selected_release.Manifest C Clause0_Error) :
+  Result ((core.result.Result (Option disclosure.Json) Clause0_Error) ×
+    (selected_release.Manifest C Clause0_Error))
+  := do
+  match self.page with
+  | none => ok (core.result.Result.Ok none, self)
+  | some page =>
+    let r ← selected_release.metadata self.document page
+    match r with
+    | core.result.Result.Ok «meta» =>
+      ok (core.result.Result.Ok (some «meta»), self)
+    | core.result.Result.Err denial =>
+      let (t, t1) ← CurrentInst.refuse self.current denial
+      ok (core.result.Result.Err t, { self with current := t1 })
+
+/-- [aivm_secrets_garrett_core::selected_release::{impl aivm_secrets_garrett_core::selected_release::Work<aivm_secrets_garrett_core::disclosure::Json, aivm_secrets_garrett_core::disclosure::Json, aivm_secrets_garrett_core::disclosure::Json, aivm_secrets_garrett_core::json_wire::Value, Clause0_Error> for aivm_secrets_garrett_core::selected_release::Manifest<'a, C, Clause0_Error>}::current]:
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 161:4-163:5
+    Visibility: public -/
+def
+  selected_release.Manifest.Insts.Aivm_secrets_garrett_coreSelected_releaseWorkJsonJsonJsonValueClause0_Error.current
+  {C : Type _} {Clause0_Error : Type _} (CurrentInst : selected_release.Current
+  C Clause0_Error) (self : selected_release.Manifest C Clause0_Error) :
+  Result ((core.result.Result Unit Clause0_Error) × (selected_release.Manifest
+    C Clause0_Error))
+  := do
+  let (r, t) ← CurrentInst.current self.current
+  ok (r, { self with current := t })
+
+/-- Trait implementation: [aivm_secrets_garrett_core::selected_release::{impl aivm_secrets_garrett_core::selected_release::Work<aivm_secrets_garrett_core::disclosure::Json, aivm_secrets_garrett_core::disclosure::Json, aivm_secrets_garrett_core::disclosure::Json, aivm_secrets_garrett_core::json_wire::Value, Clause0_Error> for aivm_secrets_garrett_core::selected_release::Manifest<'a, C, Clause0_Error>}]
+    Source: 'crates/aivm-secrets-garrett-core/src/selected_release.rs', lines 154:0-192:1 -/
+@[reducible]
+def
+  selected_release.Manifest.Insts.Aivm_secrets_garrett_coreSelected_releaseWorkJsonJsonJsonValueClause0_Error
+  {C : Type _} {Clause0_Error : Type _} (CurrentInst : selected_release.Current
+  C Clause0_Error) : selected_release.Work (selected_release.Manifest C
+  Clause0_Error) disclosure.Json disclosure.Json disclosure.Json
+  json_wire.Value Clause0_Error := {
+  current :=
+    selected_release.Manifest.Insts.Aivm_secrets_garrett_coreSelected_releaseWorkJsonJsonJsonValueClause0_Error.current
+    CurrentInst
+  pagination :=
+    selected_release.Manifest.Insts.Aivm_secrets_garrett_coreSelected_releaseWorkJsonJsonJsonValueClause0_Error.pagination
+    CurrentInst
+  project :=
+    selected_release.Manifest.Insts.Aivm_secrets_garrett_coreSelected_releaseWorkJsonJsonJsonValueClause0_Error.project
+    CurrentInst
+  assemble :=
+    selected_release.Manifest.Insts.Aivm_secrets_garrett_coreSelected_releaseWorkJsonJsonJsonValueClause0_Error.assemble
+    CurrentInst
+  check_safe :=
+    selected_release.Manifest.Insts.Aivm_secrets_garrett_coreSelected_releaseWorkJsonJsonJsonValueClause0_Error.check_safe
+    CurrentInst
+}
 
 /-- [aivm_secrets_garrett_core::trust::TrustDenial]
     Source: 'crates/aivm-secrets-garrett-core/src/trust.rs', lines 5:0-9:1

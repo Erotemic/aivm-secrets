@@ -23,7 +23,7 @@ def test_missing_error_fallback_fails_closed() -> None:
 def test_removed_guest_frame_conversion_is_detected() -> None:
     sources = guard.read_sources()
     sources[guard.TLS] = sources[guard.TLS].replace(
-        'json::capture(&value)', 'json::capture(&raw_provider_response)', 1
+        'reply.prepare(MAX_REPLY)', 'json::capture(&raw_provider_response).prepare(MAX_REPLY)', 1
     )
     assert any('answer-conversion' in problem for problem in guard.scan(sources))
 

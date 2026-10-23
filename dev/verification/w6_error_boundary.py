@@ -87,7 +87,7 @@ def check(root: Path = ROOT) -> dict:
             'guest failure message may include nonfixed diagnostics')
     require('Err(error) => {' in tls
             and 'aivm_secrets_garrett_core::public_error::denial_frame(error.into(), MAX_REPLY)' in tls
-            and 'json::capture(&value).prepare(MAX_REPLY)' in tls
+            and 'Ok(reply) => reply.prepare(MAX_REPLY)' in tls
             and 'self.0.send(&mut GuestWriter(writer))' in tls
             and 'write_all(wire)' in tls and 'self.0.flush()' in tls,
             'guest reply bypasses the canonical bounded single-attempt writer')

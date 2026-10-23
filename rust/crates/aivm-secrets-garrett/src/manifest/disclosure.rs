@@ -113,6 +113,10 @@ impl Disclosure {
                 .collect::<Outcome<_>>()?,
         })
     }
+    /// The host output schema for one operation, if configured.
+    pub(crate) fn fields(&self, operation: &str) -> Option<&Vec<filter::Field>> {
+        self.rules.get(operation)
+    }
     pub fn project(&self, operation: &str, response: &Value, credential: &[u8]) -> Outcome<Value> {
         let tree = document(response);
         let selected = filter::project_fields(
@@ -232,6 +236,113 @@ mod tests {
             ]),
         ] {
             assert_eq!(render(&selected), Err(Error::UpstreamResponse));
+        }
+    }
+
+    // The previous native release pipeline (serde pagination, projection,
+    // assembly and reflection), kept only as a byte-equality oracle for the
+    // extracted `selected_release::Manifest`.
+    fn old_release(
+        disclosure: &Disclosure,
+        page: Option<(usize, Vec<String>, Option<Option<i64>>)>,
+        raw: &Value,
+        secret: &[u8],
+    ) -> Outcome<Vec<u8>> {
+        let metadata = match &page {
+            None => None,
+            Some((size, at, parameter)) => {
+                let mut value = raw;
+                for key in at {
+                    value = value.as_object().and_then(|m| m.get(key)).ok_or(Error::UpstreamResponse)?;
+                }
+                let rows = value.as_array().ok_or(Error::UpstreamResponse)?;
+                if rows.len() > *size {
+                    return Err(Error::UpstreamResponse);
+                }
+                let mut meta = json!({"per_page":size,"possibly_more":rows.len()==*size});
+                if let Some(arg) = parameter {
+                    meta["page"] = json!(arg.ok_or(Error::InvalidRequest)?);
+                }
+                Some(json!({"pagination":meta}))
+            }
+        };
+        let selected = disclosure.project("pr.view", raw, secret)?;
+        let mut reply = json!({"version":1,"ok":true,"result":selected});
+        if let Some(metadata) = metadata {
+            reply["meta"] = metadata;
+        }
+        ensure_safe(&reply, secret)?;
+        Ok(json::canonical(&reply))
+    }
+
+    struct Always;
+    impl aivm_secrets_garrett_core::selected_release::Current for Always {
+        type Error = Error;
+        fn current(&mut self) -> Outcome<()> {
+            Ok(())
+        }
+        fn refuse(&mut self, denial: aivm_secrets_garrett_core::selected_release::Denial) -> Error {
+            use aivm_secrets_garrett_core::selected_release::Denial;
+            match denial {
+                Denial::Denied => Error::Denied,
+                Denial::UpstreamResponse => Error::UpstreamResponse,
+                Denial::InvalidRequest => Error::InvalidRequest,
+            }
+        }
+    }
+
+    #[test]
+    fn extracted_release_equals_previous_native_release() {
+        use aivm_secrets_garrett_core::selected_release::{self as release, Page, PageArgument};
+        let disclosure = Disclosure::parse(
+            &json!({"pr.view": {
+                "title": {"at": ["title"], "type": "text"},
+                "ids": {"at": ["items"], "type": "array", "max_items": 4,
+                        "items": {"at": ["id"], "type": "integer"}}
+            }}),
+            &["pr.view".to_owned()],
+        ).unwrap();
+        let documents = [
+            json!({"title": "é", "items": [{"id": 1}, {"id": 2}], "private": "x"}),
+            json!({"title": "full", "items": [{"id": 1}, {"id": 2}, {"id": 3}]}),
+            json!({"title": "over", "items": [{"id": 1}, {"id": 2}, {"id": 3}, {"id": 4}]}),
+            json!({"title": "no rows"}),
+            json!({"title": "has broker-secret inside", "items": []}),
+            json!({"title": 7, "items": []}),
+        ];
+        let pages: [Option<(usize, Vec<String>, Option<Option<i64>>)>; 5] = [
+            None,
+            Some((3, vec!["items".into()], None)),
+            Some((3, vec!["items".into()], Some(Some(2)))),
+            Some((3, vec!["items".into()], Some(None))),
+            Some((3, vec!["missing".into()], Some(Some(1)))),
+        ];
+        let secret = b"broker-secret".to_vec();
+        for raw in &documents {
+            for page in &pages {
+                let expected = old_release(&disclosure, page.clone(), raw, &secret);
+                let input = page.as_ref().map(|(size, at, parameter)| Page {
+                    at: at.iter().map(|k| k.as_bytes().to_vec()).collect(),
+                    size: *size as i64,
+                    argument: match parameter {
+                        None => PageArgument::Unused,
+                        Some(None) => PageArgument::Missing,
+                        Some(Some(value)) => PageArgument::Value(*value),
+                    },
+                });
+                let tree = document(raw);
+                let mut work = release::Manifest {
+                    current: Always,
+                    document: &tree,
+                    fields: disclosure.fields("pr.view"),
+                    page: &input,
+                    secret: &secret,
+                };
+                let actual = release::select(&mut work).map(|wire| {
+                    aivm_secrets_garrett_core::json_wire::encode(&wire).ok().unwrap()
+                });
+                assert_eq!(actual, expected, "{raw} {page:?}");
+            }
         }
     }
 

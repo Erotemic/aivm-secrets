@@ -82,11 +82,9 @@ def test_w6_new_provider_send_or_public_raw_return_is_rejected(tmp_path):
     path.write_text(body)
     with pytest.raises(ContractError, match='another provider send'):
         check(checkout)
-    projection = ('        self.session.disclosure.project(\n'
-                  '            &self.operation.name, self.raw, &self.secret.0,\n'
-                  '        )\n')
-    assert original.count(projection) == 1
-    path.write_text(original.replace(projection, '        Ok(self.raw.clone())\n', 1))
+    release = '                aivm_secrets_garrett_core::selected_release::select(&mut selection)\n'
+    assert original.count(release) == 1
+    path.write_text(original.replace(release, '                Ok(raw_wire(&raw))\n', 1))
     with pytest.raises(ContractError, match='raw provider body'):
         check(checkout)
 

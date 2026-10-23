@@ -19,14 +19,14 @@ struct PendingCompletion<'a, S> {
     request_digest: &'a str,
     fresh: &'a dyn Fn() -> Outcome<()>,
 }
-impl<S: FnMut() -> Outcome<Value>> aivm_secrets_garrett_core::completion::Work
+impl<O, S: FnMut() -> Outcome<O>> aivm_secrets_garrett_core::completion::Work
     for PendingCompletion<'_, S>
 {
-    type Output = Value;
+    type Output = O;
     type Error = Error;
     const INVALID_TRANSITION: Error = Error::InternalError;
 
-    fn select(&mut self) -> Outcome<Value> {
+    fn select(&mut self) -> Outcome<O> {
         (self.select)()
     }
     fn recheck(&mut self, _phase: read_transition::CompletionPhase) -> Outcome<()> {
@@ -59,11 +59,11 @@ where
     C: FnMut(Value) -> CP,
     R: Fn() -> Outcome<()>,
     DP: aivm_secrets_garrett_core::dispatch::Work<Output = Value, Error = Error>,
-    CP: aivm_secrets_garrett_core::completion::Work<Output = Value, Error = Error>,
+    CP: aivm_secrets_garrett_core::completion::Work<Error = Error>,
 {
     type Facts = Value;
     type Effect = Effect;
-    type Output = Value;
+    type Output = CP::Output;
     type Error = Error;
     type Dispatch = DP;
     type Completion = CP;
@@ -103,42 +103,25 @@ where
     }
 }
 
-// The production disclosure adapter supplies only the five external JSON and
-// clock/reflection primitives. The *order* and fail-stop release decision
-// live in extracted `selected_release::select`, not this callback.
-struct ManifestSelection<'a> {
+// Pagination, projection, assembly, both reflection checks and the wire value
+// are extracted `selected_release::Manifest`; only the current-control check
+// and the mapping of its refusals to public errors remain native.
+struct ManifestCurrent<'a> {
     session: &'a Session,
-    operation: &'a crate::manifest::Operation,
-    args: &'a BTreeMap<String, Value>,
-    raw: &'a Value,
-    secret: &'a Credential,
 }
-impl aivm_secrets_garrett_core::selected_release::Work for ManifestSelection<'_> {
-    type Metadata = Value;
-    type Selected = Value;
-    type Reply = Value;
+impl aivm_secrets_garrett_core::selected_release::Current for ManifestCurrent<'_> {
     type Error = Error;
 
     fn current(&mut self) -> Outcome<()> {
         self.session.require_control_active(host_time()?)
     }
-    fn pagination(&mut self) -> Outcome<Option<Value>> {
-        self.session.policy.pagination(self.operation, self.args, self.raw)
-    }
-    fn project(&mut self) -> Outcome<Value> {
-        self.session.disclosure.project(
-            &self.operation.name, self.raw, &self.secret.0,
-        )
-    }
-    fn assemble(&mut self, selected: Value, metadata: Option<Value>) -> Value {
-        let mut reply = json!({"version":1,"ok":true,"result":selected});
-        if let Some(metadata) = metadata {
-            reply["meta"] = metadata;
+    fn refuse(&mut self, denial: aivm_secrets_garrett_core::selected_release::Denial) -> Error {
+        use aivm_secrets_garrett_core::selected_release::Denial;
+        match denial {
+            Denial::Denied => Error::Denied,
+            Denial::UpstreamResponse => Error::UpstreamResponse,
+            Denial::InvalidRequest => Error::InvalidRequest,
         }
-        reply
-    }
-    fn check_safe(&mut self, reply: &Value) -> Outcome<()> {
-        crate::manifest::disclosure::ensure_safe(reply, &self.secret.0)
     }
 }
 
@@ -359,7 +342,7 @@ impl Session {
         expected: Expectation,
         value: &Value,
         _now: i64,
-    ) -> Outcome<Value> {
+    ) -> Outcome<json::Reply> {
         let _vault = self
             .base
             .oauth
@@ -499,7 +482,7 @@ impl Session {
                     .ok_or(Error::InternalError)?
                     .state
                     .remember(&approval_digest, &canonical_request)?;
-                return Ok(reply);
+                return Ok(json::Reply::Native(reply));
             }
         }
         // Factories return primitive adapters only. Receipt ownership, phase
@@ -530,16 +513,19 @@ impl Session {
             request_adapter::DispatchPlan { work, keyed_write }
         };
         let session = &*self;
-        let selection_args = &args;
+        let selection_fields = self.disclosure.fields(&op.name);
+        let page = self.policy.page(op, &args);
+        let selection_page = &page;
         let selection_secret = &secret;
         let release = |raw: Value| PendingCompletion {
             select: move || {
-                let mut selection = ManifestSelection {
-                    session,
-                    operation: op,
-                    args: selection_args,
-                    raw: &raw,
-                    secret: selection_secret,
+                let document = crate::manifest::disclosure::document(&raw);
+                let mut selection = aivm_secrets_garrett_core::selected_release::Manifest {
+                    current: ManifestCurrent { session },
+                    document: &document,
+                    fields: selection_fields,
+                    page: selection_page,
+                    secret: &selection_secret.0,
                 };
                 aivm_secrets_garrett_core::selected_release::select(&mut selection)
             },
@@ -567,6 +553,7 @@ impl Session {
         let pending = request_adapter::Pending::new(work);
         read_transition::run_current(pending)
             .map(aivm_secrets_garrett_core::completion::Completed::into_value)
+            .map(|wire| json::Reply::Released(json::Captured::released(wire)))
     }
 
     pub(super) fn control(

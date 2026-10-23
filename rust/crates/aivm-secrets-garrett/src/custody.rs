@@ -1259,9 +1259,11 @@ impl ProviderSession {
         expected: Expectation,
         value: &Value,
         now: i64,
-    ) -> Outcome<Value> {
+    ) -> Outcome<json::Reply> {
         match &mut self.0 {
-            Backend::Account(s) => s.request(verifier, token, peer, expected, value, now),
+            Backend::Account(s) => s
+                .request(verifier, token, peer, expected, value, now)
+                .map(json::Reply::Native),
             Backend::Manifest(s) => s.request(verifier, token, peer, expected, value, now),
         }
     }
