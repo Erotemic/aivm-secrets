@@ -1,5 +1,6 @@
 import GarrettNR23ProductionBoundary
 import GarrettRequestContext
+import GarrettPublicError
 
 open Aeneas Aeneas.Std
 set_option maxHeartbeats 6000000
@@ -17,10 +18,13 @@ seen by every trace is the exact one passed to `ScopedRequest::new`. These
 theorems therefore drop `NativeContext` and the caller-chosen `capture`
 function; the remaining native premises are named below, unchanged.
 
+The denial frame is no longer a premise either: `GarrettPublicError` proves
+the extracted `public_error::denial_frame` emits one of 17 fixed JSON lines.
+
 Still assumed here: `ExactNativeSinkCoverage` (every native credential-bearing
-write is one ordered source send), the native completion-to-JSON conversion
-(`toCapturedJson` and its `Valid`/`Bound`), and the native denial-to-JSON
-conversion. No delivery, durability or TLS property is stated.
+write is one ordered source send) and the native completion-to-JSON conversion
+(`toCapturedJson` and its `Valid`/`Bound`). No delivery, durability or TLS
+property is stated.
 -/
 namespace aivm_secrets_garrett_core.production.Assurance
 
@@ -175,5 +179,48 @@ theorem production_denial_attempts_are_authorized_and_bound
     (request_context.Proofs.native_context_contract work factory routes)
     ⟨context, native, state⟩ pending out attempts created returned coverage
   simpa only [initial] using result
+
+/-- Production returned denial, end to end: attempt accounting against the
+    constructor context, and the guest frame is the fixed text for whichever
+    public error the bridge reports. Compared with
+    `nr23.ProductionBoundary.returned_denial_needs_separate_checked_public_frame`,
+    `NativeContext`, `capture`, `denialJson`, `valid`, `room` and `prepared`
+    are all gone. The bridge's `Error -> PublicError` mapping is not trusted:
+    the statement holds for every `PublicError`. -/
+theorem production_denial_has_authorized_attempts_and_fixed_guest_frame
+    {W F A E O X D V H C WriterState WriteError : Type}
+    (work : request_adapter.Work W A E O X D V H) (factory : CheckFactory F X C)
+    (routes : provider_io.RouteWork D H X)
+    (context : current_admission.Context) (native : W) (state : F)
+    (pending : request_adapter.Pending (ScopedRequest W F A E O X D V H C) A E O X
+      (current_admission.Bound (provider_io.Routed D H A X) C H A X) V H)
+    (error : X) (attempts : List NativeAttempt)
+    (created : request_adapter.Pending.new (scopedOps work factory routes)
+      ⟨context, native, state⟩ = Result.ok pending)
+    (returned : read_transition.run_current
+      (request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error
+        (scopedOps work factory routes)) pending = Result.ok (.Err error))
+    (coverage : ExactNativeSinkCoverage (scopedOps work factory routes)
+      (fun pending => pending.context) pending (.Err error) attempts)
+    (reported : public_error.PublicError) (limit : Usize)
+    (frame afterFrame : guest_frame.Frame) (writer nextWriter : WriterState)
+    (out : core.result.Result Unit WriteError)
+    (writerOps : guest_frame.Writer WriterState WriteError)
+    (built : public_error.denial_frame reported limit = Result.ok (.Ok frame))
+    (sent : guest_frame.Frame.send writerOps frame writer =
+      Result.ok (out, afterFrame, nextWriter)) :
+    (∀ attempt, attempt ∈ attempts →
+      attempt.gate.accepted ∧ attempt.auditAck = true ∧
+      gateBinding attempt.gate = (current_admission.Proofs.view context).binding) ∧
+    writerOps.write_frame writer (alloc.vec.Vec.deref frame.wire) = Result.ok (out, nextWriter) ∧
+    frame.wire.val = public_error.Proofs.ascii (public_error.Proofs.denialText reported) ++ [10#u8] ∧
+    afterFrame.attempted = true := by
+  obtain ⟨_, _, _, _, _, _, _, secured, _⟩ :=
+    production_denial_attempts_are_authorized_and_bound work factory routes context native
+      state pending (.Err error) attempts created returned coverage
+  obtain ⟨wrote, exact, attempted, _⟩ :=
+    public_error.Proofs.denial_frame_send_exact writerOps reported limit frame afterFrame writer
+      nextWriter out built sent
+  exact ⟨secured, wrote, exact, attempted⟩
 
 end aivm_secrets_garrett_core.production.Assurance

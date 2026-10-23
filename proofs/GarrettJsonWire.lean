@@ -42,6 +42,15 @@ def Valid : Nat → Value → Prop
   | n + 1, .Object fields => ∀ field ∈ fields.val, TextValid field.1 ∧ Valid n field.2
   | _ + 1, _ => True
 
+/-- `Valid` for a text value is scalar validity of every code point. -/
+theorem valid_text_iff (fuel : Nat) (text : alloc.vec.Vec U32) :
+    Valid (fuel + 1) (.Text text) ↔ json_string.Proofs.ValidFrom text 0 := Iff.rfl
+
+/-- `Valid` for an object: valid names and recursively valid values. -/
+theorem valid_object_iff (fuel : Nat) (fields : alloc.vec.Vec (alloc.vec.Vec U32 × Value)) :
+    Valid (fuel + 1) (.Object fields) ↔
+      ∀ field ∈ fields.val, json_string.Proofs.ValidFrom field.1 0 ∧ Valid fuel field.2 := Iff.rfl
+
 private theorem series_length_bound {α : Type} (bytes : α → List U8) (bound : α → Nat)
     (values : List α) (position : Nat) (each : ∀ value ∈ values, (bytes value).length ≤ bound value) :
     (Series bytes position values).length ≤ SeriesBound bound values := by
