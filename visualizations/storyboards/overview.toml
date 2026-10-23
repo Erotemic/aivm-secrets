@@ -180,3 +180,14 @@ claim = "Two provider worlds that agree, request by request, on the selected JSO
 narration = "Imagine two providers whose answers differ. If they agree on what the host selects, on the row count and on the status class, the guest sees exactly the same frames, even when it picks each request from what it saw before. The row count and the status class are deliberate leaks, now written down."
 sources = ["proofs/GarrettNR4ManifestRelease.lean", "proofs/GarrettNR4ExchangeAdaptive.lean", "proofs/GarrettNR4RequestAdaptive.lean"]
 proof_anchors = ["aivm_secrets_garrett_core.selected_release.Relational.manifest_release_noninterference", "aivm_secrets_garrett_core.provider_status.Proofs.manifest_classes", "aivm_secrets_garrett_core.selected_release.Admission.adaptive_request_noninterference"]
+
+[[scene]]
+id = "proof_proxy"
+file = "aivis/scenes/proof_proxy.py"
+class = "ProofProxyScene"
+plan = "aivis.plans.proof_proxy"
+status = "source-linked-controller"
+claim = "In the optional credential-substitution proxy, the extracted encoder drops every credential-bearing guest field and writes the secret exactly once, as the verified authentication line between a request-only prefix and suffix; refusals write nothing. The parser is tested, not proved, and the profile grants the credential's full authority at the origin."
+narration = "A guest tool sends any request through the proxy with a placeholder credential. The strict parser accepts a narrow subset or refuses. The extracted encoder drops fourteen field names, including Authorization, X-API-Key and Cookie, keeps the rest in order, and writes the secret once, as one verified line. A deny-listed request or a bad credential writes nothing. This is not confinement: the guest can still do whatever the credential can do at that origin."
+sources = ["proofs/GarrettProxyHttp.lean", "rust/crates/aivm-secrets-garrett-core/src/proxy_http.rs", "docs/planning/aivm-secrets-http-proxy-profiles.md"]
+proof_anchors = ["aivm_secrets_garrett_core.proxy_http.Proofs.encode_upstream_contract", "aivm_secrets_garrett_core.proxy_http.Proofs.forwarded_drops", "aivm_secrets_garrett_core.proxy_http.Proofs.dropped_eq"]
