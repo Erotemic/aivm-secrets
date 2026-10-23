@@ -421,6 +421,31 @@ def _probe_independent_identities(
             'tampered_capability_rejected': True}
 
 
+def _probe_reenrolled_certificate(ssh: GuestSSH, guest: str, host: Path, authority: Path,
+                                  provider: LocalProvider, count: int) -> dict:
+    """Re-enroll the original subject with a NEW VM-generated key while the
+    broker runs. The original certificate and capability must then be
+    refused without provider traffic. Run last: it retires the guest's
+    working identity (revocation follows)."""
+    ssh.required('exec ' + shlex.join([
+        f'{guest}/garrett-client', 'request', '--key-mode', 'software',
+        '--key', f'{guest}/renewed.key', '--csr', f'{guest}/renewed.csr',
+    ]), label='create replacement VM client key')
+    csr = ssh.required('cat ' + shlex.quote(f'{guest}/renewed.csr'),
+                       label='retrieve replacement public CSR')
+    fingerprint = inspect_csr(csr)
+    host_csr = write(host / 'renewed-guest.csr', csr)
+    authority_action(authority, host, 'enroll', subject='offline-guest',
+                     csr_file=str(host_csr), approve_fingerprint=fingerprint,
+                     replace=True)
+    _reject_without_provider_effect(
+        ssh, provider, count,
+        _guest_command(guest, 'gh', 'pr', 'view', str(PR), '--repo', REPOSITORY,
+                       '--json', 'number'),
+        label='certificate replaced by a live re-enrollment')
+    return {'reenrolled_certificate_rejected': True}
+
+
 def run_vm_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path,
                       *, adversarial: bool = False) -> dict:
     tools = binaries(bin_dir)
@@ -570,6 +595,8 @@ def run_vm_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path,
                     'no_provider_effect_with_forward_disconnected': True,
                     'authorized_read_after_reconnect': True,
                 }
+                attacks['identities'].update(_probe_reenrolled_certificate(
+                    ssh, guest, host, tools['authority'], provider, requests_after_reads))
             authority_action(tools['authority'], host, 'revoke', subject='offline-guest')
             revoked = ssh.call(_guest_command(
                 guest, 'gh', 'pr', 'view', str(PR), '--repo', REPOSITORY,

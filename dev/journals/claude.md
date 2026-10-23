@@ -656,3 +656,15 @@ chars and non-ASCII for both profiles. Deferred NATIVE-SINK-01 step 2 (opaque
 core credential type): it would retype the secret in dozens of extracted
 signatures/proofs while four native readers (envelope seal, OAuth marker,
 legacy account writer, inner-issue export) still need bytes; low payoff now.
+
+## 2026-10-23 16:55:11 -0400
+
+W8 identity negatives: found that the existing synthetic coverage
+(test_rust_identity_negative.py) exercises only the legacy registry_path bridge
+mode, while AIVM uses authority-root mode. Added authority-mode tests: live
+re-enrollment fences the old cert (invalid_capability, no provider call);
+an enrollment reaching not_after mid-run is refused at TLS (back-dated init +
+enroll, 12 s window); forget refuses active and revoked subjects (so
+"unregistered" is unreachable for a live identity in this mode). Added the
+re-enrollment probe as the last --adversarial VM step (portable test; not run
+on a VM). Uncertainty: the 12 s expiry window could flake on a very slow host.

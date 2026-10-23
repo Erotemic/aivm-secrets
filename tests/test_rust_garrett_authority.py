@@ -393,6 +393,75 @@ def test_native_authority_provider_action_and_live_revocation():
                 assert len(provider.requests) == calls
 
 
+def _refused_without_provider_call(case, provider):
+    """A refused request: the client fails or gets a public refusal, and the
+    synthetic provider sees nothing."""
+    calls = len(provider.requests)
+    try:
+        answer = case.invoke()
+    except subprocess.CalledProcessError as error:
+        assert TOKEN.encode() not in error.stdout + error.stderr
+        answer = None
+    assert answer is None or answer["ok"] is False, answer
+    assert len(provider.requests) == calls
+    return answer
+
+
+def test_reenrolled_certificate_is_fenced_live_in_authority_mode():
+    """W8 identity negative, authority-root profile (the one AIVM uses): the
+    operator re-enrolls the subject with a new key while the bridge runs. The
+    old certificate is refused with no provider call."""
+    with tempfile.TemporaryDirectory(prefix="agadmin-") as directory:
+        p = Path(directory)
+        authority = AuthorityCase(p)
+        with TLSService(provider_directory(p)) as provider:
+            provider.routes[("GET", "/v1/account")] = dict(id=42, active=True)
+            with AuthorityProviderCase(p, provider, authority) as case:
+                assert case.invoke()["ok"]
+                authority.enroll(replace=True)
+                answer = _refused_without_provider_call(case, provider)
+                assert answer["error"]["code"] == "invalid_capability"
+
+
+def test_enrollment_that_expires_while_the_bridge_runs_is_refused():
+    """W8 identity negative, authority-root profile: an enrollment reaches its
+    ``not_after`` while the bridge is live. The authority is initialized
+    with a back-dated clock so the enrollment expires seconds into the run;
+    before then the same client succeeds, so the refusal is the expiry."""
+    with tempfile.TemporaryDirectory(prefix="agadmin-") as directory:
+        p = Path(directory)
+        authority = AuthorityCase(p, initialize=False)
+        then = int(time.time()) - 604800 + 12
+        authority.call("init", issuer="aivm.test", audience="aivm-secrets.remote", now=then)
+        key, _, enrollment = authority.enroll(now=then)
+        assert enrollment["not_after"] == then + 604800
+        certs = authority.certs(key=key, enrollment=enrollment)
+        with TLSService(provider_directory(p)) as provider:
+            provider.routes[("GET", "/v1/account")] = dict(id=42, active=True)
+            with AuthorityProviderCase(p, provider, authority, certs=certs) as case:
+                assert case.invoke()["ok"]
+                time.sleep(max(0.0, enrollment["not_after"] - time.time()) + 1.5)
+                _refused_without_provider_call(case, provider)
+
+
+def test_forget_never_unregisters_a_live_identity():
+    """W8 identity negative, authority-root profile: an unregistered-subject
+    state cannot be reached for an active or merely revoked identity, because
+    ``forget`` refuses both; the live identity stays usable (or revoked)."""
+    with tempfile.TemporaryDirectory(prefix="agadmin-") as directory:
+        p = Path(directory)
+        authority = AuthorityCase(p)
+        with TLSService(provider_directory(p)) as provider:
+            provider.routes[("GET", "/v1/account")] = dict(id=42, active=True)
+            with AuthorityProviderCase(p, provider, authority) as case:
+                assert case.invoke()["ok"]
+                authority.call("forget", subject="vm-test", error="denied")
+                assert case.invoke()["ok"]
+                authority.call("revoke", subject="vm-test")
+                authority.call("forget", subject="vm-test", error="denied")
+                _refused_without_provider_call(case, provider)
+
+
 def test_live_issuer_retirement_and_ca_cutover_fence_old_bridge():
     with tempfile.TemporaryDirectory(prefix="agadmin-") as directory:
         p = Path(directory)

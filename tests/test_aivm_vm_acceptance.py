@@ -321,6 +321,34 @@ def test_independent_identity_probe_uses_separate_guest_key_and_subject(tmp_path
     assert provider.seen() == []
 
 
+def test_reenrolled_certificate_probe_replaces_the_subject_with_a_new_guest_key(tmp_path, monkeypatch):
+    import dev.aivm_vm_acceptance as target
+    host = tmp_path / 'host'
+    host.mkdir()
+    ssh = GuestSSH('aivm-2404', tmp_path / 'ssh.conf')
+    scripts, actions, calls = [], [], []
+
+    def fake_required(script, *, label, **kwargs):
+        scripts.append(script)
+        return b'PUBLIC-CSR' if script.startswith('cat ') else b''
+
+    monkeypatch.setattr(ssh, 'required', fake_required)
+    monkeypatch.setattr(ssh, 'call', lambda script: calls.append(script) or
+                        subprocess.CompletedProcess([], 1, b'', b''))
+    monkeypatch.setattr(target, 'inspect_csr', lambda pem: 'fingerprint')
+    monkeypatch.setattr(target, 'authority_action',
+                        lambda binary, host_path, action, **kwargs: actions.append((action, kwargs)) or {})
+    provider = _Provider()
+    result = target._probe_reenrolled_certificate(ssh, '/guest', host, Path('/host/authority'), provider, 0)
+    assert result == {'reenrolled_certificate_rejected': True}
+    assert any('renewed.key' in cmd and 'renewed.csr' in cmd for cmd in scripts)
+    assert actions == [('enroll', {'subject': 'offline-guest', 'csr_file': str(host / 'renewed-guest.csr'),
+                                   'approve_fingerprint': 'fingerprint', 'replace': True})]
+    # The refused read uses the ORIGINAL guest identity (default client config).
+    assert len(calls) == 1 and 'client.json' in calls[0] and 'renewed' not in calls[0]
+    assert provider.seen() == []
+
+
 def test_network_canary_reports_denial_and_raises_on_reachability(tmp_path, monkeypatch):
     import dev.aivm_vm_acceptance as target
     ssh = GuestSSH('aivm-2404', tmp_path / 'ssh.conf')

@@ -178,6 +178,18 @@ probe tooling causes a failed acceptance, not a silently skipped check.
    an unregistered subject, an enrollment past `not_after`, a re-enrolled
    certificate and an expired capability are refused with no provider call,
    and restoring the registry restores service. That is not a real-VM run.
+   Those synthetic tests use the legacy `registry_path` bridge mode. For the
+   authority-root mode this VM run uses, `tests/test_rust_garrett_authority.py`
+   (2026-10-23) shows that a live re-enrollment with a new key fences the old
+   certificate (`invalid_capability`, no provider call), that an enrollment
+   reaching `not_after` while the bridge runs is refused at TLS with no
+   provider call, and that `forget` refuses active and merely revoked
+   subjects, so a live identity cannot become "unregistered" in that mode.
+6. **(Added 2026-10-23, not yet run on a VM.)** Last, generate a third key in
+   the VM and re-enroll the original subject with it (`replace`). The original
+   certificate and capability must be refused without provider traffic
+   (`adversarial.identities.reenrolled_certificate_rejected`). Revocation
+   follows as before.
 5. Terminate the SSH Unix-socket forward while the original capability is
    still active. The disconnected guest must get no data and cause no
    provider request. Reestablish the forward *only* to the same host-owned
