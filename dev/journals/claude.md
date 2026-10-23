@@ -706,3 +706,10 @@ Remaining session records moved: `opened_record`, `issued_record`,
 `account_dispatch_record` (+ `authentication_name`), each with an exact
 theorem and a byte oracle. Every audit record both sessions write is now
 core-built; the approval extension's three host-control records remain native.
+
+## 2026-10-23 18:26:38 -0400
+
+Approval extension records (`approval_requested`, `approved`, host
+`revoked`) also core-built (`approval_requested_record_exact`,
+`approved_record_exact`, `event_record`); `Audit::write_record` is now
+`#[cfg(test)]`, so no production audit record is assembled natively.

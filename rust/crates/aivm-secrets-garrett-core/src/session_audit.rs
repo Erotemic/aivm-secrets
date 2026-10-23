@@ -142,3 +142,36 @@ pub fn account_dispatch_record(
         (text_units(b"schema"), Value::Number(b"1".to_vec())),
     ])
 }
+
+/// `{"approval":{"digest":D},"event":"approval_requested","grant":G,
+/// "operation":O,"policy":P,"schema":1}`: a write waits for host approval.
+pub fn approval_requested_record(
+    digest: Value,
+    grant: Value,
+    operation: Value,
+    policy: Value,
+) -> Value {
+    Value::Object(vec![
+        (
+            text_units(b"approval"),
+            Value::Object(vec![(text_units(b"digest"), digest)]),
+        ),
+        (text_units(b"event"), text(b"approval_requested")),
+        (text_units(b"grant"), grant),
+        (text_units(b"operation"), operation),
+        (text_units(b"policy"), policy),
+        (text_units(b"schema"), Value::Number(b"1".to_vec())),
+    ])
+}
+
+/// `{"digest":D,"event":"approved","grant":G,"policy":P,"schema":1}`: the
+/// host approved the request with this digest.
+pub fn approved_record(digest: Value, grant: Value, policy: Value) -> Value {
+    Value::Object(vec![
+        (text_units(b"digest"), digest),
+        (text_units(b"event"), text(b"approved")),
+        (text_units(b"grant"), grant),
+        (text_units(b"policy"), policy),
+        (text_units(b"schema"), Value::Number(b"1".to_vec())),
+    ])
+}

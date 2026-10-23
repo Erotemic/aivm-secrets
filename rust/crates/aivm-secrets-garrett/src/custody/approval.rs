@@ -2,6 +2,7 @@
 //! capability enters this object; the guest reaches only `admit`/`remember`.
 use super::*;
 use aivm_secrets_garrett_core::approval::{self as core, Approval, Decision, Mode};
+use aivm_secrets_garrett_core::session_audit as core_audit;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 pub(super) struct Metadata {
@@ -72,10 +73,12 @@ impl Shared {
         let mut state = self.state.lock().map_err(|_| Error::InternalError)?;
         let now = host_time()?;
         self.require_active(now)?;
-        self.record(
-            &json!({"schema":1,"event":"approval_requested","operation":request["operation"],
-            "grant":self.audit.grant,"policy":self.audit.policy,"approval":{"digest":wanted}}),
-        )?;
+        self.record(&core_audit::approval_requested_record(
+            wire_text(wanted),
+            wire_text(&self.audit.grant),
+            crate::json::capture(&request["operation"]).into_wire(),
+            wire_text(&self.audit.policy),
+        ))?;
         state.pending.retain(|p| p["digest"] != wanted);
         if state.pending.len() >= 16 {
             state.pending.remove(0);
@@ -86,9 +89,10 @@ impl Shared {
             "operation":request["operation"],"arguments":request["arguments"],"requested_at":now}));
         Ok(())
     }
-    fn record(&self, value: &Value) -> Outcome<()> {
+    /// Append an extracted record; a failed append revokes (fail closed).
+    fn record(&self, value: &aivm_secrets_garrett_core::json_wire::Value) -> Outcome<()> {
         self.audit
-            .write_record(value)
+            .append_value(value)
             .inspect_err(|_| self.revoke())
     }
     fn pending_digest(state: &State, value: &Value) -> Outcome<String> {
@@ -142,8 +146,11 @@ impl Shared {
                     // ones; a full store or failed audit leaves it unchanged.
                     let store =
                         core::install(&state.approvals, slot, now).ok_or(Error::Exhausted)?;
-                    self.record(&json!({"schema":1,"event":"approved","digest":digest,
-                        "grant":self.audit.grant,"policy":self.audit.policy}))?;
+                    self.record(&core_audit::approved_record(
+                        wire_text(&digest),
+                        wire_text(&self.audit.grant),
+                        wire_text(&self.audit.policy),
+                    ))?;
                     state.approvals = store;
                 }
                 state.pending.retain(|p| p["digest"] != digest);
@@ -161,7 +168,13 @@ impl Shared {
                 // Authority changes before any audit wait and independently
                 // of the provider mutex. Late dispatch/release reads this flag.
                 self.revoke();
-                self.record(&json!({"schema":1,"event":"revoked","grant":self.audit.grant,"policy":self.audit.policy}))?;
+                self.record(&core_audit::event_record(
+                    wire_text("revoked"),
+                    wire_text(&self.audit.grant),
+                    wire_text(&self.audit.policy),
+                    None,
+                    None,
+                ))?;
                 Ok(json!({"version":1,"ok":true}))
             }
             _ => Err(Error::InvalidRequest),
@@ -214,6 +227,56 @@ mod store_oracle {
 
     fn old_view(map: &BTreeMap<String, Approval>) -> BTreeMap<String, i64> {
         map.iter().map(|(k, s)| (k.clone(), s.expires_at)).collect()
+    }
+
+    #[test]
+    fn extracted_approval_records_match_the_serde_records() {
+        use super::super::wire_text;
+        use aivm_secrets_garrett_core::session_audit as audit;
+        use serde_json::json;
+        let bytes = |value: &aivm_secrets_garrett_core::json_wire::Value| {
+            aivm_secrets_garrett_core::json_wire::encode(value)
+                .ok()
+                .expect("encodable record")
+        };
+        for text in ["g", "", "quote\"\\", "é😀"] {
+            for operation in [json!("pull.comment"), json!(null), json!({"x":[1,"y"]})] {
+                assert_eq!(
+                    bytes(&audit::approval_requested_record(
+                        wire_text(text),
+                        wire_text("g1"),
+                        crate::json::capture(&operation).into_wire(),
+                        wire_text(text)
+                    )),
+                    crate::json::canonical(
+                        &json!({"schema":1,"event":"approval_requested","operation":operation,
+                        "grant":"g1","policy":text,"approval":{"digest":text}})
+                    )
+                );
+            }
+            assert_eq!(
+                bytes(&audit::approved_record(
+                    wire_text(text),
+                    wire_text("g1"),
+                    wire_text(text)
+                )),
+                crate::json::canonical(
+                    &json!({"schema":1,"event":"approved","digest":text,"grant":"g1","policy":text})
+                )
+            );
+            assert_eq!(
+                bytes(&audit::event_record(
+                    wire_text("revoked"),
+                    wire_text(text),
+                    wire_text("p"),
+                    None,
+                    None
+                )),
+                crate::json::canonical(
+                    &json!({"schema":1,"event":"revoked","grant":text,"policy":"p"})
+                )
+            );
+        }
     }
 
     #[test]

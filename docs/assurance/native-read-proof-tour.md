@@ -594,9 +594,11 @@ extracted `append_durable_record`
 
 | `opened_record_exact`, `issued_record_exact`, `account_dispatch_record_exact` | The manifest `session_open` record, the capability `issued` record and the account profile's dispatch record have the same kind of exact statement. In the account dispatch record the method is the fixed `GET`, and the authentication name (`bearer` or `x-api-key`) is decided by the scheme (`AuthenticationName`). |
 
-With these, every audit record the two sessions write is built by extracted
-code; only the approval extension's records (`approval_requested`,
-`approved`, `revoked` on the host control socket) are still native `json!`.
+| `approval_requested_record_exact`, `approved_record_exact` | The approval extension's records (a write waiting for approval, a host approval); its host `revoke` record is `event_record`. |
+
+With these, every production audit record (account and manifest sessions and
+the approval extension) is built by extracted code. Native `json!` audit
+records remain only in tests.
 Oracle tests check the encoded bytes against the serde records they replaced
 (including nested, escaped identity claims). **Still native:** the values the
 sessions pass in (the identity claims are captured from the session's claims

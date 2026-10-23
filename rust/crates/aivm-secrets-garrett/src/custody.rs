@@ -259,6 +259,9 @@ impl Audit {
             .map_err(|_| Error::InternalError)?;
         self.append_bytes(&bytes)
     }
+    // Production records are built by `session_audit`; tests still write
+    // arbitrary serde records through the same durable append.
+    #[cfg(test)]
     fn write_record(&self, value: &Value) -> Outcome<()> {
         self.append_bytes(&json::canonical(value))
     }

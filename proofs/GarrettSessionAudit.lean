@@ -345,4 +345,81 @@ theorem account_dispatch_record_exact
     by simpa [Key] using text_units_ok h18, by simpa [Key] using text_units_ok h19,
     one_vec rfl h20⟩
 
+/-- **A write waiting for approval.**
+    `{"approval":{"digest":D},"event":"approval_requested","grant":G,
+    "operation":O,"policy":P,"schema":1}`. -/
+theorem approval_requested_record_exact {digest grant operation policy v : json_wire.Value}
+    (h : approval_requested_record digest grant operation policy = Result.ok v) :
+    ∃ (top approval : alloc.vec.Vec (alloc.vec.Vec U32 × json_wire.Value))
+      (kapproval kdigest kevent kgrant koperation kpolicy kschema : alloc.vec.Vec U32)
+      (event : json_wire.Value) (one : alloc.vec.Vec U8),
+      v = .Object top ∧
+      top.val = [(kapproval, .Object approval), (kevent, event), (kgrant, grant),
+        (koperation, operation), (kpolicy, policy), (kschema, .Number one)] ∧
+      approval.val = [(kdigest, digest)] ∧
+      control.Proofs.IsText event [97#u8, 112#u8, 112#u8, 114#u8, 111#u8, 118#u8, 97#u8, 108#u8, 95#u8,
+        114#u8, 101#u8, 113#u8, 117#u8, 101#u8, 115#u8, 116#u8, 101#u8, 100#u8] ∧
+      Key kapproval [97#u8, 112#u8, 112#u8, 114#u8, 111#u8, 118#u8, 97#u8, 108#u8] ∧
+      Key kdigest [100#u8, 105#u8, 103#u8, 101#u8, 115#u8, 116#u8] ∧
+      Key kevent [101#u8, 118#u8, 101#u8, 110#u8, 116#u8] ∧
+      Key kgrant [103#u8, 114#u8, 97#u8, 110#u8, 116#u8] ∧
+      Key koperation OperationKey ∧
+      Key kpolicy [112#u8, 111#u8, 108#u8, 105#u8, 99#u8, 121#u8] ∧
+      Key kschema [115#u8, 99#u8, 104#u8, 101#u8, 109#u8, 97#u8] ∧
+      one.val = [49#u8] := by
+  unfold approval_requested_record at h
+  simp only [lift, Array.to_slice, Array.make, bind_ok] at h
+  obtain ⟨kapproval, h1, h⟩ := bind_ok_inv h
+  obtain ⟨kdigest, h2, h⟩ := bind_ok_inv h
+  obtain ⟨kevent, h3, h⟩ := bind_ok_inv h
+  obtain ⟨event, h4, h⟩ := bind_ok_inv h
+  obtain ⟨kgrant, h5, h⟩ := bind_ok_inv h
+  obtain ⟨koperation, h6, h⟩ := bind_ok_inv h
+  obtain ⟨kpolicy, h7, h⟩ := bind_ok_inv h
+  obtain ⟨kschema, h8, h⟩ := bind_ok_inv h
+  obtain ⟨one, h9, h⟩ := bind_ok_inv h
+  simp only [Result.ok.injEq] at h
+  subst h
+  obtain ⟨eu, he, heu⟩ := control.Proofs.text_ok h4
+  exact ⟨_, _, kapproval, kdigest, kevent, kgrant, koperation, kpolicy, kschema, event, one,
+    rfl, rfl, rfl, ⟨eu, he, by simpa using heu⟩,
+    by simpa [Key] using text_units_ok h1, by simpa [Key] using text_units_ok h2,
+    by simpa [Key] using text_units_ok h3, by simpa [Key] using text_units_ok h5,
+    by simpa [Key, OperationKey] using text_units_ok h6, by simpa [Key] using text_units_ok h7,
+    by simpa [Key] using text_units_ok h8, one_vec rfl h9⟩
+
+/-- **A host approval.**
+    `{"digest":D,"event":"approved","grant":G,"policy":P,"schema":1}`. -/
+theorem approved_record_exact {digest grant policy v : json_wire.Value}
+    (h : approved_record digest grant policy = Result.ok v) :
+    ∃ (top : alloc.vec.Vec (alloc.vec.Vec U32 × json_wire.Value))
+      (kdigest kevent kgrant kpolicy kschema : alloc.vec.Vec U32) (event : json_wire.Value)
+      (one : alloc.vec.Vec U8),
+      v = .Object top ∧
+      top.val = [(kdigest, digest), (kevent, event), (kgrant, grant), (kpolicy, policy),
+        (kschema, .Number one)] ∧
+      control.Proofs.IsText event [97#u8, 112#u8, 112#u8, 114#u8, 111#u8, 118#u8, 101#u8, 100#u8] ∧
+      Key kdigest [100#u8, 105#u8, 103#u8, 101#u8, 115#u8, 116#u8] ∧
+      Key kevent [101#u8, 118#u8, 101#u8, 110#u8, 116#u8] ∧
+      Key kgrant [103#u8, 114#u8, 97#u8, 110#u8, 116#u8] ∧
+      Key kpolicy [112#u8, 111#u8, 108#u8, 105#u8, 99#u8, 121#u8] ∧
+      Key kschema [115#u8, 99#u8, 104#u8, 101#u8, 109#u8, 97#u8] ∧
+      one.val = [49#u8] := by
+  unfold approved_record at h
+  simp only [lift, Array.to_slice, Array.make, bind_ok] at h
+  obtain ⟨kdigest, h1, h⟩ := bind_ok_inv h
+  obtain ⟨kevent, h2, h⟩ := bind_ok_inv h
+  obtain ⟨event, h3, h⟩ := bind_ok_inv h
+  obtain ⟨kgrant, h4, h⟩ := bind_ok_inv h
+  obtain ⟨kpolicy, h5, h⟩ := bind_ok_inv h
+  obtain ⟨kschema, h6, h⟩ := bind_ok_inv h
+  obtain ⟨one, h7, h⟩ := bind_ok_inv h
+  simp only [Result.ok.injEq] at h
+  subst h
+  obtain ⟨eu, he, heu⟩ := control.Proofs.text_ok h3
+  exact ⟨_, kdigest, kevent, kgrant, kpolicy, kschema, event, one, rfl, rfl, ⟨eu, he, by simpa using heu⟩,
+    by simpa [Key] using text_units_ok h1, by simpa [Key] using text_units_ok h2,
+    by simpa [Key] using text_units_ok h4, by simpa [Key] using text_units_ok h5,
+    by simpa [Key] using text_units_ok h6, one_vec rfl h7⟩
+
 end aivm_secrets_garrett_core.session_audit.Proofs
