@@ -60,8 +60,11 @@ host-held credential for configured origins behind an ordinary `HTTPS_PROXY`
 [claim matrix](docs/assurance/proxy-claim-evidence-matrix.md)). The
 `credential-substitution` profile keeps the credential out of the guest. It
 does **not** confine what the guest may do with it at the origin, so use it
-only for narrowly scoped credentials. Named operations remain the default and
-strictest interface.
+only for narrowly scoped credentials. The `constrained-http` profile holds no
+credential: it can run inside the guest (`native-session` with
+`constrained_proxy`) and turns an ordinary HTTPS request into the one named
+operation it equals, which the host bridge then authorizes as usual. Named
+operations remain the default and strictest interface.
 
 The [extraction record](docs/extraction.md) explains the preserved authorship,
 source commit, commit map, independent checks, and remaining integration work.
