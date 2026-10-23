@@ -350,7 +350,7 @@ impl PrivateDirectory {
 
 /// CA bundles may be public, but their held path and inode must be controlled
 /// by root or the current principal. Environment-selected trust is never used.
-pub(crate) fn read_trusted_public(path: &Path, limit: usize) -> Outcome<Vec<u8>> {
+pub fn read_trusted_public(path: &Path, limit: usize) -> Outcome<Vec<u8>> {
     let directory = PrivateDirectory::trusted_directory(path.parent().ok_or(Error::UnsafeFile)?)?;
     let name = path
         .file_name()

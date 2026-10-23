@@ -22,6 +22,7 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_TESTS = [
     'tests/test_rust_http_response.py',
+    'tests/test_rust_proxy.py',
     'tests/test_rust_w6_pending.py',
     'tests/test_rust_approval.py::test_existing_python_operator_cli_controls_native_approval',
     'tests/test_rust_approval.py::test_native_exact_write_approval_is_bound_and_one_shot',

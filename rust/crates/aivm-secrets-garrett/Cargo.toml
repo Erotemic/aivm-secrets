@@ -33,6 +33,10 @@ name = "garrett-bridge"
 path = "src/bridge_main.rs"
 
 [[bin]]
+name = "garrett-proxy"
+path = "src/proxy_main.rs"
+
+[[bin]]
 name = "garrett-client"
 path = "src/client_main.rs"
 

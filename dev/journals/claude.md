@@ -198,3 +198,20 @@ Remaining for OUT-6: a native proxy server (rustls plus rcgen) wiring the core,
 HP-3 AIVM wiring, HP-6 constrained-http proof. Confidence: high for the stated
 theorems; they cover the extracted functions, not the Python server or a
 native server that does not exist yet.
+
+## 2026-10-23 03:39:36 -0400
+
+Native `garrett-proxy` (HP-4 server). It has the same policy and process
+contract as `aivm-secrets proxy` and is a thin I/O shell (sockets, rustls,
+rcgen name-constrained session CA, audit, stdin lease). Every decision calls
+the extracted core. All 27 native tests passed on the first run: stock curl,
+re-encoding, keep-alive, ambiguous requests, deny list, tunnel auth,
+reflection (raw, base64, hex), compression, redirects, oversize, expiry,
+unreachable, lease end and bad policy. Added to the gate's required no-skip
+workflow tests.
+
+Review fix before commit: the first draft fell back to an unchecked
+`std::fs::read` for the upstream CA file. It now uses
+`files::read_trusted_public` (made pub). The scope is stated explicitly:
+NATIVE-SINK-01 covers the bridge; the proxy binary is PROXY-NATIVE-01, pinned
+by a write-shape test.

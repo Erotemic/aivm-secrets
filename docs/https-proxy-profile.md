@@ -84,7 +84,6 @@ the guest sends. A `deny` path ending in `/` covers everything below it.
   it, and AIVM's default firewall allows other public egress
   (`PROXY-EGRESS-01`). The credential still cannot leave by another path.
 - No HTTP/2, streaming, `Expect`, trailers or compressed responses yet.
-- Not yet ported to Rust or proved (HP-4, HP-5).
 
 ## `constrained-http`
 
@@ -120,3 +119,17 @@ yet. Tests: `tests/test_proxy_constrained.py`.
 The response is the operation's disclosure, not the full provider response.
 Stock tools that need fields the policy does not release will fail rather
 than receive them (HP-3 tests compatibility).
+
+## Native `garrett-proxy`
+
+The same profile, with the same policy file and process contract, runs as
+the native binary `garrett-proxy --policy P --credential-file F --audit A
+[--port N]`. It is a thin I/O shell (sockets, rustls, rcgen session CA,
+audit, stdin lease). Every parse, encode, filter, reflection and re-framing
+decision is a call into the Aeneas-extracted `proxy_http` core. Two
+theorems apply to it: the credential appears upstream only as the single
+verified authentication line (`encode_upstream_contract`), and a released
+response never contains the raw credential (`guest_response_contract`).
+What the shell itself writes is pinned by a source-shape test, not proved
+(`PROXY-NATIVE-01`). Tests: `tests/test_rust_proxy.py`. The constrained-http
+profile is Python only for now.

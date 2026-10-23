@@ -932,6 +932,7 @@ RUNNERS = {
     "AIVM_SECRETS_RUST_GARRETT_RUNNER": "garrett-conformance",
     "AIVM_SECRETS_RUST_GARRETT_BRIDGE": "garrett-bridge",
     "AIVM_SECRETS_RUST_GARRETT_CLIENT": "garrett-client",
+    "AIVM_SECRETS_RUST_GARRETT_PROXY": "garrett-proxy",
     "AIVM_SECRETS_RUST_IDENTITY_RUNNER": "identity-conformance",
     "AIVM_SECRETS_RUST_REGISTRY_RUNNER": "registry-conformance",
     "AIVM_SECRETS_RUST_AUTHORITY_RUNNER": "authority-conformance",

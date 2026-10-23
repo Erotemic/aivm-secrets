@@ -1,0 +1,589 @@
+//! `garrett-proxy`: the native credential-substitution HTTPS proxy (HP-4).
+//!
+//! A thin I/O shell around the Aeneas-extracted `proxy_http` core. Every
+//! request is parsed by `parse_request`, encoded upstream by
+//! `encode_upstream` (proved: the credential appears only as one verified
+//! authentication line, no guest CR/LF), and every response is parsed by
+//! `parse_response` and released by `guest_response` (proved: released bytes
+//! never contain the raw credential). This file only moves bytes: sockets,
+//! TLS, the session CA, the audit and the process contract, which matches
+//! `aivm-secrets proxy` (one announcement line; stdin EOF ends the session).
+//! The profile makes no authority-confinement claim (PROXY-AUTHORITY-01).
+use aivm_secrets_garrett::files;
+use aivm_secrets_garrett_core::credential_use::Authentication;
+use aivm_secrets_garrett_core::proxy_http as core;
+use base64::Engine;
+use rcgen::{
+    BasicConstraints, CertificateParams, DistinguishedName, DnType, ExtendedKeyUsagePurpose,
+    GeneralSubtree, IsCa, Issuer, KeyPair, KeyUsagePurpose, NameConstraints, PKCS_ECDSA_P256_SHA256,
+};
+use ring::rand::{SecureRandom, SystemRandom};
+use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer, ServerName};
+use rustls::{ClientConfig, ClientConnection, RootCertStore, ServerConfig, ServerConnection, StreamOwned};
+use serde_json::{json, Value};
+use std::collections::BTreeMap;
+use std::io::{self, Read, Write};
+use std::net::{Shutdown, TcpListener, TcpStream, ToSocketAddrs};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+const IO_TIMEOUT: Duration = Duration::from_secs(15);
+const TOTAL_DEADLINE: Duration = Duration::from_secs(45);
+const MAX_POLICY: usize = 65536;
+const MAX_CA: usize = 1 << 20;
+
+struct Origin {
+    host: String,
+    address: String,
+    port: u16,
+    authentication: Authentication,
+    upstream: Arc<ClientConfig>,
+    guest: Arc<ServerConfig>,
+}
+
+struct Session {
+    origins: BTreeMap<String, Origin>,
+    rules: Vec<core::DenyRule>,
+    request_limit: usize,
+    response_limit: usize,
+    secret: Vec<u8>,
+    forms: Vec<core::Form>,
+    token: Vec<u8>,
+    expires: Instant,
+    revoked: AtomicBool,
+    audit: Mutex<std::fs::File>,
+}
+
+fn fail(code: &str) -> String {
+    code.to_owned()
+}
+
+fn exact_keys(value: &Value, required: &[&str], optional: &[&str]) -> Result<(), String> {
+    let object = value.as_object().ok_or_else(|| fail("invalid_policy"))?;
+    for key in required {
+        if !object.contains_key(*key) {
+            return Err(fail("invalid_policy"));
+        }
+    }
+    if object.keys().any(|k| !required.contains(&k.as_str()) && !optional.contains(&k.as_str())) {
+        return Err(fail("invalid_policy"));
+    }
+    Ok(())
+}
+
+fn text<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
+    value[key].as_str().ok_or_else(|| fail("invalid_policy"))
+}
+
+fn number(value: &Value, key: &str, low: u64, high: u64) -> Result<u64, String> {
+    match value[key].as_u64() {
+        Some(n) if (low..=high).contains(&n) => Ok(n),
+        _ => Err(fail("invalid_policy")),
+    }
+}
+
+fn valid_host(host: &str) -> bool {
+    let labels: Vec<&str> = host.split('.').collect();
+    labels.len() >= 2
+        && labels.iter().all(|l| {
+            !l.is_empty()
+                && l.len() <= 63
+                && l.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+                && !l.starts_with('-')
+                && !l.ends_with('-')
+        })
+}
+
+/// The session CA (key held in memory only), name-constrained to the origins.
+fn session_ca(hosts: &[String], lifetime: u64) -> Result<(String, Issuer<'static, KeyPair>), String> {
+    let key = KeyPair::generate_for(&PKCS_ECDSA_P256_SHA256).map_err(|_| fail("proxy_failed"))?;
+    let mut params = CertificateParams::default();
+    params.distinguished_name = DistinguishedName::new();
+    params.distinguished_name.push(DnType::CommonName, "aivm-secrets proxy session CA");
+    params.is_ca = IsCa::Ca(BasicConstraints::Constrained(0));
+    params.key_usages = vec![KeyUsagePurpose::KeyCertSign];
+    params.name_constraints = Some(NameConstraints {
+        permitted_subtrees: hosts.iter().map(|h| GeneralSubtree::DnsName(h.clone())).collect(),
+        excluded_subtrees: Vec::new(),
+    });
+    let now = time::OffsetDateTime::now_utc();
+    params.not_before = now - time::Duration::minutes(1);
+    params.not_after = now + time::Duration::seconds(lifetime as i64 + 60);
+    let certificate = params.self_signed(&key).map_err(|_| fail("proxy_failed"))?;
+    Ok((certificate.pem(), Issuer::new(params, key)))
+}
+
+fn leaf_config(host: &str, issuer: &Issuer<'static, KeyPair>, lifetime: u64) -> Result<Arc<ServerConfig>, String> {
+    let key = KeyPair::generate_for(&PKCS_ECDSA_P256_SHA256).map_err(|_| fail("proxy_failed"))?;
+    let mut params =
+        CertificateParams::new(vec![host.to_owned()]).map_err(|_| fail("proxy_failed"))?;
+    params.distinguished_name = DistinguishedName::new();
+    params.distinguished_name.push(DnType::CommonName, host);
+    params.extended_key_usages = vec![ExtendedKeyUsagePurpose::ServerAuth];
+    params.use_authority_key_identifier_extension = true;
+    let now = time::OffsetDateTime::now_utc();
+    params.not_before = now - time::Duration::minutes(1);
+    params.not_after = now + time::Duration::seconds(lifetime as i64 + 60);
+    let certificate = params.signed_by(&key, issuer).map_err(|_| fail("proxy_failed"))?;
+    let chain = vec![CertificateDer::from(certificate.der().to_vec())];
+    let private = PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(key.serialize_der()));
+    let mut config = ServerConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
+        .with_protocol_versions(&[&rustls::version::TLS13, &rustls::version::TLS12])
+        .map_err(|_| fail("proxy_failed"))?
+        .with_no_client_auth()
+        .with_single_cert(chain, private)
+        .map_err(|_| fail("proxy_failed"))?;
+    config.alpn_protocols = vec![b"http/1.1".to_vec()];
+    Ok(Arc::new(config))
+}
+
+fn upstream_config(ca_file: &Path) -> Result<Arc<ClientConfig>, String> {
+    // A trust anchor may be public but must be held by root or this user.
+    let pem = files::read_trusted_public(ca_file, MAX_CA).map_err(|_| fail("invalid_policy"))?;
+    let mut roots = RootCertStore::empty();
+    for cert in rustls_pemfile::certs(&mut &*pem) {
+        roots.add(cert.map_err(|_| fail("invalid_policy"))?).map_err(|_| fail("invalid_policy"))?;
+    }
+    if roots.is_empty() {
+        return Err(fail("invalid_policy"));
+    }
+    let mut config = ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
+        .with_protocol_versions(&[&rustls::version::TLS13, &rustls::version::TLS12])
+        .map_err(|_| fail("invalid_policy"))?
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    config.alpn_protocols = vec![b"http/1.1".to_vec()];
+    config.resumption = rustls::client::Resumption::disabled();
+    Ok(Arc::new(config))
+}
+
+fn load(policy_path: &Path, credential_path: &Path, audit_path: &Path) -> Result<(Session, String), String> {
+    let raw = files::read_private(policy_path, MAX_POLICY).map_err(|_| fail("invalid_policy"))?;
+    let policy: Value = serde_json::from_slice(&raw).map_err(|_| fail("invalid_policy"))?;
+    exact_keys(&policy, &["schema", "profile", "origins", "lifetime_seconds"], &["deny", "limits"])?;
+    if policy["schema"].as_u64() != Some(1) || policy["profile"].as_str() != Some("credential-substitution") {
+        return Err(fail("invalid_policy"));
+    }
+    let lifetime = number(&policy, "lifetime_seconds", 1, 86400)?;
+    let origins_value = policy["origins"].as_array().ok_or_else(|| fail("invalid_policy"))?;
+    if origins_value.is_empty() || origins_value.len() > 16 {
+        return Err(fail("invalid_policy"));
+    }
+    let mut hosts = Vec::new();
+    for row in origins_value {
+        exact_keys(row, &["host", "address", "port", "ca_file", "authentication"], &[])?;
+        let host = text(row, "host")?;
+        if !valid_host(host) || hosts.iter().any(|h: &String| h == host) {
+            return Err(fail("invalid_policy"));
+        }
+        hosts.push(host.to_owned());
+    }
+    let (ca_pem, issuer) = session_ca(&hosts, lifetime)?;
+    let mut origins = BTreeMap::new();
+    for row in origins_value {
+        let host = text(row, "host")?.to_owned();
+        let authentication = match text(row, "authentication")? {
+            "bearer" => Authentication::Bearer,
+            "x-api-key" => Authentication::ApiKey,
+            _ => return Err(fail("invalid_policy")),
+        };
+        let address = text(row, "address")?.to_owned();
+        if address.is_empty() {
+            return Err(fail("invalid_policy"));
+        }
+        let origin = Origin {
+            port: number(row, "port", 1, 65535)? as u16,
+            upstream: upstream_config(Path::new(text(row, "ca_file")?))?,
+            guest: leaf_config(&host, &issuer, lifetime)?,
+            host: host.clone(),
+            address,
+            authentication,
+        };
+        origins.insert(host, origin);
+    }
+    let mut rules = Vec::new();
+    if let Some(deny) = policy.get("deny") {
+        for row in deny.as_array().ok_or_else(|| fail("invalid_policy"))? {
+            exact_keys(row, &["method", "path"], &[])?;
+            let method = text(row, "method")?;
+            let path = text(row, "path")?;
+            if !(method == "*" || core::valid_method(method.as_bytes()))
+                || !core::check_target(path.as_bytes())
+            {
+                return Err(fail("invalid_policy"));
+            }
+            rules.push(core::DenyRule {
+                method: if method == "*" { Vec::new() } else { method.as_bytes().to_vec() },
+                path: path.as_bytes().to_vec(),
+            });
+        }
+    }
+    let (mut request_limit, mut response_limit) = (1usize << 20, 8usize << 20);
+    if let Some(limits) = policy.get("limits") {
+        exact_keys(limits, &[], &["request_body", "response_body"])?;
+        if limits.get("request_body").is_some() {
+            request_limit = number(limits, "request_body", 1, 64 << 20)? as usize;
+        }
+        if limits.get("response_body").is_some() {
+            response_limit = number(limits, "response_body", 1, 64 << 20)? as usize;
+        }
+    }
+    let mut secret = files::read_private(credential_path, 4097).map_err(|_| fail("credential_source"))?;
+    while secret.last() == Some(&b'\n') || secret.last() == Some(&b'\r') {
+        secret.pop();
+    }
+    if !aivm_secrets_garrett_core::http_auth::valid_credential(&secret) {
+        return Err(fail("credential_source"));
+    }
+    let mut random = [0u8; 32];
+    SystemRandom::new().fill(&mut random).map_err(|_| fail("proxy_failed"))?;
+    let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(random).into_bytes();
+    let audit = std::fs::OpenOptions::new()
+        .create_new(true)
+        .append(true)
+        .open(audit_path)
+        .map_err(|_| fail("proxy_failed"))?;
+    let forms = core::reflection_forms(&secret);
+    Ok((
+        Session {
+            origins,
+            rules,
+            request_limit,
+            response_limit,
+            secret,
+            forms,
+            token,
+            expires: Instant::now() + Duration::from_secs(lifetime),
+            revoked: AtomicBool::new(false),
+            audit: Mutex::new(audit),
+        },
+        ca_pem,
+    ))
+}
+
+impl Session {
+    fn record(&self, event: &str, detail: Value) {
+        let stamp = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+        let mut row = json!({"schema": "proxy-audit-1", "event": event, "timestamp": stamp});
+        if let (Some(row), Some(detail)) = (row.as_object_mut(), detail.as_object()) {
+            for (k, v) in detail {
+                row.insert(k.clone(), v.clone());
+            }
+        }
+        if let Ok(mut file) = self.audit.lock() {
+            let _ = writeln!(file, "{row}");
+            let _ = file.sync_data();
+        }
+    }
+    fn current(&self) -> bool {
+        !self.revoked.load(Ordering::SeqCst) && Instant::now() < self.expires
+    }
+    fn authenticated(&self, fields: &[core::Field]) -> bool {
+        let values: Vec<&core::Field> = fields.iter().filter(|f| f.name == b"proxy-authorization").collect();
+        if values.len() != 1 {
+            return false;
+        }
+        let value = &values[0].value;
+        let presented = if value.len() > 6 && value[..6].eq_ignore_ascii_case(b"basic ") {
+            match base64::engine::general_purpose::STANDARD.decode(&value[6..]) {
+                Ok(decoded) => match decoded.iter().position(|b| *b == b':') {
+                    Some(colon) => decoded[colon + 1..].to_vec(),
+                    None => return false,
+                },
+                Err(_) => return false,
+            }
+        } else if value.len() > 7 && value[..7].eq_ignore_ascii_case(b"bearer ") {
+            value[7..].to_vec()
+        } else {
+            return false;
+        };
+        // Compare without an early exit on the first differing byte.
+        presented.len() == self.token.len()
+            && presented.iter().zip(&self.token).fold(0u8, |acc, (a, b)| acc | (a ^ b)) == 0
+    }
+}
+
+/// The fixed guest response for a refusal; same bytes as the Python reference.
+fn refusal(code: &str) -> Vec<u8> {
+    let status: &str = match code {
+        "invalid_request" => "400 Bad Request",
+        "too_large" => "413 Content Too Large",
+        "denied" | "unknown_origin" | "revoked" | "unsupported_request" | "expired" => "403 Forbidden",
+        "unauthenticated" => "407 Proxy Authentication Required",
+        "exhausted" => "429 Too Many Requests",
+        _ => "502 Bad Gateway",
+    };
+    let body = format!("{{\"error\":{{\"code\":\"{code}\"}},\"ok\":false,\"proxy\":\"aivm-secrets\"}}\n");
+    let extra = if code == "unauthenticated" { "Proxy-Authenticate: Basic realm=\"aivm-secrets\"\r\n" } else { "" };
+    format!(
+        "HTTP/1.1 {status}\r\n{extra}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    )
+    .into_bytes()
+}
+
+fn refusal_code(refusal: &core::Refusal) -> &'static str {
+    match refusal {
+        core::Refusal::InvalidRequest => "invalid_request",
+        core::Refusal::TooLarge => "too_large",
+        core::Refusal::Denied => "denied",
+        core::Refusal::InvalidCredential => "credential_source",
+        core::Refusal::UpstreamResponse => "outcome_unknown",
+        core::Refusal::Reflected => "reflected",
+    }
+}
+
+fn read_head(stream: &mut TcpStream) -> io::Result<Vec<u8>> {
+    let mut data = Vec::new();
+    let mut byte = [0u8; 1];
+    // Byte-wise so nothing after the CONNECT head is consumed before TLS.
+    while core::head_end(&data).is_none() {
+        if data.len() > core::MAX_HEAD || stream.read(&mut byte)? == 0 {
+            return Err(io::ErrorKind::InvalidData.into());
+        }
+        data.push(byte[0]);
+    }
+    Ok(data)
+}
+
+fn exchange(session: &Session, origin: &Origin, wire: &[u8], head: bool) -> Result<core::Response, &'static str> {
+    let started = Instant::now();
+    let address = (origin.address.as_str(), origin.port)
+        .to_socket_addrs()
+        .ok()
+        .and_then(|mut a| a.next())
+        .ok_or("unreachable")?;
+    let socket = TcpStream::connect_timeout(&address, IO_TIMEOUT).map_err(|_| "unreachable")?;
+    socket.set_read_timeout(Some(IO_TIMEOUT)).map_err(|_| "unreachable")?;
+    socket.set_write_timeout(Some(IO_TIMEOUT)).map_err(|_| "unreachable")?;
+    let name = ServerName::try_from(origin.host.clone()).map_err(|_| "unreachable")?;
+    let connection = ClientConnection::new(origin.upstream.clone(), name).map_err(|_| "unreachable")?;
+    let mut tls = StreamOwned::new(connection, socket);
+    // A completed handshake before the first byte keeps "unreachable" honest.
+    while tls.conn.is_handshaking() {
+        tls.conn.complete_io(&mut tls.sock).map_err(|_| "unreachable")?;
+    }
+    tls.write_all(wire).map_err(|_| "outcome_unknown")?;
+    tls.flush().map_err(|_| "outcome_unknown")?;
+    let mut data = Vec::new();
+    let mut chunk = [0u8; 65536];
+    loop {
+        if started.elapsed() > TOTAL_DEADLINE {
+            return Err("outcome_unknown");
+        }
+        match tls.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(n) => {
+                data.extend_from_slice(&chunk[..n]);
+                if data.len() > session.response_limit + core::MAX_HEAD + 64 {
+                    return Err("too_large");
+                }
+            }
+            Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => break,
+            Err(_) => return Err("outcome_unknown"),
+        }
+    }
+    core::parse_response(&data, head, session.response_limit).map_err(|r| match r {
+        core::Refusal::TooLarge => "too_large",
+        _ => "outcome_unknown",
+    })
+}
+
+fn path_of(target: &[u8]) -> String {
+    String::from_utf8_lossy(&target[..core::path_end(target)]).into_owned()
+}
+
+/// One accepted guest request: encode, send, release. Returns the guest
+/// bytes and whether to keep the tunnel open.
+fn serve_one(session: &Session, origin: &Origin, request: &core::Request) -> (Vec<u8>, bool) {
+    let method = String::from_utf8_lossy(&request.method).into_owned();
+    let path = path_of(&request.target);
+    if !session.current() {
+        session.record("refused", json!({"code": "revoked", "origin": origin.host, "method": method, "path": path}));
+        return (refusal("revoked"), false);
+    }
+    let mut wire = Vec::new();
+    if let Err(refused) = core::encode_upstream(
+        &mut wire, request, origin.host.as_bytes(), &session.rules, &session.secret, &origin.authentication,
+    ) {
+        let code = refusal_code(&refused);
+        session.record("refused", json!({"code": code, "origin": origin.host, "method": method, "path": path}));
+        return (refusal(code), false);
+    }
+    session.record("admitted", json!({"origin": origin.host, "method": method, "path": path}));
+    let head = request.method == b"HEAD";
+    let response = match exchange(session, origin, &wire, head) {
+        Ok(response) => response,
+        Err(code) => {
+            session.record("failed", json!({"code": code, "origin": origin.host, "method": method, "path": path}));
+            return (refusal(code), false);
+        }
+    };
+    let mut out = Vec::new();
+    match core::guest_response(&mut out, &response, &session.forms, request.keep_alive, head) {
+        Ok(()) => {
+            session.record("completed", json!({"origin": origin.host, "method": method, "path": path, "status": response.status}));
+            (out, request.keep_alive)
+        }
+        Err(refused) => {
+            let code = refusal_code(&refused);
+            session.record("failed", json!({"code": code, "origin": origin.host, "method": method, "path": path}));
+            (refusal(code), false)
+        }
+    }
+}
+
+fn tunnel(session: &Session, mut stream: TcpStream) -> io::Result<()> {
+    stream.set_read_timeout(Some(IO_TIMEOUT))?;
+    stream.set_write_timeout(Some(IO_TIMEOUT))?;
+    let data = read_head(&mut stream)?;
+    let end = core::head_end(&data).unwrap_or(0);
+    let head = &data[..end];
+    let first = core::line_end(head, 0);
+    let line = &head[..first];
+    let parts: Vec<&[u8]> = line.split(|b| *b == b' ').collect();
+    if !core::clean_head(head) || parts.len() != 3 || parts[0] != b"CONNECT" || parts[2] != b"HTTP/1.1" {
+        return stream.write_all(&refusal("invalid_request"));
+    }
+    let fields = if first >= head.len() { Some(Vec::new()) } else { core::parse_fields(head, first + 2) };
+    let fields = match fields {
+        Some(fields) => fields,
+        None => return stream.write_all(&refusal("invalid_request")),
+    };
+    if !session.authenticated(&fields) {
+        session.record("refused", json!({"code": "unauthenticated"}));
+        return stream.write_all(&refusal("unauthenticated"));
+    }
+    let authority = String::from_utf8_lossy(parts[1]).into_owned();
+    let (host, port) = authority.rsplit_once(':').unwrap_or(("", ""));
+    let origin = match session.origins.get(host) {
+        Some(origin) if port == "443" => origin,
+        _ => {
+            session.record("refused", json!({"code": "unknown_origin"}));
+            return stream.write_all(&refusal("unknown_origin"));
+        }
+    };
+    if !session.current() {
+        session.record("refused", json!({"code": "revoked", "origin": host}));
+        return stream.write_all(&refusal("revoked"));
+    }
+    stream.write_all(b"HTTP/1.1 200 Connection established\r\n\r\n")?;
+    let connection = ServerConnection::new(origin.guest.clone()).map_err(|_| io::Error::from(io::ErrorKind::InvalidData))?;
+    let mut tls = StreamOwned::new(connection, stream);
+    let mut buffer = Vec::new();
+    let mut chunk = [0u8; 65536];
+    loop {
+        match core::parse_request(&buffer, origin.host.as_bytes(), session.request_limit) {
+            Err(refused) => {
+                let code = refusal_code(&refused);
+                session.record("refused", json!({"code": code, "origin": origin.host}));
+                tls.write_all(&refusal(code))?;
+                break;
+            }
+            Ok(None) => {
+                let n = tls.read(&mut chunk)?;
+                if n == 0 {
+                    break;
+                }
+                buffer.extend_from_slice(&chunk[..n]);
+            }
+            Ok(Some(parsed)) => {
+                buffer.drain(..parsed.used);
+                let (reply, keep) = serve_one(session, origin, &parsed.request);
+                tls.write_all(&reply)?;
+                tls.flush()?;
+                if !keep {
+                    break;
+                }
+            }
+        }
+    }
+    tls.conn.send_close_notify();
+    let _ = tls.flush();
+    let _ = tls.sock.shutdown(Shutdown::Write);
+    Ok(())
+}
+
+fn emit(value: &Value) {
+    let mut out = io::stdout().lock();
+    let _ = writeln!(out, "{value}");
+    let _ = out.flush();
+}
+
+fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let mut options: BTreeMap<&str, &str> = BTreeMap::new();
+    let mut index = 0;
+    while index + 1 < args.len() {
+        let key = args[index].as_str();
+        if !["--policy", "--credential-file", "--audit", "--port"].contains(&key) || options.contains_key(key) {
+            emit(&json!({"version": 1, "ready": false, "error": "invalid_spec"}));
+            std::process::exit(1);
+        }
+        options.insert(key, args[index + 1].as_str());
+        index += 2;
+    }
+    if index != args.len() || ["--policy", "--credential-file", "--audit"].iter().any(|k| !options.contains_key(k)) {
+        emit(&json!({"version": 1, "ready": false, "error": "invalid_spec"}));
+        std::process::exit(1);
+    }
+    let port: u16 = match options.get("--port").map(|p| p.parse()) {
+        None => 0,
+        Some(Ok(p)) => p,
+        Some(Err(_)) => {
+            emit(&json!({"version": 1, "ready": false, "error": "invalid_spec"}));
+            std::process::exit(1);
+        }
+    };
+    let (session, ca_pem) = match load(
+        &PathBuf::from(options["--policy"]),
+        &PathBuf::from(options["--credential-file"]),
+        &PathBuf::from(options["--audit"]),
+    ) {
+        Ok(loaded) => loaded,
+        Err(code) => {
+            emit(&json!({"version": 1, "ready": false, "error": code}));
+            std::process::exit(1);
+        }
+    };
+    let listener = match TcpListener::bind(("127.0.0.1", port)) {
+        Ok(listener) => listener,
+        Err(_) => {
+            emit(&json!({"version": 1, "ready": false, "error": "proxy_failed"}));
+            std::process::exit(1);
+        }
+    };
+    let address = listener.local_addr().map(|a| a.to_string()).unwrap_or_default();
+    let session = Arc::new(session);
+    session.record("session_start", json!({"profile": "credential-substitution",
+        "origins": session.origins.keys().collect::<Vec<_>>()}));
+    let token = String::from_utf8_lossy(&session.token).into_owned();
+    let announcement = json!({
+        "version": 1, "ready": true, "profile": "credential-substitution",
+        "listen": address, "origins": session.origins.keys().collect::<Vec<_>>(),
+        "ca_pem": ca_pem, "proxy_token": token,
+    });
+    if announcement.to_string().as_bytes().windows(session.secret.len()).any(|w| w == session.secret.as_slice()) {
+        emit(&json!({"version": 1, "ready": false, "error": "credential_exposed"}));
+        std::process::exit(1);
+    }
+    emit(&announcement);
+    let acceptor = session.clone();
+    std::thread::spawn(move || {
+        for stream in listener.incoming().flatten() {
+            let session = acceptor.clone();
+            std::thread::spawn(move || {
+                let _ = tunnel(&session, stream);
+            });
+        }
+    });
+    // The session lasts exactly as long as the parent's stdin lease.
+    let mut sink = [0u8; 4096];
+    let mut stdin = io::stdin().lock();
+    while matches!(stdin.read(&mut sink), Ok(n) if n > 0) {}
+    session.revoked.store(true, Ordering::SeqCst);
+    session.record("session_end", json!({}));
+    std::process::exit(0);
+}
