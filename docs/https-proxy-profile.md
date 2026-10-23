@@ -51,6 +51,17 @@ upstream address and trust anchor are pinned; nothing is resolved from what
 the guest sends. A `deny` path ending in `/` covers everything below it and
 the path without the slash; any rule also matches its path plus a trailing `/`.
 
+## Stock tools
+
+`curl`, Python HTTP clients and the GitHub CLI work unchanged:
+`tests/test_proxy_gh_compat.py` runs `gh api` (REST, with `--jq`) through
+both the Python and the native proxy against a synthetic GitHub
+Enterprise-shaped provider, holding only a placeholder token. The provider
+sees the substituted credential, a deny-listed path fails, and nothing `gh`
+prints contains the credential. Set `GH_HOST` and `GH_ENTERPRISE_TOKEN` (any
+placeholder) for an enterprise host; for github.com, a placeholder
+`GH_TOKEN` works the same way.
+
 ## What is enforced (tested in `tests/test_proxy_substitution.py`)
 
 - CONNECT is accepted only with the session token, and only for a

@@ -535,3 +535,13 @@ end-of-formalization request, so I updated only those two hashes after a full
 `lake build` passed. I also added the proxy, route, control and write-gate
 modules to the `--proofs` build list. Whoever runs the next requested audit
 should re-record the manifest normally.
+
+## 2026-10-23 12:23:55 -0400
+
+HP-3 compatibility evidence beyond curl: installed the GitHub CLI (Ubuntu
+package) and added `tests/test_proxy_gh_compat.py`. Stock `gh api` with a
+placeholder `GH_ENTERPRISE_TOKEN` reads through both proxies from a synthetic
+enterprise-shaped provider; the provider sees only the substituted bearer;
+a deny-listed path fails. Skips where `gh` is absent. Not checked: gh
+GraphQL commands (`gh pr view` uses GraphQL), which would need a GraphQL
+route on the synthetic provider.
