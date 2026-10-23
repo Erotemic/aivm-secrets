@@ -10573,7 +10573,7 @@ def provider_wire.Endpoint.impl.port
   ok self.port
 
 /-- [aivm_secrets_garrett_core::proxy_http::Code]
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1212:0-1224:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1217:0-1229:1
     Visibility: public -/
 @[discriminant isize]
 inductive proxy_http.Code where
@@ -12380,7 +12380,7 @@ def proxy_http.path_end (target : Slice Std.U8) : Result Std.Usize := do
   proxy_http.path_end_loop target 0#usize
 
 /-- [aivm_secrets_garrett_core::proxy_http::unreserved]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1039:0-1041:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1044:0-1046:1
     Visibility: public -/
 def proxy_http.unreserved (byte : Std.U8) : Result Bool := do
   let b ← http_wire.alphanumeric byte
@@ -13124,7 +13124,7 @@ def proxy_controller.remainder
   else ok (alloc.vec.Vec.new Std.U8)
 
 /-- [aivm_secrets_garrett_core::proxy_http::append_status]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1242:0-1254:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1247:0-1259:1
     Visibility: public -/
 def proxy_http.append_status
   (output : alloc.vec.Vec Std.U8) (code : proxy_http.Code) :
@@ -13224,7 +13224,7 @@ def proxy_http.append_status
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
 
 /-- [aivm_secrets_garrett_core::proxy_http::append_code]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1226:0-1240:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1231:0-1245:1
     Visibility: public -/
 def proxy_http.append_code
   (output : alloc.vec.Vec Std.U8) (code : proxy_http.Code) :
@@ -13316,7 +13316,7 @@ def proxy_http.append_code
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
 
 /-- [aivm_secrets_garrett_core::proxy_http::refusal]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1257:0-1274:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1262:0-1279:1
     Visibility: public -/
 def proxy_http.refusal
   (code : proxy_http.Code) : Result (alloc.vec.Vec Std.U8) := do
@@ -13529,14 +13529,14 @@ def proxy_controller.is_head (method : Slice Std.U8) : Result Bool := do
   core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 method head
 
 /-- [aivm_secrets_garrett_core::proxy_http::Form]
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 860:0-863:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 865:0-868:1
     Visibility: public -/
 structure proxy_http.Form where
   bytes : alloc.vec.Vec Std.U8
   folded : Bool
 
 /-- [aivm_secrets_garrett_core::proxy_http::form_present]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1169:0-1175:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1174:0-1180:1
     Visibility: public -/
 def proxy_http.form_present
   (data : Slice Std.U8) (folded_data : Slice Std.U8)
@@ -13557,7 +13557,7 @@ def proxy_http.form_present
       reflection.contains unwrapped_data s1
 
 /-- [aivm_secrets_garrett_core::proxy_http::unwrapped]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1159:4-1163:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1164:4-1168:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.unwrapped_loop
@@ -13579,7 +13579,7 @@ def proxy_http.unwrapped_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::unwrapped]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1157:0-1165:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1162:0-1170:1
     Visibility: public -/
 def proxy_http.unwrapped
   (data : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
@@ -13589,7 +13589,7 @@ def proxy_http.unwrapped
   proxy_http.unwrapped_loop iter (alloc.vec.Vec.new Std.U8)
 
 /-- [aivm_secrets_garrett_core::proxy_http::reflects]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1180:4-1186:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1185:4-1191:1
     Visibility: public -/
 @[rust_loop]
 def proxy_http.reflects_loop
@@ -13611,7 +13611,7 @@ def proxy_http.reflects_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::reflects]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1177:0-1186:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1182:0-1191:1
     Visibility: public -/
 def proxy_http.reflects
   (data : Slice Std.U8) (forms : Slice proxy_http.Form) : Result Bool := do
@@ -13623,7 +13623,7 @@ def proxy_http.reflects
   proxy_http.reflects_loop iter data folded_data unwrapped_data
 
 /-- [aivm_secrets_garrett_core::proxy_http::Response]
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 851:0-856:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 856:0-861:1
     Visibility: public -/
 structure proxy_http.Response where
   status : Std.U16
@@ -13632,7 +13632,7 @@ structure proxy_http.Response where
   body : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::proxy_http::append_fields]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 779:4-784:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 784:4-789:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.append_fields_loop
@@ -13659,7 +13659,7 @@ def proxy_http.append_fields_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::append_fields]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 778:0-785:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 783:0-790:1
     Visibility: public -/
 def proxy_http.append_fields
   (output : alloc.vec.Vec Std.U8) (fields : Slice proxy_http.Field) :
@@ -13671,7 +13671,7 @@ def proxy_http.append_fields
   proxy_http.append_fields_loop iter output
 
 /-- [aivm_secrets_garrett_core::proxy_http::encode_response]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1006:0-1029:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1011:0-1034:1
     Visibility: public -/
 def proxy_http.encode_response
   (output : alloc.vec.Vec Std.U8) (response : proxy_http.Response)
@@ -13732,7 +13732,7 @@ def proxy_http.encode_response
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output9 s5
 
 /-- [aivm_secrets_garrett_core::proxy_http::dropped_response]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 980:0-990:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 985:0-995:1
     Visibility: public -/
 def proxy_http.dropped_response (field : proxy_http.Field) : Result Bool := do
   let s ←
@@ -13824,7 +13824,7 @@ def proxy_http.dropped_response (field : proxy_http.Field) : Result Bool := do
                   proxy_http.name_is field s8
 
 /-- [aivm_secrets_garrett_core::proxy_http::returned_fields]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 994:4-1001:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 999:4-1006:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.returned_fields_loop
@@ -13849,7 +13849,7 @@ def proxy_http.returned_fields_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::returned_fields]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 992:0-1003:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 997:0-1008:1
     Visibility: public -/
 def proxy_http.returned_fields
   (fields : Slice proxy_http.Field) :
@@ -13861,7 +13861,7 @@ def proxy_http.returned_fields
   proxy_http.returned_fields_loop iter (alloc.vec.Vec.new proxy_http.Field)
 
 /-- [aivm_secrets_garrett_core::proxy_http::guest_response]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1190:0-1205:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1195:0-1210:1
     Visibility: public -/
 def proxy_http.guest_response
   (output : alloc.vec.Vec Std.U8) (response : proxy_http.Response)
@@ -13886,7 +13886,7 @@ def proxy_http.guest_response
     ok (core.result.Result.Ok (), output1)
 
 /-- [aivm_secrets_garrett_core::proxy_http::identity_only]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 906:4-912:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 911:4-917:1
     Visibility: public -/
 @[rust_loop]
 def proxy_http.identity_only_loop
@@ -13918,7 +13918,7 @@ def proxy_http.identity_only_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::identity_only]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 905:0-912:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 910:0-917:1
     Visibility: public -/
 def proxy_http.identity_only
   (fields : Slice proxy_http.Field) : Result Bool := do
@@ -13928,7 +13928,7 @@ def proxy_http.identity_only
   proxy_http.identity_only_loop iter
 
 /-- [aivm_secrets_garrett_core::proxy_http::digit3]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 871:4-880:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 876:4-885:1
     Visibility: public -/
 @[rust_loop]
 def proxy_http.digit3_loop
@@ -13956,7 +13956,7 @@ def proxy_http.digit3_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::digit3]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 865:0-880:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 870:0-885:1
     Visibility: public -/
 def proxy_http.digit3
   (line : Slice Std.U8) (start : Std.Usize) : Result (Option Std.U16) := do
@@ -13967,7 +13967,7 @@ def proxy_http.digit3
   else proxy_http.digit3_loop line start 0#u16 start
 
 /-- [aivm_secrets_garrett_core::proxy_http::status_line]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 883:0-903:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 888:0-908:1
     Visibility: public -/
 def proxy_http.status_line
   (head : Slice Std.U8) («end» : Std.Usize) :
@@ -14034,7 +14034,7 @@ def proxy_http.status_line
     else ok none
 
 /-- [aivm_secrets_garrett_core::proxy_http::parse_response]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 916:0-977:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 921:0-982:1
     Visibility: public -/
 def proxy_http.parse_response
   (data : Slice Std.U8) (head_request : Bool) (limit : Std.Usize) :
@@ -14388,7 +14388,7 @@ def proxy_controller.release
         proxy_controller.Stage.Failed
 
 /-- [aivm_secrets_garrett_core::proxy_http::needs_length]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 787:0-793:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 792:0-798:1
     Visibility: public -/
 def proxy_http.needs_length (request : proxy_http.Request) : Result Bool := do
   let post ←
@@ -14414,7 +14414,7 @@ def proxy_http.needs_length (request : proxy_http.Request) : Result Bool := do
       else core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 method patch
 
 /-- [aivm_secrets_garrett_core::proxy_http::clean_field]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 763:0-767:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 768:0-772:1
     Visibility: public -/
 def proxy_http.clean_field (field : proxy_http.Field) : Result Bool := do
   let i := alloc.vec.Vec.len field.name
@@ -14432,7 +14432,7 @@ def proxy_http.clean_field (field : proxy_http.Field) : Result Bool := do
   else ok false
 
 /-- [aivm_secrets_garrett_core::proxy_http::clean_fields]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 770:4-776:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 775:4-781:1
     Visibility: public -/
 @[rust_loop]
 def proxy_http.clean_fields_loop
@@ -14448,7 +14448,7 @@ def proxy_http.clean_fields_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::clean_fields]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 769:0-776:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 774:0-781:1
     Visibility: public -/
 def proxy_http.clean_fields
   (fields : Slice proxy_http.Field) : Result Bool := do
@@ -14456,6 +14456,91 @@ def proxy_http.clean_fields
     SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
       fields
   proxy_http.clean_fields_loop iter
+
+/-- [aivm_secrets_garrett_core::proxy_http::ends_with_slash]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 738:0-740:1
+    Visibility: public -/
+def proxy_http.ends_with_slash (rule_path : Slice Std.U8) : Result Bool := do
+  let i := Slice.len rule_path
+  if i > 0#usize
+  then
+    let i1 := Slice.len rule_path
+    let i2 ← i1 - 1#usize
+    let i3 ← Slice.index_usize rule_path i2
+    ok (i3 = 47#u8)
+  else ok false
+
+/-- [aivm_secrets_garrett_core::proxy_http::plus_slash]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 730:0-735:1
+    Visibility: public -/
+def proxy_http.plus_slash
+  («prefix» : Slice Std.U8) (path : Slice Std.U8) : Result Bool := do
+  let i := Slice.len path
+  let i1 := Slice.len «prefix»
+  if i > i1
+  then
+    let i2 := Slice.len path
+    let i3 := Slice.len «prefix»
+    let i4 ← i2 - i3
+    if i4 = 1#usize
+    then
+      let i5 := Slice.len «prefix»
+      let i6 ← Slice.index_usize path i5
+      if i6 = 47#u8
+      then
+        let i7 := Slice.len «prefix»
+        let s ←
+          core.slice.index.Slice.index
+            (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) path
+            { «end» := i7 }
+        core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s «prefix»
+      else ok false
+    else ok false
+  else ok false
+
+/-- [aivm_secrets_garrett_core::proxy_http::path_matches]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 744:0-750:1
+    Visibility: public -/
+def proxy_http.path_matches
+  (rule_path : Slice Std.U8) (path : Slice Std.U8) : Result Bool := do
+  let b ←
+    core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 path rule_path
+  if b
+  then ok true
+  else
+    let b1 ← proxy_http.plus_slash rule_path path
+    if b1
+    then ok true
+    else
+      let b2 ← proxy_http.ends_with_slash rule_path
+      if b2
+      then
+        let b3 ← proxy_http.plus_slash path rule_path
+        if b3
+        then ok true
+        else
+          let i := Slice.len path
+          let i1 := Slice.len rule_path
+          if i >= i1
+          then
+            let i2 := Slice.len rule_path
+            let s ←
+              core.slice.index.Slice.index
+                (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) path
+                { «end» := i2 }
+            core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s rule_path
+          else ok false
+      else ok false
+
+/-- [aivm_secrets_garrett_core::proxy_http::method_ok]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 725:0-727:1
+    Visibility: public -/
+def proxy_http.method_ok
+  (rule_method : Slice Std.U8) (method : Slice Std.U8) : Result Bool := do
+  let i := Slice.len rule_method
+  if i = 0#usize
+  then ok true
+  else core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 rule_method method
 
 /-- [aivm_secrets_garrett_core::proxy_http::DenyRule]
     Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 48:0-52:1
@@ -14465,632 +14550,21 @@ structure proxy_http.DenyRule where
   path : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::proxy_http::rule_matches]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 723:0-749:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 752:0-754:1
     Visibility: public -/
 def proxy_http.rule_matches
   (rule : proxy_http.DenyRule) (method : Slice Std.U8) (path : Slice Std.U8) :
   Result Bool
   := do
-  let rule_method := alloc.vec.Vec.deref rule.method
-  let rule_path := alloc.vec.Vec.deref rule.path
-  let i := Slice.len rule_method
-  if i != 0#usize
-  then
-    let b ←
-      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 rule_method method
-    if b
-    then
-      let b1 ←
-        core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 path rule_path
-      if b1
-      then ok true
-      else
-        let i1 := Slice.len path
-        let i2 := Slice.len rule_path
-        if i1 > i2
-        then
-          let i3 := Slice.len path
-          let i4 := Slice.len rule_path
-          let i5 ← i3 - i4
-          if i5 = 1#usize
-          then
-            let i6 := Slice.len rule_path
-            let i7 ← Slice.index_usize path i6
-            if i7 = 47#u8
-            then
-              let i8 := Slice.len rule_path
-              let s ←
-                core.slice.index.Slice.index
-                  (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) path
-                  { «end» := i8 }
-              let b2 ←
-                core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s
-                  rule_path
-              if b2
-              then ok true
-              else
-                let i9 := Slice.len rule_path
-                if i9 = 0#usize
-                then ok false
-                else
-                  let i10 := Slice.len rule_path
-                  let i11 ← i10 - 1#usize
-                  let i12 ← Slice.index_usize rule_path i11
-                  if i12 != 47#u8
-                  then ok false
-                  else
-                    let i13 := Slice.len rule_path
-                    let i14 := Slice.len path
-                    if i13 > i14
-                    then
-                      let i15 := Slice.len rule_path
-                      let i16 := Slice.len path
-                      let i17 ← i15 - i16
-                      if i17 = 1#usize
-                      then
-                        let i18 := Slice.len path
-                        let s1 ←
-                          core.slice.index.Slice.index
-                            (core.slice.index.SliceIndexRangeToUsizeSlice
-                            Std.U8) rule_path { «end» := i18 }
-                        let b3 ←
-                          core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8
-                            path s1
-                        if b3
-                        then ok true
-                        else
-                          let i19 := Slice.len path
-                          let i20 := Slice.len rule_path
-                          if i19 >= i20
-                          then
-                            let i21 := Slice.len rule_path
-                            let s2 ←
-                              core.slice.index.Slice.index
-                                (core.slice.index.SliceIndexRangeToUsizeSlice
-                                Std.U8) path { «end» := i21 }
-                            core.slice.cmp.PartialEqSlice.eq
-                              core.cmp.PartialEqU8 s2 rule_path
-                          else ok false
-                      else
-                        let i18 := Slice.len path
-                        let i19 := Slice.len rule_path
-                        if i18 >= i19
-                        then
-                          let i20 := Slice.len rule_path
-                          let s1 ←
-                            core.slice.index.Slice.index
-                              (core.slice.index.SliceIndexRangeToUsizeSlice
-                              Std.U8) path { «end» := i20 }
-                          core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8
-                            s1 rule_path
-                        else ok false
-                    else
-                      let i15 := Slice.len path
-                      let i16 := Slice.len rule_path
-                      if i15 >= i16
-                      then
-                        let i17 := Slice.len rule_path
-                        let s1 ←
-                          core.slice.index.Slice.index
-                            (core.slice.index.SliceIndexRangeToUsizeSlice
-                            Std.U8) path { «end» := i17 }
-                        core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8
-                          s1 rule_path
-                      else ok false
-            else
-              let i8 := Slice.len rule_path
-              if i8 = 0#usize
-              then ok false
-              else
-                let i9 := Slice.len rule_path
-                let i10 ← i9 - 1#usize
-                let i11 ← Slice.index_usize rule_path i10
-                if i11 != 47#u8
-                then ok false
-                else
-                  let i12 := Slice.len rule_path
-                  let i13 := Slice.len path
-                  if i12 > i13
-                  then
-                    let i14 := Slice.len rule_path
-                    let i15 := Slice.len path
-                    let i16 ← i14 - i15
-                    if i16 = 1#usize
-                    then
-                      let i17 := Slice.len path
-                      let s ←
-                        core.slice.index.Slice.index
-                          (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                          rule_path { «end» := i17 }
-                      let b2 ←
-                        core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8
-                          path s
-                      if b2
-                      then ok true
-                      else
-                        let i18 := Slice.len path
-                        let i19 := Slice.len rule_path
-                        if i18 >= i19
-                        then
-                          let i20 := Slice.len rule_path
-                          let s1 ←
-                            core.slice.index.Slice.index
-                              (core.slice.index.SliceIndexRangeToUsizeSlice
-                              Std.U8) path { «end» := i20 }
-                          core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8
-                            s1 rule_path
-                        else ok false
-                    else
-                      let i17 := Slice.len path
-                      let i18 := Slice.len rule_path
-                      if i17 >= i18
-                      then
-                        let i19 := Slice.len rule_path
-                        let s ←
-                          core.slice.index.Slice.index
-                            (core.slice.index.SliceIndexRangeToUsizeSlice
-                            Std.U8) path { «end» := i19 }
-                        core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s
-                          rule_path
-                      else ok false
-                  else
-                    let i14 := Slice.len path
-                    let i15 := Slice.len rule_path
-                    if i14 >= i15
-                    then
-                      let i16 := Slice.len rule_path
-                      let s ←
-                        core.slice.index.Slice.index
-                          (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                          path { «end» := i16 }
-                      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s
-                        rule_path
-                    else ok false
-          else
-            let i6 := Slice.len rule_path
-            if i6 = 0#usize
-            then ok false
-            else
-              let i7 := Slice.len rule_path
-              let i8 ← i7 - 1#usize
-              let i9 ← Slice.index_usize rule_path i8
-              if i9 != 47#u8
-              then ok false
-              else
-                let i10 := Slice.len rule_path
-                let i11 := Slice.len path
-                if i10 > i11
-                then
-                  let i12 := Slice.len rule_path
-                  let i13 := Slice.len path
-                  let i14 ← i12 - i13
-                  if i14 = 1#usize
-                  then
-                    let i15 := Slice.len path
-                    let s ←
-                      core.slice.index.Slice.index
-                        (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                        rule_path { «end» := i15 }
-                    let b2 ←
-                      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8
-                        path s
-                    if b2
-                    then ok true
-                    else
-                      let i16 := Slice.len path
-                      let i17 := Slice.len rule_path
-                      if i16 >= i17
-                      then
-                        let i18 := Slice.len rule_path
-                        let s1 ←
-                          core.slice.index.Slice.index
-                            (core.slice.index.SliceIndexRangeToUsizeSlice
-                            Std.U8) path { «end» := i18 }
-                        core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8
-                          s1 rule_path
-                      else ok false
-                  else
-                    let i15 := Slice.len path
-                    let i16 := Slice.len rule_path
-                    if i15 >= i16
-                    then
-                      let i17 := Slice.len rule_path
-                      let s ←
-                        core.slice.index.Slice.index
-                          (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                          path { «end» := i17 }
-                      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s
-                        rule_path
-                    else ok false
-                else
-                  let i12 := Slice.len path
-                  let i13 := Slice.len rule_path
-                  if i12 >= i13
-                  then
-                    let i14 := Slice.len rule_path
-                    let s ←
-                      core.slice.index.Slice.index
-                        (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                        path { «end» := i14 }
-                    core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s
-                      rule_path
-                  else ok false
-        else
-          let i3 := Slice.len rule_path
-          if i3 = 0#usize
-          then ok false
-          else
-            let i4 := Slice.len rule_path
-            let i5 ← i4 - 1#usize
-            let i6 ← Slice.index_usize rule_path i5
-            if i6 != 47#u8
-            then ok false
-            else
-              let i7 := Slice.len rule_path
-              let i8 := Slice.len path
-              if i7 > i8
-              then
-                let i9 := Slice.len rule_path
-                let i10 := Slice.len path
-                let i11 ← i9 - i10
-                if i11 = 1#usize
-                then
-                  let i12 := Slice.len path
-                  let s ←
-                    core.slice.index.Slice.index
-                      (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                      rule_path { «end» := i12 }
-                  let b2 ←
-                    core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 path
-                      s
-                  if b2
-                  then ok true
-                  else
-                    let i13 := Slice.len path
-                    let i14 := Slice.len rule_path
-                    if i13 >= i14
-                    then
-                      let i15 := Slice.len rule_path
-                      let s1 ←
-                        core.slice.index.Slice.index
-                          (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                          path { «end» := i15 }
-                      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s1
-                        rule_path
-                    else ok false
-                else
-                  let i12 := Slice.len path
-                  let i13 := Slice.len rule_path
-                  if i12 >= i13
-                  then
-                    let i14 := Slice.len rule_path
-                    let s ←
-                      core.slice.index.Slice.index
-                        (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                        path { «end» := i14 }
-                    core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s
-                      rule_path
-                  else ok false
-              else
-                let i9 := Slice.len path
-                let i10 := Slice.len rule_path
-                if i9 >= i10
-                then
-                  let i11 := Slice.len rule_path
-                  let s ←
-                    core.slice.index.Slice.index
-                      (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                      path { «end» := i11 }
-                  core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s
-                    rule_path
-                else ok false
-    else ok false
-  else
-    let b ←
-      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 path rule_path
-    if b
-    then ok true
-    else
-      let i1 := Slice.len path
-      let i2 := Slice.len rule_path
-      if i1 > i2
-      then
-        let i3 := Slice.len path
-        let i4 := Slice.len rule_path
-        let i5 ← i3 - i4
-        if i5 = 1#usize
-        then
-          let i6 := Slice.len rule_path
-          let i7 ← Slice.index_usize path i6
-          if i7 = 47#u8
-          then
-            let i8 := Slice.len rule_path
-            let s ←
-              core.slice.index.Slice.index
-                (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) path
-                { «end» := i8 }
-            let b1 ←
-              core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s rule_path
-            if b1
-            then ok true
-            else
-              let i9 := Slice.len rule_path
-              if i9 = 0#usize
-              then ok false
-              else
-                let i10 := Slice.len rule_path
-                let i11 ← i10 - 1#usize
-                let i12 ← Slice.index_usize rule_path i11
-                if i12 != 47#u8
-                then ok false
-                else
-                  let i13 := Slice.len rule_path
-                  let i14 := Slice.len path
-                  if i13 > i14
-                  then
-                    let i15 := Slice.len rule_path
-                    let i16 := Slice.len path
-                    let i17 ← i15 - i16
-                    if i17 = 1#usize
-                    then
-                      let i18 := Slice.len path
-                      let s1 ←
-                        core.slice.index.Slice.index
-                          (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                          rule_path { «end» := i18 }
-                      let b2 ←
-                        core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8
-                          path s1
-                      if b2
-                      then ok true
-                      else
-                        let i19 := Slice.len path
-                        let i20 := Slice.len rule_path
-                        if i19 >= i20
-                        then
-                          let i21 := Slice.len rule_path
-                          let s2 ←
-                            core.slice.index.Slice.index
-                              (core.slice.index.SliceIndexRangeToUsizeSlice
-                              Std.U8) path { «end» := i21 }
-                          core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8
-                            s2 rule_path
-                        else ok false
-                    else
-                      let i18 := Slice.len path
-                      let i19 := Slice.len rule_path
-                      if i18 >= i19
-                      then
-                        let i20 := Slice.len rule_path
-                        let s1 ←
-                          core.slice.index.Slice.index
-                            (core.slice.index.SliceIndexRangeToUsizeSlice
-                            Std.U8) path { «end» := i20 }
-                        core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8
-                          s1 rule_path
-                      else ok false
-                  else
-                    let i15 := Slice.len path
-                    let i16 := Slice.len rule_path
-                    if i15 >= i16
-                    then
-                      let i17 := Slice.len rule_path
-                      let s1 ←
-                        core.slice.index.Slice.index
-                          (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                          path { «end» := i17 }
-                      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s1
-                        rule_path
-                    else ok false
-          else
-            let i8 := Slice.len rule_path
-            if i8 = 0#usize
-            then ok false
-            else
-              let i9 := Slice.len rule_path
-              let i10 ← i9 - 1#usize
-              let i11 ← Slice.index_usize rule_path i10
-              if i11 != 47#u8
-              then ok false
-              else
-                let i12 := Slice.len rule_path
-                let i13 := Slice.len path
-                if i12 > i13
-                then
-                  let i14 := Slice.len rule_path
-                  let i15 := Slice.len path
-                  let i16 ← i14 - i15
-                  if i16 = 1#usize
-                  then
-                    let i17 := Slice.len path
-                    let s ←
-                      core.slice.index.Slice.index
-                        (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                        rule_path { «end» := i17 }
-                    let b1 ←
-                      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8
-                        path s
-                    if b1
-                    then ok true
-                    else
-                      let i18 := Slice.len path
-                      let i19 := Slice.len rule_path
-                      if i18 >= i19
-                      then
-                        let i20 := Slice.len rule_path
-                        let s1 ←
-                          core.slice.index.Slice.index
-                            (core.slice.index.SliceIndexRangeToUsizeSlice
-                            Std.U8) path { «end» := i20 }
-                        core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8
-                          s1 rule_path
-                      else ok false
-                  else
-                    let i17 := Slice.len path
-                    let i18 := Slice.len rule_path
-                    if i17 >= i18
-                    then
-                      let i19 := Slice.len rule_path
-                      let s ←
-                        core.slice.index.Slice.index
-                          (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                          path { «end» := i19 }
-                      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s
-                        rule_path
-                    else ok false
-                else
-                  let i14 := Slice.len path
-                  let i15 := Slice.len rule_path
-                  if i14 >= i15
-                  then
-                    let i16 := Slice.len rule_path
-                    let s ←
-                      core.slice.index.Slice.index
-                        (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                        path { «end» := i16 }
-                    core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s
-                      rule_path
-                  else ok false
-        else
-          let i6 := Slice.len rule_path
-          if i6 = 0#usize
-          then ok false
-          else
-            let i7 := Slice.len rule_path
-            let i8 ← i7 - 1#usize
-            let i9 ← Slice.index_usize rule_path i8
-            if i9 != 47#u8
-            then ok false
-            else
-              let i10 := Slice.len rule_path
-              let i11 := Slice.len path
-              if i10 > i11
-              then
-                let i12 := Slice.len rule_path
-                let i13 := Slice.len path
-                let i14 ← i12 - i13
-                if i14 = 1#usize
-                then
-                  let i15 := Slice.len path
-                  let s ←
-                    core.slice.index.Slice.index
-                      (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                      rule_path { «end» := i15 }
-                  let b1 ←
-                    core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 path
-                      s
-                  if b1
-                  then ok true
-                  else
-                    let i16 := Slice.len path
-                    let i17 := Slice.len rule_path
-                    if i16 >= i17
-                    then
-                      let i18 := Slice.len rule_path
-                      let s1 ←
-                        core.slice.index.Slice.index
-                          (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                          path { «end» := i18 }
-                      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s1
-                        rule_path
-                    else ok false
-                else
-                  let i15 := Slice.len path
-                  let i16 := Slice.len rule_path
-                  if i15 >= i16
-                  then
-                    let i17 := Slice.len rule_path
-                    let s ←
-                      core.slice.index.Slice.index
-                        (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                        path { «end» := i17 }
-                    core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s
-                      rule_path
-                  else ok false
-              else
-                let i12 := Slice.len path
-                let i13 := Slice.len rule_path
-                if i12 >= i13
-                then
-                  let i14 := Slice.len rule_path
-                  let s ←
-                    core.slice.index.Slice.index
-                      (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                      path { «end» := i14 }
-                  core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s
-                    rule_path
-                else ok false
-      else
-        let i3 := Slice.len rule_path
-        if i3 = 0#usize
-        then ok false
-        else
-          let i4 := Slice.len rule_path
-          let i5 ← i4 - 1#usize
-          let i6 ← Slice.index_usize rule_path i5
-          if i6 != 47#u8
-          then ok false
-          else
-            let i7 := Slice.len rule_path
-            let i8 := Slice.len path
-            if i7 > i8
-            then
-              let i9 := Slice.len rule_path
-              let i10 := Slice.len path
-              let i11 ← i9 - i10
-              if i11 = 1#usize
-              then
-                let i12 := Slice.len path
-                let s ←
-                  core.slice.index.Slice.index
-                    (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                    rule_path { «end» := i12 }
-                let b1 ←
-                  core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 path s
-                if b1
-                then ok true
-                else
-                  let i13 := Slice.len path
-                  let i14 := Slice.len rule_path
-                  if i13 >= i14
-                  then
-                    let i15 := Slice.len rule_path
-                    let s1 ←
-                      core.slice.index.Slice.index
-                        (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                        path { «end» := i15 }
-                    core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s1
-                      rule_path
-                  else ok false
-              else
-                let i12 := Slice.len path
-                let i13 := Slice.len rule_path
-                if i12 >= i13
-                then
-                  let i14 := Slice.len rule_path
-                  let s ←
-                    core.slice.index.Slice.index
-                      (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-                      path { «end» := i14 }
-                  core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s
-                    rule_path
-                else ok false
-            else
-              let i9 := Slice.len path
-              let i10 := Slice.len rule_path
-              if i9 >= i10
-              then
-                let i11 := Slice.len rule_path
-                let s ←
-                  core.slice.index.Slice.index
-                    (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) path
-                    { «end» := i11 }
-                core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s
-                  rule_path
-              else ok false
+  let s := alloc.vec.Vec.deref rule.method
+  let b ← proxy_http.method_ok s method
+  if b
+  then let s1 := alloc.vec.Vec.deref rule.path
+       proxy_http.path_matches s1 path
+  else ok false
 
 /-- [aivm_secrets_garrett_core::proxy_http::denied]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 752:4-758:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 757:4-763:1
     Visibility: public -/
 @[rust_loop]
 def proxy_http.denied_loop
@@ -15109,7 +14583,7 @@ def proxy_http.denied_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::denied]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 751:0-758:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 756:0-763:1
     Visibility: public -/
 def proxy_http.denied
   (rules : Slice proxy_http.DenyRule) (method : Slice Std.U8)
@@ -15352,7 +14826,7 @@ def proxy_http.forwarded
   proxy_http.forwarded_loop iter (alloc.vec.Vec.new proxy_http.Field)
 
 /-- [aivm_secrets_garrett_core::proxy_http::encode_upstream]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 800:0-844:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 805:0-849:1
     Visibility: public -/
 def proxy_http.encode_upstream
   (output : alloc.vec.Vec Std.U8) (request : proxy_http.Request)
@@ -15513,7 +14987,7 @@ def proxy_controller.serve
     ok (s, io1)
 
 /-- [aivm_secrets_garrett_core::proxy_http::hex_lower]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1031:0-1037:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1036:0-1042:1
     Visibility: public -/
 def proxy_http.hex_lower (nibble : Std.U8) : Result Std.U8 := do
   if nibble < 10#u8
@@ -15522,7 +14996,7 @@ def proxy_http.hex_lower (nibble : Std.U8) : Result Std.U8 := do
        97#u8 + i
 
 /-- [aivm_secrets_garrett_core::proxy_http::percent_lower]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1046:4-1054:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1051:4-1059:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.percent_lower_loop
@@ -15551,7 +15025,7 @@ def proxy_http.percent_lower_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::percent_lower]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1044:0-1056:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1049:0-1061:1
     Visibility: public -/
 def proxy_http.percent_lower
   (secret : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
@@ -15561,7 +15035,7 @@ def proxy_http.percent_lower
   proxy_http.percent_lower_loop iter (alloc.vec.Vec.new Std.U8)
 
 /-- [aivm_secrets_garrett_core::proxy_http::hex_bytes]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1060:4-1063:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1065:4-1068:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.hex_bytes_loop
@@ -15582,7 +15056,7 @@ def proxy_http.hex_bytes_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::hex_bytes]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1058:0-1065:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1063:0-1070:1
     Visibility: public -/
 def proxy_http.hex_bytes
   (secret : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
@@ -15592,7 +15066,7 @@ def proxy_http.hex_bytes
   proxy_http.hex_bytes_loop iter (alloc.vec.Vec.new Std.U8)
 
 /-- [aivm_secrets_garrett_core::proxy_http::base64_symbol]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1067:0-1085:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1072:0-1090:1
     Visibility: public -/
 def proxy_http.base64_symbol
   (value : Std.U8) (url : Bool) : Result Std.U8 := do
@@ -15616,7 +15090,7 @@ def proxy_http.base64_symbol
              else ok 47#u8
 
 /-- [aivm_secrets_garrett_core::proxy_http::sextet]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1088:0-1096:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1093:0-1101:1
     Visibility: public -/
 def proxy_http.sextet
   (bytes : Slice Std.U8) (index : Std.Usize) : Result Std.U8 := do
@@ -15641,7 +15115,7 @@ def proxy_http.sextet
   ok (UScalar.cast .U8 i6)
 
 /-- [aivm_secrets_garrett_core::proxy_http::aligned_base64]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1103:4-1106:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1108:4-1111:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.aligned_base64_loop0
@@ -15657,7 +15131,7 @@ def proxy_http.aligned_base64_loop0
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::aligned_base64]: loop 1:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1112:4-1115:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1117:4-1120:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.aligned_base64_loop1
@@ -15677,7 +15151,7 @@ def proxy_http.aligned_base64_loop1
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::aligned_base64]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1100:0-1117:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1105:0-1122:1
     Visibility: public -/
 def proxy_http.aligned_base64
   (secret : Slice Std.U8) (shift : Std.Usize) (url : Bool) :
@@ -15697,7 +15171,7 @@ def proxy_http.aligned_base64
     Std.U8) start
 
 /-- [aivm_secrets_garrett_core::proxy_http::json_slashes]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1123:4-1128:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1128:4-1133:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.json_slashes_loop
@@ -15716,7 +15190,7 @@ def proxy_http.json_slashes_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::json_slashes]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1121:0-1130:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1126:0-1135:1
     Visibility: public -/
 def proxy_http.json_slashes
   (secret : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
@@ -15726,7 +15200,7 @@ def proxy_http.json_slashes
   proxy_http.json_slashes_loop iter (alloc.vec.Vec.new Std.U8)
 
 /-- [aivm_secrets_garrett_core::proxy_http::reflection_forms]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1142:4-1152:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1147:4-1157:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.reflection_forms_loop
@@ -15758,7 +15232,7 @@ def proxy_http.reflection_forms_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::reflection_forms]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1132:0-1154:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1137:0-1159:1
     Visibility: public -/
 def proxy_http.reflection_forms
   (secret : Slice Std.U8) : Result (alloc.vec.Vec proxy_http.Form) := do

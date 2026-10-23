@@ -713,3 +713,15 @@ Approval extension records (`approval_requested`, `approved`, host
 `revoked`) also core-built (`approval_requested_record_exact`,
 `approved_record_exact`, `event_record`); `Audit::write_record` is now
 `#[cfg(test)]`, so no production audit record is assembled natively.
+
+## 2026-10-23 19:08:07 -0400
+
+PROXY-PARSE-01: deny-list matching semantics proved. Restated
+`proxy_http::rule_matches` as `method_ok && path_matches` (helpers
+`plus_slash`, `ends_with_slash`) because the early-return form extracted
+into a ~500-line duplicated tree; exhaustive oracle (all paths/rule paths of
+length <= 4 over {a,/}, all method pairs) against the old matcher.
+`rule_matches_spec`/`denied_spec` now state exact semantics
+(`RuleMatches`/`PathMatches`) instead of totality. A splice error of mine
+briefly duplicated part of GarrettProxyHttp.lean; reconstructed and re-spliced
+before any build/commit.

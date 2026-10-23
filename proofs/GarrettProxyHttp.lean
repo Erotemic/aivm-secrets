@@ -277,38 +277,6 @@ theorem path_end_spec (target : Slice U8) :
   intro e ⟨_, hi, at_q⟩
   exact ⟨hi, at_q⟩
 
-@[step]
-theorem rule_matches_spec (rule : proxy_http.DenyRule) (method path : Slice U8) :
-    rule_matches rule method path ⦃ _ => True ⦄ := by
-  unfold rule_matches
-  step*
-
-theorem denied_loop_spec (it : core.slice.iter.Iter proxy_http.DenyRule) (method path : Slice U8) :
-    denied_loop it method path ⦃ _ => True ⦄ := by
-  suffices ∀ n (it : core.slice.iter.Iter proxy_http.DenyRule), it.slice.length - it.i = n →
-      denied_loop it method path ⦃ _ => True ⦄ from this _ it rfl
-  intro n
-  induction n using Nat.strong_induction_on with
-  | h n ih =>
-    intro it measure
-    rw [denied_loop.eq_def]
-    by_cases inside : it.i < it.slice.length
-    · rw [iter_next_inside it inside]
-      simp only [bind_ok]
-      step as ⟨b⟩
-      split
-      · simp
-      · exact ih (it.slice.length - (it.i + 1)) (by scalar_tac) { it with i := it.i + 1 } rfl
-    · rw [iter_next_done it inside]
-      simp
-
-@[step]
-theorem denied_spec (rules : Slice proxy_http.DenyRule) (method path : Slice U8) :
-    denied rules method path ⦃ _ => True ⦄ := by
-  unfold denied
-  simp only [SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter, bind_ok]
-  exact denied_loop_spec _ method path
-
 def CRLF : List U8 := [13#u8, 10#u8]
 
 /-- One forwarded field on the wire. -/
@@ -385,6 +353,237 @@ theorem slice_eq_eq (a b : Slice U8) :
   · simpa [e] using h
   · simp only [e, decide_false]
     cases out <;> simp_all
+
+/-! ### Deny rules: what they match -/
+
+/-- A rule's method matches: an empty rule method matches any method. -/
+def MethodMatches (rule method : List U8) : Prop := rule = [] ∨ rule = method
+
+/-- A rule's path matches: exactly; with one added trailing `/`; and, for a
+    rule path ending in `/`, without that `/` or as a prefix of the path. -/
+def PathMatches (rule path : List U8) : Prop :=
+  path = rule ∨ path = rule ++ [47#u8] ∨
+    ((∃ init, rule = init ++ [47#u8]) ∧ (rule = path ++ [47#u8] ∨ rule <+: path))
+
+def RuleMatches (rule : proxy_http.DenyRule) (method path : List U8) : Prop :=
+  MethodMatches rule.method.val method ∧ PathMatches rule.path.val path
+
+theorem take_eq_prefix {p pre : List U8} :
+    p.take pre.length = pre ↔ pre <+: p := by
+  constructor
+  · intro e; rw [← e]; exact List.take_prefix _ _
+  · intro hp; exact (List.prefix_iff_eq_take.mp hp).symm
+
+@[step]
+theorem method_ok_spec (rule method : Slice U8) :
+    method_ok rule method ⦃ r => r = true ↔ MethodMatches rule.val method.val ⦄ := by
+  unfold method_ok
+  dsimp only
+  split
+  · simp only [WP.spec_ok, true_iff]
+    left; exact List.eq_nil_of_length_eq_zero (by scalar_tac)
+  · rw [slice_eq_eq]
+    simp only [WP.spec_ok, decide_eq_true_eq, MethodMatches]
+    constructor
+    · exact Or.inr
+    · rintro (empty | same)
+      · exfalso; have : rule.val.length = 0 := by simp [empty]
+        scalar_tac
+      · exact same
+
+theorem slice_zero_eq_take (n : Nat) (l : List U8) : List.slice 0 n l = l.take n := by
+  simp [List.slice]
+
+/-- `p` is `pre` and one `/` exactly when it is one longer, has `/` at
+    `pre`'s length, and starts with `pre`. -/
+theorem plus_slash_list {pre p : List U8} (hlen : p.length = pre.length + 1)
+    (hlast : p[pre.length]'(by omega) = 47#u8) : p.take pre.length = pre ↔ p = pre ++ [47#u8] := by
+  constructor
+  · intro taken
+    have tail : p.drop pre.length = [47#u8] := by
+      rw [List.drop_eq_getElem_cons (by omega), hlast]
+      simp [List.drop_eq_nil_of_le (show p.length ≤ pre.length + 1 by omega)]
+    rw [← List.take_append_drop pre.length p, taken, tail]
+  · intro e; subst e; simp
+
+@[step]
+theorem plus_slash_spec (pre path : Slice U8) :
+    plus_slash pre path ⦃ r => r = true ↔ path.val = pre.val ++ [47#u8] ⦄ := by
+  unfold plus_slash
+  dsimp only
+  split
+  · rename_i longer
+    step as ⟨d, hd⟩
+    split
+    · rename_i one
+      step as ⟨c, hc⟩
+      have hlen : path.val.length = pre.val.length + 1 := by
+        have : d.val = 1 := by rw [one]; rfl
+        scalar_tac
+      split
+      · rename_i slash
+        have within : pre.len.val ≤ path.length := by scalar_tac
+        simp only [core.slice.index.SliceIndexRangeToUsizeSlice.index,
+          within, ↓reduceIte, bind_ok, slice_eq_eq, WP.spec_ok, decide_eq_true_eq]
+        have length : pre.len.val = pre.val.length := by simp
+        have last : path.val[pre.val.length]'(by omega) = 47#u8 := by
+          rw [← slash, hc]; simp
+        rw [Slice.from_val, slice_zero_eq_take, length]
+        exact plus_slash_list hlen last
+      · rename_i not_slash
+        simp only [WP.spec_ok, Bool.false_eq_true, false_iff]
+        intro e
+        apply not_slash
+        rw [hc]
+        simp [e]
+    · rename_i not_one
+      simp only [WP.spec_ok, Bool.false_eq_true, false_iff]
+      intro e
+      apply not_one
+      have : path.val.length = pre.val.length + 1 := by simp [e]
+      scalar_tac
+  · rename_i shorter
+    simp only [WP.spec_ok, Bool.false_eq_true, false_iff]
+    intro e
+    have : path.val.length = pre.val.length + 1 := by simp [e]
+    scalar_tac
+
+@[step]
+theorem ends_with_slash_spec (rule : Slice U8) :
+    ends_with_slash rule ⦃ r => r = true ↔ ∃ init, rule.val = init ++ [47#u8] ⦄ := by
+  unfold ends_with_slash
+  dsimp only
+  split
+  · rename_i nonempty
+    step as ⟨k, hk⟩
+    step as ⟨c, hc⟩
+    simp only [decide_eq_true_eq]
+    have ne : rule.val ≠ [] := by intro e; have : rule.val.length = 0 := by simp [e]
+                                  scalar_tac
+    have split_last : rule.val = rule.val.dropLast ++ [c] := by
+      rw [hc]
+      have : k.val = rule.val.length - 1 := by scalar_tac
+      simp only [this]
+      rw [← List.getLast_eq_getElem ne]
+      exact (List.dropLast_append_getLast ne).symm
+    constructor
+    · intro e; exact ⟨_, e ▸ split_last⟩
+    · rintro ⟨init, e⟩
+      rw [e] at split_last
+      have := List.append_inj_right' split_last (by simp)
+      simpa using this.symm
+  · rename_i empty
+    simp only [WP.spec_ok, Bool.false_eq_true, false_iff, not_exists]
+    intro init e
+    have : rule.val.length = init.length + 1 := by simp [e]
+    scalar_tac
+
+@[step]
+theorem path_matches_spec (rule path : Slice U8) :
+    path_matches rule path ⦃ r => r = true ↔ PathMatches rule.val path.val ⦄ := by
+  unfold path_matches
+  rw [slice_eq_eq]
+  simp only [bind_ok]
+  by_cases same : path.val = rule.val
+  · simp [same, WP.spec_ok, PathMatches]
+  · simp only [same, decide_false, Bool.false_eq_true, ↓reduceIte]
+    step as ⟨b1, hb1⟩
+    split
+    · simp_all [WP.spec_ok, PathMatches]
+    · step as ⟨b2, hb2⟩
+      split
+      · step as ⟨b3, hb3⟩
+        split
+        · simp_all [WP.spec_ok, PathMatches]
+        · split
+          · rename_i longer
+            have within : rule.len.val ≤ path.length := by scalar_tac
+            simp only [core.slice.index.SliceIndexRangeToUsizeSlice.index,
+              within, ↓reduceIte, bind_ok, slice_eq_eq, WP.spec_ok, decide_eq_true_eq]
+            rw [Slice.from_val, slice_zero_eq_take]
+            have length : rule.len.val = rule.val.length := by simp
+            rw [length, take_eq_prefix]
+            simp_all [PathMatches]
+          · rename_i shorter
+            simp only [WP.spec_ok, Bool.false_eq_true, false_iff]
+            intro hm
+            unfold PathMatches at hm
+            rcases hm with e | e | ⟨_, e | pre⟩
+            · exact same e
+            · simp_all
+            · simp_all
+            · have := pre.length_le; scalar_tac
+      · simp only [WP.spec_ok, Bool.false_eq_true, false_iff]
+        intro hm
+        rcases hm with e | e | ⟨ends, _⟩
+        · exact same e
+        · simp_all
+        · simp_all
+
+/-- **What a deny rule matches.** -/
+@[step]
+theorem rule_matches_spec (rule : proxy_http.DenyRule) (method path : Slice U8) :
+    rule_matches rule method path ⦃ r => r = true ↔ RuleMatches rule method.val path.val ⦄ := by
+  unfold rule_matches
+  step as ⟨b, hb⟩
+  split
+  · refine WP.spec_mono (path_matches_spec _ _) ?_
+    intro r hr
+    simp_all [RuleMatches, aivm_secrets_garrett_core.http_wire.Proofs.vec_deref_val]
+  · simp_all [WP.spec_ok, RuleMatches, aivm_secrets_garrett_core.http_wire.Proofs.vec_deref_val]
+
+/-- The remaining rules from `it.i` on. -/
+def Remaining (it : core.slice.iter.Iter proxy_http.DenyRule) : List proxy_http.DenyRule :=
+  it.slice.val.drop it.i
+
+theorem denied_loop_spec (it : core.slice.iter.Iter proxy_http.DenyRule) (method path : Slice U8) :
+    denied_loop it method path ⦃ r =>
+      r = true ↔ ∃ rule ∈ Remaining it, RuleMatches rule method.val path.val ⦄ := by
+  suffices ∀ n (it : core.slice.iter.Iter proxy_http.DenyRule), it.slice.length - it.i = n →
+      denied_loop it method path ⦃ r =>
+        r = true ↔ ∃ rule ∈ Remaining it, RuleMatches rule method.val path.val ⦄ from this _ it rfl
+  intro n
+  induction n using Nat.strong_induction_on with
+  | h n ih =>
+    intro it measure
+    rw [denied_loop.eq_def]
+    by_cases inside : it.i < it.slice.length
+    · rw [iter_next_inside it inside]
+      simp only [bind_ok]
+      have cons : Remaining it = it.slice[it.i] :: Remaining { it with i := it.i + 1 } := by
+        simp only [Remaining]
+        exact List.drop_eq_getElem_cons (by simpa using inside)
+      step as ⟨b, hb⟩
+      split
+      · rename_i hit
+        simp only [WP.spec_ok, true_iff]
+        exact ⟨_, by rw [cons]; exact List.mem_cons_self, hb.mp hit⟩
+      · rename_i miss
+        refine WP.spec_mono (ih (it.slice.length - (it.i + 1)) (by scalar_tac) { it with i := it.i + 1 } rfl) ?_
+        intro r hr
+        rw [hr, cons]
+        constructor
+        · rintro ⟨rule, mem, matching⟩; exact ⟨rule, List.mem_cons_of_mem _ mem, matching⟩
+        · rintro ⟨rule, mem, matching⟩
+          rcases List.mem_cons.mp mem with same | rest
+          · subst same; exact absurd (hb.mpr matching) miss
+          · exact ⟨rule, rest, matching⟩
+    · rw [iter_next_done it inside]
+      have empty : Remaining it = [] := by
+        simp only [Remaining]; exact List.drop_eq_nil_of_le (by simpa using inside)
+      simp [WP.spec_ok, empty]
+
+/-- **What the deny list refuses.** `denied` is true exactly when some rule
+    in the list matches the method and path (`RuleMatches`). -/
+@[step]
+theorem denied_spec (rules : Slice proxy_http.DenyRule) (method path : Slice U8) :
+    denied rules method path ⦃ r =>
+      r = true ↔ ∃ rule ∈ rules.val, RuleMatches rule method.val path.val ⦄ := by
+  unfold denied
+  simp only [SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter, bind_ok]
+  refine WP.spec_mono (denied_loop_spec _ method path) ?_
+  intro r hr
+  simpa [Remaining] using hr
 
 /-- Methods that always carry an explicit `Content-Length`. -/
 def BodyMethods : List (List U8) := [ascii "POST", ascii "PUT", ascii "PATCH"]

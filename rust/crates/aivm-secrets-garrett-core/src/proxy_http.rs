@@ -720,32 +720,37 @@ pub fn forwarded(fields: &[Field]) -> Vec<Field> {
 /// for a `/`-ending prefix, the prefix without its slash and everything
 /// under it.
 #[allow(clippy::len_zero)]
+/// An empty rule method matches any method.
+#[allow(clippy::len_zero)]
+pub fn method_ok(rule_method: &[u8], method: &[u8]) -> bool {
+    rule_method.len() == 0 || rule_method == method
+}
+
+/// `path` is `prefix` followed by exactly one `/`.
+pub fn plus_slash(prefix: &[u8], path: &[u8]) -> bool {
+    path.len() > prefix.len()
+        && path.len() - prefix.len() == 1
+        && path[prefix.len()] == b'/'
+        && &path[..prefix.len()] == prefix
+}
+
+/// `rule_path` ends with `/`.
+pub fn ends_with_slash(rule_path: &[u8]) -> bool {
+    rule_path.len() > 0 && rule_path[rule_path.len() - 1] == b'/'
+}
+
+/// The rule path matches exactly, with one added trailing `/`, and, for a
+/// rule path ending in `/`, without that `/` or as a prefix.
+pub fn path_matches(rule_path: &[u8], path: &[u8]) -> bool {
+    path == rule_path
+        || plus_slash(rule_path, path)
+        || (ends_with_slash(rule_path)
+            && (plus_slash(path, rule_path)
+                || (path.len() >= rule_path.len() && &path[..rule_path.len()] == rule_path)))
+}
+
 pub fn rule_matches(rule: &DenyRule, method: &[u8], path: &[u8]) -> bool {
-    let rule_method: &[u8] = &rule.method;
-    let rule_path: &[u8] = &rule.path;
-    if rule_method.len() != 0 && !(rule_method == method) {
-        return false;
-    }
-    if path == rule_path {
-        return true;
-    }
-    if path.len() > rule_path.len()
-        && path.len() - rule_path.len() == 1
-        && path[rule_path.len()] == b'/'
-        && &path[..rule_path.len()] == rule_path
-    {
-        return true;
-    }
-    if rule_path.len() == 0 || rule_path[rule_path.len() - 1] != b'/' {
-        return false;
-    }
-    if rule_path.len() > path.len()
-        && rule_path.len() - path.len() == 1
-        && path == &rule_path[..path.len()]
-    {
-        return true;
-    }
-    path.len() >= rule_path.len() && &path[..rule_path.len()] == rule_path
+    method_ok(&rule.method, method) && path_matches(&rule.path, path)
 }
 
 pub fn denied(rules: &[DenyRule], method: &[u8], path: &[u8]) -> bool {
@@ -1275,6 +1280,65 @@ pub fn refusal(code: &Code) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
+    /// The deny-rule matcher before it was split into helpers.
+    fn legacy_rule_matches(rule: &DenyRule, method: &[u8], path: &[u8]) -> bool {
+        let rule_method: &[u8] = &rule.method;
+        let rule_path: &[u8] = &rule.path;
+        if rule_method.len() != 0 && !(rule_method == method) {
+            return false;
+        }
+        if path == rule_path {
+            return true;
+        }
+        if path.len() > rule_path.len()
+            && path.len() - rule_path.len() == 1
+            && path[rule_path.len()] == b'/'
+            && &path[..rule_path.len()] == rule_path
+        {
+            return true;
+        }
+        if rule_path.len() == 0 || rule_path[rule_path.len() - 1] != b'/' {
+            return false;
+        }
+        if rule_path.len() > path.len()
+            && rule_path.len() - path.len() == 1
+            && path == &rule_path[..path.len()]
+        {
+            return true;
+        }
+        path.len() >= rule_path.len() && &path[..rule_path.len()] == rule_path
+    }
+
+    #[test]
+    fn deny_rule_matcher_agrees_with_the_legacy_matcher_on_all_short_paths() {
+        // Every path and rule path of up to four bytes over {a, /}, every
+        // method pair: exhaustive, not sampled.
+        let mut words: Vec<Vec<u8>> = vec![Vec::new()];
+        let mut frontier = words.clone();
+        for _ in 0..4 {
+            frontier = frontier
+                .iter()
+                .flat_map(|w| [b'a', b'/'].map(|b| [w.clone(), vec![b]].concat()))
+                .collect();
+            words.extend(frontier.clone());
+        }
+        let methods: [&[u8]; 3] = [b"", b"GET", b"POST"];
+        for rule_path in &words {
+            for rule_method in methods {
+                let rule = DenyRule { method: rule_method.to_vec(), path: rule_path.clone() };
+                for path in &words {
+                    for method in &methods[1..] {
+                        assert_eq!(
+                            rule_matches(&rule, method, path),
+                            legacy_rule_matches(&rule, method, path),
+                            "{rule_method:?} {rule_path:?} {method:?} {path:?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     use super::*;
 
     fn parse(bytes: &[u8]) -> Result<Option<Parsed>, Refusal> {
