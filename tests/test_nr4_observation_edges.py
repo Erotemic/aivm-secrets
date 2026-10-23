@@ -11,10 +11,11 @@ def test_current_checked_sources_have_expected_shape() -> None:
 
 def test_missing_error_fallback_fails_closed() -> None:
     sources = guard.read_sources()
-    original = sources[guard.TLS]
-    assert '_ => "Broker failed closed."' in original
-    sources[guard.TLS] = original.replace(
-        '_ => "Broker failed closed."', '_ => "some private text"', 1
+    original = sources[guard.PUBLIC_ERROR]
+    fallback = '_ => out.extend_from_slice(b"Broker failed closed.")'
+    assert fallback in original
+    sources[guard.PUBLIC_ERROR] = original.replace(
+        fallback, '_ => out.extend_from_slice(b"some private text")', 1
     )
     assert any('bounded-error-taxonomy' in problem for problem in guard.scan(sources))
 
@@ -47,8 +48,8 @@ def test_framing_before_authentication_is_detected() -> None:
 
 def test_unsafe_return_of_provider_error_detected_as_source_drift() -> None:
     sources = guard.read_sources()
-    sources[guard.TLS] = sources[guard.TLS].replace(
-        'Error::OutcomeUnknown =>', 'Error::ProviderDebug =>', 1
+    sources[guard.PUBLIC_ERROR] = sources[guard.PUBLIC_ERROR].replace(
+        'PublicError::OutcomeUnknown => {', 'PublicError::ProviderDebug => {', 1
     )
     assert any('bounded-error-taxonomy' in problem for problem in guard.scan(sources))
 
@@ -59,6 +60,6 @@ def test_native_source_guard_not_a_semantic_certification() -> None:
     sources = guard.read_sources()
     source = sources[guard.TLS]
     sources[guard.TLS] = source.replace(
-        'json::capture(&value)', 'json::capture(&value) /* unreviewed side effect */', 1
+        'Err(error) => {', 'Err(error) => { /* unreviewed side effect */', 1
     )
     assert guard.scan(sources) == []

@@ -7725,6 +7725,567 @@ def provider_wire.append
       ok (core.result.Result.Err error, output1)
   | core.result.Result.Err error => ok (core.result.Result.Err error, output)
 
+/-- [aivm_secrets_garrett_core::public_error::PublicError]
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 10:0-28:1
+    Visibility: public -/
+@[discriminant isize]
+inductive public_error.PublicError where
+| InvalidCapability : public_error.PublicError
+| InvalidPolicy : public_error.PublicError
+| ResourceMismatch : public_error.PublicError
+| InvalidRequest : public_error.PublicError
+| Denied : public_error.PublicError
+| Unreachable : public_error.PublicError
+| UpstreamResponse : public_error.PublicError
+| UpstreamRejected : public_error.PublicError
+| UpstreamError : public_error.PublicError
+| InternalError : public_error.PublicError
+| UnsafeFile : public_error.PublicError
+| OutcomeUnknown : public_error.PublicError
+| Exhausted : public_error.PublicError
+| Revoked : public_error.PublicError
+| CredentialSource : public_error.PublicError
+| Expired : public_error.PublicError
+| AuthorizationDenied : public_error.PublicError
+
+/-- [aivm_secrets_garrett_core::public_error::{impl core::fmt::Debug for aivm_secrets_garrett_core::public_error::PublicError}::fmt]:
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 9:9-9:14
+    Visibility: public -/
+def public_error.PublicError.Insts.CoreFmtDebug.fmt
+  (self : public_error.PublicError) (f : core.fmt.Formatter) :
+  Result ((core.result.Result Unit core.fmt.Error) × core.fmt.Formatter)
+  := do
+  match self with
+  | public_error.PublicError.InvalidCapability =>
+    core.fmt.Formatter.write_str f (toStr "InvalidCapability")
+  | public_error.PublicError.InvalidPolicy =>
+    core.fmt.Formatter.write_str f (toStr "InvalidPolicy")
+  | public_error.PublicError.ResourceMismatch =>
+    core.fmt.Formatter.write_str f (toStr "ResourceMismatch")
+  | public_error.PublicError.InvalidRequest =>
+    core.fmt.Formatter.write_str f (toStr "InvalidRequest")
+  | public_error.PublicError.Denied =>
+    core.fmt.Formatter.write_str f (toStr "Denied")
+  | public_error.PublicError.Unreachable =>
+    core.fmt.Formatter.write_str f (toStr "Unreachable")
+  | public_error.PublicError.UpstreamResponse =>
+    core.fmt.Formatter.write_str f (toStr "UpstreamResponse")
+  | public_error.PublicError.UpstreamRejected =>
+    core.fmt.Formatter.write_str f (toStr "UpstreamRejected")
+  | public_error.PublicError.UpstreamError =>
+    core.fmt.Formatter.write_str f (toStr "UpstreamError")
+  | public_error.PublicError.InternalError =>
+    core.fmt.Formatter.write_str f (toStr "InternalError")
+  | public_error.PublicError.UnsafeFile =>
+    core.fmt.Formatter.write_str f (toStr "UnsafeFile")
+  | public_error.PublicError.OutcomeUnknown =>
+    core.fmt.Formatter.write_str f (toStr "OutcomeUnknown")
+  | public_error.PublicError.Exhausted =>
+    core.fmt.Formatter.write_str f (toStr "Exhausted")
+  | public_error.PublicError.Revoked =>
+    core.fmt.Formatter.write_str f (toStr "Revoked")
+  | public_error.PublicError.CredentialSource =>
+    core.fmt.Formatter.write_str f (toStr "CredentialSource")
+  | public_error.PublicError.Expired =>
+    core.fmt.Formatter.write_str f (toStr "Expired")
+  | public_error.PublicError.AuthorizationDenied =>
+    core.fmt.Formatter.write_str f (toStr "AuthorizationDenied")
+
+/-- Trait implementation: [aivm_secrets_garrett_core::public_error::{impl core::fmt::Debug for aivm_secrets_garrett_core::public_error::PublicError}]
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 9:9-9:14 -/
+@[reducible]
+def public_error.PublicError.Insts.CoreFmtDebug : core.fmt.Debug
+  public_error.PublicError := {
+  fmt := public_error.PublicError.Insts.CoreFmtDebug.fmt
+}
+
+/-- [aivm_secrets_garrett_core::public_error::{impl core::clone::Clone for aivm_secrets_garrett_core::public_error::PublicError}::clone]:
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 9:16-9:21
+    Visibility: public -/
+def public_error.PublicError.Insts.CoreCloneClone.clone
+  (self : public_error.PublicError) : Result public_error.PublicError := do
+  ok self
+
+/-- Trait implementation: [aivm_secrets_garrett_core::public_error::{impl core::clone::Clone for aivm_secrets_garrett_core::public_error::PublicError}]
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 9:16-9:21 -/
+@[reducible]
+def public_error.PublicError.Insts.CoreCloneClone : core.clone.Clone
+  public_error.PublicError := {
+  clone := public_error.PublicError.Insts.CoreCloneClone.clone
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::public_error::{impl core::marker::Copy for aivm_secrets_garrett_core::public_error::PublicError}]
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 9:23-9:27 -/
+@[reducible]
+def public_error.PublicError.Insts.CoreMarkerCopy : core.marker.Copy
+  public_error.PublicError := {
+  cloneInst := public_error.PublicError.Insts.CoreCloneClone
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::public_error::{impl core::marker::StructuralPartialEq for aivm_secrets_garrett_core::public_error::PublicError}]
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 9:29-9:38 -/
+@[reducible]
+def public_error.PublicError.Insts.CoreMarkerStructuralPartialEq :
+  core.marker.StructuralPartialEq public_error.PublicError := {
+}
+
+/-- [aivm_secrets_garrett_core::public_error::{impl core::cmp::PartialEq<aivm_secrets_garrett_core::public_error::PublicError> for aivm_secrets_garrett_core::public_error::PublicError}::eq]:
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 9:29-9:38
+    Visibility: public -/
+def public_error.PublicError.Insts.CoreCmpPartialEqPublicError.eq
+  (self : public_error.PublicError) (other : public_error.PublicError) :
+  Result Bool
+  := do
+  let self1 := read_discriminant self
+  let other1 := read_discriminant other
+  ok (self1 = other1)
+
+/-- Trait implementation: [aivm_secrets_garrett_core::public_error::{impl core::cmp::PartialEq<aivm_secrets_garrett_core::public_error::PublicError> for aivm_secrets_garrett_core::public_error::PublicError}]
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 9:29-9:38 -/
+@[reducible]
+impl_def public_error.PublicError.Insts.CoreCmpPartialEqPublicError :
+  core.cmp.PartialEq public_error.PublicError public_error.PublicError := {
+  eq := public_error.PublicError.Insts.CoreCmpPartialEqPublicError.eq
+  ne := core.cmp.PartialEq.ne.trait_default
+    public_error.PublicError.Insts.CoreCmpPartialEqPublicError
+}
+
+/-- Trait implementation: [aivm_secrets_garrett_core::public_error::{impl core::cmp::Eq for aivm_secrets_garrett_core::public_error::PublicError}]
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 9:40-9:42 -/
+@[reducible]
+def public_error.PublicError.Insts.CoreCmpEq : core.cmp.Eq
+  public_error.PublicError := {
+  partialEqInst := public_error.PublicError.Insts.CoreCmpPartialEqPublicError
+}
+
+/-- [aivm_secrets_garrett_core::public_error::code]:
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 32:0-54:1
+    Visibility: public -/
+def public_error.code
+  (error : public_error.PublicError) : Result (alloc.vec.Vec Std.U8) := do
+  match error with
+  | public_error.PublicError.InvalidCapability =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 18#usize [
+          105#u8, 110#u8, 118#u8, 97#u8, 108#u8, 105#u8, 100#u8, 95#u8, 99#u8,
+          97#u8, 112#u8, 97#u8, 98#u8, 105#u8, 108#u8, 105#u8, 116#u8, 121#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.InvalidPolicy =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 14#usize [
+          105#u8, 110#u8, 118#u8, 97#u8, 108#u8, 105#u8, 100#u8, 95#u8, 112#u8,
+          111#u8, 108#u8, 105#u8, 99#u8, 121#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.ResourceMismatch =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 17#usize [
+          114#u8, 101#u8, 115#u8, 111#u8, 117#u8, 114#u8, 99#u8, 101#u8, 95#u8,
+          109#u8, 105#u8, 115#u8, 109#u8, 97#u8, 116#u8, 99#u8, 104#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.InvalidRequest =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 15#usize [
+          105#u8, 110#u8, 118#u8, 97#u8, 108#u8, 105#u8, 100#u8, 95#u8, 114#u8,
+          101#u8, 113#u8, 117#u8, 101#u8, 115#u8, 116#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.Denied =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 6#usize [ 100#u8, 101#u8, 110#u8, 105#u8, 101#u8, 100#u8 ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.Unreachable =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 11#usize [
+          117#u8, 110#u8, 114#u8, 101#u8, 97#u8, 99#u8, 104#u8, 97#u8, 98#u8,
+          108#u8, 101#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.UpstreamResponse =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 17#usize [
+          117#u8, 112#u8, 115#u8, 116#u8, 114#u8, 101#u8, 97#u8, 109#u8, 95#u8,
+          114#u8, 101#u8, 115#u8, 112#u8, 111#u8, 110#u8, 115#u8, 101#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.UpstreamRejected =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 17#usize [
+          117#u8, 112#u8, 115#u8, 116#u8, 114#u8, 101#u8, 97#u8, 109#u8, 95#u8,
+          114#u8, 101#u8, 106#u8, 101#u8, 99#u8, 116#u8, 101#u8, 100#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.UpstreamError =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 14#usize [
+          117#u8, 112#u8, 115#u8, 116#u8, 114#u8, 101#u8, 97#u8, 109#u8, 95#u8,
+          101#u8, 114#u8, 114#u8, 111#u8, 114#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.InternalError =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 14#usize [
+          105#u8, 110#u8, 116#u8, 101#u8, 114#u8, 110#u8, 97#u8, 108#u8, 95#u8,
+          101#u8, 114#u8, 114#u8, 111#u8, 114#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.UnsafeFile =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 11#usize [
+          117#u8, 110#u8, 115#u8, 97#u8, 102#u8, 101#u8, 95#u8, 102#u8, 105#u8,
+          108#u8, 101#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.OutcomeUnknown =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 15#usize [
+          111#u8, 117#u8, 116#u8, 99#u8, 111#u8, 109#u8, 101#u8, 95#u8, 117#u8,
+          110#u8, 107#u8, 110#u8, 111#u8, 119#u8, 110#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.Exhausted =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 9#usize [
+          101#u8, 120#u8, 104#u8, 97#u8, 117#u8, 115#u8, 116#u8, 101#u8, 100#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.Revoked =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 7#usize [
+          114#u8, 101#u8, 118#u8, 111#u8, 107#u8, 101#u8, 100#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.CredentialSource =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 17#usize [
+          99#u8, 114#u8, 101#u8, 100#u8, 101#u8, 110#u8, 116#u8, 105#u8, 97#u8,
+          108#u8, 95#u8, 115#u8, 111#u8, 117#u8, 114#u8, 99#u8, 101#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.Expired =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 7#usize [
+          101#u8, 120#u8, 112#u8, 105#u8, 114#u8, 101#u8, 100#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.AuthorizationDenied =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 17#usize [
+          99#u8, 114#u8, 101#u8, 100#u8, 101#u8, 110#u8, 116#u8, 105#u8, 97#u8,
+          108#u8, 95#u8, 115#u8, 111#u8, 117#u8, 114#u8, 99#u8, 101#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+
+/-- [aivm_secrets_garrett_core::public_error::message]:
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 57:0-70:1
+    Visibility: public -/
+def public_error.message
+  (error : public_error.PublicError) : Result (alloc.vec.Vec Std.U8) := do
+  match error with
+  | public_error.PublicError.InvalidCapability =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 33#usize [
+          67#u8, 97#u8, 112#u8, 97#u8, 98#u8, 105#u8, 108#u8, 105#u8, 116#u8,
+          121#u8, 32#u8, 97#u8, 117#u8, 116#u8, 104#u8, 101#u8, 110#u8, 116#u8,
+          105#u8, 99#u8, 97#u8, 116#u8, 105#u8, 111#u8, 110#u8, 32#u8, 102#u8,
+          97#u8, 105#u8, 108#u8, 101#u8, 100#u8, 46#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.InvalidPolicy =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 21#usize [
+          66#u8, 114#u8, 111#u8, 107#u8, 101#u8, 114#u8, 32#u8, 102#u8, 97#u8,
+          105#u8, 108#u8, 101#u8, 100#u8, 32#u8, 99#u8, 108#u8, 111#u8, 115#u8,
+          101#u8, 100#u8, 46#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.ResourceMismatch =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 21#usize [
+          66#u8, 114#u8, 111#u8, 107#u8, 101#u8, 114#u8, 32#u8, 102#u8, 97#u8,
+          105#u8, 108#u8, 101#u8, 100#u8, 32#u8, 99#u8, 108#u8, 111#u8, 115#u8,
+          101#u8, 100#u8, 46#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.InvalidRequest =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 33#usize [
+          77#u8, 97#u8, 108#u8, 102#u8, 111#u8, 114#u8, 109#u8, 101#u8, 100#u8,
+          32#u8, 111#u8, 114#u8, 32#u8, 117#u8, 110#u8, 115#u8, 117#u8, 112#u8,
+          112#u8, 111#u8, 114#u8, 116#u8, 101#u8, 100#u8, 32#u8, 114#u8,
+          101#u8, 113#u8, 117#u8, 101#u8, 115#u8, 116#u8, 46#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.Denied =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 43#usize [
+          79#u8, 112#u8, 101#u8, 114#u8, 97#u8, 116#u8, 105#u8, 111#u8, 110#u8,
+          32#u8, 105#u8, 115#u8, 32#u8, 111#u8, 117#u8, 116#u8, 115#u8, 105#u8,
+          100#u8, 101#u8, 32#u8, 116#u8, 104#u8, 101#u8, 32#u8, 103#u8, 114#u8,
+          97#u8, 110#u8, 116#u8, 101#u8, 100#u8, 32#u8, 97#u8, 117#u8, 116#u8,
+          104#u8, 111#u8, 114#u8, 105#u8, 116#u8, 121#u8, 46#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.Unreachable =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 21#usize [
+          66#u8, 114#u8, 111#u8, 107#u8, 101#u8, 114#u8, 32#u8, 102#u8, 97#u8,
+          105#u8, 108#u8, 101#u8, 100#u8, 32#u8, 99#u8, 108#u8, 111#u8, 115#u8,
+          101#u8, 100#u8, 46#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.UpstreamResponse =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 21#usize [
+          66#u8, 114#u8, 111#u8, 107#u8, 101#u8, 114#u8, 32#u8, 102#u8, 97#u8,
+          105#u8, 108#u8, 101#u8, 100#u8, 32#u8, 99#u8, 108#u8, 111#u8, 115#u8,
+          101#u8, 100#u8, 46#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.UpstreamRejected =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 21#usize [
+          66#u8, 114#u8, 111#u8, 107#u8, 101#u8, 114#u8, 32#u8, 102#u8, 97#u8,
+          105#u8, 108#u8, 101#u8, 100#u8, 32#u8, 99#u8, 108#u8, 111#u8, 115#u8,
+          101#u8, 100#u8, 46#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.UpstreamError =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 21#usize [
+          66#u8, 114#u8, 111#u8, 107#u8, 101#u8, 114#u8, 32#u8, 102#u8, 97#u8,
+          105#u8, 108#u8, 101#u8, 100#u8, 32#u8, 99#u8, 108#u8, 111#u8, 115#u8,
+          101#u8, 100#u8, 46#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.InternalError =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 21#usize [
+          66#u8, 114#u8, 111#u8, 107#u8, 101#u8, 114#u8, 32#u8, 102#u8, 97#u8,
+          105#u8, 108#u8, 101#u8, 100#u8, 32#u8, 99#u8, 108#u8, 111#u8, 115#u8,
+          101#u8, 100#u8, 46#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.UnsafeFile =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 52#usize [
+          72#u8, 111#u8, 115#u8, 116#u8, 32#u8, 102#u8, 105#u8, 108#u8, 101#u8,
+          32#u8, 111#u8, 119#u8, 110#u8, 101#u8, 114#u8, 115#u8, 104#u8,
+          105#u8, 112#u8, 44#u8, 32#u8, 112#u8, 101#u8, 114#u8, 109#u8, 105#u8,
+          115#u8, 115#u8, 105#u8, 111#u8, 110#u8, 115#u8, 44#u8, 32#u8, 111#u8,
+          114#u8, 32#u8, 116#u8, 121#u8, 112#u8, 101#u8, 32#u8, 105#u8, 115#u8,
+          32#u8, 117#u8, 110#u8, 115#u8, 97#u8, 102#u8, 101#u8, 46#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.OutcomeUnknown =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 67#usize [
+          65#u8, 32#u8, 100#u8, 105#u8, 115#u8, 112#u8, 97#u8, 116#u8, 99#u8,
+          104#u8, 101#u8, 100#u8, 32#u8, 114#u8, 101#u8, 113#u8, 117#u8,
+          101#u8, 115#u8, 116#u8, 32#u8, 109#u8, 97#u8, 121#u8, 32#u8, 104#u8,
+          97#u8, 118#u8, 101#u8, 32#u8, 99#u8, 111#u8, 109#u8, 112#u8, 108#u8,
+          101#u8, 116#u8, 101#u8, 100#u8, 59#u8, 32#u8, 114#u8, 101#u8, 99#u8,
+          111#u8, 110#u8, 99#u8, 105#u8, 108#u8, 101#u8, 32#u8, 98#u8, 101#u8,
+          102#u8, 111#u8, 114#u8, 101#u8, 32#u8, 114#u8, 101#u8, 116#u8,
+          114#u8, 121#u8, 105#u8, 110#u8, 103#u8, 46#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.Exhausted =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 21#usize [
+          66#u8, 114#u8, 111#u8, 107#u8, 101#u8, 114#u8, 32#u8, 102#u8, 97#u8,
+          105#u8, 108#u8, 101#u8, 100#u8, 32#u8, 99#u8, 108#u8, 111#u8, 115#u8,
+          101#u8, 100#u8, 46#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.Revoked =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 21#usize [
+          66#u8, 114#u8, 111#u8, 107#u8, 101#u8, 114#u8, 32#u8, 102#u8, 97#u8,
+          105#u8, 108#u8, 101#u8, 100#u8, 32#u8, 99#u8, 108#u8, 111#u8, 115#u8,
+          101#u8, 100#u8, 46#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.CredentialSource =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 21#usize [
+          66#u8, 114#u8, 111#u8, 107#u8, 101#u8, 114#u8, 32#u8, 102#u8, 97#u8,
+          105#u8, 108#u8, 101#u8, 100#u8, 32#u8, 99#u8, 108#u8, 111#u8, 115#u8,
+          101#u8, 100#u8, 46#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.Expired =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 21#usize [
+          66#u8, 114#u8, 111#u8, 107#u8, 101#u8, 114#u8, 32#u8, 102#u8, 97#u8,
+          105#u8, 108#u8, 101#u8, 100#u8, 32#u8, 99#u8, 108#u8, 111#u8, 115#u8,
+          101#u8, 100#u8, 46#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  | public_error.PublicError.AuthorizationDenied =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 21#usize [
+          66#u8, 114#u8, 111#u8, 107#u8, 101#u8, 114#u8, 32#u8, 102#u8, 97#u8,
+          105#u8, 108#u8, 101#u8, 100#u8, 32#u8, 99#u8, 108#u8, 111#u8, 115#u8,
+          101#u8, 100#u8, 46#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+
+/-- [aivm_secrets_garrett_core::public_error::text]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 76:4-79:5 -/
+@[rust_loop]
+def public_error.text_loop
+  (bytes : Slice Std.U8) (out : alloc.vec.Vec Std.U32) (i : Std.Usize) :
+  Result (alloc.vec.Vec Std.U32)
+  := do
+  let i1 := Slice.len bytes
+  if i < i1
+  then
+    let i2 ← Slice.index_usize bytes i
+    let i3 ← lift (UScalar.cast .U32 i2)
+    let out1 ← alloc.vec.Vec.push out i3
+    let i4 ← i + 1#usize
+    public_error.text_loop bytes out1 i4
+  else ok out
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::public_error::text]:
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 73:0-81:1 -/
+@[reducible]
+def public_error.text
+  (bytes : Slice Std.U8) : Result (alloc.vec.Vec Std.U32) := do
+  public_error.text_loop bytes (alloc.vec.Vec.new Std.U32) 0#usize
+
+/-- [aivm_secrets_garrett_core::public_error::denial]:
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 86:0-98:1
+    Visibility: public -/
+def public_error.denial
+  (error : public_error.PublicError) : Result json_wire.Value := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 5#usize [ 101#u8, 114#u8, 114#u8, 111#u8, 114#u8 ]))
+  let v ← public_error.text s
+  let s1 ←
+    lift (Array.to_slice
+      (Array.make 4#usize [ 99#u8, 111#u8, 100#u8, 101#u8 ]))
+  let v1 ← public_error.text s1
+  let v2 ← public_error.code error
+  let s2 := alloc.vec.Vec.deref v2
+  let v3 ← public_error.text s2
+  let s3 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        109#u8, 101#u8, 115#u8, 115#u8, 97#u8, 103#u8, 101#u8
+        ]))
+  let v4 ← public_error.text s3
+  let v5 ← public_error.message error
+  let s4 := alloc.vec.Vec.deref v5
+  let v6 ← public_error.text s4
+  let y ←
+    lift (Std.Array.to_slice
+      (Array.make 2#usize [
+         (v1, json_wire.Value.Text v3), (v4, json_wire.Value.Text v6)
+         ] : Array ((alloc.vec.Vec Std.U32) × json_wire.Value) 2#usize))
+  let ret := alloc.slice.Slice.into_vec y
+  let s5 ← lift (Array.to_slice (Array.make 2#usize [ 111#u8, 107#u8 ]))
+  let v7 ← public_error.text s5
+  let s6 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        118#u8, 101#u8, 114#u8, 115#u8, 105#u8, 111#u8, 110#u8
+        ]))
+  let v8 ← public_error.text s6
+  let s7 ← lift (Array.to_slice (Array.make 1#usize [ 49#u8 ]))
+  let v9 ← alloc.slice.Slice.to_vec core.clone.CloneU8 s7
+  let y1 ←
+    lift (Std.Array.to_slice
+      (Array.make 3#usize [
+         (v, json_wire.Value.Object ret), (v7, json_wire.Value.Boolean false),
+         (v8, json_wire.Value.Number v9)
+         ] : Array ((alloc.vec.Vec Std.U32) × json_wire.Value) 3#usize))
+  let ret1 := alloc.slice.Slice.into_vec y1
+  ok (json_wire.Value.Object ret1)
+
+/-- [aivm_secrets_garrett_core::public_error::denial_frame]:
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 101:0-106:1
+    Visibility: public -/
+def public_error.denial_frame
+  (error : public_error.PublicError) (limit : Std.Usize) :
+  Result (core.result.Result guest_frame.Frame guest_frame.FrameDenial)
+  := do
+  let v ← public_error.denial error
+  json_wire.prepare v limit
+
 /-- [aivm_secrets_garrett_core::read_transition::invocation::Trace]
     Source: 'crates/aivm-secrets-garrett-core/src/read_transition/invocation.rs', lines 9:0-20:1
     Visibility: public -/

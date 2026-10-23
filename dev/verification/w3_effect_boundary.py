@@ -512,8 +512,10 @@ def review_semantics(contents: dict[str, str]) -> None:
     require('GuestFrame::from_answer(answer)?.send(&mut stream)?;' in serve
             and '.write_all(' not in serve,
             'authenticated guest writer bypasses GuestFrame')
-    require('answer.unwrap_or_else(failure)' in guest,
-            'guest failure is not the fixed Error::code mapper')
+    require(same_order(guest, 'Ok(value) => json::capture(&value).prepare(MAX_REPLY)',
+                       'Err(error) =>', 'aivm_secrets_garrett_core::public_error::denial_frame(error.into(), MAX_REPLY)')
+            and 'json!(' not in guest and 'format!(' not in guest,
+            'guest failure is not the extracted fixed public_error denial frame')
     require('verbs[0] == "delegate"' in answer
             and 'if let Backend::Provider(provider)' in answer
             and 'return provider.request(' in answer,
@@ -731,7 +733,7 @@ def review_semantics(contents: dict[str, str]) -> None:
     # The shared reader keeps the buffer that read_until may fill beyond LF.
     # Request errors are pre-dispatch; reply errors remain post-send uncertainty.
     transport = contents[RUST + 'tls.rs']
-    framed = part(transport, 'pub(crate) fn frame(', '\nfn failure(')
+    framed = part(transport, 'pub(crate) fn frame(', '\nenum Backend')
     require('limit.checked_add(1)' in framed
             and 'BufReader::with_capacity(16384, stream.take(bound as u64))' in framed
             and same_order(framed, '.read_until(',

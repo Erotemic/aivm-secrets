@@ -251,3 +251,4 @@ pub mod provider_io;
 pub mod provider_wire;
 
 pub mod json_wire;
+pub mod public_error;

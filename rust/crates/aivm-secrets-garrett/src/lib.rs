@@ -47,6 +47,8 @@ pub enum Error {
 }
 pub type Outcome<T> = Result<T, Error>;
 impl Error {
+    /// Host-side spelling; equality with the extracted guest-frame table
+    /// `public_error::code` is pinned by `public_error_tests`.
     pub fn code(self) -> &'static str {
         match self {
             Self::InvalidCapability => "invalid_capability",
@@ -68,6 +70,63 @@ impl Error {
         }
     }
 }
+// One-to-one and exhaustive: adding a native variant must extend PublicError.
+impl From<Error> for aivm_secrets_garrett_core::public_error::PublicError {
+    fn from(error: Error) -> Self {
+        use aivm_secrets_garrett_core::public_error::PublicError as P;
+        match error {
+            Error::InvalidCapability => P::InvalidCapability,
+            Error::InvalidPolicy => P::InvalidPolicy,
+            Error::ResourceMismatch => P::ResourceMismatch,
+            Error::InvalidRequest => P::InvalidRequest,
+            Error::Denied => P::Denied,
+            Error::Unreachable => P::Unreachable,
+            Error::UpstreamResponse => P::UpstreamResponse,
+            Error::UpstreamRejected => P::UpstreamRejected,
+            Error::UpstreamError => P::UpstreamError,
+            Error::InternalError => P::InternalError,
+            Error::UnsafeFile => P::UnsafeFile,
+            Error::OutcomeUnknown => P::OutcomeUnknown,
+            Error::Exhausted => P::Exhausted,
+            Error::Revoked => P::Revoked,
+            Error::CredentialSource => P::CredentialSource,
+            Error::Expired => P::Expired,
+            Error::AuthorizationDenied => P::AuthorizationDenied,
+        }
+    }
+}
 
 #[cfg(feature = "conformance")]
 pub mod conformance;
+
+#[cfg(test)]
+mod public_error_tests {
+    use super::Error;
+    // The public codes predate the extracted table; they must not change.
+    #[test]
+    fn extracted_codes_equal_previous_native_codes() {
+        for (error, code) in [
+            (Error::InvalidCapability, "invalid_capability"),
+            (Error::InvalidPolicy, "invalid_policy"),
+            (Error::ResourceMismatch, "resource_mismatch"),
+            (Error::InvalidRequest, "invalid_request"),
+            (Error::Denied, "denied"),
+            (Error::Unreachable, "unreachable"),
+            (Error::UpstreamResponse, "upstream_response"),
+            (Error::UpstreamRejected, "upstream_rejected"),
+            (Error::UpstreamError, "upstream_error"),
+            (Error::InternalError, "internal_error"),
+            (Error::UnsafeFile, "unsafe_file"),
+            (Error::OutcomeUnknown, "outcome_unknown"),
+            (Error::Exhausted, "exhausted"),
+            (Error::Revoked, "revoked"),
+            (Error::CredentialSource, "credential_source"),
+            (Error::AuthorizationDenied, "credential_source"),
+            (Error::Expired, "expired"),
+        ] {
+            assert_eq!(error.code(), code);
+            let public = aivm_secrets_garrett_core::public_error::code(error.into());
+            assert_eq!(public, code.as_bytes());
+        }
+    }
+}

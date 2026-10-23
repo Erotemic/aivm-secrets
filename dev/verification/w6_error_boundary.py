@@ -15,6 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = Path('docs/planning/aivm-secrets-read-failure-scope.json')
 TLS = Path('rust/crates/aivm-secrets-garrett/src/tls.rs')
+PUBLIC_ERROR = Path('rust/crates/aivm-secrets-garrett-core/src/public_error.rs')
 ERROR = Path('rust/crates/aivm-secrets-garrett/src/lib.rs')
 MANIFEST_SESSION = Path('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs')
 CLASSES = {
@@ -72,17 +73,21 @@ def check(root: Path = ROOT) -> dict:
     tls = (root / TLS).read_text()
     error = (root / ERROR).read_text()
     session = (root / MANIFEST_SESSION).read_text()
-    require('fn failure(error: Error) -> Value {' in tls and '\nenum Backend' in tls,
+    public = (root / PUBLIC_ERROR).read_text().split('#[cfg(test)]', 1)[0]
+    require('pub fn message(error: PublicError) -> Vec<u8> {' in public and '\nfn text(' in public,
             'fixed public denial function changed')
-    body = tls.split('fn failure(error: Error) -> Value {', 1)[1].split('\nenum Backend', 1)[0]
-    require('match error {' in body and '_ => "Broker failed closed."' in body,
+    body = public.split('pub fn message(error: PublicError) -> Vec<u8> {', 1)[1].split('\nfn text(', 1)[0]
+    require('match error {' in body and '_ => out.extend_from_slice(b"Broker failed closed.")' in body,
             'guest denial fallback is not fixed')
-    require('json!({"version":1,"ok":false,"error":{"code":error.code(),"message":message}})' in body,
+    require('(text(b"code"), Value::Text(text(&code(error))))' in public
+            and '(text(b"message"), Value::Text(text(&message(error))))' in public
+            and 'crate::json_wire::prepare(&denial(error), limit)' in public,
             'guest denial schema no longer consists of fixed code/message')
-    require('format!(' not in body and 'to_string(' not in body,
+    require('format!(' not in public and 'to_string(' not in public,
             'guest failure message may include nonfixed diagnostics')
-    require('let value = answer.unwrap_or_else(failure);' in tls
-            and 'json::capture(&value)' in tls and '.prepare(MAX_REPLY)' in tls
+    require('Err(error) => {' in tls
+            and 'aivm_secrets_garrett_core::public_error::denial_frame(error.into(), MAX_REPLY)' in tls
+            and 'json::capture(&value).prepare(MAX_REPLY)' in tls
             and 'self.0.send(&mut GuestWriter(writer))' in tls
             and 'write_all(wire)' in tls and 'self.0.flush()' in tls,
             'guest reply bypasses the canonical bounded single-attempt writer')

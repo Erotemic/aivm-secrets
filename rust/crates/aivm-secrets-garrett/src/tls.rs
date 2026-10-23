@@ -146,20 +146,6 @@ pub(crate) fn frame(stream: impl Read, limit: usize) -> Outcome<Vec<u8>> {
     Ok(data)
 }
 
-fn failure(error: Error) -> Value {
-    let message = match error {
-        Error::InvalidCapability => "Capability authentication failed.",
-        Error::InvalidRequest => "Malformed or unsupported request.",
-        Error::Denied => "Operation is outside the granted authority.",
-        Error::UnsafeFile => "Host file ownership, permissions, or type is unsafe.",
-        Error::OutcomeUnknown => {
-            "A dispatched request may have completed; reconcile before retrying."
-        }
-        _ => "Broker failed closed.",
-    };
-    json!({"version":1,"ok":false,"error":{"code":error.code(),"message":message}})
-}
-
 enum Backend {
     Socket(PathBuf),
     Provider(Box<std::sync::Mutex<crate::ProviderSession>>),
@@ -195,11 +181,16 @@ impl<W: Write> aivm_secrets_garrett_core::guest_frame::Writer for GuestWriter<'_
 }
 impl GuestFrame {
     fn from_answer(answer: Outcome<Value>) -> Outcome<Self> {
-        let value = answer.unwrap_or_else(failure);
-        json::capture(&value)
-            .prepare(MAX_REPLY)
-            .map(Self)
-            .map_err(|_| Error::InternalError)
+        // A failure frame is one of the extracted fixed public denials; no
+        // native error text or serde conversion reaches the guest.
+        match answer {
+            Ok(value) => json::capture(&value).prepare(MAX_REPLY),
+            Err(error) => {
+                aivm_secrets_garrett_core::public_error::denial_frame(error.into(), MAX_REPLY)
+            }
+        }
+        .map(Self)
+        .map_err(|_| Error::InternalError)
     }
     fn send(&mut self, writer: &mut impl Write) -> Outcome<()> {
         self.0.send(&mut GuestWriter(writer))
@@ -555,6 +546,46 @@ mod guest_frame_tests {
         }
     }
 
+    fn old_failure(error: Error) -> Value {
+        let message = match error {
+            Error::InvalidCapability => "Capability authentication failed.",
+            Error::InvalidRequest => "Malformed or unsupported request.",
+            Error::Denied => "Operation is outside the granted authority.",
+            Error::UnsafeFile => "Host file ownership, permissions, or type is unsafe.",
+            Error::OutcomeUnknown => {
+                "A dispatched request may have completed; reconcile before retrying."
+            }
+            _ => "Broker failed closed.",
+        };
+        json!({"version":1,"ok":false,"error":{"code":error.code(),"message":message}})
+    }
+    const ALL_ERRORS: [Error; 17] = [
+        Error::InvalidCapability, Error::InvalidPolicy, Error::ResourceMismatch,
+        Error::InvalidRequest, Error::Denied, Error::Unreachable,
+        Error::UpstreamResponse, Error::UpstreamRejected, Error::UpstreamError,
+        Error::InternalError, Error::UnsafeFile, Error::OutcomeUnknown,
+        Error::Exhausted, Error::Revoked, Error::CredentialSource, Error::Expired,
+        Error::AuthorizationDenied,
+    ];
+
+    // The extracted denial table must reproduce the previous native serde
+    // frames byte for byte, for every native error variant.
+    #[test]
+    fn extracted_denial_frames_equal_previous_native_frames() {
+        for error in ALL_ERRORS {
+            let mut frame = GuestFrame::from_answer(Err(error)).unwrap();
+            let mut writer = FaultWriter {
+                accepted: Vec::new(),
+                limit: usize::MAX,
+                flush_error: false,
+            };
+            frame.send(&mut writer).unwrap();
+            let mut expected = json::canonical(&old_failure(error));
+            expected.push(b'\n');
+            assert_eq!(writer.accepted, expected, "{error:?}");
+        }
+    }
+
     #[test]
     fn actual_guest_constructor_preserves_fixed_errors_and_refuses_oversize() {
         let mut frame = GuestFrame::from_answer(Err(Error::Revoked)).unwrap();
@@ -565,7 +596,7 @@ mod guest_frame_tests {
         };
         frame.send(&mut writer).unwrap();
         let value: Value = serde_json::from_slice(&writer.accepted).unwrap();
-        assert_eq!(value, failure(Error::Revoked));
+        assert_eq!(value, old_failure(Error::Revoked));
         assert_eq!(writer.accepted.iter().filter(|b| **b == b'\n').count(), 1);
         assert!(matches!(
             GuestFrame::from_answer(Ok(json!({"result":"x".repeat(MAX_REPLY)}))),

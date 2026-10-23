@@ -18,7 +18,7 @@ spec.loader.exec_module(checker)
 
 def _review_snapshot(tmp_path):
     for name in (checker.MANIFEST, checker.TLS, checker.ERROR,
-                 checker.MANIFEST_SESSION):
+                 checker.MANIFEST_SESSION, checker.PUBLIC_ERROR):
         dest = tmp_path / name
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / name, dest)
@@ -30,8 +30,8 @@ def test_reviewed_public_denial_leaf_is_stable(tmp_path):
 
 
 @pytest.mark.parametrize('name,original,mutant', [
-    (checker.TLS, '"Broker failed closed."', '"Provider said: "'),
-    (checker.TLS, 'let value = answer.unwrap_or_else(failure);', 'let value = answer.unwrap();'),
+    (checker.PUBLIC_ERROR, 'b"Broker failed closed."', 'b"Provider said: "'),
+    (checker.TLS, 'aivm_secrets_garrett_core::public_error::denial_frame(error.into(), MAX_REPLY)', 'json::capture(&json!({"detail": format!("{:?}", error)})).prepare(MAX_REPLY)'),
     (checker.TLS, 'write_all(wire)', 'write_all(&b"raw"[..])'),
     (checker.TLS, 'self.0.send(&mut GuestWriter(writer))',
      'unchecked_send(writer)'),

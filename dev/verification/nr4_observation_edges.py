@@ -17,6 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 TLS = 'rust/crates/aivm-secrets-garrett/src/tls.rs'
 JSON_CORE = 'rust/crates/aivm-secrets-garrett-core/src/guest_frame.rs'
+PUBLIC_ERROR = 'rust/crates/aivm-secrets-garrett-core/src/public_error.rs'
 SESSION = 'rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs'
 
 
@@ -30,21 +31,25 @@ class Edge:
 
 
 EDGES = (
-    Edge('bounded-error-taxonomy', TLS, 'fn failure(error: Error)', 'enum Backend', (
-        'Error::InvalidCapability =>',
-        'Error::InvalidRequest =>',
-        'Error::Denied =>',
-        'Error::UnsafeFile =>',
-        'Error::OutcomeUnknown =>',
-        '_ => "Broker failed closed."',
-        '"code":error.code()',
+    Edge('bounded-error-taxonomy', PUBLIC_ERROR, 'pub fn message(error: PublicError)', '#[cfg(test)]', (
+        'PublicError::InvalidCapability =>',
+        'PublicError::InvalidRequest =>',
+        'PublicError::Denied =>',
+        'PublicError::UnsafeFile =>',
+        'PublicError::OutcomeUnknown =>',
+        '_ => out.extend_from_slice(b"Broker failed closed.")',
+        'pub fn denial(error: PublicError) -> Value {',
+        'Value::Text(text(&code(error)))',
+        'Value::Text(text(&message(error)))',
+        'pub fn denial_frame(',
+        'crate::json_wire::prepare(&denial(error), limit)',
     )),
     Edge('answer-conversion', TLS,
          'fn from_answer(answer: Outcome<Value>)',
          'fn send(&mut self, writer: &mut impl Write)', (
-             'answer.unwrap_or_else(failure)',
-             'json::capture(&value)',
-             '.prepare(MAX_REPLY)',
+             'Ok(value) => json::capture(&value).prepare(MAX_REPLY)',
+             'Err(error) =>',
+             'aivm_secrets_garrett_core::public_error::denial_frame(error.into(), MAX_REPLY)',
          )),
     Edge('guest-frame-single-writer', TLS,
          'impl<W: Write> aivm_secrets_garrett_core::guest_frame::Writer',
@@ -130,7 +135,7 @@ def scan(sources: dict[str, str]) -> list[str]:
 def read_sources(root: Path = ROOT) -> dict[str, str]:
     return {
         path: (root / path).read_text()
-        for path in (TLS, JSON_CORE, SESSION)
+        for path in (TLS, JSON_CORE, SESSION, PUBLIC_ERROR)
     }
 
 

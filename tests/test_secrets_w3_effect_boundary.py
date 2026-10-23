@@ -296,8 +296,8 @@ def mutate(repo, filename, before, after):
     ),
     (
         RUST + 'tls.rs',
-        'let value = answer.unwrap_or_else(failure);',
-        'let value = answer.unwrap_or_else(|error| json!({"detail": format!("{:?}", error)}));',
+        'aivm_secrets_garrett_core::public_error::denial_frame(error.into(), MAX_REPLY)',
+        'json::capture(&json!({"detail": format!("{:?}", error)})).prepare(MAX_REPLY)',
     ),
 ])
 def test_w3_bypass_mutants_fail_even_with_updated_source_digest(
