@@ -523,3 +523,15 @@ card headings shifted right by half their width (overflowing for long
 names) and long subtitles running off the frame. Structural tests had
 passed throughout; only rendering showed it. Lesson: render at least one
 still after changing a scene.
+
+## 2026-10-23 12:22:34 -0400
+
+`system.py --proofs` had been failing since before this session: the
+freshness manifest pinned old hashes of `proofs/lakefile.lean` (roots added
+over many commits) and `dev/verification/freshness.py` (changed in
+`523408e`). `freshness.py record` would refresh them but also runs the
+transitive axiom audit, which AGENTS.md reserves for an explicit
+end-of-formalization request, so I updated only those two hashes after a full
+`lake build` passed. I also added the proxy, route, control and write-gate
+modules to the `--proofs` build list. Whoever runs the next requested audit
+should re-record the manifest normally.

@@ -218,6 +218,12 @@ def main() -> int:
             run('lean-profile-emission-oauth', ['lake', '-d', 'proofs', 'build',
                                                '+GarrettProfiles', '+GarrettEmission',
                                                '+GarrettOAuth', '+GarrettCoordination', '+GarrettRetryKey', '+GarrettRebinding', '+GarrettHttpAuth', '+GarrettHttpRequest', '+GarrettHttpWire', '+GarrettLineFrame', '+GarrettBundle', '+GarrettJsonReflection', '+GarrettCoordinatorAuthority', '+GarrettCoordinatorReply', '+GarrettApproval'])
+            # The HTTPS proxy profiles, request targets, control verbs and the write gate.
+            run('lean-proxy-route-control', ['lake', '-d', 'proofs', 'build',
+                                            '+GarrettProxyHttp', '+GarrettProxyResponse',
+                                            '+GarrettProxyController', '+GarrettProxyConnect',
+                                            '+GarrettRoute', '+GarrettRouteMatch', '+GarrettControl',
+                                            '+GarrettWriteGate'])
         if args.full_tests:
             with tempfile.TemporaryDirectory(prefix='as-full-', dir='/tmp') as temporary:
                 run('full-python-native', [python, '-m', 'pytest', '-q', '-ra',
