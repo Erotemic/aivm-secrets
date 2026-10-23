@@ -90,6 +90,34 @@ def test_native_session_serves_one_guest_and_tears_down(tmp_path):
         assert TOKEN.encode() not in out + err
 
 
+
+def test_revoking_the_guest_identity_mid_session_stops_the_next_request(tmp_path):
+    """W8: revocation while the session is live, through the session's own
+    authority, is honoured on the very next request with no provider call."""
+    from aivm_secrets.native_session import SUBJECT
+
+    with TLSService(provider_directory(tmp_path), host="api.example.org") as provider:
+        provider.routes[("GET", "/v1/tickets/7")] = {"id": 7}
+        process, announcement = start(spec_for(tmp_path, provider))
+        try:
+            assert announcement.get("ready") is True, announcement
+            assert guest_invoke(announcement, "ticket.view", '{"ticket":7}').returncode == 0
+            assert len(provider.seen()) == 1
+            request = private(tmp_path / "revoke.json", {"subject": SUBJECT})
+            revoked = subprocess.run(
+                [executable("AIVM_SECRETS_RUST_AUTHORITY_ADMIN"), "revoke",
+                 "--root", str(tmp_path / "host" / "authority"), "--request", str(request)],
+                capture_output=True, timeout=30)
+            assert revoked.returncode == 0, revoked
+            assert json.loads(revoked.stdout)["ok"] is True
+            after = guest_invoke(announcement, "ticket.view", '{"ticket":7}')
+            assert after.returncode != 0 or not json.loads(after.stdout)["ok"], after
+            assert len(provider.seen()) == 1
+            assert TOKEN.encode() not in after.stdout + after.stderr
+        finally:
+            process.stdin.close()
+            assert process.wait(timeout=30) == 0
+
 def test_native_session_refuses_a_spec_without_explicit_key_approval(tmp_path):
     with TLSService(provider_directory(tmp_path), host="api.example.org") as provider:
         process, announcement = start(spec_for(tmp_path, provider, approve_session_key=False))

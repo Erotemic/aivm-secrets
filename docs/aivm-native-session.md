@@ -67,7 +67,13 @@ this package; a subprocess test in AIVM checks this.
 
 - A maintainer real-VM run of the SSH guest transport through `aivm ssh`.
   The real-KVM acceptance used the fixture driver, not this adapter.
-- Identity revocation while the session is live. The Python adapter polls
-  the machine store; this one relies on the session ending.
-- Guest mount/share reachability, aliases, and unregistered or expired
-  identities (W8 open negative tests).
+- Revocation by AIVM's own machine store while the session is live. The
+  Python adapter polls that store; this one does not. Revoking the guest
+  subject in the **session authority** (`garrett-authority revoke --root
+  WORKSPACE/host/authority`) does take effect on the next request, with no
+  provider call (`tests/test_native_session.py`), as do registry changes
+  (`tests/test_rust_identity_negative.py`).
+- Guest mount/share reachability and aliases on a real VM (W8). Unregistered
+  subjects, expired enrollments, re-enrolled certificates and expired
+  capabilities are refused by the running bridge
+  (`tests/test_rust_identity_negative.py`).
