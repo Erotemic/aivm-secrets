@@ -202,7 +202,7 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and 'completion::complete(pending, self.effects)' in request_core
            and 'let pending = self.work.complete(raw);' in request_core
            and 'fresh:&fresh,' in release[1]
-           and 'read_transition::run_current(pending).map(aivm_secrets_garrett_core::completion::Completed::into_value).map(|wire|json::Reply::Released(json::Captured::released(wire)))' in ''.join(entry.split()),
+           and 'write_gate::Gated::Ran(result)=>result.map(aivm_secrets_garrett_core::completion::Completed::into_value).map(|wire|json::Reply::Released(json::Captured::released(wire)))' in ''.join(entry.split()),
            'native success can reach guest without completion audit')
     return {'channels': len(channels), 'remaining': len(contract['remaining_obligations']),
             'status': 'review guard only; runtime/formal gates are separate'}

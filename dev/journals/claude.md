@@ -266,3 +266,24 @@ unchanged, so no repair is triggered. The full AIVM suite passes in a clean
 worktree (3625; only the known 1-second timing test excluded). Risk: not
 exercised on real nftables or a VM. A wrong rule order would either break
 SSH or fail open; a unit test checks the order.
+
+## 2026-10-23 06:05:42 -0400
+
+OUT-4 first increment: the exact-write gate. The native session used to
+branch on the approval decision itself before calling the production
+controller. That branch is now the extracted `write_gate::run_approved`,
+which is the session's only call of `run_current`. `GarrettWriteGate`:
+`run_approved_ran`, `run_approved_refusals`,
+`approve_mode_write_ran_consumed_its_approval` (composed with the existing
+single-use approval proofs), `deny_mode_write_never_runs` and
+`production_write_has_approval_and_authorized_attempts` (composed with the
+production attempt-accounting theorem, which already holds for any
+operation). All of them compiled on the first try because the existing
+infrastructure did the heavy lifting.
+
+Behaviour is unchanged: 151 native approval, invoke and manifest tests pass.
+The Required path now builds the (side-effect-free) closures before
+returning. Five guards were re-anchored, and a new mutant that forces
+`Decision::Allowed` is detected. APPROVAL-RUST-01 is narrowed to "the
+session passes this request's own decision". A new visual scene,
+`proof_write_gate`, was added.

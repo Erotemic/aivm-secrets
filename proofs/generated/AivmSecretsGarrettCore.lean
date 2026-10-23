@@ -16977,4 +16977,31 @@ def trust.commit_trust
       ok (core.result.Result.Err trust.TrustDenial.Unpublished)
   | core.result.Result.Err _ => ok r
 
+/-- [aivm_secrets_garrett_core::write_gate::Gated]
+    Source: 'crates/aivm-secrets-garrett-core/src/write_gate.rs', lines 11:0-15:1
+    Visibility: public -/
+@[discriminant isize]
+inductive write_gate.Gated (T : Type _) where
+| Ran : T → write_gate.Gated T
+| Denied : write_gate.Gated T
+| Required : write_gate.Gated T
+
+/-- [aivm_secrets_garrett_core::write_gate::run_approved]:
+    Source: 'crates/aivm-secrets-garrett-core/src/write_gate.rs', lines 17:0-26:1
+    Visibility: public -/
+def write_gate.run_approved
+  {R : Type _} {Clause0_Facts : Type _} {Clause0_Effect : Type _}
+  {Clause0_Output : Type _} {Clause0_Error : Type _}
+  (read_transitionRequestInst : read_transition.Request R Clause0_Facts
+  Clause0_Effect Clause0_Output Clause0_Error) (decision : approval.Decision)
+  (adapter : R) :
+  Result (write_gate.Gated (core.result.Result Clause0_Output Clause0_Error))
+  := do
+  match decision with
+  | approval.Decision.Allowed =>
+    let r ← read_transition.run_current read_transitionRequestInst adapter
+    ok (write_gate.Gated.Ran r)
+  | approval.Decision.Denied => ok write_gate.Gated.Denied
+  | approval.Decision.Required => ok write_gate.Gated.Required
+
 end aivm_secrets_garrett_core

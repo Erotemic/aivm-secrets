@@ -143,6 +143,8 @@ fails if a named theorem disappears):
   encoded for the captured route, and what native trust remains.
 - `proof_release`: what a successful read frame is byte-for-byte, and the
   17 fixed denial lines.
+- `proof_write_gate`: when a write may run: the extracted approval decision and
+  the write gate in front of the production controller (OUT-4).
 - `proof_proxy`: where the optional credential-substitution proxy writes the
   credential (one verified line), what it drops, and why it is not confinement.
 - `proof_two_worlds`: noninterference as two provider worlds an adaptive

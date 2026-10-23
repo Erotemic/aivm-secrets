@@ -135,10 +135,13 @@ def review_semantics(contents: dict[str, str]) -> None:
     m = contents[RUST + 'custody/manifest_session.rs']
     request = part(m, 'pub(super) fn request(', 'pub(super) fn control(')
     require(same_order(request, 'control.state.admit(&approval_digest, op.write)?',
-                       'Decision::Required =>', 'fresh()?;',
-                       '.remember(&approval_digest, &canonical_request)?;',
-                       'let dispatch = |phase: DispatchPhase, effect: Effect|', 'preflight: || self.policy.preflight('),
-            'approval is not enforced before credentialed preflight/final effects')
+                       'let dispatch = |phase: DispatchPhase, effect: Effect|', 'preflight: || self.policy.preflight(',
+                       'aivm_secrets_garrett_core::write_gate::run_approved(decision, pending)',
+                       'write_gate::Gated::Denied => Err(Error::Denied)',
+                       'write_gate::Gated::Required => {', 'fresh()?;',
+                       '.remember(&approval_digest, &canonical_request)?;')
+            and request.count('run_current(') == 0 and request.count('run_approved(') == 1,
+            'approval is not enforced by the extracted write gate before the controller')
     require('self.policy.digest()' in request and '"grant":self.base.executor.audit.grant' in request
             and 'self.session.require_control_active(now)' in m
             and 'fresh: &fresh,' in request,
@@ -146,7 +149,7 @@ def review_semantics(contents: dict[str, str]) -> None:
     control = part(m, 'pub(super) fn control(', '\nfn manifest_fields(')
     dispatch = part(request, 'let dispatch = |phase: DispatchPhase, effect: Effect|', 'let release = |raw: Value|')
     release = part(request, 'let release = |raw: Value| PendingCompletion {', 'let work = PendingRequest {')
-    plan = part(request, 'let work = PendingRequest {', 'read_transition::run_current(pending)')
+    plan = part(request, 'let work = PendingRequest {', 'aivm_secrets_garrett_core::write_gate::run_approved(decision, pending)')
     transition = contents['rust/crates/aivm-secrets-garrett-core/src/read_transition.rs']
     dispatch_core = contents['rust/crates/aivm-secrets-garrett-core/src/dispatch.rs'].split('#[cfg(test)]', 1)[0]
     request_core = contents['rust/crates/aivm-secrets-garrett-core/src/request_adapter.rs'].split('#[cfg(test)]', 1)[0]
@@ -243,7 +246,7 @@ def review_semantics(contents: dict[str, str]) -> None:
                        'pending.release()') and
             completion.count('Err(error) => return Err(error)') == 3,
             'completion bypasses current authority, audit or post-audit freshness')
-    require(''.join(request.split()).count('read_transition::run_current(pending).map(aivm_secrets_garrett_core::completion::Completed::into_value)') == 1
+    require(''.join(request.split()).count('write_gate::Gated::Ran(result)=>result.map(aivm_secrets_garrett_core::completion::Completed::into_value)') == 1
             and 'complete: release,' in plan and 'fresh: &fresh,' in plan
             and 'fresh: &fresh,' in release,
             'guest result bypasses audited release or sent-write uncertainty')

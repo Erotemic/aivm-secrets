@@ -470,21 +470,6 @@ impl Session {
             )
             .0
         };
-        match decision {
-            aivm_secrets_garrett_core::approval::Decision::Allowed => (),
-            aivm_secrets_garrett_core::approval::Decision::Denied => return Err(Error::Denied),
-            aivm_secrets_garrett_core::approval::Decision::Required => {
-                fresh()?;
-                let reply = json!({"version":1,"ok":false,"error":{"code":"approval_required", "message":"Exact write needs host approval."},"approval":{"digest":approval_digest}});
-                crate::manifest::disclosure::ensure_safe(&reply, &secret.0)?;
-                self.control
-                    .as_ref()
-                    .ok_or(Error::InternalError)?
-                    .state
-                    .remember(&approval_digest, &canonical_request)?;
-                return Ok(json::Reply::Native(reply));
-            }
-        }
         // Factories return primitive adapters only. Receipt ownership, phase
         // preparation, controller calls and every error post-state are core.
         let dispatch = |phase: DispatchPhase, effect: Effect| {
@@ -553,9 +538,26 @@ impl Session {
             },
         );
         let pending = request_adapter::Pending::new(work);
-        read_transition::run_current(pending)
-            .map(aivm_secrets_garrett_core::completion::Completed::into_value)
-            .map(|wire| json::Reply::Released(json::Captured::released(wire)))
+        // The extracted gate runs the production controller only when the
+        // exact-write approval decision is `Allowed`; nothing above performs
+        // provider I/O.
+        match aivm_secrets_garrett_core::write_gate::run_approved(decision, pending) {
+            aivm_secrets_garrett_core::write_gate::Gated::Ran(result) => result
+                .map(aivm_secrets_garrett_core::completion::Completed::into_value)
+                .map(|wire| json::Reply::Released(json::Captured::released(wire))),
+            aivm_secrets_garrett_core::write_gate::Gated::Denied => Err(Error::Denied),
+            aivm_secrets_garrett_core::write_gate::Gated::Required => {
+                fresh()?;
+                let reply = json!({"version":1,"ok":false,"error":{"code":"approval_required", "message":"Exact write needs host approval."},"approval":{"digest":approval_digest}});
+                crate::manifest::disclosure::ensure_safe(&reply, &secret.0)?;
+                self.control
+                    .as_ref()
+                    .ok_or(Error::InternalError)?
+                    .state
+                    .remember(&approval_digest, &canonical_request)?;
+                Ok(json::Reply::Native(reply))
+            }
+        }
     }
 
     pub(super) fn control(

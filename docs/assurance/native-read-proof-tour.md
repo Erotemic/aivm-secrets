@@ -435,3 +435,27 @@ mutant that forwarded `Cookie` fails it.
   does), writes exactly these bytes.
 - **The profile grants the credential's full authority at the origin**
   (`PROXY-AUTHORITY-01`). None of this is authority confinement.
+
+## OUT-4 first increment: the exact-write gate (2026-10-23)
+
+Writes and reads run through the same extracted production controller,
+`read_transition::run_current`. Until now, the approval decision that decides
+whether a write may run was checked by native code in front of it. That check
+is now the extracted `write_gate::run_approved(decision, pending)`. It is the
+session's only call to the controller ([`GarrettWriteGate`](../../proofs/GarrettWriteGate.lean)).
+
+| Theorem | Says |
+| --- | --- |
+| `run_approved_ran` | The controller ran only if the decision was `Allowed`, with exactly its result. |
+| `run_approved_refusals` | A `Denied` or `Required` decision returns without invoking the controller, so no dispatch and no provider attempt happen. |
+| `approve_mode_write_ran_consumed_its_approval` | In `approve` mode, a write that ran had a matching, unexpired approval. The approval is consumed and cannot be reused. |
+| `deny_mode_write_never_runs` | In `deny` mode a write never reaches the controller. |
+| `production_write_has_approval_and_authorized_attempts` | For the production request type, a gated request that returned had an `Allowed` decision. Every accounted provider attempt was currently authorized (write mode included), audit-acknowledged and bound to its admission context, and the attempt count equals the trace's sends, so nothing is retried behind the trace. |
+
+**Still assumed:** that the session gives the gate the decision it computed
+for *this* request's digest, and the host approval store's locking
+(`APPROVAL-RUST-01`). Also assumed: the production theorem's native premises,
+and the keyed-retry and coordinator contracts for coordinated writes
+(`COORD-RUST-01`). This is not yet the full OUT-4 claim: provider-side write
+semantics and the uncertain-outcome policy across sessions still need their
+own statements.

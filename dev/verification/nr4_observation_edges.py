@@ -107,7 +107,7 @@ EDGES = (
              'let current_context =',
              'let dispatch =',
              'let release =',
-             'read_transition::run_current(pending)',
+             'aivm_secrets_garrett_core::write_gate::run_approved(decision, pending)',
          )),
 )
 

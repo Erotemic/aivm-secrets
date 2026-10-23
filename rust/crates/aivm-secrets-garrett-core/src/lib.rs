@@ -255,3 +255,4 @@ pub mod public_error;
 pub mod channel_work;
 pub mod provider_status;
 pub mod proxy_http;
+pub mod write_gate;

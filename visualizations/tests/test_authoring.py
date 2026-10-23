@@ -19,7 +19,7 @@ from aivis.svg_preview import CANVAS_H, CANVAS_W, render_svg, write_preview
 SCENES=['legend','boundary','garrett_enroll','garrett_issue','packaging',
         'garrett_present','garrett_stolen','gh_diff','dispatch','projection',
         'reflection','evidence','proof_map','proof_send','proof_release',
-        'proof_two_worlds', 'proof_proxy']
+        'proof_two_worlds', 'proof_proxy', 'proof_write_gate']
 
 
 def test_catalog_is_ordered_for_protocol_walkthrough():
