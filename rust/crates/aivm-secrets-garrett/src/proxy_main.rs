@@ -46,6 +46,10 @@ const TOTAL_DEADLINE: Duration = Duration::from_secs(45);
 const MAX_POLICY: usize = 65536;
 const MAX_CA: usize = 1 << 20;
 const MAX_ROUTES: usize = 262144;
+/// The bridge client's own argument limit, its reply bound and deadline.
+const MAX_INVOKE_ARGUMENTS: usize = 16384;
+const MAX_INVOKE_REPLY: usize = 4 << 20;
+const INVOKE_DEADLINE: Duration = Duration::from_secs(60);
 /// Concurrent guest connections; extra connections are closed at once.
 const MAX_CONNECTIONS: usize = 32;
 /// Whole-head and whole-request deadlines, so a slow guest cannot hold a
@@ -559,13 +563,13 @@ fn serve_translated(session: &Session, translator: &Translator, origin: &Origin,
         return (refusal("unsupported_request"), false);
     };
     session.record("admitted", json!({"origin": origin.host, "method": method, "path": path, "operation": operation}));
-    let reply = std::process::Command::new(&translator.client[0])
-        .args(&translator.client[1..])
-        .args(["invoke", &operation, "--arguments", &arguments.to_string()])
-        .stdin(std::process::Stdio::null())
-        .output()
-        .ok()
-        .and_then(|done| serde_json::from_slice::<Value>(&done.stdout).ok());
+    let body = arguments.to_string().into_bytes();
+    if body.len() > MAX_INVOKE_ARGUMENTS {
+        // The client would refuse it; say so instead of "outcome unknown".
+        session.record("refused", json!({"code": "too_large", "origin": origin.host, "method": method, "path": path}));
+        return (refusal("too_large"), false);
+    }
+    let reply = invoke_bridge(&translator.client, &operation, &body);
     match reply {
         Some(reply) if reply["ok"] == json!(true) && reply.get("result").is_some() => {
             let body = serde_json::to_vec(&reply["result"]).unwrap_or_default();
@@ -592,6 +596,46 @@ fn serve_translated(session: &Session, translator: &Translator, origin: &Origin,
             (refusal(code), false)
         }
     }
+}
+
+/// Run the guest's bridge client once: arguments on stdin (not argv, which
+/// other guest users can read), a deadline, and a bounded reply.
+fn invoke_bridge(client: &[String], operation: &str, body: &[u8]) -> Option<Value> {
+    use std::process::{Command, Stdio};
+    let mut child = Command::new(&client[0])
+        .args(&client[1..])
+        .args(["invoke", operation, "--arguments-file", "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let mut input = child.stdin.take()?;
+    let written = input.write_all(body).is_ok();
+    drop(input);
+    let mut output = child.stdout.take()?;
+    let reader = std::thread::spawn(move || {
+        let mut data = Vec::new();
+        let _ = (&mut output).take(MAX_INVOKE_REPLY as u64 + 1).read_to_end(&mut data);
+        data
+    });
+    let started = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if started.elapsed() < INVOKE_DEADLINE => std::thread::sleep(Duration::from_millis(20)),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
+    }
+    let data = reader.join().ok()?;
+    if !written || data.len() > MAX_INVOKE_REPLY {
+        return None;
+    }
+    serde_json::from_slice::<Value>(&data).ok()
 }
 
 fn tunnel(session: &Session, mut stream: TcpStream) -> io::Result<()> {

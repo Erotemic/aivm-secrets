@@ -246,6 +246,8 @@ def test_native_proxy_writes_only_core_outputs():
     writes = re.findall(r'(\w+)\.write_all\(([^)]*\)?)\)', source)
     allowed = {('tls', 'wire'), ('tls', '&reply'), ('tls', '&refusal(code)'),
                ('tls', '&core::refusal(&code)'),
+               # The guest-side translator writes invoke arguments to its own client.
+               ('input', 'body'),
                ('stream', '&core::refusal(&code)'),
                ('stream', '&core::refusal(&core::Code::InvalidRequest)'),
                ('stream', 'b"HTTP/1.1 200 Connection established\\r\\n\\r\\n"')}

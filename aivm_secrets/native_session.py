@@ -454,7 +454,12 @@ class Session:
             announced = json.loads(self.translator.stdout.readline()) if ready else {}
         except ValueError:
             announced = {}
-        if announced.get('ready') is not True or announced.get('profile') != 'constrained-http':
+        # Over SSH the guest writes this line: check its shape before use.
+        if (not isinstance(announced, dict) or announced.get('ready') is not True
+                or announced.get('profile') != 'constrained-http'
+                or not isinstance(announced.get('ca_pem'), str)
+                or not isinstance(announced.get('proxy_token'), str)
+                or not announced['proxy_token'].replace('-', '').replace('_', '').isalnum()):
             raise SessionError('proxy_failed')
         guest.publish('proxy-ca.pem', announced['ca_pem'].encode('ascii'))
         made = guest.run(['sh', '-c', f'if [ -r {SYSTEM_ROOTS} ]; then cat {SYSTEM_ROOTS}; fi; '

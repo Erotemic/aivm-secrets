@@ -244,3 +244,33 @@ def test_native_session_refuses_a_spec_without_explicit_key_approval(tmp_path):
         assert announcement == {"version": 1, "ready": False, "error": "invalid_spec"}
         assert process.wait(timeout=30) == 1
         assert not (tmp_path / "host").exists()
+
+
+@pytest.mark.parametrize("line", [b"[1]", b'{"ready":true,"profile":"constrained-http"}',
+                                  b'{"ready":true,"profile":"constrained-http","ca_pem":"x","proxy_token":"a b"}',
+                                  b"not json"])
+def test_a_malformed_translator_announcement_fails_closed(tmp_path, monkeypatch, line):
+    """Over SSH the guest writes the translator's announcement; a bad one is
+    reported as proxy_failed and the whole session is torn down."""
+    import socket
+
+    from aivm_secrets import native_session
+
+    def fake_spawn(self, argv):
+        return subprocess.Popen(["sh", "-c", "printf '%s\\n' \"$0\"; exec cat >/dev/null", line],
+                                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                stderr=subprocess.DEVNULL)
+
+    monkeypatch.setattr(native_session.LocalGuest, "spawn", fake_spawn)
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    with TLSService(provider_directory(tmp_path), host="api.example.org") as provider:
+        spec = native_session.load_spec(spec_for(tmp_path, provider, constrained_proxy={"guest_port": port}))
+        session = native_session.Session(spec)
+        with pytest.raises(native_session.SessionError) as raised:
+            session.__enter__()
+        assert raised.value.code == "proxy_failed"
+        assert session.translator is None and session.guest is not None
+        assert not Path(session.guest.dir).exists()
+        assert provider.seen() == []

@@ -902,6 +902,10 @@ impl Operation {
         })
     }
 }
+// `route::scalar_text` converts an `i64` magnitude to `usize`; on a 32-bit
+// target that would truncate and name a different resource (its Lean theorem
+// assumes a 64-bit `usize`). Refuse to build anywhere else.
+const _: () = assert!(usize::BITS >= 64, "route::scalar_text needs a 64-bit usize");
 /// The template parts as the extracted `route` module takes them.
 fn route_pieces(parts: &[Part]) -> Vec<route::Piece> {
     parts

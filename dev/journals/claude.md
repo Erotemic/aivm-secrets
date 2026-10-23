@@ -547,3 +547,23 @@ GraphQL commands (`gh pr view` uses GraphQL), which would need a GraphQL
 route on the synthetic provider.
 Follow-up: `gh pr view --json` (GraphQL) also works through both proxies;
 added to the test with a GraphQL route on the synthetic provider.
+
+## 2026-10-23 12:42:07 -0400
+
+Independent review (subagent, unanchored brief) of today's proxy, translator,
+native-session, route and control changes: no high-severity defects; three
+low ones fixed here.
+
+1. The native translator passed invoke arguments on argv (visible to other
+   guest users, and over-long arguments made the client fail, reported as
+   "outcome unknown"). It now uses `--arguments-file -` on stdin, refuses
+   arguments over the client's 16 KiB limit as `too_large` before any call,
+   and bounds the client with a 60 s deadline and a 4 MiB reply.
+2. `route::scalar_text` truncates on a 32-bit `usize`; a compile-time
+   assertion in the native manifest now refuses to build there (matches the
+   theorem's stated premise).
+3. A malformed guest-written translator announcement raised an unexpected
+   exception on the host; it is now validated and reported as
+   `proxy_failed`, with a test for four malformed lines.
+The reviewer also confirmed (and I keep documented) that the Rust
+translator requires the policy's query order while Python accepts any order.
