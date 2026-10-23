@@ -756,7 +756,7 @@ theorem length_field_bytes : ascii "Content-Length: " =
      76#u8, 101#u8, 110#u8, 103#u8, 116#u8, 104#u8, 58#u8, 32#u8] := by rfl
 
 attribute [local scalar_tac_simps] Array.length_to_slice
-attribute [local step] aivm_secrets_garrett_core.http_wire.Proofs.append_decimal_exact
+attribute [step] aivm_secrets_garrett_core.http_wire.Proofs.append_decimal_exact
 
 @[step]
 theorem needs_length_spec (request : proxy_http.Request) :

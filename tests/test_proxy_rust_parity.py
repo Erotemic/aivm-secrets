@@ -18,14 +18,17 @@ from pathlib import Path
 
 from aivm_secrets.proxy import http1
 from aivm_secrets.proxy.http1 import Refused
-from aivm_secrets.proxy.policy import Deny, Origin, ProxyPolicy, upstream_request
+from aivm_secrets.proxy.policy import (Deny, Origin, ProxyPolicy, guest_response,
+                                       reflection_forms, upstream_request)
 
 VECTORS = Path(__file__).resolve().parent / 'secrets_vectors' / 'proxy-http-v1.tsv'
+RESPONSES = Path(__file__).resolve().parent / 'secrets_vectors' / 'proxy-http-response-v1.tsv'
 HOST = b'api.example.org'
 LIMIT = 64
 DENY = (Deny(b'POST', b'/v1/tokens'), Deny(b'*', b'/v1/admin/'))
 CODES = {'invalid_request': 'invalid', 'too_large': 'large', 'denied': 'denied',
-         'credential_source': 'credential'}
+         'credential_source': 'credential', 'upstream_response': 'upstream',
+         'reflected': 'reflected'}
 
 
 def head(line: bytes, *fields: bytes) -> bytes:
@@ -133,8 +136,91 @@ def render() -> str:
     return '\n'.join(lines) + '\n'
 
 
+def response_corpus() -> list[tuple[bytes, bool, bool, bytes]]:
+    """(raw upstream bytes, HEAD request, keep-alive, credential)."""
+    import base64
+    from urllib.parse import quote
+
+    secret = b'SECRET-token_1'
+
+    def r(status: bytes, *fields: bytes, body: bytes = b'') -> bytes:
+        return status + b'\r\n' + b''.join(f + b'\r\n' for f in fields) + b'\r\n' + body
+
+    cl = lambda body: b'Content-Length: %d' % len(body)
+    ok = b'{"login":"demo"}'
+    cases = [
+        r(b'HTTP/1.1 200 OK', b'Content-Type: application/json', cl(ok), body=ok),
+        r(b'HTTP/1.1 201 Created', b'Transfer-Encoding: chunked', body=b'3\r\nabc\r\n0\r\n\r\n'),
+        r(b'HTTP/1.1 200 OK', b'X-Note: close-delimited', body=b'abcdef'),
+        r(b'HTTP/1.1 204 No Content', body=b'ignored'),
+        r(b'HTTP/1.1 304 Not Modified', cl(b'12345')),
+        r(b'HTTP/1.1 200', cl(b'')),
+        r(b'HTTP/1.1 200 ', cl(b'')),
+        r(b'HTTP/1.1 404 Not\tFound', cl(b'{}'), body=b'{}'),
+        r(b'HTTP/1.1 302 Found', b'Location: https://evil.example.net/x', cl(b'')),
+        r(b'HTTP/1.1 200 OK', b'Set-Cookie: s=1', b'Connection: keep-alive', b'Keep-Alive: 5',
+          b'Proxy-Authenticate: Basic', b'X-Keep: yes', cl(b'ab'), body=b'ab'),
+        r(b'HTTP/1.1 200 OK', b'Content-Encoding: gzip', cl(b'xx'), body=b'xx'),
+        r(b'HTTP/1.1 200 OK', b'Content-Encoding: IDENTITY', cl(b'xx'), body=b'xx'),
+        r(b'HTTP/1.1 199 Early', cl(b'')),
+        r(b'HTTP/1.1 999 Odd', cl(b'')),
+        r(b'HTTP/1.0 200 OK', cl(b'')),
+        r(b'HTTP/1.1 2000 OK', cl(b'')),
+        r(b'HTTP/1.1  200 OK', cl(b'')),
+        r(b'HTTP/1.1 200 OK', b'Bad Header: x', cl(b'')),
+        r(b'HTTP/1.1 200 OK', cl(b'12345'), body=b'12'),
+        r(b'HTTP/1.1 200 OK', cl(b'1'), cl(b'1'), body=b'1'),
+        r(b'HTTP/1.1 200 OK', cl(b'1'), b'Transfer-Encoding: chunked', body=b'1'),
+        r(b'HTTP/1.1 200 OK', b'Transfer-Encoding: chunked', body=b'3\r\nab'),
+        r(b'HTTP/1.1 200 OK', cl(b'x' * 65), body=b'x' * 65),
+        r(b'HTTP/1.1 200 OK', body=b'x' * 65),
+        b'HTTP/1.1 200 OK\r\nContent-Length: 0\r\n',
+        r(b'HTTP/1.1 200 OK', cl(secret), body=secret),
+        r(b'HTTP/1.1 200 OK', b'X-Echo: ' + secret, cl(b'')),
+        r(b'HTTP/1.1 200 ' + secret, cl(b'')),
+        r(b'HTTP/1.1 200 OK', cl(b'')) + b'',
+    ]
+    encodings = [base64.b64encode(b'x-access-token:' + secret),
+                 base64.urlsafe_b64encode(b'ab' + secret),
+                 base64.b64encode(b'a' + secret),
+                 quote(secret + b'/', safe='').upper().encode(),
+                 secret.hex().upper().encode(),
+                 secret.lower()]
+    for form in encodings:
+        body = b'{"e":"' + form + b'"}'
+        cases.append(r(b'HTTP/1.1 200 OK', cl(body), body=body))
+    rows = [(raw, False, False, secret) for raw in cases]
+    rows += [(cases[0], True, False, secret), (cases[0], False, True, secret),
+             (cases[1], True, True, secret), (cases[0], False, False, b'abc')]
+    return rows
+
+
+def response_outcome(raw: bytes, head: bool, keep_alive: bool, secret: bytes) -> str:
+    try:
+        response = http1.parse_response(raw, method=b'HEAD' if head else b'GET',
+                                        body_limit=LIMIT, complete=True)
+        wire = guest_response(response, reflection_forms(secret), keep_alive=keep_alive,
+                              head=head)
+    except Refused as refused:
+        return 'refused:' + CODES[refused.code]
+    return 'ok:' + wire.hex()
+
+
+def render_responses() -> str:
+    lines = ['# raw-hex\thead\tkeep-alive\tcredential-hex\toutcome  (limit 64)']
+    for raw, head, keep, secret in response_corpus():
+        lines.append('\t'.join([raw.hex(), str(int(head)), str(int(keep)), secret.hex(),
+                                response_outcome(raw, head, keep, secret)]))
+    return '\n'.join(lines) + '\n'
+
+
 def write() -> None:
     VECTORS.write_text(render())
+    RESPONSES.write_text(render_responses())
+
+
+def test_response_vector_file_is_the_python_reference():
+    assert RESPONSES.read_text() == render_responses()
 
 
 def test_vector_file_is_the_python_reference():

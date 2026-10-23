@@ -180,3 +180,21 @@ without `start + 3` (an overflow the model would expose), `segment_ok` as
 plain early returns, `all_token` also requiring `visible`. Proof lesson:
 when simp normalizes `decide (x ∈ list)` into an `||` chain, use `change`
 to restore membership form and peel the if-chain with a `map fold` lemma.
+
+## 2026-10-23 03:22:04 -0400
+
+HP-4 core complete and HP-5(c) proved. The response side (parser, field
+filter, reflection forms, re-framing) is now in the extracted core, with byte
+parity over 40 response vectors (a mutant without the hex form fails).
+`GarrettProxyResponse` proves that a released response never contains the
+raw credential: `reflects_spec`, `guest_response_contract` (HEAD is a
+prefix of the checked bytes) and `reflection_forms_include_raw`. The last is
+partial correctness, proved by inversion because the form loop only pushes,
+which avoids proving totality of the base64 arithmetic. That is enough for
+the safety claim. Rust change for provability: `form_present` helper, so the
+loop body starts with a call that `step` can take.
+
+Remaining for OUT-6: a native proxy server (rustls plus rcgen) wiring the core,
+HP-3 AIVM wiring, HP-6 constrained-http proof. Confidence: high for the stated
+theorems; they cover the extracted functions, not the Python server or a
+native server that does not exist yet.

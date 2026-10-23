@@ -404,6 +404,19 @@ right. They do not say that guest header values can never contain text that
 *looks like* a credential: a guest can put any visible bytes there, but it
 does not know the credential.
 
+**What the guest may receive** ([`GarrettProxyResponse`](../../proofs/GarrettProxyResponse.lean)).
+
+| Theorem | Says |
+| --- | --- |
+| `reflects_spec` | When the extracted check answers "not reflected", no case-sensitive form occurs anywhere in the checked bytes. |
+| `guest_response_contract` | For any upstream response, the proxy either refuses and appends nothing, or appends bytes in which no case-sensitive form occurs. For `HEAD`, the appended bytes are a prefix of the checked ones (`response_head_prefix`), so the same holds. |
+| `reflection_forms_include_raw` | Whenever the form list is built, it contains the credential's exact bytes as a case-sensitive form. |
+
+Together: **a released response never contains the credential's exact
+bytes.** Percent, hex and base64 forms are also checked, but the proof
+covers them only as listed byte strings. Any other derived value, such as a
+freshly minted token, is outside it (`PROXY-REFLECT-01`, `PROXY-AUTHORITY-01`).
+
 **Byte parity with the Python reference.** `tests/secrets_vectors/proxy-http-v1.tsv`
 holds 64 adversarial and positive cases. The Python test checks that the
 file is exactly the Python reference's output, and the Rust test
@@ -414,7 +427,7 @@ mutant that forwarded `Cookie` fails it.
 - That the provider reads the canonical HTTP/1.1 bytes conventionally and
   routes the path as written; a provider that normalizes paths (case,
   encoding) could route around a deny-list entry (`PROXY-PARSE-01`).
-- The response reflection check (`PROXY-REFLECT-01`).
+- Encodings of the credential other than the listed forms (`PROXY-REFLECT-01`).
 - TLS and the session CA (`PROXY-TLS-01`).
 - That the native proxy, which does not exist yet (only the Python server
   does), writes exactly these bytes.
