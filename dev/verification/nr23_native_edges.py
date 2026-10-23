@@ -19,6 +19,7 @@ TLS = 'rust/crates/aivm-secrets-garrett/src/tls.rs'
 CORE = 'rust/crates/aivm-secrets-garrett-core/src/provider_io.rs'
 CORE_AUDIT = 'rust/crates/aivm-secrets-garrett-core/src/audit_record.rs'
 CORE_RESPONSE = 'rust/crates/aivm-secrets-garrett-core/src/response_gate.rs'
+CORE_CHANNEL = 'rust/crates/aivm-secrets-garrett-core/src/channel_work.rs'
 
 
 @dataclass(frozen=True)
@@ -36,30 +37,35 @@ EDGES = (
          ('guards::authorize(', 'let current_context =',
           'let dispatch =', 'let release =', 'let work = PendingRequest {',
           'request_adapter::Pending::new(work)', 'read_transition::run_current(pending)')),
-    Edge(MANIFEST, 'manifest-wire-encoder-before-TLS',
-         'fn setup_route(&mut self, route:', '\n}\nfn manifest_response(',
+    Edge(MANIFEST, 'manifest-wire-encoder-then-TLS-primitives',
+         'fn request_body(&mut self, route:', '\n}\nfn manifest_response(',
          ('manifest_request_bytes(route, self.secret, &self.effect, &self.headers)',
-          'let request = ManifestWire(bytes)', 'TcpStream::connect_timeout(',
+          'self.endpoint = Some(endpoint);', 'Ok(ManifestWire(bytes))',
+          'fn connect(', 'self.endpoint.take()', 'TcpStream::connect_timeout(',
           'ClientConnection::new(', 'while conn.is_handshaking()',
-          'StreamOwned::new(conn, socket)',
-          'aivm_secrets_garrett_core::provider_io::Channel::new(',
-          'ProviderWriter(stream)', 'deadline')),
-    Edge(MANIFEST, 'provider-send-enters-extracted-channel',
-         'fn send(&mut self, channel: &mut ManifestChannel)',
-         'fn receive(&mut self, channel:',
-         ('send_manifest_bytes(channel)',)),
-    Edge(MANIFEST, 'native-send-helper-is-only-submit',
-         'fn send_manifest_bytes<W: Write, M>', 'type ManifestChannel',
+          'StreamOwned::new(conn, socket)', 'Ok((ProviderWriter(stream), deadline))')),
+    Edge(CORE_CHANNEL, 'core-setup-encodes-then-connects',
+         'fn setup_route(', 'fn audit_route(',
+         ('self.work.request_body(route)', 'self.work.connect(route)',
+          'Ok(Channel::new(body, writer, meta))')),
+    Edge(CORE_CHANNEL, 'core-send-is-only-submit',
+         'fn send(&mut self, channel: &mut Self::Channel)', 'fn receive(',
          ('channel.submit()',)),
+    Edge(MANIFEST, 'production-dispatch-uses-core-channel-work',
+         'let keyed_write =', 'let session = &*self;',
+         ('let work = ManifestProvider {', 'endpoint: None,',
+          'aivm_secrets_garrett_core::channel_work::Submitting::new(work)')),
     Edge(MANIFEST, 'writer-forwards-exact-byte-vector',
          'impl<W: Write> aivm_secrets_garrett_core::provider_io::Writer for ProviderWriter<W>',
-         'fn send_manifest_bytes<W: Write, M>',
+         'struct ManifestDispatch<',
          ('fn write_all(&mut self, bytes: &Vec<u8>)',
           'self.0.write_all(bytes)', 'fn flush(&mut self)', 'self.0.flush()')),
-    Edge(MANIFEST, 'native-receive-enters-extracted-response-gate',
-         'fn receive(&mut self, channel: ManifestChannel)',
-         '// The native parser consumes',
-         ('let released = aivm_secrets_garrett_core::response_gate::receive(channel)?;',
+    Edge(CORE_CHANNEL, 'core-receive-enters-extracted-response-gate',
+         'fn receive(&mut self, channel: Self::Channel)', 'impl<W: ChannelWork> dispatch::Work',
+         ('match response_gate::receive(channel) {', 'Ok(released) => self.work.parse(released)')),
+    Edge(MANIFEST, 'native-parse-takes-only-released-token',
+         'fn parse(\n        &mut self,\n        released:', 'fn audit_route(',
+         ('aivm_secrets_garrett_core::response_gate::Released<',
           'let mut parser = ManifestResponse { effect: &self.effect };',
           'parser.parse(released)')),
     Edge(CORE_RESPONSE, 'extracted-response-gate-before-token-mint',
@@ -67,11 +73,11 @@ EDGES = (
          ('channel.into_parts()?;', 'Ok(Released {', 'writer,', 'request,', 'metadata,')),
     Edge(MANIFEST, 'native-parser-only-receives-released-parts',
          'struct ManifestResponse',
-         'impl aivm_secrets_garrett_core::provider_io::RouteWork',
+         'fn manifest_response(',
          ('fn parse(', 'response_gate::Released<',
           'released.into_parts()', 'manifest_response(BufReader::new(stream)',)),
     Edge(MANIFEST, 'audit-route-records-request-binding',
-         'fn audit_route(&mut self, route:', 'fn setup_route(&mut self, route:',
+         'fn audit_route(&mut self, route:', 'fn request_body(&mut self, route:',
          ('audit.write_record(&json!({', '"event":"dispatch"',
           '"phase":phase.as_str()', '"grant":audit.grant',
           '"identity":self.dispatch.identity',
@@ -144,7 +150,7 @@ def scan(sources: dict[str, str]) -> list[str]:
 
 
 def read_sources(root: Path = ROOT) -> dict[str, str]:
-    return {name: (root / name).read_text() for name in (MANIFEST, CUSTODY, TLS, CORE, CORE_AUDIT, CORE_RESPONSE)}
+    return {name: (root / name).read_text() for name in (MANIFEST, CUSTODY, TLS, CORE, CORE_AUDIT, CORE_RESPONSE, CORE_CHANNEL)}
 
 
 def main() -> int:

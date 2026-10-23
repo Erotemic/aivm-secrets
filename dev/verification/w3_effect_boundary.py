@@ -169,7 +169,9 @@ def review_semantics(contents: dict[str, str]) -> None:
                        'dispatch::dispatch(plan.work, Ok(prepared), self.effects, plan.keyed_write)',
                        'self.effects = report.effects;', 'report.outcome')
             and same_order(dispatch, 'let keyed_write =', 'let work = ManifestProvider {',
-                           'request_adapter::DispatchPlan { work, keyed_write }')
+                           'request_adapter::DispatchPlan {',
+                           'work: aivm_secrets_garrett_core::channel_work::Submitting::new(work),',
+                           'keyed_write,')
             and 'matches!(phase, DispatchPhase::Final)' in dispatch
             and '&& effect.write' in dispatch and '&& self.base.coordinator.is_some()' in dispatch
             and 'fresh: &fresh,' in dispatch
@@ -362,12 +364,13 @@ def review_semantics(contents: dict[str, str]) -> None:
     require('if status == 206 {' in m, 'unreviewed partial response release')
     runtime = m.split('#[cfg(test)]', 1)[0]
     require(runtime.count('TcpStream::connect_timeout(') == 1 and runtime.count('.write_all(') == 1
-            and ''.join(runtime.split()).count('send_manifest_bytes(channel)') == 1
+            and runtime.count('channel.submit()') == 0
+            and runtime.count('channel_work::Submitting::new(work)') == 1
             and runtime.count('request_adapter::Pending::new(work)') == 1
             and 'dispatch::dispatch(' not in runtime,
             'native module added a credentialed socket or alternate HTTP writer')
     provider_work = part(runtime, "struct ManifestDispatch<'a>", 'fn manifest_response(')
-    require('aivm_secrets_garrett_core::dispatch::WorkforManifestProvider' in ''.join(provider_work.split())
+    require('aivm_secrets_garrett_core::channel_work::ChannelWorkforManifestProvider' in ''.join(provider_work.split())
             and 'effects: EffectsCell' not in provider_work and 'send_state:' not in provider_work
             and same_order(provider_work, 'fn prepare(', 'claims_json(self.dispatch.claims)', 'ensure_safe(',
                            'fn audit_route(', 'audit.write_record(')
@@ -378,7 +381,7 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'self.dispatch.coordinator' in ''.join(provider_work.split()) and '.reserve(key, fingerprint)' in provider_work
             and '.finish(key, fingerprint)' in provider_work
             and '(self.dispatch.fresh)()' in provider_work
-            and 'Err(Error::InternalError)' in part(provider_work, 'fn recheck(&mut self)', 'fn send(&mut self,')
+            and 'fn recheck(' not in provider_work and 'fn send(' not in provider_work
             and '(self.current)()' not in provider_work,
             'native coordination/current primitives detached from host inputs')
     require('audited: &read_transition::Audited' in dispatch_core
@@ -390,11 +393,18 @@ def review_semantics(contents: dict[str, str]) -> None:
             and same_order(part(dispatch_core, 'fn send(&mut self,', 'fn receive(&mut self,'),
                            '.begin_send(self.phase, &mut self.local, self.write)', 'self.work.send(channel)'),
             'provider/current/raw-write receipt gates detached from the source-owned controller')
-    setup = part(runtime, 'fn setup_route(&mut self, route: &core::Route)', 'fn manifest_response(')
-    primitive = part(runtime, 'struct ProviderWriter', 'type ManifestChannel =')
-    sender = part(runtime, 'fn send(&mut self, channel:', 'fn receive(&mut self, channel:')
-    require(same_order(setup, 'let (bytes, endpoint) =', 'TcpStream::connect_timeout(',
-                       'while conn.is_handshaking()', 'StreamOwned::new(conn, socket)', 'Ok(aivm_secrets_garrett_core::provider_io::Channel::new(')
+    setup = part(runtime, 'fn request_body(&mut self, route: &core::Route)', 'fn manifest_response(')
+    primitive = part(runtime, 'struct ProviderWriter', "struct ManifestDispatch<'a>")
+    channel_work = contents['rust/crates/aivm-secrets-garrett-core/src/channel_work.rs'].split('#[cfg(test)]', 1)[0]
+    sender = part(channel_work, 'fn send(&mut self, channel: &mut Self::Channel)', 'fn receive(')
+    require(same_order(setup, 'let (bytes, endpoint) =', 'self.endpoint = Some(endpoint);',
+                       'Ok(ManifestWire(bytes))', 'fn connect(', 'self.endpoint.take()',
+                       'TcpStream::connect_timeout(',
+                       'while conn.is_handshaking()', 'StreamOwned::new(conn, socket)',
+                       'Ok((ProviderWriter(stream), deadline))')
+            and same_order(part(channel_work, 'fn setup_route(', 'fn audit_route('),
+                           'self.work.request_body(route)', 'self.work.connect(route)',
+                           'Ok(Channel::new(body, writer, meta))')
             and 'SocketAddr::new(self.executor.address, endpoint.port())' in setup
             and 'std::str::from_utf8(endpoint.host())' in setup
             and 'u16::try_from(route.port)' not in setup and 'std::str::from_utf8(&route.host)' not in setup and 'ClientConnection::new(self.executor.tls.clone(), name)' in setup,
@@ -407,11 +417,10 @@ def review_semantics(contents: dict[str, str]) -> None:
                        'fn write_all(&mut self, bytes: &Vec<u8>)',
                        'self.0.write_all(bytes).map_err(|_| Error::UpstreamResponse)',
                        'fn flush(&mut self)',
-                       'self.0.flush().map_err(|_| Error::UpstreamResponse)',
-                       'channel.submit()')
+                       'self.0.flush().map_err(|_| Error::UpstreamResponse)')
             and primitive.count('self.0.write_all(bytes)') == 1
             and primitive.count('self.0.flush()') == 1
-            and 'send_manifest_bytes(channel)' in ''.join(sender.split()),
+            and ''.join(sender.split()) == '->Result<(),Self::Error>{channel.submit()}',
             'native raw credential-bearing writer callback ordering/error mapping bypassed')
     sampled = part(request, 'let current_peer =', 'let canonical_request')
     native_checks = part(m, "struct CurrentChecks<'a, L>", 'pub(crate) struct Session {')
@@ -459,19 +468,22 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'body: B,' in io and 'pub body:' not in io
             and same_order(io, 'if self.attempted {', 'self.attempted = true;',
                            'writer.write_all(bytes)', 'writer.flush()')
-            and 'channel.submit()' in primitive
-            and 'let request = ManifestWire(bytes);' in setup
-            and 'Err(Error::InternalError)' in part(runtime, 'fn setup(&mut self)', 'fn recheck(&mut self)')
-            and 'Err(Error::InternalError)' in part(provider_work, 'fn audit(&mut self', 'fn configure(&mut self,'),
+            and 'Ok(ManifestWire(bytes))' in setup
+            and 'Err(W::INVALID_TRANSITION)' in part(channel_work, 'fn setup(&mut self)', 'fn recheck(&mut self)')
+            and 'Err(W::INVALID_TRANSITION)' in part(channel_work, 'fn recheck(&mut self)', 'fn send(&mut self,')
+            and 'Err(W::INVALID_TRANSITION)' in part(channel_work, 'fn audit(&mut self', 'fn configure(&mut self,')
+            and 'const INVALID_TRANSITION: Error = Error::InternalError;' in provider_work,
             'provider captured route or one-attempt request buffer detached')
     channel = part(io, 'pub struct Channel<', '#[cfg(test)]') if '#[cfg(test)]' in io else io.split('pub struct Channel<', 1)[1]
-    receiver = part(runtime, 'fn receive(&mut self, channel: ManifestChannel)', 'impl aivm_secrets_garrett_core::provider_io::RouteWork')
+    receiver = part(runtime, 'fn parse(\n        &mut self,\n        released:', 'fn manifest_response(')
+    core_receiver = part(channel_work, 'fn receive(&mut self, channel: Self::Channel)', 'impl<W: ChannelWork> dispatch::Work')
     require(all(marker in channel for marker in ['request: Request<B>', 'writer: W,', 'metadata: M,', 'ready: bool,', 'request: Request::new(body)', 'ready: false,'])
             and not any(marker in channel for marker in ['pub request:', 'pub writer:', 'pub metadata:', 'pub ready:'])
             and same_order(channel, 'self.ready = false;', 'self.request.submit(&mut self.writer)', 'self.ready = true;')
             and same_order(channel, 'pub fn into_parts(self)', 'if !self.ready {', 'return Err(W::INVALID_TRANSITION)', 'Ok((self.writer, self.request, self.metadata))')
+            and same_order(core_receiver, 'match response_gate::receive(channel) {',
+                           'Ok(released) => self.work.parse(released)')
             and same_order(receiver,
-                           'let released = aivm_secrets_garrett_core::response_gate::receive(channel)?;',
                            'let mut parser = ManifestResponse { effect: &self.effect };',
                            'parser.parse(released)',
                            'struct ManifestResponse', 'fn parse(',
@@ -488,7 +500,7 @@ def review_semantics(contents: dict[str, str]) -> None:
                         for t in ('pub writer: W,', 'pub request: Request<B>,', 'pub metadata: M,'))
             and '#[derive(Clone' not in contents['rust/crates/aivm-secrets-garrett-core/src/response_gate.rs']
             and contents['rust/crates/aivm-secrets-garrett-core/src/response_gate.rs'].split('#[cfg(test)]', 1)[0].count('Ok(Released {') == 1
-            and 'request,ProviderWriter(stream),deadline,' in ''.join(setup.split()),
+            and 'Ok((ProviderWriter(stream),deadline))' in ''.join(setup.split()),
             'captured native channel or successful-flush response gate bypassed')
     provider = contents['rust/crates/aivm-secrets-garrett-core/src/provider_exchange.rs'].split('#[cfg(test)]', 1)[0]
     require(same_order(provider, 'pub fn exchange<', 'ops.setup()', 'ops.recheck()',

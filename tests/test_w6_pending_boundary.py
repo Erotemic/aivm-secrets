@@ -32,6 +32,8 @@ def test_pending_source_guard_rejects_unreviewed_boundary_mutation(tmp_path, mut
     admission = (ROOT / admission_path).read_text()
     scope_path = 'rust/crates/aivm-secrets-garrett-core/src/request_context.rs'
     scope_source = (ROOT / scope_path).read_text()
+    channel_path = 'rust/crates/aivm-secrets-garrett-core/src/channel_work.rs'
+    (tmp_path / channel_path).write_text((ROOT / channel_path).read_text())
     source = (ROOT / RUST).read_text()
     scope = json.loads((ROOT / SCOPE).read_text())
     if mutation == 'no-fresh-before-emit':

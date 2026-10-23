@@ -20,6 +20,7 @@ CORE_REQUEST = 'rust/crates/aivm-secrets-garrett-core/src/request_adapter.rs'
 CORE_IO = 'rust/crates/aivm-secrets-garrett-core/src/provider_io.rs'
 CORE_GATE = 'rust/crates/aivm-secrets-garrett-core/src/response_gate.rs'
 CORE_RELEASE = 'rust/crates/aivm-secrets-garrett-core/src/selected_release.rs'
+CORE_CHANNEL = 'rust/crates/aivm-secrets-garrett-core/src/channel_work.rs'
 CORE_CONTEXT = 'rust/crates/aivm-secrets-garrett-core/src/request_context.rs'
 CORE_CURRENT = 'rust/crates/aivm-secrets-garrett-core/src/current_admission.rs'
 COMMON_ENCODER = 'rust/crates/aivm-secrets-garrett/src/custody.rs'
@@ -89,16 +90,20 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and 'body: B,' in io and 'pub body:' not in io
            and 'if self.attempted {' in io and 'self.attempted = true;' in io
            and io.index('self.attempted = true;') < io.index('writer.write_all(bytes)')
-           and 'writer.flush()' in io and 'channel.submit()' in source
-           and 'let request = ManifestWire(bytes);' in source,
+           and 'writer.flush()' in io
+           and 'channel.submit()' in (root / CORE_CHANNEL).read_text().split('fn receive(', 1)[0]
+           and 'Ok(ManifestWire(bytes))' in source
+           and 'channel_work::Submitting::new(work)' in source,
            'captured route/buffer submission bypassed')
     channel = io.split('pub struct Channel<', 1)[1]
-    receiver = source.split('fn receive(&mut self, channel: ManifestChannel)', 1)[1].split('impl aivm_secrets_garrett_core::provider_io::RouteWork', 1)[0]
+    receiver = source.split('fn parse(\n        &mut self,\n        released:', 1)[1].split('fn manifest_response(', 1)[0]
+    core_receive = (root / CORE_CHANNEL).read_text().split('fn receive(', 1)[1].split('impl<W: ChannelWork> dispatch::Work', 1)[0]
     ensure('request: Request::new(body)' in channel and 'ready: false,' in channel
            and 'self.ready = false;' in channel and 'self.request.submit(&mut self.writer)' in channel
            and 'self.ready = true;' in channel and 'if !self.ready {' in channel
            and 'Ok((self.writer, self.request, self.metadata))' in channel
-           and 'let released = aivm_secrets_garrett_core::response_gate::receive(channel)?;' in receiver
+           and 'match response_gate::receive(channel) {' in core_receive
+           and 'Ok(released) => self.work.parse(released)' in core_receive
            and 'let mut parser = ManifestResponse { effect: &self.effect };' in receiver
            and 'parser.parse(released)' in receiver
            and 'released: aivm_secrets_garrett_core::response_gate::Released<' in receiver
@@ -106,7 +111,7 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and 'channel.into_parts()?' in (root / CORE_GATE).read_text()
            and 'Ok(Released {' in (root / CORE_GATE).read_text()
            and (root / CORE_GATE).read_text().split('#[cfg(test)]', 1)[0].count('Ok(Released {') == 1
-           and receiver.index('aivm_secrets_garrett_core::response_gate::receive(') < receiver.index('manifest_response('),
+           and receiver.index('parser.parse(released)') < receiver.index('manifest_response('),
            'captured channel or successful-flush response gate bypassed')
     admission = (root / CORE_CURRENT).read_text().split('#[cfg(test)]', 1)[0]
     scope = (root / CORE_CONTEXT).read_text().split('#[cfg(test)]', 1)[0]
@@ -125,7 +130,7 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and runtime.count('TcpStream::connect_timeout(') == 1,
            'native manifest adapter has another provider send')
     routed_wire = (root / CORE_ROUTE).read_text().split('#[cfg(test)]', 1)[0]
-    setup = source.split('fn setup_route(&mut self, route: &core::Route)', 1)[1].split('fn manifest_response(', 1)[0]
+    setup = source.split('fn request_body(&mut self, route: &core::Route)', 1)[1].split('fn manifest_response(', 1)[0]
     ensure('host: route.host.clone()' in routed_wire and 'port: route.port as u16' in routed_wire
            and 'if route.port <= 0 || route.port > 65535' in routed_wire
            and 'http_wire::append_request(output, &head, secret, &route.authentication, body)' in routed_wire

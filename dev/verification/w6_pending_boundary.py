@@ -75,7 +75,7 @@ def check(root: Path = ROOT) -> dict:
             and 'audit.write_record(' in source and 'phase.as_str()' in source,
             'native manifest might execute a provider effect before dispatch audit')
     require('let dispatch = |phase: DispatchPhase, effect: Effect|' in request
-            and 'request_adapter::DispatchPlan { work, keyed_write }' in request
+            and 'work: aivm_secrets_garrett_core::channel_work::Submitting::new(work),' in request
             and 'operation_write: op.write,' in request,
             'manifest preflight/final no longer share the audited dispatcher')
     fresh = request.split('let current_peer =', 1)[-1].split('let canonical_request', 1)[0]
@@ -92,14 +92,15 @@ def check(root: Path = ROOT) -> dict:
             and 'current_context.current(&mut CurrentChecks' in fresh,
             'last-admission primitives detached from host state')
     scope = (root / 'rust/crates/aivm-secrets-garrett-core/src/request_context.rs').read_text().split('#[cfg(test)]', 1)[0]
-    primitive = source.split('struct ProviderWriter', 1)[1].split('type ManifestChannel =', 1)[0]
+    primitive = source.split('struct ProviderWriter', 1)[1].split("struct ManifestDispatch<'a>", 1)[0]
+    channel_work = (root / 'rust/crates/aivm-secrets-garrett-core/src/channel_work.rs').read_text().split('#[cfg(test)]', 1)[0]
     require('let stream = StreamOwned::new(conn, socket);' in source and
-            'channel.into_parts()?' in source and
-            'channel.submit()' in primitive and
+            'match response_gate::receive(channel) {' in channel_work and
+            'channel.submit()' in channel_work.split('fn receive(', 1)[0] and
             'self.0.write_all(bytes)' in ''.join(primitive.split()) and
-            'send_manifest_bytes(channel)' in ''.join(source.split()) and
-            'aivm_secrets_garrett_core::dispatch::WorkforManifestProvider' in ''.join(source.split()) and
-            'fn recheck(&mut self) -> Outcome<guards::AdmissionStamp>' in source and
+            'channel.submit()' not in source.split('#[cfg(test)]', 1)[0] and
+            'aivm_secrets_garrett_core::channel_work::ChannelWorkforManifestProvider' in ''.join(source.split()) and
+            'Err(W::INVALID_TRANSITION)' in channel_work.split('fn recheck(', 1)[1].split('fn send(', 1)[0] and
             'request_context::ScopedRequest::new(' in request
             and 'current_admission::Bound::new(self.context, routed, checks)' in scope
             and 'provider_io::Routed::new(self.context.route(), plan.work)' in scope

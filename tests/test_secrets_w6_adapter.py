@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from dev.verification.w6_adapter import CONTRACT, SOURCE, TESTS, CORE_ROUTE, CORE_ENCODER, CORE_DISPATCH, CORE_REQUEST, CORE_CURRENT, CORE_CONTEXT, CORE_IO, CORE_GATE, CORE_RELEASE, COMMON_ENCODER, ContractError, check
+from dev.verification.w6_adapter import CONTRACT, SOURCE, TESTS, CORE_ROUTE, CORE_ENCODER, CORE_DISPATCH, CORE_REQUEST, CORE_CURRENT, CORE_CONTEXT, CORE_IO, CORE_GATE, CORE_RELEASE, CORE_CHANNEL, COMMON_ENCODER, ContractError, check
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def fixture_checkout(tmp_path):
     dst = tmp_path / 'checkout'
     contract = json.loads((ROOT / CONTRACT).read_text())
-    names = {CONTRACT, SOURCE, TESTS, CORE_ROUTE, CORE_ENCODER, CORE_DISPATCH, CORE_REQUEST, CORE_CURRENT, CORE_CONTEXT, CORE_IO, CORE_GATE, CORE_RELEASE, COMMON_ENCODER,
+    names = {CONTRACT, SOURCE, TESTS, CORE_ROUTE, CORE_ENCODER, CORE_DISPATCH, CORE_REQUEST, CORE_CURRENT, CORE_CONTEXT, CORE_IO, CORE_GATE, CORE_RELEASE, CORE_CHANNEL, COMMON_ENCODER,
              'docs/planning/aivm-secrets-w0-boundaries.json',
              'docs/planning/aivm-secrets-assumptions.json'}
     names.update(channel['path'] for channel in contract['channels'])
@@ -75,10 +75,11 @@ def test_w6_new_provider_send_or_public_raw_return_is_rejected(tmp_path):
     checkout = fixture_checkout(tmp_path)
     path = checkout / SOURCE
     original = path.read_text()
-    marker = '        // Core dispatch owns the composite receipt/current attempt gate.\n        send_manifest_bytes(channel)'
+    # A second credential-bearing write from the native connection primitive.
+    marker = '        Ok((ProviderWriter(stream), deadline))'
     assert original.count(marker) == 1
     body = original.replace(marker,
-                            '        channel.stream.write_all(b"bypass").map_err(|_| Error::UpstreamResponse)?;\n' + marker, 1)
+                            '        let mut stream = stream;\n        stream.write_all(b"bypass").map_err(|_| Error::UpstreamResponse)?;\n' + marker, 1)
     path.write_text(body)
     with pytest.raises(ContractError, match='another provider send'):
         check(checkout)

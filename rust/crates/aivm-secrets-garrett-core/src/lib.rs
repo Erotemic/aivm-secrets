@@ -252,3 +252,4 @@ pub mod provider_wire;
 
 pub mod json_wire;
 pub mod public_error;
+pub mod channel_work;
