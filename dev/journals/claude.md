@@ -125,3 +125,12 @@ operations.
 Risk: credential amplification is inherent to substitution; documented, not
 solved. Confidence: medium-high on the reference's refusals (tested and
 mutated); the parser has no proof yet (HP-4/HP-5 next, after HP-2).
+
+HP-2 (same session): `constrained-http` uses the broker's schema-2 operations
+as the allowlist instead of a separate shape table. A request is served only
+if the host encoder, run on arguments read off it, reproduces it exactly, so
+a matcher bug cannot widen authority. A test injects a broken matcher and
+checks that it is refused. The proxy holds no credential in this profile; the
+in-process Broker does. 19 tests, including the process contract. Not yet
+translated: checks, GraphQL and pagination metadata. Stock-tool
+compatibility is open (HP-3).

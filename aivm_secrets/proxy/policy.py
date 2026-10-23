@@ -24,7 +24,7 @@ from . import http1
 from .http1 import Refused
 
 SCHEMA = 1
-PROFILES = ('credential-substitution',)
+PROFILES = ('credential-substitution', 'constrained-http')
 # Authentication field for each scheme, as the provider expects it.
 SCHEMES = {
     'bearer': (b'authorization', b'Bearer '),
@@ -93,7 +93,20 @@ def parse_policy(value: Any) -> ProxyPolicy:
     origins: dict[str, Origin] = {}
     if not isinstance(top['origins'], list) or not 1 <= len(top['origins']) <= 16:
         raise PolicyError('invalid_policy')
+    constrained = top['profile'] == 'constrained-http'
+    if constrained and ('deny' in top or len(top['origins']) != 1):
+        # The broker's operations are the allowlist; its policy names one host.
+        raise PolicyError('invalid_policy')
     for row in top['origins']:
+        if constrained:
+            # No destination, trust anchor or credential scheme: the broker's
+            # own service policy owns all three.
+            row = _exact_keys(row, {'host'})
+            host = row['host']
+            if not isinstance(host, str) or not _HOST.match(host):
+                raise PolicyError('invalid_policy')
+            origins[host] = Origin(host, '', 0, '', '')
+            continue
         row = _exact_keys(row, {'host', 'address', 'port', 'ca_file', 'authentication'})
         host = row['host']
         if (not isinstance(host, str) or not _HOST.match(host) or host in origins

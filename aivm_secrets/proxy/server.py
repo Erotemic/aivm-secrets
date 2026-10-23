@@ -25,7 +25,7 @@ import ssl
 import threading
 import time
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from ..errors import SecretsError
 from ..host.files import read_owned
@@ -33,7 +33,10 @@ from ..primitives import codec
 from . import http1
 from .ca import SessionCA
 from .http1 import Refused
-from .policy import Origin, ProxyPolicy, guest_response, reflection_forms, upstream_request
+from ..kernel.https import HTTPSpec
+from .constrained import translate
+from .policy import (Origin, PolicyError, ProxyPolicy, guest_response, reflection_forms,
+                     upstream_request)
 
 IO_TIMEOUT = 15.0
 TOTAL_DEADLINE = 45.0
@@ -68,11 +71,22 @@ class ProxyAudit:
 class ProxySession:
     """The credential, the session CA and the guest's surrogate for one session."""
 
-    def __init__(self, policy: ProxyPolicy, credential: bytes, *,
-                 audit: ProxyAudit | None = None, clock: Callable[[], float] = time.time):
+    def __init__(self, policy: ProxyPolicy, credential: bytes | None, *,
+                 broker: Any = None, audit: ProxyAudit | None = None,
+                 clock: Callable[[], float] = time.time):
+        # Exactly one authority source per profile, and never a fallback:
+        # substitution holds the credential; constrained-http holds only an
+        # in-process broker, which holds the credential.
+        if policy.profile == 'credential-substitution':
+            if not credential or broker is not None:
+                raise PolicyError('invalid_policy')
+        elif (credential is not None or not isinstance(getattr(broker, 'spec', None), HTTPSpec)
+              or set(policy.origins) != {broker.spec.egress.host}):
+            raise PolicyError('invalid_policy')
         self.policy = policy
-        self._credential = credential
-        self.forms = reflection_forms(credential)
+        self.broker = broker
+        self._credential = credential or b''
+        self.forms = reflection_forms(credential) if credential else []
         self.token = secrets.token_urlsafe(32)
         self.ca = SessionCA(sorted(policy.origins), policy.lifetime_seconds)
         self._clock = clock
@@ -256,6 +270,8 @@ class _Handler(socketserver.BaseRequestHandler):
         if denial is not None:
             session.record('refused', code=denial, origin=origin.host, method=method, path=path)
             return http1.refusal('revoked'), False
+        if session.broker is not None:
+            return self._constrained(session, origin, request, method, path)
         try:
             wire = session.upstream_bytes(origin, request)
         except Refused as refused:
@@ -274,6 +290,36 @@ class _Handler(socketserver.BaseRequestHandler):
         session.record('completed', origin=origin.host, method=method, path=path,
                        status=response.status)
         return reply, request.keep_alive
+
+
+    def _constrained(self, session: ProxySession, origin: Origin, request: http1.Request,
+                     method: str, path: str) -> tuple[bytes, bool]:
+        """Translate to the one named operation it equals, then ask the broker."""
+        try:
+            named = translate(session.broker.spec, request)
+        except Refused as refused:
+            session.record('refused', code=refused.code, origin=origin.host,
+                           method=method, path=path)
+            return http1.refusal(refused.code), False
+        session.record('admitted', origin=origin.host, method=method, path=path,
+                       operation=named.operation)
+        frame = codec.dumps({'version': 1, 'capability': session.broker.capability,
+                             'request': {'operation': named.operation,
+                                         'arguments': dict(named.arguments)}})
+        reply = session.broker.handle(frame)
+        if reply.get('ok') is True:
+            body = codec.dumps(reply.get('result'))
+            response = http1.Response(200, b'OK', ((b'content-type', b'application/json'),), body)
+            session.record('completed', origin=origin.host, method=method, path=path,
+                           operation=named.operation, status=200)
+            return http1.encode_response(response, fields=response.fields,
+                                         keep_alive=request.keep_alive,
+                                         head=request.method == b'HEAD'), request.keep_alive
+        error = reply.get('error') or {}
+        code = error.get('code') if isinstance(error.get('code'), str) else 'internal_error'
+        session.record('failed', code=code, origin=origin.host, method=method, path=path,
+                       operation=named.operation)
+        return http1.refusal(code, status=error.get('status')), False
 
 
 class _Server(socketserver.ThreadingMixIn, socketserver.TCPServer):

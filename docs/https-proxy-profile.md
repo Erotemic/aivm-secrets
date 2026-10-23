@@ -1,4 +1,4 @@
-# HTTPS proxy profile: `credential-substitution` (experimental)
+# HTTPS proxy profiles (experimental)
 
 **Python reference, synthetic-tested. Not proved, not the default, and
 weaker than named operations.** See the
@@ -85,3 +85,38 @@ the guest sends. A `deny` path ending in `/` covers everything below it.
   (`PROXY-EGRESS-01`). The credential still cannot leave by another path.
 - No HTTP/2, streaming, `Expect`, trailers or compressed responses yet.
 - Not yet ported to Rust or proved (HP-4, HP-5).
+
+## `constrained-http`
+
+```
+python -I -m aivm_secrets proxy --policy proxy.json --credential-file token \
+    --audit proxy.jsonl --service-policy service.json --broker-audit broker.jsonl \
+    [--writes deny|allow]
+```
+
+With `"profile": "constrained-http"`, the proxy policy names exactly one
+origin, `{"host": …}`, which must be the service policy's host. It carries
+no address, trust anchor, credential scheme or deny list. The proxy holds
+**no credential**. It runs the ordinary broker in-process for
+`service.json`, a schema-2 HTTPS policy, and serves a guest request only
+when it is **exactly** one of that policy's named operations:
+
+1. Arguments are read off the request against each operation's method,
+   path template and query template.
+2. The broker's own encoder is run on those arguments. The request is
+   accepted only if that encoder reproduces the guest's method, path, query
+   (order-insensitive, no duplicates) and JSON body. A matcher defect
+   therefore cannot widen authority.
+3. The broker re-checks scope and write mode, builds and sends the provider
+   request itself, and returns only the operation's disclosure as the
+   response body.
+
+Anything else is `403 unsupported_request`, with no provider call. There is
+no fallback to substitution: one session runs one profile, and a
+constrained session has no credential to substitute. Operations with
+checks, pinned GraphQL documents or pagination metadata are not translated
+yet. Tests: `tests/test_proxy_constrained.py`.
+
+The response is the operation's disclosure, not the full provider response.
+Stock tools that need fields the policy does not release will fail rather
+than receive them (HP-3 tests compatibility).

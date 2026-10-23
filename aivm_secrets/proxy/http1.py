@@ -316,14 +316,24 @@ def encode_response(
     return bytes(out)
 
 
-def refusal(code: str) -> bytes:
-    """The fixed guest response for a refused request: no detail, no echo."""
-    status = {'invalid_request': b'400 Bad Request', 'too_large': b'413 Content Too Large',
+def refusal(code: str, *, status: int | None = None) -> bytes:
+    """The fixed guest response for a refused request: no detail, no echo.
+
+    ``status`` is a provider's three-digit status, the one provider-derived
+    datum a broker error may carry; it is used only when it is a 4xx/5xx.
+    """
+    if not code.replace('_', '').isalnum() or not code.isascii():
+        code = 'internal_error'
+    reported = (str(status).encode() + b' Upstream Status'
+                if type(status) is int and 400 <= status <= 599 else None)
+    status = reported or {'invalid_request': b'400 Bad Request', 'too_large': b'413 Content Too Large',
               'denied': b'403 Forbidden', 'unknown_origin': b'403 Forbidden',
               'unauthenticated': b'407 Proxy Authentication Required',
               'revoked': b'403 Forbidden', 'reflected': b'502 Bad Gateway',
               'upstream_response': b'502 Bad Gateway', 'unreachable': b'502 Bad Gateway',
-              'outcome_unknown': b'502 Bad Gateway'}.get(code, b'500 Internal Server Error')
+              'outcome_unknown': b'502 Bad Gateway', 'unsupported_request': b'403 Forbidden',
+              'expired': b'403 Forbidden',
+              'exhausted': b'429 Too Many Requests'}.get(code, b'502 Bad Gateway')
     body = b'{"error":{"code":"' + code.encode('ascii') + b'"},"ok":false,"proxy":"aivm-secrets"}\n'
     extra = b'Proxy-Authenticate: Basic realm="aivm-secrets"\r\n' if code == 'unauthenticated' else b''
     return (b'HTTP/1.1 ' + status + b'\r\n' + extra + b'Content-Type: application/json\r\n'
