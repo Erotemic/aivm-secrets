@@ -23,6 +23,7 @@ from aivm_secrets.proxy.policy import PolicyError, parse_policy
 from aivm_secrets.proxy.server import ProxyAudit, ProxyServer, ProxySession
 from tests.secrets_helpers import TOKEN, TLSService, write_private
 from tests.test_proxy_substitution import World, status
+from tests.test_rust_garrett import executable
 from tests.test_rust_garrett_manifest import ManifestCase, provider_directory
 from tests.test_rust_invoke import client_config
 from tests.test_rust_second_provider import HOST, registry_disclosure, registry_policy
@@ -52,6 +53,46 @@ class GuestWorld(World):
         self.server = ProxyServer(self.session)
 
 
+
+class NativeGuestWorld(World):
+    """The same translator in the native `garrett-proxy` (constrained mode)."""
+
+    host = HOST
+
+    def __init__(self, tmp_path, case, route_policy):
+        directory = tmp_path / 'native-guest'
+        directory.mkdir(mode=0o700)
+        self.policy_path = write_private(directory / 'proxy.json', json.dumps(POLICY).encode())
+        self.routes_path = write_private(directory / 'routes.json', json.dumps(route_policy).encode())
+        self.audit_path = directory / 'audit.jsonl'
+        self.ca_path = directory / 'ca.pem'
+        self.client = client_config(case)
+
+    def __enter__(self):
+        self.process = subprocess.Popen(
+            [executable('AIVM_SECRETS_RUST_GARRETT_PROXY'), '--policy', str(self.policy_path),
+             '--routes', str(self.routes_path), '--bridge-client', json.dumps(self.client),
+             '--audit', str(self.audit_path)],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        assert select.select([self.process.stdout], [], [], 30)[0], 'no announcement'
+        announcement = json.loads(self.process.stdout.readline())
+        assert announcement['ready'] is True, announcement
+        assert announcement['profile'] == 'constrained-http'
+        self.ca_path.write_text(announcement['ca_pem'])
+        self.port = int(announcement['listen'].rsplit(':', 1)[1])
+        self.session = type('Session', (), {'token': announcement['proxy_token']})
+        return self
+
+    def __exit__(self, *exc):
+        if self.process.stdin and not self.process.stdin.closed:
+            self.process.stdin.close()
+        assert self.process.wait(timeout=30) == 0
+        assert TOKEN.encode() not in self.process.stdout.read() + self.process.stderr.read()
+
+
+WORLDS = [GuestWorld, NativeGuestWorld]
+
+
 @pytest.fixture
 def registry(tmp_path):
     with TLSService(provider_directory(tmp_path), host=HOST) as provider:
@@ -70,9 +111,10 @@ def get(target: str) -> bytes:
             + b'\r\nAuthorization: token guest-placeholder\r\nConnection: close\r\n\r\n')
 
 
-def test_a_plain_request_becomes_the_named_operation_on_the_bridge(tmp_path, registry):
+@pytest.mark.parametrize('make', WORLDS, ids=['python', 'native'])
+def test_a_plain_request_becomes_the_named_operation_on_the_bridge(tmp_path, registry, make):
     provider, case, policy = registry
-    with GuestWorld(tmp_path, case, routes(policy)) as world:
+    with make(tmp_path, case, routes(policy)) as world:
         reply = world.raw(get('/api/packages/alpha'))
     assert status(reply) == 200, reply
     assert json.loads(reply.split(b'\r\n\r\n', 1)[1]) == {
@@ -92,20 +134,22 @@ def test_a_plain_request_becomes_the_named_operation_on_the_bridge(tmp_path, reg
     '/api/packages/alpha?extra=1',    # no operation has this query
     '/api/users/alpha',               # no operation has this path
 ])
-def test_unmatched_requests_are_refused_without_any_bridge_call(tmp_path, registry, target):
+@pytest.mark.parametrize('make', WORLDS, ids=['python', 'native'])
+def test_unmatched_requests_are_refused_without_any_bridge_call(tmp_path, registry, target, make):
     provider, case, policy = registry
-    with GuestWorld(tmp_path, case, routes(policy)) as world:
+    with make(tmp_path, case, routes(policy)) as world:
         reply = world.raw(get(target))
     assert status(reply) in (400, 403), reply
     assert provider.seen() == []
 
 
-def test_a_tampered_route_copy_cannot_widen_what_the_bridge_allows(tmp_path, registry):
+@pytest.mark.parametrize('make', WORLDS, ids=['python', 'native'])
+def test_a_tampered_route_copy_cannot_widen_what_the_bridge_allows(tmp_path, registry, make):
     """The guest's copy allows `gamma`; the host bridge's policy does not."""
     provider, case, policy = registry
     widened = routes(policy)
     widened['operations'][0]['parameters']['name'] = ['alpha', 'beta', 'gamma']
-    with GuestWorld(tmp_path, case, widened) as world:
+    with make(tmp_path, case, widened) as world:
         reply = world.raw(get('/api/packages/gamma'))
     assert status(reply) >= 400, reply
     assert provider.seen() == []

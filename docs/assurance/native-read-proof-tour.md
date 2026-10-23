@@ -493,10 +493,23 @@ replaced, over more than 500 template, query and argument combinations
 converting JSON arguments to text. Both are checked by the manifest parity
 tests against the Python reference, not proved.
 
-**Why it matters for the proxy.** HP-6's guest-side translator asks for
-named operations; the host then builds the target with this function. A
-future native translator can prove its round trip against the same
-`fill_target` the host uses.
+**The guest-side translator (HP-6).** The constrained proxy can run inside
+the guest, untrusted, with no credential (`garrett-proxy --routes ...
+--bridge-client ...`). It reads candidate arguments off a request target
+and accepts them only through the extracted `route_match::translate`
+([`GarrettRouteMatch`](../../proofs/GarrettRouteMatch.lean)):
+
+| Theorem | Says |
+| --- | --- |
+| `translate_round_trip` | Whenever `translate` returns arguments, the host encoder `fill_target`, applied to the same templates and those arguments, returns exactly the guest's target. |
+| `translate_exact` | So the accepted target is `PathBytes ++ QueryBytes` of those arguments, contains only safe bytes, and every template part had a value. |
+
+How candidates are read off the target is not proved and does not need to
+be: it only decides which requests are translated. The typed arguments then
+go through the guest's native `invoke` to the host bridge, which authorizes
+the named operation on its **own** policy. So a guest whose route copy
+differs from the host's can only ask for a different named operation, never
+widen authority (`tests/test_proxy_guest_translator.py` tampers the copy).
 
 ## The other guest verbs: `describe` and `renounce` (2026-10-23)
 

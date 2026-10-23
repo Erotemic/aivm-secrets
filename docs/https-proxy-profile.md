@@ -153,9 +153,21 @@ policy, builds the provider request and releases only the disclosure. So:
   would for any guest tool. `tests/test_proxy_guest_translator.py` widens
   the guest copy and checks that the provider still sees nothing.
 
-The translator is Python for now; the guest needs Python and the native
-client. A native translator with a proved round trip (template match then
-fill reproduces the target) is the next HP-6 step.
+The native `garrett-proxy` runs the same mode without Python:
+
+```
+garrett-proxy --policy proxy.json --audit proxy.jsonl --routes routes.json \
+    --bridge-client '["garrett-client", "--config", "client.json", "--capability-file", "cap"]'
+```
+
+It accepts a request only if the extracted `route_match::translate` finds
+arguments under which the host's own `route::fill_target` writes the target
+back byte for byte (proved: `translate_round_trip`), and the typed arguments
+reproduce the method, target and JSON body through the route copy's request
+validation. Differences from the Python translator: the query must be in
+the policy's (sorted) order, each path parameter is one segment, and a
+bridge error is reported as `denied`, `invalid_request`, `revoked` or
+`outcome_unknown`.
 
 ## Native `garrett-proxy`
 

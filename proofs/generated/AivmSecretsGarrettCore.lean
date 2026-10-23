@@ -17726,6 +17726,242 @@ def route.fill_target
     else ok (core.result.Result.Err route.RouteDenial.Denied)
   | core.result.Result.Err denial => ok (core.result.Result.Err denial)
 
+/-- [aivm_secrets_garrett_core::route_match::path_end]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/route_match.rs', lines 15:4-22:1
+    Visibility: public -/
+@[rust_loop]
+def route_match.path_end_loop
+  (target : Slice Std.U8) (index : Std.Usize) : Result Std.Usize := do
+  let i := Slice.len target
+  if index < i
+  then
+    let i1 ← Slice.index_usize target index
+    if i1 = 63#u8
+    then ok index
+    else let index1 ← index + 1#usize
+         route_match.path_end_loop target index1
+  else ok (Slice.len target)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::route_match::path_end]:
+    Source: 'crates/aivm-secrets-garrett-core/src/route_match.rs', lines 13:0-22:1
+    Visibility: public -/
+@[reducible]
+def route_match.path_end (target : Slice Std.U8) : Result Std.Usize := do
+  route_match.path_end_loop target 0#usize
+
+/-- [aivm_secrets_garrett_core::route_match::piece_end]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/route_match.rs', lines 27:4-34:1
+    Visibility: public -/
+@[rust_loop]
+def route_match.piece_end_loop
+  (target : Slice Std.U8) («end» : Std.Usize) (stop : Std.U8)
+  (index : Std.Usize) :
+  Result Std.Usize
+  := do
+  if index < «end»
+  then
+    let i := Slice.len target
+    if index < i
+    then
+      let i1 ← Slice.index_usize target index
+      if i1 = stop
+      then ok index
+      else
+        let index1 ← index + 1#usize
+        route_match.piece_end_loop target «end» stop index1
+    else ok «end»
+  else ok «end»
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::route_match::piece_end]:
+    Source: 'crates/aivm-secrets-garrett-core/src/route_match.rs', lines 25:0-34:1
+    Visibility: public -/
+@[reducible]
+def route_match.piece_end
+  (target : Slice Std.U8) (start : Std.Usize) («end» : Std.Usize)
+  (stop : Std.U8) :
+  Result Std.Usize
+  := do
+  route_match.piece_end_loop target «end» stop start
+
+/-- [aivm_secrets_garrett_core::route_match::bind]:
+    Source: 'crates/aivm-secrets-garrett-core/src/route_match.rs', lines 37:0-45:1
+    Visibility: public -/
+def route_match.bind
+  (bindings : alloc.vec.Vec route.Binding) («name» : Slice Std.U8)
+  (value : Slice Std.U8) :
+  Result (alloc.vec.Vec route.Binding)
+  := do
+  let s := alloc.vec.Vec.deref bindings
+  let o ← route.lookup s «name»
+  match o with
+  | none =>
+    let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 «name»
+    let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 value
+    alloc.vec.Vec.push bindings ({ «name» := v, value := v1 } :
+      route.Binding)
+  | some _ => ok bindings
+
+/-- [aivm_secrets_garrett_core::route_match::bind_path]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/route_match.rs', lines 51:4-59:5
+    Visibility: public -/
+@[rust_loop]
+def route_match.bind_path_loop
+  (bindings : alloc.vec.Vec route.Binding) (path : Slice route.Piece)
+  (target : Slice Std.U8) («end» : Std.Usize) (start : Std.Usize)
+  (index : Std.Usize) :
+  Result (alloc.vec.Vec route.Binding)
+  := do
+  let i := Slice.len path
+  if index < i
+  then
+    if start <= «end»
+    then
+      let stop ← route_match.piece_end target start «end» 47#u8
+      let p ← Slice.index_usize path index
+      let bindings1 ←
+        match p with
+        | route.Piece.Literal _ => ok bindings
+        | route.Piece.Parameter «name» =>
+          do
+          let s := alloc.vec.Vec.deref «name»
+          let s1 ←
+            core.slice.index.Slice.index
+              (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) target
+              { start, «end» := stop }
+          route_match.bind bindings s s1
+      let start1 ← stop + 1#usize
+      let index1 ← index + 1#usize
+      route_match.bind_path_loop bindings1 path target «end» start1 index1
+    else ok bindings
+  else ok bindings
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::route_match::bind_path]:
+    Source: 'crates/aivm-secrets-garrett-core/src/route_match.rs', lines 48:0-60:1
+    Visibility: public -/
+@[reducible]
+def route_match.bind_path
+  (bindings : alloc.vec.Vec route.Binding) (path : Slice route.Piece)
+  (target : Slice Std.U8) («end» : Std.Usize) :
+  Result (alloc.vec.Vec route.Binding)
+  := do
+  route_match.bind_path_loop bindings path target «end» 1#usize 0#usize
+
+/-- [aivm_secrets_garrett_core::route_match::bind_query]: loop 1:
+    Source: 'crates/aivm-secrets-garrett-core/src/route_match.rs', lines 72:12-83:13
+    Visibility: public -/
+@[rust_loop]
+def route_match.bind_query_loop0_loop0
+  (bindings : alloc.vec.Vec route.Binding) (query : Slice route.QueryPiece)
+  (target : Slice Std.U8) (stop : Std.Usize) (equals : Std.Usize)
+  («name» : Slice Std.U8) (index : Std.Usize) :
+  Result (alloc.vec.Vec route.Binding)
+  := do
+  let i := Slice.len query
+  if index < i
+  then
+    let qp ← Slice.index_usize query index
+    let wanted := alloc.vec.Vec.deref qp.name
+    let b ←
+      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 wanted «name»
+    let bindings1 ←
+      if b
+      then
+        match qp.piece with
+        | route.Piece.Literal _ => ok bindings
+        | route.Piece.Parameter parameter =>
+          do
+          let s := alloc.vec.Vec.deref parameter
+          let i1 ← equals + 1#usize
+          let s1 ←
+            core.slice.index.Slice.index
+              (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) target
+              { start := i1, «end» := stop }
+          route_match.bind bindings s s1
+      else ok bindings
+    let index1 ← index + 1#usize
+    route_match.bind_query_loop0_loop0 bindings1 query target stop equals
+      «name» index1
+  else ok bindings
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::route_match::bind_query]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/route_match.rs', lines 66:4-86:5
+    Visibility: public -/
+@[rust_loop]
+def route_match.bind_query_loop0
+  (bindings : alloc.vec.Vec route.Binding) (query : Slice route.QueryPiece)
+  (target : Slice Std.U8) (start : Std.Usize) :
+  Result (alloc.vec.Vec route.Binding)
+  := do
+  let i := Slice.len target
+  if start < i
+  then
+    let i1 := Slice.len target
+    let stop ← route_match.piece_end target start i1 38#u8
+    let equals ← route_match.piece_end target start stop 61#u8
+    if equals < stop
+    then
+      let «name» ←
+        core.slice.index.Slice.index
+          (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) target
+          { start, «end» := equals }
+      let bindings1 ←
+        route_match.bind_query_loop0_loop0 bindings query target stop equals
+          «name» 0#usize
+      let start1 ← stop + 1#usize
+      route_match.bind_query_loop0 bindings1 query target start1
+    else
+      let start1 ← stop + 1#usize
+      route_match.bind_query_loop0 bindings query target start1
+  else ok bindings
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::route_match::bind_query]:
+    Source: 'crates/aivm-secrets-garrett-core/src/route_match.rs', lines 64:0-87:1
+    Visibility: public -/
+def route_match.bind_query
+  (bindings : alloc.vec.Vec route.Binding) (query : Slice route.QueryPiece)
+  (target : Slice Std.U8) («end» : Std.Usize) :
+  Result (alloc.vec.Vec route.Binding)
+  := do
+  let start ← «end» + 1#usize
+  route_match.bind_query_loop0 bindings query target start
+
+/-- [aivm_secrets_garrett_core::route_match::translate]:
+    Source: 'crates/aivm-secrets-garrett-core/src/route_match.rs', lines 91:0-110:1
+    Visibility: public -/
+def route_match.translate
+  (path : Slice route.Piece) (query : Slice route.QueryPiece)
+  (target : Slice Std.U8) :
+  Result (Option (alloc.vec.Vec route.Binding))
+  := do
+  let «end» ← route_match.path_end target
+  if «end» = 0#usize
+  then ok none
+  else
+    let i ← Slice.index_usize target 0#usize
+    if i != 47#u8
+    then ok none
+    else
+      let bindings ←
+        route_match.bind_path (alloc.vec.Vec.new route.Binding) path target
+          «end»
+      let bindings1 ← route_match.bind_query bindings query target «end»
+      let s := alloc.vec.Vec.deref bindings1
+      let r ← route.fill_target path query s
+      match r with
+      | core.result.Result.Ok filled =>
+        let produced := alloc.vec.Vec.deref filled
+        let b ←
+          core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 produced target
+        if b
+        then ok (some bindings1)
+        else ok none
+      | core.result.Result.Err _ => ok none
+
 /-- [aivm_secrets_garrett_core::selected_conversion::public_field_name]: loop 0:
     Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 24:4-35:1
     Visibility: public -/

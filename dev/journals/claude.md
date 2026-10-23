@@ -400,3 +400,26 @@ row CONTROL-NATIVE-01 for the three callbacks.
 - I drafted the description theorem with a placeholder `sorry` and replaced
   it with the real statement before the first build; nothing with `sorry`
   was compiled or committed.
+
+## 2026-10-23 09:26:46 -0400
+
+HP-6 native: `garrett-proxy` gains the guest-side constrained mode
+(`--routes`, `--bridge-client`, no credential). Matching is the extracted
+`route_match::translate`, which accepts candidate arguments only when the
+host's own `route::fill_target` reproduces the target;
+`translate_round_trip` / `translate_exact` are proved. The native
+manifest's `Policy::translate` then types the arguments and re-checks
+method, target and body through the route copy's validation, and requires
+exactly one match.
+
+- Design choice: prove soundness by construction (the extracted matcher ends
+  in the host's encoder and a byte comparison) rather than proving the
+  matching heuristics. This mirrors the Python round-trip guard and keeps
+  the proof small; completeness is a usability property only.
+- Known differences from the Python translator, documented: query order must
+  match the policy (BTreeMap) order, path parameters are single segments, and
+  bridge errors collapse to four refusal codes.
+- Exactly one authority source is enforced in argv parsing and in `load`
+  (constrained + credential, or substitution + routes, is invalid).
+- Tests: the guest-translator suite now runs on both backends (12 passed),
+  including the tampered route copy.

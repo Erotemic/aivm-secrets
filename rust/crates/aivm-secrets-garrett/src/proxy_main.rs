@@ -11,6 +11,14 @@
 //! TLS, the session CA, the audit and the process contract, which matches
 //! `aivm-secrets proxy` (one announcement line; stdin EOF ends the session).
 //! The profile makes no authority-confinement claim (PROXY-AUTHORITY-01).
+//!
+//! With `"profile": "constrained-http"`, `--routes` and `--bridge-client`
+//! instead of a credential, the same binary is the **guest-side**
+//! constrained translator (HP-6): it holds no credential, accepts a request
+//! only if it is exactly one named operation of the route copy
+//! (`manifest::Policy::translate`, over the proved `route_match::translate`)
+//! and sends that operation through the guest's native `invoke`; the host
+//! bridge authorizes it on its own policy.
 use aivm_secrets_garrett::files;
 use aivm_secrets_garrett_core::credential_use::Authentication;
 use aivm_secrets_garrett_core::proxy_controller::{self as controller, Stage, Upstream};
@@ -36,6 +44,7 @@ const IO_TIMEOUT: Duration = Duration::from_secs(15);
 const TOTAL_DEADLINE: Duration = Duration::from_secs(45);
 const MAX_POLICY: usize = 65536;
 const MAX_CA: usize = 1 << 20;
+const MAX_ROUTES: usize = 262144;
 /// Concurrent guest connections; extra connections are closed at once.
 const MAX_CONNECTIONS: usize = 32;
 /// Whole-head and whole-request deadlines, so a slow guest cannot hold a
@@ -48,12 +57,21 @@ struct Origin {
     address: String,
     port: u16,
     authentication: Authentication,
-    upstream: Arc<ClientConfig>,
+    /// `None` in the constrained profile, which never connects upstream.
+    upstream: Option<Arc<ClientConfig>>,
     guest: Arc<ServerConfig>,
+}
+
+/// The guest-side constrained translator's route copy and bridge client.
+struct Translator {
+    routes: aivm_secrets_garrett::manifest::Policy,
+    client: Vec<String>,
 }
 
 struct Session {
     origins: BTreeMap<String, Origin>,
+    /// `Some` exactly in the constrained-http profile (no credential).
+    translator: Option<Translator>,
     rules: Vec<core::DenyRule>,
     request_limit: usize,
     response_limit: usize,
@@ -177,11 +195,24 @@ fn upstream_config(ca_file: &Path) -> Result<Arc<ClientConfig>, String> {
     Ok(Arc::new(config))
 }
 
-fn load(policy_path: &Path, credential_path: &Path, audit_path: &Path) -> Result<(Session, String), String> {
+/// Where the session's authority comes from: exactly one, never a fallback.
+enum Authority<'a> {
+    /// credential-substitution: the credential file.
+    Credential(&'a Path),
+    /// constrained-http, guest side: a route copy and the bridge client argv.
+    Bridge(&'a Path, Vec<String>),
+}
+
+fn load(policy_path: &Path, authority: Authority<'_>, audit_path: &Path) -> Result<(Session, String), String> {
     let raw = files::read_private(policy_path, MAX_POLICY).map_err(|_| fail("invalid_policy"))?;
     let policy: Value = serde_json::from_slice(&raw).map_err(|_| fail("invalid_policy"))?;
     exact_keys(&policy, &["schema", "profile", "origins", "lifetime_seconds"], &["deny", "limits"])?;
-    if policy["schema"].as_u64() != Some(1) || policy["profile"].as_str() != Some("credential-substitution") {
+    let constrained = match (policy["profile"].as_str(), &authority) {
+        (Some("credential-substitution"), Authority::Credential(_)) => false,
+        (Some("constrained-http"), Authority::Bridge(..)) => true,
+        _ => return Err(fail("invalid_policy")),
+    };
+    if policy["schema"].as_u64() != Some(1) || (constrained && policy.get("deny").is_some()) {
         return Err(fail("invalid_policy"));
     }
     let lifetime = number(&policy, "lifetime_seconds", 1, 86400)?;
@@ -191,17 +222,55 @@ fn load(policy_path: &Path, credential_path: &Path, audit_path: &Path) -> Result
     }
     let mut hosts = Vec::new();
     for row in origins_value {
-        exact_keys(row, &["host", "address", "port", "ca_file", "authentication"], &[])?;
+        if constrained {
+            exact_keys(row, &["host"], &[])?;
+        } else {
+            exact_keys(row, &["host", "address", "port", "ca_file", "authentication"], &[])?;
+        }
         let host = text(row, "host")?;
         if !valid_host(host) || hosts.iter().any(|h: &String| h == host) {
             return Err(fail("invalid_policy"));
         }
         hosts.push(host.to_owned());
     }
+    let translator = match &authority {
+        Authority::Bridge(routes, client) => {
+            // The route copy is guest data, read with a bound; a wrong copy
+            // can only change which named operation is asked for.
+            let mut raw = Vec::new();
+            std::fs::File::open(routes)
+                .and_then(|file| file.take(MAX_ROUTES as u64 + 1).read_to_end(&mut raw))
+                .map_err(|_| fail("invalid_policy"))?;
+            if raw.len() > MAX_ROUTES {
+                return Err(fail("invalid_policy"));
+            }
+            let routes = aivm_secrets_garrett::manifest::Policy::parse(
+                &serde_json::from_slice(&raw).map_err(|_| fail("invalid_policy"))?,
+            )
+            .map_err(|_| fail("invalid_policy"))?;
+            if hosts != [routes.host().to_owned()] || client.is_empty() || client.iter().any(String::is_empty) {
+                return Err(fail("invalid_policy"));
+            }
+            Some(Translator { routes, client: client.clone() })
+        }
+        Authority::Credential(_) => None,
+    };
     let (ca_pem, issuer) = session_ca(&hosts, lifetime)?;
     let mut origins = BTreeMap::new();
     for row in origins_value {
         let host = text(row, "host")?.to_owned();
+        if constrained {
+            let origin = Origin {
+                port: 443,
+                upstream: None,
+                guest: leaf_config(&host, &issuer, lifetime)?,
+                host: host.clone(),
+                address: String::new(),
+                authentication: Authentication::Bearer,
+            };
+            origins.insert(host, origin);
+            continue;
+        }
         let authentication = match text(row, "authentication")? {
             "bearer" => Authentication::Bearer,
             "x-api-key" => Authentication::ApiKey,
@@ -213,7 +282,7 @@ fn load(policy_path: &Path, credential_path: &Path, audit_path: &Path) -> Result
         }
         let origin = Origin {
             port: number(row, "port", 1, 65535)? as u16,
-            upstream: upstream_config(Path::new(text(row, "ca_file")?))?,
+            upstream: Some(upstream_config(Path::new(text(row, "ca_file")?))?),
             guest: leaf_config(&host, &issuer, lifetime)?,
             host: host.clone(),
             address,
@@ -248,13 +317,20 @@ fn load(policy_path: &Path, credential_path: &Path, audit_path: &Path) -> Result
             response_limit = number(limits, "response_body", 1, 64 << 20)? as usize;
         }
     }
-    let mut secret = files::read_private(credential_path, 4097).map_err(|_| fail("credential_source"))?;
-    while secret.last() == Some(&b'\n') || secret.last() == Some(&b'\r') {
-        secret.pop();
-    }
-    if !aivm_secrets_garrett_core::http_auth::valid_credential(&secret) {
-        return Err(fail("credential_source"));
-    }
+    let secret = match authority {
+        Authority::Credential(credential_path) => {
+            let mut secret =
+                files::read_private(credential_path, 4097).map_err(|_| fail("credential_source"))?;
+            while secret.last() == Some(&b'\n') || secret.last() == Some(&b'\r') {
+                secret.pop();
+            }
+            if !aivm_secrets_garrett_core::http_auth::valid_credential(&secret) {
+                return Err(fail("credential_source"));
+            }
+            secret
+        }
+        Authority::Bridge(..) => Vec::new(),
+    };
     let mut random = [0u8; 32];
     SystemRandom::new().fill(&mut random).map_err(|_| fail("proxy_failed"))?;
     let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(random).into_bytes();
@@ -270,6 +346,7 @@ fn load(policy_path: &Path, credential_path: &Path, audit_path: &Path) -> Result
     Ok((
         Session {
             origins,
+            translator,
             rules,
             request_limit,
             response_limit,
@@ -347,6 +424,7 @@ fn refusal(code: &str) -> Vec<u8> {
         "reflected" => core::Code::Reflected,
         "unreachable" => core::Code::Unreachable,
         "credential_source" => core::Code::CredentialSource,
+        "unsupported_request" => core::Code::UnsupportedRequest,
         _ => core::Code::OutcomeUnknown,
     };
     core::refusal(&code)
@@ -408,7 +486,8 @@ fn exchange(session: &Session, origin: &Origin, wire: &[u8]) -> Result<Vec<u8>, 
     socket.set_read_timeout(Some(IO_TIMEOUT)).map_err(|_| core::Code::Unreachable)?;
     socket.set_write_timeout(Some(IO_TIMEOUT)).map_err(|_| core::Code::Unreachable)?;
     let name = ServerName::try_from(origin.host.clone()).map_err(|_| core::Code::Unreachable)?;
-    let connection = ClientConnection::new(origin.upstream.clone(), name).map_err(|_| core::Code::Unreachable)?;
+    let upstream = origin.upstream.clone().ok_or(core::Code::Unreachable)?;
+    let connection = ClientConnection::new(upstream, name).map_err(|_| core::Code::Unreachable)?;
     let mut tls = StreamOwned::new(connection, socket);
     // A completed handshake before the first byte keeps core::Code::Unreachable honest.
     while tls.conn.is_handshaking() {
@@ -470,6 +549,9 @@ impl Upstream for Native<'_> {
 /// One accepted guest request through `proxy_controller::serve`. Returns the
 /// guest bytes and whether to keep the tunnel open.
 fn serve_one(session: &Session, origin: &Origin, request: &core::Request) -> (Vec<u8>, bool) {
+    if let Some(translator) = &session.translator {
+        return serve_translated(session, translator, origin, request);
+    }
     let method = String::from_utf8_lossy(&request.method).into_owned();
     let path = path_of(&request.target);
     let mut native = Native { session, origin, method: &method, path: &path };
@@ -492,6 +574,57 @@ fn serve_one(session: &Session, origin: &Origin, request: &core::Request) -> (Ve
         }
     }
     (served.reply, served.keep)
+}
+
+/// The guest-side constrained profile: the one named operation the request
+/// equals, sent through the guest's native `invoke`. No credential exists in
+/// this process; the reply body is the operation's disclosure.
+fn serve_translated(session: &Session, translator: &Translator, origin: &Origin, request: &core::Request) -> (Vec<u8>, bool) {
+    let method = String::from_utf8_lossy(&request.method).into_owned();
+    let target = String::from_utf8_lossy(&request.target).into_owned();
+    let path = path_of(&request.target);
+    if !session.current() {
+        session.record("refused", json!({"code": "revoked", "origin": origin.host, "method": method, "path": path}));
+        return (refusal("revoked"), false);
+    }
+    let Some((operation, arguments)) = translator.routes.translate(&method, &target, &request.body) else {
+        session.record("refused", json!({"code": "unsupported_request", "origin": origin.host, "method": method, "path": path}));
+        return (refusal("unsupported_request"), false);
+    };
+    session.record("admitted", json!({"origin": origin.host, "method": method, "path": path, "operation": operation}));
+    let reply = std::process::Command::new(&translator.client[0])
+        .args(&translator.client[1..])
+        .args(["invoke", &operation, "--arguments", &arguments.to_string()])
+        .stdin(std::process::Stdio::null())
+        .output()
+        .ok()
+        .and_then(|done| serde_json::from_slice::<Value>(&done.stdout).ok());
+    match reply {
+        Some(reply) if reply["ok"] == json!(true) && reply.get("result").is_some() => {
+            let body = serde_json::to_vec(&reply["result"]).unwrap_or_default();
+            session.record("completed", json!({"origin": origin.host, "method": method, "path": path, "operation": operation, "status": 200}));
+            let mut out = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: {}\r\n\r\n",
+                body.len(),
+                if request.keep_alive { "keep-alive" } else { "close" }
+            )
+            .into_bytes();
+            if request.method != b"HEAD" {
+                out.extend_from_slice(&body);
+            }
+            (out, request.keep_alive)
+        }
+        reply => {
+            let code = match reply.as_ref().and_then(|r| r["error"]["code"].as_str()) {
+                Some("denied") => "denied",
+                Some("invalid_request") => "invalid_request",
+                Some("revoked" | "expired" | "invalid_capability") => "revoked",
+                _ => "outcome_unknown",
+            };
+            session.record("failed", json!({"code": code, "origin": origin.host, "method": method, "path": path, "operation": operation}));
+            (refusal(code), false)
+        }
+    }
 }
 
 fn tunnel(session: &Session, mut stream: TcpStream) -> io::Result<()> {
@@ -590,14 +723,24 @@ fn main() {
     let mut index = 0;
     while index + 1 < args.len() {
         let key = args[index].as_str();
-        if !["--policy", "--credential-file", "--audit", "--port"].contains(&key) || options.contains_key(key) {
+        if !["--policy", "--credential-file", "--audit", "--port", "--routes", "--bridge-client"].contains(&key)
+            || options.contains_key(key)
+        {
             emit(&json!({"version": 1, "ready": false, "error": "invalid_spec"}));
             std::process::exit(1);
         }
         options.insert(key, args[index + 1].as_str());
         index += 2;
     }
-    if index != args.len() || ["--policy", "--credential-file", "--audit"].iter().any(|k| !options.contains_key(k)) {
+    // Exactly one authority source: a credential, or a route copy and bridge client.
+    let bridge = options.contains_key("--routes") || options.contains_key("--bridge-client");
+    let complete = if bridge {
+        options.contains_key("--routes") && options.contains_key("--bridge-client")
+            && !options.contains_key("--credential-file")
+    } else {
+        options.contains_key("--credential-file")
+    };
+    if index != args.len() || !complete || ["--policy", "--audit"].iter().any(|k| !options.contains_key(k)) {
         emit(&json!({"version": 1, "ready": false, "error": "invalid_spec"}));
         std::process::exit(1);
     }
@@ -609,11 +752,23 @@ fn main() {
             std::process::exit(1);
         }
     };
-    let (session, ca_pem) = match load(
-        &PathBuf::from(options["--policy"]),
-        &PathBuf::from(options["--credential-file"]),
-        &PathBuf::from(options["--audit"]),
-    ) {
+    let routes = options.get("--routes").map(PathBuf::from);
+    let credential = options.get("--credential-file").map(PathBuf::from);
+    let authority = match (&routes, &credential) {
+        (Some(routes), None) => match serde_json::from_str::<Vec<String>>(options["--bridge-client"]) {
+            Ok(client) => Authority::Bridge(routes, client),
+            Err(_) => {
+                emit(&json!({"version": 1, "ready": false, "error": "invalid_spec"}));
+                std::process::exit(1);
+            }
+        },
+        (None, Some(credential)) => Authority::Credential(credential),
+        _ => {
+            emit(&json!({"version": 1, "ready": false, "error": "invalid_spec"}));
+            std::process::exit(1);
+        }
+    };
+    let (session, ca_pem) = match load(&PathBuf::from(options["--policy"]), authority, &PathBuf::from(options["--audit"])) {
         Ok(loaded) => loaded,
         Err(code) => {
             emit(&json!({"version": 1, "ready": false, "error": code}));
@@ -629,15 +784,18 @@ fn main() {
     };
     let address = listener.local_addr().map(|a| a.to_string()).unwrap_or_default();
     let session = Arc::new(session);
-    session.record("session_start", json!({"profile": "credential-substitution",
+    let profile = if session.translator.is_some() { "constrained-http" } else { "credential-substitution" };
+    session.record("session_start", json!({"profile": profile,
         "origins": session.origins.keys().collect::<Vec<_>>()}));
     let token = String::from_utf8_lossy(&session.token).into_owned();
     let announcement = json!({
-        "version": 1, "ready": true, "profile": "credential-substitution",
+        "version": 1, "ready": true, "profile": profile,
         "listen": address, "origins": session.origins.keys().collect::<Vec<_>>(),
         "ca_pem": ca_pem, "proxy_token": token,
     });
-    if announcement.to_string().as_bytes().windows(session.secret.len()).any(|w| w == session.secret.as_slice()) {
+    if !session.secret.is_empty()
+        && announcement.to_string().as_bytes().windows(session.secret.len()).any(|w| w == session.secret.as_slice())
+    {
         emit(&json!({"version": 1, "ready": false, "error": "credential_exposed"}));
         std::process::exit(1);
     }

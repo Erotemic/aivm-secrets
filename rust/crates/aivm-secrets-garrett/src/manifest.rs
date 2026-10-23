@@ -2,7 +2,7 @@
 //! response disclosure; requests contain only operation names and scalar values.
 use crate::{files, json, Error, Outcome};
 use aivm_secrets_garrett_core::manifest as core;
-use aivm_secrets_garrett_core::route;
+use aivm_secrets_garrett_core::{route, route_match};
 use serde_json::{json, Map, Value};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -909,6 +909,31 @@ fn route_bindings(args: &BTreeMap<String, Value>) -> Vec<route::Binding> {
         })
         .collect()
 }
+/// The query template as `route` takes it.
+fn route_query(query: &BTreeMap<String, Part>) -> Vec<route::QueryPiece> {
+    query
+        .iter()
+        .map(|(n, part)| route::QueryPiece {
+            name: n.as_bytes().to_vec(),
+            piece: route_pieces(std::slice::from_ref(part)).remove(0),
+        })
+        .collect()
+}
+/// Text bindings read off a target, typed by the operation's parameter
+/// rules (integers for integer rules, strings otherwise).
+fn typed_arguments(op: &Operation, bindings: &[route::Binding]) -> Option<Map<String, Value>> {
+    let mut out = Map::new();
+    for binding in bindings {
+        let name = String::from_utf8(binding.name.clone()).ok()?;
+        let text = String::from_utf8(binding.value.clone()).ok()?;
+        let value = match &op.parameters.get(&name)?.rule {
+            core::Rule::Integers(_) | core::Rule::Range(..) => Value::from(text.parse::<i64>().ok()?),
+            _ => Value::String(text),
+        };
+        out.insert(name, value);
+    }
+    Some(out)
+}
 /// The provider target, written by the extracted `route::fill_target`
 /// (proofs/GarrettRoute.lean: exact bytes, unreserved values only).
 fn route_target(
@@ -916,13 +941,7 @@ fn route_target(
     query: &BTreeMap<String, Part>,
     args: &BTreeMap<String, Value>,
 ) -> Outcome<String> {
-    let query: Vec<route::QueryPiece> = query
-        .iter()
-        .map(|(n, part)| route::QueryPiece {
-            name: n.as_bytes().to_vec(),
-            piece: route_pieces(std::slice::from_ref(part)).remove(0),
-        })
-        .collect();
+    let query = route_query(query);
     let bytes = route::fill_target(&route_pieces(path), &query, &route_bindings(args))
         .map_err(|_| Error::Denied)?;
     String::from_utf8(bytes).map_err(|_| Error::Denied)
@@ -1132,6 +1151,71 @@ impl Policy {
     }
     pub fn operations(&self) -> Vec<String> {
         self.operations.keys().cloned().collect()
+    }
+    /// The service host the policy's operations address.
+    pub fn host(&self) -> &str {
+        &self.host
+    }
+    /// HP-6, guest side and untrusted: the one named request an HTTP request
+    /// is exactly, or `None`. Candidates come from the extracted
+    /// `route_match::translate` (accepted only when `route::fill_target`
+    /// reproduces the target, `proofs/GarrettRouteMatch.lean`); the typed
+    /// arguments must then give back the same method, target and JSON body
+    /// through this policy's own request validation and effect. Operations
+    /// with checks, GraphQL documents or `returns: check` are not translated.
+    /// The host bridge authorizes the result on its own policy.
+    pub fn translate(&self, method: &str, target: &str, body: &[u8]) -> Option<(String, Value)> {
+        let mut found: Vec<(String, Value)> = Vec::new();
+        for (n, op) in &self.operations {
+            if op.method != method || op.requires.is_some() || op.returns_check || op.graphql.is_some() {
+                continue;
+            }
+            let pieces = route_pieces(&op.path);
+            let query = route_query(&op.query);
+            let Some(bindings) = route_match::translate(&pieces, &query, target.as_bytes()) else {
+                continue;
+            };
+            let Some(mut arguments) = typed_arguments(op, &bindings) else {
+                continue;
+            };
+            let sent: Option<Map<String, Value>> = if op.fields.is_empty() {
+                if !body.is_empty() {
+                    continue;
+                }
+                None
+            } else {
+                match serde_json::from_slice::<Value>(body) {
+                    Ok(Value::Object(fields)) if fields.values().all(Value::is_string) => Some(fields),
+                    _ => continue,
+                }
+            };
+            if let Some(fields) = &sent {
+                if fields.keys().any(|k| arguments.contains_key(k)) {
+                    continue;
+                }
+                arguments.extend(fields.clone());
+            }
+            let request = json!({"operation": n, "arguments": Value::Object(arguments.clone())});
+            let Ok((checked, args)) = self.operation(&request) else {
+                continue;
+            };
+            let Ok(effect) = checked.effect(&args) else {
+                continue;
+            };
+            let same_body = match (&effect.body, &sent) {
+                (None, None) => true,
+                (Some(Value::Object(built)), Some(fields)) => built == fields,
+                _ => false,
+            };
+            if effect.method == method && effect.target == target && same_body {
+                found.push((n.clone(), Value::Object(arguments)));
+            }
+        }
+        if found.len() == 1 {
+            found.pop()
+        } else {
+            None
+        }
     }
     pub(crate) fn operation(
         &self,
