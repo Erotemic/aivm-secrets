@@ -130,6 +130,7 @@ def test_constrained_proxy_serves_stock_curl_without_a_guest_credential(tmp_path
         port = probe.getsockname()[1]
     with TLSService(provider_directory(tmp_path), host="api.example.org") as provider:
         provider.routes[("GET", "/v1/tickets/7")] = {"id": 7, "private": TOKEN}
+        provider.routes[("GET", "/v1/tickets?page=2&state=open")] = {"rows": [{"id": 3}]}
         spec = spec_for(tmp_path, provider, constrained_proxy={"guest_port": port})
         process, announcement = start(spec)
         try:
@@ -155,6 +156,10 @@ def test_constrained_proxy_serves_stock_curl_without_a_guest_credential(tmp_path
             unmatched = curl("/v1/users/7")
             assert unmatched.stdout.endswith(b"403"), unmatched
             assert len(provider.seen()) == 1
+            # Query pairs in any order: the host sends its own (by key).
+            listed = curl("'/v1/tickets?state=open&page=2'")
+            assert listed.stdout.endswith(b"200"), listed
+            assert provider.seen()[-1]["target"] == "/v1/tickets?page=2&state=open"
             for path in guest_dir.rglob("*"):
                 if path.is_file():
                     assert TOKEN.encode() not in path.read_bytes(), path

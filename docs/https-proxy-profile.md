@@ -180,8 +180,8 @@ arguments under which the host's own `route::fill_target` writes the target
 back byte for byte (proved: `translate_round_trip`); a parameter's allowed
 texts let one value span `/` (such as `owner/repo`). The typed arguments
 reproduce the method, target and JSON body through the route copy's request
-validation. Differences from the Python translator: the query must be in
-the policy's (sorted) order, a path parameter without allowed texts is one
+validation. The guest's query pairs may come in any order. Differences
+from the Python translator: a path parameter without allowed texts is one
 segment, and a bridge error is reported as `denied`, `invalid_request`, `revoked` or
 `outcome_unknown`.
 

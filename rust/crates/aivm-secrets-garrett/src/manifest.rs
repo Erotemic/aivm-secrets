@@ -933,6 +933,19 @@ fn route_bindings(args: &BTreeMap<String, Value>) -> Vec<route::Binding> {
         })
         .collect()
 }
+/// `target` with its query pairs ordered by key (duplicates kept, so the
+/// round trip still refuses them).
+fn sorted_query(target: &str) -> String {
+    match target.split_once('?') {
+        Some((path, query)) => {
+            let mut pairs: Vec<&str> = query.split('&').collect();
+            // By key, as the host's BTreeMap orders them.
+            pairs.sort_by_key(|pair| pair.split('=').next().unwrap_or(""));
+            format!("{path}?{}", pairs.join("&"))
+        }
+        None => target.to_owned(),
+    }
+}
 /// The query template as `route` takes it.
 fn route_query(query: &BTreeMap<String, Part>) -> Vec<route::QueryPiece> {
     query
@@ -1190,6 +1203,9 @@ impl Policy {
     /// target needs a host check's facts, are not translated.
     /// The host bridge authorizes the result on its own policy.
     pub fn translate(&self, method: &str, target: &str, body: &[u8]) -> Option<(String, Value)> {
+        // Query order carries no meaning (the host writes its own, by key):
+        // match the guest's pairs in key order, as the Python translator does.
+        let target = &sorted_query(target);
         let mut found: Vec<(String, Value)> = Vec::new();
         for (n, op) in &self.operations {
             // A host check (`requires`) runs on the host; the final target
@@ -1246,7 +1262,7 @@ impl Policy {
                 (Some(Value::Object(built)), Some(fields)) => built == fields,
                 _ => false,
             };
-            if effect.method == method && effect.target == target && same_body {
+            if effect.method == method && effect.target == *target && same_body {
                 found.push((n.clone(), Value::Object(arguments)));
             }
         }

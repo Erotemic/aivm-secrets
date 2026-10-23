@@ -185,3 +185,4 @@ def test_the_process_contract_holds_no_credential(tmp_path, registry):
 def test_the_dispatcher_refuses_an_empty_client():
     with pytest.raises(PolicyError):
         BridgeDispatcher(None, [])
+
