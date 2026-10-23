@@ -13316,6 +13316,300 @@ def proxy_http.guest_response
       proxy_http.encode_response output response s3 keep_alive head
     ok (core.result.Result.Ok (), output1)
 
+/-- [aivm_secrets_garrett_core::proxy_http::Code]
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1134:0-1146:1
+    Visibility: public -/
+@[discriminant isize]
+inductive proxy_http.Code where
+| InvalidRequest : proxy_http.Code
+| TooLarge : proxy_http.Code
+| Denied : proxy_http.Code
+| UnknownOrigin : proxy_http.Code
+| Unauthenticated : proxy_http.Code
+| Revoked : proxy_http.Code
+| Reflected : proxy_http.Code
+| Unreachable : proxy_http.Code
+| OutcomeUnknown : proxy_http.Code
+| CredentialSource : proxy_http.Code
+| UnsupportedRequest : proxy_http.Code
+
+/-- [aivm_secrets_garrett_core::proxy_http::append_code]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1148:0-1162:1
+    Visibility: public -/
+def proxy_http.append_code
+  (output : alloc.vec.Vec Std.U8) (code : proxy_http.Code) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  match code with
+  | proxy_http.Code.InvalidRequest =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 15#usize [
+          105#u8, 110#u8, 118#u8, 97#u8, 108#u8, 105#u8, 100#u8, 95#u8, 114#u8,
+          101#u8, 113#u8, 117#u8, 101#u8, 115#u8, 116#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.TooLarge =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 9#usize [
+          116#u8, 111#u8, 111#u8, 95#u8, 108#u8, 97#u8, 114#u8, 103#u8, 101#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.Denied =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 6#usize [ 100#u8, 101#u8, 110#u8, 105#u8, 101#u8, 100#u8 ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.UnknownOrigin =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 14#usize [
+          117#u8, 110#u8, 107#u8, 110#u8, 111#u8, 119#u8, 110#u8, 95#u8,
+          111#u8, 114#u8, 105#u8, 103#u8, 105#u8, 110#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.Unauthenticated =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 15#usize [
+          117#u8, 110#u8, 97#u8, 117#u8, 116#u8, 104#u8, 101#u8, 110#u8,
+          116#u8, 105#u8, 99#u8, 97#u8, 116#u8, 101#u8, 100#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.Revoked =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 7#usize [
+          114#u8, 101#u8, 118#u8, 111#u8, 107#u8, 101#u8, 100#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.Reflected =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 9#usize [
+          114#u8, 101#u8, 102#u8, 108#u8, 101#u8, 99#u8, 116#u8, 101#u8, 100#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.Unreachable =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 11#usize [
+          117#u8, 110#u8, 114#u8, 101#u8, 97#u8, 99#u8, 104#u8, 97#u8, 98#u8,
+          108#u8, 101#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.OutcomeUnknown =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 15#usize [
+          111#u8, 117#u8, 116#u8, 99#u8, 111#u8, 109#u8, 101#u8, 95#u8, 117#u8,
+          110#u8, 107#u8, 110#u8, 111#u8, 119#u8, 110#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.CredentialSource =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 17#usize [
+          99#u8, 114#u8, 101#u8, 100#u8, 101#u8, 110#u8, 116#u8, 105#u8, 97#u8,
+          108#u8, 95#u8, 115#u8, 111#u8, 117#u8, 114#u8, 99#u8, 101#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.UnsupportedRequest =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 19#usize [
+          117#u8, 110#u8, 115#u8, 117#u8, 112#u8, 112#u8, 111#u8, 114#u8,
+          116#u8, 101#u8, 100#u8, 95#u8, 114#u8, 101#u8, 113#u8, 117#u8,
+          101#u8, 115#u8, 116#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+
+/-- [aivm_secrets_garrett_core::proxy_http::append_status]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1164:0-1176:1
+    Visibility: public -/
+def proxy_http.append_status
+  (output : alloc.vec.Vec Std.U8) (code : proxy_http.Code) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  match code with
+  | proxy_http.Code.InvalidRequest =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 15#usize [
+          52#u8, 48#u8, 48#u8, 32#u8, 66#u8, 97#u8, 100#u8, 32#u8, 82#u8,
+          101#u8, 113#u8, 117#u8, 101#u8, 115#u8, 116#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.TooLarge =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 21#usize [
+          52#u8, 49#u8, 51#u8, 32#u8, 67#u8, 111#u8, 110#u8, 116#u8, 101#u8,
+          110#u8, 116#u8, 32#u8, 84#u8, 111#u8, 111#u8, 32#u8, 76#u8, 97#u8,
+          114#u8, 103#u8, 101#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.Denied =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 13#usize [
+          52#u8, 48#u8, 51#u8, 32#u8, 70#u8, 111#u8, 114#u8, 98#u8, 105#u8,
+          100#u8, 100#u8, 101#u8, 110#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.UnknownOrigin =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 13#usize [
+          52#u8, 48#u8, 51#u8, 32#u8, 70#u8, 111#u8, 114#u8, 98#u8, 105#u8,
+          100#u8, 100#u8, 101#u8, 110#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.Unauthenticated =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 33#usize [
+          52#u8, 48#u8, 55#u8, 32#u8, 80#u8, 114#u8, 111#u8, 120#u8, 121#u8,
+          32#u8, 65#u8, 117#u8, 116#u8, 104#u8, 101#u8, 110#u8, 116#u8, 105#u8,
+          99#u8, 97#u8, 116#u8, 105#u8, 111#u8, 110#u8, 32#u8, 82#u8, 101#u8,
+          113#u8, 117#u8, 105#u8, 114#u8, 101#u8, 100#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.Revoked =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 13#usize [
+          52#u8, 48#u8, 51#u8, 32#u8, 70#u8, 111#u8, 114#u8, 98#u8, 105#u8,
+          100#u8, 100#u8, 101#u8, 110#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.Reflected =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 15#usize [
+          53#u8, 48#u8, 50#u8, 32#u8, 66#u8, 97#u8, 100#u8, 32#u8, 71#u8,
+          97#u8, 116#u8, 101#u8, 119#u8, 97#u8, 121#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.Unreachable =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 15#usize [
+          53#u8, 48#u8, 50#u8, 32#u8, 66#u8, 97#u8, 100#u8, 32#u8, 71#u8,
+          97#u8, 116#u8, 101#u8, 119#u8, 97#u8, 121#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.OutcomeUnknown =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 15#usize [
+          53#u8, 48#u8, 50#u8, 32#u8, 66#u8, 97#u8, 100#u8, 32#u8, 71#u8,
+          97#u8, 116#u8, 101#u8, 119#u8, 97#u8, 121#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.CredentialSource =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 15#usize [
+          53#u8, 48#u8, 50#u8, 32#u8, 66#u8, 97#u8, 100#u8, 32#u8, 71#u8,
+          97#u8, 116#u8, 101#u8, 119#u8, 97#u8, 121#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.UnsupportedRequest =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 13#usize [
+          52#u8, 48#u8, 51#u8, 32#u8, 70#u8, 111#u8, 114#u8, 98#u8, 105#u8,
+          100#u8, 100#u8, 101#u8, 110#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+
+/-- [aivm_secrets_garrett_core::proxy_http::refusal]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1179:0-1196:1
+    Visibility: public -/
+def proxy_http.refusal
+  (code : proxy_http.Code) : Result (alloc.vec.Vec Std.U8) := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 18#usize [
+        123#u8, 34#u8, 101#u8, 114#u8, 114#u8, 111#u8, 114#u8, 34#u8, 58#u8,
+        123#u8, 34#u8, 99#u8, 111#u8, 100#u8, 101#u8, 34#u8, 58#u8, 34#u8
+        ]))
+  let body ←
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  let body1 ← proxy_http.append_code body code
+  let s1 ←
+    lift (Array.to_slice
+      (Array.make 38#usize [
+        34#u8, 125#u8, 44#u8, 34#u8, 111#u8, 107#u8, 34#u8, 58#u8, 102#u8,
+        97#u8, 108#u8, 115#u8, 101#u8, 44#u8, 34#u8, 112#u8, 114#u8, 111#u8,
+        120#u8, 121#u8, 34#u8, 58#u8, 34#u8, 97#u8, 105#u8, 118#u8, 109#u8,
+        45#u8, 115#u8, 101#u8, 99#u8, 114#u8, 101#u8, 116#u8, 115#u8, 34#u8,
+        125#u8, 10#u8
+        ]))
+  let body2 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 body1 s1
+  let s2 ←
+    lift (Array.to_slice
+      (Array.make 9#usize [
+        72#u8, 84#u8, 84#u8, 80#u8, 47#u8, 49#u8, 46#u8, 49#u8, 32#u8
+        ]))
+  let out ←
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s2
+  let out1 ← proxy_http.append_status out code
+  let s3 ← lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
+  let out2 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 out1 s3
+  let out3 ←
+    match code with
+    | proxy_http.Code.InvalidRequest => ok out2
+    | proxy_http.Code.TooLarge => ok out2
+    | proxy_http.Code.Denied => ok out2
+    | proxy_http.Code.UnknownOrigin => ok out2
+    | proxy_http.Code.Unauthenticated =>
+      do
+      let s4 ←
+        lift (Array.to_slice
+          (Array.make 48#usize [
+            80#u8, 114#u8, 111#u8, 120#u8, 121#u8, 45#u8, 65#u8, 117#u8,
+            116#u8, 104#u8, 101#u8, 110#u8, 116#u8, 105#u8, 99#u8, 97#u8,
+            116#u8, 101#u8, 58#u8, 32#u8, 66#u8, 97#u8, 115#u8, 105#u8, 99#u8,
+            32#u8, 114#u8, 101#u8, 97#u8, 108#u8, 109#u8, 61#u8, 34#u8, 97#u8,
+            105#u8, 118#u8, 109#u8, 45#u8, 115#u8, 101#u8, 99#u8, 114#u8,
+            101#u8, 116#u8, 115#u8, 34#u8, 13#u8, 10#u8
+            ]))
+      alloc.vec.Vec.extend_from_slice core.clone.CloneU8 out2 s4
+    | proxy_http.Code.Revoked => ok out2
+    | proxy_http.Code.Reflected => ok out2
+    | proxy_http.Code.Unreachable => ok out2
+    | proxy_http.Code.OutcomeUnknown => ok out2
+    | proxy_http.Code.CredentialSource => ok out2
+    | proxy_http.Code.UnsupportedRequest => ok out2
+  let s4 ←
+    lift (Array.to_slice
+      (Array.make 48#usize [
+        67#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8, 45#u8, 84#u8,
+        121#u8, 112#u8, 101#u8, 58#u8, 32#u8, 97#u8, 112#u8, 112#u8, 108#u8,
+        105#u8, 99#u8, 97#u8, 116#u8, 105#u8, 111#u8, 110#u8, 47#u8, 106#u8,
+        115#u8, 111#u8, 110#u8, 13#u8, 10#u8, 67#u8, 111#u8, 110#u8, 116#u8,
+        101#u8, 110#u8, 116#u8, 45#u8, 76#u8, 101#u8, 110#u8, 103#u8, 116#u8,
+        104#u8, 58#u8, 32#u8
+        ]))
+  let out4 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 out3 s4
+  let i := alloc.vec.Vec.len body2
+  let out5 ← http_wire.append_decimal out4 i
+  let s5 ←
+    lift (Array.to_slice
+      (Array.make 23#usize [
+        13#u8, 10#u8, 67#u8, 111#u8, 110#u8, 110#u8, 101#u8, 99#u8, 116#u8,
+        105#u8, 111#u8, 110#u8, 58#u8, 32#u8, 99#u8, 108#u8, 111#u8, 115#u8,
+        101#u8, 13#u8, 10#u8, 13#u8, 10#u8
+        ]))
+  let out6 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 out5 s5
+  let s6 := alloc.vec.Vec.deref body2
+  alloc.vec.Vec.extend_from_slice core.clone.CloneU8 out6 s6
+
 /-- [aivm_secrets_garrett_core::public_error::PublicError]
     Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 10:0-28:1
     Visibility: public -/

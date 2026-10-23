@@ -433,4 +433,52 @@ theorem reflection_forms_include_raw (secret : Slice U8) (forms : alloc.vec.Vec 
     simp
   · simp [alloc.vec.Vec.val, ← same]
 
+/-! ## Fixed refusals (HP-5(d)) -/
+
+def codeText : proxy_http.Code → String
+  | .InvalidRequest => "invalid_request" | .TooLarge => "too_large" | .Denied => "denied"
+  | .UnknownOrigin => "unknown_origin" | .Unauthenticated => "unauthenticated"
+  | .Revoked => "revoked" | .Reflected => "reflected" | .Unreachable => "unreachable"
+  | .OutcomeUnknown => "outcome_unknown" | .CredentialSource => "credential_source"
+  | .UnsupportedRequest => "unsupported_request"
+
+def statusText : proxy_http.Code → String
+  | .InvalidRequest => "400 Bad Request" | .TooLarge => "413 Content Too Large"
+  | .Unauthenticated => "407 Proxy Authentication Required"
+  | .Denied | .UnknownOrigin | .Revoked | .UnsupportedRequest => "403 Forbidden"
+  | .Reflected | .Unreachable | .OutcomeUnknown | .CredentialSource => "502 Bad Gateway"
+
+def refusalBody (code : proxy_http.Code) : String :=
+  "{\"error\":{\"code\":\"" ++ codeText code ++ "\"},\"ok\":false,\"proxy\":\"aivm-secrets\"}\n"
+
+/-- The complete refusal text for a code. It mentions nothing but the code. -/
+def refusalText (code : proxy_http.Code) : String :=
+  "HTTP/1.1 " ++ statusText code ++ "\r\n" ++
+    (match code with
+     | .Unauthenticated => "Proxy-Authenticate: Basic realm=\"aivm-secrets\"\r\n"
+     | _ => "") ++
+    "Content-Type: application/json\r\nContent-Length: " ++
+    toString (refusalBody code).length ++ "\r\nConnection: close\r\n\r\n" ++ refusalBody code
+
+theorem digits_two (n : Nat) (lo : 10 ≤ n) (hi : n < 100) :
+    Digits n = [aivm_secrets_garrett_core.http_wire.Proofs.Digit (n / 10),
+      aivm_secrets_garrett_core.http_wire.Proofs.Digit n] := by
+  rw [Digits]
+  simp only [ge_iff_le, lo, ↓reduceIte]
+  rw [Digits]
+  simp only [ge_iff_le, show ¬ 10 ≤ n / 10 by omega, ↓reduceIte]
+  rfl
+
+/-- **Fixed refusals.** For every code, the extracted `refusal` returns exactly
+    the ASCII bytes of `refusalText code`: one of eleven fixed responses that
+    depend on nothing but the code, so a refusal carries no request,
+    provider or credential bytes. -/
+theorem refusal_exact (code : proxy_http.Code) :
+    refusal code ⦃ out => out.val = ascii (refusalText code) ⦄ := by
+  cases code <;>
+    simp only [refusal, append_code, append_status, lifted_slice, bind_ok] <;>
+    step* <;>
+    simp_all [alloc.vec.Vec.length, alloc.vec.Vec.new, digits_two] <;>
+    first | scalar_tac | rfl
+
 end aivm_secrets_garrett_core.proxy_http.Proofs

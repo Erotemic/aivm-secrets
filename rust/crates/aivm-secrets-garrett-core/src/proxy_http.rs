@@ -1126,6 +1126,75 @@ pub fn guest_response(
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Fixed refusals: the only guest-visible answer when a request is refused.
+// ---------------------------------------------------------------------------
+
+/// Every public refusal reason of the proxy.
+pub enum Code {
+    InvalidRequest,
+    TooLarge,
+    Denied,
+    UnknownOrigin,
+    Unauthenticated,
+    Revoked,
+    Reflected,
+    Unreachable,
+    OutcomeUnknown,
+    CredentialSource,
+    UnsupportedRequest,
+}
+
+pub fn append_code(output: &mut Vec<u8>, code: &Code) {
+    match code {
+        Code::InvalidRequest => output.extend_from_slice(b"invalid_request"),
+        Code::TooLarge => output.extend_from_slice(b"too_large"),
+        Code::Denied => output.extend_from_slice(b"denied"),
+        Code::UnknownOrigin => output.extend_from_slice(b"unknown_origin"),
+        Code::Unauthenticated => output.extend_from_slice(b"unauthenticated"),
+        Code::Revoked => output.extend_from_slice(b"revoked"),
+        Code::Reflected => output.extend_from_slice(b"reflected"),
+        Code::Unreachable => output.extend_from_slice(b"unreachable"),
+        Code::OutcomeUnknown => output.extend_from_slice(b"outcome_unknown"),
+        Code::CredentialSource => output.extend_from_slice(b"credential_source"),
+        Code::UnsupportedRequest => output.extend_from_slice(b"unsupported_request"),
+    }
+}
+
+pub fn append_status(output: &mut Vec<u8>, code: &Code) {
+    match code {
+        Code::InvalidRequest => output.extend_from_slice(b"400 Bad Request"),
+        Code::TooLarge => output.extend_from_slice(b"413 Content Too Large"),
+        Code::Unauthenticated => output.extend_from_slice(b"407 Proxy Authentication Required"),
+        Code::Denied | Code::UnknownOrigin | Code::Revoked | Code::UnsupportedRequest => {
+            output.extend_from_slice(b"403 Forbidden")
+        }
+        Code::Reflected | Code::Unreachable | Code::OutcomeUnknown | Code::CredentialSource => {
+            output.extend_from_slice(b"502 Bad Gateway")
+        }
+    }
+}
+
+/// The fixed guest response for a refusal: status, code and nothing else.
+pub fn refusal(code: &Code) -> Vec<u8> {
+    let mut body = Vec::new();
+    body.extend_from_slice(b"{\"error\":{\"code\":\"");
+    append_code(&mut body, code);
+    body.extend_from_slice(b"\"},\"ok\":false,\"proxy\":\"aivm-secrets\"}\n");
+    let mut out = Vec::new();
+    out.extend_from_slice(b"HTTP/1.1 ");
+    append_status(&mut out, code);
+    out.extend_from_slice(b"\r\n");
+    if let Code::Unauthenticated = code {
+        out.extend_from_slice(b"Proxy-Authenticate: Basic realm=\"aivm-secrets\"\r\n");
+    }
+    out.extend_from_slice(b"Content-Type: application/json\r\nContent-Length: ");
+    http_wire::append_decimal(&mut out, body.len());
+    out.extend_from_slice(b"\r\nConnection: close\r\n\r\n");
+    out.extend_from_slice(&body);
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1247,6 +1316,28 @@ mod tests {
             checked += 1;
         }
         assert!(checked >= 35);
+    }
+
+    /// Refusal parity with the Python reference.
+    #[test]
+    fn python_reference_refusals() {
+        let vectors = include_str!("../../../../tests/secrets_vectors/proxy-http-refusal-v1.tsv");
+        let codes = [
+            ("invalid_request", Code::InvalidRequest), ("too_large", Code::TooLarge),
+            ("denied", Code::Denied), ("unknown_origin", Code::UnknownOrigin),
+            ("unauthenticated", Code::Unauthenticated), ("revoked", Code::Revoked),
+            ("reflected", Code::Reflected), ("unreachable", Code::Unreachable),
+            ("outcome_unknown", Code::OutcomeUnknown), ("credential_source", Code::CredentialSource),
+            ("unsupported_request", Code::UnsupportedRequest),
+        ];
+        let mut checked = 0;
+        for line in vectors.lines().skip(1) {
+            let columns: Vec<&str> = line.split('\t').collect();
+            let code = &codes.iter().find(|(name, _)| *name == columns[0]).unwrap().1;
+            assert_eq!(hex(&refusal(code)), columns[1], "refusal {}", columns[0]);
+            checked += 1;
+        }
+        assert_eq!(checked, codes.len());
     }
 
     #[test]

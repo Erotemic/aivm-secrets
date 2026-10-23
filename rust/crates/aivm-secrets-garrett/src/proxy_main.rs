@@ -305,23 +305,21 @@ impl Session {
     }
 }
 
-/// The fixed guest response for a refusal; same bytes as the Python reference.
+/// The fixed guest response for a refusal: the extracted `core::refusal`.
 fn refusal(code: &str) -> Vec<u8> {
-    let status: &str = match code {
-        "invalid_request" => "400 Bad Request",
-        "too_large" => "413 Content Too Large",
-        "denied" | "unknown_origin" | "revoked" | "unsupported_request" | "expired" => "403 Forbidden",
-        "unauthenticated" => "407 Proxy Authentication Required",
-        "exhausted" => "429 Too Many Requests",
-        _ => "502 Bad Gateway",
+    let code = match code {
+        "invalid_request" => core::Code::InvalidRequest,
+        "too_large" => core::Code::TooLarge,
+        "denied" => core::Code::Denied,
+        "unknown_origin" => core::Code::UnknownOrigin,
+        "unauthenticated" => core::Code::Unauthenticated,
+        "revoked" => core::Code::Revoked,
+        "reflected" => core::Code::Reflected,
+        "unreachable" => core::Code::Unreachable,
+        "credential_source" => core::Code::CredentialSource,
+        _ => core::Code::OutcomeUnknown,
     };
-    let body = format!("{{\"error\":{{\"code\":\"{code}\"}},\"ok\":false,\"proxy\":\"aivm-secrets\"}}\n");
-    let extra = if code == "unauthenticated" { "Proxy-Authenticate: Basic realm=\"aivm-secrets\"\r\n" } else { "" };
-    format!(
-        "HTTP/1.1 {status}\r\n{extra}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-        body.len()
-    )
-    .into_bytes()
+    core::refusal(&code)
 }
 
 fn refusal_code(refusal: &core::Refusal) -> &'static str {

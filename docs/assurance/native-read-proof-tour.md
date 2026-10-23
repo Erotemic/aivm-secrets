@@ -412,6 +412,8 @@ does not know the credential.
 | `guest_response_contract` | For any upstream response, the proxy either refuses and appends nothing, or appends bytes in which no case-sensitive form occurs. For `HEAD`, the appended bytes are a prefix of the checked ones (`response_head_prefix`), so the same holds. |
 | `reflection_forms_include_raw` | Whenever the form list is built, it contains the credential's exact bytes as a case-sensitive form. |
 
+| `refusal_exact` | Every refusal the proxy sends is exactly one of eleven fixed responses, which depend on nothing but the refusal code. No request, provider or credential bytes appear in a refusal. |
+
 Together: **a released response never contains the credential's exact
 bytes.** Percent, hex and base64 forms are also checked, but the proof
 covers them only as listed byte strings. Any other derived value, such as a

@@ -229,3 +229,14 @@ keeps it from being an open relay, at the cost of breaking such tools for
 other hosts while the env is sourced. Documented. Not tested on real KVM yet:
 the SSH TCP reverse forward is exercised only by code review and the AIVM unit
 tests (fake child).
+
+## 2026-10-23 04:59:03 -0400
+
+HP-5(d): the proxy's refusal responses moved into the extracted core
+(`proxy_http::refusal(&Code)`) with byte parity to Python over all 11 codes.
+`refusal_exact` proves each is exactly the ASCII of a fixed text that mentions
+only the code. The native shell now calls the core function. Proof
+technique: after `step*`, `simp_all` with a two-digit `Digits` lemma makes
+everything concrete, then `scalar_tac`, `rfl` or `decide` close it. This
+completes HP-5 for the credential-substitution profile's request, response
+and refusal paths. The native shell's own writes stay PROXY-NATIVE-01.

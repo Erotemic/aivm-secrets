@@ -23,6 +23,10 @@ from aivm_secrets.proxy.policy import (Deny, Origin, ProxyPolicy, guest_response
 
 VECTORS = Path(__file__).resolve().parent / 'secrets_vectors' / 'proxy-http-v1.tsv'
 RESPONSES = Path(__file__).resolve().parent / 'secrets_vectors' / 'proxy-http-response-v1.tsv'
+REFUSALS = Path(__file__).resolve().parent / 'secrets_vectors' / 'proxy-http-refusal-v1.tsv'
+REFUSAL_CODES = ('invalid_request', 'too_large', 'denied', 'unknown_origin', 'unauthenticated',
+                 'revoked', 'reflected', 'unreachable', 'outcome_unknown', 'credential_source',
+                 'unsupported_request')
 HOST = b'api.example.org'
 LIMIT = 64
 DENY = (Deny(b'POST', b'/v1/tokens'), Deny(b'*', b'/v1/admin/'))
@@ -214,9 +218,20 @@ def render_responses() -> str:
     return '\n'.join(lines) + '\n'
 
 
+def render_refusals() -> str:
+    lines = ['# code\trefusal-hex']
+    lines += [f'{code}\t{http1.refusal(code).hex()}' for code in REFUSAL_CODES]
+    return '\n'.join(lines) + '\n'
+
+
 def write() -> None:
     VECTORS.write_text(render())
     RESPONSES.write_text(render_responses())
+    REFUSALS.write_text(render_refusals())
+
+
+def test_refusal_vector_file_is_the_python_reference():
+    assert REFUSALS.read_text() == render_refusals()
 
 
 def test_response_vector_file_is_the_python_reference():
