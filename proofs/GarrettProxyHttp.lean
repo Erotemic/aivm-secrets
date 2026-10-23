@@ -888,6 +888,188 @@ theorem segment_ok_spec (path : Slice U8) (start stop : Usize) (last : Bool)
   unfold segment_ok
   repeat (first | step | split | simp)
 
+/-! ### Path segments -/
+
+/-- The bytes of `path` from `start` up to `stop`. -/
+def Piece (path : List U8) (start stop : Nat) : List U8 := (path.drop start).take (stop - start)
+
+/-- A segment the encoder accepts: empty only when it is the last one (a
+    trailing `/`), and never `.` or `..`. -/
+def SegOk (seg : List U8) (last : Bool) : Prop :=
+  (seg = [] → last = true) ∧ seg ≠ [46#u8] ∧ seg ≠ [46#u8, 46#u8]
+
+theorem segment_ok_exact (path : Slice U8) (start stop : Usize) (last : Bool)
+    (order : start.val ≤ stop.val) (inside : stop.val ≤ path.length) :
+    segment_ok path start stop last ⦃ r =>
+      r = true ↔ SegOk (Piece path.val start.val stop.val) last ⦄ := by
+  unfold segment_ok
+  step as ⟨length, hlength⟩
+  have piece_len : (Piece path.val start.val stop.val).length = length.val := by
+    simp [Piece]; scalar_tac
+  split
+  · rename_i zero
+    have empty : Piece path.val start.val stop.val = [] := by
+      apply List.eq_nil_of_length_eq_zero; rw [piece_len, zero]; rfl
+    simp [WP.spec_ok, SegOk, empty]
+  · rename_i nonzero
+    split
+    · rename_i one
+      step as ⟨c, hc⟩
+      have single : Piece path.val start.val stop.val = [c] := by
+        apply List.ext_getElem
+        · rw [piece_len, one]; rfl
+        · intro i h1 h2
+          have : i = 0 := by simp at h2; omega
+          subst this
+          simp [Piece, hc]
+      simp only [bne_iff_ne, ne_eq, single, SegOk]
+      constructor
+      · intro hne; refine ⟨by simp, ?_, by simp⟩; intro e; apply hne; simpa using e
+      · rintro ⟨_, hne, _⟩; intro e; apply hne; simp [e]
+    · rename_i not_one
+      split
+      · rename_i two
+        have two' : length.val = 2 := by rw [two]; rfl
+        have room : start.val + 1 < path.val.length := by
+          have : path.length = path.val.length := rfl
+          omega
+        step as ⟨c, hc⟩
+        have pair : ∀ d, path.val[start.val + 1]? = some d → Piece path.val start.val stop.val = [c, d] := by
+          intro d hd
+          apply List.ext_getElem
+          · rw [piece_len, two]; rfl
+          · intro i h1 h2
+            have : i = 0 ∨ i = 1 := by simp at h2; omega
+            rcases this with rfl | rfl
+            · simp [Piece, hc]
+            · have := List.getElem?_eq_some_iff.mp hd
+              simp [Piece, this.2]
+        split
+        · rename_i dot
+          step as ⟨next, hnext⟩
+          step as ⟨d, hd⟩
+          have seg := pair d (by rw [List.getElem?_eq_getElem room, hd]; simp only [hnext])
+          simp only [seg, SegOk]
+          constructor
+          · intro h; refine ⟨by simp, by simp, ?_⟩
+            intro e; simp only [List.cons.injEq] at e; simp_all
+          · rintro ⟨_, _, hne⟩; simp only [decide_eq_true_eq]; intro e; apply hne; rw [dot, e]
+        · rename_i not_dot
+          simp only [WP.spec_ok, bind_ok, SegOk]
+          obtain ⟨d, hd⟩ : ∃ d, path.val[start.val + 1]? = some d :=
+            ⟨_, List.getElem?_eq_getElem room⟩
+          rw [pair d hd]
+          constructor
+          · intro _
+            refine ⟨by simp, by simp, ?_⟩
+            intro e; simp only [List.cons.injEq] at e; exact not_dot e.1
+          · intro _; simp
+      · rename_i more
+        simp only [WP.spec_ok, true_iff, SegOk]
+        refine ⟨?_, ?_, ?_⟩
+        · intro e; have := congrArg List.length e; rw [piece_len] at this; simp at this; scalar_tac
+        · intro e; have := congrArg List.length e; rw [piece_len] at this; simp at this
+          apply not_one; scalar_tac
+        · intro e; have := congrArg List.length e; rw [piece_len] at this; simp at this
+          apply more; scalar_tac
+
+/-- Every segment closed by a `/` at a position up to `bound` is accepted
+    as an interior segment. -/
+def InteriorOk (p : List U8) (bound : Nat) : Prop :=
+  ∀ i j, i < j → j ≤ bound → p[i]? = some 47#u8 → (∀ m, i < m → m < j → p[m]? ≠ some 47#u8) →
+    p[j]? = some 47#u8 → SegOk (Piece p (i + 1) j) false
+
+/-- The segment after the last `/` is accepted as the final segment. -/
+def FinalOk (p : List U8) : Prop :=
+  ∀ i, p[i]? = some 47#u8 → (∀ m, i < m → m < p.length → p[m]? ≠ some 47#u8) →
+    SegOk (Piece p (i + 1) p.length) true
+
+theorem segments_ok_loop_exact (path : Slice U8) (start index : Usize)
+    (one : 1 ≤ start.val) (order : start.val ≤ index.val) (inside : index.val ≤ path.length)
+    (opened : path.val[start.val - 1]? = some 47#u8)
+    (plain : ∀ m, start.val ≤ m → m < index.val → path.val[m]? ≠ some 47#u8)
+    (before : InteriorOk path.val (start.val - 1)) :
+    segments_ok_loop path start index ⦃ r =>
+      r = true → InteriorOk path.val path.val.length ∧ FinalOk path.val ⦄ := by
+  have len : path.length = path.val.length := rfl
+  suffices ∀ n (start index : Usize), path.length - index.val = n → 1 ≤ start.val →
+      start.val ≤ index.val → index.val ≤ path.length →
+      path.val[start.val - 1]? = some 47#u8 →
+      (∀ m, start.val ≤ m → m < index.val → path.val[m]? ≠ some 47#u8) →
+      InteriorOk path.val (start.val - 1) →
+      segments_ok_loop path start index ⦃ r =>
+        r = true → InteriorOk path.val path.val.length ∧ FinalOk path.val ⦄ from
+    this _ start index rfl one order inside opened plain before
+  intro n
+  induction n using Nat.strong_induction_on with
+  | h n ih =>
+    intro start index measure one order inside opened plain before
+    rw [segments_ok_loop.eq_def]
+    dsimp only
+    split
+    · rename_i more
+      have lt : index.val < path.val.length := by scalar_tac
+      step as ⟨byte, hbyte⟩
+      have at_index : path.val[index.val]? = some byte := by
+        rw [List.getElem?_eq_getElem (by omega), hbyte]
+      split
+      · rename_i slash
+        refine WP.spec_bind (segment_ok_exact path start index false order (by omega)) ?_
+        intro ok hok
+        split
+        · rename_i accepted
+          step as ⟨next, hnext⟩
+          refine ih (path.length - next.val) (by omega) next next rfl (by omega) (le_refl _) (by omega)
+            (by rw [show next.val - 1 = index.val by omega, at_index, slash]) (by intro m a b; omega) ?_
+          -- The segment just closed at `index` joins the accepted interior ones.
+          intro i j ij jb hi between hj
+          by_cases old : j ≤ start.val - 1
+          · exact before i j ij old hi between hj
+          · have j_eq : j = index.val := by
+              by_contra ne
+              exact plain j (by omega) (by omega) hj
+            have i_eq : i = start.val - 1 := by
+              by_contra ne
+              rcases Nat.lt_or_gt_of_ne ne with lt | gt
+              · exact between (start.val - 1) lt (by omega) opened
+              · exact plain i (by omega) (by omega) hi
+            subst j_eq i_eq
+            rw [show start.val - 1 + 1 = start.val by omega]
+            exact hok.mp accepted
+        · simp
+      · rename_i not_slash
+        step as ⟨next, hnext⟩
+        refine ih (path.length - next.val) (by omega) start next rfl one (by omega) (by omega) opened ?_ before
+        intro m lo hi e
+        by_cases same : m = index.val
+        · subst same; rw [at_index] at e; simp only [Option.some.injEq] at e; exact not_slash e
+        · exact plain m lo (by omega) e
+    · rename_i done
+      refine WP.spec_mono (segment_ok_exact path start path.len true (by scalar_tac) (by scalar_tac)) ?_
+      intro r hr accepted
+      have last := hr.mp accepted
+      have whole : index.val = path.val.length := by scalar_tac
+      constructor
+      · intro i j ij jb hi between hj
+        by_cases old : j ≤ start.val - 1
+        · exact before i j ij old hi between hj
+        · exfalso
+          have : j < path.val.length := by
+            by_contra ge; rw [List.getElem?_eq_none (by omega)] at hj; cases hj
+          exact plain j (by omega) (by omega) hj
+      · intro i hi after
+        have i_eq : i = start.val - 1 := by
+          by_contra ne
+          rcases Nat.lt_or_gt_of_ne ne with lt | gt
+          · exact after (start.val - 1) lt (by
+              have := List.getElem?_eq_some_iff.mp opened; exact this.1) opened
+          · have : i < path.val.length := by
+              by_contra ge; rw [List.getElem?_eq_none (by omega)] at hi; cases hi
+            exact plain i (by omega) (by omega) hi
+        subst i_eq
+        rw [show start.val - 1 + 1 = start.val by omega]
+        simpa using last
+
 theorem segments_ok_loop_spec (path : Slice U8) (start index : Usize)
     (order : start.val ≤ index.val) (inside : index.val ≤ path.length) :
     segments_ok_loop path start index ⦃ _ => True ⦄ := by
@@ -947,6 +1129,61 @@ theorem check_target_plain (target : Slice U8) :
             (by scalar_tac)) ?_
           intro _ _ _ k hk
           exact hplain accepted k hk (Nat.zero_le _)
+        · simp
+
+theorem segments_ok_exact (path : Slice U8) (opened : path.val[0]? = some 47#u8) :
+    segments_ok path ⦃ r => r = true → InteriorOk path.val path.val.length ∧ FinalOk path.val ⦄ := by
+  have nonempty : 1 ≤ path.val.length := by
+    have := (List.getElem?_eq_some_iff.mp opened).1; omega
+  exact segments_ok_loop_exact path 1#usize 1#usize (by decide) (le_refl _) (by scalar_tac)
+    (by simpa using opened) (by intro m a b; scalar_tac) (by intro i j ij jb; scalar_tac)
+
+/-- **An accepted target's path segments.** In the part of the target
+    before its first `?`, every segment closed by a `/` is non-empty and not
+    `.` or `..` (`InteriorOk`), and the last segment is not `.` or `..`
+    (`FinalOk`; it may be empty, a trailing `/`). So `//`, `/./` and `/../`
+    never reach the provider. -/
+theorem check_target_segments (target : Slice U8) :
+    check_target target ⦃ t => t = true → ∃ stop, stop ≤ target.val.length ∧
+      InteriorOk (target.val.take stop) (target.val.take stop).length ∧
+      FinalOk (target.val.take stop) ⦄ := by
+  unfold check_target
+  dsimp only
+  split
+  · simp
+  · split
+    · simp
+    · step as ⟨first, hfirst⟩
+      split
+      · simp
+      · rename_i slash
+        refine WP.spec_bind (plain_target_bytes_loop_spec target 0#usize) ?_
+        intro plain hplain
+        split
+        · rename_i accepted
+          step as ⟨stop, hstop, at_q⟩
+          step as ⟨path, hpath, hpath_len⟩
+          have one : 1 ≤ stop.val := by
+            by_contra zero
+            have z : stop.val = 0 := by omega
+            have q := at_q (by scalar_tac)
+            simp only [z] at q
+            simp only [bne_iff_ne, ne_eq, Decidable.not_not] at slash
+            have f47 : first = 47#u8 := slash
+            rw [hfirst] at f47
+            rw [f47] at q
+            exact absurd q (by decide)
+          have taken : path.val = target.val.take stop.val := by rw [hpath, slice_zero_eq_take]
+          have opened : path.val[0]? = some 47#u8 := by
+            simp only [bne_iff_ne, ne_eq, Decidable.not_not] at slash
+            rw [taken, List.getElem?_take]
+            simp only [show 0 < stop.val by omega, ↓reduceIte]
+            rw [List.getElem?_eq_getElem (by scalar_tac), ← hfirst, slash]
+          refine WP.spec_mono (segments_ok_exact path opened) ?_
+          intro r hr ok
+          obtain ⟨interior, final⟩ := hr ok
+          rw [taken] at interior final
+          exact ⟨stop.val, by scalar_tac, interior, final⟩
         · simp
 
 /-- An accepted target is visible ASCII only: no SP, CR, LF or NUL. -/

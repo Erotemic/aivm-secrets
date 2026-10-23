@@ -734,3 +734,11 @@ stated as the extracted `bad_escape_at` returning false there, not as a
 handwritten escape grammar). `check_target_spec` (visible only, @[step]) is
 now derived from it. Dot/empty segment refusal still tested only: a
 splitOn-based segment invariant for `segments_ok_loop` is the next proof.
+
+## 2026-10-23 19:39:56 -0400
+
+`check_target_segments`: dot-segment and empty-segment refusal proved. Specs:
+`segment_ok_exact` (`SegOk` of `Piece`), `segments_ok_loop_exact` with a
+positional invariant (`InteriorOk`/`FinalOk` stated over `p[i]? = some '/'`
+instead of `List.splitOn`, which kept the loop proof short). PROXY-PARSE-01's
+remaining unproved part is now only provider-side normalization.
