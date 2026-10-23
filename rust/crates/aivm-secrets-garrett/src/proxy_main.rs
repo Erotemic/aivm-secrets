@@ -1,16 +1,19 @@
 //! `garrett-proxy`: the native credential-substitution HTTPS proxy (HP-4).
 //!
 //! A thin I/O shell around the Aeneas-extracted `proxy_http` core. Every
-//! request is parsed by `parse_request`, encoded upstream by
-//! `encode_upstream` (proved: the credential appears only as one verified
-//! authentication line, no guest CR/LF), and every response is parsed by
-//! `parse_response` and released by `guest_response` (proved: released bytes
-//! never contain the raw credential). This file only moves bytes: sockets,
+//! request is parsed by `parse_request` and handed to the extracted
+//! controller `proxy_controller::serve`, which checks the session, encodes
+//! upstream with `encode_upstream` (proved: the credential appears only as
+//! one verified authentication line, no guest CR/LF), passes exactly those
+//! bytes to [`Origin`]'s exchange, and releases the answer with
+//! `guest_response` (proved: released bytes never contain the raw
+//! credential) or a fixed refusal. This file only moves bytes: sockets,
 //! TLS, the session CA, the audit and the process contract, which matches
 //! `aivm-secrets proxy` (one announcement line; stdin EOF ends the session).
 //! The profile makes no authority-confinement claim (PROXY-AUTHORITY-01).
 use aivm_secrets_garrett::files;
 use aivm_secrets_garrett_core::credential_use::Authentication;
+use aivm_secrets_garrett_core::proxy_controller::{self as controller, Stage, Upstream};
 use aivm_secrets_garrett_core::proxy_http as core;
 use base64::Engine;
 use rcgen::{
@@ -360,6 +363,22 @@ fn refusal_code(refusal: &core::Refusal) -> &'static str {
     }
 }
 
+fn code_name(code: &core::Code) -> &'static str {
+    match code {
+        core::Code::InvalidRequest => "invalid_request",
+        core::Code::TooLarge => "too_large",
+        core::Code::Denied => "denied",
+        core::Code::UnknownOrigin => "unknown_origin",
+        core::Code::Unauthenticated => "unauthenticated",
+        core::Code::Revoked => "revoked",
+        core::Code::Reflected => "reflected",
+        core::Code::Unreachable => "unreachable",
+        core::Code::OutcomeUnknown => "outcome_unknown",
+        core::Code::CredentialSource => "credential_source",
+        core::Code::UnsupportedRequest => "unsupported_request",
+    }
+}
+
 fn read_head(stream: &mut TcpStream) -> io::Result<Vec<u8>> {
     let started = Instant::now();
     let mut data = Vec::new();
@@ -377,91 +396,102 @@ fn read_head(stream: &mut TcpStream) -> io::Result<Vec<u8>> {
     Ok(data)
 }
 
-fn exchange(session: &Session, origin: &Origin, wire: &[u8], head: bool) -> Result<core::Response, &'static str> {
+/// Send `wire` to the pinned origin and return its raw answer.
+fn exchange(session: &Session, origin: &Origin, wire: &[u8]) -> Result<Vec<u8>, core::Code> {
     let started = Instant::now();
     let address = (origin.address.as_str(), origin.port)
         .to_socket_addrs()
         .ok()
         .and_then(|mut a| a.next())
-        .ok_or("unreachable")?;
-    let socket = TcpStream::connect_timeout(&address, IO_TIMEOUT).map_err(|_| "unreachable")?;
-    socket.set_read_timeout(Some(IO_TIMEOUT)).map_err(|_| "unreachable")?;
-    socket.set_write_timeout(Some(IO_TIMEOUT)).map_err(|_| "unreachable")?;
-    let name = ServerName::try_from(origin.host.clone()).map_err(|_| "unreachable")?;
-    let connection = ClientConnection::new(origin.upstream.clone(), name).map_err(|_| "unreachable")?;
+        .ok_or(core::Code::Unreachable)?;
+    let socket = TcpStream::connect_timeout(&address, IO_TIMEOUT).map_err(|_| core::Code::Unreachable)?;
+    socket.set_read_timeout(Some(IO_TIMEOUT)).map_err(|_| core::Code::Unreachable)?;
+    socket.set_write_timeout(Some(IO_TIMEOUT)).map_err(|_| core::Code::Unreachable)?;
+    let name = ServerName::try_from(origin.host.clone()).map_err(|_| core::Code::Unreachable)?;
+    let connection = ClientConnection::new(origin.upstream.clone(), name).map_err(|_| core::Code::Unreachable)?;
     let mut tls = StreamOwned::new(connection, socket);
-    // A completed handshake before the first byte keeps "unreachable" honest.
+    // A completed handshake before the first byte keeps core::Code::Unreachable honest.
     while tls.conn.is_handshaking() {
-        tls.conn.complete_io(&mut tls.sock).map_err(|_| "unreachable")?;
+        tls.conn.complete_io(&mut tls.sock).map_err(|_| core::Code::Unreachable)?;
     }
-    tls.write_all(wire).map_err(|_| "outcome_unknown")?;
-    tls.flush().map_err(|_| "outcome_unknown")?;
+    tls.write_all(wire).map_err(|_| core::Code::OutcomeUnknown)?;
+    tls.flush().map_err(|_| core::Code::OutcomeUnknown)?;
     let mut data = Vec::new();
     let mut chunk = [0u8; 65536];
     loop {
         if started.elapsed() > TOTAL_DEADLINE {
-            return Err("outcome_unknown");
+            return Err(core::Code::OutcomeUnknown);
         }
         match tls.read(&mut chunk) {
             Ok(0) => break,
             Ok(n) => {
                 data.extend_from_slice(&chunk[..n]);
                 if data.len() > session.response_limit + core::MAX_HEAD + 64 {
-                    return Err("too_large");
+                    return Err(core::Code::TooLarge);
                 }
             }
             Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => break,
-            Err(_) => return Err("outcome_unknown"),
+            Err(_) => return Err(core::Code::OutcomeUnknown),
         }
     }
-    core::parse_response(&data, head, session.response_limit).map_err(|r| match r {
-        core::Refusal::TooLarge => "too_large",
-        _ => "outcome_unknown",
-    })
+    Ok(data)
 }
 
 fn path_of(target: &[u8]) -> String {
     String::from_utf8_lossy(&target[..core::path_end(target)]).into_owned()
 }
 
-/// One accepted guest request: encode, send, release. Returns the guest
-/// bytes and whether to keep the tunnel open.
+/// The native side of one request: the session clock, the admission audit
+/// and the socket exchange. Every decision is the extracted controller's.
+struct Native<'a> {
+    session: &'a Session,
+    origin: &'a Origin,
+    method: &'a str,
+    path: &'a str,
+}
+
+impl Upstream for Native<'_> {
+    fn current(&mut self) -> bool {
+        self.session.current()
+    }
+
+    fn admitted(&mut self) {
+        self.session.record(
+            "admitted",
+            json!({"origin": self.origin.host, "method": self.method, "path": self.path}),
+        );
+    }
+
+    fn exchange(&mut self, wire: &[u8]) -> Result<Vec<u8>, core::Code> {
+        exchange(self.session, self.origin, wire)
+    }
+}
+
+/// One accepted guest request through `proxy_controller::serve`. Returns the
+/// guest bytes and whether to keep the tunnel open.
 fn serve_one(session: &Session, origin: &Origin, request: &core::Request) -> (Vec<u8>, bool) {
     let method = String::from_utf8_lossy(&request.method).into_owned();
     let path = path_of(&request.target);
-    if !session.current() {
-        session.record("refused", json!({"code": "revoked", "origin": origin.host, "method": method, "path": path}));
-        return (refusal("revoked"), false);
-    }
-    let mut wire = Vec::new();
-    if let Err(refused) = core::encode_upstream(
-        &mut wire, request, origin.host.as_bytes(), &session.rules, &session.secret, &origin.authentication,
-    ) {
-        let code = refusal_code(&refused);
-        session.record("refused", json!({"code": code, "origin": origin.host, "method": method, "path": path}));
-        return (refusal(code), false);
-    }
-    session.record("admitted", json!({"origin": origin.host, "method": method, "path": path}));
-    let head = request.method == b"HEAD";
-    let response = match exchange(session, origin, &wire, head) {
-        Ok(response) => response,
-        Err(code) => {
-            session.record("failed", json!({"code": code, "origin": origin.host, "method": method, "path": path}));
-            return (refusal(code), false);
+    let mut native = Native { session, origin, method: &method, path: &path };
+    let served = controller::serve(
+        &mut native, request, origin.host.as_bytes(), &session.rules, &session.secret,
+        &origin.authentication, &session.forms, session.response_limit,
+    );
+    let detail = json!({"origin": origin.host, "method": method, "path": path});
+    match served.stage {
+        Stage::Completed => {
+            let mut detail = detail;
+            detail["status"] = json!(served.status);
+            session.record("completed", detail);
         }
-    };
-    let mut out = Vec::new();
-    match core::guest_response(&mut out, &response, &session.forms, request.keep_alive, head) {
-        Ok(()) => {
-            session.record("completed", json!({"origin": origin.host, "method": method, "path": path, "status": response.status}));
-            (out, request.keep_alive)
-        }
-        Err(refused) => {
-            let code = refusal_code(&refused);
-            session.record("failed", json!({"code": code, "origin": origin.host, "method": method, "path": path}));
-            (refusal(code), false)
+        Stage::Refused | Stage::Failed => {
+            let mut detail = detail;
+            detail["code"] = json!(code_name(&served.code));
+            let event = if matches!(served.stage, Stage::Refused) { "refused" } else { "failed" };
+            session.record(event, detail);
         }
     }
+    (served.reply, served.keep)
 }
 
 fn tunnel(session: &Session, mut stream: TcpStream) -> io::Result<()> {

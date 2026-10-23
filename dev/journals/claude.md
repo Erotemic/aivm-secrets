@@ -312,3 +312,26 @@ proofs, parity vectors and both-backend tests
   hash-chained audit are tested, not proved; recorded in PROXY-NATIVE-01.
 - Confidence: high for the proofs as stated; medium for completeness of the
   spelling list against real provider normalizers (PROXY-PARSE-01 stays).
+
+## 2026-10-23 07:32:30 -0400
+
+PROXY-NATIVE-01 narrowed: `proxy_controller::serve` is now the extracted
+per-request controller of `garrett-proxy`; the native shell supplies only
+`current`, `admitted` and `exchange` callbacks and records the audit
+from the returned `Served`. `GarrettProxyController` proves, for any
+callbacks: the three paths (`serve_paths`); exchange only after current
+and admitted, with exactly the encoder's output (`serve_upstream`); the
+reply is a fixed refusal or `guest_response` output (`serve_guest_reply`).
+
+- Decision: I kept the size premises (encoding / checked response fits in
+  a usize) explicit rather than trying to derive them from parse limits. They
+  are memory bounds; deriving them would need a length theory for
+  `ResponseBytes` that buys no security. I avoided a tempting universally
+  quantified fit premise because it would be false and make the theorem
+  vacuous.
+- I briefly wrote a placeholder theorem concluding `True`; removed before
+  building. Noting it so the pattern is watched for.
+- Oracle: Rust tests compare `serve` against the pre-extraction composition
+  byte for byte and check callback order with a recording mock.
+- Remaining native: the CONNECT/tunnel loop, the callbacks themselves and
+  socket/TLS. Confidence high for the stated theorems.

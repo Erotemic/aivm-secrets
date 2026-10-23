@@ -429,6 +429,26 @@ bytes.** Percent, hex and base64 forms are also checked, but the proof
 covers them only as listed byte strings. Any other derived value, such as a
 freshly minted token, is outside it (`PROXY-REFLECT-01`, `PROXY-AUTHORITY-01`).
 
+**Who sequences a request** ([`GarrettProxyController`](../../proofs/GarrettProxyController.lean)).
+The native shell `garrett-proxy` no longer decides anything per request. It
+calls the extracted `proxy_controller::serve` and supplies three callbacks:
+`current` (the session clock), `admitted` (the audit line) and `exchange`
+(send bytes to the pinned origin, return its answer). The theorems hold for
+**any** callbacks, so they do not trust the native side to behave.
+
+| Theorem | Says |
+| --- | --- |
+| `serve_paths` | Every returned `serve` took one of three paths: not current (nothing admitted or sent, `revoked`); encoder refused (nothing admitted or sent, a fixed refusal); or current, encoded, audited, then `exchange` called with **exactly the encoder's output**. |
+| `serve_upstream` | A request not refused before egress went through `exchange` once, after `current` and `admitted`, and the bytes sent are `UpstreamPrefix ++ HeaderPrefix ++ secret ++ CRLF ++ UpstreamSuffix`, with a valid credential, visible target and clean guest fields. A refused request never reached `admitted` or `exchange`. |
+| `serve_guest_reply` | The reply is the fixed refusal for its code, or a completed request's `guest_response` output, in which no case-sensitive credential form occurs. |
+| `release_reply` | The response half: parsing failures and reflections become fixed refusals with stage `Failed`. |
+
+Both byte statements carry a size premise: the canonical encoding (or the
+checked response) fits in a `usize`. It is a memory bound, not a security
+assumption. A Rust oracle test (`proxy_controller::tests`) checks that
+`serve` produces the same upstream and guest bytes as the composition the
+shell used before, and that callbacks run in the order the theorems state.
+
 **Byte parity with the Python reference.** `tests/secrets_vectors/proxy-http-v1.tsv`
 holds 76 adversarial and positive cases (and `proxy-http-response-v1.tsv` 43 response cases). The Python test checks that the
 file is exactly the Python reference's output, and the Rust test
@@ -441,8 +461,10 @@ mutant that forwarded `Cookie` fails it.
   encoding) could route around a deny-list entry (`PROXY-PARSE-01`).
 - Encodings of the credential other than the listed forms (`PROXY-REFLECT-01`).
 - TLS and the session CA (`PROXY-TLS-01`).
-- That the native shell `garrett-proxy` writes exactly these bytes upstream
-  and only released or refusal bytes to the guest (`PROXY-NATIVE-01`).
+- That the native callbacks do what they say: `exchange` writes its
+  argument to the pinned origin and nothing else, and the shell writes only
+  `serve`'s reply (or a tunnel-level fixed refusal or the CONNECT answer) to
+  the guest (`PROXY-NATIVE-01`, narrowed: the sequencing is now proved).
 - **The profile grants the credential's full authority at the origin**
   (`PROXY-AUTHORITY-01`). None of this is authority confinement.
 

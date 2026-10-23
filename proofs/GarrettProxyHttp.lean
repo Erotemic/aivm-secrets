@@ -621,7 +621,7 @@ theorem unreserved_spec (byte : U8) : unreserved byte ⦃ _ => True ⦄ := by
 theorem bad_escape_at_spec (value : Slice U8) (start : Usize) :
     bad_escape_at value start ⦃ _ => True ⦄ := by
   unfold bad_escape_at
-  repeat (first | step | split | simp | scalar_tac)
+  repeat (first | step | split | simp)
 
 theorem plain_target_bytes_loop_spec (target : Slice U8) (index : Usize) :
     plain_target_bytes_loop target index ⦃ t => t = true →

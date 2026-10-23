@@ -230,9 +230,11 @@ def test_native_refuses_a_bad_policy(tmp_path, service):
 def test_native_proxy_writes_only_core_outputs():
     """Source shape of the native shell (reviewed, not proved).
 
-    Upstream: only the ``wire`` that ``encode_upstream`` filled. Guest: fixed
-    refusals, the fixed CONNECT answer, or the ``reply`` built by
-    ``guest_response``/``refusal`` in ``serve_one``. Audit and announcement
+    Upstream: only the ``wire`` that the extracted ``proxy_controller::serve``
+    passes to ``Upstream::exchange`` (proved to be ``encode_upstream``'s
+    output). Guest: fixed refusals, the fixed CONNECT answer, or the
+    ``reply`` returned by ``serve`` (proved: a fixed refusal or
+    ``guest_response`` output). Audit and announcement
     are JSON written by this file; neither contains the credential (checked
     at runtime above).
     """
@@ -248,8 +250,10 @@ def test_native_proxy_writes_only_core_outputs():
     for target, argument in writes:
         assert (target, argument) in allowed or (
             target == 'stream' and argument.startswith('&refusal("')), (target, argument)
-    assert source.count('core::encode_upstream(') == 1
-    assert source.count('core::guest_response(') == 1
-    assert 'wire' in re.findall(r'core::encode_upstream\(\s*&mut (\w+)', source)
+    # Every request decision is the extracted controller's (PROXY-NATIVE-01).
+    assert source.count('controller::serve(') == 1
+    assert 'core::encode_upstream(' not in source and 'core::guest_response(' not in source
+    assert source.count('exchange(self.session, self.origin, wire)') == 1
+    assert re.findall(r'fn exchange\(&mut self, wire: &\[u8\]\)', source)
     assert re.findall(r'\.write\(', source) == []
     assert source.count('writeln!') == 2

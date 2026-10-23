@@ -17,8 +17,8 @@ credentials.
 | | |
 | --- | --- |
 | Claim | The credential is written upstream only as one authentication line, after every guest field, on a request for a configured origin. No guest field named `Authorization`, `X-Api-Key`, `Proxy-Authorization`, `Cookie`, a method-override field, `Range` or `If-Range` (19 names, any ASCII case) is forwarded. A guest cannot add a header line. |
-| Theorems | `encode_upstream_contract`, `forwarded_drops`, `dropped_eq`, `clean_field_single_line` ([GarrettProxyHttp](../../proofs/GarrettProxyHttp.lean)); `accepted_header_exact` ([GarrettHttpAuth](../../proofs/GarrettHttpAuth.lean)) |
-| Premises | `PROXY-NATIVE-01` (the native shell writes only the encoder's buffer upstream), `PROXY-TLS-01`, `PROXY-PARSE-01` (provider routing semantics), `RUST-COMPILER-01` |
+| Theorems | `serve_upstream` ([GarrettProxyController](../../proofs/GarrettProxyController.lean)), `encode_upstream_contract`, `forwarded_drops`, `dropped_eq`, `clean_field_single_line` ([GarrettProxyHttp](../../proofs/GarrettProxyHttp.lean)); `accepted_header_exact` ([GarrettHttpAuth](../../proofs/GarrettHttpAuth.lean)) |
+| Premises | `PROXY-NATIVE-01` (narrowed: `serve_upstream` proves the controller passes only the encoder's buffer to `exchange`; the native `exchange` writing only its argument is assumed), `PROXY-TLS-01`, `PROXY-PARSE-01` (provider routing semantics), `RUST-COMPILER-01` |
 | Witnesses | `tests/test_proxy_substitution.py`, `tests/test_rust_proxy.py` (native, stock curl), byte parity `tests/secrets_vectors/proxy-http-v1.tsv` checked by Python and Rust |
 | Excluded | Delivery; the provider's interpretation of paths for the deny list |
 
@@ -27,7 +27,7 @@ credentials.
 | | |
 | --- | --- |
 | Claim | A response released to the guest never contains the credential's exact bytes. Listed percent, hex, base64 and JSON-`\/` forms are also refused, and case-sensitive forms are also searched with line breaks removed (MIME-wrapped base64). Every refusal is one of eleven fixed responses that name only a code. |
-| Theorems | `guest_response_contract`, `reflects_spec`, `unwrapped_spec`, `reflection_forms_include_raw`, `refusal_exact` ([GarrettProxyResponse](../../proofs/GarrettProxyResponse.lean)) |
+| Theorems | `serve_guest_reply` ([GarrettProxyController](../../proofs/GarrettProxyController.lean)), `guest_response_contract`, `reflects_spec`, `unwrapped_spec`, `reflection_forms_include_raw`, `refusal_exact` ([GarrettProxyResponse](../../proofs/GarrettProxyResponse.lean)) |
 | Premises | `PROXY-REFLECT-01` (other encodings and freshly minted credentials are not detected), `PROXY-NATIVE-01` |
 | Witnesses | Reflection, compression and redirect tests in both suites; response and refusal parity vectors |
 | Excluded | Credential amplification (`PROXY-AUTHORITY-01`), timing |
@@ -37,7 +37,7 @@ credentials.
 | | |
 | --- | --- |
 | Claim | Only a client presenting the session token can open a tunnel, and only to a configured origin on port 443. Revocation and expiry are re-checked before every upstream request, including inside an open keep-alive tunnel. The session ends when the parent's stdin closes. |
-| Theorems | None: tested behaviour of the Python reference and the native shell. |
+| Theorems | `serve_paths`: a request whose `current` callback answers false is never admitted or sent. The clock, token check and lease are tested behaviour. |
 | Premises | `PROXY-NATIVE-01`, host process isolation (`HOST-01`) |
 | Witnesses | Tunnel-auth, revocation-in-tunnel, expiry and lease-end tests in `tests/test_proxy_substitution.py` and `tests/test_rust_proxy.py` |
 | Excluded | A guest that already holds the token can use it until the session ends |
