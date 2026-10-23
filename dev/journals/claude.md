@@ -477,3 +477,14 @@ local guest found two real gaps before any VM run:
 
 The local rehearsal now reads a pull request diff through stock `curl`;
 the provider sees the host's own check and the diff, both via the bridge.
+
+## 2026-10-23 10:47:55 -0400
+
+ROUTE-NATIVE-01 narrowed: argument text is the extracted
+`route::scalar_text` (strings as is, integers in decimal via the already
+proved `append_decimal`). `scalar_text_integer` carries an explicit
+platform premise (`|n| + 2 ≤ usize::MAX`): Aeneas models `usize`
+abstractly, and `as usize` would truncate on a 32-bit target. I stated it
+rather than hide it; it holds on the 64-bit native build. Oracle test against
+Rust formatting includes `i64::MIN` (absolute value computed without
+overflow).

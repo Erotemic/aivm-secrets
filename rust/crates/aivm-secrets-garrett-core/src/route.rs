@@ -7,7 +7,8 @@
 //! every query name and value, so a target contains no `?`, `#`, `%`, space,
 //! CR or LF beyond the single `?` and the `=`/`&` separators written here.
 
-use crate::http_wire::alphanumeric;
+use crate::http_wire::{alphanumeric, append_decimal};
+use crate::manifest::Scalar;
 
 /// One template part: a literal segment or a named parameter.
 pub enum Piece {
@@ -69,6 +70,33 @@ pub fn segments_ok(value: &[u8]) -> bool {
         index += 1;
     }
     segment_ok(&value[start..])
+}
+
+/// The text of a scalar argument: a string as is, an integer in decimal
+/// (with `-` when negative).
+pub fn scalar_text(value: &Scalar) -> Vec<u8> {
+    let mut out = Vec::new();
+    match value {
+        Scalar::Text(bytes) => out.extend_from_slice(bytes),
+        Scalar::Integer(number) => {
+            if *number < 0 {
+                out.push(b'-');
+                // |number| without overflow, also for i64::MIN.
+                append_decimal(&mut out, (-(*number + 1)) as usize + 1);
+            } else {
+                append_decimal(&mut out, *number as usize);
+            }
+        }
+    }
+    out
+}
+
+/// A binding from a name and a scalar argument.
+pub fn scalar_binding(name: &[u8], value: &Scalar) -> Binding {
+    Binding {
+        name: name.to_vec(),
+        value: scalar_text(value),
+    }
 }
 
 /// The index of the binding named `name`, if any.

@@ -214,6 +214,8 @@ fn references(parts: &[Part]) -> BTreeSet<String> {
         .map(str::to_owned)
         .collect()
 }
+/// The native conversion `route::scalar_text` replaced; kept for the oracle test.
+#[cfg(test)]
 fn scalar_string(value: &Value) -> Outcome<String> {
     match value {
         Value::String(s) => Ok(s.clone()),
@@ -896,16 +898,20 @@ fn route_pieces(parts: &[Part]) -> Vec<route::Piece> {
         })
         .collect()
 }
-/// Every scalar argument as text (integers in decimal); `route` looks up the
-/// ones its templates reference. Parameters are already scalars after
+/// Every scalar argument as text, written by the extracted
+/// `route::scalar_text` (integers in decimal); `route` looks up the ones its
+/// templates reference. Parameters are already scalars after
 /// `Operation::request`, so nothing referenced is dropped here.
 fn route_bindings(args: &BTreeMap<String, Value>) -> Vec<route::Binding> {
     args.iter()
         .filter_map(|(n, v)| {
-            scalar_string(v).ok().map(|text| route::Binding {
-                name: n.as_bytes().to_vec(),
-                value: text.into_bytes(),
-            })
+            let scalar = match v {
+                Value::String(text) => core::Scalar::Text(text.as_bytes().to_vec()),
+                Value::Number(number) => core::Scalar::Integer(number.as_i64()?),
+                _ => return None,
+            };
+            // The extracted encoder writes the text (integers in decimal).
+            Some(route::scalar_binding(n.as_bytes(), &scalar))
         })
         .collect()
 }
@@ -1380,6 +1386,23 @@ mod route_oracle {
 
     fn outcome(result: Outcome<String>) -> Result<String, String> {
         result.map_err(|error| format!("{error:?}"))
+    }
+
+    #[test]
+    fn extracted_integer_text_matches_rust_formatting() {
+        let mut values = vec![0, 1, 9, 10, 99, 100, -1, -9, -10, i64::MAX, i64::MIN, i64::MIN + 1];
+        let mut x: i64 = 1;
+        while let Some(next) = x.checked_mul(7) {
+            values.extend([next, -next, next - 1, 1 - next]);
+            x = next;
+        }
+        for value in values {
+            assert_eq!(
+                route::scalar_text(&core::Scalar::Integer(value)),
+                value.to_string().into_bytes(),
+                "{value}"
+            );
+        }
     }
 
     #[test]

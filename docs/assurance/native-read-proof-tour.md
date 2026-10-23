@@ -505,9 +505,15 @@ extracted function gives the same target or refusal as the native code it
 replaced, over more than 500 template, query and argument combinations
 (including `..`, `a/b`, `x?y`, `%2e`, non-ASCII and over-long values).
 
+Argument text is extracted too: `scalar_text_text` and
+`scalar_text_integer` show a string argument is used as is, and an integer
+as `-` (if negative) and its decimal digits (`decimal_value_exact` reads them
+back as the number; the integer case assumes a 64-bit `usize`). An oracle
+test compares it with Rust's own formatting, including `i64::MIN`.
+
 **Still trusted** (`ROUTE-NATIVE-01`): parsing the policy into templates, and
-converting JSON arguments to text. Both are checked by the manifest parity
-tests against the Python reference, not proved.
+mapping JSON arguments to strings or `i64`s. Both are checked by the manifest
+parity tests against the Python reference, not proved.
 
 **The guest-side translator (HP-6).** The constrained proxy can run inside
 the guest, untrusted, with no credential (`garrett-proxy --routes ...

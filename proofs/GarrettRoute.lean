@@ -693,3 +693,81 @@ theorem fill_target_safe {path : Slice Piece} {query : Slice QueryPiece} {bindin
   · exact query_bytes_safe bindings.val query.val true qbound byte in_query
 
 end aivm_secrets_garrett_core.route.Proofs
+
+namespace aivm_secrets_garrett_core.route.Proofs
+
+open aivm_secrets_garrett_core.http_wire.Proofs (Digits digits_length_bound append_decimal_exact)
+
+theorem extend_contract_route (output : alloc.vec.Vec U8) (bytes : Slice U8)
+    (room : output.length + bytes.length ≤ Usize.max) :
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output bytes ⦃ out =>
+      out.val = output.val ++ bytes.val ⦄ := by
+  unfold alloc.vec.Vec.extend_from_slice
+  rw [dite_eq_left room]
+  apply WP.spec_bind (List.clone_spec (clone := core.clone.CloneU8.clone)
+    (l := bytes.val) (by intro x hx; simp))
+  intro cloned exact_copy
+  simp [exact_copy.1]
+
+/-- The text of a scalar argument: a string as is, an integer as `-`
+    (when negative) followed by the decimal digits of its absolute value. -/
+def ScalarText : manifest.Scalar → List U8
+  | .Text bytes => bytes.val
+  | .Integer number =>
+    (if number.val < 0 then [45#u8] else []) ++ Digits number.val.natAbs
+
+/-- **Argument text.** The extracted `scalar_text` writes a string's bytes
+    unchanged, and an integer as `-` (when negative) followed by the decimal
+    digits of its absolute value (`decimal_value_exact` reads them back as
+    the number). The integer case assumes `usize` holds the absolute value,
+    as on the 64-bit native build. -/
+theorem scalar_text_text (bytes : alloc.vec.Vec U8) :
+    scalar_text (.Text bytes) ⦃ out => out.val = bytes.val ⦄ := by
+  unfold scalar_text
+  simp only
+  refine WP.spec_mono (extend_contract_route (alloc.vec.Vec.new U8) (alloc.vec.Vec.deref bytes)
+    (by simp [alloc.vec.Vec.new, alloc.vec.Vec.length])) ?_
+  intro out h
+  simpa [alloc.vec.Vec.new, aivm_secrets_garrett_core.http_wire.Proofs.vec_deref_val] using h
+
+theorem scalar_text_integer (number : I64) (fits : number.val.natAbs + 2 ≤ Usize.max) :
+    scalar_text (.Integer number) ⦃ out =>
+      out.val = ScalarText (.Integer number) ⦄ := by
+  unfold scalar_text
+  simp only
+  split
+  · rename_i negative
+    have below : number.val < 0 := by scalar_tac
+    step as ⟨out, hout⟩
+    step as ⟨i, hi⟩
+    step as ⟨i1, hi1⟩
+    obtain ⟨i2, h2, v2⟩ := returned_of_spec
+      (IScalar.hcast_inBounds_spec UScalarTy.Usize i1 (by constructor <;> scalar_tac))
+    rw [h2]
+    simp only [bind_ok]
+    step as ⟨i3, hi3⟩
+    have value : i3.val = number.val.natAbs := by scalar_tac
+    have one : out.length = 1 := by simp [alloc.vec.Vec.length, hout, alloc.vec.Vec.new]
+    refine WP.spec_mono (append_decimal_exact out i3 ?_) ?_
+    · have := digits_length_bound i3.val
+      scalar_tac
+    · intro r hr
+      rw [hr, hout, value]
+      simp [ScalarText, below, alloc.vec.Vec.new]
+  · rename_i nonnegative
+    have above : 0 ≤ number.val := by scalar_tac
+    obtain ⟨k, hk, kv⟩ := returned_of_spec
+      (IScalar.hcast_inBounds_spec UScalarTy.Usize number (by constructor <;> scalar_tac))
+    rw [hk]
+    simp only [bind_ok]
+    have value : k.val = number.val.natAbs := by scalar_tac
+    refine WP.spec_mono (append_decimal_exact (alloc.vec.Vec.new U8) k ?_) ?_
+    · have := digits_length_bound k.val
+      change 0 + (Digits k.val).length ≤ Usize.max
+      scalar_tac
+    · intro r hr
+      rw [hr, value]
+      have : ¬ number.val < 0 := by omega
+      simp [ScalarText, this, alloc.vec.Vec.new]
+
+end aivm_secrets_garrett_core.route.Proofs
