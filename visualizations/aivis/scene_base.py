@@ -33,7 +33,8 @@ class DiagramScene(Scene):
         self.camera.background_color=colors['background']
         title=text_label(plan.title,colors,font_size=36)
         title.move_to(xy((-1.0,3.36)))
-        kicker=text_label(plan.kicker,colors,font_size=16,color='muted')
+        # Fit the subtitle between the frame's left edge and the status badge.
+        kicker=text_label(plan.kicker,colors,font_size=16,color='muted',max_width=11.0)
         kicker.move_to(xy((-1.0,2.9)))
         footer=text_label(plan.footer,colors,font_size=12,color='muted')
         footer.move_to(xy((0,-3.85)))

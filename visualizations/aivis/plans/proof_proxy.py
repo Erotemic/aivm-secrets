@@ -17,10 +17,10 @@ PLAN = Diagram(
     title='Where the proxy puts the credential',
     kicker='encode_upstream_contract: prefix (request only) ++ one verified auth line ++ suffix (request only).',
     nodes=(
-        Node('guest', 'Guest tool', 'curl / gh via HTTPS_PROXY', (X[0], Y), 2.6, 1.12, 'guest'),
-        Node('parser', 'Strict parser', 'parse_request', (X[1], Y), 2.6, 1.12, 'assumed'),
-        Node('encoder', 'Upstream encoder', 'encode_upstream', (X[2], Y), 2.6, 1.12, 'proved'),
-        Node('provider', 'Configured origin', 'pinned address, CA', (X[3], Y), 2.6, 1.12, 'provider'),
+        Node('guest', 'Guest', 'curl / gh via HTTPS_PROXY', (X[0], Y), 2.6, 1.12, 'guest'),
+        Node('parser', 'Parser', 'parse_request', (X[1], Y), 2.6, 1.12, 'assumed'),
+        Node('encoder', 'Encoder', 'encode_upstream', (X[2], Y), 2.6, 1.12, 'proved'),
+        Node('provider', 'Origin', 'pinned address, CA', (X[3], Y), 2.6, 1.12, 'provider'),
     ),
     links=(
         Link('send', 'guest', 'parser', 'any request bytes', ((X[0]+1.31, Y), (X[1]-1.31, Y)), 'guest', label_xy=(-3.5, 2.3)),

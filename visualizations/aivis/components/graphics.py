@@ -123,7 +123,8 @@ def knowledge_card(entry, owner, colors):
                    color=colors[owner.role], weight='BOLD')
     _fit(heading, entry.width-0.30)
     heading.move_to(box.get_top()+DOWN*0.23)
-    heading.align_to(box, LEFT).shift(RIGHT*(0.14+heading.width/2))
+    # Left edge 0.14 inside the card (align_to already places the left edge).
+    heading.align_to(box, LEFT).shift(RIGHT*0.14)
     entries = VGroup()
     for idx, value in enumerate(entry.items):
         row = Text(value, font_size=15, color=colors['foreground'])
