@@ -94,3 +94,34 @@ Python adapter; the session ends with the shell. Documented as open. Risk: the
 SSH guest transport is untested on real KVM through `aivm ssh`; only the
 local guest is tested here. Confidence: high on the contract and default-path
 independence; medium on SSH-transport details until a real-VM run.
+
+## 2026-10-23 00:46:39 -0400
+
+Maintainer pivot: an optional Docker-sandbox-style HTTPS credential
+substitution profile is now a priority, beside (not replacing) named
+operations.
+
+- Planning: `docs/planning/aivm-secrets-http-proxy-profiles.md` defines three
+  interface profiles (`named-operation`, `constrained-http`,
+  `credential-substitution`), their exact allowed claims, HP-0..HP-7 and
+  OUT-6. Before writing it I checked `../aivm/aivm/firewall.py`: the forward
+  chain accepts public egress, so `HTTPS_PROXY` is not mediation. The plan
+  says so; the maintainer's notes were right on that point.
+- HP-1, Python reference: `aivm_secrets/proxy`. It has a strict HTTP/1.1
+  subset parser, canonical re-encoding, credential stripping and injection,
+  a pinned upstream, a name-constrained per-session CA, reflection refusal
+  at any base64 offset, a deny list, revocation re-sampled per request, an
+  audit and a stdin-lease process contract. 54 synthetic tests, including
+  stock `curl`.
+- Mutation check: a mutant that removed the per-request revocation check
+  survived, because the tunnel-level check masked it. I added a mid-tunnel
+  revocation test that kills it. The other eight mutants were caught.
+- Decisions: refuse compressed responses rather than decode them, so the
+  reflection check always sees plain bytes. Never follow redirects. Kept
+  interface profiles out of the identity-binding assurance table (different
+  axis). Five new ledger rows (`PROXY-*`). Substitution's lack of authority
+  confinement is a specification entry, not hidden.
+
+Risk: credential amplification is inherent to substitution; documented, not
+solved. Confidence: medium-high on the reference's refusals (tested and
+mutated); the parser has no proof yet (HP-4/HP-5 next, after HP-2).

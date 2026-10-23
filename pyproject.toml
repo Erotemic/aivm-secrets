@@ -32,6 +32,7 @@ packages = [
   "aivm_secrets.identity.garrett",
   "aivm_secrets.kernel",
   "aivm_secrets.primitives",
+  "aivm_secrets.proxy",
   "aivm_secrets.transport",
 ]
 

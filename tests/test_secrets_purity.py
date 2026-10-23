@@ -248,8 +248,16 @@ def test_only_reviewed_host_adapters_can_open_network_connections():
         source = path.read_text(encoding='utf-8')
         if 'create_connection' in source or 'http.client' in source:
             openers.add(str(path.relative_to(PACKAGE)))
+    # proxy/server.py is the optional credential-substitution profile's own
+    # upstream sink (OUT-6, HP-1): pinned origin address and trust anchor
+    # only. It is separately enabled and the broker never imports it.
     assert openers == {'host/egress.py', 'identity/oauth_transport.py',
-                       'identity/coordination.py'}
+                       'identity/coordination.py', 'proxy/server.py'}
+    # Only the top-level CLI dispatches to the proxy; nothing else loads it.
+    loaders = {str(path.relative_to(PACKAGE)) for path in ALL
+               if path.parent.name != 'proxy'
+               and any('proxy' in name.split('.') for _, name in imports(path))}
+    assert loaders == {'cli.py'}
 
 
 def test_only_one_module_runs_a_program_and_never_through_a_shell():

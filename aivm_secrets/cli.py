@@ -9,6 +9,7 @@
   revoke [SESSION]          end a session's authority now
   audit-verify FILE...      check an audit file's hash chain
   native-session --spec F  hold one native Rust broker session for a guest
+  proxy --policy P ...     hold one credential-substitution HTTPS proxy session
 
 ``invoke``, ``operations``, ``delegate``, ``renounce`` and ``as`` are the
 guest client's verbs and are passed straight through to it.
@@ -548,6 +549,11 @@ def main(argv: list[str] | None = None) -> int:
         from .native_session import main as native_session
 
         return native_session(argv[1:])
+    if argv[:1] == ['proxy']:
+        # Optional credential-substitution proxy profile (OUT-6, HP-1).
+        from .proxy.cli import main as proxy
+
+        return proxy(argv[1:])
     args = _parser().parse_args(argv)
     announce = getattr(args, 'announce', 'text')
     try:
