@@ -1162,17 +1162,32 @@ impl Policy {
     /// reproduces the target, `proofs/GarrettRouteMatch.lean`); the typed
     /// arguments must then give back the same method, target and JSON body
     /// through this policy's own request validation and effect. Operations
-    /// with checks, GraphQL documents or `returns: check` are not translated.
+    /// with GraphQL documents or `returns: check`, and those whose final
+    /// target needs a host check's facts, are not translated.
     /// The host bridge authorizes the result on its own policy.
     pub fn translate(&self, method: &str, target: &str, body: &[u8]) -> Option<(String, Value)> {
         let mut found: Vec<(String, Value)> = Vec::new();
         for (n, op) in &self.operations {
-            if op.method != method || op.requires.is_some() || op.returns_check || op.graphql.is_some() {
+            // A host check (`requires`) runs on the host; the final target
+            // must still come from the arguments alone (round trip below).
+            if op.method != method || op.returns_check || op.graphql.is_some() {
                 continue;
             }
             let pieces = route_pieces(&op.path);
             let query = route_query(&op.query);
-            let Some(bindings) = route_match::translate(&pieces, &query, target.as_bytes()) else {
+            // Allowed texts let a value span `/` (e.g. `owner/repo`).
+            let candidates: Vec<route::Binding> = op
+                .parameters
+                .iter()
+                .flat_map(|(n, p)| match &p.rule {
+                    core::Rule::Texts(values) => values
+                        .iter()
+                        .map(|v| route::Binding { name: n.as_bytes().to_vec(), value: v.clone() })
+                        .collect::<Vec<_>>(),
+                    _ => Vec::new(),
+                })
+                .collect();
+            let Some(bindings) = route_match::translate(&pieces, &query, &candidates, target.as_bytes()) else {
                 continue;
             };
             let Some(mut arguments) = typed_arguments(op, &bindings) else {

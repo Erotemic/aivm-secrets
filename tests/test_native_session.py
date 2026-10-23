@@ -168,6 +168,64 @@ def test_constrained_proxy_serves_stock_curl_without_a_guest_credential(tmp_path
         assert TOKEN.encode() not in out + err
 
 
+
+@pytest.mark.skipif(__import__("shutil").which("curl") is None, reason="needs curl")
+def test_constrained_proxy_reads_a_github_shaped_pull_request(tmp_path):
+    """The real-VM acceptance flow with a local guest: a two-segment
+    repository parameter, the diff media type set by the host, and an
+    out-of-scope pull request that never reaches the provider."""
+    import socket
+
+    from dev import offline_native_guest as offline
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    with offline.LocalProvider(tmp_path / "provider") as provider:
+        for path in provider.files.values():
+            path.chmod(0o600)
+        spec = dict(
+            version=1, bin_dir=str(Path(executable("AIVM_SECRETS_RUST_GARRETT_BRIDGE")).parent),
+            workspace=str(tmp_path / "host"),
+            policy_file=str(private(tmp_path / "policy.json", offline.policy(tmp_path, provider))),
+            disclosure_file=str(private(tmp_path / "disclosure.json", offline.disclosure())),
+            credential_file=str(private(tmp_path / "credential", offline.FAKE_TOKEN.encode())),
+            provider=dict(host=provider.host, address="127.0.0.1", port=provider.port,
+                          server_ca=str(provider.files["ca"]), authentication="bearer"),
+            binding=dict(access_identity="operator-test", vm="vm-constrained"),
+            guest=dict(kind="local"), approve_session_key=True,
+            constrained_proxy=dict(guest_port=port),
+        )
+        process, announcement = start(private(tmp_path / "session.json", spec))
+        try:
+            assert announcement.get("ready") is True, announcement
+            env = announcement["guest"]["env"]
+            base = f"https://{provider.host}/repos/{offline.REPOSITORY.lower()}/pulls/"
+
+            def curl(url):
+                return subprocess.run(
+                    ["sh", "-c", ". " + env + " && exec curl -sS --max-time 20 "
+                     "-w '\\n%{http_code}' " + url],
+                    capture_output=True, timeout=60)
+
+            allowed = curl(base + str(offline.PR))
+            body, _, code = allowed.stdout.rpartition(b"\n")
+            assert code == b"200", allowed
+            assert json.loads(body) == {"diff": offline.DIFF}
+            # The host's own `pull` check, then the diff: both by the bridge.
+            sent = provider.seen()
+            assert [(r["path"], r["accept"]) for r in sent] == [
+                (offline.PULL_PATH, offline.GITHUB_JSON), (offline.PULL_PATH, offline.GITHUB_DIFF)]
+            assert {r["authorization"] for r in sent} == {"Bearer " + offline.FAKE_TOKEN}
+            other = curl(base + str(offline.PR + 1))
+            assert not other.stdout.endswith(b"200"), other
+            assert len(provider.seen()) == 2
+            for output in (allowed, other):
+                assert offline.FAKE_TOKEN.encode() not in output.stdout + output.stderr
+        finally:
+            process.stdin.close()
+            assert process.wait(timeout=30) == 0
+
 def test_native_session_refuses_a_bad_constrained_proxy_spec(tmp_path):
     with TLSService(provider_directory(tmp_path), host="api.example.org") as provider:
         path = spec_for(tmp_path, provider)

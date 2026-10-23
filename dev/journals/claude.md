@@ -458,3 +458,22 @@ credential.
   with the existing SSH transport; this is a maintainer action.
 - I reused `proxy_session.environment_file` with new name parameters
   rather than duplicating it, since the bridge already uses `ca.pem`.
+
+## 2026-10-23 10:26:27 -0400
+
+Wrote `dev/aivm_constrained_acceptance.py` (maintainer real-VM run of the
+constrained profile through native-session). Rehearsing it locally with a
+local guest found two real gaps before any VM run:
+
+1. The GitHub-shaped policy's `repository` parameter spans two segments
+   (`owner/repo`). The extracted matcher now takes allowed texts as
+   candidates; acceptance is still the proved round trip, so the theorem is
+   unchanged apart from the new argument.
+2. Every GitHub-shaped operation has a host check (`requires: pull`), and
+   both translators skipped such operations. That was stricter than needed:
+   the host runs the check for any named request, and the round trip already
+   rejects operations whose final target needs check facts (`pr.checks`,
+   head SHA). Relaxed in the Python reference and the native translator.
+
+The local rehearsal now reads a pull request diff through stock `curl`;
+the provider sees the host's own check and the diff, both via the bridge.

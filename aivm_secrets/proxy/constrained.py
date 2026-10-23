@@ -85,8 +85,10 @@ def _query(target: str) -> list[tuple[str, str]] | None:
 
 def candidates(operation: HTTPOperation, method: str, target: str) -> list[dict[str, Any]]:
     """Argument sets under which ``operation`` might produce this request."""
-    if (operation.returns_check or operation.requires or operation.graphql_document
-            or operation.method != method):
+    # An operation with a host check (`requires`) is fine: the host runs the
+    # check itself. Its final target must still come from the arguments
+    # alone, which the round trip in `translate` enforces.
+    if operation.returns_check or operation.graphql_document or operation.method != method:
         return []
     path = target.split('?', 1)[0]
     segments = path[1:].split('/')

@@ -18,8 +18,8 @@ Proved here:
   byte is unreserved or one of `/ ? = &`, and every template part had a
   value.
 
-How candidates are read off the target (`bind_path`, `bind_query`) is not
-proved and need not be: it only decides which requests are translated. The
+How candidates are read off the target (`bind_path`, `bind_query`, and the
+allowed texts that let one value span `/`) is not proved and need not be: it only decides which requests are translated. The
 host bridge still authorizes the resulting named operation on its own
 policy, so a guest whose route copy differs from the host's can only ask for
 a different named operation, never widen authority.
@@ -37,9 +37,10 @@ open aivm_secrets_garrett_core.route
 
 /-- **Round trip.** Accepted arguments make the host's `fill_target`
     reproduce the guest's target exactly. -/
-theorem translate_round_trip {path : Slice Piece} {query : Slice QueryPiece} {target : Slice U8}
+theorem translate_round_trip {path : Slice Piece} {query : Slice QueryPiece}
+    {candidates : Slice Binding} {target : Slice U8}
     {bindings : alloc.vec.Vec Binding}
-    (h : translate path query target = Result.ok (some bindings)) :
+    (h : translate path query candidates target = Result.ok (some bindings)) :
     ∃ filled : alloc.vec.Vec U8,
       fill_target path query (alloc.vec.Vec.deref bindings) = Result.ok (.Ok filled) ∧
       filled.val = target.val := by
@@ -68,9 +69,10 @@ theorem translate_round_trip {path : Slice Piece} {query : Slice QueryPiece} {ta
 /-- **What an accepted translation means.** The guest's target is exactly
     the host encoding of the accepted arguments, and contains only safe
     bytes. -/
-theorem translate_exact {path : Slice Piece} {query : Slice QueryPiece} {target : Slice U8}
+theorem translate_exact {path : Slice Piece} {query : Slice QueryPiece}
+    {candidates : Slice Binding} {target : Slice U8}
     {bindings : alloc.vec.Vec Binding}
-    (h : translate path query target = Result.ok (some bindings)) :
+    (h : translate path query candidates target = Result.ok (some bindings)) :
     target.val = PathBytes bindings.val path.val ++ QueryBytes bindings.val true query.val ∧
       Bound bindings.val path.val ∧ QueryBound bindings.val query.val ∧
       ∀ byte ∈ target.val, TargetByte byte := by

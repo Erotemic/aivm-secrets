@@ -123,9 +123,12 @@ when it is **exactly** one of that policy's named operations:
 
 Anything else is `403 unsupported_request`, with no provider call. There is
 no fallback to substitution: one session runs one profile, and a
-constrained session has no credential to substitute. Operations with
-checks, pinned GraphQL documents or pagination metadata are not translated
-yet. Tests: `tests/test_proxy_constrained.py`.
+constrained session has no credential to substitute. Operations with a
+host check (`requires`) are translated when their final target comes from
+the arguments alone (the host runs the check itself, as for any named
+request); operations whose target needs the check's facts (such as a head
+SHA), pinned GraphQL documents and `returns: check` are not. Tests:
+`tests/test_proxy_constrained.py`.
 
 The response is the operation's disclosure, not the full provider response.
 Stock tools that need fields the policy does not release will fail rather
@@ -162,11 +165,12 @@ garrett-proxy --policy proxy.json --audit proxy.jsonl --routes routes.json \
 
 It accepts a request only if the extracted `route_match::translate` finds
 arguments under which the host's own `route::fill_target` writes the target
-back byte for byte (proved: `translate_round_trip`), and the typed arguments
+back byte for byte (proved: `translate_round_trip`); a parameter's allowed
+texts let one value span `/` (such as `owner/repo`). The typed arguments
 reproduce the method, target and JSON body through the route copy's request
 validation. Differences from the Python translator: the query must be in
-the policy's (sorted) order, each path parameter is one segment, and a
-bridge error is reported as `denied`, `invalid_request`, `revoked` or
+the policy's (sorted) order, a path parameter without allowed texts is one
+segment, and a bridge error is reported as `denied`, `invalid_request`, `revoked` or
 `outcome_unknown`.
 
 ## Native `garrett-proxy`

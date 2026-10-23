@@ -44,17 +44,63 @@ pub fn bind(bindings: &mut Vec<Binding>, name: &[u8], value: &[u8]) {
     }
 }
 
-/// Read one path segment per template part (`/part/part...`).
-pub fn bind_path(bindings: &mut Vec<Binding>, path: &[Piece], target: &[u8], end: usize) {
+/// Whether `value` occurs at `start` and ends at a `/` or at `end`.
+pub fn fits_at(target: &[u8], start: usize, end: usize, value: &[u8]) -> bool {
+    if value.is_empty() || start > end || end - start < value.len() {
+        return false;
+    }
+    let mut index = 0;
+    while index < value.len() {
+        if target[start + index] != value[index] {
+            return false;
+        }
+        index += 1;
+    }
+    let stop = start + value.len();
+    stop == end || target[stop] == b'/'
+}
+
+/// Where a parameter's value ends: after the first allowed text named
+/// `name` that fits at `start` (a text may span `/`), else at the next `/`.
+pub fn value_end(
+    candidates: &[Binding],
+    name: &[u8],
+    target: &[u8],
+    start: usize,
+    end: usize,
+) -> usize {
+    let mut index = 0;
+    while index < candidates.len() {
+        let candidate: &[u8] = &candidates[index].name;
+        if candidate == name && fits_at(target, start, end, &candidates[index].value) {
+            return start + candidates[index].value.len();
+        }
+        index += 1;
+    }
+    piece_end(target, start, end, b'/')
+}
+
+/// Read one value per template part (`/part/part...`).
+pub fn bind_path(
+    bindings: &mut Vec<Binding>,
+    candidates: &[Binding],
+    path: &[Piece],
+    target: &[u8],
+    end: usize,
+) {
     let mut start = 1;
     let mut index = 0;
     while index < path.len() && start <= end {
-        let stop = piece_end(target, start, end, b'/');
         match &path[index] {
-            Piece::Literal(_) => (),
-            Piece::Parameter(name) => bind(bindings, name, &target[start..stop]),
+            Piece::Literal(_) => {
+                start = piece_end(target, start, end, b'/') + 1;
+            }
+            Piece::Parameter(name) => {
+                let stop = value_end(candidates, name, target, start, end);
+                bind(bindings, name, &target[start..stop]);
+                start = stop + 1;
+            }
         }
-        start = stop + 1;
         index += 1;
     }
 }
@@ -87,14 +133,20 @@ pub fn bind_query(bindings: &mut Vec<Binding>, query: &[QueryPiece], target: &[u
 }
 
 /// The arguments under which the host's own `fill_target` writes exactly
-/// `target`, or `None`.
-pub fn translate(path: &[Piece], query: &[QueryPiece], target: &[u8]) -> Option<Vec<Binding>> {
+/// `target`, or `None`. `candidates` are allowed texts per parameter name,
+/// used only to read multi-segment values; acceptance is the round trip.
+pub fn translate(
+    path: &[Piece],
+    query: &[QueryPiece],
+    candidates: &[Binding],
+    target: &[u8],
+) -> Option<Vec<Binding>> {
     let end = path_end(target);
     if end == 0 || target[0] != b'/' {
         return None;
     }
     let mut bindings = Vec::new();
-    bind_path(&mut bindings, path, target, end);
+    bind_path(&mut bindings, candidates, path, target, end);
     bind_query(&mut bindings, query, target, end);
     match fill_target(path, query, &bindings) {
         Ok(filled) => {
@@ -137,7 +189,8 @@ mod tests {
             name: b"page".to_vec(),
             piece: param("page"),
         }];
-        let found = translate(&path, &query, b"/repos/octo/demo/pulls/7?page=2").expect("match");
+        let found =
+            translate(&path, &query, &[], b"/repos/octo/demo/pulls/7?page=2").expect("match");
         assert_eq!(value(&found, "owner"), b"octo");
         assert_eq!(value(&found, "pr"), b"7");
         assert_eq!(value(&found, "page"), b"2");
@@ -152,7 +205,7 @@ mod tests {
             b"/repos/octo/demo/pulls/7?page=2#f",   // fragment
         ] {
             assert!(
-                translate(&path, &query, refused).is_none(),
+                translate(&path, &query, &[], refused).is_none(),
                 "{:?}",
                 String::from_utf8_lossy(refused)
             );
@@ -160,9 +213,22 @@ mod tests {
     }
 
     #[test]
+    fn allowed_texts_may_span_segments() {
+        let path = [lit("repos"), param("repository"), lit("pulls"), param("pr")];
+        let candidates = [Binding {
+            name: b"repository".to_vec(),
+            value: b"octo/demo".to_vec(),
+        }];
+        let found = translate(&path, &[], &candidates, b"/repos/octo/demo/pulls/7").expect("match");
+        assert_eq!(value(&found, "repository"), b"octo/demo");
+        assert!(translate(&path, &[], &[], b"/repos/octo/demo/pulls/7").is_none());
+        assert!(translate(&path, &[], &candidates, b"/repos/octo/other/pulls/7").is_none());
+    }
+
+    #[test]
     fn repeated_parameters_must_agree() {
         let path = [param("x"), param("x")];
-        assert!(translate(&path, &[], b"/a/a").is_some());
-        assert!(translate(&path, &[], b"/a/b").is_none());
+        assert!(translate(&path, &[], &[], b"/a/a").is_some());
+        assert!(translate(&path, &[], &[], b"/a/b").is_none());
     }
 }
