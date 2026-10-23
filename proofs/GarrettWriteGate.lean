@@ -1,5 +1,6 @@
 import GarrettProductionAssurance
 import GarrettApproval
+import GarrettDispatch
 
 /-!
 # OUT-4: the exact-write gate in front of the production controller
@@ -142,5 +143,65 @@ theorem production_write_has_approval_and_authorized_attempts
     production_denial_attempts_are_authorized_and_bound work factory routes context native state
       pending out attempts created returned coverage
   exact ⟨allowed, authorized, after, events, run, sound, count⟩
+
+theorem bind_ok_inv {A B : Type} {first : Result A} {next : A → Result B} {out : B}
+    (h : (first >>= next) = Result.ok out) :
+    ∃ value, first = Result.ok value ∧ next value = Result.ok out := by
+  cases first using Result.cases <;> simp_all
+
+/-- **A keyed write reserves before egress.** If the extracted dispatch
+    returns success for a keyed (coordinated) write, then admission audit,
+    configuration, the late check and the coordinator **reservation** all
+    succeeded before the exchange, and the coordinator **finish** succeeded
+    after it. (A failed finish is reported as `OUTCOME_UNKNOWN`, never
+    retried: `dispatch.Proofs.coordinator_finish_refusal`.) -/
+theorem keyed_success_reserved_and_finished {W C O X : Type} (ops : dispatch.Work W C O X)
+    (pending : dispatch.Pending W C O X) (prepared : read_transition.Prepared)
+    (value : O) (final : dispatch.Pending W C O X)
+    (returned : dispatch.run ops pending prepared true = Result.ok (.Ok value, final)) :
+    ∃ audited pendingA configured checked reserved exchanged,
+      dispatch.audit ops pending prepared = Result.ok (.Ok audited, pendingA) ∧
+      ops.configure pendingA.work true = Result.ok (.Ok (), configured) ∧
+      ops.check configured = Result.ok (.Ok (), checked) ∧
+      ops.reserve checked = Result.ok (.Ok (), reserved) ∧
+      dispatch.exchange ops { pendingA with work := reserved } audited =
+        Result.ok (.Ok value, exchanged) ∧
+      dispatch.finish ops exchanged true = Result.ok (.Ok (), final) := by
+  unfold dispatch.run at returned
+  obtain ⟨⟨r, pendingA⟩, auditCall, after⟩ := bind_ok_inv returned
+  cases r with
+  | Err e => simp at after
+  | Ok audited =>
+    obtain ⟨⟨r1, configured⟩, configureCall, after⟩ := bind_ok_inv after
+    cases r1 with
+    | Err e => simp at after
+    | Ok u =>
+      obtain ⟨⟨r2, checked⟩, checkCall, after⟩ := bind_ok_inv after
+      cases r2 with
+      | Err e => simp at after
+      | Ok u2 =>
+        obtain ⟨⟨t2, reserved⟩, reserveCall, after⟩ := bind_ok_inv after
+        simp only [↓reduceIte] at reserveCall
+        obtain ⟨⟨reservedResult, t3⟩, reserveOps, reserveEq⟩ := bind_ok_inv reserveCall
+        simp at reserveEq
+        obtain ⟨hT2, hRes⟩ := reserveEq
+        subst hT2 hRes
+        cases reservedResult with
+        | Err e => simp at after
+        | Ok u3 =>
+          obtain ⟨⟨r3, exchanged⟩, exchangeCall, after⟩ := bind_ok_inv after
+          cases r3 with
+          | Err e => simp at after
+          | Ok v =>
+            obtain ⟨⟨r4, finished⟩, finishCall, after⟩ := bind_ok_inv after
+            cases r4 with
+            | Err e => simp at after
+            | Ok u4 =>
+              simp at after
+              obtain ⟨hv, hf⟩ := after
+              subst hv hf
+              cases u; cases u2; cases u3; cases u4
+              exact ⟨audited, pendingA, configured, checked, t3, exchanged, auditCall,
+                configureCall, checkCall, reserveOps, exchangeCall, finishCall⟩
 
 end aivm_secrets_garrett_core.write_gate.Proofs
