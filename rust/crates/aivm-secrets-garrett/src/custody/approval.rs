@@ -14,7 +14,7 @@ pub(super) struct Metadata {
 }
 struct State {
     pending: Vec<Value>,
-    approvals: BTreeMap<String, Approval>,
+    approvals: Vec<Approval>,
 }
 pub(crate) struct Shared {
     metadata: Metadata,
@@ -32,7 +32,7 @@ impl Shared {
             used: AtomicU64::new(0),
             state: Mutex::new(State {
                 pending: Vec::new(),
-                approvals: BTreeMap::new(),
+                approvals: Vec::new(),
             }),
         }
     }
@@ -52,12 +52,17 @@ impl Shared {
         let mut state = self.state.lock().map_err(|_| Error::InternalError)?;
         let now = host_time()?;
         self.require_active(now)?;
-        let slot = state.approvals.remove(wanted);
-        let (decision, remaining) =
-            core::consume(Mode::Approve, write, &wanted.as_bytes().to_vec(), now, slot);
-        if let Some(slot) = remaining {
-            state.approvals.insert(wanted.into(), slot);
-        }
+        // The extracted store chooses the slot for exactly this digest and
+        // returns it only if it was not spent.
+        let admitted = core::admit(
+            &state.approvals,
+            Mode::Approve,
+            write,
+            &wanted.as_bytes().to_vec(),
+            now,
+        );
+        state.approvals = admitted.store;
+        let decision = admitted.decision;
         if matches!(decision, Decision::Allowed) {
             self.used.fetch_add(1, Ordering::Relaxed);
         }
@@ -133,15 +138,13 @@ impl Shared {
                         .map_err(|_| Error::InvalidRequest)?;
                     let slot = core::issue(digest.as_bytes().to_vec(), now, ttl)
                         .ok_or(Error::InvalidRequest)?;
-                    state
-                        .approvals
-                        .retain(|key, p| key != &digest && now < p.expires_at);
-                    if state.approvals.len() >= 16 {
-                        return Err(Error::Exhausted);
-                    }
+                    // Replaces any slot for this digest and drops expired
+                    // ones; a full store or failed audit leaves it unchanged.
+                    let store =
+                        core::install(&state.approvals, slot, now).ok_or(Error::Exhausted)?;
                     self.record(&json!({"schema":1,"event":"approved","digest":digest,
                         "grant":self.audit.grant,"policy":self.audit.policy}))?;
-                    state.approvals.insert(digest.clone(), slot);
+                    state.approvals = store;
                 }
                 state.pending.retain(|p| p["digest"] != digest);
                 Ok(json!({"version":1,"ok":true,"digest":digest}))
@@ -163,5 +166,109 @@ impl Shared {
             }
             _ => Err(Error::InvalidRequest),
         }
+    }
+}
+
+#[cfg(test)]
+mod store_oracle {
+    //! Oracle: the extracted approval store against the `BTreeMap` slots it
+    //! replaced, over pseudo-random admit/approve sequences. The one intended
+    //! difference: a full store used to be pruned before refusing; now a
+    //! refusal leaves the store unchanged, so the oracle resynchronizes there.
+    use super::core::{self, Approval, Decision, Mode};
+    use std::collections::BTreeMap;
+
+    fn old_admit(
+        map: &mut BTreeMap<String, Approval>,
+        wanted: &str,
+        write: bool,
+        now: i64,
+    ) -> Decision {
+        let slot = map.remove(wanted);
+        let (decision, remaining) =
+            core::consume(Mode::Approve, write, &wanted.as_bytes().to_vec(), now, slot);
+        if let Some(slot) = remaining {
+            map.insert(wanted.into(), slot);
+        }
+        decision
+    }
+
+    fn old_install(map: &mut BTreeMap<String, Approval>, digest: &str, now: i64, ttl: i64) -> bool {
+        let slot = core::issue(digest.as_bytes().to_vec(), now, ttl).unwrap();
+        map.retain(|key, p| key != digest && now < p.expires_at);
+        if map.len() >= 16 {
+            return false;
+        }
+        map.insert(digest.into(), slot);
+        true
+    }
+
+    fn view(store: &[Approval]) -> BTreeMap<String, i64> {
+        let out: BTreeMap<_, _> = store
+            .iter()
+            .map(|s| (String::from_utf8(s.digest.clone()).unwrap(), s.expires_at))
+            .collect();
+        assert_eq!(out.len(), store.len(), "one slot per digest");
+        out
+    }
+
+    fn old_view(map: &BTreeMap<String, Approval>) -> BTreeMap<String, i64> {
+        map.iter().map(|(k, s)| (k.clone(), s.expires_at)).collect()
+    }
+
+    #[test]
+    fn extracted_store_matches_the_btreemap_slots() {
+        let mut seed: u64 = 0x9e37_79b9_7f4a_7c15;
+        let mut next = move |bound: u64| {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed % bound
+        };
+        let mut exhausted = 0;
+        for _run in 0..200 {
+            let mut old = BTreeMap::new();
+            let mut new: Vec<Approval> = Vec::new();
+            let mut now = 1_000;
+            for _step in 0..120 {
+                now += next(6) as i64;
+                let digest = format!("{:064x}", next(40));
+                if next(2) == 0 {
+                    let ttl = 1 + next(900) as i64;
+                    let slot = core::issue(digest.as_bytes().to_vec(), now, ttl).unwrap();
+                    match core::install(&new, slot, now) {
+                        Some(store) => {
+                            assert!(old_install(&mut old, &digest, now, ttl));
+                            new = store;
+                        }
+                        None => {
+                            assert!(!old_install(&mut old, &digest, now, ttl));
+                            exhausted += 1;
+                            old = new
+                                .iter()
+                                .map(|s| {
+                                    (
+                                        String::from_utf8(s.digest.clone()).unwrap(),
+                                        Approval {
+                                            digest: s.digest.clone(),
+                                            expires_at: s.expires_at,
+                                        },
+                                    )
+                                })
+                                .collect();
+                        }
+                    }
+                } else {
+                    let write = next(4) != 0;
+                    let admitted =
+                        core::admit(&new, Mode::Approve, write, &digest.as_bytes().to_vec(), now);
+                    let expected = old_admit(&mut old, &digest, write, now);
+                    assert_eq!(admitted.decision as u8, expected as u8);
+                    new = admitted.store;
+                }
+                assert_eq!(view(&new), old_view(&old));
+            }
+        }
+        assert!(exhausted > 0, "the full-store refusal was exercised");
     }
 }

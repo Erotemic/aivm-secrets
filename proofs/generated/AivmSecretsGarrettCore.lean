@@ -169,6 +169,154 @@ def approval.consume
     | approval.Mode.Allow => ok (approval.Decision.Allowed, prior)
   else ok (approval.Decision.Allowed, prior)
 
+/-- [aivm_secrets_garrett_core::approval::STORE_LIMIT]
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 63:0-63:34
+    Visibility: public -/
+@[global_simps, irreducible] def approval.STORE_LIMIT : Std.Usize := 16#usize
+
+/-- [aivm_secrets_garrett_core::approval::Taken]
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 65:0-68:1
+    Visibility: public -/
+structure approval.Taken where
+  slot : Option approval.Approval
+  rest : alloc.vec.Vec approval.Approval
+
+/-- [aivm_secrets_garrett_core::approval::copy]:
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 70:0-75:1 -/
+def approval.copy (slot : approval.Approval) : Result approval.Approval := do
+  let v ← alloc.vec.CloneVec.clone core.clone.CloneU8 slot.digest
+  ok { slot with digest := v }
+
+/-- [aivm_secrets_garrett_core::approval::take]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 82:4-93:5
+    Visibility: public -/
+@[rust_loop]
+def approval.take_loop
+  (store : alloc.vec.Vec approval.Approval) (wanted : alloc.vec.Vec Std.U8)
+  (slot : Option approval.Approval) (rest : alloc.vec.Vec approval.Approval)
+  (index : Std.Usize) :
+  Result ((Option approval.Approval) × (alloc.vec.Vec approval.Approval))
+  := do
+  let i := alloc.vec.Vec.len store
+  if index < i
+  then
+    let first ←
+      match slot with
+      | none =>
+        do
+        let a ←
+          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+            approval.Approval) store index
+        alloc.vec.partial_eq.PartialEqVec.eq core.cmp.PartialEqU8 a.digest
+          wanted
+      | some _ => ok false
+    let (slot1, rest1) ←
+      if first
+      then
+        do
+        let a ←
+          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+            approval.Approval) store index
+        let a1 ← approval.copy a
+        ok (some a1, rest)
+      else
+        do
+        let a ←
+          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+            approval.Approval) store index
+        let a1 ← approval.copy a
+        let rest2 ← alloc.vec.Vec.push rest a1
+        ok (slot, rest2)
+    let index1 ← index + 1#usize
+    approval.take_loop store wanted slot1 rest1 index1
+  else ok (slot, rest)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::approval::take]:
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 78:0-95:1
+    Visibility: public -/
+def approval.take
+  (store : alloc.vec.Vec approval.Approval) (wanted : alloc.vec.Vec Std.U8) :
+  Result approval.Taken
+  := do
+  let (slot, rest) ←
+    approval.take_loop store wanted none (alloc.vec.Vec.new approval.Approval)
+      0#usize
+  ok { slot, rest }
+
+/-- [aivm_secrets_garrett_core::approval::Admitted]
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 97:0-100:1
+    Visibility: public -/
+structure approval.Admitted where
+  decision : approval.Decision
+  store : alloc.vec.Vec approval.Approval
+
+/-- [aivm_secrets_garrett_core::approval::admit]:
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 104:0-122:1
+    Visibility: public -/
+def approval.admit
+  (store : alloc.vec.Vec approval.Approval) (mode : approval.Mode)
+  (write : Bool) (wanted : alloc.vec.Vec Std.U8) (now : Std.I64) :
+  Result approval.Admitted
+  := do
+  let taken ← approval.take store wanted
+  let (d, o) ← approval.consume mode write wanted now taken.slot
+  match o with
+  | none => ok { decision := d, store := taken.rest }
+  | some kept =>
+    let rest ← alloc.vec.Vec.push taken.rest kept
+    ok { decision := d, store := rest }
+
+/-- [aivm_secrets_garrett_core::approval::install]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 129:4-134:5
+    Visibility: public -/
+@[rust_loop]
+def approval.install_loop
+  (store : alloc.vec.Vec approval.Approval) (slot : approval.Approval)
+  (now : Std.I64) (kept : alloc.vec.Vec approval.Approval) (index : Std.Usize)
+  :
+  Result (approval.Approval × (alloc.vec.Vec approval.Approval))
+  := do
+  let i := alloc.vec.Vec.len store
+  if index < i
+  then
+    let a ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        approval.Approval) store index
+    let b ←
+      alloc.vec.partial_eq.PartialEqVec.ne core.cmp.PartialEqU8 a.digest
+        slot.digest
+    let kept1 ←
+      if b
+      then
+        if now < a.expires_at
+        then do
+             let a1 ← approval.copy a
+             alloc.vec.Vec.push kept a1
+        else ok kept
+      else ok kept
+    let index1 ← index + 1#usize
+    approval.install_loop store slot now kept1 index1
+  else ok (slot, kept)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::approval::install]:
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 126:0-140:1
+    Visibility: public -/
+def approval.install
+  (store : alloc.vec.Vec approval.Approval) (slot : approval.Approval)
+  (now : Std.I64) :
+  Result (Option (alloc.vec.Vec approval.Approval))
+  := do
+  let (slot1, kept) ←
+    approval.install_loop store slot now (alloc.vec.Vec.new approval.Approval)
+      0#usize
+  let i := alloc.vec.Vec.len kept
+  if i >= approval.STORE_LIMIT
+  then ok none
+  else let kept1 ← alloc.vec.Vec.push kept slot1
+       ok (some kept1)
+
 /-- Trait declaration: [aivm_secrets_garrett_core::audit_record::Sink]
     Source: 'crates/aivm-secrets-garrett-core/src/audit_record.rs', lines 13:0-18:1
     Visibility: public -/

@@ -607,3 +607,20 @@ guarantees. Notes: `step*` applies the induction hypothesis itself, leaving
 measure goals closed by `rfl`; `‹...›` with holes plus `generalize`
 recovers inaccessible hypotheses at the end of a long inversion. Full
 `lake build`: 1,898 jobs, no warnings.
+
+## 2026-10-23 14:55:07 -0400
+
+APPROVAL-RUST-01 narrowed: the host approval store (native `BTreeMap`) is now
+the extracted `approval::take/admit/install` over a `Vec<Approval>`, proved
+in `GarrettApprovalStore.lean` (first-slot lookup, admit = consume on that
+slot, Allowed removes it, uniqueness preserved, spent approval Required again,
+install replaces same digest / drops expired / refuses when full). Oracle test
+`store_oracle` replays 200x120 random admit/approve steps against the old map.
+Decision: a full store now refuses *without* pruning (old code pruned first and
+could lose a still-valid same-digest slot on refusal or audit failure); the
+oracle resynchronizes only at that point. Aeneas needed indexing `store[index]`
+directly (a shared `here` borrow across the join failed context matching).
+Lean: pair-let after `consume` reduced with `WP.spec_bind (Pₘ := (· = pair))`
+then `change`. Still assumed: the one native line passing `admit`'s decision
+to `run_approved`, digest computation, lock. Confidence: high on proofs;
+medium that the 16-slot/TTL behaviour is what the maintainer wants (unchanged).

@@ -223,7 +223,7 @@ def main() -> int:
                                             '+GarrettProxyHttp', '+GarrettProxyResponse',
                                             '+GarrettProxyController', '+GarrettProxyConnect',
                                             '+GarrettRoute', '+GarrettRouteMatch', '+GarrettControl',
-                                            '+GarrettWriteGate', '+GarrettPublicFieldNameContract', '+GarrettProxyParse'])
+                                            '+GarrettWriteGate', '+GarrettPublicFieldNameContract', '+GarrettProxyParse', '+GarrettApprovalStore'])
         if args.full_tests:
             with tempfile.TemporaryDirectory(prefix='as-full-', dir='/tmp') as temporary:
                 run('full-python-native', [python, '-m', 'pytest', '-q', '-ra',

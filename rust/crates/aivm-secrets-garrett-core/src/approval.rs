@@ -57,3 +57,84 @@ pub fn consume(
         },
     }
 }
+
+/// The host's approval store: at most one slot per digest, at most
+/// `STORE_LIMIT` live slots. Keys are the slots' own digests.
+pub const STORE_LIMIT: usize = 16;
+
+pub struct Taken {
+    pub slot: Option<Approval>,
+    pub rest: Vec<Approval>,
+}
+
+fn copy(slot: &Approval) -> Approval {
+    Approval {
+        digest: slot.digest.clone(),
+        expires_at: slot.expires_at,
+    }
+}
+
+/// Removes the first slot whose digest is `wanted`; the rest keep their order.
+pub fn take(store: &Vec<Approval>, wanted: &Vec<u8>) -> Taken {
+    let mut slot = None;
+    let mut rest = Vec::new();
+    let mut index = 0;
+    while index < store.len() {
+        let first = match slot {
+            None => store[index].digest == *wanted,
+            Some(_) => false,
+        };
+        if first {
+            slot = Some(copy(&store[index]));
+        } else {
+            rest.push(copy(&store[index]));
+        }
+        index += 1;
+    }
+    Taken { slot, rest }
+}
+
+pub struct Admitted {
+    pub decision: Decision,
+    pub store: Vec<Approval>,
+}
+
+/// Looks up the slot for exactly this request digest and decides with
+/// `consume`. An unspent slot goes back into the store.
+pub fn admit(
+    store: &Vec<Approval>,
+    mode: Mode,
+    write: bool,
+    wanted: &Vec<u8>,
+    now: i64,
+) -> Admitted {
+    let taken = take(store, wanted);
+    let mut rest = taken.rest;
+    let decided = consume(mode, write, wanted, now, taken.slot);
+    match decided.1 {
+        Some(kept) => rest.push(kept),
+        None => {}
+    }
+    Admitted {
+        decision: decided.0,
+        store: rest,
+    }
+}
+
+/// Installs a newly issued slot: drops any slot with the same digest and any
+/// expired slot, then refuses if the store is still full.
+pub fn install(store: &Vec<Approval>, slot: Approval, now: i64) -> Option<Vec<Approval>> {
+    let mut kept = Vec::new();
+    let mut index = 0;
+    while index < store.len() {
+        if store[index].digest != slot.digest && now < store[index].expires_at {
+            kept.push(copy(&store[index]));
+        }
+        index += 1;
+    }
+    if kept.len() >= STORE_LIMIT {
+        return None;
+    }
+    kept.push(slot);
+    Some(kept)
+}

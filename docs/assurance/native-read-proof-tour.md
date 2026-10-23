@@ -605,8 +605,29 @@ session's only call to the controller ([`GarrettWriteGate`](../../proofs/Garrett
 
 Already proved for the controller itself, and so holding for writes through it: a write that was sent and then failed completion returns `outcome_unknown` and halts. It is never retried (`read_transition.Proofs.sent_write_completion_failure_is_uncertain`).
 
-**Still assumed:** that the session gives the gate the decision it computed
-for *this* request's digest, and the host approval store's locking
+**Which approval a write spends (2026-10-23).** The host's approval store used
+to be a native `BTreeMap` keyed by digest. It is now the extracted
+`approval::admit` and `approval::install` over a list of slots
+([`GarrettApprovalStore`](../../proofs/GarrettApprovalStore.lean)); the native
+adapter only holds the lock, reads the clock and keeps the list. A byte-level
+oracle test replays random sequences against the old map.
+
+| Theorem | Says |
+| --- | --- |
+| `take_spec` | The slot looked up is the **first** slot whose digest is this request's digest; the rest of the store is unchanged and in order. |
+| `admit_spec` | The decision is `consume` applied to exactly that slot; the new store is the rest plus whatever `consume` handed back. |
+| `admit_write_spec` | In `approve` mode a write is `Allowed` exactly when the store holds a live slot for this digest. `Allowed` removes it; `Required` keeps every slot. |
+| `install_spec` | Approving replaces any slot for the same digest and drops expired ones; if 16 survivors remain, it refuses and the store is unchanged. |
+| `install_unique`, `admit_unique` | The store never holds two slots for one digest. |
+| `spent_slot_is_gone`, `spent_approval_cannot_be_reused` | After an `Allowed` write no slot for that digest is left, so the same request is `Required` again at any later time. |
+
+Read the predicates `ForDigest`, `Survives` and `Unique` (three lines each):
+they are the whole specification. One behaviour changed on purpose: a full
+store used to be pruned before refusing; now a refusal leaves it untouched.
+
+**Still assumed:** that the session passes the gate the decision `admit`
+returned for the digest it computed for *this* request (one native line), how
+that digest is computed (canonical JSON and SHA-256), and the store's lock
 (`APPROVAL-RUST-01`). Also assumed: the production theorem's native premises,
 and the keyed-retry and coordinator contracts for coordinated writes
 (`COORD-RUST-01`). This is not yet the full OUT-4 claim: provider-side write

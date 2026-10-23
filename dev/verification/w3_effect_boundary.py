@@ -68,14 +68,18 @@ def same_order(source: str, *markers: str) -> bool:
 
 
 def review_semantics(contents: dict[str, str]) -> None:
-    approval = contents[RUST + 'custody/approval.rs']
+    approval = contents[RUST + 'custody/approval.rs'].split('#[cfg(test)]', 1)[0]
     admission = part(approval, 'pub(super) fn admit(', 'pub(super) fn remember(')
     require(same_order(admission, 'self.state.lock()', 'let now = host_time()?;',
-                       'self.require_active(now)?;', 'state.approvals.remove(wanted)',
-                       'core::consume(Mode::Approve, write,', 'if let Some(slot) = remaining'),
+                       'self.require_active(now)?;', 'core::admit(', 'Mode::Approve,',
+                       'state.approvals = admitted.store;', 'let decision = admitted.decision;'),
             'approval consumption bypasses current clock, unique slot or extracted decision')
-    require('state.approvals.insert(wanted.into(), slot)' in admission
-            and approval.count('core::issue(') == 1,
+    approve = part(approval, 'Some("approve" | "deny") =>', 'Some("revoke") =>')
+    require(same_order(approve, 'core::issue(', 'core::install(&state.approvals, slot, now)',
+                       'self.record(', 'state.approvals = store;')
+            and approval.count('core::issue(') == 1
+            and approval.count('state.approvals') == 4
+            and approval.count('state.approvals =') == 2,
             'approval slot can be refunded or issued through an unreviewed path')
     host_control = contents[RUST + 'host_control.rs']
     serve_control = part(host_control, 'fn serve(', 'impl Drop for Running')
