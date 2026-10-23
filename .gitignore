@@ -115,3 +115,6 @@ aivm-source-*.tar.gz
 /rust/*.llbc
 /proofs/.lake/
 *.tar.gz
+
+# Goal guard state (receipts and the armed goal never belong in git)
+/.goal/

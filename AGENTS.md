@@ -217,3 +217,25 @@ given.
   It is offline and idempotent, and it reads the committed `.llm_resource_tally/settings.json`
   policy.
 <!-- END llm_resource_tally -->
+
+## Long unattended runs: the goal guard
+
+`scripts/goal_guard.py` is a deterministic Stop hook (wired in
+`.claude/settings.json`). An armed goal blocks a session's Stop and restates
+the goal; only a clock (`deadline_utc`, `max_run_hours`), the stalled-commit
+fuse or a human ends a run. It runs no commands and no model judges
+completion, so a status report never releases it. Details and rules:
+`docs/tools/goal-guard.md`; a ready template is
+`dev/goal_examples/docs-planning-24h.json`.
+
+```bash
+python3 scripts/goal_guard.py --status
+python3 scripts/goal_guard.py --arm goal.json      # the maintainer arms runs
+python3 scripts/goal_guard.py --extend 48h
+python3 scripts/goal_guard.py --pause "maintainer asked me to finish X and wait"
+```
+
+Use `--pause`/`--hold` only when the maintainer asks. Never hand-edit
+`.goal/active.json` (it is gitignored). Commit real progress: a run that stops
+moving HEAD trips the stall fuse. Guard tests are outside the default suite:
+`python -m pytest -q scripts/tests`.

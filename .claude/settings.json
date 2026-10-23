@@ -1,0 +1,38 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; until [ -f \"$d/scripts/goal_guard.py\" ] || [ \"$d\" = / ]; do d=$(dirname \"$d\"); done; if [ -x \"$d/scripts/goal_guard_hook.sh\" ]; then exec bash \"$d/scripts/goal_guard_hook.sh\"; elif [ -f \"$d/scripts/goal_guard.py\" ]; then exec python3 \"$d/scripts/goal_guard.py\"; else echo '{\"decision\":\"block\",\"reason\":\"The goal guard could not be located from this working directory, so it did NOT run and NOTHING has been verified. This is not the goal being met. cd to the repository root, and fix the hook command in .claude/settings.json.\"}'; fi",
+            "timeout": 60,
+            "statusMessage": "Checking the armed goal..."
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; until [ -f \"$d/scripts/goal_guard.py\" ] || [ \"$d\" = / ]; do d=$(dirname \"$d\"); done; if [ -x \"$d/scripts/goal_guard_hook.sh\" ]; then exec bash \"$d/scripts/goal_guard_hook.sh\" --inject; elif [ -f \"$d/scripts/goal_guard.py\" ]; then exec python3 \"$d/scripts/goal_guard.py\" --inject; else true; fi",
+            "timeout": 15,
+            "statusMessage": "Restating the armed goal..."
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -B \"$CLAUDE_PROJECT_DIR/.llm_resource_tally/tool\" reconcile >/dev/null 2>&1; python3 -B \"$CLAUDE_PROJECT_DIR/.llm_resource_tally/tool\" rollup >/dev/null 2>&1; python3 -B \"$CLAUDE_PROJECT_DIR/.llm_resource_tally/tool\" publish >/dev/null 2>&1; true  # llm_resource_tally"
+          }
+        ]
+      }
+    ]
+  }
+}
