@@ -567,3 +567,29 @@ low ones fixed here.
    `proxy_failed`, with a test for four malformed lines.
 The reviewer also confirmed (and I keep documented) that the Rust
 translator requires the policy's query order while Python accepts any order.
+
+## 2026-10-23 13:37:47 -0400
+
+Maintainer task: bounded Anodized 0.7 pilot on `public_field_name` with the
+pinned Charon/Aeneas. Result: **no-go**, documented in
+`docs/assurance/anodized-pilot-2026-10-23.md`, reproducible with
+`dev/verification/anodized_pilot.py` (scratch copy only).
+
+- Charon understands `#[charon::contract]` and folds the contract into the
+  function; Aeneas then extracts `public_field_name` as a wrapper around
+  `anodized.__.eval_once`/`apply_keep` (and `eval`), all new
+  uninterpreted axioms. The result is unprovable and the contract never
+  becomes a Lean obligation.
+- The brief assumed the annotated body is untouched in Charon mode; it is
+  not: Anodized inserts two unused loop-spec closures per loop iteration.
+  Behaviour is unchanged (validator test identical with and without), but the
+  verified body would differ from the shipped one.
+- Kept: `GarrettPublicFieldNameContract` with the complete accepted-language
+  theorem over the unannotated extraction, a validator unit test, and the
+  pilot script. Reverted: the optional dependency, feature, crate attributes
+  and annotation (the lockfile is unchanged).
+- Toolchain reuse: I used the existing pinned binaries and `lake exe cache
+  get`; nothing reimplemented. I did not try hax or newer Charon, per the
+  brief.
+- I parked my in-progress proxy-parser refactor in `git stash` to keep this
+  commit focused; it resumes next.

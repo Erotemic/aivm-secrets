@@ -486,4 +486,30 @@ mod tests {
         assert_eq!(render(&Json::Opaque, &mut builder), Err(Failure::Invalid));
         assert_eq!(render(&Json::Array(vec![Json::Opaque]), &mut builder), Err(Failure::Invalid));
     }
+
+    /// The accepted language proved in proofs/GarrettPublicFieldNameContract.lean
+    /// (`public_field_name_spec`); dev/verification/anodized_pilot.py reruns
+    /// this test with the Anodized contract attribute to compare behaviour.
+    #[test]
+    fn public_field_name_accepts_exactly_the_documented_language() {
+        let accepted: [&[u8]; 6] = [b"a", b"title", b"head_ref_oid", b"aB9_", b"z0", b"abcdefghijklmnopqrstuvwxyz012345"];
+        let refused: [&[u8]; 10] = [
+            b"",                                  // empty
+            b"abcdefghijklmnopqrstuvwxyz0123456", // 33 bytes
+            b"Title",                             // uppercase first byte
+            b"_name",                             // underscore first byte
+            b"9name",                             // digit first byte
+            b"na-me",                             // '-' later
+            b"na.me",                             // '.' later
+            b"na me",                             // space later
+            b"nam\xc3\xa9",                       // non-ASCII later
+            b"name/",                             // '/' later
+        ];
+        for name in accepted {
+            assert!(public_field_name(&name.to_vec()), "{:?}", name);
+        }
+        for name in refused {
+            assert!(!public_field_name(&name.to_vec()), "{:?}", name);
+        }
+    }
 }

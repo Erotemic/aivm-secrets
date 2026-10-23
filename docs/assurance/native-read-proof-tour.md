@@ -568,6 +568,23 @@ operation lists.
 they say (revocation takes effect for later requests, the record is a
 durable audit append), and the capability check that precedes the call.
 
+## Host output field names, and the Anodized pilot (2026-10-23)
+
+`selected_conversion::public_field_name` checks every host-owned output field
+name the manifest parser accepts. [`GarrettPublicFieldNameContract`](../../proofs/GarrettPublicFieldNameContract.lean)
+proves, over the extracted function and its loop, that it **always returns and
+accepts exactly** names of 1–32 bytes with a lowercase first byte and only
+ASCII letters, digits and `_` (`public_field_name_spec`). The language is the
+eight-line predicate `PublicFieldName` in that file; check that it says what
+you want.
+
+We also tried stating the necessary half of this as an Anodized 0.7 `ensures`
+contract on the Rust function. With the pinned Charon/Aeneas the contract
+turns the extracted function into a wrapper over three new uninterpreted
+axioms, so nothing about it could be proved, and the contract never becomes a
+Lean statement. It was not adopted; details and a reproduction script are in
+[the pilot record](anodized-pilot-2026-10-23.md).
+
 ## OUT-4 first increment: the exact-write gate (2026-10-23)
 
 Writes and reads run through the same extracted production controller,
