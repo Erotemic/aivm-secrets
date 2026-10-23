@@ -45,6 +45,9 @@ callbacks) and the rest of the native crate perform no *other* write of
 credential bytes. That is a reachability property of native code, checked by
 the W3/W6 source guards and their mutation tests, not by Lean.
 
+For review, the [claim-to-evidence matrix](claim-evidence-matrix.md) lists each
+property with its theorems, premises, witnesses and exclusions.
+
 Every remaining premise, library contract and deployment assumption is
 enumerated with its class and removal path in the
 [assumption removal roadmap](../planning/aivm-secrets-assumption-roadmap.md).
