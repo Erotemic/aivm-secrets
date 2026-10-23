@@ -2,6 +2,9 @@
 
 **Maintainer guide — initial state, 2026-10-21.** This document explains what is proved, what is conditional, and how to inspect the result. It is **not** a whole-service verification certificate. The overnight formalization agent must update it only when the linked theorem and source evidence actually change. The [overnight campaign](../planning/aivm-secrets-overnight-formalization.md), [W0 security contract](../planning/aivm-secrets-conditional-confinement.md), [native read roadmap](../planning/aivm-secrets-native-read-assurance-roadmap.md), and [assumptions](../planning/aivm-secrets-assumptions.json) control scope.
 
+
+**Latest handoff:** [2026-10-23, HTTPS proxy profiles and native narrowing](handoff-2026-10-23.md) indexes the newest theorems and assumption changes.
+
 ## What you are trying to trust
 
 A guest is malicious and may send arbitrary framed requests, select allowed arguments adaptively and retry after errors. A trusted host owns provider tokens, configured operations and result projections. The intended **read-only** contract has two halves:
