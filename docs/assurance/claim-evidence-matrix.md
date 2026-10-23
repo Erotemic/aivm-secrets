@@ -46,9 +46,9 @@ still needs, the runtime witnesses, and what remains excluded.
 
 | | |
 | --- | --- |
-| Claim | Endpoint, request bytes, audit records, status classification, response gate and guest frames are produced by extracted Rust; the remaining native steps are named contracts. |
-| Theorems | [GarrettProviderWire](../../proofs/GarrettProviderWire.lean), [GarrettHttpWire](../../proofs/GarrettHttpWire.lean), [GarrettHttpAuth](../../proofs/GarrettHttpAuth.lean), [GarrettLineFrame](../../proofs/GarrettLineFrame.lean), [GarrettProductionResponseGate](../../proofs/GarrettProductionResponseGate.lean), [GarrettChannelWork](../../proofs/GarrettChannelWork.lean) |
-| Premises | `RUST-HTTPS-01`, `RUST-MTLS-01`, `RUST-JSON-01`, `RUST-AUDIT-01`, `NATIVE-GLUE-01` |
+| Claim | Endpoint, the request target, request bytes, audit records, status classification, response gate and guest frames are produced by extracted Rust; the remaining native steps are named contracts. The guest's other verbs, `describe` and `renounce`, are decided by extracted code and never reach a provider. |
+| Theorems | [GarrettProviderWire](../../proofs/GarrettProviderWire.lean), [GarrettHttpWire](../../proofs/GarrettHttpWire.lean), [GarrettHttpAuth](../../proofs/GarrettHttpAuth.lean), [GarrettLineFrame](../../proofs/GarrettLineFrame.lean), [GarrettProductionResponseGate](../../proofs/GarrettProductionResponseGate.lean), [GarrettChannelWork](../../proofs/GarrettChannelWork.lean); `fill_target_exact`, `fill_target_safe`, `parse_template_some`, `scalar_text_integer` ([GarrettRoute](../../proofs/GarrettRoute.lean)); `control_paths`, `manifest_description_exact` ([GarrettControl](../../proofs/GarrettControl.lean)) |
+| Premises | `RUST-HTTPS-01`, `RUST-MTLS-01`, `RUST-JSON-01`, `RUST-AUDIT-01`, `NATIVE-GLUE-01`, `ROUTE-NATIVE-01` (JSON layer of templates and arguments), `CONTROL-NATIVE-01` (revoke, audit append and grant callbacks) |
 | Witnesses | `tests/test_rust_http_auth.py`, `tests/test_rust_http_request.py`, `tests/test_rust_http_response.py`, `tests/test_rust_line_framing.py`, NR-2/3 and NR-4 edge guards |
 | Excluded | DNS (address is pinned by policy), TLS and OS correctness, power-loss durability |
 
