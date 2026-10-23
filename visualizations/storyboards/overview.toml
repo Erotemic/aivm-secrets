@@ -188,9 +188,20 @@ class = "ProofProxyScene"
 plan = "aivis.plans.proof_proxy"
 status = "source-linked-controller"
 claim = "In the optional credential-substitution proxy, the extracted encoder drops every credential-bearing guest field and writes the secret exactly once, as the verified authentication line between a request-only prefix and suffix; refusals write nothing. The encoder re-checks method, target and every field itself, so no guest CR or LF reaches the upstream bytes whatever the parser does; the profile still grants the credential's full authority at the origin."
-narration = "A guest tool sends any request through the proxy with a placeholder credential. The strict parser accepts a narrow subset or refuses. The extracted encoder drops fourteen field names, including Authorization, X-API-Key and Cookie, keeps the rest in order, and writes the secret once, as one verified line. A deny-listed request or a bad credential writes nothing. This is not confinement: the guest can still do whatever the credential can do at that origin."
+narration = "A guest tool sends any request through the proxy with a placeholder credential. The strict parser accepts a narrow subset or refuses. The extracted encoder drops nineteen field names, including Authorization, X-API-Key, Cookie and the method overrides, keeps the rest in order, and writes the secret once, as one verified line. A deny-listed request or a bad credential writes nothing. This is not confinement: the guest can still do whatever the credential can do at that origin."
 sources = ["proofs/GarrettProxyHttp.lean", "proofs/GarrettProxyResponse.lean", "rust/crates/aivm-secrets-garrett-core/src/proxy_http.rs", "docs/planning/aivm-secrets-http-proxy-profiles.md"]
 proof_anchors = ["aivm_secrets_garrett_core.proxy_http.Proofs.encode_upstream_contract", "aivm_secrets_garrett_core.proxy_http.Proofs.forwarded_drops", "aivm_secrets_garrett_core.proxy_http.Proofs.dropped_eq", "aivm_secrets_garrett_core.proxy_http.Proofs.clean_field_single_line", "aivm_secrets_garrett_core.proxy_http.Proofs.guest_response_contract", "aivm_secrets_garrett_core.proxy_http.Proofs.reflection_forms_include_raw"]
+
+[[scene]]
+id = "proof_constrained"
+file = "aivis/scenes/proof_constrained.py"
+class = "ProofConstrainedScene"
+plan = "aivis.plans.proof_constrained"
+status = "source-linked-controller"
+claim = "In the optional constrained-http profile run inside the guest, the translator holds no credential and accepts a request target only if the host's extracted route encoder writes the same target back from the arguments it read; the host bridge then authorizes the named operation on its own policy, so a wrong or tampered route copy can only ask for a different operation."
+narration = "A stock tool in the guest sends an ordinary HTTPS request with a placeholder. The translator, also in the guest and holding no credential, reads arguments off the target and keeps them only if the host's own encoder writes the same target back. It then asks the host bridge for that named operation, like any guest tool. The host authorizes it on its own policy and sends a target whose every byte is the proved encoder's output. A tampered route copy can only ask for another operation, which the host refuses."
+sources = ["proofs/GarrettRouteMatch.lean", "proofs/GarrettRoute.lean", "rust/crates/aivm-secrets-garrett-core/src/route_match.rs", "rust/crates/aivm-secrets-garrett-core/src/route.rs", "tests/test_proxy_guest_translator.py"]
+proof_anchors = ["aivm_secrets_garrett_core.route_match.Proofs.translate_round_trip", "aivm_secrets_garrett_core.route_match.Proofs.translate_exact", "aivm_secrets_garrett_core.route.Proofs.fill_target_exact", "aivm_secrets_garrett_core.route.Proofs.fill_target_safe"]
 
 [[scene]]
 id = "proof_write_gate"

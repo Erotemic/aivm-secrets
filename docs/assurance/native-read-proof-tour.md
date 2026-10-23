@@ -542,6 +542,7 @@ go through the guest's native `invoke` to the host bridge, which authorizes
 the named operation on its **own** policy. So a guest whose route copy
 differs from the host's can only ask for a different named operation, never
 widen authority (`tests/test_proxy_guest_translator.py` tampers the copy).
+The visualization scene `proof_constrained` walks through these steps.
 
 ## The other guest verbs: `describe` and `renounce` (2026-10-23)
 
