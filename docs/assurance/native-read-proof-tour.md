@@ -442,6 +442,7 @@ calls the extracted `proxy_controller::serve` and supplies three callbacks:
 | `serve_upstream` | A request not refused before egress went through `exchange` once, after `current` and `admitted`, and the bytes sent are `UpstreamPrefix ++ HeaderPrefix ++ secret ++ CRLF ++ UpstreamSuffix`, with a valid credential, visible target and clean guest fields. A refused request never reached `admitted` or `exchange`. |
 | `serve_guest_reply` | The reply is the fixed refusal for its code, or a completed request's `guest_response` output, in which no case-sensitive credential form occurs. |
 | `release_reply` | The response half: parsing failures and reflections become fixed refusals with stage `Failed`. |
+| `frame_paths` | Before `serve`, the extracted `frame` decides what to do with buffered tunnel bytes: past `raw_limit` it refuses `too_large` without parsing; otherwise a request reaches `serve` only if the strict parser accepted it, and more bytes are read only if the parser asked for them. |
 
 Both byte statements carry a size premise: the canonical encoding (or the
 checked response) fits in a `usize`. It is a memory bound, not a security

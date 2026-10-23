@@ -22,7 +22,7 @@
 use aivm_secrets_garrett::files;
 use aivm_secrets_garrett_core::credential_use::Authentication;
 use aivm_secrets_garrett_core::proxy_connect::{self as connect, Admission};
-use aivm_secrets_garrett_core::proxy_controller::{self as controller, Stage, Upstream};
+use aivm_secrets_garrett_core::proxy_controller::{self as controller, Framed, Stage, Upstream};
 use aivm_secrets_garrett_core::proxy_http as core;
 use base64::Engine;
 use rcgen::{
@@ -408,17 +408,6 @@ fn refusal(code: &str) -> Vec<u8> {
     core::refusal(&code)
 }
 
-fn refusal_code(refusal: &core::Refusal) -> &'static str {
-    match refusal {
-        core::Refusal::InvalidRequest => "invalid_request",
-        core::Refusal::TooLarge => "too_large",
-        core::Refusal::Denied => "denied",
-        core::Refusal::InvalidCredential => "credential_source",
-        core::Refusal::UpstreamResponse => "outcome_unknown",
-        core::Refusal::Reflected => "reflected",
-    }
-}
-
 fn code_name(code: &core::Code) -> &'static str {
     match code {
         core::Code::InvalidRequest => "invalid_request",
@@ -631,34 +620,27 @@ fn tunnel(session: &Session, mut stream: TcpStream) -> io::Result<()> {
     let mut tls = StreamOwned::new(connection, stream);
     let mut buffer = Vec::new();
     let mut chunk = [0u8; 65536];
-    // Raw bytes allowed for one request: the body limit with room for chunk
-    // framing, plus the head. This also bounds re-parsing an incomplete body.
-    let raw_limit = 2 * session.request_limit + core::MAX_HEAD + 65536;
     let mut started = Instant::now();
     loop {
-        if buffer.len() > raw_limit {
-            session.record("refused", json!({"code": "too_large", "origin": origin.host}));
-            tls.write_all(&refusal("too_large"))?;
-            break;
-        }
         if !buffer.is_empty() && started.elapsed() > REQUEST_DEADLINE {
             break;
         }
-        match core::parse_request(&buffer, origin.host.as_bytes(), session.request_limit) {
-            Err(refused) => {
-                let code = refusal_code(&refused);
-                session.record("refused", json!({"code": code, "origin": origin.host}));
-                tls.write_all(&refusal(code))?;
+        // The framing decision (raw bound, strict parse) is the extracted
+        // `proxy_controller::frame`; this loop only reads and writes.
+        match controller::frame(&buffer, origin.host.as_bytes(), session.request_limit) {
+            Framed::Refuse(code) => {
+                session.record("refused", json!({"code": code_name(&code), "origin": origin.host}));
+                tls.write_all(&core::refusal(&code))?;
                 break;
             }
-            Ok(None) => {
+            Framed::More => {
                 let n = tls.read(&mut chunk)?;
                 if n == 0 {
                     break;
                 }
                 buffer.extend_from_slice(&chunk[..n]);
             }
-            Ok(Some(parsed)) => {
+            Framed::Request(parsed) => {
                 buffer.drain(..parsed.used);
                 started = Instant::now();
                 let (reply, keep) = serve_one(session, origin, &parsed.request);

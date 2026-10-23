@@ -238,4 +238,45 @@ theorem serve_guest_reply (inst : Upstream U) (io : U) (request : proxy_http.Req
         · exact absurd rfl wrong
       · exact Or.inl refused
 
+/-! ## Framing the guest's bytes -/
+
+/-- **A request is framed only by the strict parser within the raw bound.**
+    `frame` hands a request to `serve` only if the buffered bytes are within
+    `raw_limit` and the extracted `parse_request` accepted them; it asks for
+    more bytes only in the same two conditions; past the bound it refuses
+    with `too_large` without parsing. -/
+theorem frame_paths {buffer host : Slice U8} {limit : Usize} {out : Framed}
+    (h : frame buffer host limit = Result.ok out) :
+    ∃ bound, raw_limit limit = Result.ok bound ∧
+      ((buffer.length > bound.val ∧ out = .Refuse .TooLarge) ∨
+       (buffer.length ≤ bound.val ∧ ∃ parsed, proxy_http.parse_request buffer host limit = Result.ok parsed ∧
+         match parsed with
+         | .Ok none => out = .More
+         | .Ok (some request) => out = .Request request
+         | .Err refused => code_of refused = Result.ok (match out with
+             | .Refuse code => code
+             | _ => .InvalidRequest) ∧ ∃ code, out = .Refuse code)) := by
+  unfold frame at h
+  obtain ⟨bound, hbound, h⟩ := bind_ok_inv h
+  refine ⟨bound, hbound, ?_⟩
+  split at h
+  · rename_i over
+    simp only [Result.ok.injEq] at h
+    exact Or.inl ⟨by scalar_tac, h.symm⟩
+  · rename_i within
+    right
+    refine ⟨by scalar_tac, ?_⟩
+    obtain ⟨parsed, hparsed, h⟩ := bind_ok_inv h
+    refine ⟨parsed, hparsed, ?_⟩
+    cases parsed with
+    | Ok o =>
+      cases o with
+      | none => simp only [Result.ok.injEq] at h; exact h.symm
+      | some request => simp only [Result.ok.injEq] at h; exact h.symm
+    | Err refused =>
+      obtain ⟨code, coded, h⟩ := bind_ok_inv h
+      simp only [Result.ok.injEq] at h
+      subst h
+      exact ⟨coded, code, rfl⟩
+
 end aivm_secrets_garrett_core.proxy_controller.Proofs

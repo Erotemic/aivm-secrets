@@ -5,8 +5,8 @@
 
 use crate::credential_use::Authentication;
 use crate::proxy_http::{
-    encode_upstream, guest_response, parse_response, refusal, Code, DenyRule, Form, Refusal,
-    Request,
+    encode_upstream, guest_response, parse_request, parse_response, refusal, Code, DenyRule, Form,
+    Parsed, Refusal, Request, MAX_HEAD,
 };
 
 /// What the native shell provides for one guest request.
@@ -40,6 +40,36 @@ pub struct Served {
     pub code: Code,
     /// The provider status of a completed request (0 otherwise).
     pub status: u16,
+}
+
+/// What to do with the bytes a guest has sent on a tunnel so far.
+pub enum Framed {
+    /// Read more bytes.
+    More,
+    /// Refuse with this fixed response and close the tunnel.
+    Refuse(Code),
+    /// One complete request, and how many buffered bytes it used.
+    Request(Parsed),
+}
+
+/// The raw bytes one request may occupy before it is complete: the body
+/// limit with room for chunk framing, plus the head. This also bounds how
+/// often an incomplete body is re-parsed.
+pub fn raw_limit(request_limit: usize) -> usize {
+    2 * request_limit + MAX_HEAD + 65536
+}
+
+/// The next step for `buffer`: refuse if it is past `raw_limit`, otherwise
+/// what the strict parser says.
+pub fn frame(buffer: &[u8], host: &[u8], request_limit: usize) -> Framed {
+    if buffer.len() > raw_limit(request_limit) {
+        return Framed::Refuse(Code::TooLarge);
+    }
+    match parse_request(buffer, host, request_limit) {
+        Err(refused) => Framed::Refuse(code_of(&refused)),
+        Ok(None) => Framed::More,
+        Ok(Some(parsed)) => Framed::Request(parsed),
+    }
 }
 
 pub fn code_of(refused: &Refusal) -> Code {

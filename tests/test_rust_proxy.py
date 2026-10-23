@@ -245,7 +245,7 @@ def test_native_proxy_writes_only_core_outputs():
               / 'rust/crates/aivm-secrets-garrett/src/proxy_main.rs').read_text()
     writes = re.findall(r'(\w+)\.write_all\(([^)]*\)?)\)', source)
     allowed = {('tls', 'wire'), ('tls', '&reply'), ('tls', '&refusal(code)'),
-               ('tls', '&refusal("too_large")'),
+               ('tls', '&core::refusal(&code)'),
                ('stream', '&core::refusal(&code)'),
                ('stream', '&core::refusal(&core::Code::InvalidRequest)'),
                ('stream', 'b"HTTP/1.1 200 Connection established\\r\\n\\r\\n"')}

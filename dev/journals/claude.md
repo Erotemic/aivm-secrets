@@ -488,3 +488,13 @@ abstractly, and `as usize` would truncate on a 32-bit target. I stated it
 rather than hide it; it holds on the 64-bit native build. Oracle test against
 Rust formatting includes `i64::MIN` (absolute value computed without
 overflow).
+
+## 2026-10-23 11:11:21 -0400
+
+`garrett-proxy`'s framing decision (raw bound, then the strict parser) is
+now the extracted `proxy_controller::frame`, with `frame_paths` proved. With
+`serve` and `admit`, every decision in the proxy's request path is in the
+extracted core; what remains native in PROXY-NATIVE-01 is socket/TLS I/O,
+deadlines and the session clock. The strict parser itself is still tested,
+not proved; the encoder re-checks everything it writes, so framing safety
+does not depend on it.
