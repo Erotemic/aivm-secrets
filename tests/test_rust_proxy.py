@@ -234,7 +234,8 @@ def test_native_proxy_writes_only_core_outputs():
     passes to ``Upstream::exchange`` (proved to be ``encode_upstream``'s
     output). Guest: fixed refusals, the fixed CONNECT answer, or the
     ``reply`` returned by ``serve`` (proved: a fixed refusal or
-    ``guest_response`` output). Audit and announcement
+    ``guest_response`` output), passed to ``Guest::send`` only by the
+    extracted ``proxy_controller::step`` (``step_paths``). Audit and announcement
     are JSON written by this file; neither contains the credential (checked
     at runtime above).
     """
@@ -244,7 +245,7 @@ def test_native_proxy_writes_only_core_outputs():
     source = (Path(__file__).resolve().parents[1]
               / 'rust/crates/aivm-secrets-garrett/src/proxy_main.rs').read_text()
     writes = re.findall(r'(\w+)\.write_all\(([^)]*\)?)\)', source)
-    allowed = {('tls', 'wire'), ('tls', '&reply'), ('tls', '&refusal(code)'),
+    allowed = {('tls', 'wire'), ('tls', '&reply'), ('tls', 'bytes'), ('tls', '&refusal(code)'),
                ('tls', '&core::refusal(&code)'),
                # The guest-side translator writes invoke arguments to its own client.
                ('input', 'body'),
@@ -256,6 +257,10 @@ def test_native_proxy_writes_only_core_outputs():
             target == 'stream' and argument.startswith('&refusal("')), (target, argument)
     # Every request decision is the extracted controller's (PROXY-NATIVE-01).
     assert source.count('controller::serve(') == 1
+    # The tunnel loop is the extracted one; `send` writes only its argument.
+    assert source.count('controller::tunnel(&mut guest,') == 1
+    assert source.count('self.tls.write_all(bytes)') == 1
+    assert 'controller::frame(' not in source and 'buffer.drain(' not in source
     assert 'core::encode_upstream(' not in source and 'core::guest_response(' not in source
     assert source.count('exchange(self.session, self.origin, wire)') == 1
     assert re.findall(r'fn exchange\(&mut self, wire: &\[u8\]\)', source)

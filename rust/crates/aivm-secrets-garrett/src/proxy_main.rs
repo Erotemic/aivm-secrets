@@ -22,7 +22,7 @@
 use aivm_secrets_garrett::files;
 use aivm_secrets_garrett_core::credential_use::Authentication;
 use aivm_secrets_garrett_core::proxy_connect::{self as connect, Admission};
-use aivm_secrets_garrett_core::proxy_controller::{self as controller, Framed, Stage, Upstream};
+use aivm_secrets_garrett_core::proxy_controller::{self as controller, Stage, Upstream};
 use aivm_secrets_garrett_core::proxy_http as core;
 use base64::Engine;
 use rcgen::{
@@ -638,6 +638,37 @@ fn invoke_bridge(client: &[String], operation: &str, body: &[u8]) -> Option<Valu
     serde_json::from_slice::<Value>(&data).ok()
 }
 
+struct GuestTunnel<'a> {
+    session: &'a Session,
+    origin: &'a Origin,
+    tls: StreamOwned<ServerConnection, TcpStream>,
+    started: Instant,
+    chunk: Vec<u8>,
+}
+
+impl controller::Guest for GuestTunnel<'_> {
+    fn overdue(&mut self) -> bool {
+        self.started.elapsed() > REQUEST_DEADLINE
+    }
+    fn read(&mut self) -> Option<Vec<u8>> {
+        match self.tls.read(&mut self.chunk) {
+            Ok(n) => Some(self.chunk[..n].to_vec()),
+            Err(_) => None,
+        }
+    }
+    fn send(&mut self, bytes: &[u8]) -> bool {
+        self.tls.write_all(bytes).and_then(|()| self.tls.flush()).is_ok()
+    }
+    fn refused(&mut self, code: &core::Code) {
+        self.session.record("refused", json!({"code": code_name(code), "origin": self.origin.host}));
+    }
+    fn serve(&mut self, request: &core::Request) -> controller::Answer {
+        let (reply, keep) = serve_one(self.session, self.origin, request);
+        self.started = Instant::now();
+        controller::Answer { reply, keep }
+    }
+}
+
 fn tunnel(session: &Session, mut stream: TcpStream) -> io::Result<()> {
     stream.set_read_timeout(Some(IO_TIMEOUT))?;
     stream.set_write_timeout(Some(IO_TIMEOUT))?;
@@ -661,41 +692,19 @@ fn tunnel(session: &Session, mut stream: TcpStream) -> io::Result<()> {
     };
     stream.write_all(b"HTTP/1.1 200 Connection established\r\n\r\n")?;
     let connection = ServerConnection::new(origin.guest.clone()).map_err(|_| io::Error::from(io::ErrorKind::InvalidData))?;
-    let mut tls = StreamOwned::new(connection, stream);
-    let mut buffer = Vec::new();
-    let mut chunk = [0u8; 65536];
-    let mut started = Instant::now();
-    loop {
-        if !buffer.is_empty() && started.elapsed() > REQUEST_DEADLINE {
-            break;
-        }
-        // The framing decision (raw bound, strict parse) is the extracted
-        // `proxy_controller::frame`; this loop only reads and writes.
-        match controller::frame(&buffer, origin.host.as_bytes(), session.request_limit) {
-            Framed::Refuse(code) => {
-                session.record("refused", json!({"code": code_name(&code), "origin": origin.host}));
-                tls.write_all(&core::refusal(&code))?;
-                break;
-            }
-            Framed::More => {
-                let n = tls.read(&mut chunk)?;
-                if n == 0 {
-                    break;
-                }
-                buffer.extend_from_slice(&chunk[..n]);
-            }
-            Framed::Request(parsed) => {
-                buffer.drain(..parsed.used);
-                started = Instant::now();
-                let (reply, keep) = serve_one(session, origin, &parsed.request);
-                tls.write_all(&reply)?;
-                tls.flush()?;
-                if !keep {
-                    break;
-                }
-            }
-        }
-    }
+    let tls = StreamOwned::new(connection, stream);
+    // Each step (deadline, raw bound, strict parse, refusal, serve, keep-alive)
+    // is the extracted `proxy_controller::step`; `GuestTunnel` only reads, writes,
+    // keeps the clock and audits.
+    let mut guest = GuestTunnel {
+        session,
+        origin,
+        tls,
+        started: Instant::now(),
+        chunk: vec![0u8; 65536],
+    };
+    controller::tunnel(&mut guest, origin.host.as_bytes(), session.request_limit);
+    let mut tls = guest.tls;
     tls.conn.send_close_notify();
     let _ = tls.flush();
     let _ = tls.sock.shutdown(Shutdown::Write);

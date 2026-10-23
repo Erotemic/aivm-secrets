@@ -624,3 +624,20 @@ Lean: pair-let after `consume` reduced with `WP.spec_bind (Pₘ := (· = pair))`
 then `change`. Still assumed: the one native line passing `admit`'s decision
 to `run_approved`, digest computation, lock. Confidence: high on proofs;
 medium that the 16-slot/TTL behaviour is what the maintainer wants (unchanged).
+
+## 2026-10-23 15:36:42 -0400
+
+OUT-6 "framing loop into the core" done: `proxy_controller::step/tunnel` behind a
+`Guest` trait (overdue/read/send/refused/serve); `garrett-proxy` keeps only
+`GuestTunnel` callbacks and close_notify. `GarrettProxyTunnel.lean`:
+`step_paths` (four cases, exact callback arguments), `step_request_fits`
+(parse_request_bounds through frame_paths; carries the 64-bit-size premises),
+loop equations. Oracle `extracted_tunnel_matches_the_native_loop` replays 400
+scripted tunnels (random chunking, truncation, refusals, send failures,
+deadlines) against the old loop: identical effect logs. Behaviour deltas,
+deliberate and small: the request deadline restarts after `serve` returns,
+not before (old code counted serve time against the next request); read/write
+errors now end the tunnel and still send close_notify. Aeneas: `Vec::is_empty`
+is an unmodelled axiom, so `len() == 0` with a clippy allow. Lean: pair
+bindings from trait calls are inverted only by unification
+(`bind_ok_inv`, new `ite_ok_inv`, `ok_pair_inv`); `simp` cannot reduce them.
