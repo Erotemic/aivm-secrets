@@ -5,7 +5,8 @@
 
 use crate::credential_use::Authentication;
 use crate::proxy_http::{
-    encode_upstream, guest_response, parse_response, refusal, Code, DenyRule, Form, Refusal, Request,
+    encode_upstream, guest_response, parse_response, refusal, Code, DenyRule, Form, Refusal,
+    Request,
 };
 
 /// What the native shell provides for one guest request.
@@ -54,7 +55,13 @@ pub fn code_of(refused: &Refusal) -> Code {
 
 pub fn stopped(code: Code, stage: Stage) -> Served {
     let reply = refusal(&code);
-    Served { reply, keep: false, stage, code, status: 0 }
+    Served {
+        reply,
+        keep: false,
+        stage,
+        code,
+        status: 0,
+    }
 }
 
 pub fn is_head(method: &[u8]) -> bool {
@@ -150,19 +157,41 @@ mod tests {
     }
 
     fn mock(current: bool, answer: fn() -> Result<Vec<u8>, Code>) -> Mock {
-        Mock { current, calls: Vec::new(), sent: Vec::new(), answer }
+        Mock {
+            current,
+            calls: Vec::new(),
+            sent: Vec::new(),
+            answer,
+        }
     }
 
     fn run(io: &mut Mock, request: &Request, rules: &[DenyRule]) -> Served {
         let forms = reflection_forms(SECRET);
-        serve(io, request, HOST, rules, SECRET, &Authentication::Bearer, &forms, 4096)
+        serve(
+            io,
+            request,
+            HOST,
+            rules,
+            SECRET,
+            &Authentication::Bearer,
+            &forms,
+            4096,
+        )
     }
 
     /// Oracle: the composition `garrett-proxy` used before the controller
     /// was extracted (encode, exchange, parse, release).
     fn old_composition(request: &Request, answer: &[u8]) -> (Vec<u8>, Vec<u8>) {
         let mut wire = Vec::new();
-        assert!(encode_upstream(&mut wire, request, HOST, &[], SECRET, &Authentication::Bearer).is_ok());
+        assert!(encode_upstream(
+            &mut wire,
+            request,
+            HOST,
+            &[],
+            SECRET,
+            &Authentication::Bearer
+        )
+        .is_ok());
         let head = request.method == b"HEAD";
         let response = parse_response(answer, head, 4096).ok().expect("parsed");
         let mut out = Vec::new();
@@ -174,7 +203,10 @@ mod tests {
     #[test]
     fn a_completed_request_matches_the_old_composition_byte_for_byte() {
         fn ok() -> Result<Vec<u8>, Code> {
-            Ok(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}".to_vec())
+            Ok(
+                b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}"
+                    .to_vec(),
+            )
         }
         let answer = ok().ok().expect("answer");
         for raw in [
@@ -204,7 +236,10 @@ mod tests {
         assert_eq!(served.reply, refusal(&Code::Revoked));
         assert!(matches!(served.stage, Stage::Refused) && !served.keep);
 
-        let rules = [DenyRule { method: Vec::new(), path: b"/v1/admin/".to_vec() }];
+        let rules = [DenyRule {
+            method: Vec::new(),
+            path: b"/v1/admin/".to_vec(),
+        }];
         let mut io = mock(true, || Ok(Vec::new()));
         let served = run(&mut io, &get, &rules);
         assert_eq!(io.calls, ["current"]);
@@ -218,8 +253,14 @@ mod tests {
         let cases: [(fn() -> Result<Vec<u8>, Code>, Code); 4] = [
             (|| Err(Code::Unreachable), Code::Unreachable),
             (|| Ok(b"garbage".to_vec()), Code::OutcomeUnknown),
-            (|| Ok(b"HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nSECRET-value".to_vec()), Code::Reflected),
-            (|| Ok(b"HTTP/1.1 200 OK\r\nContent-Length: 9000\r\n\r\n".to_vec()), Code::TooLarge),
+            (
+                || Ok(b"HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nSECRET-value".to_vec()),
+                Code::Reflected,
+            ),
+            (
+                || Ok(b"HTTP/1.1 200 OK\r\nContent-Length: 9000\r\n\r\n".to_vec()),
+                Code::TooLarge,
+            ),
         ];
         for (answer, code) in cases {
             let mut io = mock(true, answer);

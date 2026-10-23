@@ -355,3 +355,27 @@ credential file in that mode (one authority source, no fallback).
   connects by IP. Lesson: use anchored, single replacements in test edits.
 - Confidence: high on the authority argument; medium on stock-tool
   compatibility (disclosure-only bodies) which is unchanged from HP-2.
+
+## 2026-10-23 08:37:10 -0400
+
+Named-operation targets are now written by the extracted
+`route::fill_target`; the native manifest only parses templates and turns
+arguments into text. `GarrettRoute` proves the exact bytes
+(`fill_target_exact`) and the byte classes (`fill_target_safe`) in
+inversion style, so no size premise appears. New ledger row
+ROUTE-NATIVE-01 for what stays native.
+
+- Why this before a native HP-6 matcher: a matcher round trip is only
+  meaningful against the function the host really uses. This also narrows
+  host-side native code that every read and write goes through.
+- Semantics: one deliberate difference from the replaced code. A referenced
+  argument that is not a scalar now gives Denied instead of InvalidRequest.
+  It is unreachable because `Operation::request` already requires scalar
+  parameters; the oracle test asserts both refuse in that case and are
+  byte-identical otherwise (>500 combinations).
+- Tooling: installed rustfmt/clippy components for the pinned nightly. The
+  tree has substantial pre-existing rustfmt drift; I formatted only files I
+  created, to avoid churning pinned hashes in an unrelated commit.
+- Pitfall noted: building bins without `--all-features` overwrites the
+  conformance runner with a featureless build and makes retry-key tests fail
+  spuriously.

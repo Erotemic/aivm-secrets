@@ -28,6 +28,12 @@ PLAN = Diagram(
         Link('deliver', 'writer', 'provider', 'TLS records', ((X[2]+1.31, 1.63), (X[3]-1.31, 1.63)), 'assumed', label_xy=(3.5, 2.3)),
     ),
     beats=(
+        Beat('target', 'The route target is written by route::fill_target: exact bytes, unreserved values.',
+             nodes=('route', 'channel', 'writer', 'provider'), focus=('route',), status='implemented',
+             knowledge=_k(('/repos/{owner}/...', 'fill_target_exact', 'fill_target_safe'),
+                          ('—',),
+                          ('—',),
+                          ('no # % space CR LF', 'one ? at most'))),
         Beat('setup', 'Setup encodes the request for the captured route before connecting.',
              nodes=('route', 'channel', 'writer', 'provider'), links=('encode',), packet='encode',
              packet_label='request_body(route)', status='implemented',

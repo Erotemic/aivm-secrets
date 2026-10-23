@@ -468,6 +468,36 @@ mutant that forwarded `Cookie` fails it.
 - **The profile grants the credential's full authority at the origin**
   (`PROXY-AUTHORITY-01`). None of this is authority confinement.
 
+## The provider request target (2026-10-23)
+
+Every named operation's provider target, `/repos/octo/demo/pulls/7?page=2`,
+used to be assembled by native string formatting in `manifest.rs`. It is now
+written by the extracted `route::fill_target`
+([`GarrettRoute`](../../proofs/GarrettRoute.lean)). The native manifest still
+parses the policy's templates and turns each JSON argument into text
+(integers in decimal); `route` writes every byte.
+
+| Theorem | Says |
+| --- | --- |
+| `fill_target_exact` | A returned target is exactly `PathBytes ++ QueryBytes`: `/value` for each path part, then `?name=value` and `&name=value` for each query entry. A value is the literal, or the **first** argument with the parameter's name. Every part had a value, the path is 2–1024 bytes and the target at most 8192. |
+| `fill_target_safe` | Every target byte is unreserved (`A-Z a-z 0-9 - . _ ~`) or one of `/ ? = &`. Path values hold only unreserved bytes and `/`; query names and values only unreserved bytes. So the only `?` is the query separator, and no `#`, `%`, space, CR or LF can reach the request line. |
+| `segment_ok_contract`, `segments_ok_contract` | The checks behind both: a segment is non-empty, at most 128 bytes, not `.` or `..`, and unreserved. |
+
+The statements are about what a *returned* target is, so they need no size
+premise. A Rust oracle test (`manifest::route_oracle`) checks that the
+extracted function gives the same target or refusal as the native code it
+replaced, over more than 500 template, query and argument combinations
+(including `..`, `a/b`, `x?y`, `%2e`, non-ASCII and over-long values).
+
+**Still trusted** (`ROUTE-NATIVE-01`): parsing the policy into templates, and
+converting JSON arguments to text. Both are checked by the manifest parity
+tests against the Python reference, not proved.
+
+**Why it matters for the proxy.** HP-6's guest-side translator asks for
+named operations; the host then builds the target with this function. A
+future native translator can prove its round trip against the same
+`fill_target` the host uses.
+
 ## OUT-4 first increment: the exact-write gate (2026-10-23)
 
 Writes and reads run through the same extracted production controller,

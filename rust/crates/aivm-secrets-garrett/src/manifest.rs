@@ -2,6 +2,7 @@
 //! response disclosure; requests contain only operation names and scalar values.
 use crate::{files, json, Error, Outcome};
 use aivm_secrets_garrett_core::manifest as core;
+use aivm_secrets_garrett_core::route;
 use serde_json::{json, Map, Value};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -191,6 +192,8 @@ impl Part {
             _ => None,
         }
     }
+    /// The native fill `route::fill_target` replaced; kept for the oracle test.
+    #[cfg(test)]
     fn fill(&self, args: &BTreeMap<String, Value>) -> Outcome<String> {
         match self {
             Self::Literal(v) => Ok(v.clone()),
@@ -872,21 +875,7 @@ impl Operation {
         } else {
             None
         };
-        let path = fill_path(&self.path, args)?;
-        let mut query = Vec::new();
-        for (n, p) in &self.query {
-            let v = p.fill(args)?;
-            segment(&v).map_err(|_| Error::Denied)?;
-            query.push(format!("{n}={v}"));
-        }
-        let target = if query.is_empty() {
-            path
-        } else {
-            format!("{path}?{}", query.join("&"))
-        };
-        if target.len() > 8192 {
-            return Err(Error::Denied);
-        }
+        let target = route_target(&self.path, &self.query, args)?;
         Ok(Effect {
             method: self.method.clone(),
             target,
@@ -897,20 +886,46 @@ impl Operation {
         })
     }
 }
-fn fill_path(parts: &[Part], args: &BTreeMap<String, Value>) -> Outcome<String> {
-    let mut values = Vec::new();
-    for p in parts {
-        let v = p.fill(args)?;
-        for piece in v.split('/') {
-            segment(piece).map_err(|_| Error::Denied)?;
-        }
-        values.push(v);
-    }
-    let path = format!("/{}", values.join("/"));
-    if !(2..=1024).contains(&path.len()) {
-        return Err(Error::Denied);
-    }
-    Ok(path)
+/// The template parts as the extracted `route` module takes them.
+fn route_pieces(parts: &[Part]) -> Vec<route::Piece> {
+    parts
+        .iter()
+        .map(|part| match part {
+            Part::Literal(text) => route::Piece::Literal(text.as_bytes().to_vec()),
+            Part::Parameter(n) => route::Piece::Parameter(n.as_bytes().to_vec()),
+        })
+        .collect()
+}
+/// Every scalar argument as text (integers in decimal); `route` looks up the
+/// ones its templates reference. Parameters are already scalars after
+/// `Operation::request`, so nothing referenced is dropped here.
+fn route_bindings(args: &BTreeMap<String, Value>) -> Vec<route::Binding> {
+    args.iter()
+        .filter_map(|(n, v)| {
+            scalar_string(v).ok().map(|text| route::Binding {
+                name: n.as_bytes().to_vec(),
+                value: text.into_bytes(),
+            })
+        })
+        .collect()
+}
+/// The provider target, written by the extracted `route::fill_target`
+/// (proofs/GarrettRoute.lean: exact bytes, unreserved values only).
+fn route_target(
+    path: &[Part],
+    query: &BTreeMap<String, Part>,
+    args: &BTreeMap<String, Value>,
+) -> Outcome<String> {
+    let query: Vec<route::QueryPiece> = query
+        .iter()
+        .map(|(n, part)| route::QueryPiece {
+            name: n.as_bytes().to_vec(),
+            piece: route_pieces(std::slice::from_ref(part)).remove(0),
+        })
+        .collect();
+    let bytes = route::fill_target(&route_pieces(path), &query, &route_bindings(args))
+        .map_err(|_| Error::Denied)?;
+    String::from_utf8(bytes).map_err(|_| Error::Denied)
 }
 #[derive(Clone)]
 pub struct Effect {
@@ -1149,7 +1164,7 @@ impl Policy {
                 let c = &self.checks[n];
                 Ok(Effect {
                     method: "GET".into(),
-                    target: fill_path(&c.path, args)?,
+                    target: route_target(&c.path, &BTreeMap::new(), args)?,
                     accept: c.accept.clone(),
                     response: "json".into(),
                     body: None,
@@ -1221,4 +1236,104 @@ pub fn evaluate(v: &Value) -> Outcome<Value> {
     }
     let result = policy.inspect(&m["request"], m.get("facts").unwrap_or(&Value::Null))?;
     Ok(json!({"ok":true,"result":result}))
+}
+
+#[cfg(test)]
+mod route_oracle {
+    //! Byte-equality oracle: the extracted `route::fill_target` against the
+    //! native target construction it replaced.
+    use super::*;
+
+    fn legacy_fill_path(parts: &[Part], args: &BTreeMap<String, Value>) -> Outcome<String> {
+        let mut values = Vec::new();
+        for p in parts {
+            let v = p.fill(args)?;
+            for piece in v.split('/') {
+                segment(piece).map_err(|_| Error::Denied)?;
+            }
+            values.push(v);
+        }
+        let path = format!("/{}", values.join("/"));
+        if !(2..=1024).contains(&path.len()) {
+            return Err(Error::Denied);
+        }
+        Ok(path)
+    }
+
+    fn legacy_target(
+        path: &[Part],
+        query: &BTreeMap<String, Part>,
+        args: &BTreeMap<String, Value>,
+    ) -> Outcome<String> {
+        let path = legacy_fill_path(path, args)?;
+        let mut parts = Vec::new();
+        for (n, p) in query {
+            let v = p.fill(args)?;
+            segment(&v).map_err(|_| Error::Denied)?;
+            parts.push(format!("{n}={v}"));
+        }
+        let target = if parts.is_empty() { path } else { format!("{path}?{}", parts.join("&")) };
+        if target.len() > 8192 {
+            return Err(Error::Denied);
+        }
+        Ok(target)
+    }
+
+    fn outcome(result: Outcome<String>) -> Result<String, String> {
+        result.map_err(|error| format!("{error:?}"))
+    }
+
+    #[test]
+    fn extracted_targets_match_the_native_construction() {
+        let templates = [
+            "/repos/{owner}/{repo}/pulls/{number}",
+            "/v1/{path}",
+            "/a/b",
+            "/{x}/{x}",
+            "/items/{id}",
+        ];
+        let queries: [&[(&str, &str)]; 4] = [
+            &[],
+            &[("page", "{page}")],
+            &[("page", "{page}"), ("state", "open")],
+            &[("q", "{owner}")],
+        ];
+        let values: Vec<Value> = vec![
+            json!("octo"), json!("a/b"), json!("a//b"), json!(".."), json!("."), json!("x y"),
+            json!("x?y"), json!("%2e"), json!(""), json!(7), json!(-3), json!("é"),
+            json!("~tilde_ok-1.2"), json!("a".repeat(129)), json!("a".repeat(128)),
+            json!(["list"]), json!(true),
+        ];
+        let mut checked = 0;
+        for template in templates {
+            let parts = template.strip_prefix('/').unwrap().split('/')
+                .map(|piece| Part::parse(piece).expect("template")).collect::<Vec<_>>();
+            for query in queries {
+                let query: BTreeMap<String, Part> = query.iter()
+                    .map(|(n, v)| (n.to_string(), Part::parse(v).expect("query"))).collect();
+                for value in &values {
+                    for other in [&json!("r"), value] {
+                        let mut args = BTreeMap::new();
+                        for name in ["owner", "repo", "path", "x", "id", "page"] {
+                            args.insert(name.to_string(), value.clone());
+                        }
+                        args.insert("number".to_string(), other.clone());
+                        let old = outcome(legacy_target(&parts, &query, &args));
+                        let new = outcome(route_target(&parts, &query, &args));
+                        let referenced_non_scalar = matches!(value, Value::Array(_) | Value::Bool(_))
+                            || matches!(other, Value::Array(_) | Value::Bool(_));
+                        if referenced_non_scalar && old != new {
+                            // Unreachable after `Operation::request` (parameters
+                            // are scalars); both refuse, with different codes.
+                            assert!(old.is_err() && new.is_err(), "{template} {value}");
+                        } else {
+                            assert_eq!(old, new, "{template} {:?} {value} {other}", query.keys().collect::<Vec<_>>());
+                        }
+                        checked += 1;
+                    }
+                }
+            }
+        }
+        assert!(checked > 500);
+    }
 }
