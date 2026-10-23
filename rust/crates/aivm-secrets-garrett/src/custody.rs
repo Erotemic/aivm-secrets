@@ -1451,6 +1451,29 @@ mod control_oracle {
     }
 
     #[test]
+    fn extracted_dispatch_records_match_the_serde_records() {
+        use aivm_secrets_garrett_core::session_audit::dispatch_record;
+        let identity = json!({"sub":"vm-1","nested":{"list":[1,-2,"x\u{7f}"],"t":true,"n":null},"é":"😀"});
+        for (text, port) in [("api.example.org", 443i64), ("quote\"\\", 8443), ("", 1)] {
+            for phase in ["preflight", "final"] {
+                let old = crate::json::canonical(&json!({
+                    "schema":1, "event":"dispatch", "phase":phase, "grant":text, "policy":"p",
+                    "identity":identity, "operation":"pull.view", "request_digest":text,
+                    "route":{"host":text, "port":port, "method":"GET", "path":"/repos/o/r?a=b&c=%20"}
+                }));
+                let new = bytes(&dispatch_record(
+                    wire_text(phase), wire_text(text), wire_text("p"),
+                    crate::json::capture(&identity).into_wire(), wire_text("pull.view"), wire_text(text),
+                    wire_text(text),
+                    aivm_secrets_garrett_core::json_wire::Value::Number(port.to_string().into_bytes()),
+                    wire_text("GET"), wire_text("/repos/o/r?a=b&c=%20"),
+                ));
+                assert_eq!(new, old);
+            }
+        }
+    }
+
+    #[test]
     fn extracted_revocation_records_match_the_serde_records() {
         let texts = ["g-1", "", "quote\"back\\slash", "line\nbreak\u{1}", "é😀", "sha256:00ff"];
         for grant in texts {

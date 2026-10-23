@@ -113,4 +113,75 @@ theorem event_record_exact {event grant policy : json_wire.Value}
     one_vec rfl hone, op_ok, dig_ok⟩
   rw [push_ok_val hfields3, hdig, push_ok_val hfields1, hop]
 
+/-- `key` holds the text of `label`. -/
+def Key (key : alloc.vec.Vec U32) (label : List U8) : Prop := key.val = Units label
+
+/-- **The dispatch record's structure and only inputs.** Written before every
+    manifest provider send:
+    `{"event":"dispatch","grant":G,"identity":I,"operation":O,"phase":PH,
+    "policy":P,"request_digest":D,"route":{"host":H,"method":M,"path":T,
+    "port":N},"schema":1}`; the ten values the session passes are its only
+    inputs. -/
+theorem dispatch_record_exact {phase grant policy identity operation digest host port method path v : json_wire.Value}
+    (h : dispatch_record phase grant policy identity operation digest host port method path = Result.ok v) :
+    ∃ (top route : alloc.vec.Vec (alloc.vec.Vec U32 × json_wire.Value))
+      (kevent kgrant kidentity koperation kphase kpolicy kdigest kroute kschema
+        khost kmethod kpath kport : alloc.vec.Vec U32) (event : json_wire.Value) (one : alloc.vec.Vec U8),
+      v = .Object top ∧
+      top.val = [(kevent, event), (kgrant, grant), (kidentity, identity), (koperation, operation),
+        (kphase, phase), (kpolicy, policy), (kdigest, digest), (kroute, .Object route),
+        (kschema, .Number one)] ∧
+      route.val = [(khost, host), (kmethod, method), (kpath, path), (kport, port)] ∧
+      control.Proofs.IsText event [100#u8, 105#u8, 115#u8, 112#u8, 97#u8, 116#u8, 99#u8, 104#u8] ∧
+      Key kevent [101#u8, 118#u8, 101#u8, 110#u8, 116#u8] ∧
+      Key kgrant [103#u8, 114#u8, 97#u8, 110#u8, 116#u8] ∧
+      Key kidentity [105#u8, 100#u8, 101#u8, 110#u8, 116#u8, 105#u8, 116#u8, 121#u8] ∧
+      Key koperation OperationKey ∧
+      Key kphase [112#u8, 104#u8, 97#u8, 115#u8, 101#u8] ∧
+      Key kpolicy [112#u8, 111#u8, 108#u8, 105#u8, 99#u8, 121#u8] ∧
+      Key kdigest DigestKey ∧
+      Key kroute [114#u8, 111#u8, 117#u8, 116#u8, 101#u8] ∧
+      Key kschema [115#u8, 99#u8, 104#u8, 101#u8, 109#u8, 97#u8] ∧
+      Key khost [104#u8, 111#u8, 115#u8, 116#u8] ∧
+      Key kmethod [109#u8, 101#u8, 116#u8, 104#u8, 111#u8, 100#u8] ∧
+      Key kpath [112#u8, 97#u8, 116#u8, 104#u8] ∧
+      Key kport [112#u8, 111#u8, 114#u8, 116#u8] ∧
+      one.val = [49#u8] := by
+  unfold dispatch_record at h
+  simp only [lift, Array.to_slice, Array.make, bind_ok] at h
+  obtain ⟨khost, h1, h⟩ := bind_ok_inv h
+  obtain ⟨kmethod, h2, h⟩ := bind_ok_inv h
+  obtain ⟨kpath, h3, h⟩ := bind_ok_inv h
+  obtain ⟨kport, h4, h⟩ := bind_ok_inv h
+  obtain ⟨kevent, h5, h⟩ := bind_ok_inv h
+  obtain ⟨event, h6, h⟩ := bind_ok_inv h
+  obtain ⟨kgrant, h7, h⟩ := bind_ok_inv h
+  obtain ⟨kidentity, h8, h⟩ := bind_ok_inv h
+  obtain ⟨koperation, h9, h⟩ := bind_ok_inv h
+  obtain ⟨kphase, h10, h⟩ := bind_ok_inv h
+  obtain ⟨kpolicy, h11, h⟩ := bind_ok_inv h
+  obtain ⟨kdigest, h12, h⟩ := bind_ok_inv h
+  obtain ⟨kroute, h13, h⟩ := bind_ok_inv h
+  obtain ⟨kschema, h14, h⟩ := bind_ok_inv h
+  obtain ⟨one, h15, h⟩ := bind_ok_inv h
+  simp only [Result.ok.injEq] at h
+  subst h
+  obtain ⟨eu, he, heu⟩ := control.Proofs.text_ok h6
+  refine ⟨_, _, kevent, kgrant, kidentity, koperation, kphase, kpolicy, kdigest, kroute, kschema,
+    khost, kmethod, kpath, kport, event, one, rfl, rfl, rfl, ⟨eu, he, by simpa using heu⟩,
+    ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, one_vec rfl h15⟩
+  · simpa [Key] using text_units_ok h5
+  · simpa [Key] using text_units_ok h7
+  · simpa [Key] using text_units_ok h8
+  · simpa [Key, OperationKey] using text_units_ok h9
+  · simpa [Key] using text_units_ok h10
+  · simpa [Key] using text_units_ok h11
+  · simpa [Key, DigestKey] using text_units_ok h12
+  · simpa [Key] using text_units_ok h13
+  · simpa [Key] using text_units_ok h14
+  · simpa [Key] using text_units_ok h1
+  · simpa [Key] using text_units_ok h2
+  · simpa [Key] using text_units_ok h3
+  · simpa [Key] using text_units_ok h4
+
 end aivm_secrets_garrett_core.session_audit.Proofs

@@ -688,3 +688,14 @@ the extracted encoding via `Audit::append_value` -> `append_bytes` ->
 `append_durable_record`. `GarrettSessionAudit.event_record_exact`. Guards
 (W3, W6, NR-2/3 mutation tests) moved to the new source shape. Left native:
 the manifest dispatch record (nested identity claims + route); next candidate.
+
+## 2026-10-23 17:31:12 -0400
+
+Dispatch record into the core: `session_audit::dispatch_record` (+
+`dispatch_record_exact`), `Captured::into_wire` to hand captured identity
+claims to it, oracle with nested/escaped claims. W3, NR-2/3 edge and W3
+mutation tests moved to the new shape (the mutation that inserts a credential
+print before the dispatch audit still trips the guard). Manifest dispatch and
+completion records now have core-built content; still native: the manifest
+`session_open` (with profile), `issued`, and the account-profile dispatch
+record (custody.rs:750, 1013, 1079).

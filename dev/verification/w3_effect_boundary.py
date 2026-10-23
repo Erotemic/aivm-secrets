@@ -394,7 +394,7 @@ def review_semantics(contents: dict[str, str]) -> None:
     require('aivm_secrets_garrett_core::channel_work::ChannelWorkforManifestProvider' in ''.join(provider_work.split())
             and 'effects: EffectsCell' not in provider_work and 'send_state:' not in provider_work
             and same_order(provider_work, 'fn prepare(', 'claims_json(self.dispatch.claims)',
-                           'fn audit_route(', 'audit.write_record(')
+                           'fn audit_route(', 'audit.append_value(&aivm_secrets_garrett_core::session_audit::dispatch_record(')
             and 'const REFLECTED: Error = Error::UpstreamResponse;' in provider_work
             and same_order(part(channel_core, 'fn prepare(&mut self)', 'fn audit('),
                            'self.work.prepare()', 'self.work.target()',

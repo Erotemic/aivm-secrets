@@ -579,7 +579,8 @@ precedes the call.
 
 The account session's audit events (`session_open`, `completed`, `failed`,
 `revoked`) and the manifest session's completion record are now built by the
-extracted `session_audit::event_record`. They are encoded by the extracted JSON
+extracted `session_audit::event_record`, and the manifest dispatch record by
+`session_audit::dispatch_record`. They are encoded by the extracted JSON
 encoder, and the native audit appends exactly those bytes through the
 extracted `append_durable_record`
 ([`GarrettSessionAudit`](../../proofs/GarrettSessionAudit.lean)).
@@ -588,10 +589,12 @@ extracted `append_durable_record`
 | --- | --- |
 | `event_record_exact` | A record is `{"event":E,"grant":G,["operation":O,]"policy":P,["request_digest":D,]"schema":1}`, keys in byte order, and the five values the session passes are its only inputs. `OptionalField` says each optional field is absent or exactly one keyed pair. |
 
-An oracle test checks the encoded bytes against the serde records they
-replaced. **Still native:** the strings the sessions pass in, and the
-manifest dispatch record, which also carries the guest identity's claims
-and the provider route.
+| `dispatch_record_exact` | The manifest dispatch record, written and acknowledged before every provider send, is `{"event":"dispatch","grant":G,"identity":I,"operation":O,"phase":PH,"policy":P,"request_digest":D,"route":{"host":H,"method":M,"path":T,"port":N},"schema":1}`; the ten values the session passes are its only inputs. |
+
+Oracle tests check the encoded bytes against the serde records they replaced
+(including nested, escaped identity claims). **Still native:** the values the
+sessions pass in (the identity claims are captured from the session's claims
+JSON; the port is its decimal text).
 
 ## Host output field names, and the Anodized pilot (2026-10-23)
 

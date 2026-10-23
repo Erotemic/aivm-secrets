@@ -247,7 +247,7 @@ def mutate(repo, filename, before, after):
     ('rust/crates/aivm-secrets-garrett-core/src/request_adapter.rs', 'self.work.operation_write(),', 'true,'),
     ('rust/crates/aivm-secrets-garrett-core/src/request_adapter.rs', '            phase,\n            self.work.operation_write(),', '            read_transition::Phase::Final,\n            self.work.operation_write(),'),
     (RUST + 'custody/manifest_session.rs',
-     'audit.write_record(&json!({', 'let _ = audit; // bypass\n        unchecked_record(&json!({'),
+     'audit.append_value(&aivm_secrets_garrett_core::session_audit::dispatch_record(', 'let _ = audit; // bypass\n        unchecked_record(&aivm_secrets_garrett_core::session_audit::dispatch_record('),
     ('rust/crates/aivm-secrets-garrett-core/src/dispatch.rs', 'read_transition::acknowledge(prepared, true)', 'unchecked_acknowledge(prepared, true)'),
     ('rust/crates/aivm-secrets-garrett-core/src/dispatch.rs', 'audited: &read_transition::Audited', 'audited: &Effect'),
     (RUST + 'custody/manifest_session.rs',
@@ -293,8 +293,8 @@ def mutate(repo, filename, before, after):
     ('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs', 'aivm_secrets_garrett_core::selected_release::select(&mut selection)', 'Ok(raw_wire(&raw)) // unsafe raw release'),
     (
         RUST + 'custody/manifest_session.rs',
-        '        audit.write_record(&json!({',
-        '        println!("{:?}", &secret.0);\n        audit.write_record(&json!({',
+        '        audit.append_value(&aivm_secrets_garrett_core::session_audit::dispatch_record(',
+        '        println!("{:?}", &secret.0);\n        audit.append_value(&aivm_secrets_garrett_core::session_audit::dispatch_record(',
     ),
     (
         RUST + 'tls.rs',

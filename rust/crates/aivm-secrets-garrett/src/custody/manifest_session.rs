@@ -757,23 +757,23 @@ impl aivm_secrets_garrett_core::channel_work::ChannelWork for ManifestProvider<'
         parser.parse(released)
     }
     fn audit_route(&mut self, route: &core::Route, phase: DispatchPhase) -> Outcome<()> {
+        // The record's shape is the extracted `session_audit::dispatch_record`.
         let audit = &self.executor.audit;
-        audit.write_record(&json!({
-            "schema":1,
-            "event":"dispatch",
-            "phase":phase.as_str(),
-            "grant":audit.grant,
-            "policy":audit.policy,
-            "identity":self.dispatch.identity.as_ref().ok_or(Error::InternalError)?,
-            "operation":self.dispatch.operation,
-            "request_digest":self.dispatch.request_digest,
-            "route":{
-                "host":std::str::from_utf8(&route.host).map_err(|_| Error::InvalidPolicy)?,
-                "port":route.port,
-                "method":self.effect.method,
-                "path":self.effect.target,
-            }
-        }))
+        let identity = self.dispatch.identity.as_ref().ok_or(Error::InternalError)?;
+        let host = std::str::from_utf8(&route.host).map_err(|_| Error::InvalidPolicy)?;
+        audit.append_value(&aivm_secrets_garrett_core::session_audit::dispatch_record(
+            super::wire_text(phase.as_str()),
+            super::wire_text(&audit.grant),
+            super::wire_text(&audit.policy),
+            crate::json::capture(identity).into_wire(),
+            super::wire_text(self.dispatch.operation),
+            super::wire_text(self.dispatch.request_digest),
+            super::wire_text(host),
+            // Exactly `json::capture` of an integer.
+            aivm_secrets_garrett_core::json_wire::Value::Number(route.port.to_string().into_bytes()),
+            super::wire_text(&self.effect.method),
+            super::wire_text(&self.effect.target),
+        ))
     }
     fn request_fields(&mut self) -> Outcome<aivm_secrets_garrett_core::channel_work::RequestParts> {
         Ok(aivm_secrets_garrett_core::channel_work::RequestParts {

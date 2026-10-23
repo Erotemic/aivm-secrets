@@ -162,6 +162,10 @@ impl Captured {
     pub(crate) fn wire(&self) -> &aivm_secrets_garrett_core::json_wire::Value {
         &self.0
     }
+    /// The captured value itself, for building an extracted record.
+    pub(crate) fn into_wire(mut self) -> aivm_secrets_garrett_core::json_wire::Value {
+        std::mem::replace(&mut self.0, aivm_secrets_garrett_core::json_wire::Value::Null)
+    }
 }
 pub fn canonical(value: &Value) -> Vec<u8> {
     aivm_secrets_garrett_core::json_wire::encode(&capture(value).0)
