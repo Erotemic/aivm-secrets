@@ -211,7 +211,7 @@ def review_semantics(contents: dict[str, str]) -> None:
     completed = part(m, "struct PendingCompletion<'a, S>", 'struct PendingRequest<')
     core_completion = part(core_callbacks, '    fn complete(&mut self, raw:', '    fn outcome_unknown(')
     require('impl<O, S: FnMut() -> Outcome<O>>' in completed
-            and same_order(completed, 'fn recheck(', '(self.fresh)()', 'fn audit(', 'self.audit.write_record(')
+            and same_order(completed, 'fn recheck(', '(self.fresh)()', 'fn audit(', 'self.audit.append_value(&aivm_secrets_garrett_core::session_audit::event_record(')
             and same_order(core_completion, 'self.work.complete(raw)',
                            'completion::complete(pending, self.effects)',
                            'self.effects = report.effects;', 'report.outcome'),

@@ -128,7 +128,7 @@ def test_w6_completion_audit_is_required_before_native_public_success(tmp_path):
         check(checkout)
     controller.write_text(core_original)
     path.write_text(original.replace(
-        '        self.audit.write_record(&json!({\n            "schema":1,\n            "event":"completed",',
-        '        unchecked_record(&json!({\n            "schema":1,\n            "event":"completed",', 1))
+        'self.audit.append_value(&aivm_secrets_garrett_core::session_audit::event_record(',
+        'unchecked_record(&aivm_secrets_garrett_core::session_audit::event_record(', 1))
     with pytest.raises(ContractError, match='completion audit'):
         check(checkout)

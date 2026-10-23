@@ -245,7 +245,19 @@ impl Audit {
         })
     }
     fn record(&self, event: &str) -> Outcome<()> {
-        self.write_record(&json!({"schema":1,"event":event,"operation":"profile.read","grant":self.grant,"policy":self.policy}))
+        self.append_value(&aivm_secrets_garrett_core::session_audit::event_record(
+            wire_text(event),
+            wire_text(&self.grant),
+            wire_text(&self.policy),
+            Some(wire_text("profile.read")),
+            None,
+        ))
+    }
+    /// Append an extracted record value, encoded by the extracted encoder.
+    fn append_value(&self, record: &aivm_secrets_garrett_core::json_wire::Value) -> Outcome<()> {
+        let bytes = aivm_secrets_garrett_core::json_wire::encode(record)
+            .map_err(|_| Error::InternalError)?;
+        self.append_bytes(&bytes)
     }
     fn write_record(&self, value: &Value) -> Outcome<()> {
         self.append_bytes(&json::canonical(value))
@@ -1414,6 +1426,28 @@ mod control_oracle {
 
     fn native(value: &Value) -> Vec<u8> {
         bytes(crate::json::capture(value).wire())
+    }
+
+    #[test]
+    fn extracted_session_event_records_match_the_serde_records() {
+        use aivm_secrets_garrett_core::session_audit::event_record;
+        let texts = ["g-1", "", "quote\"back\\slash", "line\nbreak\u{1}", "é😀", "sha256:00ff"];
+        for a in texts {
+            for b in texts {
+                for event in ["session_open", "completed", "failed", "revoked"] {
+                    // The account session's `Audit::record(event)`.
+                    assert_eq!(
+                        bytes(&event_record(wire_text(event), wire_text(a), wire_text(b), Some(wire_text("profile.read")), None)),
+                        crate::json::canonical(&json!({"schema":1,"event":event,"operation":"profile.read","grant":a,"policy":b}))
+                    );
+                }
+                // The manifest session's completion record.
+                assert_eq!(
+                    bytes(&event_record(wire_text("completed"), wire_text(a), wire_text(b), Some(wire_text(b)), Some(wire_text(a)))),
+                    crate::json::canonical(&json!({"schema":1,"event":"completed","operation":b,"grant":a,"policy":b,"request_digest":a}))
+                );
+            }
+        }
     }
 
     #[test]

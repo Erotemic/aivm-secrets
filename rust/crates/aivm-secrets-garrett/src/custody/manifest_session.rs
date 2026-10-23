@@ -33,14 +33,14 @@ impl<O, S: FnMut() -> Outcome<O>> aivm_secrets_garrett_core::completion::Work
         (self.fresh)()
     }
     fn audit(&mut self) -> Outcome<()> {
-        self.audit.write_record(&json!({
-            "schema":1,
-            "event":"completed",
-            "operation":self.operation,
-            "grant":self.audit.grant,
-            "policy":self.audit.policy,
-            "request_digest":self.request_digest,
-        }))
+        // The record's shape is the extracted `session_audit::event_record`.
+        self.audit.append_value(&aivm_secrets_garrett_core::session_audit::event_record(
+            super::wire_text("completed"),
+            super::wire_text(&self.audit.grant),
+            super::wire_text(&self.audit.policy),
+            Some(super::wire_text(self.operation)),
+            Some(super::wire_text(self.request_digest)),
+        ))
     }
 }
 struct PendingRequest<P, D, F, C, R> {

@@ -678,3 +678,13 @@ canary-name search of share mount points (depth 4, 20 s; timeout = incomplete,
 not absence). Chose bounds after exhausting virtiofsd fds earlier today with an
 unbounded find. Not run on a VM; the maintainer run decides whether depth 4
 is meaningful for their shares.
+
+## 2026-10-23 17:03:06 -0400
+
+Audit-record link (Track A "connect the audit callback to the receipt"),
+second step: `session_audit::event_record` now builds the account profile's
+four event records and the manifest completion record; native appends exactly
+the extracted encoding via `Audit::append_value` -> `append_bytes` ->
+`append_durable_record`. `GarrettSessionAudit.event_record_exact`. Guards
+(W3, W6, NR-2/3 mutation tests) moved to the new source shape. Left native:
+the manifest dispatch record (nested identity claims + route); next candidate.

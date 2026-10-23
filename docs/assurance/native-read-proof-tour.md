@@ -575,6 +575,24 @@ the grant flag), that `record` is the session audit's `append_bytes` (one
 native line into the extracted durable append), and the capability check that
 precedes the call.
 
+## Session audit records (2026-10-23)
+
+The account session's audit events (`session_open`, `completed`, `failed`,
+`revoked`) and the manifest session's completion record are now built by the
+extracted `session_audit::event_record`. They are encoded by the extracted JSON
+encoder, and the native audit appends exactly those bytes through the
+extracted `append_durable_record`
+([`GarrettSessionAudit`](../../proofs/GarrettSessionAudit.lean)).
+
+| Theorem | Says |
+| --- | --- |
+| `event_record_exact` | A record is `{"event":E,"grant":G,["operation":O,]"policy":P,["request_digest":D,]"schema":1}`, keys in byte order, and the five values the session passes are its only inputs. `OptionalField` says each optional field is absent or exactly one keyed pair. |
+
+An oracle test checks the encoded bytes against the serde records they
+replaced. **Still native:** the strings the sessions pass in, and the
+manifest dispatch record, which also carries the guest identity's claims
+and the provider route.
+
 ## Host output field names, and the Anodized pilot (2026-10-23)
 
 `selected_conversion::public_field_name` checks every host-owned output field

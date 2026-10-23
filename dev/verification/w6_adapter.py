@@ -198,7 +198,7 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
                     'crate::reflection::contains(&bytes, secret)')),
            'raw provider body may be returned without extracted selection/reflection checks')
     completed = source.split("struct PendingCompletion<'a, S>", 1)[1].split('struct PendingRequest<', 1)[0]
-    ensure('self.audit.write_record(' in completed and '(self.fresh)()' in completed
+    ensure('self.audit.append_value(&aivm_secrets_garrett_core::session_audit::event_record(' in completed and '(self.fresh)()' in completed
            and 'completion::complete(pending, self.effects)' in request_core
            and 'let pending = self.work.complete(raw);' in request_core
            and 'fresh:&fresh,' in release[1]
