@@ -164,4 +164,8 @@ Every HTTPS request from a tool that honours `HTTPS_PROXY` goes through the
 proxy, and the proxy refuses origins the policy does not list. The proxy is
 never an open relay, so such tools cannot reach unlisted HTTPS hosts while
 the env file is sourced. Tools that ignore `HTTPS_PROXY` are not mediated
-(`PROXY-EGRESS-01`).
+(`PROXY-EGRESS-01`). To close direct egress, set AIVM's
+`firewall.public_egress = false`. Every new guest-initiated forwarded
+connection is then dropped, while the proxy keeps working because it rides
+the host-initiated SSH session. This is unit-tested in AIVM; a real-VM check
+is a maintainer action.

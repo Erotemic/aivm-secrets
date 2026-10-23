@@ -254,3 +254,15 @@ than a model of native code, so `production_frame_noninterference` and
 `Captured::wire`. Four guards and their mutation tests were re-anchored to
 the new shape, plus a released-reply byte-equality oracle. Existing oracles
 already cover all 17 denial frames.
+
+## 2026-10-23 05:53:51 -0400
+
+HP-7 in AIVM (local commit `32b475d`, unpushed): `firewall.public_egress =
+false`. The key observation is that the proxy's guest port is carried by the
+host-initiated SSH session, so dropping *new* guest-initiated forwarded
+connections leaves the proxy working and removes direct egress. It is
+minimal: one config field and one final rule, and the default fingerprint is
+unchanged, so no repair is triggered. The full AIVM suite passes in a clean
+worktree (3625; only the known 1-second timing test excluded). Risk: not
+exercised on real nftables or a VM. A wrong rule order would either break
+SSH or fail open; a unit test checks the order.
