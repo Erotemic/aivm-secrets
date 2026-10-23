@@ -163,6 +163,7 @@ class AuthorityProviderCase(ProviderCase):
             ),
             provider=provider,
         )
+        config.update(getattr(self, "extra_config", {}))
         path = private(p / "bridge.json", config)
         self.process = subprocess.Popen(
             [self.bridge, "--config", str(path)],
@@ -638,3 +639,20 @@ def test_normal_authority_tpm_challenge_enrollment_and_provider_action():
                     )
                     authority.call("revoke", subject="vm-test")
                     assert not case.invoke(key_configuration=config)["ok"]
+
+
+def test_the_native_profile_never_also_selects_the_legacy_broker_socket(tmp_path):
+    """RUST-LEGACY-01: a provider-backed bridge cannot also forward to the
+    legacy Python broker socket; the configuration is refused before the
+    bridge announces or listens."""
+    from tests.secrets_helpers import TLSService
+
+    (tmp_path / "provider").mkdir()
+    with TLSService(tmp_path / "provider") as provider:
+        case = AuthorityProviderCase(tmp_path, provider, AuthorityCase(tmp_path))
+        case.extra_config = {"broker_socket": str(tmp_path / "broker.sock")}
+        with pytest.raises(AssertionError):
+            case.__enter__()
+        assert case.process.wait(timeout=10) != 0
+        assert not (tmp_path / "identity.sock").exists()
+        assert provider.requests == []
