@@ -90,7 +90,9 @@ pub fn valid_method(method: &[u8]) -> bool {
 /// `true` when `value[start..]` begins with the escape `%` `a` `b`, compared
 /// without regard to the case of the two hex digits.
 pub fn escape_at(value: &[u8], start: usize, a: u8, b: u8) -> bool {
-    start + 3 <= value.len()
+    // Written without `start + 3` so it cannot overflow.
+    start <= value.len()
+        && value.len() - start >= 3
         && value[start] == b'%'
         && http_wire::ascii_lower(value[start + 1]) == a
         && http_wire::ascii_lower(value[start + 2]) == b
@@ -130,10 +132,13 @@ pub fn segment_ok(path: &[u8], start: usize, end: usize, last: bool) -> bool {
     if length == 0 {
         return last;
     }
-    if length == 1 && path[start] == b'.' {
-        return false;
+    if length == 1 {
+        return path[start] != b'.';
     }
-    !(length == 2 && path[start] == b'.' && path[start + 1] == b'.')
+    if length == 2 {
+        return !(path[start] == b'.' && path[start + 1] == b'.');
+    }
+    true
 }
 
 /// No empty segment (except a trailing slash) and no dot segment.
@@ -232,7 +237,8 @@ pub fn blank(byte: u8) -> bool {
 pub fn all_token(line: &[u8], end: usize) -> bool {
     let mut index = 0;
     while index < end {
-        if !token_byte(line[index]) {
+        // Every token byte is visible; checking both keeps the proof local.
+        if !visible(line[index]) || !token_byte(line[index]) {
             return false;
         }
         index += 1;
@@ -306,9 +312,10 @@ pub fn parse_fields(head: &[u8], start: usize) -> Option<Vec<Field>> {
     Some(fields)
 }
 
+/// ASCII-case-insensitive, so the filter does not depend on the parser
+/// having lowercased names.
 pub fn name_is(field: &Field, name: &[u8]) -> bool {
-    let bytes: &[u8] = &field.name;
-    bytes == name
+    http_wire::ascii_equal(&field.name, name)
 }
 
 pub fn count_named(fields: &[Field], name: &[u8]) -> usize {
@@ -697,6 +704,24 @@ pub fn denied(rules: &[DenyRule], method: &[u8], path: &[u8]) -> bool {
     false
 }
 
+/// A field that is one header line: a non-empty token name and a value of
+/// visible ASCII, SP and HTAB (so no CR, LF or NUL).
+#[allow(clippy::len_zero)]
+pub fn clean_field(field: &Field) -> bool {
+    field.name.len() != 0
+        && all_token(&field.name, field.name.len())
+        && all_value(&field.value, 0, field.value.len())
+}
+
+pub fn clean_fields(fields: &[Field]) -> bool {
+    for field in fields {
+        if !clean_field(field) {
+            return false;
+        }
+    }
+    true
+}
+
 pub fn append_fields(output: &mut Vec<u8>, fields: &[Field]) {
     for field in fields {
         output.extend_from_slice(&field.name);
@@ -727,6 +752,15 @@ pub fn encode_upstream(
     secret: &[u8],
     authentication: &Authentication,
 ) -> Result<(), Refusal> {
+    // Re-validate everything the parser should already have ensured, so the
+    // framing of the upstream request does not depend on the parser.
+    if !valid_method(&request.method) || !check_target(&request.target) {
+        return Err(Refusal::InvalidRequest);
+    }
+    let fields = forwarded(&request.fields);
+    if !clean_fields(&fields) {
+        return Err(Refusal::InvalidRequest);
+    }
     let end = path_end(&request.target);
     if denied(rules, &request.method, &request.target[..end]) {
         return Err(Refusal::Denied);
@@ -740,7 +774,7 @@ pub fn encode_upstream(
     output.extend_from_slice(b" HTTP/1.1\r\nHost: ");
     output.extend_from_slice(host);
     output.extend_from_slice(b"\r\n");
-    append_fields(output, &forwarded(&request.fields));
+    append_fields(output, &fields);
     match http_auth::append_header(output, secret, authentication) {
         Ok(()) => (),
         Err(_) => return Err(Refusal::InvalidCredential),

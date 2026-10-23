@@ -162,3 +162,21 @@ the credential goes.
 Next: prove the parser's value/target admission (PROXY-PARSE-01, P1), then
 the response reflection check in Rust. Confidence: high on the encoder
 theorem; the parser is tested, not proved.
+
+## 2026-10-23 02:41:56 -0400
+
+HP-5(b) by design rather than by parser proof. Instead of proving the large
+parser admits only CR/LF-free fields, the extracted encoder now re-validates
+method, a visible-ASCII target and every forwarded field (`clean_fields`)
+before writing, and drops credential names ignoring ASCII case (via the
+already proved `http_wire::ascii_equal`). `encode_upstream_contract` now
+also concludes target visibility and that every forwarded field is clean;
+`clean_field_single_line` shows none has CR or LF. Framing no longer depends
+on the parser. PROXY-PARSE-01 drops to a specification entry (provider
+routing semantics; deny list is best effort).
+
+Rust tweaks for provability, with byte parity kept: `escape_at` written
+without `start + 3` (an overflow the model would expose), `segment_ok` as
+plain early returns, `all_token` also requiring `visible`. Proof lesson:
+when simp normalizes `decide (x ∈ list)` into an `||` chain, use `change`
+to restore membership form and peel the if-chain with a `map fold` lemma.

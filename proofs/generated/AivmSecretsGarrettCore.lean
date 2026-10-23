@@ -10213,34 +10213,38 @@ def proxy_http.valid_method (method : Slice Std.U8) : Result Bool := do
                 options
 
 /-- [aivm_secrets_garrett_core::proxy_http::escape_at]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 92:0-97:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 92:0-99:1
     Visibility: public -/
 def proxy_http.escape_at
   (value : Slice Std.U8) (start : Std.Usize) (a : Std.U8) (b : Std.U8) :
   Result Bool
   := do
-  let i ← start + 3#usize
-  let i1 := Slice.len value
-  if i <= i1
+  let i := Slice.len value
+  if start <= i
   then
-    let i2 ← Slice.index_usize value start
-    if i2 = 37#u8
+    let i1 := Slice.len value
+    let i2 ← i1 - start
+    if i2 >= 3#usize
     then
-      let i3 ← start + 1#usize
-      let i4 ← Slice.index_usize value i3
-      let i5 ← http_wire.ascii_lower i4
-      if i5 = a
+      let i3 ← Slice.index_usize value start
+      if i3 = 37#u8
       then
-        let i6 ← start + 2#usize
-        let i7 ← Slice.index_usize value i6
-        let i8 ← http_wire.ascii_lower i7
-        ok (i8 = b)
+        let i4 ← start + 1#usize
+        let i5 ← Slice.index_usize value i4
+        let i6 ← http_wire.ascii_lower i5
+        if i6 = a
+        then
+          let i7 ← start + 2#usize
+          let i8 ← Slice.index_usize value i7
+          let i9 ← http_wire.ascii_lower i8
+          ok (i9 = b)
+        else ok false
       else ok false
     else ok false
   else ok false
 
 /-- [aivm_secrets_garrett_core::proxy_http::forbidden_escape_at]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 99:0-104:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 101:0-106:1
     Visibility: public -/
 def proxy_http.forbidden_escape_at
   (value : Slice Std.U8) (start : Std.Usize) : Result Bool := do
@@ -10258,7 +10262,7 @@ def proxy_http.forbidden_escape_at
       else proxy_http.escape_at value start 48#u8 48#u8
 
 /-- [aivm_secrets_garrett_core::proxy_http::plain_target_bytes]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 109:4-117:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 111:4-119:1
     Visibility: public -/
 @[rust_loop]
 def proxy_http.plain_target_bytes_loop
@@ -10287,14 +10291,14 @@ def proxy_http.plain_target_bytes_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::plain_target_bytes]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 107:0-117:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 109:0-119:1
     Visibility: public -/
 @[reducible]
 def proxy_http.plain_target_bytes (target : Slice Std.U8) : Result Bool := do
   proxy_http.plain_target_bytes_loop target 0#usize
 
 /-- [aivm_secrets_garrett_core::proxy_http::path_end]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 121:4-123:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 123:4-125:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.path_end_loop
@@ -10311,14 +10315,14 @@ def proxy_http.path_end_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::path_end]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 119:0-125:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 121:0-127:1
     Visibility: public -/
 @[reducible]
 def proxy_http.path_end (target : Slice Std.U8) : Result Std.Usize := do
   proxy_http.path_end_loop target 0#usize
 
 /-- [aivm_secrets_garrett_core::proxy_http::segment_ok]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 128:0-137:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 130:0-142:1
     Visibility: public -/
 def proxy_http.segment_ok
   (path : Slice Std.U8) (start : Std.Usize) («end» : Std.Usize) (last : Bool)
@@ -10330,40 +10334,25 @@ def proxy_http.segment_ok
   then ok last
   else
     if length = 1#usize
-    then
-      let i ← Slice.index_usize path start
-      if i = 46#u8
-      then ok false
-      else
-        let b ←
-          if length = 2#usize
-          then
-            if i = 46#u8
-            then
-              do
-              let i1 ← start + 1#usize
-              let i2 ← Slice.index_usize path i1
-              ok (i2 = 46#u8)
-            else ok false
-          else ok false
-        ok (¬ b)
+    then let i ← Slice.index_usize path start
+         ok (i != 46#u8)
     else
-      let b ←
-        if length = 2#usize
-        then
-          do
-          let i ← Slice.index_usize path start
+      if length = 2#usize
+      then
+        let i ← Slice.index_usize path start
+        let b ←
           if i = 46#u8
           then
+            do
             let i1 ← start + 1#usize
             let i2 ← Slice.index_usize path i1
             ok (i2 = 46#u8)
           else ok false
-        else ok false
-      ok (¬ b)
+        ok (¬ b)
+      else ok true
 
 /-- [aivm_secrets_garrett_core::proxy_http::segments_ok]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 144:4-154:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 149:4-159:1
     Visibility: public -/
 @[rust_loop]
 def proxy_http.segments_ok_loop
@@ -10390,14 +10379,14 @@ def proxy_http.segments_ok_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::segments_ok]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 140:0-154:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 145:0-159:1
     Visibility: public -/
 @[reducible]
 def proxy_http.segments_ok (path : Slice Std.U8) : Result Bool := do
   proxy_http.segments_ok_loop path 1#usize 1#usize
 
 /-- [aivm_secrets_garrett_core::proxy_http::check_target]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 157:0-166:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 162:0-171:1
     Visibility: public -/
 def proxy_http.check_target (target : Slice Std.U8) : Result Bool := do
   let i := Slice.len target
@@ -10424,7 +10413,7 @@ def proxy_http.check_target (target : Slice Std.U8) : Result Bool := do
         else ok false
 
 /-- [aivm_secrets_garrett_core::proxy_http::head_end]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 171:4-182:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 176:4-187:1
     Visibility: public -/
 @[rust_loop]
 def proxy_http.head_end_loop
@@ -10457,14 +10446,14 @@ def proxy_http.head_end_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::head_end]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 169:0-182:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 174:0-187:1
     Visibility: public -/
 @[reducible]
 def proxy_http.head_end (data : Slice Std.U8) : Result (Option Std.Usize) := do
   proxy_http.head_end_loop data 0#usize
 
 /-- [aivm_secrets_garrett_core::proxy_http::clean_head]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 187:4-201:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 192:4-206:1
     Visibility: public -/
 @[rust_loop]
 def proxy_http.clean_head_loop
@@ -10518,14 +10507,14 @@ def proxy_http.clean_head_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::clean_head]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 185:0-201:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 190:0-206:1
     Visibility: public -/
 @[reducible]
 def proxy_http.clean_head (head : Slice Std.U8) : Result Bool := do
   proxy_http.clean_head_loop head 0#usize
 
 /-- [aivm_secrets_garrett_core::proxy_http::line_end]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 206:4-208:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 211:4-213:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.line_end_loop
@@ -10542,7 +10531,7 @@ def proxy_http.line_end_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::line_end]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 204:0-210:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 209:0-215:1
     Visibility: public -/
 @[reducible]
 def proxy_http.line_end
@@ -10550,7 +10539,7 @@ def proxy_http.line_end
   proxy_http.line_end_loop head start
 
 /-- [aivm_secrets_garrett_core::proxy_http::lowered]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 214:4-216:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 219:4-221:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.lowered_loop
@@ -10567,7 +10556,7 @@ def proxy_http.lowered_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::lowered]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 212:0-218:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 217:0-223:1
     Visibility: public -/
 def proxy_http.lowered
   (bytes : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
@@ -10577,7 +10566,7 @@ def proxy_http.lowered
   proxy_http.lowered_loop iter (alloc.vec.Vec.new Std.U8)
 
 /-- [aivm_secrets_garrett_core::proxy_http::colon_at]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 222:4-224:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 227:4-229:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.colon_at_loop
@@ -10594,14 +10583,14 @@ def proxy_http.colon_at_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::colon_at]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 220:0-226:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 225:0-231:1
     Visibility: public -/
 @[reducible]
 def proxy_http.colon_at (line : Slice Std.U8) : Result Std.Usize := do
   proxy_http.colon_at_loop line 0#usize
 
 /-- [aivm_secrets_garrett_core::proxy_http::blank]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 228:0-230:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 233:0-235:1
     Visibility: public -/
 def proxy_http.blank (byte : Std.U8) : Result Bool := do
   if byte = 32#u8
@@ -10609,7 +10598,7 @@ def proxy_http.blank (byte : Std.U8) : Result Bool := do
   else ok (byte = 9#u8)
 
 /-- [aivm_secrets_garrett_core::proxy_http::all_token]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 234:4-241:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 239:4-247:1
     Visibility: public -/
 @[rust_loop]
 def proxy_http.all_token_loop
@@ -10619,17 +10608,21 @@ def proxy_http.all_token_loop
   if index < «end»
   then
     let i ← Slice.index_usize line index
-    let b ← proxy_http.token_byte i
+    let b ← proxy_http.visible i
     if b
     then
-      let index1 ← index + 1#usize
-      proxy_http.all_token_loop line «end» index1
+      let b1 ← proxy_http.token_byte i
+      if b1
+      then
+        let index1 ← index + 1#usize
+        proxy_http.all_token_loop line «end» index1
+      else ok false
     else ok false
   else ok true
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::all_token]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 232:0-241:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 237:0-247:1
     Visibility: public -/
 @[reducible]
 def proxy_http.all_token
@@ -10637,7 +10630,7 @@ def proxy_http.all_token
   proxy_http.all_token_loop line «end» 0#usize
 
 /-- [aivm_secrets_garrett_core::proxy_http::skip_blank]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 245:4-247:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 251:4-253:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.skip_blank_loop
@@ -10655,7 +10648,7 @@ def proxy_http.skip_blank_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::skip_blank]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 243:0-249:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 249:0-255:1
     Visibility: public -/
 @[reducible]
 def proxy_http.skip_blank
@@ -10663,7 +10656,7 @@ def proxy_http.skip_blank
   proxy_http.skip_blank_loop line start
 
 /-- [aivm_secrets_garrett_core::proxy_http::trim_blank_end]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 253:4-255:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 259:4-261:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.trim_blank_end_loop
@@ -10682,7 +10675,7 @@ def proxy_http.trim_blank_end_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::trim_blank_end]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 251:0-257:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 257:0-263:1
     Visibility: public -/
 def proxy_http.trim_blank_end
   (line : Slice Std.U8) (first : Std.Usize) : Result Std.Usize := do
@@ -10690,7 +10683,7 @@ def proxy_http.trim_blank_end
   proxy_http.trim_blank_end_loop line first last
 
 /-- [aivm_secrets_garrett_core::proxy_http::all_value]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 261:4-268:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 267:4-274:1
     Visibility: public -/
 @[rust_loop]
 def proxy_http.all_value_loop
@@ -10716,7 +10709,7 @@ def proxy_http.all_value_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::all_value]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 259:0-268:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 265:0-274:1
     Visibility: public -/
 @[reducible]
 def proxy_http.all_value
@@ -10726,7 +10719,7 @@ def proxy_http.all_value
   proxy_http.all_value_loop line last first
 
 /-- [aivm_secrets_garrett_core::proxy_http::parse_field]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 272:0-289:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 278:0-295:1
     Visibility: public -/
 def proxy_http.parse_field
   (line : Slice Std.U8) : Result (Option proxy_http.Field) := do
@@ -10771,7 +10764,7 @@ def proxy_http.parse_field
           else ok none
 
 /-- [aivm_secrets_garrett_core::proxy_http::parse_fields]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 295:4-307:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 301:4-313:1
     Visibility: public -/
 @[rust_loop]
 def proxy_http.parse_fields_loop
@@ -10802,7 +10795,7 @@ def proxy_http.parse_fields_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::parse_fields]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 292:0-307:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 298:0-313:1
     Visibility: public -/
 @[reducible]
 def proxy_http.parse_fields
@@ -10812,15 +10805,15 @@ def proxy_http.parse_fields
   proxy_http.parse_fields_loop head (alloc.vec.Vec.new proxy_http.Field) start
 
 /-- [aivm_secrets_garrett_core::proxy_http::name_is]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 309:0-312:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 317:0-319:1
     Visibility: public -/
 def proxy_http.name_is
   (field : proxy_http.Field) («name» : Slice Std.U8) : Result Bool := do
-  let bytes := alloc.vec.Vec.deref field.name
-  core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 bytes «name»
+  let s := alloc.vec.Vec.deref field.name
+  http_wire.ascii_equal s «name»
 
 /-- [aivm_secrets_garrett_core::proxy_http::count_named]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 316:4-320:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 323:4-327:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.count_named_loop
@@ -10841,7 +10834,7 @@ def proxy_http.count_named_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::count_named]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 314:0-322:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 321:0-329:1
     Visibility: public -/
 def proxy_http.count_named
   (fields : Slice proxy_http.Field) («name» : Slice Std.U8) :
@@ -10853,7 +10846,7 @@ def proxy_http.count_named
   proxy_http.count_named_loop iter «name» 0#usize
 
 /-- [aivm_secrets_garrett_core::proxy_http::first_named]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 327:4-329:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 334:4-336:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.first_named_loop
@@ -10875,7 +10868,7 @@ def proxy_http.first_named_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::first_named]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 325:0-331:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 332:0-338:1
     Visibility: public -/
 @[reducible]
 def proxy_http.first_named
@@ -10885,7 +10878,7 @@ def proxy_http.first_named
   proxy_http.first_named_loop fields «name» 0#usize
 
 /-- [aivm_secrets_garrett_core::proxy_http::refused_field]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 333:0-338:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 340:0-345:1
     Visibility: public -/
 def proxy_http.refused_field (field : proxy_http.Field) : Result Bool := do
   let s ←
@@ -10917,7 +10910,7 @@ def proxy_http.refused_field (field : proxy_http.Field) : Result Bool := do
         proxy_http.name_is field s3
 
 /-- [aivm_secrets_garrett_core::proxy_http::any_refused_field]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 341:4-347:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 348:4-354:1
     Visibility: public -/
 @[rust_loop]
 def proxy_http.any_refused_field_loop
@@ -10933,7 +10926,7 @@ def proxy_http.any_refused_field_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::any_refused_field]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 340:0-347:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 347:0-354:1
     Visibility: public -/
 def proxy_http.any_refused_field
   (fields : Slice proxy_http.Field) : Result Bool := do
@@ -10943,7 +10936,7 @@ def proxy_http.any_refused_field
   proxy_http.any_refused_field_loop iter
 
 /-- [aivm_secrets_garrett_core::proxy_http::host_matches]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 350:0-357:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 357:0-364:1
     Visibility: public -/
 def proxy_http.host_matches
   (value : Slice Std.U8) (host : Slice Std.U8) : Result Bool := do
@@ -10964,7 +10957,7 @@ def proxy_http.host_matches
       host_port
 
 /-- [aivm_secrets_garrett_core::proxy_http::connection_token]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 363:4-365:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 370:4-372:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.connection_token_loop0
@@ -10984,7 +10977,7 @@ def proxy_http.connection_token_loop0
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::connection_token]: loop 1:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 367:4-369:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 374:4-376:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.connection_token_loop1
@@ -11003,7 +10996,7 @@ def proxy_http.connection_token_loop1
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::connection_token]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 361:0-381:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 368:0-388:1
     Visibility: public -/
 def proxy_http.connection_token
   (value : Slice Std.U8) (start : Std.Usize) («end» : Std.Usize) :
@@ -11035,7 +11028,7 @@ def proxy_http.connection_token
     else ok none
 
 /-- [aivm_secrets_garrett_core::proxy_http::connection_value]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 388:4-399:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 395:4-406:1
     Visibility: public -/
 @[rust_loop]
 def proxy_http.connection_value_loop
@@ -11078,7 +11071,7 @@ def proxy_http.connection_value_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::connection_value]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 384:0-399:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 391:0-406:1
     Visibility: public -/
 @[reducible]
 def proxy_http.connection_value
@@ -11086,7 +11079,7 @@ def proxy_http.connection_value
   proxy_http.connection_value_loop value false 0#usize 0#usize
 
 /-- [aivm_secrets_garrett_core::proxy_http::keep_alive]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 404:4-413:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 411:4-420:1
     Visibility: public -/
 @[rust_loop]
 def proxy_http.keep_alive_loop
@@ -11118,7 +11111,7 @@ def proxy_http.keep_alive_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::keep_alive]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 402:0-413:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 409:0-420:1
     Visibility: public -/
 def proxy_http.keep_alive
   (fields : Slice proxy_http.Field) : Result (Option Bool) := do
@@ -11128,7 +11121,7 @@ def proxy_http.keep_alive
   proxy_http.keep_alive_loop iter false
 
 /-- [aivm_secrets_garrett_core::proxy_http::decimal]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 420:4-427:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 427:4-434:1
     Visibility: public -/
 @[rust_loop]
 def proxy_http.decimal_loop
@@ -11153,7 +11146,7 @@ def proxy_http.decimal_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::decimal]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 415:0-427:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 422:0-434:1
     Visibility: public -/
 def proxy_http.decimal (value : Slice Std.U8) : Result (Option Std.Usize) := do
   let i := Slice.len value
@@ -11170,7 +11163,7 @@ def proxy_http.decimal (value : Slice Std.U8) : Result (Option Std.Usize) := do
       proxy_http.decimal_loop iter 0#usize
 
 /-- [aivm_secrets_garrett_core::proxy_http::hex_digit]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 429:0-439:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 436:0-446:1
     Visibility: public -/
 def proxy_http.hex_digit (byte : Std.U8) : Result (Option Std.Usize) := do
   if byte >= 48#u8
@@ -11244,7 +11237,7 @@ def proxy_http.hex_digit (byte : Std.U8) : Result (Option Std.Usize) := do
       else ok none
 
 /-- [aivm_secrets_garrett_core::proxy_http::chunk_size]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 448:4-456:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 455:4-463:1
     Visibility: public -/
 @[rust_loop]
 def proxy_http.chunk_size_loop
@@ -11267,7 +11260,7 @@ def proxy_http.chunk_size_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::chunk_size]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 442:0-456:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 449:0-463:1
     Visibility: public -/
 def proxy_http.chunk_size
   (data : Slice Std.U8) (start : Std.Usize) («end» : Std.Usize) :
@@ -11282,7 +11275,7 @@ def proxy_http.chunk_size
     else proxy_http.chunk_size_loop data «end» 0#usize start
 
 /-- [aivm_secrets_garrett_core::proxy_http::crlf_from]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 460:4-462:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 467:4-469:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.crlf_from_loop
@@ -11303,7 +11296,7 @@ def proxy_http.crlf_from_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::crlf_from]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 458:0-468:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 465:0-475:1
     Visibility: public -/
 def proxy_http.crlf_from
   (data : Slice Std.U8) (start : Std.Usize) : Result Std.Usize := do
@@ -11315,7 +11308,7 @@ def proxy_http.crlf_from
   else ok (Slice.len data)
 
 /-- [aivm_secrets_garrett_core::proxy_http::Chunked]
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 471:0-475:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 478:0-482:1
     Visibility: public -/
 @[discriminant isize]
 inductive proxy_http.Chunked where
@@ -11324,7 +11317,7 @@ inductive proxy_http.Chunked where
 | Bad : proxy_http.Refusal → proxy_http.Chunked
 
 /-- [aivm_secrets_garrett_core::proxy_http::decode_chunked]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 481:4-514:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 488:4-521:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.decode_chunked_loop
@@ -11397,7 +11390,7 @@ def proxy_http.decode_chunked_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::decode_chunked]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 478:0-515:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 485:0-522:1
     Visibility: public -/
 @[reducible]
 def proxy_http.decode_chunked
@@ -11407,7 +11400,7 @@ def proxy_http.decode_chunked
   proxy_http.decode_chunked_loop data limit (alloc.vec.Vec.new Std.U8) start
 
 /-- [aivm_secrets_garrett_core::proxy_http::request_line]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 520:4-522:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 527:4-529:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.request_line_loop0
@@ -11426,7 +11419,7 @@ def proxy_http.request_line_loop0
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::request_line]: loop 1:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 524:4-526:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 531:4-533:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.request_line_loop1
@@ -11445,7 +11438,7 @@ def proxy_http.request_line_loop1
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::request_line]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 518:0-538:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 525:0-545:1
     Visibility: public -/
 def proxy_http.request_line
   (head : Slice Std.U8) («end» : Std.Usize) :
@@ -11498,7 +11491,7 @@ def proxy_http.request_line
       else ok none
 
 /-- [aivm_secrets_garrett_core::proxy_http::Framing]
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 541:0-545:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 548:0-552:1
     Visibility: public -/
 @[discriminant isize]
 inductive proxy_http.Framing where
@@ -11507,7 +11500,7 @@ inductive proxy_http.Framing where
 | Chunked : proxy_http.Framing
 
 /-- [aivm_secrets_garrett_core::proxy_http::framing]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 547:0-571:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 554:0-578:1
     Visibility: public -/
 def proxy_http.framing
   (fields : Slice proxy_http.Field) (limit : Std.Usize) :
@@ -11579,7 +11572,7 @@ def proxy_http.framing
     else ok (core.result.Result.Ok proxy_http.Framing.Empty)
 
 /-- [aivm_secrets_garrett_core::proxy_http::parse_request]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 574:0-640:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 581:0-647:1
     Visibility: public -/
 def proxy_http.parse_request
   (data : Slice Std.U8) (host : Slice Std.U8) (limit : Std.Usize) :
@@ -11834,7 +11827,7 @@ def proxy_http.parse_request
       else ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest)
 
 /-- [aivm_secrets_garrett_core::proxy_http::dropped]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 644:0-659:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 651:0-666:1
     Visibility: public -/
 def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
   let s ←
@@ -11972,7 +11965,7 @@ def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
                             proxy_http.name_is field s13
 
 /-- [aivm_secrets_garrett_core::proxy_http::forwarded]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 663:4-670:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 670:4-677:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.forwarded_loop
@@ -11997,7 +11990,7 @@ def proxy_http.forwarded_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::forwarded]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 661:0-672:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 668:0-679:1
     Visibility: public -/
 def proxy_http.forwarded
   (fields : Slice proxy_http.Field) :
@@ -12009,7 +12002,7 @@ def proxy_http.forwarded
   proxy_http.forwarded_loop iter (alloc.vec.Vec.new proxy_http.Field)
 
 /-- [aivm_secrets_garrett_core::proxy_http::rule_matches]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 676:0-689:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 683:0-696:1
     Visibility: public -/
 def proxy_http.rule_matches
   (rule : proxy_http.DenyRule) (method : Slice Std.U8) (path : Slice Std.U8) :
@@ -12080,7 +12073,7 @@ def proxy_http.rule_matches
       else ok false
 
 /-- [aivm_secrets_garrett_core::proxy_http::denied]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 692:4-698:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 699:4-705:1
     Visibility: public -/
 @[rust_loop]
 def proxy_http.denied_loop
@@ -12099,7 +12092,7 @@ def proxy_http.denied_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::denied]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 691:0-698:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 698:0-705:1
     Visibility: public -/
 def proxy_http.denied
   (rules : Slice proxy_http.DenyRule) (method : Slice Std.U8)
@@ -12111,8 +12104,52 @@ def proxy_http.denied
       rules
   proxy_http.denied_loop iter method path
 
+/-- [aivm_secrets_garrett_core::proxy_http::clean_field]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 710:0-714:1
+    Visibility: public -/
+def proxy_http.clean_field (field : proxy_http.Field) : Result Bool := do
+  let i := alloc.vec.Vec.len field.name
+  if i != 0#usize
+  then
+    let s := alloc.vec.Vec.deref field.name
+    let i1 := alloc.vec.Vec.len field.name
+    let b ← proxy_http.all_token s i1
+    if b
+    then
+      let s1 := alloc.vec.Vec.deref field.value
+      let i2 := alloc.vec.Vec.len field.value
+      proxy_http.all_value s1 0#usize i2
+    else ok false
+  else ok false
+
+/-- [aivm_secrets_garrett_core::proxy_http::clean_fields]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 717:4-723:1
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.clean_fields_loop
+  (iter : core.slice.iter.Iter proxy_http.Field) : Result Bool := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok true
+  | some field =>
+    let b ← proxy_http.clean_field field
+    if b
+    then proxy_http.clean_fields_loop iter1
+    else ok false
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_http::clean_fields]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 716:0-723:1
+    Visibility: public -/
+def proxy_http.clean_fields
+  (fields : Slice proxy_http.Field) : Result Bool := do
+  let iter ←
+    SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+      fields
+  proxy_http.clean_fields_loop iter
+
 /-- [aivm_secrets_garrett_core::proxy_http::append_fields]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 701:4-706:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 726:4-731:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.append_fields_loop
@@ -12139,7 +12176,7 @@ def proxy_http.append_fields_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::append_fields]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 700:0-707:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 725:0-732:1
     Visibility: public -/
 def proxy_http.append_fields
   (output : alloc.vec.Vec Std.U8) (fields : Slice proxy_http.Field) :
@@ -12151,7 +12188,7 @@ def proxy_http.append_fields
   proxy_http.append_fields_loop iter output
 
 /-- [aivm_secrets_garrett_core::proxy_http::needs_length]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 709:0-715:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 734:0-740:1
     Visibility: public -/
 def proxy_http.needs_length (request : proxy_http.Request) : Result Bool := do
   let post ←
@@ -12177,7 +12214,7 @@ def proxy_http.needs_length (request : proxy_http.Request) : Result Bool := do
       else core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 method patch
 
 /-- [aivm_secrets_garrett_core::proxy_http::encode_upstream]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 722:0-757:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 747:0-791:1
     Visibility: public -/
 def proxy_http.encode_upstream
   (output : alloc.vec.Vec Std.U8) (request : proxy_http.Request)
@@ -12186,92 +12223,116 @@ def proxy_http.encode_upstream
   Result ((core.result.Result Unit proxy_http.Refusal) × (alloc.vec.Vec
     Std.U8))
   := do
-  let s := alloc.vec.Vec.deref request.target
-  let «end» ← proxy_http.path_end s
-  let s1 := alloc.vec.Vec.deref request.method
-  let s2 ←
-    alloc.vec.Vec.index (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
-      request.target { «end» }
-  let b ← proxy_http.denied rules s1 s2
+  let s := alloc.vec.Vec.deref request.method
+  let b ← proxy_http.valid_method s
   if b
-  then ok (core.result.Result.Err proxy_http.Refusal.Denied, output)
-  else
-    let b1 ← http_auth.valid_credential secret
+  then
+    let s1 := alloc.vec.Vec.deref request.target
+    let b1 ← proxy_http.check_target s1
     if b1
     then
-      let s3 := alloc.vec.Vec.deref request.method
-      let output1 ←
-        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s3
-      let s4 ← lift (Array.to_slice (Array.make 1#usize [ 32#u8 ]))
-      let output2 ←
-        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output1 s4
-      let s5 := alloc.vec.Vec.deref request.target
-      let output3 ←
-        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output2 s5
-      let s6 ←
-        lift (Array.to_slice
-          (Array.make 17#usize [
-            32#u8, 72#u8, 84#u8, 84#u8, 80#u8, 47#u8, 49#u8, 46#u8, 49#u8,
-            13#u8, 10#u8, 72#u8, 111#u8, 115#u8, 116#u8, 58#u8, 32#u8
-            ]))
-      let output4 ←
-        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output3 s6
-      let output5 ←
-        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output4 host
-      let s7 ← lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
-      let output6 ←
-        alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output5 s7
-      let s8 := alloc.vec.Vec.deref request.fields
-      let v ← proxy_http.forwarded s8
-      let s9 := alloc.vec.Vec.deref v
-      let output7 ← proxy_http.append_fields output6 s9
-      let (r, output8) ←
-        http_auth.append_header output7 secret authentication
-      match r with
-      | core.result.Result.Ok _ =>
-        let s10 ←
-          lift (Array.to_slice
-            (Array.make 46#usize [
-              65#u8, 99#u8, 99#u8, 101#u8, 112#u8, 116#u8, 45#u8, 69#u8,
-              110#u8, 99#u8, 111#u8, 100#u8, 105#u8, 110#u8, 103#u8, 58#u8,
-              32#u8, 105#u8, 100#u8, 101#u8, 110#u8, 116#u8, 105#u8, 116#u8,
-              121#u8, 13#u8, 10#u8, 67#u8, 111#u8, 110#u8, 110#u8, 101#u8,
-              99#u8, 116#u8, 105#u8, 111#u8, 110#u8, 58#u8, 32#u8, 99#u8,
-              108#u8, 111#u8, 115#u8, 101#u8, 13#u8, 10#u8
-              ]))
-        let output9 ←
-          alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output8 s10
-        let b2 ← proxy_http.needs_length request
-        let output10 ←
-          if b2
+      let s2 := alloc.vec.Vec.deref request.fields
+      let fields ← proxy_http.forwarded s2
+      let s3 := alloc.vec.Vec.deref fields
+      let b2 ← proxy_http.clean_fields s3
+      if b2
+      then
+        let s4 := alloc.vec.Vec.deref request.target
+        let «end» ← proxy_http.path_end s4
+        let s5 := alloc.vec.Vec.deref request.method
+        let s6 ←
+          alloc.vec.Vec.index (core.slice.index.SliceIndexRangeToUsizeSlice
+            Std.U8) request.target { «end» }
+        let b3 ← proxy_http.denied rules s5 s6
+        if b3
+        then ok (core.result.Result.Err proxy_http.Refusal.Denied, output)
+        else
+          let b4 ← http_auth.valid_credential secret
+          if b4
           then
-            do
-            let s11 ←
+            let s7 := alloc.vec.Vec.deref request.method
+            let output1 ←
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s7
+            let s8 ← lift (Array.to_slice (Array.make 1#usize [ 32#u8 ]))
+            let output2 ←
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output1 s8
+            let s9 := alloc.vec.Vec.deref request.target
+            let output3 ←
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output2 s9
+            let s10 ←
               lift (Array.to_slice
-                (Array.make 16#usize [
-                  67#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8, 45#u8,
-                  76#u8, 101#u8, 110#u8, 103#u8, 116#u8, 104#u8, 58#u8, 32#u8
+                (Array.make 17#usize [
+                  32#u8, 72#u8, 84#u8, 84#u8, 80#u8, 47#u8, 49#u8, 46#u8,
+                  49#u8, 13#u8, 10#u8, 72#u8, 111#u8, 115#u8, 116#u8, 58#u8,
+                  32#u8
                   ]))
-            let output11 ←
-              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output9 s11
-            let i := alloc.vec.Vec.len request.body
-            let output12 ← http_wire.append_decimal output11 i
-            let s12 ←
+            let output4 ←
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output3 s10
+            let output5 ←
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output4 host
+            let s11 ←
               lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
-            alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output12 s12
-          else ok output9
-        let s11 ← lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
-        let output11 ←
-          alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output10 s11
-        let s12 := alloc.vec.Vec.deref request.body
-        let output12 ←
-          alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output11 s12
-        ok (core.result.Result.Ok (), output12)
-      | core.result.Result.Err _ =>
-        ok (core.result.Result.Err proxy_http.Refusal.InvalidCredential,
-          output8)
-    else
-      ok (core.result.Result.Err proxy_http.Refusal.InvalidCredential, output)
+            let output6 ←
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output5 s11
+            let s12 := alloc.vec.Vec.deref fields
+            let output7 ← proxy_http.append_fields output6 s12
+            let (r, output8) ←
+              http_auth.append_header output7 secret authentication
+            match r with
+            | core.result.Result.Ok _ =>
+              let s13 ←
+                lift (Array.to_slice
+                  (Array.make 46#usize [
+                    65#u8, 99#u8, 99#u8, 101#u8, 112#u8, 116#u8, 45#u8, 69#u8,
+                    110#u8, 99#u8, 111#u8, 100#u8, 105#u8, 110#u8, 103#u8,
+                    58#u8, 32#u8, 105#u8, 100#u8, 101#u8, 110#u8, 116#u8,
+                    105#u8, 116#u8, 121#u8, 13#u8, 10#u8, 67#u8, 111#u8,
+                    110#u8, 110#u8, 101#u8, 99#u8, 116#u8, 105#u8, 111#u8,
+                    110#u8, 58#u8, 32#u8, 99#u8, 108#u8, 111#u8, 115#u8,
+                    101#u8, 13#u8, 10#u8
+                    ]))
+              let output9 ←
+                alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output8 s13
+              let b5 ← proxy_http.needs_length request
+              let output10 ←
+                if b5
+                then
+                  do
+                  let s14 ←
+                    lift (Array.to_slice
+                      (Array.make 16#usize [
+                        67#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8,
+                        45#u8, 76#u8, 101#u8, 110#u8, 103#u8, 116#u8, 104#u8,
+                        58#u8, 32#u8
+                        ]))
+                  let output11 ←
+                    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output9
+                      s14
+                  let i := alloc.vec.Vec.len request.body
+                  let output12 ← http_wire.append_decimal output11 i
+                  let s15 ←
+                    lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
+                  alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output12
+                    s15
+                else ok output9
+              let s14 ←
+                lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
+              let output11 ←
+                alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output10 s14
+              let s15 := alloc.vec.Vec.deref request.body
+              let output12 ←
+                alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output11 s15
+              ok (core.result.Result.Ok (), output12)
+            | core.result.Result.Err _ =>
+              ok (core.result.Result.Err proxy_http.Refusal.InvalidCredential,
+                output8)
+          else
+            ok (core.result.Result.Err proxy_http.Refusal.InvalidCredential,
+              output)
+      else
+        ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest, output)
+    else ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest, output)
+  else ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest, output)
 
 /-- [aivm_secrets_garrett_core::public_error::PublicError]
     Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 10:0-28:1

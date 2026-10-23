@@ -165,9 +165,17 @@ def upstream_request(
     policy: ProxyPolicy, origin: Origin, request: http1.Request, credential: bytes
 ) -> bytes:
     """The exact bytes sent upstream for an accepted request, or a refusal."""
+    # Re-validate what the parser ensures, as the extracted encoder does, so
+    # upstream framing never depends on the parser.
+    if request.method not in http1.METHODS:
+        raise Refused('invalid_request')
+    http1.check_target(request.target)
+    forwarded = tuple((k, v) for k, v in request.fields if k.lower() not in DROPPED)
+    if any(not k or any(b not in http1._TOKEN for b in k)
+           or any(not (http1._visible(b) or b in b' \t') for b in v) for k, v in forwarded):
+        raise Refused('invalid_request')
     if denied(policy, request.method, request.path):
         raise Refused('denied')
-    forwarded = tuple((k, v) for k, v in request.fields if k not in DROPPED)
     name, prefix = SCHEMES[origin.authentication]
     if (not credential or len(credential) > MAX_CREDENTIAL
             or any(not http1._visible(b) for b in credential)):

@@ -385,10 +385,11 @@ other than the one authentication line? Can a guest-supplied
 
 | Theorem | Says |
 | --- | --- |
-| `dropped_eq` | The extracted filter drops a guest field exactly when its (lowercased) name is one of 14 names, including `authorization`, `x-api-key`, `proxy-authorization` and `cookie`. |
+| `dropped_eq` | The extracted filter drops a guest field exactly when its name equals one of 14 names **ignoring ASCII case**, including `authorization`, `x-api-key`, `proxy-authorization` and `cookie`. |
 | `forwarded_contract`, `forwarded_drops` | The forwarded fields are the guest fields in their original order, minus those names. No forwarded field has a dropped name. |
 | `append_fields_contract` | Each forwarded field is written as `name: value` CRLF, and nothing else. |
-| `encode_upstream_contract` | For **every** guest request, host, deny list and credential, the encoder either refuses and leaves the output buffer unchanged, or the credential is valid and it appends exactly `UpstreamPrefix ++ HeaderPrefix a ++ secret ++ CRLF ++ UpstreamSuffix`. |
+| `encode_upstream_contract` | For **every** guest request, host, deny list and credential, the encoder either refuses and leaves the output buffer unchanged, or it has checked that the credential is valid, the target is visible ASCII and every forwarded field is one clean header line, and it appends exactly `UpstreamPrefix ++ HeaderPrefix a ++ secret ++ CRLF ++ UpstreamSuffix`. |
+| `clean_field_single_line`, `visible_single_line` | A forwarded field or accepted target contains no CR or LF, so a guest cannot add a header line. |
 
 `UpstreamPrefix` is the request line, `Host` and the forwarded fields.
 `UpstreamSuffix` is the fixed lines, an optional `Content-Length` and the
@@ -396,13 +397,12 @@ body. Both are defined without the secret. So the secret appears in the
 upstream bytes as the one verified authentication line
 (`http_auth.Proofs.accepted_header_exact`), placed after every guest field.
 
-**Read the conclusion carefully.** These theorems describe the *encoder*.
-They do not say that guest bytes in the prefix can never contain text that
-*looks like* a credential: a guest can put any visible bytes in its own
-header values, but it does not know the credential. Header framing is safe
-because the parser only accepts values of visible ASCII, space and tab
-(`parse_field`). That fact is enforced by the extracted parser and tested,
-**not yet proved**.
+**Read the conclusion carefully.** These theorems describe the *encoder*,
+which re-checks method, target and every forwarded field itself, so header
+framing and the credential filter **do not depend on the parser** being
+right. They do not say that guest header values can never contain text that
+*looks like* a credential: a guest can put any visible bytes there, but it
+does not know the credential.
 
 **Byte parity with the Python reference.** `tests/secrets_vectors/proxy-http-v1.tsv`
 holds 64 adversarial and positive cases. The Python test checks that the
@@ -411,8 +411,9 @@ file is exactly the Python reference's output, and the Rust test
 mutant that forwarded `Cookie` fails it.
 
 **Still trusted for this profile.**
-- The parser's agreement with how the provider reads the canonical bytes
-  (`PROXY-PARSE-01`; next proof target).
+- That the provider reads the canonical HTTP/1.1 bytes conventionally and
+  routes the path as written; a provider that normalizes paths (case,
+  encoding) could route around a deny-list entry (`PROXY-PARSE-01`).
 - The response reflection check (`PROXY-REFLECT-01`).
 - TLS and the session CA (`PROXY-TLS-01`).
 - That the native proxy, which does not exist yet (only the Python server
