@@ -10,6 +10,7 @@
   audit-verify FILE...      check an audit file's hash chain
   native-session --spec F  hold one native Rust broker session for a guest
   proxy --policy P ...     hold one credential-substitution HTTPS proxy session
+  proxy-session --spec F   give one guest that proxy (CA, env, forwarded port)
 
 ``invoke``, ``operations``, ``delegate``, ``renounce`` and ``as`` are the
 guest client's verbs and are passed straight through to it.
@@ -549,6 +550,11 @@ def main(argv: list[str] | None = None) -> int:
         from .native_session import main as native_session
 
         return native_session(argv[1:])
+    if argv[:1] == ['proxy-session']:
+        # Optional proxy lifecycle for one guest (OUT-6, HP-3).
+        from .proxy_session import main as proxy_session
+
+        return proxy_session(argv[1:])
     if argv[:1] == ['proxy']:
         # Optional credential-substitution proxy profile (OUT-6, HP-1).
         from .proxy.cli import main as proxy

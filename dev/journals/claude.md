@@ -215,3 +215,17 @@ Review fix before commit: the first draft fell back to an unchecked
 `files::read_trusted_public` (made pub). The scope is stated explicitly:
 NATIVE-SINK-01 covers the bridge; the proxy binary is PROXY-NATIVE-01, pinned
 by a write-shape test.
+
+## 2026-10-23 03:56:58 -0400
+
+HP-3: `aivm-secrets proxy-session`, plus the opt-in AIVM flag
+`--secrets_proxy_spec`. Both reuse the native-session transports and AIVM
+adapter; the latter gained a `contract` parameter. The guest gets a CA, a
+bundle and an env file. The token lives only in that guest file and never on
+stdout. A local-guest curl test passes against both the Python and the native
+proxy. Design decision: tools that honour `HTTPS_PROXY` send all HTTPS through
+the proxy, and it refuses unlisted origins rather than relaying them. That
+keeps it from being an open relay, at the cost of breaking such tools for
+other hosts while the env is sourced. Documented. Not tested on real KVM yet:
+the SSH TCP reverse forward is exercised only by code review and the AIVM unit
+tests (fake child).

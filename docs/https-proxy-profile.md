@@ -133,3 +133,35 @@ response never contains the raw credential (`guest_response_contract`).
 What the shell itself writes is pinned by a source-shape test, not proved
 (`PROXY-NATIVE-01`). Tests: `tests/test_rust_proxy.py`. The constrained-http
 profile is Python only for now.
+
+## Giving a guest the proxy: `proxy-session` and AIVM
+
+```
+python -I -m aivm_secrets proxy-session --spec SPEC
+```
+
+`SPEC` has exactly these keys: `version` (1); `bin_dir` (the directory of
+`garrett-proxy`, or `null` for the Python reference); `policy_file`,
+`credential_file`, `audit_file` (host-private); `guest_port` (a guest
+loopback port, 1024–65535); and `guest` (`{"kind":"ssh","ssh_config":…,"host":…}`,
+or `{"kind":"local"}` for tests). The child starts the proxy and creates a
+fresh guest directory. There it publishes the session CA, a CA bundle (the
+guest's system roots plus the session CA) and an `env` file that sets
+`HTTPS_PROXY` (with the session token) together with `SSL_CERT_FILE`,
+`CURL_CA_BUNDLE`, `REQUESTS_CA_BUNDLE` and `NODE_EXTRA_CA_CERTS`. It then
+forwards the guest port to the proxy over SSH and prints one line:
+`{"version":1,"ready":true,"profile":…,"origins":[…],"guest":{"dir":…,"env":…,"ca":…}}`.
+The announcement carries no token and no credential. Closing stdin stops
+the proxy and the forward and removes the guest directory.
+
+In AIVM, `aivm ssh --secrets_proxy_spec TEMPLATE` (the spec without `guest`)
+runs this contract with a strict, self-contained SSH route. It sources the
+`env` file before the login shell. Like `--secrets_native_spec`, it is
+process-only, excludes the other `--secrets_*` options and leaves default
+`aivm ssh` unchanged.
+
+Every HTTPS request from a tool that honours `HTTPS_PROXY` goes through the
+proxy, and the proxy refuses origins the policy does not list. The proxy is
+never an open relay, so such tools cannot reach unlisted HTTPS hosts while
+the env file is sourced. Tools that ignore `HTTPS_PROXY` are not mediated
+(`PROXY-EGRESS-01`).

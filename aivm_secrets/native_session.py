@@ -163,6 +163,23 @@ class SSHGuest:
         process.terminate()
         raise SessionError('forward_failed')
 
+    def forward_tcp(self, guest_port: int, host_port: int) -> subprocess.Popen:
+        """Forward guest loopback ``guest_port`` to host loopback ``host_port``."""
+        process = subprocess.Popen(
+            [*self.forward_base, '-R', f'127.0.0.1:{guest_port}:127.0.0.1:{host_port}'],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            env=_environment())
+        probe = f"bash -c 'exec 3<>/dev/tcp/127.0.0.1/{int(guest_port)}'"
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            if process.poll() is not None:
+                raise SessionError('forward_failed')
+            if self._call(probe, timeout=10).returncode == 0:
+                return process
+            time.sleep(0.25)
+        process.terminate()
+        raise SessionError('forward_failed')
+
     def remove(self) -> None:
         self._call('rm -rf -- ' + shlex.quote(self.dir), timeout=20)
 

@@ -274,7 +274,8 @@ def test_only_one_module_runs_a_program_and_never_through_a_shell():
     # is the optional integrator launcher: it runs ssh and the native Garrett
     # binaries from the spec's bin_dir, never a resolver or a shell, and it is
     # not imported by the broker.
-    assert runners == {'host/sources.py', 'native_session.py'}
+    # proxy_session is the optional proxy launcher, also never loaded by the broker.
+    assert runners == {'host/sources.py', 'native_session.py', 'proxy_session.py'}
     launcher = (PACKAGE / 'native_session.py').read_text(encoding='utf-8')
     assert "['ssh'," in launcher and 'shlex.join(' in launcher
     assert 'native_session' not in (PACKAGE / 'host' / 'broker.py').read_text(encoding='utf-8')
