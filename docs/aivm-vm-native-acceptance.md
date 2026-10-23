@@ -173,7 +173,11 @@ probe tooling causes a failed acceptance, not a silently skipped check.
    certificate/private-key mismatch and a capability with one modified
    signature byte. Every attempt must fail without new provider traffic.
    A wrong-subject denial is not proof of an unregistered-certificate or
-   expired-certificate path; those are distinct outstanding cases.
+   expired-certificate path; those are distinct cases. They now have
+   synthetic native-bridge coverage (`tests/test_rust_identity_negative.py`):
+   an unregistered subject, an enrollment past `not_after`, a re-enrolled
+   certificate and an expired capability are refused with no provider call,
+   and restoring the registry restores service. That is not a real-VM run.
 5. Terminate the SSH Unix-socket forward while the original capability is
    still active. The disconnected guest must get no data and cause no
    provider request. Reestablish the forward *only* to the same host-owned
@@ -198,8 +202,9 @@ recorded exactly four authorized synthetic GETs. The report correctly keeps
 `filesystem_isolation_proved` and `whole_service_secrecy_proved` false.
 
 The following remain for OUT-2: verified end-to-end AIVM firewall rules,
-full guest mount/share exposure analysis including aliases, unregistered or
-expired certificates, full guest reboot and snapshot/clone behavior, an
+full guest mount/share exposure analysis including aliases, a real-VM run of
+the unregistered/expired identity cases (synthetic bridge coverage exists),
+full guest reboot and snapshot/clone behavior, an
 independently reviewed optional adapter lifecycle, and preservation of
 normal AIVM workflows. The synthetic provider never receives a real GitHub
 credential. OUT-3 real-provider compatibility is a separate opt-in gate.
