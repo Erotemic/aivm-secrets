@@ -220,11 +220,15 @@ def test_serve_holds_no_secret_in_its_command_line_or_output(world):
 def test_session_outlives_its_grant_only_to_say_expired(world):
     policy = write_policy_file(
         world.root / 'short.json',
-        world.service.policy(world.token, lifetime_seconds=1),
+        world.service.policy(world.token, lifetime_seconds=2),
     )
+    # Expiry is checked in whole seconds, so a lifetime of L can end anywhere
+    # in (L-1, L] after issue; 2 s leaves room for the first request and
+    # 3.2 s is certainly past it.
     with serve(world, policy=policy) as broker:
-        assert broker.invoke('profile.read')['ok']
-        time.sleep(1.6)
+        first = broker.invoke('profile.read')
+        assert first['ok'], first
+        time.sleep(3.2)
         assert code(broker.invoke('profile.read')) == 'expired'
         assert broker.process.poll() is None  # the lease, not the TTL, ends it
     assert len(world.service.requests) == 1
