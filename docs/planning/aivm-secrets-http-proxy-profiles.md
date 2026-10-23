@@ -1,7 +1,7 @@
 # HTTPS proxy profiles: compatible credential use beside named operations
 
-**Status: new priority (maintainer, 2026-10-23). Planning only; nothing here
-is implemented or verified yet.** Work items are `HP-0`..`HP-7`. They join the
+**Status: new priority (maintainer, 2026-10-23).** HP-0..HP-5 and HP-7 have landed (see each row). The
+[proxy claim-to-evidence matrix](../assurance/proxy-claim-evidence-matrix.md) collects what is proved and assumed. Work items are `HP-0`..`HP-7`. They join the
 [active queue](aivm-secrets-active-work.md) and the
 [product roadmap](aivm-secrets-product-roadmap.md) as outcome `OUT-6`.
 

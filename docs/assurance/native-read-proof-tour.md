@@ -371,6 +371,8 @@ sinks, and OS/TLS behavior remain separate implementation obligations.
 
 ## HTTPS proxy, credential-substitution profile: where the credential goes (2026-10-23)
 
+Reviewers: start from the [proxy claim-to-evidence matrix](proxy-claim-evidence-matrix.md).
+
 This section is about the optional proxy profile
 ([plan](../planning/aivm-secrets-http-proxy-profiles.md)), not the native
 read profile. Source: `rust/crates/aivm-secrets-garrett-core/src/proxy_http.rs`,
@@ -451,6 +453,8 @@ session's only call to the controller ([`GarrettWriteGate`](../../proofs/Garrett
 | `approve_mode_write_ran_consumed_its_approval` | In `approve` mode, a write that ran had a matching, unexpired approval. The approval is consumed and cannot be reused. |
 | `deny_mode_write_never_runs` | In `deny` mode a write never reaches the controller. |
 | `production_write_has_approval_and_authorized_attempts` | For the production request type, a gated request that returned had an `Allowed` decision. Every accounted provider attempt was currently authorized (write mode included), audit-acknowledged and bound to its admission context, and the attempt count equals the trace's sends, so nothing is retried behind the trace. |
+
+Already proved for the controller itself, and so holding for writes through it: a write that was sent and then failed completion returns `outcome_unknown` and halts. It is never retried (`read_transition.Proofs.sent_write_completion_failure_is_uncertain`).
 
 **Still assumed:** that the session gives the gate the decision it computed
 for *this* request's digest, and the host approval store's locking
