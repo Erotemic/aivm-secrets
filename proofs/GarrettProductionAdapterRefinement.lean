@@ -29,9 +29,9 @@ open aivm_secrets_garrett_core.response_gate.Proofs
 /-- Independent extracted fail-stop properties, without sequencing contracts
     provided by the caller. -/
 theorem poisoned_audit_and_revoked_selection_refuse
-    {S X W M Sel Reply : Type}
+    {S X W M Sel Reply Released : Type}
     (audit : audit_record.Sink S X)
-    (release : selected_release.Work W M Sel Reply X)
+    (release : selected_release.Work W M Sel Reply Released X)
     (file : S) (payload : alloc.vec.Vec U8)
     (work afterWork : W) (code : X)
     (poisoned : audit.POISONED = Result.ok code)
@@ -64,19 +64,19 @@ theorem extracted_response_gate_is_refusal_preserving
     executions to the same native request and proving the primitive callbacks
     remain outstanding implementation-refinement obligations. -/
 theorem returned_audit_selection_and_receive_have_source_callback_witnesses
-    {S A W Meta Sel Reply B Writer M X : Type}
+    {S A W Meta Sel Reply Released B Writer M X : Type}
     (auditOps : audit_record.Sink S A)
-    (selectedOps : selected_release.Work W Meta Sel Reply X)
+    (selectedOps : selected_release.Work W Meta Sel Reply Released X)
     (bytes : provider_io.WireBytes B)
     (writerOps : provider_io.Writer Writer X)
     (auditStart auditDone : S) (record : alloc.vec.Vec U8)
-    (selectStart selectDone : W) (reply : Reply)
+    (selectStart selectDone : W) (released : Released)
     (before after : provider_io.Channel B Writer M X)
     (submittedResult : core.result.Result Unit X)
     (auditReturned : audit_record.append_durable_record auditOps auditStart false record =
       Result.ok (.Ok (), auditDone, false))
     (selectReturned : selected_release.select selectedOps selectStart =
-      Result.ok (.Ok reply, selectDone))
+      Result.ok (.Ok released, selectDone))
     (submitReturned : provider_io.Channel.submit bytes writerOps before =
       Result.ok (submittedResult, after))
     (receiveReturned : ∃ token,
@@ -88,12 +88,12 @@ theorem returned_audit_selection_and_receive_have_source_callback_witnesses
       auditOps.append first delimiter = Result.ok (.Ok (), second) ∧
       auditOps.sync_record second = Result.ok (.Ok (), auditDone)) ∧
     (∃ checked paged projected assembled : W, ∃ metadata : Option Meta,
-      ∃ selected : Sel,
+      ∃ selected : Sel, ∃ reply : Reply,
       selectedOps.current selectStart = Result.ok (.Ok (), checked) ∧
       selectedOps.pagination checked = Result.ok (.Ok metadata, paged) ∧
       selectedOps.project paged = Result.ok (.Ok selected, projected) ∧
       selectedOps.assemble projected selected metadata = Result.ok (reply, assembled) ∧
-      selectedOps.check_safe assembled reply = Result.ok (.Ok (), selectDone)) ∧
+      selectedOps.check_safe assembled reply = Result.ok (.Ok released, selectDone)) ∧
     (submittedResult = .Ok () ∧ before.request.attempted = false ∧
       after.request.body = before.request.body ∧
       after.metadata = before.metadata ∧
@@ -107,7 +107,7 @@ theorem returned_audit_selection_and_receive_have_source_callback_witnesses
     returned_success_requires_exact_append_delimiter_sync
       auditOps auditStart auditDone record auditReturned,
     every_successful_release_has_all_five_callbacks
-      selectedOps selectStart selectDone reply selectReturned,
+      selectedOps selectStart selectDone released selectReturned,
     actual_release_after_submit_has_exact_writer_origin
       bytes writerOps before after submittedResult submitReturned receiveReturned⟩
 

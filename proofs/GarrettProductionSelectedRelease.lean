@@ -27,7 +27,7 @@ attribute [local simp] core.convert.FromSame
 /-- Current-control failure refuses before metadata, projection, assembly,
     or reflection callbacks. -/
 theorem stale_current_control_refuses_release
-    {W M S R X : Type} (ops : selected_release.Work W M S R X)
+    {W M S R L X : Type} (ops : selected_release.Work W M S R L X)
     (start after : W) (error : X)
     (rejected : ops.current start = Result.ok (.Err error, after)) :
     selected_release.select ops start = Result.ok (.Err error, after) := by
@@ -36,7 +36,7 @@ theorem stale_current_control_refuses_release
 /-- A failed pagination callback is terminal: the projection has not been
     called and there is no selected public reply. -/
 theorem pagination_denial_stops_before_projection
-    {W M S R X : Type} (ops : selected_release.Work W M S R X)
+    {W M S R L X : Type} (ops : selected_release.Work W M S R L X)
     (start checked failed : W) (error : X)
     (fresh : ops.current start = Result.ok (.Ok (), checked))
     (denied : ops.pagination checked = Result.ok (.Err error, failed)) :
@@ -46,7 +46,7 @@ theorem pagination_denial_stops_before_projection
 /-- Failure in the actual native projection is terminal before any JSON
     assembly or reflected-secret check. -/
 theorem failed_projection_refuses_release
-    {W M S R X : Type} (ops : selected_release.Work W M S R X)
+    {W M S R L X : Type} (ops : selected_release.Work W M S R L X)
     (start checked paged refused : W) (metadata : Option M) (error : X)
     (fresh : ops.current start = Result.ok (.Ok (), checked))
     (page : ops.pagination checked = Result.ok (.Ok metadata, paged))
@@ -57,7 +57,7 @@ theorem failed_projection_refuses_release
 /-- A reflection rejection cannot be converted into a successful public
     release after the reply has been assembled. -/
 theorem rejected_reflection_refuses_assembled_reply
-    {W M S R X : Type} (ops : selected_release.Work W M S R X)
+    {W M S R L X : Type} (ops : selected_release.Work W M S R L X)
     (start checked paged projected assembled rejected : W)
     (metadata : Option M) (selected : S) (reply : R) (error : X)
     (fresh : ops.current start = Result.ok (.Ok (), checked))
@@ -69,34 +69,36 @@ theorem rejected_reflection_refuses_assembled_reply
   simp [selected_release.select, fresh, page, project, assemble, reflectionDenied]
 
 /-- Positive witness for exactly the *real extracted* five callbacks. The
-    successful controller yields only the very reply checked by `check_safe`.
-    This is strictly stronger than assuming an opaque native select result. -/
+    successful controller yields only the value released by `check_safe` from
+    the assembled reply; nothing else can be returned. -/
 theorem five_accepted_callbacks_release_only_checked_reply
-    {W M S R X : Type} (ops : selected_release.Work W M S R X)
+    {W M S R L X : Type} (ops : selected_release.Work W M S R L X)
     (start checked paged projected assembled done : W)
-    (metadata : Option M) (selected : S) (reply : R)
+    (metadata : Option M) (selected : S) (reply : R) (released : L)
     (fresh : ops.current start = Result.ok (.Ok (), checked))
     (page : ops.pagination checked = Result.ok (.Ok metadata, paged))
     (project : ops.project paged = Result.ok (.Ok selected, projected))
     (assemble : ops.assemble projected selected metadata = Result.ok (reply, assembled))
-    (safe : ops.check_safe assembled reply = Result.ok (.Ok (), done)) :
-    selected_release.select ops start = Result.ok (.Ok reply, done) := by
+    (safe : ops.check_safe assembled reply = Result.ok (.Ok released, done)) :
+    selected_release.select ops start = Result.ok (.Ok released, done) := by
   simp [selected_release.select, fresh, page, project, assemble, safe]
 
 /-- Reverse direction: a successful *actual returned* release necessarily
-    has a current check, accepted pagination, projection, assembled output,
-    and a successful reflection check on the exact returned value, in order.
+    has a current check, accepted pagination, projection, an assembled reply,
+    and a successful reflection check that released the returned value from
+    that exact reply, in order.
     These callback witnesses are not chosen by the theorem caller. -/
 theorem every_successful_release_has_all_five_callbacks
-    {W M S R X : Type} (ops : selected_release.Work W M S R X)
-    (start done : W) (reply : R)
-    (returned : selected_release.select ops start = Result.ok (.Ok reply, done)) :
+    {W M S R L X : Type} (ops : selected_release.Work W M S R L X)
+    (start done : W) (released : L)
+    (returned : selected_release.select ops start = Result.ok (.Ok released, done)) :
     ∃ checked paged projected assembled : W, ∃ metadata : Option M, ∃ selected : S,
+      ∃ reply : R,
       ops.current start = Result.ok (.Ok (), checked) ∧
       ops.pagination checked = Result.ok (.Ok metadata, paged) ∧
       ops.project paged = Result.ok (.Ok selected, projected) ∧
       ops.assemble projected selected metadata = Result.ok (reply, assembled) ∧
-      ops.check_safe assembled reply = Result.ok (.Ok (), done) := by
+      ops.check_safe assembled reply = Result.ok (.Ok released, done) := by
   unfold selected_release.select at returned
   obtain ⟨⟨currentResult, checked⟩, first, rest⟩ :=
     (bind_returns_iff _ _ _).mp returned
@@ -141,27 +143,9 @@ theorem every_successful_release_has_all_five_callbacks
             projectFlowCall.symm
         subst flowProject
         dsimp only at rest
-        obtain ⟨⟨assembledReply, assembled⟩, fourth, rest⟩ :=
+        obtain ⟨⟨assembledReply, assembled⟩, fourth, last⟩ :=
           (bind_returns_iff _ _ _).mp rest
-        obtain ⟨⟨safeResult, checkedLast⟩, fifth, last⟩ :=
-          (bind_returns_iff _ _ _).mp rest
-        cases safeResult with
-        | Err error =>
-          simp [core.result.Result.Insts.CoreOpsTry.branch,
-            core.result.Result.Insts.CoreOpsTry_traitFromResidualResult.from_residual] at last
-        | Ok u =>
-          cases u
-          obtain ⟨flowSafe, safeFlowCall, last⟩ :=
-            (bind_returns_iff _ _ _).mp last
-          have safeContinues : flowSafe = .Continue () := by
-            simpa [core.result.Result.Insts.CoreOpsTry.branch] using
-              safeFlowCall.symm
-          subst flowSafe
-          dsimp only at last
-          have equality : (assembledReply, checkedLast) = (reply, done) := by
-            simpa using last
-          obtain ⟨rfl, rfl⟩ := Prod.mk.inj equality
-          exact ⟨checked, paged, projected, assembled, metadata, selected,
-            first, second, third, fourth, fifth⟩
+        exact ⟨checked, paged, projected, assembled, metadata, selected,
+          assembledReply, first, second, third, fourth, last⟩
 
 end aivm_secrets_garrett_core.selected_release.Proofs
