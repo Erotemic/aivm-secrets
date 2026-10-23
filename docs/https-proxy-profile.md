@@ -131,6 +131,32 @@ The response is the operation's disclosure, not the full provider response.
 Stock tools that need fields the policy does not release will fail rather
 than receive them (HP-3 tests compatibility).
 
+### Guest side, over the native bridge (HP-6)
+
+```
+python -I -m aivm_secrets proxy --policy proxy.json --audit proxy.jsonl \
+    --service-policy routes.json \
+    --bridge-client '["garrett-client", "--config", "client.json"]'
+```
+
+The same translator can run **inside the guest**, untrusted. It takes no
+credential (a `--credential-file` next to `--bridge-client` is refused) and
+no broker audit. `routes.json` is a public copy of the host's schema-2
+policy, used only for its route templates. Each translated operation goes
+through the guest's native client, `invoke`, to the host bridge, which
+re-checks the operation, its arguments, scope and write mode on its **own**
+policy, builds the provider request and releases only the disclosure. So:
+
+- the native-read theorems apply to every provider effect unchanged;
+- a wrong or tampered `routes.json` can only make the translator ask for a
+  different named operation, which the bridge allows or refuses as it
+  would for any guest tool. `tests/test_proxy_guest_translator.py` widens
+  the guest copy and checks that the provider still sees nothing.
+
+The translator is Python for now; the guest needs Python and the native
+client. A native translator with a proved round trip (template match then
+fill reproduces the target) is the next HP-6 step.
+
 ## Native `garrett-proxy`
 
 The same profile, with the same policy file and process contract, runs as

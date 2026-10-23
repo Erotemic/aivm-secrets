@@ -275,7 +275,14 @@ def test_only_one_module_runs_a_program_and_never_through_a_shell():
     # binaries from the spec's bin_dir, never a resolver or a shell, and it is
     # not imported by the broker.
     # proxy_session is the optional proxy launcher, also never loaded by the broker.
-    assert runners == {'host/sources.py', 'native_session.py', 'proxy_session.py'}
+    # proxy/bridge.py is the guest-side constrained translator (HP-6): it runs
+    # only the guest's native client with a fixed argv list (``invoke``),
+    # holds no credential and is never loaded by the broker.
+    assert runners == {'host/sources.py', 'native_session.py', 'proxy_session.py',
+                       'proxy/bridge.py'}
+    bridge = (PACKAGE / 'proxy' / 'bridge.py').read_text(encoding='utf-8')
+    assert "[*self._client, 'invoke'," in bridge
+    assert 'bridge' not in (PACKAGE / 'host' / 'broker.py').read_text(encoding='utf-8')
     launcher = (PACKAGE / 'native_session.py').read_text(encoding='utf-8')
     assert "['ssh'," in launcher and 'shlex.join(' in launcher
     assert 'native_session' not in (PACKAGE / 'host' / 'broker.py').read_text(encoding='utf-8')

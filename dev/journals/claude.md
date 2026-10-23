@@ -335,3 +335,23 @@ reply is a fixed refusal or `guest_response` output (`serve_guest_reply`).
   byte for byte and check callback order with a recording mock.
 - Remaining native: the CONNECT/tunnel loop, the callbacks themselves and
   socket/TLS. Confidence high for the stated theorems.
+
+## 2026-10-23 07:53:43 -0400
+
+HP-6, first step: guest-side constrained-http in Python
+(`aivm_secrets/proxy/bridge.py`). The existing translator now has a second
+dispatcher that calls the guest's native `invoke` instead of an in-process
+broker, selected by `aivm-secrets proxy --bridge-client`. It refuses a
+credential file in that mode (one authority source, no fallback).
+
+- Why Python first: the translator's correctness is a usability property
+  once it sits on the guest side; authority is the bridge's. A native
+  translator only matters for guests without Python and for a proved round
+  trip, so it comes second.
+- Key test: a tampered guest route copy that allows `gamma` still gets
+  nothing from the provider, because the bridge decides on its own policy.
+- I tripped over my own `str.replace` replacing every `server_hostname=HOST`
+  in the substitution tests; caught by the suite and restored the one that
+  connects by IP. Lesson: use anchored, single replacements in test edits.
+- Confidence: high on the authority argument; medium on stock-tool
+  compatibility (disclosure-only bodies) which is unchanged from HP-2.

@@ -59,8 +59,9 @@ class World:
             auth: bytes | None = None, read_all: bool = True) -> bytes:
         """Send ``request`` through a CONNECT tunnel; return the guest's bytes."""
         token = self.session.token.encode() if auth is None else auth
-        connect = connect or (b'CONNECT ' + HOST.encode() + b':443 HTTP/1.1\r\nHost: '
-                              + HOST.encode() + b':443\r\n')
+        host = getattr(self, 'host', HOST)
+        connect = connect or (b'CONNECT ' + host.encode() + b':443 HTTP/1.1\r\nHost: '
+                              + host.encode() + b':443\r\n')
         head = connect
         if token:
             head += b'Proxy-Authorization: Basic ' + base64.b64encode(b'aivm:' + token) + b'\r\n'
@@ -75,7 +76,7 @@ class World:
             if not answer.startswith(b'HTTP/1.1 200 '):
                 return answer
             context = ssl.create_default_context(cafile=str(self.ca_path))
-            with context.wrap_socket(raw, server_hostname=HOST) as tls:
+            with context.wrap_socket(raw, server_hostname=host) as tls:
                 tls.sendall(request)
                 reply = b''
                 while True:

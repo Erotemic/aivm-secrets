@@ -3,7 +3,10 @@
 ``credential-substitution`` holds the credential itself. ``constrained-http``
 holds an in-process broker built from ``--service-policy`` (a schema-2
 HTTPS policy), which holds the credential; the proxy only translates
-requests that equal named operations (see :mod:`.constrained`).
+requests that equal named operations (see :mod:`.constrained`). With
+``--bridge-client`` instead of a credential, ``constrained-http`` runs on the
+guest side (HP-6, :mod:`.bridge`): it holds no credential and sends each
+translated operation through the guest's native ``invoke``.
 
 Process contract v1, mirroring ``native-session``: arguments in, one JSON
 announcement line out, and the session lasts until stdin reaches EOF or the
@@ -39,11 +42,14 @@ def _emit(value: dict) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog='aivm-secrets proxy')
     parser.add_argument('--policy', required=True, type=Path)
-    parser.add_argument('--credential-file', required=True, type=Path)
+    parser.add_argument('--credential-file', type=Path)
     parser.add_argument('--audit', required=True, type=Path)
     parser.add_argument('--service-policy', type=Path,
                         help='constrained-http: the broker policy whose operations are allowed')
     parser.add_argument('--broker-audit', type=Path)
+    parser.add_argument('--bridge-client',
+                        help='guest-side constrained-http: JSON array, the native client argv '
+                             '(for example ["garrett-client", "--config", "client.json"])')
     parser.add_argument('--writes', choices=('deny', 'allow'), default='deny')
     parser.add_argument('--access-identity', default='')
     parser.add_argument('--vm', default='')
@@ -55,6 +61,24 @@ def main(argv: list[str] | None = None) -> int:
     broker = None
     try:
         policy = load_policy(args.policy)
+        if args.bridge_client is not None:
+            # Guest side: no credential, no in-process broker, no fallback.
+            if (policy.profile != 'constrained-http' or args.credential_file is not None
+                    or args.service_policy is None or args.broker_audit is not None):
+                raise PolicyError('invalid_policy')
+            from .bridge import BridgeDispatcher, load_routes
+
+            try:
+                client = json.loads(args.bridge_client)
+            except ValueError as error:
+                raise PolicyError('invalid_policy') from error
+            if not isinstance(client, list):
+                raise PolicyError('invalid_policy')
+            broker = BridgeDispatcher(load_routes(args.service_policy), client)
+            session = ProxySession(policy, None, broker=broker, audit=ProxyAudit(args.audit))
+            return _serve(args, policy, session, b'')
+        if args.credential_file is None:
+            raise PolicyError('invalid_policy')
         credential = credential_from_file(args.credential_file)
         if policy.profile == 'constrained-http':
             if args.service_policy is None or args.broker_audit is None:
@@ -100,7 +124,7 @@ def _serve(args, policy, session, secret: bytes) -> int:
             'listen': server.address, 'origins': sorted(policy.origins),
             'ca_pem': session.ca.pem.decode('ascii'), 'proxy_token': session.token,
         }
-        if secret in json.dumps(announcement).encode():
+        if secret and secret in json.dumps(announcement).encode():
             raise PolicyError('credential_exposed')
         _emit(announcement)
         try:
