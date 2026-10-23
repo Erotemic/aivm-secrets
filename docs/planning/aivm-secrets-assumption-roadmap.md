@@ -26,11 +26,11 @@ hypotheses are on the same list as library and deployment trust.
 | --- | --- | --- |
 | `NATIVE-SINK-01` | P1 | Done: request primitives no longer receive the credential (core encodes). Next: core-owned opaque credential outside custody/unsealing; independent review of the remaining native call graph |
 | `NATIVE-GLUE-01` | P1 | Move remaining native-to-core call sites into extracted wrappers where Aeneas allows |
-| `MODEL-EXCHANGE-01` | P2 | Extract transport error classification (status classes already extracted) |
 | `EMISSION-RUST-01` | P2 | Extract remaining admission sampling wrappers |
 | `APPROVAL-RUST-01` | P2 | Adapter-level single-use linearization in the write (OUT-4) campaign |
 | `COORD-RUST-01` | P2 | Extend coordinator proofs to client transport phases |
 | `RUST-LEGACY-01` | P2 | Guard legacy socket forwarding out of the native read profile |
+| `MODEL-EXCHANGE-01` | P3 | Done: failures compared by public code at the frame boundary (`production_frame_noninterference`). Remaining: body parse (optional, `RUST-JSON-01`) |
 | `OAUTH-RUST-01`, `OAUTH-LOGIN-RUST-01` | P3 | Extract remaining state decisions; crypto and sockets stay external |
 | `COORD-AUTHORITY-RUST-01`, `COORD-OPERATOR-RUST-01` | P3 | Extract receipt/decision logic; SQL and transport stay external |
 | `REBIND-RUST-01`, `BUNDLE-RUST-01` | P3 | Extract remaining consistency decisions; files and crypto stay external |

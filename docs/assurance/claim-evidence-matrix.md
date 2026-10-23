@@ -36,9 +36,9 @@ still needs, the runtime witnesses, and what remains excluded.
 
 | | |
 | --- | --- |
-| Claim | An adaptive guest sees the same histories in two worlds that agree request by request on the selected JSON, the pagination row count and the status class; success frames are the checked encoding of the selected reply and denial frames are one of 17 fixed lines. |
-| Theorems | `manifest_release_noninterference` ([GarrettNR4ManifestRelease](../../proofs/GarrettNR4ManifestRelease.lean)); `adaptive_release_same_histories`, `adaptive_exchange_noninterference`, `adaptive_request_noninterference`; `manifest_classes`; `production_read_frame`, `read_confinement_for_every_document`; `denial_frame_exact` ([GarrettPublicError](../../proofs/GarrettPublicError.lean)) |
-| Premises | `MODEL-EXCHANGE-01` (transport errors as classes), `RUST-JSON-01` (which documents are compared; not needed for confinement), `NATIVE-GLUE-01` (`Reply::Released` framing) |
+| Claim | An adaptive guest sees the same histories in two worlds that agree request by request on the selected JSON, the pagination row count, the status class and the public code of each transport failure; success frames are the checked encoding of the selected reply and denial frames are one of 17 fixed lines. |
+| Theorems | `manifest_release_noninterference` ([GarrettNR4ManifestRelease](../../proofs/GarrettNR4ManifestRelease.lean)); `adaptive_release_same_histories`, `adaptive_exchange_noninterference`, `adaptive_request_noninterference`; `production_frame_noninterference`, `production_failure_frame` ([GarrettNR4FrameAdaptive](../../proofs/GarrettNR4FrameAdaptive.lean)); `manifest_classes`; `production_read_frame`, `read_confinement_for_every_document`; `denial_frame_exact` ([GarrettPublicError](../../proofs/GarrettPublicError.lean)) |
+| Premises | `MODEL-EXCHANGE-01` (body parse modeled; transport failures are a declassified public code), `RUST-JSON-01` (which documents are compared; not needed for confinement), `NATIVE-GLUE-01` (`Reply::Released` framing) |
 | Witnesses | `tests/test_rust_second_provider.py`, `tests/test_rust_garrett_reflection.py`, byte-equality oracles in Rust (`extracted_release_equals_previous_native_release`, `extracted_denial_frames_equal_previous_native_frames`, `extracted_status_equals_previous_native_status`) |
 | Excluded | Timing and co-resident side channels; content harm in selected fields; the reflection refusal is an explicit declassification |
 
