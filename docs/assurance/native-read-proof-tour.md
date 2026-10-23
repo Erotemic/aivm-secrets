@@ -45,6 +45,10 @@ callbacks) and the rest of the native crate perform no *other* write of
 credential bytes. That is a reachability property of native code, checked by
 the W3/W6 source guards and their mutation tests, not by Lean.
 
+Every remaining premise, library contract and deployment assumption is
+enumerated with its class and removal path in the
+[assumption removal roadmap](../planning/aivm-secrets-assumption-roadmap.md).
+
 **Not extracted, by decision.** The provider body parse into the `Json`
 document stays native serde: any deterministic, effect-free parser maps
 responses to documents, so noninterference over documents carries to bytes

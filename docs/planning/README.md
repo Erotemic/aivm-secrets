@@ -25,7 +25,9 @@ Read in this order:
 4. [W0 conditional-confinement contract](aivm-secrets-conditional-confinement.md)
    and [boundary inventory](aivm-secrets-w0-boundaries.json) — normative
    principals, adversary, allowed releases and scoped sinks.
-5. [Assumption ledger](aivm-secrets-assumptions.json),
+5. [Assumption ledger](aivm-secrets-assumptions.json) with its
+   [removal roadmap](aivm-secrets-assumption-roadmap.md) (class, justification
+   and removal path for every entry),
    [formal assurance architecture](aivm-secrets-formal-assurance.md),
    [Garrett proof obligations](aivm-secrets-garrett-verification.md) and
    [modular proof design](aivm-secrets-modular-proof-architecture.md).
