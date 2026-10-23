@@ -513,3 +513,13 @@ to 1024). ROUTE-NATIVE-01 is now only the JSON layer.
 Proof-engineering notes for the next agent: `step*` shadows hypothesis names
 (`inner_post✝`); refer to them by type with `‹...›`. Contradictory
 `if` branches from extraction need an explicit `exfalso; scalar_tac` first.
+
+## 2026-10-23 12:04:21 -0400
+
+Installed manim (and the pango/cairo headers it needs) into the
+visualization venv and rendered stills of the proof scenes for the first
+time in this session. Found and fixed two layout bugs shared by every scene:
+card headings shifted right by half their width (overflowing for long
+names) and long subtitles running off the frame. Structural tests had
+passed throughout; only rendering showed it. Lesson: render at least one
+still after changing a scene.
