@@ -6,23 +6,26 @@ import GarrettProviderExchange
 
 Source: `rust/crates/aivm-secrets-garrett-core/src/channel_work.rs`, extracted
 by Aeneas. Production dispatch wraps the native `ManifestProvider` in
-`channel_work::Submitting`, so the core builds the provider channel (encode the
-request for the captured route, then connect), sends with `Channel::submit`,
-and mints the response-gate token before the native parser runs.
+`channel_work::Submitting`, which holds the credential: the native provider has
+no credential field. The core asks native code only for the host request
+fields, encodes them with the extracted `channel_work::encode` (over
+`provider_wire::append`) for the captured route, hands the encoded bytes to a
+native zeroizing wrapper, connects to the encoder's endpoint, builds the
+channel, sends with `Channel::submit` and mints the response-gate token before
+the native parser runs. The target credential-reflection check also runs in
+core (`selected_release::checked`).
 
-`exchange_send_writes_route_body`: in every read exchange over the routed
-production provider that reached the send stage (refused at send, refused at
-response, or completed), the native writer callback was called with exactly the
-encoded bytes of the request body produced for that exchange's own captured
-route, on a fresh channel holding that body. This is the run-linked form of the
-former `PayloadCorresponds` premise, which took the channel as an arbitrary
-input.
+* `setup_route_constructs`, `sent_bytes_are_setup_body`: the bytes handed to
+  the native writer are the wrapped encoder output for this route.
+* `sent_bytes_are_encoder_output`: under the two-line wrapper contract
+  `WrapPreserves` (`ManifestWire` returns the vector it stores), the writer
+  receives exactly the extracted encoder's output.
+* `exchange_send_writes_route_body`: every read exchange reaching the send
+  stage satisfies the above for its own captured route and credential.
 
-Still native and trusted: `request_body` (a wrapper over the extracted
-`provider_wire::append`, whose output is proved elsewhere), `connect` (TCP/TLS),
-`parse` (receives only the released token), and the writer's I/O. That native
-code makes no *other* credential-bearing write remains the narrowed
-`ExactNativeSinkCoverage` premise, checked by the W3/W6 source guards.
+Still native and trusted (`NATIVE-SINK-01`, `NATIVE-GLUE-01`): `request_fields`,
+`wrap_body`, `connect` (TCP/TLS), `parse` (receives only the released token),
+the writer's I/O, and that no other native code writes credential bytes.
 -/
 
 open Aeneas Aeneas.Std
@@ -49,50 +52,66 @@ theorem send_is_submit (s : Submitting W B PW M O X) (ch : provider_io.Channel B
             cw.provider_ioWriterInst ch
           Result.ok (r, s, ch₁)) := rfl
 
-/-- A returned routed setup built the channel from this route's encoded
-    request body, *then* connected, and nothing else: a fresh, unsent,
-    not-ready channel owning exactly that body. -/
+/-- A returned routed setup asked the native work only for host request
+    fields, encoded them with the credential using the extracted
+    `channel_work::encode` (over `provider_wire::append`) for the captured
+    route, handed the encoded bytes to the native wrapper, *then* connected to
+    the encoder's endpoint, and built a fresh, unsent, not-ready channel. -/
 theorem setup_route_constructs (s s' : Submitting W B PW M O X) (route : credential_use.Route)
     (ch : provider_io.Channel B PW M X)
     (returned : (submittingRoutes cw).setup_route s route = Result.ok (.Ok ch, s')) :
-    ∃ body t writer md,
-      cw.request_body s.work route = Result.ok (.Ok body, t) ∧
-      cw.connect t route = Result.ok (.Ok (writer, md), s'.work) ∧
+    ∃ parts t encoded endpoint body t1 writer md,
+      cw.request_fields s.work = Result.ok (.Ok parts, t) ∧
+      channel_work.encode (alloc.vec.Vec.new U8) route parts s.secret =
+        Result.ok (.Ok endpoint, encoded) ∧
+      cw.wrap_body t encoded = Result.ok (body, t1) ∧
+      cw.connect t1 endpoint = Result.ok (.Ok (writer, md), s'.work) ∧
       ch = ⟨⟨body, false⟩, writer, md, false⟩ := by
   simp only [
     Submitting.Insts.Aivm_secrets_garrett_coreProvider_ioRouteWorkChannelClause0_Error.setup_route] at returned
-  obtain ⟨⟨r, t⟩, hbody, returned⟩ := (bind_returns_iff _ _ _).mp returned
+  obtain ⟨⟨r, t⟩, hfields, returned⟩ := (bind_returns_iff _ _ _).mp returned
   cases r with
   | Err e => simp at returned
-  | Ok body =>
-    obtain ⟨⟨r1, t1⟩, hconn, returned⟩ := (bind_returns_iff _ _ _).mp returned
+  | Ok parts =>
+    obtain ⟨⟨r1, encoded⟩, hencode, returned⟩ := (bind_returns_iff _ _ _).mp returned
     cases r1 with
-    | Err e => simp at returned
-    | Ok parts =>
-      obtain ⟨writer, md⟩ := parts
-      simp [provider_io.Channel.new, provider_io.Request.new] at returned
-      obtain ⟨hch, hs⟩ := returned
-      refine ⟨body, t, writer, md, hbody, ?_, hch.symm⟩
-      rw [← hs]; exact hconn
+    | Err d =>
+      obtain ⟨⟨_, _⟩, _, returned⟩ := (bind_returns_iff _ _ _).mp returned
+      simp at returned
+    | Ok endpoint =>
+      obtain ⟨⟨body, t1⟩, hwrap, returned⟩ := (bind_returns_iff _ _ _).mp returned
+      obtain ⟨⟨r2, t2⟩, hconn, returned⟩ := (bind_returns_iff _ _ _).mp returned
+      cases r2 with
+      | Err e => simp at returned
+      | Ok pair =>
+        obtain ⟨writer, md⟩ := pair
+        simp [provider_io.Channel.new, provider_io.Request.new] at returned
+        obtain ⟨hch, hs⟩ := returned
+        refine ⟨parts, t, encoded, endpoint, body, t1, writer, md, hfields, hencode, hwrap, ?_, hch.symm⟩
+        rw [← hs]; exact hconn
 
 /-- **Provider payload origin.** If the core-owned setup returned channel `ch`
     for `route` and the core-owned send then ran on `ch`, the native writer
-    callback was invoked with exactly the bytes of the request body that
-    `request_body` produced for that same route (before `connect`). This is
-    the run-linked form of the former `PayloadCorresponds` premise. -/
+    callback was invoked with exactly the bytes of the wrapped encoder output
+    for that same route and this request's credential. This is the run-linked
+    form of the former `PayloadCorresponds` premise. -/
 theorem sent_bytes_are_setup_body (s s' s₂ s₃ : Submitting W B PW M O X)
     (route : credential_use.Route) (ch ch' : provider_io.Channel B PW M X)
     (out : core.result.Result Unit X)
     (setup : (submittingRoutes cw).setup_route s route = Result.ok (.Ok ch, s'))
     (sent : (submittingProvider cw).send s₂ ch = Result.ok (out, s₃, ch')) :
-    ∃ body t calls wire,
-      cw.request_body s.work route = Result.ok (.Ok body, t) ∧
+    ∃ parts t encoded endpoint body t1 calls wire,
+      cw.request_fields s.work = Result.ok (.Ok parts, t) ∧
+      channel_work.encode (alloc.vec.Vec.new U8) route parts s.secret =
+        Result.ok (.Ok endpoint, encoded) ∧
+      cw.wrap_body t encoded = Result.ok (body, t1) ∧
       ch.request.body = body ∧ ch.request.attempted = false ∧
       cw.provider_ioWireBytesInst.bytes body = Result.ok wire ∧
       Call.write wire ∈ calls ∧
       Observed cw.provider_ioWireBytesInst cw.provider_ioWriterInst ch.request ch.writer out
         ch'.request ch'.writer calls := by
-  obtain ⟨body, t, writer, md, hbody, _, rfl⟩ := setup_route_constructs cw s s' route ch setup
+  obtain ⟨parts, t, encoded, endpoint, body, t1, writer, md, hf, he, hw, _, rfl⟩ :=
+    setup_route_constructs cw s s' route ch setup
   rw [send_is_submit] at sent
   obtain ⟨⟨r, ch₁⟩, submitted, sent⟩ := (bind_returns_iff _ _ _).mp sent
   simp at sent
@@ -100,7 +119,40 @@ theorem sent_bytes_are_setup_body (s s' s₂ s₃ : Submitting W B PW M O X)
   obtain ⟨calls, wire, seen, hwire, hcall, -, -, -⟩ :=
     nr23.WriterOrigin.fresh_returned_channel_exposes_exact_writer_bytes
       cw.provider_ioWireBytesInst cw.provider_ioWriterInst _ ch₁ r rfl submitted
-  exact ⟨body, t, calls, wire, hbody, rfl, rfl, hwire, hcall, seen⟩
+  exact ⟨parts, t, encoded, endpoint, body, t1, calls, wire, hf, he, hw, rfl, rfl, hwire, hcall, seen⟩
+
+/-- The native wrapper contract (`NATIVE-GLUE-01`): the wrapped body's bytes
+    are exactly the encoded bytes it was given. Production: `ManifestWire`
+    stores the vector and `WireBytes::bytes` returns it. -/
+def WrapPreserves : Prop :=
+  ∀ s encoded body s', cw.wrap_body s encoded = Result.ok (body, s') →
+    cw.provider_ioWireBytesInst.bytes body = Result.ok encoded
+
+/-- Under the two-line wrapper contract, the bytes handed to the native writer
+    are exactly the extracted encoder's output for the captured route, host
+    fields and this request's credential. Properties of that output (the
+    credential appears only in the authentication header) are the existing
+    `provider_wire`/`http_wire` theorems. -/
+theorem sent_bytes_are_encoder_output (wrap : WrapPreserves cw)
+    (s s' s₂ s₃ : Submitting W B PW M O X)
+    (route : credential_use.Route) (ch ch' : provider_io.Channel B PW M X)
+    (out : core.result.Result Unit X)
+    (setup : (submittingRoutes cw).setup_route s route = Result.ok (.Ok ch, s'))
+    (sent : (submittingProvider cw).send s₂ ch = Result.ok (out, s₃, ch')) :
+    ∃ parts endpoint encoded calls,
+      channel_work.encode (alloc.vec.Vec.new U8) route parts s.secret =
+        Result.ok (.Ok endpoint, encoded) ∧
+      Call.write encoded ∈ calls ∧
+      Observed cw.provider_ioWireBytesInst cw.provider_ioWriterInst ch.request ch.writer out
+        ch'.request ch'.writer calls := by
+  obtain ⟨parts, _, encoded, endpoint, body, _, calls, wire, _, he, hw, _, _, hwire, hcall, seen⟩ :=
+    sent_bytes_are_setup_body cw s s' s₂ s₃ route ch ch' out setup sent
+  have same : wire = encoded := by
+    have := wrap _ _ _ _ hw
+    rw [this] at hwire
+    exact (Result.ok_injective hwire).symm
+  subst same
+  exact ⟨parts, endpoint, wire, calls, he, hcall, seen⟩
 
 abbrev submittingDispatch :=
   Submitting.Insts.Aivm_secrets_garrett_coreDispatchWorkChannelClause0_OutputClause0_Error cw
@@ -126,16 +178,22 @@ theorem routed_send_is_submit (p : provider_io.Routed (Submitting W B PW M O X)
 /-- **Every production exchange that reaches the send stage wrote exactly its
     own route's encoded request.** For a read exchange over the routed
     core-owned provider that refused at send, refused at response, or
-    completed, the native writer was called with the bytes of the body that
-    `request_body` produced for the exchange's captured route. -/
+    completed, the native writer was called with the bytes of the wrapped
+    output of the extracted encoder for the exchange's captured route and its
+    own credential, on a fresh channel holding that body. -/
 theorem exchange_send_writes_route_body
     (p after : provider_io.Routed (Submitting W B PW M O X) (provider_io.Channel B PW M X) O X)
     (phase : read_transition.Phase) (report : provider_exchange.Report O X)
     (run : provider_exchange.Proofs.ReadRun (routedProvider cw) p phase report after)
     (reached : report.stage = .Send ∨ report.stage = .Response ∨ report.stage = .Complete) :
-    ∃ (channel : provider_io.Channel B PW M X) (body : B) (t : W) (calls : List Call)
-      (wire : alloc.vec.Vec U8) (out : core.result.Result Unit X) (ch' : provider_io.Channel B PW M X),
-      cw.request_body p.work.work p.route = Result.ok (.Ok body, t) ∧
+    ∃ (channel : provider_io.Channel B PW M X) (parts : RequestParts) (t : W)
+      (encoded : alloc.vec.Vec U8) (endpoint : provider_wire.Endpoint) (body : B) (t1 : W)
+      (calls : List Call) (wire : alloc.vec.Vec U8) (out : core.result.Result Unit X)
+      (ch' : provider_io.Channel B PW M X),
+      cw.request_fields p.work.work = Result.ok (.Ok parts, t) ∧
+      channel_work.encode (alloc.vec.Vec.new U8) p.route parts p.work.secret =
+        Result.ok (.Ok endpoint, encoded) ∧
+      cw.wrap_body t encoded = Result.ok (body, t1) ∧
       channel.request.body = body ∧ channel.request.attempted = false ∧
       cw.provider_ioWireBytesInst.bytes body = Result.ok wire ∧
       Call.write wire ∈ calls ∧
@@ -146,9 +204,14 @@ theorem exchange_send_writes_route_body
       (out : core.result.Result Unit X),
       (routedProvider cw).setup p = Result.ok (.Ok channel, s1) →
       (routedProvider cw).send s2 channel = Result.ok (out, s3, next) →
-      ∃ (channel : provider_io.Channel B PW M X) (body : B) (t : W) (calls : List Call)
-        (wire : alloc.vec.Vec U8) (out : core.result.Result Unit X) (ch' : provider_io.Channel B PW M X),
-        cw.request_body p.work.work p.route = Result.ok (.Ok body, t) ∧
+      ∃ (channel : provider_io.Channel B PW M X) (parts : RequestParts) (t : W)
+        (encoded : alloc.vec.Vec U8) (endpoint : provider_wire.Endpoint) (body : B) (t1 : W)
+        (calls : List Call) (wire : alloc.vec.Vec U8) (out : core.result.Result Unit X)
+        (ch' : provider_io.Channel B PW M X),
+        cw.request_fields p.work.work = Result.ok (.Ok parts, t) ∧
+        channel_work.encode (alloc.vec.Vec.new U8) p.route parts p.work.secret =
+          Result.ok (.Ok endpoint, encoded) ∧
+        cw.wrap_body t encoded = Result.ok (body, t1) ∧
         channel.request.body = body ∧ channel.request.attempted = false ∧
         cw.provider_ioWireBytesInst.bytes body = Result.ok wire ∧
         Call.write wire ∈ calls ∧
@@ -158,9 +221,10 @@ theorem exchange_send_writes_route_body
     obtain ⟨native, routed, _⟩ := (provider_io.Proofs.routed_setup_iff (submittingDispatch cw)
       (submittingRoutes cw) p s1 (.Ok channel)).mp setup
     obtain ⟨s', hs⟩ := routed_send_is_submit cw s2 channel next out s3 sent
-    obtain ⟨body, t, calls, wire, hbody, hb, ha, hwire, hcall, seen⟩ :=
+    obtain ⟨parts, t, encoded, endpoint, body, t1, calls, wire, hf, he, hw, hb, ha, hwire, hcall, seen⟩ :=
       sent_bytes_are_setup_body cw p.work native s2.work s' p.route channel next out routed hs
-    exact ⟨channel, body, t, calls, wire, out, next, hbody, hb, ha, hwire, hcall, seen⟩
+    exact ⟨channel, parts, t, encoded, endpoint, body, t1, calls, wire, out, next,
+      hf, he, hw, hb, ha, hwire, hcall, seen⟩
   cases run with
   | setupDenied => simp [provider_exchange.Proofs.receipt] at reached
   | admissionDenied => simp [provider_exchange.Proofs.receipt] at reached
