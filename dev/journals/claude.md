@@ -134,3 +134,31 @@ checks that it is refused. The proxy holds no credential in this profile; the
 in-process Broker does. 19 tests, including the process contract. Not yet
 translated: checks, GraphQL and pagination metadata. Stock-tool
 compatibility is open (HP-3).
+
+## 2026-10-23 02:00:03 -0400
+
+HP-4/HP-5(a): extracted the proxy request side into Rust and proved where
+the credential goes.
+
+- `proxy_http.rs` in the Aeneas core: strict parser, field filter, deny
+  rules, upstream encoder. Byte parity with the Python reference over 64
+  vectors (`tests/secrets_vectors/proxy-http-v1.tsv`), checked from both
+  sides. A `Cookie`-forwarding mutant fails the Rust oracle.
+- `GarrettProxyHttp.lean`: `dropped_eq`, `forwarded_contract`,
+  `append_fields_contract`, `needs_length_eq`, totality of `path_end` and
+  `denied`, and `encode_upstream_contract`. An accepted encode is exactly
+  prefix ++ verified auth line ++ suffix, and neither prefix nor suffix
+  mentions the secret. Refusals leave the buffer unchanged. No sorry, no
+  warnings.
+- Aeneas lessons: `Vec::as_slice` and slice `!=` / array `==` extract to
+  uninterpreted axioms (`alloc.vec.Vec.as_slice`,
+  `PartialEqShared.ne`, `CoreCmpPartialEqArray`). Write
+  `let x: &[u8] = &v; x == y` and `!(a == b)` instead. I checked the
+  generated axiom list was back to HEAD's two before proving anything.
+- Python changed to the Rust header spelling (`Authorization`,
+  `X-API-Key`), dropped the `token` scheme and added the 4096-byte credential
+  bound, all for parity.
+
+Next: prove the parser's value/target admission (PROXY-PARSE-01, P1), then
+the response reflection check in Rust. Confidence: high on the encoder
+theorem; the parser is tested, not proved.

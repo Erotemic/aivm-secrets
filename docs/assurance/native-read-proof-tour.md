@@ -368,3 +368,54 @@ called; the native parser consumes that token and cannot accept a raw Channel.
 **token-eligibility and exact writer/flush provenance**, not a fictitious
 symbolic native parser invocation. The concrete native parse, all other native
 sinks, and OS/TLS behavior remain separate implementation obligations.
+
+## HTTPS proxy, credential-substitution profile: where the credential goes (2026-10-23)
+
+This section is about the optional proxy profile
+([plan](../planning/aivm-secrets-http-proxy-profiles.md)), not the native
+read profile. Source: `rust/crates/aivm-secrets-garrett-core/src/proxy_http.rs`,
+extracted by Aeneas. Proofs: [`GarrettProxyHttp`](../../proofs/GarrettProxyHttp.lean).
+
+**The question.** The proxy takes an arbitrary guest HTTP request and adds the
+real credential. Can a guest arrange for the credential to land somewhere
+other than the one authentication line? Can a guest-supplied
+`Authorization` or `Cookie` header be forwarded alongside it?
+
+**What is proved, in plain words.**
+
+| Theorem | Says |
+| --- | --- |
+| `dropped_eq` | The extracted filter drops a guest field exactly when its (lowercased) name is one of 14 names, including `authorization`, `x-api-key`, `proxy-authorization` and `cookie`. |
+| `forwarded_contract`, `forwarded_drops` | The forwarded fields are the guest fields in their original order, minus those names. No forwarded field has a dropped name. |
+| `append_fields_contract` | Each forwarded field is written as `name: value` CRLF, and nothing else. |
+| `encode_upstream_contract` | For **every** guest request, host, deny list and credential, the encoder either refuses and leaves the output buffer unchanged, or the credential is valid and it appends exactly `UpstreamPrefix ++ HeaderPrefix a ++ secret ++ CRLF ++ UpstreamSuffix`. |
+
+`UpstreamPrefix` is the request line, `Host` and the forwarded fields.
+`UpstreamSuffix` is the fixed lines, an optional `Content-Length` and the
+body. Both are defined without the secret. So the secret appears in the
+upstream bytes as the one verified authentication line
+(`http_auth.Proofs.accepted_header_exact`), placed after every guest field.
+
+**Read the conclusion carefully.** These theorems describe the *encoder*.
+They do not say that guest bytes in the prefix can never contain text that
+*looks like* a credential: a guest can put any visible bytes in its own
+header values, but it does not know the credential. Header framing is safe
+because the parser only accepts values of visible ASCII, space and tab
+(`parse_field`). That fact is enforced by the extracted parser and tested,
+**not yet proved**.
+
+**Byte parity with the Python reference.** `tests/secrets_vectors/proxy-http-v1.tsv`
+holds 64 adversarial and positive cases. The Python test checks that the
+file is exactly the Python reference's output, and the Rust test
+`python_reference_vectors` checks the extracted code against every line. A
+mutant that forwarded `Cookie` fails it.
+
+**Still trusted for this profile.**
+- The parser's agreement with how the provider reads the canonical bytes
+  (`PROXY-PARSE-01`; next proof target).
+- The response reflection check (`PROXY-REFLECT-01`).
+- TLS and the session CA (`PROXY-TLS-01`).
+- That the native proxy, which does not exist yet (only the Python server
+  does), writes exactly these bytes.
+- **The profile grants the credential's full authority at the origin**
+  (`PROXY-AUTHORITY-01`). None of this is authority confinement.

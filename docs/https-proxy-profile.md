@@ -46,7 +46,7 @@ origin. The guest never receives it.
 }
 ```
 
-`authentication` is `bearer`, `token` (GitHub style) or `x-api-key`. The
+`authentication` is `bearer` (`Authorization: Bearer …`) or `x-api-key` (`X-API-Key: …`). The
 upstream address and trust anchor are pinned; nothing is resolved from what
 the guest sends. A `deny` path ending in `/` covers everything below it.
 

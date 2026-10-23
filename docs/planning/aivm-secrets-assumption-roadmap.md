@@ -26,6 +26,7 @@ hypotheses are on the same list as library and deployment trust.
 | --- | --- | --- |
 | `NATIVE-SINK-01` | P1 | Done: request primitives no longer receive the credential (core encodes). Next: core-owned opaque credential outside custody/unsealing; independent review of the remaining native call graph |
 | `NATIVE-GLUE-01` | P1 | Move remaining native-to-core call sites into extracted wrappers where Aeneas allows |
+| `PROXY-PARSE-01` | P1 | Proxy profile (OUT-6): encoder proved (`encode_upstream_contract`); next prove the extracted parser admits only CR/LF-free values and exact targets, then parser–encoder agreement |
 | `EMISSION-RUST-01` | P2 | Extract remaining admission sampling wrappers |
 | `APPROVAL-RUST-01` | P2 | Adapter-level single-use linearization in the write (OUT-4) campaign |
 | `COORD-RUST-01` | P2 | Extend coordinator proofs to client transport phases |

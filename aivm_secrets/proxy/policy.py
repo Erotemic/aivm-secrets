@@ -25,12 +25,13 @@ from .http1 import Refused
 
 SCHEMA = 1
 PROFILES = ('credential-substitution', 'constrained-http')
-# Authentication field for each scheme, as the provider expects it.
+# Authentication field for each scheme, spelled exactly as the extracted
+# Rust `http_auth::append_header` writes it (byte parity, HP-4).
 SCHEMES = {
-    'bearer': (b'authorization', b'Bearer '),
-    'token': (b'authorization', b'token '),
-    'x-api-key': (b'x-api-key', b''),
+    'bearer': (b'Authorization', b'Bearer '),
+    'x-api-key': (b'X-API-Key', b''),
 }
+MAX_CREDENTIAL = 4096
 # Guest fields never forwarded upstream: credentials (any scheme), proxy
 # and hop-by-hop fields, framing, and content negotiation the proxy owns.
 DROPPED = frozenset({
@@ -168,7 +169,8 @@ def upstream_request(
         raise Refused('denied')
     forwarded = tuple((k, v) for k, v in request.fields if k not in DROPPED)
     name, prefix = SCHEMES[origin.authentication]
-    if not credential or any(not http1._visible(b) for b in credential):
+    if (not credential or len(credential) > MAX_CREDENTIAL
+            or any(not http1._visible(b) for b in credential)):
         raise Refused('credential_source')
     return http1.encode_request(
         request, host=origin.host.encode('ascii'), forwarded=forwarded,
