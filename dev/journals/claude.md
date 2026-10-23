@@ -545,3 +545,5 @@ enterprise-shaped provider; the provider sees only the substituted bearer;
 a deny-listed path fails. Skips where `gh` is absent. Not checked: gh
 GraphQL commands (`gh pr view` uses GraphQL), which would need a GraphQL
 route on the synthetic provider.
+Follow-up: `gh pr view --json` (GraphQL) also works through both proxies;
+added to the test with a GraphQL route on the synthetic provider.

@@ -1,4 +1,4 @@
-"""HP-3: stock `gh` through the credential-substitution proxy (both backends).
+"""HP-3: stock `gh` (REST and GraphQL) through the credential-substitution proxy.
 
 The guest's `gh` holds only a placeholder token. It talks to a synthetic
 GitHub Enterprise-shaped provider (`GH_HOST`) through `HTTPS_PROXY`, trusting
@@ -41,6 +41,8 @@ def service(tmp_path):
         provider.routes[('GET', '/api/v3/user')] = {'login': 'demo', 'id': 7}
         provider.routes[('GET', '/api/v3/repos/octo/demo/pulls/7')] = {
             'number': 7, 'title': 'Fix the proof', 'state': 'open'}
+        provider.routes[('POST', '/api/graphql')] = lambda seen: (200, {}, json.dumps(
+            {'data': {'repository': {'pullRequest': {'title': 'Fix the proof', 'number': 7}}}}).encode())
         yield provider
 
 
@@ -109,15 +111,20 @@ def test_stock_gh_reads_through_the_proxy_with_only_a_placeholder(tmp_path, serv
         user = gh(tmp_path, proxy, 'api', '/user')
         pull = gh(tmp_path, proxy, 'api', '/repos/octo/demo/pulls/7', '--jq', '.title')
         admin = gh(tmp_path, proxy, 'api', '/admin/users')
+        # GraphQL, as most `gh pr` commands use.
+        view = gh(tmp_path, proxy, 'pr', 'view', '7', '--repo', 'octo/demo', '--json', 'title,number')
     assert user.returncode == 0, user
+    assert view.returncode == 0 and json.loads(view.stdout) == {'number': 7, 'title': 'Fix the proof'}, view
     assert json.loads(user.stdout) == {'login': 'demo', 'id': 7}
     assert pull.returncode == 0 and pull.stdout.strip() == b'Fix the proof', pull
     assert admin.returncode != 0, admin
     sent = service.requests
-    assert [r['target'] for r in sent] == ['/api/v3/user', '/api/v3/repos/octo/demo/pulls/7']
+    assert [r['target'] for r in sent] == [
+        '/api/v3/user', '/api/v3/repos/octo/demo/pulls/7', '/api/graphql']
+    assert json.loads(sent[2]['body'])['variables'] == {'owner': 'octo', 'pr_number': 7, 'repo': 'demo'}
     for request in sent:
         pairs = [(k.lower(), v) for k, v in request['header_pairs']]
         assert [v for k, v in pairs if k == 'authorization'] == ['Bearer ' + TOKEN]
         assert PLACEHOLDER not in json.dumps(pairs)
-    for output in (user, pull, admin):
+    for output in (user, pull, admin, view):
         assert TOKEN.encode() not in output.stdout + output.stderr

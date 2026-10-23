@@ -54,7 +54,8 @@ the path without the slash; any rule also matches its path plus a trailing `/`.
 ## Stock tools
 
 `curl`, Python HTTP clients and the GitHub CLI work unchanged:
-`tests/test_proxy_gh_compat.py` runs `gh api` (REST, with `--jq`) through
+`tests/test_proxy_gh_compat.py` runs `gh api` (REST, with `--jq`) and
+`gh pr view --json` (GraphQL) through
 both the Python and the native proxy against a synthetic GitHub
 Enterprise-shaped provider, holding only a placeholder token. The provider
 sees the substituted credential, a deny-listed path fails, and nothing `gh`
