@@ -18,21 +18,51 @@ pub fn key_before(a: &[u32], b: &[u32]) -> bool {
     a.len() < b.len()
 }
 
+/// A copy of a JSON value (structural recursion; `Value` is not `Clone`).
+pub fn clone_value(value: &Value) -> Value {
+    match value {
+        Value::Null => Value::Null,
+        Value::Boolean(b) => Value::Boolean(*b),
+        Value::Number(digits) => Value::Number(digits.clone()),
+        Value::Text(units) => Value::Text(units.clone()),
+        Value::Array(items) => {
+            let mut out = Vec::new();
+            let mut index = 0;
+            while index < items.len() {
+                out.push(clone_value(&items[index]));
+                index += 1;
+            }
+            Value::Array(out)
+        }
+        Value::Object(fields) => {
+            let mut out = Vec::new();
+            let mut index = 0;
+            while index < fields.len() {
+                out.push((fields[index].0.clone(), clone_value(&fields[index].1)));
+                index += 1;
+            }
+            Value::Object(out)
+        }
+    }
+}
+
 /// Merge two key-sorted field lists into one key-sorted list.
-pub fn merge(left: Vec<(Vec<u32>, Value)>, right: Vec<(Vec<u32>, Value)>) -> Vec<(Vec<u32>, Value)> {
+pub fn merge(left: &[(Vec<u32>, Value)], right: &[(Vec<u32>, Value)]) -> Vec<(Vec<u32>, Value)> {
     let mut out = Vec::new();
-    let mut left = left.into_iter().peekable();
-    let mut right = right.into_iter().peekable();
-    loop {
-        let take_left = match (left.peek(), right.peek()) {
-            (Some(l), Some(r)) => key_before(&l.0, &r.0),
-            (Some(_), None) => true,
-            (None, Some(_)) => false,
-            (None, None) => break,
+    let mut i = 0;
+    let mut j = 0;
+    while i < left.len() || j < right.len() {
+        let take_left = if i < left.len() && j < right.len() {
+            key_before(&left[i].0, &right[j].0)
+        } else {
+            i < left.len()
         };
-        let next = if take_left { left.next() } else { right.next() };
-        if let Some(field) = next {
-            out.push(field);
+        if take_left {
+            out.push((left[i].0.clone(), clone_value(&left[i].1)));
+            i += 1;
+        } else {
+            out.push((right[j].0.clone(), clone_value(&right[j].1)));
+            j += 1;
         }
     }
     out
@@ -54,5 +84,5 @@ pub fn row(
         (text_units(b"seq"), seq),
         (text_units(b"timestamp"), timestamp),
     ];
-    Value::Object(merge(fixed, detail))
+    Value::Object(merge(&fixed, &detail))
 }

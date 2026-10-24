@@ -856,3 +856,10 @@ fields (true in production: visible-ASCII targets, ASCII origins/codes). Before
 merging: rewrite `merge` with index loops (Peekable is not Aeneas-friendly),
 extract, prove sortedness and fields, wire `Session::record`, run the gate.
 Not wired into garrett-proxy yet.
+
+## 2026-10-23 23:08:07 -0400 (branch wip/proxy-audit-rows)
+
+`clone_value` (structural recursion) and an index-loop `merge` make the
+proxy row extractable: scratch Aeneas run clean, still 2 axioms, oracle still
+passes. Remaining before merge: prove `merge` keeps key order and every
+field, wire `Session::record` through `row`, gate.
