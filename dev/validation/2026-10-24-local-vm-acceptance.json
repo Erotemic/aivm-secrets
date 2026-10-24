@@ -14,7 +14,7 @@
     "native_binaries": "debug build of rust/ at the source commit",
     "credentials": "synthetic only; no live provider"
   },
-  "scope": "OUT-2 finite witnesses: approved reads, denied write, revocation, identity negatives (foreign, mismatched key, tampered, re-enrolled certificate), host TCP canary, guest-share mount inventory with alias grouping, host canary name search over every share mount as guest root (depth 4), socket disconnect and reconnect. Not an isolation proof. Also OUT-6: credential-substitution proxy (native and Python) and the guest-side constrained-http translator, each with public egress on and off (AIVM firewall.public_egress, HP-7).",
+  "scope": "OUT-2 finite witnesses: approved reads, denied write, revocation, identity negatives (foreign, mismatched key, tampered, re-enrolled certificate), host TCP canary, guest-share mount inventory with alias grouping, host canary name search over every share mount as guest root (depth 4), socket disconnect and reconnect. Not an isolation proof. Also OUT-6: credential-substitution proxy (native and Python) and the guest-side constrained-http translator, each with public egress on and off (AIVM firewall.public_egress, HP-7). Also Phase 1.5: a simulated agent (dev/guest_agent.py) running 21 attacks inside the guest, judged by the provider's own request record, and a guest-root search of the whole guest filesystem and every process for the credential and its base64 forms (public egress off).",
   "runs": {
     "baseline": {
       "application_socket_forwarding": "ssh-remote-unix/mTLS",
@@ -417,6 +417,130 @@
         "vm": "aivm-2404",
         "whole_service_secrecy_proved": false
       }
+    },
+    "simulated_agent_and_guest_credential_search": {
+      "adversarial": {
+        "identities": {
+          "certificate_key_mismatch_rejected": true,
+          "other_enrolled_subject_rejected": true,
+          "reenrolled_certificate_rejected": true,
+          "tampered_capability_rejected": true
+        },
+        "lifecycle": {
+          "authorized_read_after_reconnect": true,
+          "no_provider_effect_with_forward_disconnected": true
+        },
+        "mounts": {
+          "aliased_mounts": 3,
+          "attachment_devices": 2,
+          "attachment_mounts_observed": 4,
+          "canary_search": {
+            "as_guest_root": true,
+            "complete": true,
+            "found": false,
+            "max_depth": 4,
+            "mount_points_searched": 4
+          },
+          "host_workspace_in_mount_table": false,
+          "scope": "mount table metadata, alias grouping and a depth-4 search for the host canary name; not an exhaustive reachability proof",
+          "whole_share_root_mounts": 4
+        },
+        "network": {
+          "direct_synthetic_provider_tcp_denied": true,
+          "host_gateway_canary_denied": true,
+          "scope": "guest gateway TCP: one ephemeral canary and the host-loopback provider port"
+        },
+        "out_of_scope_read_denied": true
+      },
+      "application_socket_forwarding": "ssh-remote-unix/mTLS",
+      "approved_diff": true,
+      "approved_view": {
+        "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "number": 13861,
+        "title": "Proof repair"
+      },
+      "denied_write": true,
+      "filesystem_isolation_proved": false,
+      "guest_credential_search": {
+        "as_guest_root": true,
+        "files_scanned": 73718,
+        "found": false,
+        "patterns": 3,
+        "processes_scanned": 186,
+        "ran": true
+      },
+      "host_private_paths_unreadable_in_guest": true,
+      "mode": "native-rust/aivm-kvm/synthetic-local-https",
+      "ok": true,
+      "provider_requests": [
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github.diff",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        }
+      ],
+      "revocation_fenced": true,
+      "simulated_agent": {
+        "attacks": {
+          "arguments_not_an_object": "refused",
+          "arguments_not_json": "refused",
+          "denied_write": "refused",
+          "encoded_slash_in_repository": "refused",
+          "extra_url_argument": "refused",
+          "header_injection_in_repository": "refused",
+          "missing_argument": "refused",
+          "one_megabyte_of_garbage": "closed:BrokenPipeError",
+          "other_pull_request": "refused",
+          "other_repository": "refused",
+          "oversized_argument": "refused",
+          "path_traversal_in_repository": "refused",
+          "plain_http_on_broker_socket": "answered:7",
+          "pr_as_path": "refused",
+          "pr_float": "refused",
+          "pr_huge": "refused",
+          "pr_negative": "refused",
+          "query_in_repository": "refused",
+          "tls_without_client_certificate": "refused:SSLError",
+          "unknown_operation": "refused",
+          "unlisted_write": "refused"
+        },
+        "useful_read": true,
+        "useful_read_after_attacks": true
+      },
+      "virtualization": "kvm",
+      "vm": "aivm-2404",
+      "whole_service_secrecy_proved": false
     }
   },
   "findings": [

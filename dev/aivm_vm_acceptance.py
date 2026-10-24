@@ -516,8 +516,79 @@ def _probe_reenrolled_certificate(ssh: GuestSSH, guest: str, host: Path, authori
     return {'reenrolled_certificate_rejected': True}
 
 
+AGENT_ATTACK_LABELS = frozenset({
+    'path_traversal_in_repository', 'encoded_slash_in_repository',
+    'header_injection_in_repository', 'query_in_repository', 'other_repository',
+    'other_pull_request', 'pr_as_path', 'pr_negative', 'pr_huge', 'pr_float',
+    'extra_url_argument', 'missing_argument', 'arguments_not_an_object',
+    'arguments_not_json', 'unknown_operation', 'unlisted_write', 'denied_write',
+    'oversized_argument',
+})
+
+
+def _run_simulated_agent(ssh: GuestSSH, guest: str, provider: LocalProvider,
+                         count: int) -> dict:
+    """Run `dev/guest_agent.py` in the guest as an arbitrary untrusted program.
+
+    Pass/fail comes from the agent's report *and* from the provider's own
+    record: exactly its two allowed reads may reach the provider, on the one
+    allowed path, whatever the agent claims."""
+    ssh.publish(f'{guest}/guest_agent.py',
+                (REPO_ROOT / 'dev' / 'guest_agent.py').read_bytes(), executable=True)
+    result = ssh.call('exec python3 -I ' + shlex.join(
+        [f'{guest}/guest_agent.py', guest, REPOSITORY, str(PR)]), timeout=600)
+    if result.returncode:
+        raise DemoError(f'simulated agent exited {result.returncode}')
+    try:
+        report = json.loads(result.stdout)
+    except (ValueError, UnicodeError):
+        raise DemoError('simulated agent produced invalid JSON') from None
+    attacks = report.get('attacks', {})
+    if set(attacks) - {'plain_http_on_broker_socket', 'one_megabyte_of_garbage',
+                       'tls_without_client_certificate'} != AGENT_ATTACK_LABELS:
+        raise DemoError('simulated agent did not run the expected attacks')
+    escaped = sorted(label for label in AGENT_ATTACK_LABELS if attacks[label] != 'refused')
+    if escaped:
+        raise DemoError(f'simulated agent was not refused: {", ".join(escaped)}')
+    if not str(attacks['tls_without_client_certificate']).startswith('refused'):
+        raise DemoError('a TLS client without a certificate got an answer')
+    if report.get('useful_read') is not True or report.get('useful_read_after_attacks') is not True:
+        raise DemoError('simulated agent could not do its allowed reads')
+    seen = provider.seen()
+    new = seen[count:]
+    if len(new) != 2 or any(row['path'] != offline.PULL_PATH for row in new):
+        raise DemoError('simulated agent caused provider traffic beyond its two allowed reads')
+    return report
+
+
+def _guest_credential_search(ssh: GuestSSH, guest: str) -> dict:
+    """Search the whole guest, as root, for the credential and its encodings.
+
+    The patterns travel on stdin, never in a guest file or argument list."""
+    if ssh.call('sudo -n true').returncode:
+        return {'ran': False, 'reason': 'no passwordless sudo in the guest'}
+    ssh.publish(f'{guest}/guest_secret_hunt.py',
+                (REPO_ROOT / 'dev' / 'guest_secret_hunt.py').read_bytes())
+    token = offline.FAKE_TOKEN.encode()
+    patterns = [token, base64.b64encode(token), base64.urlsafe_b64encode(token).rstrip(b'=')]
+    result = ssh.call('exec sudo -n python3 -I ' + shlex.quote(f'{guest}/guest_secret_hunt.py'),
+                      data=b''.join(p.hex().encode() + b'\n' for p in patterns), timeout=900)
+    try:
+        report = json.loads(result.stdout)
+    except (ValueError, UnicodeError):
+        raise DemoError('guest credential search produced invalid JSON') from None
+    if result.returncode or 'files_scanned' not in report:
+        raise DemoError('guest credential search failed')
+    if report['file_hits'] or report['process_hits']:
+        raise DemoError('the provider credential was found in the guest: '
+                        + ', '.join(report['file_hits'] + report['process_hits']))
+    return {'ran': True, 'as_guest_root': True, 'patterns': len(patterns),
+            'files_scanned': report['files_scanned'],
+            'processes_scanned': report['processes_scanned'], 'found': False}
+
+
 def run_vm_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path,
-                      *, adversarial: bool = False) -> dict:
+                      *, adversarial: bool = False, agent: bool = False) -> dict:
     tools = binaries(bin_dir)
     host = workspace / 'host'
     host.mkdir(mode=0o700)
@@ -622,6 +693,10 @@ def run_vm_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path,
                 raise DemoError('VM broker write was not denied')
             if len(provider.seen()) != requests_after_reads:
                 raise DemoError('VM write refusal caused provider traffic')
+            agent_report = None
+            if agent:
+                agent_report = _run_simulated_agent(ssh, guest, provider, requests_after_reads)
+                requests_after_reads += 2
             attacks: dict = {}
             if adversarial:
                 # A random file name in the host custody workspace: if any
@@ -679,10 +754,11 @@ def run_vm_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path,
                 raise DemoError('revoked VM guest still obtained a PR view')
             if len(provider.seen()) != requests_after_reads:
                 raise DemoError('revoked VM guest reached the provider')
+            credential_search = _guest_credential_search(ssh, guest) if agent else None
             audit_bytes = (host / 'provider-audit.jsonl').read_bytes()
             if offline.FAKE_TOKEN.encode() in audit_bytes or ready['capability'].encode() in audit_bytes:
                 raise DemoError('host audit contains private credential or surrogate')
-            witness = validate_sent(provider, expected_count=4 if adversarial else 3)
+            witness = validate_sent(provider, expected_count=requests_after_reads)
             write(host / 'provider-observations.json', {'requests': witness})
             return {
                 'ok': True, 'mode': 'native-rust/aivm-kvm/synthetic-local-https',
@@ -693,6 +769,8 @@ def run_vm_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path,
                 'application_socket_forwarding': 'ssh-remote-unix/mTLS',
                 'provider_requests': witness,
                 **({'adversarial': attacks} if adversarial else {}),
+                **({'simulated_agent': agent_report,
+                    'guest_credential_search': credential_search} if agent else {}),
                 'filesystem_isolation_proved': False,
                 'whole_service_secrecy_proved': False,
             }
@@ -718,6 +796,8 @@ def main(argv: list[str] | None = None) -> int:
                         help='new private host evidence directory under trusted ancestors')
     parser.add_argument('--adversarial', action='store_true',
                         help='opt-in controlled VM identity/egress/socket attack checks')
+    parser.add_argument('--agent', action='store_true',
+                        help='also run dev/guest_agent.py in the guest and search the guest for the credential')
     parser.add_argument('--bin-dir', type=Path, default=REPO_ROOT / 'rust/target/debug',
                         help='directory containing native Rust executables')
     args = parser.parse_args(argv)
@@ -730,14 +810,14 @@ def main(argv: list[str] | None = None) -> int:
                 config = ssh_configuration(workspace, vm)
                 report = run_vm_acceptance(workspace, GuestSSH(vm, config),
                                            args.bin_dir.absolute(),
-                                           adversarial=args.adversarial)
+                                           adversarial=args.adversarial, agent=args.agent)
         else:
             workspace = args.workspace.absolute()
             workspace.mkdir(mode=0o700, parents=True, exist_ok=False)
             config = ssh_configuration(workspace, vm)
             report = run_vm_acceptance(workspace, GuestSSH(vm, config),
                                        args.bin_dir.absolute(),
-                                       adversarial=args.adversarial)
+                                       adversarial=args.adversarial, agent=args.agent)
             write(workspace / 'summary.json', report)
         print(json.dumps(report, sort_keys=True, indent=2))
         return 0

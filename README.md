@@ -106,6 +106,12 @@ explains each one in plain language.
   and off; re-enrolled certificates refused; a search of every guest share
   (as guest root) never reaches the host's custody files
   ([run record](dev/validation/2026-10-24-local-vm-acceptance.json))
+- ✅ A simulated agent inside the VM tries 21 ways to get more than it was
+  granted (path and header injection, other repositories, malformed and
+  oversized arguments, unlisted operations, raw bytes and TLS without a
+  certificate on the broker socket). Every one is refused, with no provider
+  traffic beyond its two allowed reads. A root search of every file and
+  process in the guest then finds no trace of the credential
 
 ### Review
 

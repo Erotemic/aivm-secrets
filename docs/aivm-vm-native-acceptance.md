@@ -234,3 +234,27 @@ normal AIVM workflows. The synthetic provider never receives a real GitHub
 credential. OUT-3 real-provider compatibility is a separate opt-in gate.
 
 The next independent service-facing test is the [opt-in real GitHub read-only fixture](aivm-github-live-readonly-acceptance.md), which targets `Erotemic/aivm-secrets` without creating a PR, issue, or repository.
+
+
+## Simulated agent (`--agent`)
+
+`--agent` runs [`dev/guest_agent.py`](../dev/guest_agent.py) inside the
+guest as an ordinary program. It does an allowed read, then tries 21 ways to
+get more: path, query and header injection in arguments, other repositories
+and pull requests, malformed, oversized or extra arguments, unlisted and
+denied operations, plain HTTP and garbage on the broker socket, and TLS
+without a client certificate. Finally it does the allowed read again. The host
+fails the run if any attempt is not refused or if the provider saw anything
+other than the two allowed reads. The agent's own report is not enough.
+
+The same flag then runs [`dev/guest_secret_hunt.py`](../dev/guest_secret_hunt.py)
+as guest root. It searches the root filesystem, the guest tmpfs mounts and
+every process's environment and command line for the credential and its
+base64 forms. The patterns are sent on stdin, so the credential never appears
+in a guest file or argument. Tests with planted files and environments
+(`tests/test_guest_agent_probes.py`) show that the search finds what it is
+looking for.
+
+```bash
+python dev/aivm_vm_acceptance.py --vm aivm-2404 --adversarial --agent --workspace "$RUN"
+```
