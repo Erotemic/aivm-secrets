@@ -54,6 +54,9 @@ the [plan](docs/planning/aivm-secrets-active-work.md).
   bytes once (`aivm-secrets approve`)
 - ✅ Optional multi-host coordinator for shared revocation and write
   reservations (`garrett-coordinator`, opt-in build feature)
+- ✅ A `read-only` build whose bridge refuses any configuration outside the
+  proved read profile ([release guide](docs/release-read-only.md),
+  [protocol v1](docs/protocol-v1.md))
 - ✅ Optional HTTPS proxy profiles for stock tools such as `gh` and `curl`:
   `constrained-http` (requests become named operations) and
   `credential-substitution` (credential added at the proxy; see
@@ -84,10 +87,15 @@ explains each one in plain language.
 - ✅ Writes: a completed write had a single-use approval for its exact digest
 - ✅ Proxy substitution: the credential is placed only in the upstream request
   and never appears in a released response
-- ⬜ No other native path writes the credential (`NATIVE-SINK-01`). Today this
-  rests on source guards with mutation tests
-- ⬜ An accepted `constrained-http` request equals exactly one named operation
-  (HP-6)
+- ✅ A guest that renounces its grant is refused on every later request
+- ✅ An accepted `constrained-http` request is the host encoding of exactly
+  one named operation and one set of arguments, when path values are single
+  segments (HP-6; the condition is necessary)
+- ⬜ No other native path writes the credential (`NATIVE-SINK-01`). The
+  credential type is sealed at compile time, its seven readers are pinned,
+  and a whole-process `strace` run shows no credential bytes in any write and
+  no destination but the provider. What remains is a short contract on those
+  readers for a reviewer to accept
 - ⬜ Provider-side write semantics and uncertain outcomes across sessions
 
 ### Tested end to end

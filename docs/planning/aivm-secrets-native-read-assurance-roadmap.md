@@ -1,6 +1,16 @@
 # Garrett native read assurance: implementation-to-trace roadmap
 
-**Technical read-only campaign; last reconciled 2026-10-21. NOT an assurance certificate.**
+**Technical read-only campaign; reconciled 2026-10-24.**
+
+**Status 2026-10-24.** NR-0 and NR-1 are accepted. NR-2/3: the production
+read theorem (`production_accepted_read_has_exact_attempt_accounting_and_guest_frame`)
+holds under one premise, `ExactNativeSinkCoverage`. That premise is now a
+contract on seven pinned readers of a compile-time-sealed credential type,
+backed by a whole-process syscall witness (`NATIVE-SINK-01`). NR-4: adaptive
+noninterference holds at the level of the guest's frames. NR-5 is waiting on
+the axiom audit and an independent review. The ordered work is in the
+[plan](aivm-secrets-active-work.md). The text below is the original campaign
+design.
 
 **Read the [product roadmap](aivm-secrets-product-roadmap.md) and
 [current task queue](aivm-secrets-active-work.md) first.** For an extended,
@@ -11,7 +21,7 @@ The product is
 useful authorized secret use by an untrusted AIVM guest; this NR-0..NR-5
 campaign addresses the *first, restricted native read assurance claim*.
 Initial NR-0 baseline and NR-1 production extraction are accepted at their
-recorded scope. NR-2 and NR-3 are **in progress**, NR-4 and NR-5 **open**.
+recorded scope (see the status above for NR-2 to NR-5).
 Real AIVM deployment/isolation (W8), opt-in live provider (W7), and approved
 write assurance are separate product gates, not consequences of NR-5.
 

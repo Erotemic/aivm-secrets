@@ -63,20 +63,26 @@ enough for a reviewer to accept or reject.
 
 ## Phase 3: finish the read claim and prepare review
 
-| Step | Deliverable |
-| --- | --- |
-| 3.1 | Extract the grant-window check in `AccountSession::start` (`EMISSION-RUST-01`) next to `nested_lifetime`, with a proof |
-| 3.2 | Represent control-path revocation as the same current-admission state the request path checks (`CONTROL-NATIVE-01`) |
-| 3.3 | Fold `GuestFrame::from_answer`'s type mapping into the extracted frame code if Aeneas allows it (`NATIVE-GLUE-01`) |
-| 3.4 | Comparative axiom audit, run once at the maintainer's request, against a recorded baseline |
-| 3.5 | NR-5 review package: claim matrix, proof tour and assumption ledger reviewed together by someone other than the author |
+| Step | Deliverable | Status |
+| --- | --- | --- |
+| 3.1 | Extract the grant-window check in `AccountSession::start` (`EMISSION-RUST-01`) | **Done 2026-10-24.** `credential_use::grant_window`, `grant_window_spec` |
+| 3.2 | Make renounce end the grant through the state the request path checks (`CONTROL-NATIVE-01`) | **Done 2026-10-24.** The extracted `control` marks the grant inactive itself; `renounced_grant_refuses_every_use` |
+| 3.3 | Fold `GuestFrame::from_answer`'s type mapping into extracted code (`NATIVE-GLUE-01`) | **Done 2026-10-24 (assessment).** Nothing left to fold: the error conversion is the identity (now written as such), and the reply capture is serde-to-wire, which belongs to `RUST-JSON-01` |
+| 3.4 | Comparative axiom audit, run once at the maintainer's request, against a recorded baseline | Open |
+| 3.5 | NR-5 review package: claim matrix, proof tour and assumption ledger reviewed together by someone other than the author | Open |
 
 ## Phase 4: a read-only release profile (OUT-5, reads only)
 
-Versioned host/guest protocol document, install and deployment instructions
-for the native binaries, the AIVM adapter as an optional extra, recovery
-steps, and an independent security review of the read-only profile. A release
-claims reads only.
+A release claims reads only.
+
+| Step | Deliverable | Status |
+| --- | --- | --- |
+| 4.1 | Versioned host/guest protocol | **Done 2026-10-24.** [protocol-v1.md](../protocol-v1.md): transport, frames, verbs, replies, the 17 error codes, versioning and retry rules |
+| 4.2 | A build that can only run the proved profile | **Done 2026-10-24.** Cargo feature `read-only`: the bridge refuses any configuration but `manifest-https-v1` with `writes = deny`, no legacy forwarding and no coordinator (`profile::read_only`, tested); the offline flow passes with it |
+| 4.3 | Build, deploy, operate and recover instructions | **Done 2026-10-24.** [release-read-only.md](../release-read-only.md) |
+| 4.4 | Tamper-evident native audit log | Open. The native audit file is synced JSON lines without the Python reference's hash chain |
+| 4.5 | AIVM adapter as an optional extra (`aivm[secrets]`) | Open, decided after review (repository boundary) |
+| 4.6 | Independent security review of the read-only profile | Needs a reviewer other than the author |
 
 ## Phase 5: writes (OUT-4)
 
@@ -89,7 +95,11 @@ until this phase decides otherwise.
 ## Phase 6: proxy profiles (OUT-6)
 
 Prove HP-6: an accepted constrained request is the host encoding of exactly
-one named operation. Then compose it with the read theorems. Substitution stays
+one named operation. Then compose it with the read theorems. **Done
+2026-10-24:** `translate_round_trip` plus `translate_unique` (single-segment
+path values; the condition is necessary). The translator runs in the guest,
+so its output is an ordinary guest request and the read theorems apply to it
+unchanged. Substitution stays
 the weakest profile and never claims authority confinement.
 
 ## Deferred by decision

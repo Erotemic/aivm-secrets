@@ -184,7 +184,7 @@ def validate(contract: dict[str, Any], ledger: dict[str, Any], root: Path) -> li
         require(expected in covered[id], f'sink {id}: no {expected} observation classification')
 
     for id, obligation in indexed['obligations'].items():
-        require(obligation.get('status') in {'open', 'in_progress', 'conditionally_proved', 'proved'},
+        require(obligation.get('status') in {'open', 'in_progress', 'conditionally_proved', 'proved', 'witnessed'},
                 f'obligation {id}: unknown status')
         require(bool(obligation.get('summary')), f'obligation {id}: no summary')
     require({'SINK-01', 'TRACE-01', 'NI-TRACE-01', 'IO-REFINE-01', 'LIVE-01'} <= set(indexed['obligations']),
@@ -209,7 +209,7 @@ def main() -> int:
           f"{len(contract['profiles'])} profiles; {len(contract['sinks'])} sinks; "
           f"{len(contract['release_rules'])} release rules; "
           f"{len(contract['observations'])} observation classes; "
-          f"{len(contract['obligations'])} unproved goals inventoried")
+          f"{len(contract['obligations'])} assurance goals inventoried")
     return 0
 
 
