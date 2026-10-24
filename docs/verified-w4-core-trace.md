@@ -57,6 +57,19 @@ are observable. W5 owns the stronger relational guarantee.
 | `METADATA` | Cover every guest-visible error, `possibly_more`, response lengths, termination, audit/diagnostics and concurrent interleavings; identify declassification vs excluded side channels explicitly. |
 | `OTHER-PROFILES` | Establish separate results for `account-status-v1`, forwarded Python legacy sessions, OAuth host startup/refresh, administration and session lifecycle. Do not silently extend this native two-phase proof to them. |
 
+### `OTHER-PROFILES`: the separate results (2026-10-24)
+
+Each other profile has its own results; none extends the two-phase read
+proof.
+
+| Profile | Results | Still open |
+| --- | --- | --- |
+| `account-status-v1` | `perform_contract`: a released reply came from an authenticated, recorded request on the one configured route, and carries only the two approved fields. `perform_projection_noninterference`: two runs with the same approved fields release the same reply (`GarrettProtocol`) | I/O refinement, as for every profile |
+| Forwarded Python legacy sessions | None in Lean. The read-only bridge refuses them (`garrett-bridge-read-only`), and they are trusted as the Python reference (`RUST-LEGACY-01`) | Retire the forwarding |
+| OAuth startup and refresh | `begin_contract`, `claim_contract` and `consumed_callback_cannot_be_claimed_again` (`GarrettLogin`); `refresh_order_contract`, `current_lease_contract` (`GarrettOAuth`); `every_emission_admitted` and `in_doubt_blocks` across histories (`GarrettServiceHistory`) | Login I/O refinement; the storage and lock adapters |
+| Administration | `revoke_prevents_admission`, `revoked_peer_never_admitted` (`GarrettAuthority`); `changed_root_fences_old_authority`, `recovery_phase_contract` (`GarrettTrust`); `authorize_client_contract`, `enroll_client_contract` (`GarrettEnrollment`) | Durable storage refinement |
+| Session lifecycle | `renounced_grant_refuses_every_use` (`GarrettControl`); `fenced_session_never_emits` and `identity_fenced_session_never_emits` (`GarrettServiceHistory`) | Adapter premises as stated there |
+
 The named adapter acknowledgements (`preAudit`, `finalAudit`,
 `completedAuditOK`, `preflightOK`, `finalProviderOK`) are *inputs describing
 external adapter outcomes*. They are not supplied by the guest and are not
