@@ -456,4 +456,42 @@ theorem nested_lifetime_spec (grant : UseGrant) (now lifetime : I64)
         · simp
       · step*
 
+/-- **The window a session's grant starts with.** `grant_window` refuses
+    unless `now` is in `[0, i64::MAX - 3600]` and the lifetime in
+    `[1, 3600]`, and otherwise returns the expiry `now + lifetime`. These are
+    exactly the bounds `Current` later requires of the grant's claims
+    (`0 ≤ issued_at ≤ 9223372036854772207`, `issued_at < expires_at ≤
+    issued_at + 3600`), so a grant started this way is one the request path
+    can admit while it is current. -/
+theorem grant_window_spec (now lifetime : I64) :
+    grant_window now lifetime ⦃ out =>
+      (out = none ↔ ¬(0 ≤ now.val ∧ now.val ≤ 9223372036854772207 ∧
+          1 ≤ lifetime.val ∧ lifetime.val ≤ 3600)) ∧
+      ∀ e, out = some e → e.val = now.val + lifetime.val ∧
+        0 ≤ now.val ∧ now.val ≤ 9223372036854772207 ∧ now.val < e.val ∧
+        e.val ≤ now.val + 3600 ⦄ := by
+  unfold grant_window
+  split
+  · apply (WP.spec_ok _).mpr; constructor
+    · simp only [true_iff]; intro h; scalar_tac
+    · simp
+  · split
+    · apply (WP.spec_ok _).mpr; constructor
+      · simp only [true_iff]; intro h; scalar_tac
+      · simp
+    · split
+      · apply (WP.spec_ok _).mpr; constructor
+        · simp only [true_iff]; intro h; scalar_tac
+        · simp
+      · split
+        · apply (WP.spec_ok _).mpr; constructor
+          · simp only [true_iff]; intro h; scalar_tac
+          · simp
+        · step*
+          refine ⟨by simp; scalar_tac, ?_⟩
+          intro e same
+          simp only [Option.some.injEq] at same
+          subst same
+          refine ⟨i_post, ?_, ?_, ?_, ?_⟩ <;> scalar_tac
+
 end aivm_secrets_garrett_core.credential_use.Proofs

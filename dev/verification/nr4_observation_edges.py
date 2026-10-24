@@ -48,7 +48,7 @@ EDGES = (
          'fn from_answer(answer: Outcome<json::Reply>)',
          'fn send(&mut self, writer: &mut impl Write)', (
              'Ok(reply) => Ok(reply.wire())',
-             'Err(error) => Err((*error).into())',
+             'Err(error) => Err(*error)',
              'aivm_secrets_garrett_core::public_error::answer_frame(public, MAX_REPLY)',
          )),
     Edge('guest-frame-single-writer', TLS,

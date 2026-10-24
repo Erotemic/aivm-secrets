@@ -576,7 +576,7 @@ def review_semantics(contents: dict[str, str]) -> None:
             and '.write_all(' not in serve,
             'authenticated guest writer bypasses GuestFrame')
     require(same_order(guest, 'Ok(reply) => Ok(reply.wire())',
-                       'Err(error) => Err((*error).into())', 'aivm_secrets_garrett_core::public_error::answer_frame(public, MAX_REPLY)')
+                       'Err(error) => Err(*error)', 'aivm_secrets_garrett_core::public_error::answer_frame(public, MAX_REPLY)')
             and 'json!(' not in guest and 'format!(' not in guest,
             'guest failure is not the extracted fixed public_error denial frame')
     reply_frame = part(contents[RUST + 'json.rs'], 'pub(crate) enum Reply {', 'pub(crate) fn capture(')

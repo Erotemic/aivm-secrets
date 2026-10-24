@@ -183,12 +183,13 @@ impl GuestFrame {
     fn from_answer(answer: Outcome<json::Reply>) -> Outcome<Self> {
         // The extracted `answer_frame` chooses the frame: a reply is framed
         // from its wire value, a failure is the fixed denial line of its
-        // public code. No native error text or serde conversion reaches the
-        // guest; this function only maps types.
+        // public code. The native `Error` is the extracted `PublicError`, so
+        // the error passes through unchanged; no native error text or serde
+        // conversion reaches the guest.
         let captured = answer.map(json::Reply::captured);
         let public = match &captured {
             Ok(reply) => Ok(reply.wire()),
-            Err(error) => Err((*error).into()),
+            Err(error) => Err(*error),
         };
         aivm_secrets_garrett_core::public_error::answer_frame(public, MAX_REPLY)
             .map(Self)

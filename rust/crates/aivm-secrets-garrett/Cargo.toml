@@ -7,6 +7,8 @@ license.workspace = true
 [features]
 conformance = []
 coordinator-server = ["dep:rusqlite"]
+# A release that claims only reads: the bridge refuses any other configuration.
+read-only = []
 
 [dependencies]
 aivm-secrets-garrett-core = { path = "../aivm-secrets-garrett-core" }

@@ -1,3 +1,4 @@
+import Garrett
 import GarrettRoute
 import GarrettJsonWire
 
@@ -97,25 +98,27 @@ variable {C E : Type}
 /-- **The control verbs' only paths.** Any returned `control` took exactly
     one of these, for any native callbacks:
     1. `renounce`: `revoke`, then encode `revoked` with the extracted JSON
-       encoder and pass **exactly those bytes** to `record`; on success
-       `deactivate` and reply `renounced`; on failure return the error, no
-       reply, grant untouched; if encoding fails, `Unencodable`, nothing
+       encoder and pass **exactly those bytes** to `record`; on success mark
+       the grant inactive and reply `renounced`; on failure return the error,
+       no reply, grant untouched; if encoding fails, `Unencodable`, nothing
        recorded, grant untouched;
-    2. `describe`: reply with the description, no callback;
-    3. anything else: `Denied`, no callback. -/
-theorem control_paths (inst : Control C E) (io : C) (verb : Slice U8) (description revoked : json_wire.Value)
-    (out : Controlled E) (after : C)
-    (h : control.control inst io verb description revoked = Result.ok (out, after)) :
+    2. `describe`: reply with the description, no callback, grant untouched;
+    3. anything else: `Denied`, no callback, grant untouched. -/
+theorem control_paths (inst : Control C E) (io : C) (grant : credential_use.UseGrant)
+    (verb : Slice U8) (description revoked : json_wire.Value)
+    (out : Controlled E) (after : C) (grant' : credential_use.UseGrant)
+    (h : control.control inst io grant verb description revoked = Result.ok (out, after, grant')) :
     (verb.val = RenounceVerb ∧ ∃ io1 encoded bytes, inst.revoke io = Result.ok io1 ∧
       json_wire.append (alloc.vec.Vec.new U8) revoked = Result.ok (encoded, bytes) ∧
-      ((encoded = false ∧ out = .Unencodable ∧ after = io1) ∨
+      ((encoded = false ∧ out = .Unencodable ∧ after = io1 ∧ grant' = grant) ∨
        (encoded = true ∧ ∃ io2 r, inst.record io1 (alloc.vec.Vec.deref bytes) = Result.ok (r, io2) ∧
-        ((∃ io3 reply, r = .Ok () ∧ inst.deactivate io2 = Result.ok io3 ∧
-            renounced = Result.ok reply ∧ out = .Reply reply ∧ after = io3) ∨
-         (∃ error, r = .Err error ∧ out = .Failed error ∧ after = io2))))) ∨
+        ((∃ reply, r = .Ok () ∧ renounced = Result.ok reply ∧ out = .Reply reply ∧
+            after = io2 ∧ grant' = { grant with active := false }) ∨
+         (∃ error, r = .Err error ∧ out = .Failed error ∧ after = io2 ∧ grant' = grant))))) ∨
     (verb.val = DescribeVerb ∧ ∃ reply, described description = Result.ok reply ∧
-      out = .Reply reply ∧ after = io) ∨
-    (verb.val ≠ RenounceVerb ∧ verb.val ≠ DescribeVerb ∧ out = .Denied ∧ after = io) := by
+      out = .Reply reply ∧ after = io ∧ grant' = grant) ∨
+    (verb.val ≠ RenounceVerb ∧ verb.val ≠ DescribeVerb ∧ out = .Denied ∧ after = io ∧
+      grant' = grant) := by
   unfold control.control at h
   simp only [lift, Array.to_slice, Array.make, bind_ok, slice_eq_eq] at h
   split at h
@@ -128,9 +131,9 @@ theorem control_paths (inst : Control C E) (io : C) (verb : Slice U8) (descripti
     refine ⟨io1, encoded, bytes, revoked_ok, appended, ?_⟩
     cases encoded with
     | false =>
-      have h : Result.ok (Controlled.Unencodable, io1) = Result.ok (out, after) := h
+      have h : Result.ok (Controlled.Unencodable, io1, grant) = Result.ok (out, after, grant') := h
       simp only [Result.ok.injEq, Prod.mk.injEq] at h
-      exact Or.inl ⟨rfl, h.1.symm, h.2.symm⟩
+      exact Or.inl ⟨rfl, h.1.symm, h.2.1.symm, h.2.2.symm⟩
     | true =>
       refine Or.inr ⟨rfl, ?_⟩
       obtain ⟨⟨r, io2⟩, recorded, h⟩ := bind_ok_inv h
@@ -138,16 +141,15 @@ theorem control_paths (inst : Control C E) (io : C) (verb : Slice U8) (descripti
       cases r with
       | Ok u =>
         cases u
-        obtain ⟨io3, deactivated, h⟩ := bind_ok_inv h
         obtain ⟨reply, replied, h⟩ := bind_ok_inv h
         simp only [Result.ok.injEq, Prod.mk.injEq] at h
-        obtain ⟨o, a⟩ := h
-        exact Or.inl ⟨io3, reply, rfl, deactivated, replied, o.symm, a.symm⟩
+        obtain ⟨o, a, g⟩ := h
+        exact Or.inl ⟨reply, rfl, replied, o.symm, a.symm, g.symm⟩
       | Err error =>
-        have h : Result.ok (Controlled.Failed error, io2) = Result.ok (out, after) := h
+        have h : Result.ok (Controlled.Failed error, io2, grant) = Result.ok (out, after, grant') := h
         simp only [Result.ok.injEq, Prod.mk.injEq] at h
-        obtain ⟨o, a⟩ := h
-        exact Or.inr ⟨error, rfl, o.symm, a.symm⟩
+        obtain ⟨o, a, g⟩ := h
+        exact Or.inr ⟨error, rfl, o.symm, a.symm, g.symm⟩
   · rename_i not_renounce
     simp only [decide_eq_true_eq] at not_renounce
     split at h
@@ -155,14 +157,49 @@ theorem control_paths (inst : Control C E) (io : C) (verb : Slice U8) (descripti
       simp only [decide_eq_true_eq] at is_describe
       obtain ⟨reply, replied, h⟩ := bind_ok_inv h
       simp only [Result.ok.injEq, Prod.mk.injEq] at h
-      obtain ⟨o, a⟩ := h
-      exact Or.inr (Or.inl ⟨by simpa [DescribeVerb] using is_describe, reply, replied, o.symm, a.symm⟩)
+      obtain ⟨o, a, g⟩ := h
+      exact Or.inr (Or.inl ⟨by simpa [DescribeVerb] using is_describe, reply, replied,
+        o.symm, a.symm, g.symm⟩)
     · rename_i not_describe
       simp only [decide_eq_true_eq] at not_describe
       simp only [Result.ok.injEq, Prod.mk.injEq] at h
-      obtain ⟨o, a⟩ := h
+      obtain ⟨o, a, g⟩ := h
       exact Or.inr (Or.inr ⟨by simpa [RenounceVerb] using not_renounce,
-        by simpa [DescribeVerb] using not_describe, o.symm, a.symm⟩)
+        by simpa [DescribeVerb] using not_describe, o.symm, a.symm, g.symm⟩)
+
+/-- **A renounce the guest saw succeed ended the grant.** If `renounce`
+    replied, the grant it returns is inactive. On every other outcome the
+    grant is returned unchanged. -/
+theorem renounce_reply_deactivates (inst : Control C E) (io : C) (grant : credential_use.UseGrant)
+    (verb : Slice U8) (description revoked : json_wire.Value)
+    (out : Controlled E) (after : C) (grant' : credential_use.UseGrant)
+    (h : control.control inst io grant verb description revoked = Result.ok (out, after, grant'))
+    (renounce : verb.val = RenounceVerb) (replied : ∃ reply, out = .Reply reply) :
+    grant'.active = false := by
+  rcases control_paths inst io grant verb description revoked out after grant' h with
+    ⟨_, io1, encoded, bytes, _, _, paths⟩ | ⟨describe, _⟩ | ⟨not_renounce, _⟩
+  · rcases paths with ⟨_, rfl, _, _⟩ | ⟨_, io2, r, _, ⟨reply, _, _, _, _, rfl⟩ | ⟨error, _, rfl, _, _⟩⟩
+    · obtain ⟨_, h⟩ := replied; cases h
+    · rfl
+    · obtain ⟨_, h⟩ := replied; cases h
+  · simp [renounce, RenounceVerb, DescribeVerb] at describe
+  · exact absurd renounce not_renounce
+
+/-- **After a recorded renounce, every later use of the grant is refused.**
+    This is the same `authorize_use` the request path's current-admission
+    controller runs, so no request can use a grant the guest renounced. -/
+theorem renounced_grant_refuses_every_use (inst : Control C E) (io : C)
+    (grant : credential_use.UseGrant) (verb : Slice U8) (description revoked : json_wire.Value)
+    (out : Controlled E) (after : C) (grant' : credential_use.UseGrant)
+    (h : control.control inst io grant verb description revoked = Result.ok (out, after, grant'))
+    (renounce : verb.val = RenounceVerb) (replied : ∃ reply, out = .Reply reply)
+    (claims : credential_use.UseClaims) (operation : alloc.vec.Vec U8) (now elapsed : I64) :
+    credential_use.authorize_use claims grant' operation now elapsed =
+      Result.ok (.Err credential_use.UseDenial.InvalidCapability) := by
+  have inactive := renounce_reply_deactivates inst io grant verb description revoked out after
+    grant' h renounce replied
+  rw [credential_use.Proofs.authorize_use_exact]
+  simp [credential_use.Proofs.Current, inactive]
 
 /-- **The audit record of a renounced grant is exactly the encoding of
     `revoked`.** Whenever `renounce` called `record`, its argument was the

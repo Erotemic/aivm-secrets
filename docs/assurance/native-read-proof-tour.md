@@ -775,3 +775,43 @@ preimage of the text, so the `base64` crate's decoder no longer has to be
 correct, only to return. A Rust test also checks the encoder against the crate
 for both alphabets. **Still trusted:** the crate's padded encoder for PEM
 bodies, and the parsers that consume the decoded bytes (JSON, X.509).
+
+## The window a grant starts with (2026-10-24)
+
+`AccountSession::start` used to check the new grant's window in native code.
+It now calls the extracted `credential_use::grant_window`.
+[`grant_window_spec`](../../proofs/GarrettCurrentAdmission.lean) proves that
+it refuses unless `now` is in `[0, i64::MAX - 3600]` and the lifetime is 1 to
+3600 seconds, and otherwise returns `now + lifetime`. Those are exactly the
+bounds that `Current`, the check the request path runs, later requires of the
+grant's claims. What remains native here is reading the host clock
+(`RUST-CLOCK-01`).
+
+## Renouncing a grant ends it for every later request (2026-10-24)
+
+The extracted `control::control` used to ask a native callback to mark the
+grant inactive after a recorded renounce. It now takes the grant and changes
+it itself. [`renounce_reply_deactivates`](../../proofs/GarrettControl.lean)
+says that if renounce replied, the returned grant is inactive, and that every
+other path returns the grant unchanged. `renounced_grant_refuses_every_use`
+then shows that `authorize_use` on that grant, the same check the request
+path's current admission runs, refuses with `invalid_capability` for every
+claim, operation and time. Two native callbacks remain: revoking the optional
+host control socket's state, and appending the audit record.
+
+## One request target, one set of arguments (HP-6, 2026-10-24)
+
+`translate_round_trip` already proved that a target the guest-side translator
+accepts is exactly what the host's `fill_target` writes for the accepted
+arguments. [`translate_unique`](../../proofs/GarrettRouteUnique.lean) adds the
+other half: when every path value is a single segment (no `/`), two accepted
+translations of the same target give every path piece and query parameter the
+same value, even if the guest's candidate lists differ. So an accepted request
+is the host encoding of exactly one argument assignment.
+
+The single-segment condition is necessary. A parameter whose allowed texts may
+contain `/` can make one target mean two things: `/repos/{owner}/{repo}`
+writes `/repos/a/b/c` both for `owner = a/b, repo = c` and for
+`owner = a, repo = b/c`. In that case the translator picks the first matching
+route. That affects which allowed operation runs, never what is allowed: the
+host bridge authorizes whatever named operation it receives.

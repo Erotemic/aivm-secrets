@@ -132,6 +132,16 @@ pub(crate) fn finish_use<E: CredentialExecutor>(
     };
     Ok(release_reply(response))
 }
+/// The window a new use grant gets when a session starts: `None` unless
+/// `now` is in `[0, i64::MAX - 3600]` and `lifetime` in `[1, 3600]` seconds;
+/// otherwise its expiry `now + lifetime`, which cannot overflow. These are
+/// the bounds `require_use_current` later checks on the grant's claims.
+pub fn grant_window(now: i64, lifetime: i64) -> Option<i64> {
+    if now < 0 || now > 9_223_372_036_854_772_207 || lifetime < 1 || lifetime > 3600 {
+        return None;
+    }
+    Some(now + lifetime)
+}
 /// A surrogate issued under an active use grant lives inside that grant:
 /// `None` outside `[issued_at, expires_at)`, otherwise the capped lifetime.
 pub fn nested_lifetime(grant: &UseGrant, now: i64, lifetime: i64) -> Option<i64> {

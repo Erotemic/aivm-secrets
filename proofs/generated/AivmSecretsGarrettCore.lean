@@ -332,7 +332,7 @@ inductive json_wire.Value where
   json_wire.Value
 
 /-- [aivm_secrets_garrett_core::control::text]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 39:4-42:5
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 38:4-41:5
     Visibility: public -/
 @[rust_loop]
 def control.text_loop
@@ -351,14 +351,14 @@ def control.text_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::control::text]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 36:0-44:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 35:0-43:1
     Visibility: public -/
 def control.text (bytes : Slice Std.U8) : Result json_wire.Value := do
   let out ← control.text_loop bytes (alloc.vec.Vec.new Std.U32) 0#usize
   ok (json_wire.Value.Text out)
 
 /-- [aivm_secrets_garrett_core::control::text_units]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 64:0-69:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 63:0-68:1
     Visibility: public -/
 def control.text_units
   (bytes : Slice Std.U8) : Result (alloc.vec.Vec Std.U32) := do
@@ -5264,16 +5264,15 @@ def completion.complete
   ok { outcome, work := pending.work, effects := pending.effects }
 
 /-- Trait declaration: [aivm_secrets_garrett_core::control::Control]
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 11:0-20:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 12:0-19:1
     Visibility: public -/
 structure control.Control (Self : Type _) (Self_Error : Type _) where
   revoke : Self → Result Self
   record : Self → Slice Std.U8 → Result ((core.result.Result Unit
     Self_Error) × Self)
-  deactivate : Self → Result Self
 
 /-- [aivm_secrets_garrett_core::control::Controlled]
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 23:0-34:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 22:0-33:1
     Visibility: public -/
 @[discriminant isize]
 inductive control.Controlled (E : Type _) where
@@ -5283,7 +5282,7 @@ inductive control.Controlled (E : Type _) where
 | Denied : control.Controlled E
 
 /-- [aivm_secrets_garrett_core::control::described]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 47:0-53:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 46:0-52:1
     Visibility: public -/
 def control.described
   (description : json_wire.Value) : Result json_wire.Value := do
@@ -5314,7 +5313,7 @@ def control.described
   ok (json_wire.Value.Object ret)
 
 /-- [aivm_secrets_garrett_core::control::renounced]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 56:0-62:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 55:0-61:1
     Visibility: public -/
 def control.renounced : Result json_wire.Value := do
   let s ← lift (Array.to_slice (Array.make 2#usize [ 111#u8, 107#u8 ]))
@@ -5343,7 +5342,7 @@ def control.renounced : Result json_wire.Value := do
   ok (json_wire.Value.Object ret)
 
 /-- [aivm_secrets_garrett_core::control::mode_name]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 71:0-77:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 70:0-76:1
     Visibility: public -/
 def control.mode_name (writes : approval.Mode) : Result json_wire.Value := do
   match writes with
@@ -5366,7 +5365,7 @@ def control.mode_name (writes : approval.Mode) : Result json_wire.Value := do
     control.text s
 
 /-- [aivm_secrets_garrett_core::control::names]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 82:4-85:5 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 81:4-84:5 -/
 @[rust_loop]
 def control.names_loop
   (operations : Slice (alloc.vec.Vec Std.U8))
@@ -5386,7 +5385,7 @@ def control.names_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::control::names]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 79:0-87:1 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 78:0-86:1 -/
 @[reducible]
 def control.names
   (operations : Slice (alloc.vec.Vec Std.U8)) :
@@ -5395,7 +5394,7 @@ def control.names
   control.names_loop operations (alloc.vec.Vec.new json_wire.Value) 0#usize
 
 /-- [aivm_secrets_garrett_core::control::manifest_description]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 91:0-98:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 90:0-97:1
     Visibility: public -/
 def control.manifest_description
   (operations : Slice (alloc.vec.Vec Std.U8)) (writes : approval.Mode) :
@@ -5449,7 +5448,7 @@ def control.manifest_description
   ok (json_wire.Value.Object ret)
 
 /-- [aivm_secrets_garrett_core::control::account_description]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 101:0-113:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 100:0-112:1
     Visibility: public -/
 def control.account_description : Result json_wire.Value := do
   let s ←
@@ -5509,7 +5508,7 @@ def control.account_description : Result json_wire.Value := do
   ok (json_wire.Value.Object ret2)
 
 /-- [aivm_secrets_garrett_core::control::revoked_record]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 118:0-130:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 117:0-129:1
     Visibility: public -/
 def control.revoked_record
   (grant : json_wire.Value) (policy : json_wire.Value)
@@ -5561,14 +5560,34 @@ def control.revoked_record
   let fields2 ← alloc.vec.Vec.push fields1 (v4, json_wire.Value.Number v5)
   ok (json_wire.Value.Object fields2)
 
+/-- [aivm_secrets_garrett_core::credential_use::UseClaims]
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 21:0-27:1
+    Visibility: public -/
+structure credential_use.UseClaims where
+  binding : alloc.vec.Vec Std.U8
+  policy : alloc.vec.Vec Std.U8
+  grant : alloc.vec.Vec Std.U8
+  issued_at : Std.I64
+  expires_at : Std.I64
+
+/-- [aivm_secrets_garrett_core::credential_use::UseGrant]
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 28:0-33:1
+    Visibility: public -/
+structure credential_use.UseGrant where
+  claims : credential_use.UseClaims
+  operation : alloc.vec.Vec Std.U8
+  route : credential_use.Route
+  active : Bool
+
 /-- [aivm_secrets_garrett_core::control::control]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 136:0-161:1
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 135:0-161:1
     Visibility: public -/
 def control.control
   {C : Type _} {Clause0_Error : Type _} (ControlInst : control.Control C
-  Clause0_Error) (io : C) (verb : Slice Std.U8) (description : json_wire.Value)
+  Clause0_Error) (io : C) (grant : credential_use.UseGrant)
+  (verb : Slice Std.U8) (description : json_wire.Value)
   (revoked : json_wire.Value) :
-  Result ((control.Controlled Clause0_Error) × C)
+  Result ((control.Controlled Clause0_Error) × C × credential_use.UseGrant)
   := do
   let renounce ←
     lift (Array.to_slice
@@ -5591,20 +5610,19 @@ def control.control
       let (r, io2) ← ControlInst.record io1 s
       match r with
       | core.result.Result.Ok _ =>
-        let io3 ← ControlInst.deactivate io2
         let v ← control.renounced
-        ok (control.Controlled.Reply v, io3)
+        ok (control.Controlled.Reply v, io2, { grant with active := false })
       | core.result.Result.Err error =>
-        ok (control.Controlled.Failed error, io2)
-    else ok (control.Controlled.Unencodable, io1)
+        ok (control.Controlled.Failed error, io2, grant)
+    else ok (control.Controlled.Unencodable, io1, grant)
   else
     let b1 ←
       core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 verb describe
     if b1
     then
       let v ← control.described description
-      ok (control.Controlled.Reply v, io)
-    else ok (control.Controlled.Denied, io)
+      ok (control.Controlled.Reply v, io, grant)
+    else ok (control.Controlled.Denied, io, grant)
 
 /-- Trait declaration: [aivm_secrets_garrett_core::coordination::Dispatch]
     Source: 'crates/aivm-secrets-garrett-core/src/coordination.rs', lines 3:0-11:1
@@ -6097,25 +6115,6 @@ inductive credential_use.UseDenial where
 | Revoked : credential_use.UseDenial
 | Upstream : credential_use.UseDenial
 
-/-- [aivm_secrets_garrett_core::credential_use::UseClaims]
-    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 21:0-27:1
-    Visibility: public -/
-structure credential_use.UseClaims where
-  binding : alloc.vec.Vec Std.U8
-  policy : alloc.vec.Vec Std.U8
-  grant : alloc.vec.Vec Std.U8
-  issued_at : Std.I64
-  expires_at : Std.I64
-
-/-- [aivm_secrets_garrett_core::credential_use::UseGrant]
-    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 28:0-33:1
-    Visibility: public -/
-structure credential_use.UseGrant where
-  claims : credential_use.UseClaims
-  operation : alloc.vec.Vec Std.U8
-  route : credential_use.Route
-  active : Bool
-
 /-- [aivm_secrets_garrett_core::credential_use::require_use_current]:
     Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 35:0-63:1
     Visibility: public -/
@@ -6287,8 +6286,27 @@ def credential_use.use_credential
       grant.route
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
+/-- [aivm_secrets_garrett_core::credential_use::grant_window]:
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 139:0-144:1
+    Visibility: public -/
+def credential_use.grant_window
+  (now : Std.I64) (lifetime : Std.I64) : Result (Option Std.I64) := do
+  if now < 0#i64
+  then ok none
+  else
+    if now > 9223372036854772207#i64
+    then ok none
+    else
+      if lifetime < 1#i64
+      then ok none
+      else
+        if lifetime > 3600#i64
+        then ok none
+        else let i ← now + lifetime
+             ok (some i)
+
 /-- [aivm_secrets_garrett_core::credential_use::nested_lifetime]:
-    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 137:0-147:1
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 147:0-157:1
     Visibility: public -/
 def credential_use.nested_lifetime
   (grant : credential_use.UseGrant) (now : Std.I64) (lifetime : Std.I64) :

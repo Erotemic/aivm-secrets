@@ -650,9 +650,7 @@ impl AccountSession {
             return Err(Error::InvalidCapability);
         }
         binding(identity_binding)?;
-        if !(0..=i64::MAX - 3600).contains(&now) || !(1..=3600).contains(&lifetime) {
-            return Err(Error::InvalidCapability);
-        }
+        let expires = core::grant_window(now, lifetime).ok_or(Error::InvalidCapability)?;
         let host = text(config, "host")?;
         if host.len() > 253
             || !host.contains('.')
@@ -695,7 +693,7 @@ impl AccountSession {
                 .with_no_client_auth();
         tls.resumption = rustls::client::Resumption::disabled();
         tls.enable_early_data = false;
-        let (secret, oauth, lifetime) = if let Some(source) = m.get("oauth") {
+        let (secret, oauth) = if let Some(source) = m.get("oauth") {
             let fields = json::keys(
                 source,
                 &["vault_root", "provider_file", "subject"],
@@ -736,17 +734,16 @@ impl AccountSession {
                     subject,
                     binding: session_binding,
                 }),
-                lifetime,
             )
         } else {
             let raw = Zeroizing::new(files::read_private(
                 Path::new(text(config, "credential_file")?),
                 4096,
             )?);
-            (credential(&raw)?, None, lifetime)
+            (credential(&raw)?, None)
         };
         let policy = hex(digest::digest(&digest::SHA256, &json::canonical(effective)).as_ref());
-        let c = json!({"binding":identity_binding,"policy_digest":policy,"grant_id":hex(&random::<16>()?),"issued_at":now,"expires_at":now+lifetime});
+        let c = json!({"binding":identity_binding,"policy_digest":policy,"grant_id":hex(&random::<16>()?),"issued_at":now,"expires_at":expires});
         let mut envelope = InnerEnvelope::new(&random::<32>()?)?;
         // OAuth's validated opaque-token grammar permits short synthetic or
         // provider-issued tokens; legacy file/fixture validation stays intact.
@@ -958,26 +955,25 @@ impl AccountSession {
             wire_text(&self.executor.audit.policy),
             Some(wire_text("profile.read")),
         );
-        let mut native = AccountControl(self);
+        let mut native = AccountControl(&self.executor.audit);
         controlled(control::control(
             &mut native,
+            &mut self.grant,
             verb.as_bytes(),
             control::account_description(),
             revoked,
         ))
     }
 }
-/// The account session's control side effects: an audit record and the
-/// grant flag; it has no separate control state to revoke.
-struct AccountControl<'a>(&'a mut AccountSession);
+/// The account session's control side effect: an audit record. It has no
+/// separate control state to revoke; the extracted `control` marks the
+/// grant inactive itself.
+struct AccountControl<'a>(&'a Audit);
 impl control::Control for AccountControl<'_> {
     type Error = Error;
     fn revoke(&mut self) {}
     fn record(&mut self, record: &[u8]) -> Outcome<()> {
-        self.0.executor.audit.append_bytes(&record.to_vec())
-    }
-    fn deactivate(&mut self) {
-        self.0.grant.active = false;
+        self.0.append_bytes(&record.to_vec())
     }
 }
 /// The guest reply for an extracted control outcome.

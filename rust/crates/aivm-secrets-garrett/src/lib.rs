@@ -21,6 +21,7 @@ pub mod manifest;
 pub mod model;
 pub mod oauth;
 pub mod oauth_vault;
+pub mod profile;
 pub mod registry;
 pub mod tls;
 pub mod tpm;

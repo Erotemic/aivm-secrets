@@ -607,9 +607,13 @@ impl Session {
             super::wire_text(&audit.policy),
             None,
         );
-        let mut native = ManifestControl(self);
+        let mut native = ManifestControl {
+            control: self.control.as_ref(),
+            audit: &self.base.executor.audit,
+        };
         super::controlled(aivm_secrets_garrett_core::control::control(
             &mut native,
+            &mut self.base.grant,
             verb.as_bytes(),
             description,
             revoked,
@@ -647,19 +651,20 @@ impl aivm_secrets_garrett_core::write_gate::Admission for SessionAdmission<'_> {
     }
 }
 /// The manifest session's control side effects (`proofs/GarrettControl.lean`).
-struct ManifestControl<'a>(&'a mut Session);
+/// The extracted `control` marks the grant inactive itself.
+struct ManifestControl<'a> {
+    control: Option<&'a crate::host_control::Control>,
+    audit: &'a super::Audit,
+}
 impl aivm_secrets_garrett_core::control::Control for ManifestControl<'_> {
     type Error = Error;
     fn revoke(&mut self) {
-        if let Some(control) = &self.0.control {
+        if let Some(control) = self.control {
             control.state.revoke();
         }
     }
     fn record(&mut self, record: &[u8]) -> Outcome<()> {
-        self.0.base.executor.audit.append_bytes(&record.to_vec())
-    }
-    fn deactivate(&mut self) {
-        self.0.base.grant.active = false;
+        self.audit.append_bytes(&record.to_vec())
     }
 }
 

@@ -5,6 +5,7 @@
 //! provider callback.
 
 use crate::approval::Mode;
+use crate::credential_use::UseGrant;
 use crate::json_wire::{append, Value};
 
 /// The native session's side effects for a control verb.
@@ -15,8 +16,6 @@ pub trait Control {
     /// Durably append `record` (canonical JSON, without the newline) to the
     /// session audit.
     fn record(&mut self, record: &[u8]) -> Result<(), Self::Error>;
-    /// Mark the grant inactive.
-    fn deactivate(&mut self);
 }
 
 /// The outcome of a control verb.
@@ -130,11 +129,12 @@ pub fn revoked_record(grant: Value, policy: Value, operation: Option<Value>) -> 
 }
 
 /// A control verb after authorization. `renounce` revokes, appends exactly
-/// the encoding of `revoked` to the audit, then deactivates the grant and
+/// the encoding of `revoked` to the audit, then marks `grant` inactive and
 /// replies; `describe` replies
 /// with `description` and changes nothing; anything else is denied.
 pub fn control<C: Control>(
     io: &mut C,
+    grant: &mut UseGrant,
     verb: &[u8],
     description: Value,
     revoked: Value,
@@ -151,7 +151,7 @@ pub fn control<C: Control>(
             Ok(()) => (),
             Err(error) => return Controlled::Failed(error),
         }
-        io.deactivate();
+        grant.active = false;
         return Controlled::Reply(renounced());
     }
     if verb == describe {

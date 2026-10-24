@@ -104,7 +104,7 @@ EDGES = (
          'fn from_answer(answer: Outcome<json::Reply>)',
          'fn send(&mut self, writer: &mut impl Write)',
          ('let captured = answer.map(json::Reply::captured);', 'Ok(reply) => Ok(reply.wire())',
-          'Err(error) => Err((*error).into())', 'aivm_secrets_garrett_core::public_error::answer_frame(public, MAX_REPLY)', '.map(Self)')),
+          'Err(error) => Err(*error)', 'aivm_secrets_garrett_core::public_error::answer_frame(public, MAX_REPLY)', '.map(Self)')),
     Edge(TLS, 'guest-writer-flush-follows-write',
          'impl<W: Write> aivm_secrets_garrett_core::guest_frame::Writer for GuestWriter',
          'impl GuestFrame {',

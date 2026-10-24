@@ -181,6 +181,9 @@ fn legacy_bridge(config: &Value) -> Outcome<(tls::Bridge, Value)> {
 fn serve(path: &Path, maximum: Option<usize>) -> Outcome<()> {
     let bytes = zeroize::Zeroizing::new(files::read_private(path, 65536)?);
     let config = json::parse(&bytes, 65536)?;
+    if cfg!(feature = "read-only") {
+        aivm_secrets_garrett::profile::read_only(&config)?;
+    }
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|_| Error::InternalError)?
