@@ -892,3 +892,14 @@ Approval digest preimage extracted: `approval::request_value`,
 extracted encoder; oracle confirms). Proved `request_value_exact`,
 `approval_preimage_exact`. APPROVAL-RUST-01 now leaves only SHA-256/hex, the
 one decision line and the lock native.
+
+## 2026-10-24 00:48:32 -0400
+
+Assessment of what remains after the digest preimage. Removable by further
+extraction with net benefit: none found today. RUST-JSON-01 deferred by
+decision; proxy/bridge callbacks are external-trusted (OS, rustls, ring);
+real-VM evidence is the maintainer's; NATIVE-GLUE-01 leftovers are type
+conversions whose extraction needs a native inverse map (no net removal);
+the approval decision line is one assignment; NATIVE-SINK-01 step 2 needs a
+maintainer decision (large proof churn, little gain over module privacy).
+Recorded on the roadmap entries.
