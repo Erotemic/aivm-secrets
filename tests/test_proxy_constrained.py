@@ -126,6 +126,25 @@ def test_writes_follow_the_broker_write_mode(tmp_path, service):
         assert json.loads(seen['body']) == {'body': 'hi'}
 
 
+@pytest.mark.parametrize('failing, code, calls', [
+    ('admitted', b'"internal_error"', 0), ('completed', b'"outcome_unknown"', 1)])
+def test_a_failed_audit_record_gates_the_broker_call_and_the_reply(world, monkeypatch, failing, code,
+                                                                  calls):
+    """As in the substitution profile: no broker call without an
+    acknowledged admission record, no reply without a completion record."""
+    real = world.session.audit.record
+
+    def record(event, **detail):
+        if event == failing:
+            raise OSError('disk full')
+        return real(event, **detail)
+
+    monkeypatch.setattr(world.session.audit, 'record', record)
+    reply = world.raw(request('GET', '/v1/account'))
+    assert status(reply) == 502 and code in reply, reply
+    assert len(world.service.requests) == calls
+
+
 def test_revocation_closes_the_constrained_session(world):
     assert status(world.raw(request('GET', '/v1/account'))) == 200
     world.session.revoke()
