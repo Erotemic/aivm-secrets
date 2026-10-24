@@ -1158,3 +1158,49 @@ Confidence: high for what the proofs and the gate cover, and for the real-VM
 runs, which were all local nested KVM and run by me. Lower for anything
 labelled a rehearsal of a maintainer run. Those show the scripts work, not
 that the maintainer's environment behaves the same.
+
+## 2026-10-24 16:56:55 -0400
+
+Continued "finish everything in docs/planning". I made the remaining
+reversible decisions myself, chose the conservative option each time and
+marked each one in the plan as an agent decision to revisit freely.
+
+Done, with the full gate passing where Rust changed:
+- **RFC 7009 upstream revocation** (`16d8942`). The gate caught a
+  mutation-test snippet that now matched both the refresh request and the
+  new revoke request. I anchored it, added a revocation mutant and a
+  real-TLS test that kills it.
+- **Native audit chain** (`843c89f`, 3478 passed). It is a `.chain`
+  sidecar rather than a changed record format, so the proved record shapes
+  and the extracted `append_durable_record` stay untouched. The chain line
+  is written inside `sync_record`, after the record is synced, so a chain
+  failure stops the action exactly like a record failure. Opening a session
+  checks the chain under the flock and refuses a mismatch. Both files are
+  read with the verifier's 64 MiB bound. Limitation, stated in the release
+  guide: rewriting both files is caught only if the operator kept an
+  earlier head digest.
+- **AIVM** (`6362c1a`, unpushed on `dev/0.6.2`): `identity_renew --all` and
+  the session-start certificate checks. Its precondition, the two
+  key-custody fixes, turned out to be already implemented. The policy
+  documents were stale, and I corrected them (`f7159b9`). The CA cut-off is
+  one day, not `CLIENT_DAYS`, because of this morning's clamping.
+- **`gh --json` audit** (`085f6dc`): there is a real gh 2.45 on this host,
+  and it lists its fields without a login. Native `pr view` fields are all
+  stock fields; Python also accepts `baseRefOid`. gh 2.45 has no
+  `pr checks --json`, so that half is still open.
+
+Recorded decisions: IDENT-ENROLL-04 stays an operator premise; GraphQL
+cursors move to schema 3; proxy SSE and cross-host `Link` stay out of
+scope. I left the rename/delete revocation prompt for the maintainer,
+because it adds secrets steps to AIVM's core lifecycle commands.
+
+Still open after this session: the reviews and sign-offs (by nature), the
+live-provider runs, the hardware or multi-host items, the trusted-host-exec
+design questions, `aivm[secrets]` after review, AIVM's stale in-tree
+`aivm_secrets` copy (an AIVM decision), and two formal items: an OAuth
+history model across crashes and concurrent refresh, and a single trace
+model across profiles. Those two are real proof work. I did not start them
+in the tail of this session.
+
+Confidence: high for the chain and RFC 7009, which have gate evidence and
+adversarial tests. High for `--all` logic, medium for its operator wording.
