@@ -175,6 +175,71 @@ pub fn tunnel<G: Guest>(guest: &mut G, host: &[u8], request_limit: usize) {
     }
 }
 
+/// What the native shell provides for one request on the guest-side
+/// constrained translator, which holds no credential and asks the host
+/// bridge for a named operation.
+pub trait Bridge {
+    /// Whether the session is still current.
+    fn current(&mut self) -> bool;
+    /// Translate the request into the one named operation it equals.
+    fn translate(&mut self) -> bool;
+    /// Durably record the admission; false if it could not be written.
+    fn admitted(&mut self) -> bool;
+    /// Whether the encoded arguments fit the bridge client's limit.
+    fn within_limit(&mut self) -> bool;
+    /// Call the host bridge: the released body, or the refusal it maps to.
+    fn invoke(&mut self) -> Result<Vec<u8>, Code>;
+    /// Durably record the completion; false if it could not be written.
+    fn completed(&mut self) -> bool;
+    /// Audit a refusal before anything was asked of the bridge.
+    fn refused(&mut self, code: &Code);
+    /// Audit a bridge call that did not succeed.
+    fn failed(&mut self, code: &Code);
+}
+
+/// The translator's answer for one request.
+pub enum Translated {
+    /// Send this fixed refusal and close.
+    Refuse(Code),
+    /// Release this bridge-selected body.
+    Release(Vec<u8>),
+}
+
+/// One translated request: the bridge is called only for a current session,
+/// a translated request, an acknowledged admission record and arguments
+/// within the limit; a body is released only after an acknowledged
+/// completion record.
+pub fn serve_translated<B: Bridge>(bridge: &mut B) -> Translated {
+    if !bridge.current() {
+        bridge.refused(&Code::Revoked);
+        return Translated::Refuse(Code::Revoked);
+    }
+    if !bridge.translate() {
+        bridge.refused(&Code::UnsupportedRequest);
+        return Translated::Refuse(Code::UnsupportedRequest);
+    }
+    if !bridge.admitted() {
+        return Translated::Refuse(Code::InternalError);
+    }
+    if !bridge.within_limit() {
+        bridge.refused(&Code::TooLarge);
+        return Translated::Refuse(Code::TooLarge);
+    }
+    match bridge.invoke() {
+        Ok(body) => {
+            if bridge.completed() {
+                Translated::Release(body)
+            } else {
+                Translated::Refuse(Code::OutcomeUnknown)
+            }
+        }
+        Err(code) => {
+            bridge.failed(&code);
+            Translated::Refuse(code)
+        }
+    }
+}
+
 /// Where the CONNECT head comes from: the raw guest socket, before TLS.
 pub trait HeadSource {
     /// True once the head has taken too long.
@@ -379,9 +444,15 @@ mod tests {
 
     #[test]
     fn a_failed_completion_audit_releases_nothing() {
-        let mut io = mock(true, || Ok(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok".to_vec()));
+        let mut io = mock(true, || {
+            Ok(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok".to_vec())
+        });
         io.completion_ok = false;
-        let served = run(&mut io, &request(b"GET /a HTTP/1.1\r\nHost: api.example.org\r\n\r\n"), &[]);
+        let served = run(
+            &mut io,
+            &request(b"GET /a HTTP/1.1\r\nHost: api.example.org\r\n\r\n"),
+            &[],
+        );
         assert_eq!(io.calls, ["current", "admitted", "exchange", "completed"]);
         assert_eq!(served.reply, refusal(&Code::OutcomeUnknown));
         assert!(matches!(served.stage, Stage::Failed) && !served.keep);
@@ -389,9 +460,15 @@ mod tests {
 
     #[test]
     fn a_failed_admission_audit_sends_nothing() {
-        let mut io = mock(true, || Ok(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n".to_vec()));
+        let mut io = mock(true, || {
+            Ok(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n".to_vec())
+        });
         io.audit_ok = false;
-        let served = run(&mut io, &request(b"GET /a HTTP/1.1\r\nHost: api.example.org\r\n\r\n"), &[]);
+        let served = run(
+            &mut io,
+            &request(b"GET /a HTTP/1.1\r\nHost: api.example.org\r\n\r\n"),
+            &[],
+        );
         assert_eq!(io.calls, ["current", "admitted"]);
         assert!(io.sent.is_empty());
         assert_eq!(served.reply, refusal(&Code::InternalError));
@@ -671,7 +748,8 @@ mod tests {
 
     #[test]
     fn extracted_connect_head_matches_the_native_reader() {
-        let head = b"CONNECT api.example.org:443 HTTP/1.1\r\nProxy-Authorization: Basic x\r\n\r\n".to_vec();
+        let head = b"CONNECT api.example.org:443 HTTP/1.1\r\nProxy-Authorization: Basic x\r\n\r\n"
+            .to_vec();
         let mut cases: Vec<Vec<u8>> = vec![
             Vec::new(),
             head.clone(),
@@ -685,10 +763,120 @@ mod tests {
         cases.push([b"x\r\n".to_vec(), b"\r\nrest".to_vec()].concat());
         for input in cases {
             for overdue_after in [0, 3, 50, usize::MAX] {
-                let make = || Bytes { input: input.clone(), at: 0, polls: 0, overdue_after };
+                let make = || Bytes {
+                    input: input.clone(),
+                    at: 0,
+                    polls: 0,
+                    overdue_after,
+                };
                 let (mut old, mut new) = (make(), make());
                 assert_eq!(legacy_head(&mut old), connect_head(&mut new));
                 assert_eq!(old.at, new.at, "the same number of bytes consumed");
+            }
+        }
+    }
+
+    struct BridgeScript {
+        answers: [bool; 5],
+        invoked: Result<Vec<u8>, u8>,
+        log: Vec<String>,
+    }
+
+    impl Bridge for BridgeScript {
+        fn current(&mut self) -> bool {
+            self.log.push("current".into());
+            self.answers[0]
+        }
+        fn translate(&mut self) -> bool {
+            self.log.push("translate".into());
+            self.answers[1]
+        }
+        fn admitted(&mut self) -> bool {
+            self.log.push("admitted".into());
+            self.answers[2]
+        }
+        fn within_limit(&mut self) -> bool {
+            self.log.push("within_limit".into());
+            self.answers[3]
+        }
+        fn invoke(&mut self) -> Result<Vec<u8>, Code> {
+            self.log.push("invoke".into());
+            match &self.invoked {
+                Ok(body) => Ok(body.clone()),
+                Err(0) => Err(Code::Denied),
+                Err(_) => Err(Code::OutcomeUnknown),
+            }
+        }
+        fn completed(&mut self) -> bool {
+            self.log.push("completed".into());
+            self.answers[4]
+        }
+        fn refused(&mut self, code: &Code) {
+            self.log.push(format!(
+                "refused {}",
+                String::from_utf8_lossy(&refusal(code))
+            ));
+        }
+        fn failed(&mut self, code: &Code) {
+            self.log.push(format!(
+                "failed {}",
+                String::from_utf8_lossy(&refusal(code))
+            ));
+        }
+    }
+
+    /// The translated path as `garrett-proxy` sequenced it natively.
+    fn legacy_translated(b: &mut BridgeScript) -> Translated {
+        if !b.current() {
+            b.refused(&Code::Revoked);
+            return Translated::Refuse(Code::Revoked);
+        }
+        if !b.translate() {
+            b.refused(&Code::UnsupportedRequest);
+            return Translated::Refuse(Code::UnsupportedRequest);
+        }
+        if !b.admitted() {
+            return Translated::Refuse(Code::InternalError);
+        }
+        if !b.within_limit() {
+            b.refused(&Code::TooLarge);
+            return Translated::Refuse(Code::TooLarge);
+        }
+        match b.invoke() {
+            Ok(body) => {
+                if !b.completed() {
+                    return Translated::Refuse(Code::OutcomeUnknown);
+                }
+                Translated::Release(body)
+            }
+            Err(code) => {
+                b.failed(&code);
+                Translated::Refuse(code)
+            }
+        }
+    }
+
+    fn shown(t: &Translated) -> Vec<u8> {
+        match t {
+            Translated::Refuse(code) => refusal(code),
+            Translated::Release(body) => [b"release ".to_vec(), body.clone()].concat(),
+        }
+    }
+
+    #[test]
+    fn extracted_translated_path_matches_the_native_sequence() {
+        for bits in 0u8..32 {
+            let answers = [0, 1, 2, 3, 4].map(|i| bits & (1 << i) != 0);
+            for invoked in [Ok(b"{}".to_vec()), Err(0u8), Err(1u8)] {
+                let make = || BridgeScript {
+                    answers,
+                    invoked: invoked.clone(),
+                    log: Vec::new(),
+                };
+                let (mut old, mut new) = (make(), make());
+                let (a, b) = (legacy_translated(&mut old), serve_translated(&mut new));
+                assert_eq!(shown(&a), shown(&b));
+                assert_eq!(old.log, new.log);
             }
         }
     }

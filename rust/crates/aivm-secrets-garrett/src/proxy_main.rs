@@ -399,24 +399,6 @@ impl Session {
 }
 
 /// The fixed guest response for a refusal: the extracted `core::refusal`.
-fn refusal(code: &str) -> Vec<u8> {
-    let code = match code {
-        "invalid_request" => core::Code::InvalidRequest,
-        "too_large" => core::Code::TooLarge,
-        "denied" => core::Code::Denied,
-        "unknown_origin" => core::Code::UnknownOrigin,
-        "unauthenticated" => core::Code::Unauthenticated,
-        "revoked" => core::Code::Revoked,
-        "reflected" => core::Code::Reflected,
-        "unreachable" => core::Code::Unreachable,
-        "credential_source" => core::Code::CredentialSource,
-        "unsupported_request" => core::Code::UnsupportedRequest,
-        "internal_error" => core::Code::InternalError,
-        _ => core::Code::OutcomeUnknown,
-    };
-    core::refusal(&code)
-}
-
 fn code_name(code: &core::Code) -> &'static str {
     match code {
         core::Code::InvalidRequest => "invalid_request",
@@ -569,38 +551,98 @@ fn serve_one(session: &Session, origin: &Origin, request: &core::Request) -> (Ve
     (served.reply, served.keep)
 }
 
-/// The guest-side constrained profile: the one named operation the request
-/// equals, sent through the guest's native `invoke`. No credential exists in
-/// this process; the reply body is the operation's disclosure.
-fn serve_translated(session: &Session, translator: &Translator, origin: &Origin, request: &core::Request) -> (Vec<u8>, bool) {
-    let method = String::from_utf8_lossy(&request.method).into_owned();
-    let target = String::from_utf8_lossy(&request.target).into_owned();
-    let path = path_of(&request.target);
-    if !session.current() {
-        session.record("refused", json!({"code": "revoked", "origin": origin.host, "method": method, "path": path}));
-        return (refusal("revoked"), false);
+/// One guest-side translated request; the order of its steps is the
+/// extracted `proxy_controller::serve_translated`.
+struct TranslatedRequest<'a> {
+    session: &'a Session,
+    translator: &'a Translator,
+    origin: &'a Origin,
+    request: &'a core::Request,
+    method: String,
+    path: String,
+    operation: String,
+    arguments: Vec<u8>,
+}
+
+impl TranslatedRequest<'_> {
+    fn detail(&self) -> Value {
+        json!({"origin": self.origin.host, "method": self.method, "path": self.path})
     }
-    let Some((operation, arguments)) = translator.routes.translate(&method, &target, &request.body) else {
-        session.record("refused", json!({"code": "unsupported_request", "origin": origin.host, "method": method, "path": path}));
-        return (refusal("unsupported_request"), false);
-    };
-    // Fail closed: no acknowledged admission record, no bridge call.
-    if !session.record("admitted", json!({"origin": origin.host, "method": method, "path": path, "operation": operation})) {
-        return (refusal("internal_error"), false);
+}
+
+impl controller::Bridge for TranslatedRequest<'_> {
+    fn current(&mut self) -> bool {
+        self.session.current()
     }
-    let body = arguments.to_string().into_bytes();
-    if body.len() > MAX_INVOKE_ARGUMENTS {
-        // The client would refuse it; say so instead of "outcome unknown".
-        session.record("refused", json!({"code": "too_large", "origin": origin.host, "method": method, "path": path}));
-        return (refusal("too_large"), false);
-    }
-    let reply = invoke_bridge(&translator.client, &operation, &body);
-    match reply {
-        Some(reply) if reply["ok"] == json!(true) && reply.get("result").is_some() => {
-            let body = serde_json::to_vec(&reply["result"]).unwrap_or_default();
-            if !session.record("completed", json!({"origin": origin.host, "method": method, "path": path, "operation": operation, "status": 200})) {
-                return (refusal("outcome_unknown"), false);
+    fn translate(&mut self) -> bool {
+        let target = String::from_utf8_lossy(&self.request.target).into_owned();
+        match self.translator.routes.translate(&self.method, &target, &self.request.body) {
+            Some((operation, arguments)) => {
+                self.operation = operation;
+                self.arguments = arguments.to_string().into_bytes();
+                true
             }
+            None => false,
+        }
+    }
+    fn admitted(&mut self) -> bool {
+        let mut detail = self.detail();
+        detail["operation"] = json!(self.operation);
+        self.session.record("admitted", detail)
+    }
+    fn within_limit(&mut self) -> bool {
+        // The client would refuse it; say so instead of "outcome unknown".
+        self.arguments.len() <= MAX_INVOKE_ARGUMENTS
+    }
+    fn invoke(&mut self) -> Result<Vec<u8>, core::Code> {
+        match invoke_bridge(&self.translator.client, &self.operation, &self.arguments) {
+            Some(reply) if reply["ok"] == json!(true) && reply.get("result").is_some() => {
+                Ok(serde_json::to_vec(&reply["result"]).unwrap_or_default())
+            }
+            reply => Err(match reply.as_ref().and_then(|r| r["error"]["code"].as_str()) {
+                Some("denied") => core::Code::Denied,
+                Some("invalid_request") => core::Code::InvalidRequest,
+                Some("revoked" | "expired" | "invalid_capability") => core::Code::Revoked,
+                _ => core::Code::OutcomeUnknown,
+            }),
+        }
+    }
+    fn completed(&mut self) -> bool {
+        let mut detail = self.detail();
+        detail["operation"] = json!(self.operation);
+        detail["status"] = json!(200);
+        self.session.record("completed", detail)
+    }
+    fn refused(&mut self, code: &core::Code) {
+        let mut detail = self.detail();
+        detail["code"] = json!(code_name(code));
+        self.session.record("refused", detail);
+    }
+    fn failed(&mut self, code: &core::Code) {
+        let mut detail = self.detail();
+        detail["code"] = json!(code_name(code));
+        detail["operation"] = json!(self.operation);
+        self.session.record("failed", detail);
+    }
+}
+
+/// A plain request on the guest side, sent as the named operation it
+/// equals through the guest's native `invoke`. No credential exists in this
+/// process; the reply body is the operation's disclosure.
+fn serve_translated(session: &Session, translator: &Translator, origin: &Origin, request: &core::Request) -> (Vec<u8>, bool) {
+    let mut bridge = TranslatedRequest {
+        session,
+        translator,
+        origin,
+        request,
+        method: String::from_utf8_lossy(&request.method).into_owned(),
+        path: path_of(&request.target),
+        operation: String::new(),
+        arguments: Vec::new(),
+    };
+    match controller::serve_translated(&mut bridge) {
+        controller::Translated::Refuse(code) => (core::refusal(&code), false),
+        controller::Translated::Release(body) => {
             let mut out = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: {}\r\n\r\n",
                 body.len(),
@@ -611,16 +653,6 @@ fn serve_translated(session: &Session, translator: &Translator, origin: &Origin,
                 out.extend_from_slice(&body);
             }
             (out, request.keep_alive)
-        }
-        reply => {
-            let code = match reply.as_ref().and_then(|r| r["error"]["code"].as_str()) {
-                Some("denied") => "denied",
-                Some("invalid_request") => "invalid_request",
-                Some("revoked" | "expired" | "invalid_capability") => "revoked",
-                _ => "outcome_unknown",
-            };
-            session.record("failed", json!({"code": code, "origin": origin.host, "method": method, "path": path, "operation": operation}));
-            (refusal(code), false)
         }
     }
 }

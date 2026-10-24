@@ -328,4 +328,70 @@ theorem connect_head_returned {S : Type} (inst : HeadSource S) (source : S)
     have h : Result.ok (none, source1) = Result.ok (some head, after) := h
     simp at h
 
+/-! ## The guest-side constrained translator -/
+
+/-- **A translated request releases a body only after every gate.** For any
+    native callbacks, if `serve_translated` releases `body`, then the session
+    was current, the request translated to a named operation, the admission
+    record was acknowledged, the arguments were within the limit, the host
+    bridge returned exactly `body`, and the completion record was
+    acknowledged, in that order. -/
+theorem translated_release {B : Type} (inst : Bridge B) (bridge : B) (body : alloc.vec.Vec U8)
+    (after : B) (h : serve_translated inst bridge = Result.ok (.Release body, after)) :
+    ∃ b1 b2 b3 b4 b5, inst.current bridge = Result.ok (true, b1) ∧
+      inst.translate b1 = Result.ok (true, b2) ∧ inst.admitted b2 = Result.ok (true, b3) ∧
+      inst.within_limit b3 = Result.ok (true, b4) ∧
+      inst.invoke b4 = Result.ok (.Ok body, b5) ∧ inst.completed b5 = Result.ok (true, after) := by
+  unfold serve_translated at h
+  obtain ⟨⟨c, b1⟩, hc, h⟩ := bind_ok_inv h
+  cases c with
+  | false =>
+    obtain ⟨_, _, h⟩ := bind_ok_inv h
+    cases (ok_pair_inv h).1
+  | true =>
+  obtain ⟨⟨t, b2⟩, ht, h⟩ := bind_ok_inv h
+  cases t with
+  | false =>
+    obtain ⟨_, _, h⟩ := bind_ok_inv h
+    cases (ok_pair_inv h).1
+  | true =>
+  obtain ⟨⟨a, b3⟩, ha, h⟩ := bind_ok_inv h
+  cases a with
+  | false => cases (ok_pair_inv h).1
+  | true =>
+  obtain ⟨⟨w, b4⟩, hw, h⟩ := bind_ok_inv h
+  cases w with
+  | false =>
+    obtain ⟨_, _, h⟩ := bind_ok_inv h
+    cases (ok_pair_inv h).1
+  | true =>
+  obtain ⟨⟨r, b5⟩, hr, h⟩ := bind_ok_inv h
+  cases r with
+  | Err code =>
+    obtain ⟨_, _, h⟩ := bind_ok_inv h
+    cases (ok_pair_inv h).1
+  | Ok got =>
+    obtain ⟨⟨d, b6⟩, hd, h⟩ := bind_ok_inv h
+    cases d with
+    | false => cases (ok_pair_inv h).1
+    | true =>
+      obtain ⟨same, rfl⟩ := ok_pair_inv h
+      cases same
+      exact ⟨b1, b2, b3, b4, b5, hc, ht, ha, hw, hr, hd⟩
+
+/-- **The bridge is called only behind the gates.** Whenever the translated
+    path got as far as the bridge, the session was current, the request
+    translated, the admission record was acknowledged and the arguments were
+    within the limit; every other outcome is a fixed refusal. -/
+theorem translated_outcome {B : Type} (inst : Bridge B) (bridge : B) (out : Translated) (after : B)
+    (h : serve_translated inst bridge = Result.ok (out, after)) :
+    (∃ code, out = .Refuse code) ∨
+    (∃ body, out = .Release body ∧ ∃ b1 b2 b3 b4 b5, inst.current bridge = Result.ok (true, b1) ∧
+      inst.translate b1 = Result.ok (true, b2) ∧ inst.admitted b2 = Result.ok (true, b3) ∧
+      inst.within_limit b3 = Result.ok (true, b4) ∧
+      inst.invoke b4 = Result.ok (.Ok body, b5) ∧ inst.completed b5 = Result.ok (true, after)) := by
+  cases out with
+  | Refuse code => exact Or.inl ⟨code, rfl⟩
+  | Release body => exact Or.inr ⟨body, rfl, translated_release inst bridge body after h⟩
+
 end aivm_secrets_garrett_core.proxy_controller.Proofs

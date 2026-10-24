@@ -817,3 +817,11 @@ Uncertainty: authority-root expiry test has a 12 s window. Confidence: high
 that every committed theorem is about the production-called extracted
 function named in its docstring; medium-high on the completeness of the
 "still assumed" lists in the tour.
+
+## 2026-10-23 22:30:30 -0400
+
+Translated proxy path sequencing extracted: `proxy_controller::serve_translated`
+behind a `Bridge` trait; exhaustive oracle over all 96 callback outcomes vs the
+old native order; `translated_release`/`translated_outcome` proved. Native
+`serve_translated` now only builds the 200 response; removed the dead native
+`refusal(&str)` helper.
