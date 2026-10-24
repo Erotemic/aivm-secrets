@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import copy
 import json
+import resource
 import select
+import signal
 import subprocess
 import sys
 
@@ -73,7 +75,8 @@ class NativeGuestWorld(World):
             [executable('AIVM_SECRETS_RUST_GARRETT_PROXY'), '--policy', str(self.policy_path),
              '--routes', str(self.routes_path), '--bridge-client', json.dumps(self.client),
              '--audit', str(self.audit_path)],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            preexec_fn=getattr(self, 'preexec', None))
         assert select.select([self.process.stdout], [], [], 30)[0], 'no announcement'
         announcement = json.loads(self.process.stdout.readline())
         assert announcement['ready'] is True, announcement
@@ -127,6 +130,35 @@ def test_a_plain_request_becomes_the_named_operation_on_the_bridge(tmp_path, reg
     events = [json.loads(line) for line in world.audit_path.read_text().splitlines()]
     assert [e['event'] for e in events] == ['session_start', 'admitted', 'completed', 'session_end']
     assert events[1]['operation'] == 'package.view'
+
+
+def test_native_translated_requests_are_gated_on_their_audit_records(tmp_path, registry):
+    """The translated path's own gates, live: let exactly N audit records
+    through (record lengths are deterministic), then check that a failed
+    admission record means no bridge call and a failed completion record
+    means no reply."""
+    provider, case, policy = registry
+    measure = tmp_path / 'measure'
+    measure.mkdir()
+    with NativeGuestWorld(measure, case, routes(policy)) as world:
+        assert status(world.raw(get('/api/packages/alpha'))) == 200
+    start, admitted = [len(line) + 1 for line in world.audit_path.read_bytes().splitlines()][:2]
+    before = len(provider.seen())
+    for limit, code, calls in ((start, b'"internal_error"', 0),
+                               (start + admitted, b'"outcome_unknown"', 1)):
+        def no_growth(size=limit):
+            signal.signal(signal.SIGXFSZ, signal.SIG_IGN)
+            resource.setrlimit(resource.RLIMIT_FSIZE, (size, size))
+
+        run = tmp_path / f'limit-{limit}'
+        run.mkdir()
+        limited = NativeGuestWorld(run, case, routes(policy))
+        limited.preexec = no_growth
+        with limited:
+            reply = limited.raw(get('/api/packages/alpha'))
+        assert status(reply) == 502 and code in reply, reply
+        assert len(provider.seen()) == before + calls
+        before = len(provider.seen())
 
 
 @pytest.mark.parametrize('target', [
