@@ -10572,6 +10572,276 @@ def provider_wire.Endpoint.impl.port
   (self : provider_wire.Endpoint) : Result Std.U16 := do
   ok self.port
 
+/-- [aivm_secrets_garrett_core::proxy_audit::key_before]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_audit.rs', lines 12:4-19:1
+    Visibility: public -/
+@[rust_loop]
+def proxy_audit.key_before_loop
+  (a : Slice Std.U32) (b : Slice Std.U32) (index : Std.Usize) :
+  Result Bool
+  := do
+  let i := Slice.len a
+  if index < i
+  then
+    let i1 := Slice.len b
+    if index < i1
+    then
+      let i2 ← Slice.index_usize a index
+      let i3 ← Slice.index_usize b index
+      if i2 != i3
+      then ok (i2 < i3)
+      else
+        let index1 ← index + 1#usize
+        proxy_audit.key_before_loop a b index1
+    else let i2 := Slice.len a
+         let i3 := Slice.len b
+         ok (i2 < i3)
+  else let i1 := Slice.len a
+       let i2 := Slice.len b
+       ok (i1 < i2)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_audit::key_before]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_audit.rs', lines 10:0-19:1
+    Visibility: public -/
+@[reducible]
+def proxy_audit.key_before
+  (a : Slice Std.U32) (b : Slice Std.U32) : Result Bool := do
+  proxy_audit.key_before_loop a b 0#usize
+
+mutual
+
+/-- [aivm_secrets_garrett_core::proxy_audit::clone_value]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_audit.rs', lines 31:12-34:13
+    Visibility: public -/
+@[rust_loop]
+def proxy_audit.clone_value_loop0
+  (items : alloc.vec.Vec json_wire.Value) (out : alloc.vec.Vec json_wire.Value)
+  (index : Std.Usize) :
+  Result (alloc.vec.Vec json_wire.Value)
+  := do
+  let i := alloc.vec.Vec.len items
+  if index < i
+  then
+    let v ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        json_wire.Value) items index
+    let v1 ← proxy_audit.clone_value v
+    let out1 ← alloc.vec.Vec.push out v1
+    let index1 ← index + 1#usize
+    proxy_audit.clone_value_loop0 items out1 index1
+  else ok out
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_audit::clone_value]: loop 1:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_audit.rs', lines 40:12-43:13
+    Visibility: public -/
+@[rust_loop]
+def proxy_audit.clone_value_loop1
+  (fields : alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value))
+  (out : alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value))
+  (index : Std.Usize) :
+  Result (alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value))
+  := do
+  let i := alloc.vec.Vec.len fields
+  if index < i
+  then
+    let (v, v1) ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
+        ((alloc.vec.Vec Std.U32) × json_wire.Value)) fields index
+    let v2 ← alloc.vec.CloneVec.clone core.clone.CloneU32 v
+    let v3 ← proxy_audit.clone_value v1
+    let out1 ← alloc.vec.Vec.push out (v2, v3)
+    let index1 ← index + 1#usize
+    proxy_audit.clone_value_loop1 fields out1 index1
+  else ok out
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_audit::clone_value]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_audit.rs', lines 22:0-47:1
+    Visibility: public -/
+def proxy_audit.clone_value
+  (value : json_wire.Value) : Result json_wire.Value := do
+  match value with
+  | json_wire.Value.Null => ok json_wire.Value.Null
+  | json_wire.Value.Boolean _ => ok value
+  | json_wire.Value.Number digits =>
+    let v ← alloc.vec.CloneVec.clone core.clone.CloneU8 digits
+    ok (json_wire.Value.Number v)
+  | json_wire.Value.Text units =>
+    let v ← alloc.vec.CloneVec.clone core.clone.CloneU32 units
+    ok (json_wire.Value.Text v)
+  | json_wire.Value.Array items =>
+    let out ←
+      proxy_audit.clone_value_loop0 items (alloc.vec.Vec.new json_wire.Value)
+        0#usize
+    ok (json_wire.Value.Array out)
+  | json_wire.Value.Object fields =>
+    let out ←
+      proxy_audit.clone_value_loop1 fields (alloc.vec.Vec.new ((alloc.vec.Vec
+        Std.U32) × json_wire.Value)) 0#usize
+    ok (json_wire.Value.Object out)
+partial_fixpoint
+
+end
+
+/-- [aivm_secrets_garrett_core::proxy_audit::merge]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_audit.rs', lines 54:4-62:5
+    Visibility: public -/
+@[rust_loop]
+def proxy_audit.merge_loop
+  (left : Slice ((alloc.vec.Vec Std.U32) × json_wire.Value))
+  (right : Slice ((alloc.vec.Vec Std.U32) × json_wire.Value))
+  (out : alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value))
+  (i : Std.Usize) (j : Std.Usize) :
+  Result (alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value))
+  := do
+  let i1 := Slice.len left
+  if i < i1
+  then
+    let i2 := Slice.len right
+    if j >= i2
+    then
+      let (v, v1) ← Slice.index_usize left i
+      let v2 ← alloc.vec.CloneVec.clone core.clone.CloneU32 v
+      let v3 ← proxy_audit.clone_value v1
+      let out1 ← alloc.vec.Vec.push out (v2, v3)
+      let i3 ← i + 1#usize
+      proxy_audit.merge_loop left right out1 i3 j
+    else
+      let i3 := Slice.len left
+      if i < i3
+      then
+        let (v, v1) ← Slice.index_usize left i
+        let s := alloc.vec.Vec.deref v
+        let (v2, v3) ← Slice.index_usize right j
+        let s1 := alloc.vec.Vec.deref v2
+        let b ← proxy_audit.key_before s s1
+        if b
+        then
+          let v4 ← alloc.vec.CloneVec.clone core.clone.CloneU32 v
+          let v5 ← proxy_audit.clone_value v1
+          let out1 ← alloc.vec.Vec.push out (v4, v5)
+          let i4 ← i + 1#usize
+          proxy_audit.merge_loop left right out1 i4 j
+        else
+          let v4 ← alloc.vec.CloneVec.clone core.clone.CloneU32 v2
+          let v5 ← proxy_audit.clone_value v3
+          let out1 ← alloc.vec.Vec.push out (v4, v5)
+          let j1 ← j + 1#usize
+          proxy_audit.merge_loop left right out1 i j1
+      else
+        let (v, v1) ← Slice.index_usize right j
+        let v2 ← alloc.vec.CloneVec.clone core.clone.CloneU32 v
+        let v3 ← proxy_audit.clone_value v1
+        let out1 ← alloc.vec.Vec.push out (v2, v3)
+        let j1 ← j + 1#usize
+        proxy_audit.merge_loop left right out1 i j1
+  else
+    let i2 := Slice.len right
+    if j < i2
+    then
+      let i3 := Slice.len right
+      if j >= i3
+      then
+        let (v, v1) ← Slice.index_usize left i
+        let v2 ← alloc.vec.CloneVec.clone core.clone.CloneU32 v
+        let v3 ← proxy_audit.clone_value v1
+        let out1 ← alloc.vec.Vec.push out (v2, v3)
+        let i4 ← i + 1#usize
+        proxy_audit.merge_loop left right out1 i4 j
+      else
+        let i4 := Slice.len left
+        if i < i4
+        then
+          let (v, v1) ← Slice.index_usize left i
+          let s := alloc.vec.Vec.deref v
+          let (v2, v3) ← Slice.index_usize right j
+          let s1 := alloc.vec.Vec.deref v2
+          let b ← proxy_audit.key_before s s1
+          if b
+          then
+            let v4 ← alloc.vec.CloneVec.clone core.clone.CloneU32 v
+            let v5 ← proxy_audit.clone_value v1
+            let out1 ← alloc.vec.Vec.push out (v4, v5)
+            let i5 ← i + 1#usize
+            proxy_audit.merge_loop left right out1 i5 j
+          else
+            let v4 ← alloc.vec.CloneVec.clone core.clone.CloneU32 v2
+            let v5 ← proxy_audit.clone_value v3
+            let out1 ← alloc.vec.Vec.push out (v4, v5)
+            let j1 ← j + 1#usize
+            proxy_audit.merge_loop left right out1 i j1
+        else
+          let (v, v1) ← Slice.index_usize right j
+          let v2 ← alloc.vec.CloneVec.clone core.clone.CloneU32 v
+          let v3 ← proxy_audit.clone_value v1
+          let out1 ← alloc.vec.Vec.push out (v2, v3)
+          let j1 ← j + 1#usize
+          proxy_audit.merge_loop left right out1 i j1
+    else ok out
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_audit::merge]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_audit.rs', lines 50:0-64:1
+    Visibility: public -/
+@[reducible]
+def proxy_audit.merge
+  (left : Slice ((alloc.vec.Vec Std.U32) × json_wire.Value))
+  (right : Slice ((alloc.vec.Vec Std.U32) × json_wire.Value)) :
+  Result (alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value))
+  := do
+  proxy_audit.merge_loop left right (alloc.vec.Vec.new ((alloc.vec.Vec Std.U32)
+    × json_wire.Value)) 0#usize 0#usize
+
+/-- [aivm_secrets_garrett_core::proxy_audit::row]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_audit.rs', lines 68:0-83:1
+    Visibility: public -/
+def proxy_audit.row
+  (event : json_wire.Value) (prev : json_wire.Value) (seq : json_wire.Value)
+  (timestamp : json_wire.Value)
+  (detail : alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value)) :
+  Result json_wire.Value
+  := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 5#usize [ 101#u8, 118#u8, 101#u8, 110#u8, 116#u8 ]))
+  let v ← control.text_units s
+  let s1 ←
+    lift (Array.to_slice
+      (Array.make 4#usize [ 112#u8, 114#u8, 101#u8, 118#u8 ]))
+  let v1 ← control.text_units s1
+  let s2 ←
+    lift (Array.to_slice
+      (Array.make 6#usize [ 115#u8, 99#u8, 104#u8, 101#u8, 109#u8, 97#u8 ]))
+  let v2 ← control.text_units s2
+  let s3 ←
+    lift (Array.to_slice
+      (Array.make 13#usize [
+        112#u8, 114#u8, 111#u8, 120#u8, 121#u8, 45#u8, 97#u8, 117#u8, 100#u8,
+        105#u8, 116#u8, 45#u8, 49#u8
+        ]))
+  let v3 ← control.text s3
+  let s4 ←
+    lift (Array.to_slice (Array.make 3#usize [ 115#u8, 101#u8, 113#u8 ]))
+  let v4 ← control.text_units s4
+  let s5 ←
+    lift (Array.to_slice
+      (Array.make 9#usize [
+        116#u8, 105#u8, 109#u8, 101#u8, 115#u8, 116#u8, 97#u8, 109#u8, 112#u8
+        ]))
+  let v5 ← control.text_units s5
+  let y ←
+    lift (Std.Array.to_slice
+      (Array.make 5#usize [
+         (v, event), (v1, prev), (v2, v3), (v4, seq), (v5, timestamp)
+         ] : Array ((alloc.vec.Vec Std.U32) × json_wire.Value) 5#usize))
+  let ret := alloc.slice.Slice.into_vec y
+  let s6 := alloc.vec.Vec.deref ret
+  let s7 := alloc.vec.Vec.deref detail
+  let v6 ← proxy_audit.merge s6 s7
+  ok (json_wire.Value.Object v6)
+
 /-- [aivm_secrets_garrett_core::proxy_http::Code]
     Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1217:0-1231:1
     Visibility: public -/

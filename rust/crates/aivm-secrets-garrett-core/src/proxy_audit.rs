@@ -52,12 +52,7 @@ pub fn merge(left: &[(Vec<u32>, Value)], right: &[(Vec<u32>, Value)]) -> Vec<(Ve
     let mut i = 0;
     let mut j = 0;
     while i < left.len() || j < right.len() {
-        let take_left = if i < left.len() && j < right.len() {
-            key_before(&left[i].0, &right[j].0)
-        } else {
-            i < left.len()
-        };
-        if take_left {
+        if j >= right.len() || (i < left.len() && key_before(&left[i].0, &right[j].0)) {
             out.push((left[i].0.clone(), clone_value(&left[i].1)));
             i += 1;
         } else {

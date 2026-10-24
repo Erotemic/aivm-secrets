@@ -863,3 +863,12 @@ Not wired into garrett-proxy yet.
 proxy row extractable: scratch Aeneas run clean, still 2 axioms, oracle still
 passes. Remaining before merge: prove `merge` keeps key order and every
 field, wire `Session::record` through `row`, gate.
+
+## 2026-10-23 23:12:28 -0400 (branch wip/proxy-audit-rows)
+
+Lesson: a clean scratch Aeneas run is not enough; the first `merge` extracted
+to Lean that did not compile (`Decidable take_left`). Restructured to a single
+condition; authoritative extraction now compiles (2 axioms). Proved
+`key_before_loop_spec` (`KeyLt`, lexicographic by scalar value) in
+`proofs/GarrettProxyAudit.lean` (not yet a lakefile root). Next: merge spec,
+row structure, wiring, gate.
