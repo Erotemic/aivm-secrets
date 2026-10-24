@@ -293,6 +293,16 @@ pub(crate) struct CurrentCredential {
     meta: core::LeaseMeta,
     expected_epoch: i64,
 }
+// Like `custody::Credential`: never printed, copied, dereferenced or
+// serialized; its one reader is `credential()`.
+static_assertions::assert_not_impl_any!(
+    CurrentCredential: std::fmt::Debug,
+    std::fmt::Display,
+    Clone,
+    std::ops::Deref,
+    AsRef<[u8]>,
+    serde::Serialize,
+);
 impl CurrentCredential {
     pub(crate) fn credential(&self) -> &[u8] {
         self.credential.as_bytes()

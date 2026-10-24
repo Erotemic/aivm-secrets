@@ -49,6 +49,28 @@ callbacks) and the rest of the native crate perform no *other* write of
 credential bytes. That is a reachability property of native code, checked by
 the W3/W6 source guards and their mutation tests, not by Lean.
 
+**How small that premise now is (2026-10-24).** The native credential type
+`custody::Credential` has a private field and one accessor, `expose()`. A
+compile-time check (`static_assertions::assert_not_impl_any!`) rejects any
+`Debug`, `Display`, `Clone`, `Copy`, `Deref`, `AsRef` or `Serialize`
+implementation, so it cannot be printed, copied or serialized by accident.
+The compiler therefore forces every reader through `expose()`, and
+`tests/test_native_credential_readers.py` lists all of them. There are seven in
+production code:
+- the envelope seal;
+- the two account-status writers;
+- the OAuth marker comparison;
+- the extracted send, the reflection check and the disclosure check in
+  `Session::request`.
+
+A whole-process witness, `dev/native_syscall_witness.py`, runs the offline
+operator/guest flow with the bridge under `strace -f`. No write or send
+buffer contains the credential or its base64 forms, and the only network
+destination is the provider. The premise a reviewer has to accept is now:
+- those seven call sites do what their review says;
+- the TLS writer forwards exactly what `Channel::submit` gives it;
+- std, rustls, ring and the kernel make no other plaintext copy.
+
 For review, the [claim-to-evidence matrix](claim-evidence-matrix.md) lists each
 property with its theorems, premises, witnesses and exclusions.
 

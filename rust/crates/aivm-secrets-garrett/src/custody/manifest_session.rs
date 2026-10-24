@@ -493,7 +493,7 @@ impl Session {
                 },
             };
             request_adapter::DispatchPlan {
-                work: aivm_secrets_garrett_core::channel_work::Submitting::new(work, &secret.0),
+                work: aivm_secrets_garrett_core::channel_work::Submitting::new(work, secret.expose()),
                 keyed_write,
             }
         };
@@ -510,7 +510,7 @@ impl Session {
                     document: &document,
                     fields: selection_fields,
                     page: selection_page,
-                    secret: &selection_secret.0,
+                    secret: selection_secret.expose(),
                 };
                 aivm_secrets_garrett_core::selected_release::select(&mut selection)
             },
@@ -555,7 +555,7 @@ impl Session {
             aivm_secrets_garrett_core::write_gate::Gated::Required => {
                 fresh()?;
                 let reply = json!({"version":1,"ok":false,"error":{"code":"approval_required", "message":"Exact write needs host approval."},"approval":{"digest":approval_digest}});
-                crate::manifest::disclosure::ensure_safe(&reply, &secret.0)?;
+                crate::manifest::disclosure::ensure_safe(&reply, secret.expose())?;
                 self.control
                     .as_ref()
                     .ok_or(Error::InternalError)?
@@ -1037,7 +1037,7 @@ mod wire_tests {
             &mut output,
             route,
             fields,
-            &secret.0,
+            secret.expose(),
             body.as_ref().map(|value| value.as_slice()),
         )
         .map_err(encoding_error)?;
@@ -1874,7 +1874,7 @@ mod wire_tests {
         }
     }
     fn secret(bytes: &[u8]) -> Credential {
-        Credential(Zeroizing::new(bytes.to_vec()))
+        Credential::new(bytes.to_vec())
     }
     #[test]
     fn unapproved_read_or_preflight_cannot_become_write_dispatch() {

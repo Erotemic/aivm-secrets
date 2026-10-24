@@ -189,7 +189,7 @@ def review_semantics(contents: dict[str, str]) -> None:
                        'self.effects = report.effects;', 'report.outcome')
             and same_order(dispatch, 'let keyed_write =', 'let work = ManifestProvider {',
                            'request_adapter::DispatchPlan {',
-                           'work: aivm_secrets_garrett_core::channel_work::Submitting::new(work, &secret.0),',
+                           'work: aivm_secrets_garrett_core::channel_work::Submitting::new(work, secret.expose()),',
                            'keyed_write,')
             and 'matches!(phase, DispatchPhase::Final)' in dispatch
             and '&& effect.write' in dispatch and '&& self.base.coordinator.is_some()' in dispatch
@@ -236,7 +236,7 @@ def review_semantics(contents: dict[str, str]) -> None:
                        'letdocument=crate::manifest::disclosure::document(&raw);',
                        'selected_release::Manifest{', 'current:ManifestCurrent{session},',
                        'document:&document,', 'fields:selection_fields,', 'page:selection_page,',
-                       'secret:&selection_secret.0,',
+                       'secret:selection_secret.expose(),',
                        'selected_release::select(&mutselection)', 'audit:&self.base.executor.audit,')
             and same_order(selection_core, 'work.current()?;', 'work.pagination()?;',
                            'work.project()?;', 'work.assemble(selected, metadata)',
@@ -369,7 +369,7 @@ def review_semantics(contents: dict[str, str]) -> None:
     shared_wire = part(c, 'fn provider_request_bytes(', 'fn account_request_bytes(')
     require(shared_wire.count('http_wire::append_request(') == 1
             and 'Zeroizing::new(Vec::new())' in shared_wire
-            and '&secret.0,' in shared_wire and 'authentication,' in shared_wire
+            and 'secret.expose(),' in shared_wire and 'authentication,' in shared_wire
             and 'Error::CredentialSource' in shared_wire
             and 'request.extend_from_slice(' not in shared_wire,
             'provider HTTP bypasses the borrowed credential/full encoder boundary')
@@ -398,7 +398,7 @@ def review_semantics(contents: dict[str, str]) -> None:
     runtime = m.split('#[cfg(test)]', 1)[0]
     require(runtime.count('TcpStream::connect_timeout(') == 1 and runtime.count('.write_all(') == 1
             and runtime.count('channel.submit()') == 0
-            and runtime.count('channel_work::Submitting::new(work, &secret.0)') == 1
+            and runtime.count('channel_work::Submitting::new(work, secret.expose())') == 1
             and runtime.count('request_adapter::Pending::new(work)') == 1
             and 'dispatch::dispatch(' not in runtime,
             'native module added a credentialed socket or alternate HTTP writer')
@@ -617,7 +617,7 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'method: b"GET".to_vec()' in account_wire
             and 'target: route.path.clone()' in account_wire
             and 'host: route.host.clone()' in account_wire
-            and 'request.extend_from_slice(&secret.0)' not in account_wire
+            and 'request.extend_from_slice(secret.expose())' not in account_wire
             and same_order(account_transport, 'let request = account_request_bytes(route, secret)?;',
                            'TcpStream::connect_timeout(', 'emit_current(fresh, || {'),
             'account HTTP bypasses the complete encoder or validates after connection')
@@ -664,9 +664,9 @@ def review_semantics(contents: dict[str, str]) -> None:
             'guest current-token lease attempts implicit refresh')
     opener = part(c, 'impl protocol::CredentialOpener for SessionOpener',
                   'impl protocol::CredentialOpener for InnerEnvelope')
-    require(same_order(opener, 'verify_session_marker(', 'opened.credential = Credential('),
+    require(same_order(opener, 'verify_session_marker(', 'opened.credential = Credential::new('),
             'OAuth capability marker not checked before credential substitution')
-    require('Credential(Zeroizing::new(session_binding.marker().to_vec()))' in c
+    require('Credential::new(session_binding.marker().to_vec())' in c
             and 'lease.require_current(current.now)?;' in c
             and 'lease.require_current(current)?;' in request,
             'OAuth session lost opaque sealing or late token-expiry admission')

@@ -29,7 +29,35 @@ use zeroize::Zeroizing;
 
 const INNER_AAD: &[u8] = b"aivm-secrets/local-session/service-neutral/v1";
 const MAX_BODY: usize = 2 * 1024 * 1024;
-struct Credential(Zeroizing<Vec<u8>>);
+mod secret {
+    //! The provider credential. Its bytes are reachable only through
+    //! [`Credential::expose`], so every reader is a call site the compiler
+    //! can list, and the type implements no trait that would print, copy,
+    //! dereference or serialize it (checked at compile time below).
+    use zeroize::Zeroizing;
+
+    pub(super) struct Credential(Zeroizing<Vec<u8>>);
+
+    impl Credential {
+        pub(super) fn new(bytes: Vec<u8>) -> Self {
+            Credential(Zeroizing::new(bytes))
+        }
+        pub(super) fn expose(&self) -> &Vec<u8> {
+            &self.0
+        }
+    }
+
+    static_assertions::assert_not_impl_any!(
+        Credential: std::fmt::Debug,
+        std::fmt::Display,
+        Clone,
+        Copy,
+        std::ops::Deref,
+        AsRef<[u8]>,
+        serde::Serialize,
+    );
+}
+use secret::Credential;
 fn credential(data: &[u8]) -> Outcome<Credential> {
     credential_at_least(data, 16)
 }
@@ -37,7 +65,7 @@ fn credential_at_least(data: &[u8], minimum: usize) -> Outcome<Credential> {
     if data.len() < minimum || !http_auth::valid_credential(data) {
         return Err(Error::CredentialSource);
     }
-    Ok(Credential(Zeroizing::new(data.to_vec())))
+    Ok(Credential::new(data.to_vec()))
 }
 fn text<'a>(v: &'a Value, key: &str) -> Outcome<&'a str> {
     v.get(key)
@@ -117,7 +145,7 @@ impl InnerEnvelope {
     fn seal(&self, claims: &Value, secret: &Credential) -> Outcome<String> {
         let nonce = random::<12>()?;
         let mut payload = Zeroizing::new(json::canonical(
-            &json!({"claims":claims,"credential":std::str::from_utf8(&secret.0).map_err(|_|Error::InvalidCapability)?}),
+            &json!({"claims":claims,"credential":std::str::from_utf8(secret.expose()).map_err(|_|Error::InvalidCapability)?}),
         ));
         self.0
             .seal_in_place_append_tag(
@@ -315,7 +343,7 @@ fn provider_request_bytes(
     body: Option<&[u8]>,
 ) -> Outcome<Zeroizing<Vec<u8>>> {
     let mut request = Zeroizing::new(Vec::new());
-    http_wire::append_request(&mut request, head, &secret.0, authentication, body).map_err(
+    http_wire::append_request(&mut request, head, secret.expose(), authentication, body).map_err(
         |error| match error {
             http_wire::EncodingDenial::InvalidRequest => Error::InvalidPolicy,
             http_wire::EncodingDenial::InvalidCredential => Error::CredentialSource,
@@ -388,7 +416,7 @@ impl Executor {
         // success frame before the selected values can leave credential custody.
         crate::manifest::disclosure::ensure_safe(
             &json!({"version":1,"ok":true,"result":{"id":id,"active":active}}),
-            &secret.0,
+            secret.expose(),
         )?;
         Ok(core::ProviderReply {
             account_id: id,
@@ -699,7 +727,7 @@ impl AccountSession {
                 )
                 .map_err(|_| Error::CredentialSource)?;
             let session_binding = vault.bind_session(&provider, &subject, &lease)?;
-            let secret = Credential(Zeroizing::new(session_binding.marker().to_vec()));
+            let secret = Credential::new(session_binding.marker().to_vec());
             (
                 secret,
                 Some(OAuthSource {
@@ -991,7 +1019,7 @@ pub(crate) fn fixture_envelope(v: &Value) -> Outcome<Value> {
         let (c, secret) = envelope.open(text(v, "token")?.as_bytes())?;
         let binding = json::parse(&c.binding, 4096)?;
         Ok(
-            json!({"ok":true,"claims":{"binding":binding,"policy_digest":std::str::from_utf8(&c.policy).map_err(|_|Error::InvalidCapability)?,"grant_id":std::str::from_utf8(&c.grant).map_err(|_|Error::InvalidCapability)?,"issued_at":c.issued_at,"expires_at":c.expires_at},"credential":std::str::from_utf8(&secret.0).map_err(|_|Error::InvalidCapability)?}),
+            json!({"ok":true,"claims":{"binding":binding,"policy_digest":std::str::from_utf8(&c.policy).map_err(|_|Error::InvalidCapability)?,"grant_id":std::str::from_utf8(&c.grant).map_err(|_|Error::InvalidCapability)?,"issued_at":c.issued_at,"expires_at":c.expires_at},"credential":std::str::from_utf8(secret.expose()).map_err(|_|Error::InvalidCapability)?}),
         )
     }
 }
@@ -1033,10 +1061,10 @@ impl protocol::CredentialOpener for SessionOpener<'_> {
                         &source.provider,
                         &source.subject,
                         &source.binding,
-                        &opened.credential.0,
+                        opened.credential.expose(),
                     )
                     .map_err(|_| core::UseDenial::InvalidCapability)?;
-                opened.credential = Credential(Zeroizing::new(current.credential().to_vec()));
+                opened.credential = Credential::new(current.credential().to_vec());
             }
             _ => return Err(core::UseDenial::InvalidCapability),
         }
@@ -1203,7 +1231,7 @@ mod tests {
                 path: b"/v1/account".to_vec(),
                 authentication,
             };
-            let secret = Credential(Zeroizing::new(b"SYNTHETIC:token/~+=".to_vec()));
+            let secret = Credential::new(b"SYNTHETIC:token/~+=".to_vec());
             let bytes = account_request_bytes(&route, &secret).unwrap();
             assert_eq!(bytes.as_slice(), format!(
                 "GET /v1/account HTTP/1.1\r\nHost: api.example.org:443\r\nAccept: application/json\r\nAccept-Encoding: identity\r\nUser-Agent: aivm-secrets/1\r\nConnection: close\r\n{expected}SYNTHETIC:token/~+=\r\n\r\n"
@@ -1227,7 +1255,7 @@ mod tests {
             b"TOKEN ",
             &[255],
         ] {
-            let secret = Credential(Zeroizing::new(value.to_vec()));
+            let secret = Credential::new(value.to_vec());
             assert!(matches!(
                 account_request_bytes(&route, &secret),
                 Err(Error::CredentialSource)

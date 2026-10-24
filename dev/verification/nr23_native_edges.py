@@ -59,7 +59,7 @@ EDGES = (
     Edge(MANIFEST, 'production-dispatch-uses-core-channel-work',
          'let keyed_write =', 'let session = &*self;',
          ('let work = ManifestProvider {',
-          'aivm_secrets_garrett_core::channel_work::Submitting::new(work, &secret.0)')),
+          'aivm_secrets_garrett_core::channel_work::Submitting::new(work, secret.expose())')),
     Edge(MANIFEST, 'writer-forwards-exact-byte-vector',
          'impl<W: Write> aivm_secrets_garrett_core::provider_io::Writer for ProviderWriter<W>',
          'struct ManifestDispatch<',

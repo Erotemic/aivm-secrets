@@ -75,7 +75,7 @@ def check(root: Path = ROOT) -> dict:
             and 'audit.write_record(' in source and 'phase.as_str()' in source,
             'native manifest might execute a provider effect before dispatch audit')
     require('let dispatch = |phase: DispatchPhase, effect: Effect|' in request
-            and 'work: aivm_secrets_garrett_core::channel_work::Submitting::new(work, &secret.0),' in request
+            and 'work: aivm_secrets_garrett_core::channel_work::Submitting::new(work, secret.expose()),' in request
             and 'operation_write: op.write,' in request,
             'manifest preflight/final no longer share the audited dispatcher')
     fresh = request.split('let current_peer =', 1)[-1].split('let canonical_request', 1)[0]

@@ -97,7 +97,7 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and 'writer.flush()' in io
            and 'channel.submit()' in (root / CORE_CHANNEL).read_text().split('fn receive(', 1)[0]
            and 'ManifestWire(Zeroizing::new(encoded))' in source
-           and 'channel_work::Submitting::new(work, &secret.0)' in source,
+           and 'channel_work::Submitting::new(work, secret.expose())' in source,
            'captured route/buffer submission bypassed')
     channel = io.split('pub struct Channel<', 1)[1]
     receiver = source.split('fn parse(\n        &mut self,\n        released:', 1)[1].split('fn manifest_response(', 1)[0]
@@ -149,8 +149,8 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
     core = (root / CORE_ENCODER).read_text().split('#[cfg(test)]', 1)[0]
     ensure('!http_auth::valid_credential(secret)' in core
            and shared.count('http_wire::append_request(') == 1
-           and '&secret.0,' in shared and 'Error::CredentialSource' in shared
-           and 'request.extend_from_slice(&secret.0)' not in shared,
+           and 'secret.expose(),' in shared and 'Error::CredentialSource' in shared
+           and 'request.extend_from_slice(secret.expose())' not in shared,
            'HTTP header may contain unvalidated OAuth/credential bytes')
     ensure(channel_encode.count('crate::provider_wire::append(') == 2
            and 'method: effect.method.as_bytes().to_vec()' in encoder

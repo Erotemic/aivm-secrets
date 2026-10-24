@@ -24,7 +24,7 @@ hypotheses are on the same list as library and deployment trust.
 
 | ID | Priority | Next step |
 | --- | --- | --- |
-| `NATIVE-SINK-01` | P1 | Done: request primitives no longer receive the credential (core encodes). Next: core-owned opaque credential outside custody/unsealing; independent review of the remaining native call graph |
+| `NATIVE-SINK-01` | P1 | Done: request primitives no longer receive the credential (core encodes); the native credential type is sealed at compile time and its seven readers are pinned; a strace witness shows no credential bytes in any write or send of the bridge and no network destination but the provider. Next: independent review of the reviewed readers and the TLS writer contract |
 | `NATIVE-GLUE-01` | P1 | Move remaining native-to-core call sites into extracted wrappers where Aeneas allows |
 | `PROXY-NATIVE-01` | P2 | Native proxy shell (OUT-6): per-request controller extracted (`proxy_controller::serve`); next, the tunnel loop and byte-exact callback contracts |
 | `ROUTE-NATIVE-01` | P2 | Named-operation targets: `route::fill_target` is extracted and proved; next, template parsing and argument-to-text conversion, then a proved guest-side match (HP-6) |

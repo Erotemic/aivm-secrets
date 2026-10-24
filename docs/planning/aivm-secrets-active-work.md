@@ -53,9 +53,9 @@ This is the main proof gap (`NATIVE-SINK-01`, `ExactNativeSinkCoverage`).
 
 | Step | Deliverable | Done when |
 | --- | --- | --- |
-| 2.1 | Make the credential's reach a compile-time fact. The credential type implements no `Debug`, `Display`, `Clone` or `Serialize`, and only custody and the extracted encoder can read its bytes. Pin this with `static_assertions` (`assert_not_impl_any!`) and module privacy, not with a new checker | A negative compile check fails if someone adds a trait or a reader |
-| 2.2 | Whole-process witness. Run the broker under `strace -f` (`write`, `writev`, `sendto`, `sendmsg`, `pwrite64`) with a synthetic credential, and decrypt the provider TLS stream with rustls `KeyLogFile` | In a full read, a denied read, a revocation and an audit failure, the credential bytes (and their base64 forms) appear only inside the authorized provider request |
-| 2.3 | Restate `ExactNativeSinkCoverage` as a short contract on the single native writer, using steps 2.1 and 2.2 as its evidence | The ledger entry names one function and one contract, and the proof tour explains it |
+| 2.1 | Seal the credential type and pin its readers | **Done 2026-10-24.** `custody::Credential` and OAuth's `CurrentCredential` are sealed with `static_assertions` (a derived `Clone` fails the build) and the seven production readers are pinned by `tests/test_native_credential_readers.py` |
+| 2.2 | Whole-process witness | **Done 2026-10-24.** `dev/native_syscall_witness.py`: no credential bytes in any write-family syscall of the bridge, only the provider as a network destination, positive control on the audit records. TLS decryption was not needed: plaintext credential bytes have no reason to appear in any syscall at all |
+| 2.3 | Restate the premise as a contract | **Done 2026-10-24.** Ledger entry, roadmap row, claim matrix and proof tour now state the narrowed premise and its evidence |
 
 Step 2.2 is a test, not a proof, but it covers std, rustls and the OS, which
 source guards cannot reach. Together with 2.1 it leaves a premise small

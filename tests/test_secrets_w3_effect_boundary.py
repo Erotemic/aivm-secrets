@@ -296,7 +296,7 @@ def mutate(repo, filename, before, after):
     (
         RUST + 'custody/manifest_session.rs',
         '        audit.append_value(&aivm_secrets_garrett_core::session_audit::dispatch_record(',
-        '        println!("{:?}", &secret.0);\n        audit.append_value(&aivm_secrets_garrett_core::session_audit::dispatch_record(',
+        '        println!("{:?}", secret.expose());\n        audit.append_value(&aivm_secrets_garrett_core::session_audit::dispatch_record(',
     ),
     (
         RUST + 'tls.rs',
