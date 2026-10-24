@@ -825,3 +825,12 @@ behind a `Bridge` trait; exhaustive oracle over all 96 callback outcomes vs the
 old native order; `translated_release`/`translated_outcome` proved. Native
 `serve_translated` now only builds the 200 response; removed the dead native
 `refusal(&str)` helper.
+
+## 2026-10-23 23:04:27 -0400
+
+End of run. `system.py --proofs` passes at `74fbe33` (includes
+`translated_release`). Next concrete removals, in order: (1) fold the approval
+decision into a core `write_gate` entry that takes the store admission
+callback, removing the one native line; (2) core-build the proxy's audit rows
+(hash chain stays native) as done for the bridge sessions; (3) revisit the
+opaque core credential type once the four native byte readers are reduced.
