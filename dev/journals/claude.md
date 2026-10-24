@@ -1239,3 +1239,15 @@ Left by nature: reviews and sign-offs, live-provider runs, hardware and
 multi-host work, AIVM's own decisions (the stale copy, the rename prompt),
 and refinement of the storage, lock, listener and TLS adapters, which the
 history models take as premises.
+
+## 2026-10-24 17:50:22 -0400
+
+Two more items closed. A checksum-verified `gh` 2.63.2, run offline,
+completed the `--json` audit. It found a real bug: the native client
+refused the stock `gh pr checks --json name,state,link`. Fixed in
+`0497ac8` with the Python client's state map; the full gate passed. AIVM
+now has the opt-in revoke before delete, rename and access removal.
+
+What remains needs a reviewer, a live provider, extra hardware, AIVM's own
+decision about its stale copy, or refinement of the adapters the history
+models take as premises.
