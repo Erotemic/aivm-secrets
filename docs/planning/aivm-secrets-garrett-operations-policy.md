@@ -170,16 +170,17 @@ All **implemented**:
   `less_than_a_day_refused`).
   `status` reports the CA's expiry as `ca_not_after` (both authorities,
   since 2026-10-24), but AIVM still reports every
-  identity-child refusal only as "identity service refused the operation",
-  so nothing tells the user why. (The clamp described above, with a one-day minimum, is now implemented.)
-- **Known defect:** after `aivm vm identity_rotate_key`, the guest's
-  `client.csr` still holds the CSR of the rotated-away key, and a plain
-  renewal certifies whatever key the CSR carries. Every later
-  `identity_renew` of that VM therefore re-certifies the rotated-away key
-  and installs a certificate that does not match the guest's `client.key`.
-  Case 3 of the
-  [rollback and clone policy](aivm-secrets-garrett-rollback-clone-policy.md)
-  gives the decided fixes and today's workaround.
+  identity-child refusal only as "identity service refused the operation".
+  Since 2026-10-24 `identity_renew --all` and the bound-session check read
+  `ca_not_after` and say why before any renewal is refused. (The clamp
+  described above, with a one-day minimum, is now implemented.)
+- **Fixed defect:** after `aivm vm identity_rotate_key`, the guest's
+  `client.csr` used to hold the CSR of the rotated-away key, and a plain
+  renewal re-certified it. Both decided fixes are in place: a renewal
+  certifies only the enrolled key (REN-07, both authorities), AIVM re-signs
+  `client.csr` with `client.key` before every renewal, and both install
+  scripts refuse a certificate whose key is not `client.key`. See case 3 of
+  the [rollback and clone policy](aivm-secrets-garrett-rollback-clone-policy.md).
 
 ### Decision
 
@@ -191,7 +192,9 @@ All **implemented**:
    asked for. Renewal stays host-initiated: a guest cannot renew itself,
    because the bootstrap key lives on the host. Any future unattended mode
    must keep that property.
-2. **Bulk renewal:** `aivm vm identity_renew --all` (**decided**).
+2. **Bulk renewal:** `aivm vm identity_renew --all` (**implemented
+   2026-10-24** in AIVM, `renew_due_managed_vms`). Its precondition held:
+   both fixes for the defect above were already in place.
    **It ships only after both decided fixes for the known defect above:**
    the host rule that a renewal certifies only the enrolled key, and the
    guest change that regenerates `client.csr` from `client.key` and checks
@@ -203,11 +206,14 @@ All **implemented**:
    - Candidates are every VM in the resolved machine store whose active
      principal is the caller, where `resolve_managed_identity` succeeds. It
      makes one `status` read of the authority.
-   - When that `status` shows the CA has `CLIENT_DAYS` or less left, it
-     renews nothing and stops with one message: run `rotate-ca`, then
-     re-enroll every VM. Every renewal would be refused otherwise (see
-     Facts). With less than `CLIENT_DAYS` plus 48 hours left, it renews as
-     usual and warns that renewal will soon be refused. Both read the CA's
+   - When that `status` shows the CA has one day or less left, it renews
+     nothing and stops with one message: run `rotate-ca`, then re-enroll
+     every VM. Every renewal would be refused otherwise. (This was
+     `CLIENT_DAYS` before certificates were clamped to the CA's expiry;
+     since then the authority refuses only a certificate shorter than a
+     day.) With less than `CLIENT_DAYS` plus 48 hours left, it renews as
+     usual and warns that new certificates end with the CA and renewal will
+     soon be refused. Both read the CA's
      `not_after` from `status` (`ca_not_after`, available since 2026-10-24).
    - A row is **due** when it is active and `not_after - now <= 172800`
      (48 hours). Already-expired active rows count as due.
@@ -235,7 +241,9 @@ All **implemented**:
    - It prints one line per VM: renewed (new epoch and `not_after`), skipped
      (reason) or failed (reason). It exits nonzero if any VM failed. Run
      twice, it renews nothing the second time.
-3. **Warning at session start** (**decided**). `aivm ssh
+3. **Warning at session start** (**implemented 2026-10-24** in AIVM,
+   `_check_certificate_window`; the capability is also capped at the
+   certificate's end). `aivm ssh
    --secrets_identity_root` warns, and neither renews nor refuses, when the
    client certificate is due by the same 48-hour rule. It also says when the
    session will end early because the certificate expires before the

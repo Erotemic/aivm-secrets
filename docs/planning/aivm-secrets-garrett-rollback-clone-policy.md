@@ -205,7 +205,8 @@ the subject, does not change. The host registry does not move.
   presents a thumbprint the registry no longer lists, so the bridge refuses
   it (**implemented**, inherent in the per-request check). Re-certifying a
   rotated-away key, however, needs no revert. **Every renewal after a key
-  rotation certifies the rotated-away key** (**implemented**, a defect):
+  rotation certified the rotated-away key** (**fixed**: every point below
+  now has its decided fix, listed under *Required outcome*; kept for history):
   - the rotation's install script replaces `client.key` and deletes the
     staged `client.rotate.*` files, but leaves `client.csr`, the CSR of the
     old key, in place (`aivm/secrets_identity_transport.py`);
@@ -242,8 +243,8 @@ the subject, does not change. The host registry does not move.
 
   Recovery then depends on the reverted key:
   - If it is still the enrolled key, `aivm vm identity_renew` installs a
-    current certificate for it. Until the guest fix lands, apply the
-    workaround above first on a VM that was ever rotated.
+    current certificate for it. AIVM re-signs the CSR with `client.key`
+    first, so the workaround above is no longer needed for managed VMs.
   - Otherwise the VM must **re-enroll** with a fresh key, which **advances the
     epoch**. While the row is still active, that means
     `aivm vm identity_rotate_key`. It stages a new key in the guest and runs
