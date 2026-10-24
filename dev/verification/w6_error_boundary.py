@@ -110,9 +110,11 @@ def check(root: Path = ROOT) -> dict:
             'if status < 200 || status >= 300 {' in status and
             'return Err(StatusDenial::Failed);' in status and
             'if status == 206 {' in status and 'return Err(StatusDenial::Partial);' in status and
-            'StatusDenial::Rejected => Error::UpstreamRejected,' in custody and
-            'StatusDenial::Failed => Error::UpstreamError,' in custody and
-            'StatusDenial::Malformed | StatusDenial::Partial => Error::UpstreamResponse,' in custody,
+            'aivm_secrets_garrett_core::public_error::of_status(denial)' in custody and
+            'StatusDenial::Rejected => PublicError::UpstreamRejected,' in error and
+            'StatusDenial::Failed => PublicError::UpstreamError,' in error and
+            'StatusDenial::Malformed => PublicError::UpstreamResponse,' in error and
+            'StatusDenial::Partial => PublicError::UpstreamResponse,' in error,
             'upstream status declassification branch changed')
     return {
         'profile': manifest['scope'],

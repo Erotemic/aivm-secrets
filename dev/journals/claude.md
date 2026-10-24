@@ -920,3 +920,11 @@ NATIVE-GLUE-01: the native `Error` enum is now `pub use PublicError as Error`;
 `Error::code()` became the extracted `PublicError::name()` (Aeneas extracts
 `&'static str` literals as `Str`, no new axioms). The 17-arm `From` map is
 deleted. Two `AuthorityError::code()` calls kept their own method.
+
+## 2026-10-24 02:06:20 -0400
+
+With Error = PublicError, the three native refusal maps moved into the core
+(`public_error::of_release/of_use/of_status`, tables pinned by rfl theorems).
+Mistake caught: I ran rustfmt on public_error.rs, which was not formatter-clean,
+and it collapsed an existing block a mutation test targets; restored from HEAD
+and re-added only my functions. Checked fa74c63 (write_gate.rs) had insertions only.

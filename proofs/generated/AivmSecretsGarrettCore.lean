@@ -15917,8 +15917,50 @@ def public_error.PublicError.name
   | public_error.PublicError.AuthorizationDenied =>
     ok (toStr "credential_source")
 
+/-- [aivm_secrets_garrett_core::public_error::of_release]:
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 55:0-61:1
+    Visibility: public -/
+def public_error.of_release
+  (denial : selected_release.Denial) : Result public_error.PublicError := do
+  match denial with
+  | selected_release.Denial.Denied => ok public_error.PublicError.Denied
+  | selected_release.Denial.UpstreamResponse =>
+    ok public_error.PublicError.UpstreamResponse
+  | selected_release.Denial.InvalidRequest =>
+    ok public_error.PublicError.InvalidRequest
+
+/-- [aivm_secrets_garrett_core::public_error::of_use]:
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 64:0-71:1
+    Visibility: public -/
+def public_error.of_use
+  (denial : credential_use.UseDenial) : Result public_error.PublicError := do
+  match denial with
+  | credential_use.UseDenial.InvalidCapability =>
+    ok public_error.PublicError.InvalidCapability
+  | credential_use.UseDenial.Denied => ok public_error.PublicError.Denied
+  | credential_use.UseDenial.Revoked => ok public_error.PublicError.Revoked
+  | credential_use.UseDenial.Upstream =>
+    ok public_error.PublicError.UpstreamResponse
+
+/-- [aivm_secrets_garrett_core::public_error::of_status]:
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 76:0-83:1
+    Visibility: public -/
+def public_error.of_status
+  (denial : provider_status.StatusDenial) :
+  Result public_error.PublicError
+  := do
+  match denial with
+  | provider_status.StatusDenial.Malformed =>
+    ok public_error.PublicError.UpstreamResponse
+  | provider_status.StatusDenial.Rejected =>
+    ok public_error.PublicError.UpstreamRejected
+  | provider_status.StatusDenial.Failed =>
+    ok public_error.PublicError.UpstreamError
+  | provider_status.StatusDenial.Partial =>
+    ok public_error.PublicError.UpstreamResponse
+
 /-- [aivm_secrets_garrett_core::public_error::code]:
-    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 56:0-78:1
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 87:0-109:1
     Visibility: public -/
 def public_error.code
   (error : public_error.PublicError) : Result (alloc.vec.Vec Std.U8) := do
@@ -16072,7 +16114,7 @@ def public_error.code
       Std.U8) s
 
 /-- [aivm_secrets_garrett_core::public_error::message]:
-    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 81:0-94:1
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 112:0-125:1
     Visibility: public -/
 def public_error.message
   (error : public_error.PublicError) : Result (alloc.vec.Vec Std.U8) := do
@@ -16261,7 +16303,7 @@ def public_error.message
       Std.U8) s
 
 /-- [aivm_secrets_garrett_core::public_error::text]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 100:4-103:5 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 131:4-134:5 -/
 @[rust_loop]
 def public_error.text_loop
   (bytes : Slice Std.U8) (out : alloc.vec.Vec Std.U32) (i : Std.Usize) :
@@ -16279,14 +16321,14 @@ def public_error.text_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::public_error::text]:
-    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 97:0-105:1 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 128:0-136:1 -/
 @[reducible]
 def public_error.text
   (bytes : Slice Std.U8) : Result (alloc.vec.Vec Std.U32) := do
   public_error.text_loop bytes (alloc.vec.Vec.new Std.U32) 0#usize
 
 /-- [aivm_secrets_garrett_core::public_error::denial]:
-    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 110:0-122:1
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 141:0-153:1
     Visibility: public -/
 def public_error.denial
   (error : public_error.PublicError) : Result json_wire.Value := do
@@ -16336,7 +16378,7 @@ def public_error.denial
   ok (json_wire.Value.Object ret1)
 
 /-- [aivm_secrets_garrett_core::public_error::denial_frame]:
-    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 125:0-130:1
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 156:0-161:1
     Visibility: public -/
 def public_error.denial_frame
   (error : public_error.PublicError) (limit : Std.Usize) :
@@ -16346,7 +16388,7 @@ def public_error.denial_frame
   json_wire.prepare v limit
 
 /-- [aivm_secrets_garrett_core::public_error::answer_frame]:
-    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 135:0-143:1
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 166:0-174:1
     Visibility: public -/
 def public_error.answer_frame
   (answer : core.result.Result json_wire.Value public_error.PublicError)

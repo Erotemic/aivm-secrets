@@ -116,12 +116,7 @@ impl aivm_secrets_garrett_core::selected_release::Current for ManifestCurrent<'_
         self.session.require_control_active(host_time()?)
     }
     fn refuse(&mut self, denial: aivm_secrets_garrett_core::selected_release::Denial) -> Error {
-        use aivm_secrets_garrett_core::selected_release::Denial;
-        match denial {
-            Denial::Denied => Error::Denied,
-            Denial::UpstreamResponse => Error::UpstreamResponse,
-            Denial::InvalidRequest => Error::InvalidRequest,
-        }
+        aivm_secrets_garrett_core::public_error::of_release(denial)
     }
 }
 

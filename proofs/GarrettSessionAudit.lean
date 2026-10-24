@@ -463,4 +463,25 @@ theorem approval_preimage_exact {grant policy request v : json_wire.Value}
     by simpa [Key] using text_units_ok h2, by simpa [Key] using text_units_ok h3⟩
   simp [alloc.slice.Slice.into_vec, alloc.vec.Vec.val, Slice.from_val, Array.from_val]
 
+/-! ## Refusals as public errors -/
+
+/-- **Provider status refusals.** 4xx is `upstream_rejected`, other failures
+    `upstream_error`, an unusable status line or a partial response
+    `upstream_response`: the guest learns only the status class. -/
+theorem of_status_table :
+    public_error.of_status .Rejected = Result.ok .UpstreamRejected ∧
+    public_error.of_status .Failed = Result.ok .UpstreamError ∧
+    public_error.of_status .Malformed = Result.ok .UpstreamResponse ∧
+    public_error.of_status .Partial = Result.ok .UpstreamResponse := ⟨rfl, rfl, rfl, rfl⟩
+
+/-- Selected-release and credential-use refusals keep their meaning. -/
+theorem of_release_and_use_tables :
+    public_error.of_release .Denied = Result.ok .Denied ∧
+    public_error.of_release .UpstreamResponse = Result.ok .UpstreamResponse ∧
+    public_error.of_release .InvalidRequest = Result.ok .InvalidRequest ∧
+    public_error.of_use .InvalidCapability = Result.ok .InvalidCapability ∧
+    public_error.of_use .Denied = Result.ok .Denied ∧
+    public_error.of_use .Revoked = Result.ok .Revoked ∧
+    public_error.of_use .Upstream = Result.ok .UpstreamResponse := ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+
 end aivm_secrets_garrett_core.session_audit.Proofs

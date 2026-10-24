@@ -282,12 +282,7 @@ mod tests {
             Ok(())
         }
         fn refuse(&mut self, denial: aivm_secrets_garrett_core::selected_release::Denial) -> Error {
-            use aivm_secrets_garrett_core::selected_release::Denial;
-            match denial {
-                Denial::Denied => Error::Denied,
-                Denial::UpstreamResponse => Error::UpstreamResponse,
-                Denial::InvalidRequest => Error::InvalidRequest,
-            }
+            aivm_secrets_garrett_core::public_error::of_release(denial)
         }
     }
 

@@ -434,12 +434,7 @@ fn line(reader: &mut impl BufRead, limit: usize) -> Outcome<Vec<u8>> {
 // The octet-exact status line parser and manifest status classes are the
 // extracted `provider_status` module; only the error mapping is native.
 pub(super) fn status_error(denial: aivm_secrets_garrett_core::provider_status::StatusDenial) -> Error {
-    use aivm_secrets_garrett_core::provider_status::StatusDenial;
-    match denial {
-        StatusDenial::Malformed | StatusDenial::Partial => Error::UpstreamResponse,
-        StatusDenial::Rejected => Error::UpstreamRejected,
-        StatusDenial::Failed => Error::UpstreamError,
-    }
+    aivm_secrets_garrett_core::public_error::of_status(denial)
 }
 fn response_status(raw: &[u8]) -> Outcome<u16> {
     aivm_secrets_garrett_core::provider_status::parse(&raw.to_vec()).map_err(status_error)
@@ -978,12 +973,7 @@ pub(crate) fn controlled(outcome: control::Controlled<Error>) -> Outcome<crate::
     }
 }
 fn use_error(error: core::UseDenial) -> Error {
-    match error {
-        core::UseDenial::InvalidCapability => Error::InvalidCapability,
-        core::UseDenial::Denied => Error::Denied,
-        core::UseDenial::Revoked => Error::Revoked,
-        core::UseDenial::Upstream => Error::UpstreamResponse,
-    }
+    aivm_secrets_garrett_core::public_error::of_use(error)
 }
 
 #[cfg(feature = "conformance")]

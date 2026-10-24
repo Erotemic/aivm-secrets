@@ -51,6 +51,37 @@ impl PublicError {
     }
 }
 
+/// The public error of a selected-release refusal.
+pub fn of_release(denial: crate::selected_release::Denial) -> PublicError {
+    match denial {
+        crate::selected_release::Denial::Denied => PublicError::Denied,
+        crate::selected_release::Denial::UpstreamResponse => PublicError::UpstreamResponse,
+        crate::selected_release::Denial::InvalidRequest => PublicError::InvalidRequest,
+    }
+}
+
+/// The public error of a credential-use refusal.
+pub fn of_use(denial: crate::credential_use::UseDenial) -> PublicError {
+    match denial {
+        crate::credential_use::UseDenial::InvalidCapability => PublicError::InvalidCapability,
+        crate::credential_use::UseDenial::Denied => PublicError::Denied,
+        crate::credential_use::UseDenial::Revoked => PublicError::Revoked,
+        crate::credential_use::UseDenial::Upstream => PublicError::UpstreamResponse,
+    }
+}
+
+/// The public error of a provider status refusal: 4xx is `upstream_rejected`,
+/// any other failure `upstream_error`, an unusable status line or a partial
+/// response `upstream_response`.
+pub fn of_status(denial: crate::provider_status::StatusDenial) -> PublicError {
+    match denial {
+        crate::provider_status::StatusDenial::Malformed => PublicError::UpstreamResponse,
+        crate::provider_status::StatusDenial::Partial => PublicError::UpstreamResponse,
+        crate::provider_status::StatusDenial::Rejected => PublicError::UpstreamRejected,
+        crate::provider_status::StatusDenial::Failed => PublicError::UpstreamError,
+    }
+}
+
 /// Stable machine-readable code. `AuthorizationDenied` deliberately shares
 /// `credential_source` so the guest cannot distinguish the two causes.
 pub fn code(error: PublicError) -> Vec<u8> {
