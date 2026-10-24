@@ -373,14 +373,25 @@ impl Session {
     fn record(&self, event: &str, detail: Value) -> bool {
         let stamp = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
         if let Ok(mut audit) = self.audit.lock() {
-            let mut row = json!({"schema": "proxy-audit-1", "seq": audit.seq, "prev": audit.head,
-                                 "event": event, "timestamp": stamp});
-            if let (Some(row), Some(detail)) = (row.as_object_mut(), detail.as_object()) {
-                for (k, v) in detail {
-                    row.insert(k.clone(), v.clone());
-                }
-            }
-            let line = row.to_string();
+            // The row is the extracted `proxy_audit::row` (fixed fields merged
+            // by key with the detail); the line is its extracted encoding.
+            let detail = match wire_of(&detail) {
+                aivm_secrets_garrett_core::json_wire::Value::Object(fields) => fields,
+                _ => Vec::new(),
+            };
+            let row = aivm_secrets_garrett_core::proxy_audit::row(
+                wire_of(&json!(event)),
+                wire_of(&json!(audit.head)),
+                wire_of(&json!(audit.seq)),
+                wire_of(&json!(stamp)),
+                detail,
+            );
+            let Ok(bytes) = aivm_secrets_garrett_core::json_wire::encode(&row) else {
+                return false;
+            };
+            let Ok(line) = String::from_utf8(bytes) else {
+                return false;
+            };
             if writeln!(audit.file, "{line}").is_ok() && audit.file.sync_data().is_ok() {
                 audit.head = ring::digest::digest(&ring::digest::SHA256, line.as_bytes())
                     .as_ref()
@@ -399,6 +410,21 @@ impl Session {
 }
 
 /// The fixed guest response for a refusal: the extracted `core::refusal`.
+/// A serde value as the extracted JSON value (strings as Unicode scalars).
+fn wire_of(value: &Value) -> aivm_secrets_garrett_core::json_wire::Value {
+    use aivm_secrets_garrett_core::json_wire::Value as Wire;
+    match value {
+        Value::Null => Wire::Null,
+        Value::Bool(b) => Wire::Boolean(*b),
+        Value::Number(n) => Wire::Number(n.to_string().into_bytes()),
+        Value::String(s) => Wire::Text(s.chars().map(u32::from).collect()),
+        Value::Array(items) => Wire::Array(items.iter().map(wire_of).collect()),
+        Value::Object(fields) => Wire::Object(
+            fields.iter().map(|(k, v)| (k.chars().map(u32::from).collect(), wire_of(v))).collect(),
+        ),
+    }
+}
+
 fn code_name(code: &core::Code) -> &'static str {
     match code {
         core::Code::InvalidRequest => "invalid_request",
@@ -928,19 +954,6 @@ mod connect_oracle {
         }
     }
 
-    fn wire_of(value: &Value) -> aivm_secrets_garrett_core::json_wire::Value {
-        use aivm_secrets_garrett_core::json_wire::Value as Wire;
-        match value {
-            Value::Null => Wire::Null,
-            Value::Bool(b) => Wire::Boolean(*b),
-            Value::Number(n) => Wire::Number(n.to_string().into_bytes()),
-            Value::String(s) => Wire::Text(s.chars().map(u32::from).collect()),
-            Value::Array(items) => Wire::Array(items.iter().map(wire_of).collect()),
-            Value::Object(fields) => Wire::Object(
-                fields.iter().map(|(k, v)| (k.chars().map(u32::from).collect(), wire_of(v))).collect(),
-            ),
-        }
-    }
 
 
     struct Legacy {

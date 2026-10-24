@@ -872,3 +872,14 @@ condition; authoritative extraction now compiles (2 axioms). Proved
 `key_before_loop_spec` (`KeyLt`, lexicographic by scalar value) in
 `proofs/GarrettProxyAudit.lean` (not yet a lakefile root). Next: merge spec,
 row structure, wiring, gate.
+
+## 2026-10-23 23:46:32 -0400
+
+Proxy audit rows finished (continuing after the time guard released, since
+the /goal condition still asked for assumption removal): `clone_value_exact`
+(well-founded on sizeOf, with `listN_mem_size`/`vec_mem_size` because Aeneas
+Slices wrap `ListN`), `merge_loop_spec`/`merge_spec` (`MergeL`),
+`row_exact`. `Session::record` now writes the extracted encoding; added a
+hash-chain test. Only premise: inputs fit in usize. Sortedness of the merged
+row (given sorted, disjoint inputs) is not proved yet; the serde oracle and the
+chain test check it on real rows.

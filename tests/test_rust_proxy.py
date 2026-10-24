@@ -230,6 +230,22 @@ def limited_world(tmp_path, service, size):
     return world
 
 
+def test_native_audit_rows_form_a_hash_chain(tmp_path, service):
+    """Rows are the extracted `proxy_audit::row` encoding; each row's `prev`
+    is the SHA-256 of the previous line, starting from the zero head."""
+    import hashlib
+
+    with NativeWorld(tmp_path, service) as world:
+        assert status(world.raw(get())) == 200
+    lines = world.audit_path.read_bytes().splitlines()
+    head = '0' * 64
+    for seq, line in enumerate(lines):
+        row = json.loads(line)
+        assert (row['schema'], row['seq'], row['prev']) == ('proxy-audit-1', seq, head)
+        assert line == json.dumps(row, separators=(',', ':'), sort_keys=True).encode()
+        head = hashlib.sha256(line).hexdigest()
+
+
 def test_native_refuses_to_start_without_an_audit(tmp_path, service):
     world = limited_world(tmp_path, service, 0)
     process = subprocess.run(
