@@ -47,9 +47,9 @@ still needs, the runtime witnesses, and what remains excluded.
 | | |
 | --- | --- |
 | Claim | Endpoint, the request target, request bytes, audit records, status classification, response gate and guest frames are produced by extracted Rust; the remaining native steps are named contracts. The guest's other verbs, `describe` and `renounce`, are decided by extracted code and never reach a provider. |
-| Theorems | [GarrettProviderWire](../../proofs/GarrettProviderWire.lean), [GarrettHttpWire](../../proofs/GarrettHttpWire.lean), [GarrettHttpAuth](../../proofs/GarrettHttpAuth.lean), [GarrettLineFrame](../../proofs/GarrettLineFrame.lean), [GarrettProductionResponseGate](../../proofs/GarrettProductionResponseGate.lean), [GarrettChannelWork](../../proofs/GarrettChannelWork.lean); `fill_target_exact`, `fill_target_safe`, `parse_template_some`, `scalar_text_integer` ([GarrettRoute](../../proofs/GarrettRoute.lean)); `control_paths`, `manifest_description_exact` ([GarrettControl](../../proofs/GarrettControl.lean)) |
-| Premises | `RUST-HTTPS-01`, `RUST-MTLS-01`, `RUST-JSON-01`, `RUST-AUDIT-01`, `NATIVE-GLUE-01`, `ROUTE-NATIVE-01` (JSON layer of templates and arguments), `CONTROL-NATIVE-01` (revoke, audit append and grant callbacks) |
-| Witnesses | `tests/test_rust_http_auth.py`, `tests/test_rust_http_request.py`, `tests/test_rust_http_response.py`, `tests/test_rust_line_framing.py`, NR-2/3 and NR-4 edge guards |
+| Theorems | [GarrettProviderWire](../../proofs/GarrettProviderWire.lean), [GarrettHttpWire](../../proofs/GarrettHttpWire.lean), [GarrettHttpAuth](../../proofs/GarrettHttpAuth.lean), [GarrettLineFrame](../../proofs/GarrettLineFrame.lean), [GarrettProductionResponseGate](../../proofs/GarrettProductionResponseGate.lean), [GarrettChannelWork](../../proofs/GarrettChannelWork.lean); `fill_target_exact`, `fill_target_safe`, `parse_template_some`, `scalar_text_integer` ([GarrettRoute](../../proofs/GarrettRoute.lean)); `control_paths`, `manifest_description_exact`, `renounce_records_exactly`, `revoked_record_exact` ([GarrettControl](../../proofs/GarrettControl.lean)); `dispatch_record_exact`, `event_record_exact`, `opened_record_exact`, `issued_record_exact`, `account_dispatch_record_exact` ([GarrettSessionAudit](../../proofs/GarrettSessionAudit.lean): every production audit record's structure and only inputs) |
+| Premises | `RUST-HTTPS-01`, `RUST-MTLS-01`, `RUST-JSON-01`, `RUST-AUDIT-01`, `NATIVE-GLUE-01`, `ROUTE-NATIVE-01` (JSON layer of templates and arguments), `CONTROL-NATIVE-01` (revoke and grant callbacks; the revocation record's content is proved) |
+| Witnesses | `tests/test_rust_http_auth.py`, `tests/test_rust_http_request.py`, `tests/test_rust_http_response.py`, `tests/test_rust_line_framing.py`, NR-2/3 and NR-4 edge guards; byte oracles in `custody::control_oracle` for every audit record against the serde records they replaced |
 | Excluded | DNS (address is pinned by policy), TLS and OS correctness, power-loss durability |
 
 ## Deployment and custody
@@ -59,8 +59,8 @@ still needs, the runtime witnesses, and what remains excluded.
 | Claim | The guest cannot reach host credentials, policy, privileged sockets or other identities in the tested deployment. |
 | Theorems | None; this is environment evidence. |
 | Premises | `ENV-GUEST-01`, `RUST-PRINCIPAL-01`, `HOST-01`, `LAUNCH-01`, `CHAN-01`, `MEM-01` |
-| Witnesses | Maintainer-run real KVM baseline and adversarial extension ([VM acceptance](../aivm-vm-native-acceptance.md)); `tests/test_aivm_vm_acceptance.py`; offline workflow `tests/test_offline_native_guest.py` |
-| Excluded | General mount/share reachability, firewall rules, snapshots and clones (`CLONE-01`, `ROLLBACK-01`), vTPM custody (`VTPM-01`), the optional AIVM adapter lifecycle |
+| Witnesses | Maintainer-run real KVM baseline and adversarial extension ([VM acceptance](../aivm-vm-native-acceptance.md)); `tests/test_aivm_vm_acceptance.py`; offline workflow `tests/test_offline_native_guest.py`; authority-root identity negatives (re-enrollment, live expiry, `forget` refusal) in `tests/test_rust_garrett_authority.py`. **Not yet run on a VM (2026-10-23):** the `--adversarial` re-enrollment probe, alias-aware mount inventory and host-canary search. |
+| Excluded | General mount/share reachability beyond the bounded canary search, firewall rules, snapshots and clones (`CLONE-01`, `ROLLBACK-01`), vTPM custody (`VTPM-01`), the optional AIVM adapter lifecycle |
 
 ## Useful authorized actions (non-vacuity)
 
@@ -80,3 +80,14 @@ still needs, the runtime witnesses, and what remains excluded.
    synthetic ones) and the focused Lean build of the named modules.
 4. Record accept or reject per row; one rejected row blocks the claim it
    supports.
+
+## Outside this profile (separate rows for the reviewer)
+
+These are proved or tested elsewhere and are **not** part of the native read
+claim above; they are listed so a reviewer does not count them toward it.
+
+| Scope | Evidence |
+| --- | --- |
+| Exact-write approval (OUT-4, `writes=approve`) | `GarrettWriteGate`; `GarrettApprovalStore` (which slot a write spends, single use, one slot per digest) |
+| Optional HTTPS proxy profiles (OUT-6) | `GarrettProxyHttp` (encoder, deny-list semantics, target byte and segment refusals), `GarrettProxyResponse`, `GarrettProxyController`, `GarrettProxyConnect`, `GarrettProxyParse`, `GarrettProxyTunnel` (tunnel loop, CONNECT head reader), `GarrettRoute`, `GarrettRouteMatch`. The substitution profile makes no authority-confinement claim (`PROXY-AUTHORITY-01`). |
+
