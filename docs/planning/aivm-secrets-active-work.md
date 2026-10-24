@@ -1,122 +1,115 @@
-# Active work: proof-backed credential use for untrusted agents
+# Plan: where we are and what comes next
 
-**Current priority queue — reconciled 2026-10-21.** Start with the
-[product outcome roadmap](aivm-secrets-product-roadmap.md) for the destination
-and [W0](aivm-secrets-conditional-confinement.md) for the normative security
-contract. This file alone orders the *next implementation work*. The detailed
-[native read roadmap](aivm-secrets-native-read-assurance-roadmap.md) specifies
-NR-0..NR-5 technical proof gates. For the current extended proof run, the
-[overnight source-linked campaign](aivm-secrets-overnight-formalization.md)
-provides the ordered tasks and maintainer-readable acceptance explanation.
-Prior implementation/validation chronology
-is in the [October 21 archive](aivm-secrets-active-work-history-2026-10-21.md),
-[October 19 archive](aivm-secrets-active-work-history-2026-10-19.md), and
-`dev/validation/`; don't append long milestone narratives here.
+Updated 2026-10-24 at `0b9cc33`. This is the single ordered work queue.
+The [product roadmap](aivm-secrets-product-roadmap.md) defines the outcome
+gates (OUT-0 to OUT-6) and the [native read roadmap](aivm-secrets-native-read-assurance-roadmap.md)
+defines the proof gates (NR-0 to NR-5). The previous queue is archived in
+[aivm-secrets-active-work-history-2026-10-24.md](aivm-secrets-active-work-history-2026-10-24.md).
 
-**North star:** A host-controlled broker holds provider credentials. An agent
-in an untrusted AIVM guest invokes *specific authorized* provider actions,
-gets only selected replies, and never receives the raw credential. Normal
-AIVM use remains independent of the separately installed service. A system
-that only denies operations fails the product goal. An authorized write is a
-separate, more demanding claim than the first read-only proof profile.
+## Where we are
 
-## Status at the available source boundary
+The broker works. The native Rust implementation runs an authority, a bridge
+and a guest client. It has done approved reads, refused a write and revoked a
+guest, both offline and from a real KVM guest. It has also made approved reads
+against GitHub. A large part of its decision logic is extracted with Aeneas
+and proved in Lean (113 proof modules, about 30k lines of Lean against 32k
+lines of Rust).
 
-**Evidence basis:** the initial source archive `8986ce6` plus the applied
-Track A/documentation/NR-0/VM overlays, and the maintainer's actual host report
-of `python dev/verification/system.py` passing, both real `aivm-2404` KVM
-acceptance modes passing and the corrected real GitHub read-only fixture
-passing with 55 focused tests. The initial OUT-2 fixture was committed as
-`b21e212`; the live OUT-3 fixture and correction were committed as `b465c16`.
-On resumption inspect
-`git status --short` and `git rev-parse HEAD`, but do not downgrade successful
-user-reported Lean compilation for want of a pasted success log. The older
-2026-10-21 frozen source record at `e741383` reports 3,116 Python tests and
-102 Rust workspace tests; those counts describe that source boundary, not
-new code.
+The gap that matters most is between those proofs and the whole native
+process. The top-level read theorem
+(`production_accepted_read_has_exact_attempt_accounting_and_guest_frame`)
+proves that every provider write the request path makes was authorized,
+audited and bound. It does so under the premise `ExactNativeSinkCoverage`: no
+other native code writes credential bytes. That premise (`NATIVE-SINK-01`) is
+checked today by source guards and tests, not by a proof. Proving that the
+authorized path is safe does not, on its own, rule out a second path.
 
-| Work | Current state and exact remaining boundary |
-| --- | --- |
-| **OUT-0: useful offline broker** | **Demonstrated** with actual native authority/broker/guest, synthetic HTTPS, allowed read, denied write, audit and revocation. The [same-UID operator/guest workflow](../offline-native-operator-guest.md) is not a VM-isolation claim. |
-| **NR-0: frozen native read profile** | **Initial baseline accepted** in the October 20 validation at `aeae955`; preserve its versioned profile/limitations, refresh only after source/config scope changes. |
-| **NR-1: source-owned transition** | **Initial production-extraction gate accepted**: invocation, admission, dispatch, provider channel and completion now use extracted Rust decisions. This does not imply actual native I/O correspondence. |
-| **NR-2: request/event simulation** | **In progress**: source-linked returned traces, writer callbacks, dispatch-to-writer composition. Production-instance theorems (2026-10-22) discharge `NativeContext` and the guest denial/success frame premises; see the [proof tour](../assurance/native-read-proof-tour.md#strongest-production-instance-statements-2026-10-22). Need the provider document parse and connected requests. |
-| **NR-3: reachable I/O and adapter effects** | **In progress**: W3/W6 guards, route-bound bytes, zeroizing-buffer/channel seam, file-audit-before-write native witness. Need complete callback/drop/error reachability review and external std/DNS/TLS/serde/parser/storage contracts. |
-| **NR-4 / NR-5** | **NR-4 in progress**: the extracted production read release is proved to depend only on the selected JSON and the pagination row count (`manifest_release_noninterference`). Adaptive histories over complete requests are proved (`adaptive_request_noninterference`). A [claim-to-evidence matrix](../assurance/claim-evidence-matrix.md) is ready for the NR-5 independent review; the baseline-comparator axiom audit remains. |
-| **W8 / OUT-2** | **Real-VM native baseline passed**, reported by maintainer on `aivm-2404` (KVM, authenticated read/diff, 3 synthetic provider GETs, write denied, revocation, tested host paths inaccessible; fixture commit `b21e212`). [Adversarial extension](../aivm-vm-native-acceptance.md#opt-in-adversarial-extension-out-2-negative-witnesses) adds network canary, identity, mount and reconnect probes behind `--adversarial`; **the extension passed a maintainer-run real-VM test** (2026-10-21, four authorized synthetic provider GETs). The [optional native session contract](../aivm-native-session.md) and an opt-in, process-only AIVM flag (`aivm ssh --secrets_native_spec`) now exist and pass synthetic tests; a maintainer real-VM run through that adapter, full guest share analysis and the remaining negative tests remain open. |
-| **W7 / OUT-3** | **Scoped live GitHub read-only acceptance passed** (maintainer real-VM report, 2026-10-21): 55 focused tests, `ok: true`, authenticated `/user`, bounded repository/README reads for `Erotemic/aivm-secrets`, denied out-of-scope repository and write, durable identity revocation (`invalid_capability`). The real provider does not supply an independent provider-side request transcript; `whole_service_secrecy_proved` remains false. See [OUT-3 evidence and opt-in instructions](../aivm-github-live-readonly-acceptance.md). Never use a live credential in CI. |
-| **OUT-4** | **First increment (2026-10-23):** the exact-write gate is extracted (`write_gate::run_approved`), and `production_write_has_approval_and_authorized_attempts` ties a returned write to an `Allowed`, single-use approval and to authorized, audited, bound and unretried attempts (see the [proof tour](../assurance/native-read-proof-tour.md#out-4-first-increment-the-exact-write-gate-2026-10-23)). **Second increment (2026-10-23):** the host approval store is extracted and proved (`GarrettApprovalStore`: which slot a write spends, single use, one slot per digest; full-store refusal matches Python), and every approval-extension audit record is core-built. Still open: provider-side write semantics, uncertain outcomes across sessions, budgets (native `unbounded` by decision), the one native line passing the decision to the gate, and Python/Rust parity per operation. |
-| **OUT-5** | **Open**: profile-specific claims/evidence, reproducible deployment and independent review before production-use claims. |
+The other open items are integration runs that the maintainer has not yet
+done in a VM, the read-only release package, and the write campaign.
 
-**Verification edge:** The maintainer has advanced through the Track A
-native-dispatch Lean repairs and reports a successful full host usable-system
-gate. Do not claim the prior Lean increment is unverified solely because a
-successful `lake build` log was not pasted: compilation errors are reported
-when present, and continuing to the next task is confirmation of success.
-Track A's native I/O correspondence still has genuine formal and environmental
-gaps as listed under NR-2/3. Both real KVM test modes (ordinary and adversarial)
-have successful maintainer reports. The fixed live GitHub acceptance test
-also **passed** on real KVM: three approved reads, out-of-scope/write denial,
-and persisted identity revocation plus no additional broker dispatch. The
-finite live acceptance is independent of NR-2/3/4 and does not prove the
-whole service. The operator's next priority is formal assurance and personal
-understanding before unattended, credential-bearing AIVM use.
+What changed for planning: this host can now run AIVM VMs itself (nested KVM;
+`aivm host install_deps` was fixed to work here). Real-VM acceptance runs no
+longer have to wait for the maintainer. They can be part of the normal loop.
+An "agent" in those runs is just a guest program, so a scripted adversarial
+guest is a faithful stand-in.
 
-## Active task queue
+## Phase 1: integration evidence from a local VM
 
-Next actions in priority order:
-
-| Priority | Task and concrete deliverable | Acceptance / avoid |
+| Step | Deliverable | Done when |
 | --- | --- | --- |
-| **P0 (new, maintainer 2026-10-23) — OUT-6 HTTPS proxy profiles** | **Done:** HP-0..HP-5 (Python and native substitution proxy; proofs of credential placement, response release and refusals), HP-2 Python constrained reference, HP-3 `proxy-session` and the AIVM flag, HP-7 AIVM egress mode. **Next:** maintainer real-VM runs (`dev/aivm_proxy_acceptance.py` for substitution, `dev/aivm_constrained_acceptance.py` for the guest-side constrained translator; the latter is rehearsed with a local guest in `tests/test_native_session.py`). The request framing loop is now in the core (`proxy_controller::tunnel`, `GarrettProxyTunnel`). HP-6 is done at its stated scope (Python and native guest-side translators, `native-session` `constrained_proxy`, route round trip proved). **`PROXY-NATIVE-01` narrowed (2026-10-23):** per-request sequencing (`proxy_controller::serve`), tunnel admission (`proxy_connect::admit`), the tunnel loop (`proxy_controller::tunnel`), the CONNECT head reader (`connect_head`) and the guest-side translator's sequencing (`serve_translated`) are extracted and proved; both proxies fail closed on audit failure (admission, completion, startup). Keep `named-operation` as the default and strictest profile. | Synthetic provider and credential only; adversarial parser/reflection/origin tests before claims; no silent fallback from constrained to substitution; per-credential opt-in; AIVM never requires it. Substitution must not claim authority confinement. |
-| **P0 — overnight formalization / operator comprehension** | Execute the [source-linked campaign](aivm-secrets-overnight-formalization.md), starting at the actual `Session::request` -> `begin_send` -> channel seam. Produce checked, source-relevant proof increments and update the [maintainer proof tour](../assurance/native-read-proof-tour.md). | Every new theorem identifies precise Rust source, removes or documents security-bearing premises and covers meaningful failures. Preserve accepted previous compilation; no theorem-count targets, axiom dumps, self-certification or live credentials. |
-| **P0 — NR-2/3 primitive-to-event link** | Connect native `Session::request` admission -> real audit-file acknowledgement -> late authorization -> provider writer/flush -> completion audit -> guest frame to existing `TraceSteps`/W4 events. Instantiate source-bound callbacks where possible; state real external I/O contracts. | Positive final/checked/two-phase read and denied/revoked/audit-failed/partial-write/flush-failed/replay witnesses; no assumed whole-provider history, fake arrival or unchecked I/O equivalence. See [Track A handoff](../native-dispatch-callback-observation.md). |
-| **P0 in parallel — W8 / OUT-2** | The adversarial VM run has **passed**. Continue guest mount/share reachability (including aliases) and a properly optional persistent AIVM adapter. Identity negatives for the authority-root mode now have synthetic coverage (re-enrolled certificate, live expiry, `forget` refusal; 2026-10-23) and the re-enrollment probe is in `--adversarial`, awaiting a maintainer VM run, as are the alias-aware mount inventory and host-canary search; do not re-run accepted validation as a substitute for this open work. | The prior baseline already passed on real KVM. The additional negative tests **passed on real KVM**; canary denial is not a proof of all forbidden egress. Normal AIVM must remain independent. |
-| **P2 — provider independence (after core proof work)** | **Synthetic scope done (2026-10-22):** `tests/test_rust_second_provider.py` drives a package-registry-shaped service (different host, `x-api-key` authentication, nested selection, pagination) through the generic native `invoke` path with no provider-specific Rust; out-of-scope names, pages and operations never reach the provider. | A new real provider still needs separate operator opt-in. Existing OUT-3 GitHub read acceptance is complete at its stated scope and need not be rerun. |
-| **P1 — NR-4, then NR-5** | Tie actual JSON projection, errors, metadata, frame lengths/EOF and sequential adaptive sessions to model observations; independently review claim/assumptions/source provenance at the end. | Precisely conditional noninterference, finite reviewed I/O boundary, positive allowed action. Final comparative axiom audit only, not per build. |
-| **P2 — OUT-4** | Extend assurance to a single bounded write, approval and idempotency/uncertain-send behavior; track Python/Rust parity per operation. | Approved effect succeeds; denied effect never reaches provider; ambiguous success is never silently retried. |
+| 1.1 | Create `aivm-2404` on this host with `aivm` (no secrets adapter) | `aivm status` is green; normal AIVM use needs nothing from this repo |
+| 1.2 | Rerun `dev/aivm_vm_acceptance.py`, baseline and `--adversarial` | Includes the three probes never run in a VM: re-enrollment, alias-aware mount inventory, host canary search |
+| 1.3 | Run `dev/aivm_proxy_acceptance.py` (substitution) and `dev/aivm_constrained_acceptance.py` (guest-side translator) | Both pass. The substitution run makes no authority-confinement claim |
+| 1.4 | Check the AIVM no-public-egress firewall mode (HP-7) | The guest reaches the bridge and the proxy but not a public address |
+| 1.5 | Write a simulated agent: a guest program that tries every attack listed in the [claim matrix](../assurance/claim-evidence-matrix.md) and also does one useful read | Repeatable script with a JSON summary. Its findings become tests |
 
-Dependencies: NR-2 and NR-3 progress together, NR-4 requires both, NR-5
-requires NR-1..4. W8 and W7 have **successful finite integration gates**,
-but neither substitutes for the formal read claim. The operator chooses to
-hold unattended credential-bearing AIVM deployment until the conditional
-native claim and actual environment assumptions have been reviewed. OUT-4
-is outside the first read-only proof target. See the
-[product dependencies](aivm-secrets-product-roadmap.md#outcome-gates-and-dependencies).
+Record each run in `dev/validation/` with the checkout hash, VM image and
+summary. These runs are evidence for OUT-2 and OUT-6, not a proof of
+isolation. The maintainer still signs off on OUT-2.
 
-## Fast feedback and handoff
+## Phase 2: close the native sink premise
 
-Use only gates relevant to the change; document-only edits need link/status
-checks, not a full native build. Typical focused commands from repo root:
+This is the main proof gap (`NATIVE-SINK-01`, `ExactNativeSinkCoverage`).
 
-```bash
-python3 dev/verification/quick_w6_read.py
-python3 dev/verification/w3_effect_boundary.py check
-python3 dev/offline_native_guest.py             # when changing product behavior
+| Step | Deliverable | Done when |
+| --- | --- | --- |
+| 2.1 | Make the credential's reach a compile-time fact. The credential type implements no `Debug`, `Display`, `Clone` or `Serialize`, and only custody and the extracted encoder can read its bytes. Pin this with `static_assertions` (`assert_not_impl_any!`) and module privacy, not with a new checker | A negative compile check fails if someone adds a trait or a reader |
+| 2.2 | Whole-process witness. Run the broker under `strace -f` (`write`, `writev`, `sendto`, `sendmsg`, `pwrite64`) with a synthetic credential, and decrypt the provider TLS stream with rustls `KeyLogFile` | In a full read, a denied read, a revocation and an audit failure, the credential bytes (and their base64 forms) appear only inside the authorized provider request |
+| 2.3 | Restate `ExactNativeSinkCoverage` as a short contract on the single native writer, using steps 2.1 and 2.2 as its evidence | The ledger entry names one function and one contract, and the proof tour explains it |
 
-# After changes to the Rust writer or dispatch implementation:
-cargo +nightly-2026-09-17 test --manifest-path rust/Cargo.toml \
-  -p aivm-secrets-garrett --lib \
-  native_read_dispatch_audit_to_writer_callback_chronology
+Step 2.2 is a test, not a proof, but it covers std, rustls and the OS, which
+source guards cannot reach. Together with 2.1 it leaves a premise small
+enough for a reviewer to accept or reject.
 
-# Focused proof build when the native dispatch trace changes:
-cd proofs
-lake exe cache get
-lake build GarrettNativeDispatchEvents
-```
+## Phase 3: finish the read claim and prepare review
 
-Compilation is the routine Lean gate. Do **not** add `#print axioms`, bulk
-`#check` output or repetitive `sorry`/`admit` scans to development builds.
-An opt-in transitive axiom **comparison** belongs to final NR-5 review; see
-`../../AGENTS.md`. Run broader native/process suites after related Rust changes,
-and full system/Charon call-linkage checks at explicit integration points,
-not on routine documentation or pure Lean edits.
+| Step | Deliverable |
+| --- | --- |
+| 3.1 | Extract the grant-window check in `AccountSession::start` (`EMISSION-RUST-01`) next to `nested_lifetime`, with a proof |
+| 3.2 | Represent control-path revocation as the same current-admission state the request path checks (`CONTROL-NATIVE-01`) |
+| 3.3 | Fold `GuestFrame::from_answer`'s type mapping into the extracted frame code if Aeneas allows it (`NATIVE-GLUE-01`) |
+| 3.4 | Comparative axiom audit, run once at the maintainer's request, against a recorded baseline |
+| 3.5 | NR-5 review package: claim matrix, proof tour and assumption ledger reviewed together by someone other than the author |
 
-For each new overlay/PR, report the changed production boundary and source
-revision, precise claim and proof module, assumptions retained, positive and
-negative native witness, tests passed/**not run**, and one next concrete task.
-Check the current tree instead of assuming an overlay was applied or committed.
-Move dated validation detail into `dev/validation/` or a focused note rather
-than extending this queue with progress prose. Follow the
-[product roadmap](aivm-secrets-product-roadmap.md) when choosing work outside
-the restricted native read proof campaign.
+## Phase 4: a read-only release profile (OUT-5, reads only)
+
+Versioned host/guest protocol document, install and deployment instructions
+for the native binaries, the AIVM adapter as an optional extra, recovery
+steps, and an independent security review of the read-only profile. A release
+claims reads only.
+
+## Phase 5: writes (OUT-4)
+
+One narrowly scoped write, first against the synthetic provider and then
+(opt-in) against a real one. Prove that an uncertain send is never retried
+automatically, carry `outcome_unknown` across sessions, and record
+Python/Rust parity for each write operation. Budgets stay unbounded in native
+until this phase decides otherwise.
+
+## Phase 6: proxy profiles (OUT-6)
+
+Prove HP-6: an accepted constrained request is the host encoding of exactly
+one named operation. Then compose it with the read theorems. Substitution stays
+the weakest profile and never claims authority confinement.
+
+## Deferred by decision
+
+- `RUST-JSON-01`: verified JSON parsing. Read confinement already holds for
+  every parsed document, so this would only change which documents two runs
+  compare. It is high cost for little benefit.
+- Python/Rust parity beyond the contracts listed in the
+  [core API inventory](aivm-secrets-python-core-api.json).
+- Hardware-backed custody claims (`VTPM-01`), clone and rollback protection
+  (`CLONE-01`, `ROLLBACK-01`) and cross-host coordination at scale.
+
+## Working rules
+
+- Every change keeps one useful success and one meaningful denial working.
+- Synthetic credentials only. A live provider credential is used only in the
+  opt-in live acceptance runs, by the maintainer.
+- Lean: compile the touched module. No axiom printing in routine builds.
+- Rust changes: run the W0/W3 checkers and the full gate
+  (`python dev/verification/system.py --full-tests`) before committing.
+- When a step finishes, update its row here and the matching ledger entry.
+  Put run logs in `dev/validation/`, not in this file.
+- AIVM stays independent: no new mandatory dependency, import or setup step.

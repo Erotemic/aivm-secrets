@@ -1,171 +1,168 @@
-# aivm-secrets (experimental)
+# aivm-secrets
 
-An experimental standalone credential-use broker with a Python reference
-implementation and a native Rust implementation for selected profiles. **Unaudited: not approved for production
-credentials or unattended privileged use.** It is not a TPM or hardware identity
-service and it is not a formally verified implementation.
+A host-side credential broker for code running in a virtual machine. The
+code in the VM, typically a coding agent, asks for named operations such as
+"read this pull request". The broker checks each request against a policy,
+calls the provider with a credential that stays on the host, and returns only
+the fields the policy selects. The guest never holds the credential.
 
-This is the standalone project extracted from AIVM. It installs its own
-`aivm-secrets` executable and does not require or bundle the AIVM VM manager.
-The long-term objective is a **proof-backed secret-use module** through which
-an untrusted AIVM guest can perform narrowly authorized provider actions
-without possessing the real credential. Read the
-[product outcome roadmap](docs/planning/aivm-secrets-product-roadmap.md),
-[current task queue](docs/planning/aivm-secrets-active-work.md) and
-[planning index](docs/planning/README.md) before choosing work. The existing
-offline native workflow is useful but does not establish actual VM isolation;
-read-only source-linked proofs do not yet justify a general production/write
-claim. Real AIVM integration, live-provider compatibility, and review are
-explicit separate gates.
-The package version remains **0.2.0**; extraction does not change the wire
-protocol or migrate existing authority, certificate, or OAuth vault state.
+The project has two implementations of the same protocol:
 
-From a trusted host checkout that guests cannot modify:
+- a **native Rust** broker (`rust/`), whose decision logic is extracted with
+  [Aeneas](https://github.com/AeneasVerif/aeneas) and proved in Lean
+  (`proofs/`);
+- a **Python reference** (`aivm_secrets/`), which defines the protocol and
+  carries features that have not been ported yet.
+
+It works on its own or with [AIVM](https://github.com/Erotemic/aivm), which
+can start a broker session for a VM. AIVM never requires this package.
+
+## How a request flows
+
+```text
+ guest VM                       trusted host
+ ─────────                      ──────────────────────────────────────────
+ agent ─► garrett-client ══mTLS══► garrett-bridge ─► policy check
+                                         │            audit record (synced)
+                                         │            credential from custody
+                                         ▼
+                                   provider HTTPS ◄── exact request bytes
+                                         │
+ agent ◄── selected fields ◄═════════════┘  (or one of 17 fixed denials)
+```
+
+The guest proves who it is with a client certificate issued by
+`garrett-authority`. The host decides what each identity may do. Every
+provider call is preceded by an audit record that has been written and
+synced. Revoking a guest stops all later calls.
+
+## Properties
+
+✅ means it exists and is checked by the evidence named. ⬜ means it is on
+the [plan](docs/planning/aivm-secrets-active-work.md).
+
+### Features
+
+- ✅ Named operations from a host manifest (`manifest-https-v1`): typed
+  arguments, fixed destinations, selected response fields, pagination and
+  fixed GraphQL reads
+- ✅ Guest identity: certificate enrollment, renewal, revocation and key
+  rotation; optional TPM-backed guest keys
+- ✅ Durable audit log; hash-chain verification (`aivm-secrets audit-verify`)
+- ✅ OAuth credential vault with refresh and host-only PKCE login (native)
+- ✅ Exact-write approval: a write waits until the operator approves its exact
+  bytes once (`aivm-secrets approve`)
+- ✅ Optional multi-host coordinator for shared revocation and write
+  reservations (`garrett-coordinator`, opt-in build feature)
+- ✅ Optional HTTPS proxy profiles for stock tools such as `gh` and `curl`:
+  `constrained-http` (requests become named operations) and
+  `credential-substitution` (credential added at the proxy; see
+  [its limits](docs/https-proxy-profile.md))
+- ⬜ Budgets and delegation in the native broker (Python only today)
+
+### Proved in Lean, about the Rust code that runs
+
+These hold for the native read profile (`manifest-https-v1`, writes denied,
+one guest session at a time). The [proof tour](docs/assurance/native-read-proof-tour.md)
+explains each one in plain language.
+
+- ✅ Every provider call of a completed request was authorized at that moment,
+  had a synced audit record first, and was bound to the requesting identity.
+  This assumes no other native code writes the credential (see the next
+  section)
+- ✅ The provider request bytes are exactly the encoder's output for the
+  chosen route. Header and request-line injection are impossible within the
+  stated size bounds
+- ✅ A successful reply to the guest is exactly the encoding of the selected
+  fields, and the credential is not in it. A denial is one of 17 fixed lines
+- ✅ Noninterference: a guest that adapts each request to earlier replies sees
+  the same replies in two worlds that agree on the selected data, the
+  pagination row count, the status class and the public failure code
+- ✅ Base64url text in a token is accepted only if the extracted encoder,
+  proved injective, reproduces it exactly, so each accepted token decodes to
+  exactly one byte string
+- ✅ Writes: a completed write had a single-use approval for its exact digest
+- ✅ Proxy substitution: the credential is placed only in the upstream request
+  and never appears in a released response
+- ⬜ No other native path writes the credential (`NATIVE-SINK-01`). Today this
+  rests on source guards with mutation tests
+- ⬜ An accepted `constrained-http` request equals exactly one named operation
+  (HP-6)
+- ⬜ Provider-side write semantics and uncertain outcomes across sessions
+
+### Tested end to end
+
+- ✅ Offline operator and guest with the real native binaries
+  (`dev/offline_native_guest.py`)
+- ✅ Real KVM guest: approved reads, denied write, revocation, foreign and
+  tampered identities, host TCP canary, mount inventory, socket reconnect
+  ([details](docs/aivm-vm-native-acceptance.md))
+- ✅ Live GitHub, read-only, from a real VM: three approved reads, an
+  out-of-scope repository and a write refused, revocation
+  ([details](docs/aivm-github-live-readonly-acceptance.md))
+- ✅ A second, synthetic provider with different authentication runs through
+  the same generic path with no provider-specific Rust
+- ⬜ Both proxy profiles and the no-public-egress firewall mode in a real VM
+- ⬜ Re-enrollment, alias-aware mount and host-canary probes in a real VM
+
+### Review
+
+- ⬜ Independent review of the read claim (NR-5) and of a read-only release
+  profile (OUT-5)
+
+### Trusted, not proved
+
+The proofs take these as given: the cryptography and TLS libraries (`ring`,
+`rustls`), the Rust compiler, the OS and VM isolation, the clock, filesystem
+durability, and `serde_json` parsing of provider bodies. Each is an entry in
+the [assumption ledger](docs/planning/aivm-secrets-assumptions.json), with
+its removal path in the [assumption roadmap](docs/planning/aivm-secrets-assumption-roadmap.md).
+
+## Getting started
+
+Python reference and tests, from a host checkout that guests cannot modify:
 
 ```bash
 umask 077
 python3 -m venv .venv
 .venv/bin/python -m pip install '.[tests]'
-.venv/bin/python -m aivm_secrets --help
 .venv/bin/python -m pytest -q
-.venv/bin/python -m build
 ```
 
-Tests use synthetic credentials and local test services. Independent Rust
-backend tests skip unless their runners are explicitly configured;
-those skips are not evidence of Python/Rust parity.
+Native binaries and the offline demo (the toolchain is pinned in
+`rust/rust-toolchain.toml`):
 
-Start with the [operator guide](docs/source/secrets.rst),
-[architecture and threat model](docs/planning/aivm-secrets-design.md),
-[policy examples](docs/examples/), and
-[assumption ledger](docs/planning/aivm-secrets-assumptions.json).
-AIVM-specific commands in the operator guide require the separate AIVM checkout
-and its existing experimental opt-in adapters.
+```bash
+cargo build --manifest-path rust/Cargo.toml --bins
+python dev/offline_native_guest.py
+```
 
-Python Garrett now also has opt-in [durable cross-host coordination,
-rolling OAuth/bound-identity credentials and keyed-write reservations](docs/garrett-python-core-extensions.md).
-These are experimental, fail-closed features requiring an explicitly
-provisioned trusted coordinator and host TLS credentials. The
-[core versus non-core Python API inventory](docs/garrett-python-core-parity.md)
-identifies which security contracts Rust must eventually match and which
-interfaces (such as CLI aliases) do not require byte-identical ports. Rust
-parity, physical cross-host deployment, rollback protection and production
-provider validation remain open.
+The full check builds the native code, runs every test with no skips allowed,
+and compiles the proofs. It needs the Lean and Aeneas toolchains:
 
-**Optional HTTPS proxy profiles (experimental).** For stock tools such as
-`curl` or `gh`, `aivm-secrets proxy` (and the native `garrett-proxy`) substitutes a
-host-held credential for configured origins behind an ordinary `HTTPS_PROXY`
-([profile guide](docs/https-proxy-profile.md),
-[plan](docs/planning/aivm-secrets-http-proxy-profiles.md),
-[claim matrix](docs/assurance/proxy-claim-evidence-matrix.md)). The
-`credential-substitution` profile keeps the credential out of the guest. It
-does **not** confine what the guest may do with it at the origin, so use it
-only for narrowly scoped credentials. The `constrained-http` profile holds no
-credential: it can run inside the guest (`native-session` with
-`constrained_proxy`) and turns an ordinary HTTPS request into the one named
-operation it equals, which the host bridge then authorizes as usual. Named
-operations remain the default and strictest interface.
+```bash
+python dev/verification/system.py --proofs --full-tests
+```
 
-The [extraction record](docs/extraction.md) explains the preserved authorship,
-source commit, commit map, independent checks, and remaining integration work.
-Original author and co-author attribution is retained in Git history:
+Tests use synthetic credentials and local HTTPS services only.
+
+## Documentation
+
+- [Operator guide](docs/source/secrets.rst) and [policy examples](docs/examples/)
+- [Design and threat model](docs/planning/aivm-secrets-design.md)
+- [Plan](docs/planning/aivm-secrets-active-work.md) and
+  [outcome gates](docs/planning/aivm-secrets-product-roadmap.md)
+- [Proof tour](docs/assurance/native-read-proof-tour.md) and
+  [claim-to-evidence matrix](docs/assurance/claim-evidence-matrix.md)
+- [Assurance by configuration](docs/assurance-profiles.md)
+- [Contributor rules](AGENTS.md)
+
+## History
+
+This repository was extracted from AIVM with its history intact; see the
+[extraction record](docs/extraction.md). The package version is 0.2.0.
 
 ```bash
 git shortlog -sne aivm-extraction-base
 git log --follow -- aivm_secrets/host/broker.py
 ```
-
-The first [verified Rust freshness primitive](docs/verified-freshness.md) has
-implementation-linked Lean proofs and scoped Python parity tests. It is an
-independent development unit; the Python broker remains experimental and
-unaudited, and full Rust broker/primitive-runner parity is still pending.
-
-The [Rust Garrett implementation](docs/verified-garrett.md) now has signed and
-encrypted surrogates, real TLS client/bridge executables, optional TPM signing
-and creation-evidence verification, and independent Python parity tests. Lean
-checks extracted issuance/opening controllers and a separate symbolic secrecy
-model under explicit crypto, TLS, provider and key-custody conditions. The
-[broader assurance campaign](docs/planning/aivm-secrets-garrett-verification.md)
-still has open service, hardware and provider obligations; the whole broker
-is not formally verified.
-
-Both native provider paths now share the [extracted complete HTTP encoder](docs/verified-http-wire.md).
-Its scoped contracts cover input admission, exact request framing and body length;
-route selection, JSON/TLS, parsers and complete I/O mediation remain open.
-
-An explicit [Rust-owned provider profile](docs/verified-provider.md) now carries
-`profile.read` from the authenticated client through credential custody and
-pinned HTTPS to a typed public result, without a Python broker in that path.
-The [composed request controller](docs/verified-composition.md) now joins
-authentication, inner opening, authorization, acknowledged audit intent and
-provider execution in the extracted Rust path. Its conditional proofs and
-disclosure contract are separate from the general Python policy interpreter.
-The [history layer](docs/verified-history.md) adds acknowledged issuance,
-ideal signature-origin proofs and conditional correspondence between source
-controller issuance and dispatch histories.
-The [Rust certificate enrollment layer](docs/verified-enrollment.md) binds a
-possession-checked CSR to explicit software approval or verified TPM evidence
-before client signing. The [native authority path](docs/verified-garrett.md#native-authority-and-live-admission)
-now initializes a Python-compatible private store, enrolls and renews clients,
-records TPM assurance, and coordinates revocation with native provider use.
-Native issuer/server/root rotation, explicit trust-transaction recovery and
-acknowledged token issuance to protected host files are implemented too.
-The native OAuth vault now preserves Python schema-2 ciphertext, refreshes through
-a pinned HTTPS origin and holds revocable credential leases through provider use.
-Extracted Lean contracts check durable quarantine before refresh and persistence
-before returning a successor. Native host-only PKCE login now binds its loopback
-callback before emitting the browser URL, exchanges one accepted code and installs
-the grant directly into the encrypted vault. Its callback/lifecycle guards have
-extracted proofs. A new native `manifest-https-v1` backend executes host-selected
-operations with typed parameters, checked facts, bodies, pagination and fixed
-GraphQL reads. Its [extracted recursive filter](docs/verified-disclosure.md) has
-conditional Lean selection and noninterference proofs. It requires an explicit
-typed response disclosure contract and uses extracted parameter and
-operation/write guards. Optional [exact-write approval](docs/native-write-approval.md)
-uses a separate private host control socket and extracted one-use/expiry decisions.
-Client aliases, command resolvers, delegation/budgets,
-JSON/I/O adapter refinement and whole-service verification remain open.
-
-The optional [native coordination authority](docs/native-coordinator-authority.md)
-now serves the same mTLS/SQLite protocol as Python, including terminal revocation
-and shared write reservations. Enable it explicitly with `coordinator-server`.
-Its core decision/history proofs and cross-backend runtime tests retain separate
-SQL/TLS/durability and native I/O obligations.
-
-The native client also supports [key/CSR bootstrap and recovery](docs/verified-client-material.md)
-with explicit software mode, protected no-replace publication and an extracted
-controller for ordered acknowledgement and uncertain outcomes. A provisioned TPM
-key can sign a CSR without exporting key material or requiring an existing client
-certificate. Tests carry that CSR through fresh attestation enrollment and a
-TPM-signed provider call under isolated emulation; hardware provenance remains
-a deployment assumption.
-
-The [native named-operation client](docs/native-operation-client.md) submits
-bounded JSON requests and host-authorized keyed writes using the same identity
-configuration. It preserves structured broker errors and uncertain outcomes;
-the broker retains all authorization and reservation decisions.
-
-## Standalone native operator and guest (offline)
-
-The [offline operator/guest demonstration](docs/offline-native-operator-guest.md)
-uses the **real** `garrett-authority`, `garrett-bridge`, and `garrett-client`
-executables against an operator-owned local HTTPS provider. It enrolls a guest,
-performs selected GitHub-shaped reads, checks an actual broker-denied write,
-and revokes the guest. No real account or production credential is used.
-With the native binaries already built, run `python dev/offline_native_guest.py`.
-An `--interactive` option exposes the running broker to manual guest CLI calls.
-The host/guest directories under one Unix account are not an isolation claim.
-
-## Reproducible synthetic system check
-
-The [native coordinator operator client](docs/native-coordinator-control.md)
-manages activation, terminal revocation and status without a Python client.
-Both clients preserve uncertainty after a possibly committed operator action.
-
-After provisioning the pinned Rust and optional Lean/Aeneas tools, run
-`python dev/verification/system.py --proofs` (add `--full-tests` for the full
-portable suite). Required Python/native Rust workflow tests fail the gate if
-a backend is skipped. No VM, physical TPM or live provider account is needed.
-See [configuration-dependent assurance](docs/assurance-profiles.md) and the
-[interactive comparison](docs/assurance-profiles.html) for the separate
-credential-confinement, identity-binding and key-custody claims and assumptions.

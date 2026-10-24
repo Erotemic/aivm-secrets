@@ -1,23 +1,21 @@
 # Planning index: aivm-secrets / Garrett
 
-**Start here when joining or resuming.** `aivm-secrets` is meant to provide an
-**independently installed, optionally AIVM-integrated, proof-backed service
-that lets an untrusted agent perform narrowly authorized actions without
-access to the provider credential**. It is still experimental and unaudited.
-The first assurance campaign covers only a restricted native read profile;
-it is not the entire product destination.
+**Start here when joining or resuming.** `aivm-secrets` lets code in a VM
+use provider credentials it never holds: the host broker performs named,
+policy-approved operations and returns selected fields. It is installed
+separately from AIVM and AIVM never requires it. The
+[README](../../README.md) lists which properties exist and which are planned.
 
 Read in this order:
 
 1. [Product outcome roadmap](aivm-secrets-product-roadmap.md) — **why the
    project exists, product acceptance gates OUT-0..OUT-5, dependencies,
    isolation/write/release boundaries and anti-drift rules**.
-2. [Active implementation queue](aivm-secrets-active-work.md) — **the current
-   ordered next tasks**, open blockers, evidence basis and focused commands.
-   This is the only rolling task queue; do not treat dated histories as tasks.
-   **New priority (2026-10-23):** [HTTPS proxy profiles](aivm-secrets-http-proxy-profiles.md)
-   — optional Docker-style `credential-substitution` and `constrained-http`
-   frontends beside named operations (OUT-6, HP-0..HP-7).
+2. [Plan](aivm-secrets-active-work.md): where the project stands and the
+   ordered phases of work. This is the only rolling task queue; dated
+   histories are records, not tasks. The
+   [HTTPS proxy profiles](aivm-secrets-http-proxy-profiles.md) plan (OUT-6,
+   HP-0..HP-7) covers the optional proxy frontends.
 3. [Native read assurance roadmap](aivm-secrets-native-read-assurance-roadmap.md)
    — NR-0..NR-5 technical read-only scope, actual Rust/Lean seams, assumptions
    and exit criteria. Not a substitute for the product outcome roadmap.
@@ -58,8 +56,9 @@ by being documented.
   [audited-but-unsent reads](aivm-secrets-read-pending-scope.json).
   A manifest/source fingerprint is not a compiler proof; an extracted theorem
   is not an entire service/I/O refinement; a test witness is not exhaustiveness.
-- [October 21 progress archive](aivm-secrets-active-work-history-2026-10-21.md)
-  and [October 19 progress archive](aivm-secrets-active-work-history-2026-10-19.md)
+- [October 24](aivm-secrets-active-work-history-2026-10-24.md),
+  [October 21](aivm-secrets-active-work-history-2026-10-21.md)
+  and [October 19 progress archives](aivm-secrets-active-work-history-2026-10-19.md)
   retain detailed dated validation narratives. They are **historical**, not
   competing roadmaps or instructions to repeat old milestones.
 

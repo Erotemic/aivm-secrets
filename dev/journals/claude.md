@@ -1024,3 +1024,43 @@ is small for signed JWTs. The translator's final "exactly one match" step
 would be a filler proof. I am stopping autonomous removal here; what remains
 is the deferred JSON work, external crypto/TLS/OS/clock review, and the
 maintainer's real-VM evidence and sign-off.
+
+## 2026-10-24 12:40:00 -0400
+
+The maintainer cleared the `/goal` and asked for a plan from where we are,
+plus a README that says what this repository is. They wanted a checklist of
+the properties that exist and the ones that are planned, no disclaimers that
+would have to be deleted later, and plain prose. They also pointed out that
+this host can run AIVM VMs, so real-VM acceptance no longer has to wait for
+them.
+
+What I did:
+- Archived the old queue as `aivm-secrets-active-work-history-2026-10-24.md`.
+- Rewrote `aivm-secrets-active-work.md` at the same path, so the roughly 20
+  inbound links still work. It has six phases: local VM evidence (including a
+  simulated adversarial agent), closing `NATIVE-SINK-01`, finishing the read
+  claim, a read-only release, writes, and proxy HP-6.
+- Rewrote the README around a checklist.
+- Trimmed the planning index's opening paragraph.
+
+I agree with the outside assessment the maintainer pasted:
+`ExactNativeSinkCoverage` is the gap that matters. The plan attacks it with
+existing tools rather than a new checker:
+- `static_assertions` to pin the credential type's traits;
+- `strace` plus a rustls `KeyLogFile` for a whole-process witness that
+  credential bytes leave only in the authorized request.
+
+The witness is a test, not a proof. I said so in the plan, because the point
+is to shrink the premise to something a reviewer can judge.
+
+Before writing the README I checked one claim against the code: base64 tokens
+are accepted only when the extracted encoder reproduces the text. That is what
+makes the injectivity proof matter, and I worded the bullet to match.
+
+The README now leaves out the old "unaudited" banner. Review is instead an
+unchecked item, and the trusted components are a factual list linked to the
+ledger. If the maintainer wants the experimental status stated somewhere,
+the Review item is the place for it.
+
+Separately, I fixed `aivm host install_deps` in the AIVM repo (see that
+repo's journal) and installed libvirt and qemu on this host for Phase 1.
