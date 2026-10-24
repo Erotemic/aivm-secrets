@@ -473,18 +473,6 @@ impl Session {
             ))?,
         )
         .as_ref());
-        let decision = if let Some(control) = &self.control {
-            control.state.admit(&approval_digest, op.write)?
-        } else {
-            aivm_secrets_garrett_core::approval::consume(
-                self.writes,
-                op.write,
-                &approval_digest.as_bytes().to_vec(),
-                now,
-                None,
-            )
-            .0
-        };
         // Factories return primitive adapters only. Receipt ownership, phase
         // preparation, controller calls and every error post-state are core.
         let dispatch = |phase: DispatchPhase, effect: Effect| {
@@ -556,7 +544,15 @@ impl Session {
         // The extracted gate runs the production controller only when the
         // exact-write approval decision is `Allowed`; nothing above performs
         // provider I/O.
-        match aivm_secrets_garrett_core::write_gate::run_approved(decision, pending) {
+        // The extracted gate admits exactly this request's digest and runs
+        // the controller only on that `Allowed` decision.
+        let mut admission = SessionAdmission { session: self, now };
+        match aivm_secrets_garrett_core::write_gate::run_admitted(
+            &mut admission,
+            &approval_digest.as_bytes().to_vec(),
+            op.write,
+            pending,
+        )? {
             aivm_secrets_garrett_core::write_gate::Gated::Ran(result) => result
                 .map(aivm_secrets_garrett_core::completion::Completed::into_value)
                 .map(|wire| json::Reply::Released(json::Captured::released(wire))),
@@ -623,6 +619,36 @@ impl Session {
             description,
             revoked,
         ))
+    }
+}
+/// The session's exact-write admission: the host approval store in approve
+/// mode (extracted `approval::admit` under its lock), otherwise the
+/// extracted `approval::consume` with no slot.
+struct SessionAdmission<'a> {
+    session: &'a Session,
+    now: i64,
+}
+impl aivm_secrets_garrett_core::write_gate::Admission for SessionAdmission<'_> {
+    type Error = Error;
+    fn admit(
+        &mut self,
+        digest: &Vec<u8>,
+        write: bool,
+    ) -> Outcome<aivm_secrets_garrett_core::approval::Decision> {
+        match &self.session.control {
+            Some(control) => {
+                let digest = std::str::from_utf8(digest).map_err(|_| Error::InternalError)?;
+                control.state.admit(digest, write)
+            }
+            None => Ok(aivm_secrets_garrett_core::approval::consume(
+                self.session.writes,
+                write,
+                digest,
+                self.now,
+                None,
+            )
+            .0),
+        }
     }
 }
 /// The manifest session's control side effects (`proofs/GarrettControl.lean`).

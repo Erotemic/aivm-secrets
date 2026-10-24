@@ -177,7 +177,7 @@ def mutate(repo, filename, before, after):
     ('rust/crates/aivm-secrets-garrett/src/host_control.rs', 'if peer.uid != rustix::process::geteuid() {', 'if false {'),
     ('rust/crates/aivm-secrets-garrett/src/custody/approval.rs', 'let now = host_time()?;', 'let now = 0;'),
     ('rust/crates/aivm-secrets-garrett/src/custody/approval.rs', 'self.active.store(false, Ordering::Release)', 'self.active.store(true, Ordering::Release)'),
-    ('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs', 'control.state.admit(&approval_digest, op.write)?', 'aivm_secrets_garrett_core::approval::Decision::Allowed'),
+    ('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs', 'control.state.admit(digest, write)', 'Ok(aivm_secrets_garrett_core::approval::Decision::Allowed)'),
     ('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs', 'fresh: &fresh,', 'fresh: &|| Ok(()),'),
 
     ('rust/crates/aivm-secrets-garrett-core/src/read_transition.rs',
@@ -243,7 +243,7 @@ def mutate(repo, filename, before, after):
      'self.audit.append_value(&aivm_secrets_garrett_core::session_audit::event_record(',
      'unchecked_release(&aivm_secrets_garrett_core::session_audit::event_record('),
     ('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs', 'write_gate::Gated::Ran(result) => result\n                .map(aivm_secrets_garrett_core::completion::Completed::into_value)', 'write_gate::Gated::Ran(result) => unchecked_reply(&result)'),
-    ('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs', 'aivm_secrets_garrett_core::write_gate::run_approved(decision, pending)', 'aivm_secrets_garrett_core::write_gate::run_approved(aivm_secrets_garrett_core::approval::Decision::Allowed, pending)'),
+    ('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs', 'aivm_secrets_garrett_core::write_gate::run_admitted(\n            &mut admission,', 'aivm_secrets_garrett_core::write_gate::run_admitted(\n            &mut AlwaysAllowed,'),
     ('rust/crates/aivm-secrets-garrett-core/src/request_adapter.rs', 'self.work.operation_write(),', 'true,'),
     ('rust/crates/aivm-secrets-garrett-core/src/request_adapter.rs', '            phase,\n            self.work.operation_write(),', '            read_transition::Phase::Final,\n            self.work.operation_write(),'),
     (RUST + 'custody/manifest_session.rs',

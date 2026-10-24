@@ -204,4 +204,29 @@ theorem keyed_success_reserved_and_finished {W C O X : Type} (ops : dispatch.Wor
               exact ⟨audited, pendingA, configured, checked, t3, exchanged, auditCall,
                 configureCall, checkCall, reserveOps, exchangeCall, finishCall⟩
 
+/-- **The decision that gates the controller is the one admitted for this
+    digest.** If `run_admitted` ran the production controller, the session's
+    admission returned `Allowed` for exactly the `digest` and `write` flag it
+    was given, and the controller's result is the one returned. -/
+theorem run_admitted_ran {AA EA : Type} (admit : Admission AA EA) (inst : read_transition.Request R F E O X)
+    (admission : AA) (digest : alloc.vec.Vec U8) (write : Bool) (adapter : R)
+    (result : core.result.Result O X) (after : AA)
+    (ran : write_gate.run_admitted admit inst admission digest write adapter =
+      Result.ok (.Ok (.Ran result), after)) :
+    admit.admit admission digest write = Result.ok (.Ok .Allowed, after) ∧
+      read_transition.run_current inst adapter = Result.ok result := by
+  unfold write_gate.run_admitted at ran
+  obtain ⟨⟨r, a1⟩, admitted, ran⟩ := bind_ok_inv ran
+  cases r with
+  | Err error =>
+    have h : (Result.ok (core.result.Result.Err error, a1) : Result (core.result.Result (Gated (core.result.Result O X)) EA × AA)) = Result.ok (.Ok (.Ran result), after) := ran
+    simp at h
+  | Ok decision =>
+    obtain ⟨g, gated, ran⟩ := bind_ok_inv ran
+    simp only [Result.ok.injEq, Prod.mk.injEq, core.result.Result.Ok.injEq] at ran
+    obtain ⟨rfl, rfl⟩ := ran
+    obtain ⟨allowed, controller⟩ := run_approved_ran inst decision adapter result gated
+    subst allowed
+    exact ⟨admitted, controller⟩
+
 end aivm_secrets_garrett_core.write_gate.Proofs

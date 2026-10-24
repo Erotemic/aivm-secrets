@@ -673,9 +673,15 @@ built by `approval::approval_preimage` and `approval::request_value`
 [`GarrettSessionAudit`](../../proofs/GarrettSessionAudit.lean)), so one approval
 names one grant, one policy and one request.
 
-**Still assumed:** that the session passes the gate the decision `admit`
-returned for that digest (one native line), SHA-256 and its hex text, and the
-store's lock (`APPROVAL-RUST-01`). Also assumed: the production theorem's native premises,
+**The decision for this digest (2026-10-24).** The gate now admits as well:
+`write_gate::run_admitted` calls the session's admission for exactly the
+digest it is given and passes that decision straight to `run_approved`.
+`run_admitted_ran`: if the controller ran, admission returned `Allowed` for
+that digest and write flag.
+
+**Still assumed:** that the native admission is the session's store
+(`approval::admit` under its lock) or `approval::consume` with no slot,
+SHA-256 and its hex text, and the store's lock (`APPROVAL-RUST-01`). Also assumed: the production theorem's native premises,
 and the keyed-retry and coordinator contracts for coordinated writes
 (`COORD-RUST-01`). This is not yet the full OUT-4 claim: provider-side write
 semantics and the uncertain-outcome policy across sessions still need their

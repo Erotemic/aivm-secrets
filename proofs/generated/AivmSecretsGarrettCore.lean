@@ -20586,4 +20586,33 @@ def write_gate.run_approved
   | approval.Decision.Denied => ok write_gate.Gated.Denied
   | approval.Decision.Required => ok write_gate.Gated.Required
 
+/-- Trait declaration: [aivm_secrets_garrett_core::write_gate::Admission]
+    Source: 'crates/aivm-secrets-garrett-core/src/write_gate.rs', lines 29:0-33:1
+    Visibility: public -/
+structure write_gate.Admission (Self : Type _) (Self_Error : Type _) where
+  admit : Self → alloc.vec.Vec Std.U8 → Bool → Result
+    ((core.result.Result approval.Decision Self_Error) × Self)
+
+/-- [aivm_secrets_garrett_core::write_gate::run_admitted]:
+    Source: 'crates/aivm-secrets-garrett-core/src/write_gate.rs', lines 38:0-48:1
+    Visibility: public -/
+def write_gate.run_admitted
+  {A : Type _} {R : Type _} {Clause0_Error : Type _} {Clause1_Facts : Type _}
+  {Clause1_Effect : Type _} {Clause1_Output : Type _} {Clause1_Error : Type _}
+  (AdmissionInst : write_gate.Admission A Clause0_Error)
+  (read_transitionRequestInst : read_transition.Request R Clause1_Facts
+  Clause1_Effect Clause1_Output Clause1_Error) (admission : A)
+  (digest : alloc.vec.Vec Std.U8) (write : Bool) (adapter : R) :
+  Result ((core.result.Result (write_gate.Gated (core.result.Result
+    Clause1_Output Clause1_Error)) Clause0_Error) × A)
+  := do
+  let (r, admission1) ← AdmissionInst.admit admission digest write
+  match r with
+  | core.result.Result.Ok decision =>
+    let g ←
+      write_gate.run_approved read_transitionRequestInst decision adapter
+    ok (core.result.Result.Ok g, admission1)
+  | core.result.Result.Err error =>
+    ok (core.result.Result.Err error, admission1)
+
 end aivm_secrets_garrett_core

@@ -36,7 +36,7 @@ EDGES = (
          'pub(super) fn request(', 'pub(super) fn control(',
          ('guards::authorize(', 'let current_context =',
           'let dispatch =', 'let release =', 'let work = PendingRequest {',
-          'request_adapter::Pending::new(work)', 'aivm_secrets_garrett_core::write_gate::run_approved(decision, pending)')),
+          'request_adapter::Pending::new(work)', 'aivm_secrets_garrett_core::write_gate::run_admitted(')),
     Edge(MANIFEST, 'native-request-primitives-without-credential',
          'fn request_fields(&mut self)', '\n}\nfn manifest_response(',
          ('manifest_fields(&self.effect, &self.headers)',

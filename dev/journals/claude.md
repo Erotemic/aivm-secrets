@@ -903,3 +903,13 @@ conversions whose extraction needs a native inverse map (no net removal);
 the approval decision line is one assignment; NATIVE-SINK-01 step 2 needs a
 maintainer decision (large proof churn, little gain over module privacy).
 Recorded on the roadmap entries.
+
+## 2026-10-24 00:54:24 -0400
+
+Approval decision line removed: `write_gate::run_admitted` takes an
+`Admission` (native `SessionAdmission`: store admit or consume) and the digest,
+admits, and gates. `run_admitted_ran` proved. Behaviour note: admission now
+happens after the (side-effect-free) pending request is constructed; the
+order of observable effects is unchanged. W3/NR-2/3/NR-4 guards and two
+mutation tests moved to the new shape; a new mutation (substituting another
+admission) is caught.

@@ -41,9 +41,9 @@ PLAN = Diagram(
              focus=('gate',), status='implemented',
              knowledge=_k(('same request again',), ('no slot left:', 'Required'), ('Required', 'controller untouched'),
                           ('nothing sent',))),
-        Beat('limits', 'Assumed: one native line passes admit\'s decision; SHA-256 of the proved preimage; provider write semantics.',
+        Beat('limits', 'Assumed: the native admission is the store; SHA-256 of the proved preimage; provider write semantics.',
              focus=('approval',), status='assumed',
-             knowledge=_k(('—',), ('store, preimage proved;', 'SHA-256 + one line', '(APPROVAL-RUST-01)'), ('proved',), ('COORD-RUST-01',))),
+             knowledge=_k(('—',), ('store, preimage, gate', 'proved; SHA-256 + lock', '(APPROVAL-RUST-01)'), ('proved',), ('COORD-RUST-01',))),
     ),
     footer='The gate is the session\'s only call of the production controller.',
 )

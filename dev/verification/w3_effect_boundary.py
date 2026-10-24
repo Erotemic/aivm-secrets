@@ -138,13 +138,23 @@ def review_semantics(contents: dict[str, str]) -> None:
     # after policy compilation, durable audit and current grant revalidation.
     m = contents[RUST + 'custody/manifest_session.rs']
     request = part(m, 'pub(super) fn request(', 'pub(super) fn control(')
-    require(same_order(request, 'control.state.admit(&approval_digest, op.write)?',
-                       'let dispatch = |phase: DispatchPhase, effect: Effect|', 'preflight: || self.policy.preflight(',
-                       'aivm_secrets_garrett_core::write_gate::run_approved(decision, pending)',
+    admission = part(m, 'impl aivm_secrets_garrett_core::write_gate::Admission for SessionAdmission',
+                     '/// The manifest session\'s control side effects')
+    require(same_order(request, 'let dispatch = |phase: DispatchPhase, effect: Effect|',
+                       'preflight: || self.policy.preflight(',
+                       'let mut admission = SessionAdmission { session: self, now };',
+                       'aivm_secrets_garrett_core::write_gate::run_admitted(',
+                       '&mut admission,',
+                       '&approval_digest.as_bytes().to_vec(),',
                        'write_gate::Gated::Denied => Err(Error::Denied)',
                        'write_gate::Gated::Required => {', 'fresh()?;',
                        '.remember(&approval_digest, &canonical_request)?;')
-            and request.count('run_current(') == 0 and request.count('run_approved(') == 1,
+            and request.count('run_current(') == 0 and request.count('run_approved(') == 0
+            and request.count('run_admitted(') == 1
+            and same_order(admission, 'Some(control) =>', 'control.state.admit(digest, write)',
+                           'None => Ok(aivm_secrets_garrett_core::approval::consume(',
+                           'self.session.writes,', 'self.now,')
+            and 'Decision::Allowed' not in admission,
             'approval is not enforced by the extracted write gate before the controller')
     require('self.policy.digest()' in request
             and 'aivm_secrets_garrett_core::approval::approval_preimage(' in request
@@ -155,7 +165,7 @@ def review_semantics(contents: dict[str, str]) -> None:
     control = part(m, 'pub(super) fn control(', '\nfn manifest_fields(')
     dispatch = part(request, 'let dispatch = |phase: DispatchPhase, effect: Effect|', 'let release = |raw: Value|')
     release = part(request, 'let release = |raw: Value| PendingCompletion {', 'let work = PendingRequest {')
-    plan = part(request, 'let work = PendingRequest {', 'aivm_secrets_garrett_core::write_gate::run_approved(decision, pending)')
+    plan = part(request, 'let work = PendingRequest {', 'aivm_secrets_garrett_core::write_gate::run_admitted(')
     transition = contents['rust/crates/aivm-secrets-garrett-core/src/read_transition.rs']
     dispatch_core = contents['rust/crates/aivm-secrets-garrett-core/src/dispatch.rs'].split('#[cfg(test)]', 1)[0]
     request_core = contents['rust/crates/aivm-secrets-garrett-core/src/request_adapter.rs'].split('#[cfg(test)]', 1)[0]
