@@ -1100,6 +1100,19 @@ pub fn sextet(bytes: &[u8], index: usize) -> u8 {
     ((pair >> (10 - offset)) & 63) as u8
 }
 
+/// Unpadded base64 of `bytes`: groups `0 .. ceil(8n/6)`. The native broker
+/// encodes with this, so `encode(decode(text)) == text` pins the decoded bytes.
+pub fn encode_unpadded(bytes: &[u8], url: bool) -> Vec<u8> {
+    let end = (8 * bytes.len() + 5) / 6;
+    let mut out = Vec::new();
+    let mut index = 0;
+    while index < end {
+        out.push(base64_symbol(sextet(bytes, index), url));
+        index += 1;
+    }
+    out
+}
+
 /// Base64 symbols that occur whenever `secret` is encoded after `shift`
 /// leading bytes: groups `ceil(8*shift/6) .. floor(8*(shift+n)/6)`.
 pub fn aligned_base64(secret: &[u8], shift: usize, url: bool) -> Vec<u8> {

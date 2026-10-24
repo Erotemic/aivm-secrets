@@ -11043,7 +11043,7 @@ def proxy_audit.row
   ok (json_wire.Value.Object v6)
 
 /-- [aivm_secrets_garrett_core::proxy_http::Code]
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1217:0-1231:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1230:0-1244:1
     Visibility: public -/
 @[discriminant isize]
 inductive proxy_http.Code where
@@ -13596,7 +13596,7 @@ def proxy_controller.remainder
   else ok (alloc.vec.Vec.new Std.U8)
 
 /-- [aivm_secrets_garrett_core::proxy_http::append_status]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1250:0-1266:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1263:0-1279:1
     Visibility: public -/
 def proxy_http.append_status
   (output : alloc.vec.Vec Std.U8) (code : proxy_http.Code) :
@@ -13704,7 +13704,7 @@ def proxy_http.append_status
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
 
 /-- [aivm_secrets_garrett_core::proxy_http::append_code]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1233:0-1248:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1246:0-1261:1
     Visibility: public -/
 def proxy_http.append_code
   (output : alloc.vec.Vec Std.U8) (code : proxy_http.Code) :
@@ -13804,7 +13804,7 @@ def proxy_http.append_code
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
 
 /-- [aivm_secrets_garrett_core::proxy_http::refusal]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1269:0-1286:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1282:0-1299:1
     Visibility: public -/
 def proxy_http.refusal
   (code : proxy_http.Code) : Result (alloc.vec.Vec Std.U8) := do
@@ -14162,7 +14162,7 @@ structure proxy_http.Form where
   folded : Bool
 
 /-- [aivm_secrets_garrett_core::proxy_http::form_present]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1174:0-1180:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1187:0-1193:1
     Visibility: public -/
 def proxy_http.form_present
   (data : Slice Std.U8) (folded_data : Slice Std.U8)
@@ -14183,7 +14183,7 @@ def proxy_http.form_present
       reflection.contains unwrapped_data s1
 
 /-- [aivm_secrets_garrett_core::proxy_http::unwrapped]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1164:4-1168:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1177:4-1181:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.unwrapped_loop
@@ -14205,7 +14205,7 @@ def proxy_http.unwrapped_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::unwrapped]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1162:0-1170:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1175:0-1183:1
     Visibility: public -/
 def proxy_http.unwrapped
   (data : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
@@ -14215,7 +14215,7 @@ def proxy_http.unwrapped
   proxy_http.unwrapped_loop iter (alloc.vec.Vec.new Std.U8)
 
 /-- [aivm_secrets_garrett_core::proxy_http::reflects]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1185:4-1191:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1198:4-1204:1
     Visibility: public -/
 @[rust_loop]
 def proxy_http.reflects_loop
@@ -14237,7 +14237,7 @@ def proxy_http.reflects_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::reflects]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1182:0-1191:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1195:0-1204:1
     Visibility: public -/
 def proxy_http.reflects
   (data : Slice Std.U8) (forms : Slice proxy_http.Form) : Result Bool := do
@@ -14487,7 +14487,7 @@ def proxy_http.returned_fields
   proxy_http.returned_fields_loop iter (alloc.vec.Vec.new proxy_http.Field)
 
 /-- [aivm_secrets_garrett_core::proxy_http::guest_response]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1195:0-1210:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1208:0-1223:1
     Visibility: public -/
 def proxy_http.guest_response
   (output : alloc.vec.Vec Std.U8) (response : proxy_http.Response)
@@ -15758,8 +15758,39 @@ def proxy_http.sextet
   let i6 ← lift (i5 &&& 63#u16)
   ok (UScalar.cast .U8 i6)
 
+/-- [aivm_secrets_garrett_core::proxy_http::encode_unpadded]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1109:4-1112:5
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.encode_unpadded_loop
+  (bytes : Slice Std.U8) (url : Bool) («end» : Std.Usize)
+  (out : alloc.vec.Vec Std.U8) (index : Std.Usize) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  if index < «end»
+  then
+    let i ← proxy_http.sextet bytes index
+    let i1 ← proxy_http.base64_symbol i url
+    let out1 ← alloc.vec.Vec.push out i1
+    let index1 ← index + 1#usize
+    proxy_http.encode_unpadded_loop bytes url «end» out1 index1
+  else ok out
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_http::encode_unpadded]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1105:0-1114:1
+    Visibility: public -/
+def proxy_http.encode_unpadded
+  (bytes : Slice Std.U8) (url : Bool) : Result (alloc.vec.Vec Std.U8) := do
+  let i := Slice.len bytes
+  let i1 ← 8#usize * i
+  let i2 ← i1 + 5#usize
+  let «end» ← i2 / 6#usize
+  proxy_http.encode_unpadded_loop bytes url «end» (alloc.vec.Vec.new Std.U8)
+    0#usize
+
 /-- [aivm_secrets_garrett_core::proxy_http::aligned_base64]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1108:4-1111:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1121:4-1124:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.aligned_base64_loop0
@@ -15775,7 +15806,7 @@ def proxy_http.aligned_base64_loop0
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::aligned_base64]: loop 1:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1117:4-1120:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1130:4-1133:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.aligned_base64_loop1
@@ -15795,7 +15826,7 @@ def proxy_http.aligned_base64_loop1
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::aligned_base64]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1105:0-1122:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1118:0-1135:1
     Visibility: public -/
 def proxy_http.aligned_base64
   (secret : Slice Std.U8) (shift : Std.Usize) (url : Bool) :
@@ -15815,7 +15846,7 @@ def proxy_http.aligned_base64
     Std.U8) start
 
 /-- [aivm_secrets_garrett_core::proxy_http::json_slashes]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1128:4-1133:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1141:4-1146:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.json_slashes_loop
@@ -15834,7 +15865,7 @@ def proxy_http.json_slashes_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::json_slashes]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1126:0-1135:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1139:0-1148:1
     Visibility: public -/
 def proxy_http.json_slashes
   (secret : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
@@ -15844,7 +15875,7 @@ def proxy_http.json_slashes
   proxy_http.json_slashes_loop iter (alloc.vec.Vec.new Std.U8)
 
 /-- [aivm_secrets_garrett_core::proxy_http::reflection_forms]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1147:4-1157:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1160:4-1170:5
     Visibility: public -/
 @[rust_loop]
 def proxy_http.reflection_forms_loop
@@ -15876,7 +15907,7 @@ def proxy_http.reflection_forms_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_http::reflection_forms]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1137:0-1159:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1150:0-1172:1
     Visibility: public -/
 def proxy_http.reflection_forms
   (secret : Slice Std.U8) : Result (alloc.vec.Vec proxy_http.Form) := do

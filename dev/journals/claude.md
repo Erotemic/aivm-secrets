@@ -986,3 +986,18 @@ extracted code or a recorded reason why the remainder is I/O, parsing
 (RUST-JSON-01, deferred), crypto, clock or real-VM evidence. Further
 assumption removal needs either the deferred JSON parser extraction or a
 design change (e.g. HP-6 constrained-http refinement), not more wrappers.
+
+## 2026-10-24 04:29:55 -0400
+
+Base64: the ledger did not list base64 as an assumption at all, but every
+native token/thumbprint decode trusted the crate. Made crypto::b64 the
+extracted proxy_http::encode_unpadded (reusing the existing sextet and
+base64_symbol) and proved it injective (GarrettBase64). Kept the crate as the
+decoder and as a test oracle, so this is not a reimplementation of base64
+parsing; the existing "re-encode must equal the text" check turns injectivity
+into "accepted bytes are the unique preimage". The proof recovers each byte
+from the two sextets covering it, which omega checks per residue mod 3.
+Not changed: certificates.rs PEM (padded, crate) and the proxy's Basic-auth
+decode (core decode_base64, separate).
+Also confirmed every proofs/*.lean except the opt-in Check/GarrettCheck audit
+modules is a lakefile root, so lake build compiles all proof modules.

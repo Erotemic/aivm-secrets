@@ -29,8 +29,13 @@ pub(crate) struct Opened {
     pub(crate) inner: InnerCapability,
 }
 
+/// The extracted encoder (`encode_unpadded_injective`); `decode` below then
+/// accepts only the unique bytes whose encoding is the given text.
 pub(crate) fn b64(bytes: &[u8]) -> String {
-    URL_SAFE_NO_PAD.encode(bytes)
+    aivm_secrets_garrett_core::proxy_http::encode_unpadded(bytes, true)
+        .into_iter()
+        .map(char::from)
+        .collect()
 }
 pub(crate) fn decode(text: &str, limit: usize) -> Outcome<Vec<u8>> {
     if text.is_empty() || text.len() > limit {
@@ -412,5 +417,31 @@ impl core::EnvelopeIssuer for Issuer {
         self.issue(claims, secret.bytes())
             .map(String::into_bytes)
             .map_err(|_| core::Denial::InvalidCapability)
+    }
+}
+
+#[cfg(test)]
+mod b64_tests {
+    #[test]
+    fn extracted_encoder_matches_the_base64_crate() {
+        use base64::Engine;
+        let mut seed = 0x2545_f491_u32;
+        for length in 0..200 {
+            let bytes: Vec<u8> = (0..length)
+                .map(|_| {
+                    seed ^= seed << 13;
+                    seed ^= seed >> 17;
+                    seed ^= seed << 5;
+                    seed as u8
+                })
+                .collect();
+            let url = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&bytes);
+            assert_eq!(super::b64(&bytes), url);
+            let standard = base64::engine::general_purpose::STANDARD_NO_PAD.encode(&bytes);
+            assert_eq!(
+                aivm_secrets_garrett_core::proxy_http::encode_unpadded(&bytes, false),
+                standard.into_bytes()
+            );
+        }
     }
 }

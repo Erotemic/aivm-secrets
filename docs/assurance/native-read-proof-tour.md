@@ -734,3 +734,22 @@ it accepts exactly the phase's own success flag, plus a revision of at least 1
 for `check` and no revision for `reserve`/`finish`. Every other reply is a
 refusal. **Still assumed** (`COORD-RUST-01`): decoding the JSON reply, TLS, and
 a coordinator that reports its committed state truthfully.
+
+## Base64 text the broker accepts (2026-10-24)
+
+JWT parts, certificate thumbprints and sealed capabilities travel as unpadded
+base64url text. The native broker now encodes them with the extracted
+`proxy_http::encode_unpadded`, and `crypto::decode` accepts decoded bytes only
+if re-encoding them gives back exactly the text it was given.
+[`GarrettBase64`](../../proofs/GarrettBase64.lean) proves:
+
+- `encode_unpadded_spec`: the encoder emits, for each 6-bit group
+  `0 .. ceil(8n/6)` of the bytes, that group's symbol.
+- `encode_unpadded_injective`: two byte strings with the same encoding are
+  equal. Each byte is recovered from the two groups that cover it.
+
+Together with the re-encoding check, the accepted bytes are the unique
+preimage of the text, so the `base64` crate's decoder no longer has to be
+correct, only to return. A Rust test also checks the encoder against the crate
+for both alphabets. **Still trusted:** the crate's padded encoder for PEM
+bodies, and the parsers that consume the decoded bytes (JSON, X.509).
