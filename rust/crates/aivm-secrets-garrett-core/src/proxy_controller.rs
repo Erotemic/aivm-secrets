@@ -13,8 +13,9 @@ use crate::proxy_http::{
 pub trait Upstream {
     /// Whether the session is still current (not revoked, not expired).
     fn current(&mut self) -> bool;
-    /// Record that a request was admitted, before anything is sent.
-    fn admitted(&mut self);
+    /// Durably record that a request was admitted, before anything is
+    /// sent; false if the record could not be written.
+    fn admitted(&mut self) -> bool;
     /// Send `wire` to the origin's pinned destination and return everything
     /// the origin answered before closing, or the refusal that applies.
     fn exchange(&mut self, wire: &[u8]) -> Result<Vec<u8>, Code>;
@@ -279,7 +280,10 @@ pub fn serve<U: Upstream>(
         Ok(()) => (),
         Err(refused) => return stopped(code_of(&refused), Stage::Refused),
     }
-    io.admitted();
+    // Fail closed: no acknowledged admission record, no egress.
+    if !io.admitted() {
+        return stopped(Code::InternalError, Stage::Refused);
+    }
     let sent: &[u8] = &wire;
     match io.exchange(sent) {
         Ok(raw) => release(&raw, request, forms, limit),
@@ -295,6 +299,7 @@ mod tests {
     /// Records every callback; answers with a fixed provider response.
     struct Mock {
         current: bool,
+        audit_ok: bool,
         calls: Vec<&'static str>,
         sent: Vec<Vec<u8>>,
         answer: fn() -> Result<Vec<u8>, Code>,
@@ -305,8 +310,9 @@ mod tests {
             self.calls.push("current");
             self.current
         }
-        fn admitted(&mut self) {
+        fn admitted(&mut self) -> bool {
             self.calls.push("admitted");
+            self.audit_ok
         }
         fn exchange(&mut self, wire: &[u8]) -> Result<Vec<u8>, Code> {
             self.calls.push("exchange");
@@ -328,6 +334,7 @@ mod tests {
     fn mock(current: bool, answer: fn() -> Result<Vec<u8>, Code>) -> Mock {
         Mock {
             current,
+            audit_ok: true,
             calls: Vec::new(),
             sent: Vec::new(),
             answer,
@@ -346,6 +353,17 @@ mod tests {
             &forms,
             4096,
         )
+    }
+
+    #[test]
+    fn a_failed_admission_audit_sends_nothing() {
+        let mut io = mock(true, || Ok(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n".to_vec()));
+        io.audit_ok = false;
+        let served = run(&mut io, &request(b"GET /a HTTP/1.1\r\nHost: api.example.org\r\n\r\n"), &[]);
+        assert_eq!(io.calls, ["current", "admitted"]);
+        assert!(io.sent.is_empty());
+        assert_eq!(served.reply, refusal(&Code::InternalError));
+        assert!(matches!(served.stage, Stage::Refused) && !served.keep);
     }
 
     /// Oracle: the composition `garrett-proxy` used before the controller

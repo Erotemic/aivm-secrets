@@ -1226,6 +1226,8 @@ pub enum Code {
     OutcomeUnknown,
     CredentialSource,
     UnsupportedRequest,
+    /// The admission audit could not be recorded; nothing was sent.
+    InternalError,
 }
 
 pub fn append_code(output: &mut Vec<u8>, code: &Code) {
@@ -1241,6 +1243,7 @@ pub fn append_code(output: &mut Vec<u8>, code: &Code) {
         Code::OutcomeUnknown => output.extend_from_slice(b"outcome_unknown"),
         Code::CredentialSource => output.extend_from_slice(b"credential_source"),
         Code::UnsupportedRequest => output.extend_from_slice(b"unsupported_request"),
+        Code::InternalError => output.extend_from_slice(b"internal_error"),
     }
 }
 
@@ -1252,7 +1255,11 @@ pub fn append_status(output: &mut Vec<u8>, code: &Code) {
         Code::Denied | Code::UnknownOrigin | Code::Revoked | Code::UnsupportedRequest => {
             output.extend_from_slice(b"403 Forbidden")
         }
-        Code::Reflected | Code::Unreachable | Code::OutcomeUnknown | Code::CredentialSource => {
+        Code::Reflected
+        | Code::Unreachable
+        | Code::OutcomeUnknown
+        | Code::CredentialSource
+        | Code::InternalError => {
             output.extend_from_slice(b"502 Bad Gateway")
         }
     }

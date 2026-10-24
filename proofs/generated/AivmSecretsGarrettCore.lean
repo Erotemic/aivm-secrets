@@ -10573,7 +10573,7 @@ def provider_wire.Endpoint.impl.port
   ok self.port
 
 /-- [aivm_secrets_garrett_core::proxy_http::Code]
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1217:0-1229:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1217:0-1231:1
     Visibility: public -/
 @[discriminant isize]
 inductive proxy_http.Code where
@@ -10588,6 +10588,7 @@ inductive proxy_http.Code where
 | OutcomeUnknown : proxy_http.Code
 | CredentialSource : proxy_http.Code
 | UnsupportedRequest : proxy_http.Code
+| InternalError : proxy_http.Code
 
 /-- [aivm_secrets_garrett_core::proxy_connect::Admission]
     Source: 'crates/aivm-secrets-garrett-core/src/proxy_connect.rs', lines 12:0-17:1
@@ -11804,16 +11805,16 @@ def proxy_connect.admit
     else ok (proxy_connect.Admission.Refuse proxy_http.Code.InvalidRequest)
 
 /-- Trait declaration: [aivm_secrets_garrett_core::proxy_controller::Upstream]
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 13:0-21:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 13:0-22:1
     Visibility: public -/
 structure proxy_controller.Upstream (Self : Type _) where
   current : Self → Result (Bool × Self)
-  admitted : Self → Result Self
+  admitted : Self → Result (Bool × Self)
   exchange : Self → Slice Std.U8 → Result ((core.result.Result
     (alloc.vec.Vec Std.U8) proxy_http.Code) × Self)
 
 /-- [aivm_secrets_garrett_core::proxy_controller::Stage]
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 24:0-31:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 25:0-32:1
     Visibility: public -/
 @[discriminant isize]
 inductive proxy_controller.Stage where
@@ -11822,7 +11823,7 @@ inductive proxy_controller.Stage where
 | Completed : proxy_controller.Stage
 
 /-- [aivm_secrets_garrett_core::proxy_controller::Served]
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 33:0-43:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 34:0-44:1
     Visibility: public -/
 structure proxy_controller.Served where
   reply : alloc.vec.Vec Std.U8
@@ -11849,7 +11850,7 @@ structure proxy_http.Parsed where
   used : Std.Usize
 
 /-- [aivm_secrets_garrett_core::proxy_controller::Framed]
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 46:0-53:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 47:0-54:1
     Visibility: public -/
 @[discriminant isize]
 inductive proxy_controller.Framed where
@@ -11864,7 +11865,7 @@ inductive proxy_controller.Framed where
 def proxy_http.MAX_HEAD : Result Std.Usize := 32#usize * 1024#usize
 
 /-- [aivm_secrets_garrett_core::proxy_controller::raw_limit]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 58:0-60:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 59:0-61:1
     Visibility: public -/
 def proxy_controller.raw_limit
   (request_limit : Std.Usize) : Result Std.Usize := do
@@ -13046,7 +13047,7 @@ def proxy_http.parse_request
       else ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest)
 
 /-- [aivm_secrets_garrett_core::proxy_controller::code_of]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 214:0-223:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 215:0-224:1
     Visibility: public -/
 def proxy_controller.code_of
   (refused : proxy_http.Refusal) : Result proxy_http.Code := do
@@ -13059,7 +13060,7 @@ def proxy_controller.code_of
   | proxy_http.Refusal.Reflected => ok proxy_http.Code.Reflected
 
 /-- [aivm_secrets_garrett_core::proxy_controller::frame]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 64:0-73:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 65:0-74:1
     Visibility: public -/
 def proxy_controller.frame
   (buffer : Slice Std.U8) (host : Slice Std.U8) (request_limit : Std.Usize) :
@@ -13081,14 +13082,14 @@ def proxy_controller.frame
       ok (proxy_controller.Framed.Refuse c)
 
 /-- [aivm_secrets_garrett_core::proxy_controller::Answer]
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 90:0-93:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 91:0-94:1
     Visibility: public -/
 structure proxy_controller.Answer where
   reply : alloc.vec.Vec Std.U8
   keep : Bool
 
 /-- Trait declaration: [aivm_secrets_garrett_core::proxy_controller::Guest]
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 76:0-87:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 77:0-88:1
     Visibility: public -/
 structure proxy_controller.Guest (Self : Type _) where
   overdue : Self → Result (Bool × Self)
@@ -13099,14 +13100,14 @@ structure proxy_controller.Guest (Self : Type _) where
     Self)
 
 /-- [aivm_secrets_garrett_core::proxy_controller::Tunnel]
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 96:0-99:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 97:0-100:1
     Visibility: public -/
 structure proxy_controller.Tunnel where
   buffer : alloc.vec.Vec Std.U8
   «open» : Bool
 
 /-- [aivm_secrets_garrett_core::proxy_controller::remainder]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 102:0-108:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 103:0-109:1
     Visibility: public -/
 def proxy_controller.remainder
   (buffer : Slice Std.U8) (used : Std.Usize) :
@@ -13124,7 +13125,7 @@ def proxy_controller.remainder
   else ok (alloc.vec.Vec.new Std.U8)
 
 /-- [aivm_secrets_garrett_core::proxy_http::append_status]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1247:0-1259:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1250:0-1266:1
     Visibility: public -/
 def proxy_http.append_status
   (output : alloc.vec.Vec Std.U8) (code : proxy_http.Code) :
@@ -13222,9 +13223,17 @@ def proxy_http.append_status
           100#u8, 100#u8, 101#u8, 110#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.InternalError =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 15#usize [
+          53#u8, 48#u8, 50#u8, 32#u8, 66#u8, 97#u8, 100#u8, 32#u8, 71#u8,
+          97#u8, 116#u8, 101#u8, 119#u8, 97#u8, 121#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
 
 /-- [aivm_secrets_garrett_core::proxy_http::append_code]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1231:0-1245:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1233:0-1248:1
     Visibility: public -/
 def proxy_http.append_code
   (output : alloc.vec.Vec Std.U8) (code : proxy_http.Code) :
@@ -13314,9 +13323,17 @@ def proxy_http.append_code
           101#u8, 115#u8, 116#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
+  | proxy_http.Code.InternalError =>
+    let s ←
+      lift (Array.to_slice
+        (Array.make 14#usize [
+          105#u8, 110#u8, 116#u8, 101#u8, 114#u8, 110#u8, 97#u8, 108#u8, 95#u8,
+          101#u8, 114#u8, 114#u8, 111#u8, 114#u8
+          ]))
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
 
 /-- [aivm_secrets_garrett_core::proxy_http::refusal]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1262:0-1279:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_http.rs', lines 1269:0-1286:1
     Visibility: public -/
 def proxy_http.refusal
   (code : proxy_http.Code) : Result (alloc.vec.Vec Std.U8) := do
@@ -13376,6 +13393,7 @@ def proxy_http.refusal
     | proxy_http.Code.OutcomeUnknown => ok out2
     | proxy_http.Code.CredentialSource => ok out2
     | proxy_http.Code.UnsupportedRequest => ok out2
+    | proxy_http.Code.InternalError => ok out2
   let s4 ←
     lift (Array.to_slice
       (Array.make 48#usize [
@@ -13401,7 +13419,7 @@ def proxy_http.refusal
   alloc.vec.Vec.extend_from_slice core.clone.CloneU8 out6 s6
 
 /-- [aivm_secrets_garrett_core::proxy_controller::step]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 115:0-161:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 116:0-162:1
     Visibility: public -/
 def proxy_controller.step
   {G : Type _} (GuestInst : proxy_controller.Guest G) (guest : G)
@@ -13481,7 +13499,7 @@ def proxy_controller.step
       else ok ({ buffer := rest, «open» := false }, guest2)
 
 /-- [aivm_secrets_garrett_core::proxy_controller::tunnel]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 169:4-171:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 170:4-172:5
     Visibility: public -/
 @[rust_loop]
 def proxy_controller.tunnel_loop
@@ -13499,7 +13517,7 @@ def proxy_controller.tunnel_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_controller::tunnel]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 164:0-172:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 165:0-173:1
     Visibility: public -/
 @[reducible]
 def proxy_controller.tunnel
@@ -13511,14 +13529,14 @@ def proxy_controller.tunnel
     { buffer := (alloc.vec.Vec.new Std.U8), «open» := true }
 
 /-- Trait declaration: [aivm_secrets_garrett_core::proxy_controller::HeadSource]
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 175:0-180:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 176:0-181:1
     Visibility: public -/
 structure proxy_controller.HeadSource (Self : Type _) where
   overdue : Self → Result (Bool × Self)
   next_byte : Self → Result ((Option Std.U8) × Self)
 
 /-- [aivm_secrets_garrett_core::proxy_controller::complete]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 183:0-188:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 184:0-189:1
     Visibility: public -/
 def proxy_controller.complete (data : Slice Std.U8) : Result Bool := do
   let o ← proxy_http.head_end data
@@ -13527,7 +13545,7 @@ def proxy_controller.complete (data : Slice Std.U8) : Result Bool := do
   | some _ => ok true
 
 /-- [aivm_secrets_garrett_core::proxy_controller::connect_head]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 197:4-206:5
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 198:4-207:5
     Visibility: public -/
 @[rust_loop]
 def proxy_controller.connect_head_loop
@@ -13565,7 +13583,7 @@ def proxy_controller.connect_head_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::proxy_controller::connect_head]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 194:0-212:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 195:0-213:1
     Visibility: public -/
 def proxy_controller.connect_head
   {S : Type _} (HeadSourceInst : proxy_controller.HeadSource S) (source : S) :
@@ -13579,7 +13597,7 @@ def proxy_controller.connect_head
   else ok (none, source1)
 
 /-- [aivm_secrets_garrett_core::proxy_controller::stopped]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 225:0-234:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 226:0-235:1
     Visibility: public -/
 def proxy_controller.stopped
   (code : proxy_http.Code) (stage : proxy_controller.Stage) :
@@ -13589,7 +13607,7 @@ def proxy_controller.stopped
   ok { reply, keep := false, stage, code, status := 0#u16 }
 
 /-- [aivm_secrets_garrett_core::proxy_controller::is_head]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 236:0-239:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 237:0-240:1
     Visibility: public -/
 def proxy_controller.is_head (method : Slice Std.U8) : Result Bool := do
   let head ←
@@ -14406,7 +14424,7 @@ def proxy_http.parse_response
       else ok (core.result.Result.Err proxy_http.Refusal.UpstreamResponse)
 
 /-- [aivm_secrets_garrett_core::proxy_controller::release]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 242:0-260:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 243:0-261:1
     Visibility: public -/
 def proxy_controller.release
   (raw : Slice Std.U8) (request : proxy_http.Request)
@@ -15015,7 +15033,7 @@ def proxy_http.encode_upstream
   else ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest, output)
 
 /-- [aivm_secrets_garrett_core::proxy_controller::serve]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 264:0-288:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 265:0-292:1
     Visibility: public -/
 def proxy_controller.serve
   {U : Type _} (UpstreamInst : proxy_controller.Upstream U) (io : U)
@@ -15033,17 +15051,24 @@ def proxy_controller.serve
         secret authentication
     match r with
     | core.result.Result.Ok _ =>
-      let io2 ← UpstreamInst.admitted io1
-      let sent := alloc.vec.Vec.deref wire
-      let (r1, io3) ← UpstreamInst.exchange io2 sent
-      match r1 with
-      | core.result.Result.Ok raw =>
-        let s := alloc.vec.Vec.deref raw
-        let s1 ← proxy_controller.release s request forms limit
-        ok (s1, io3)
-      | core.result.Result.Err code =>
-        let s ← proxy_controller.stopped code proxy_controller.Stage.Failed
-        ok (s, io3)
+      let (b1, io2) ← UpstreamInst.admitted io1
+      if b1
+      then
+        let sent := alloc.vec.Vec.deref wire
+        let (r1, io3) ← UpstreamInst.exchange io2 sent
+        match r1 with
+        | core.result.Result.Ok raw =>
+          let s := alloc.vec.Vec.deref raw
+          let s1 ← proxy_controller.release s request forms limit
+          ok (s1, io3)
+        | core.result.Result.Err code =>
+          let s ← proxy_controller.stopped code proxy_controller.Stage.Failed
+          ok (s, io3)
+      else
+        let s ←
+          proxy_controller.stopped proxy_http.Code.InternalError
+            proxy_controller.Stage.Refused
+        ok (s, io2)
     | core.result.Result.Err refused =>
       let c ← proxy_controller.code_of refused
       let s ← proxy_controller.stopped c proxy_controller.Stage.Refused

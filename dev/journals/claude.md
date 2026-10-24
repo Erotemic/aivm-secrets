@@ -758,3 +758,18 @@ pruning) matches Python `kernel/machine.approve`, which is functional and
 raises `exhausted` before replacing state. Updated the claim matrix with
 today's evidence and an explicit "outside this profile" section so OUT-4/OUT-6
 proofs are not counted toward the native read claim.
+
+## 2026-10-23 20:24:22 -0400
+
+FINDING and fix (security, fail-open → fail-closed): the native proxy's
+`Session::record` ignored write/fsync failures, so a failed admission audit
+still let `serve` call `exchange` (the Python proxy failed closed by
+letting the OSError escape and closing the tunnel silently). Now
+`Upstream::admitted -> bool`; the extracted `serve` refuses with a new public
+code `internal_error` (502) before any exchange; the native translated path
+and both Python admission sites do the same. Proofs: `serve_paths` has a
+fourth path; `serve_upstream` now says exchange follows an *acknowledged*
+record. Tests: core mock, native RLIMIT_FSIZE=0 (SIGXFSZ ignored) adversarial
+test (mutation-checked: fails with the check disabled), Python monkeypatch.
+Needs maintainer security review (changes the public refusal set: twelve
+codes now).

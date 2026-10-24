@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import base64
 import json
+import resource
+import signal
 import select
 import shutil
 import subprocess
@@ -45,7 +47,8 @@ class NativeWorld(World):
         self.process = subprocess.Popen(
             [executable('AIVM_SECRETS_RUST_GARRETT_PROXY'), '--policy', str(self.policy_path),
              '--credential-file', str(self.credential), '--audit', str(self.audit_path)],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            preexec_fn=getattr(self, 'preexec', None))
         assert select.select([self.process.stdout], [], [], 30)[0], 'no announcement'
         self.announcement = json.loads(self.process.stdout.readline())
         assert self.announcement['ready'] is True, self.announcement
@@ -199,6 +202,23 @@ def test_native_oversize_and_expiry(tmp_path, service):
         time.sleep(2.2)
         assert status(world.raw(get())) == 403
         assert len(service.requests) == 1
+
+
+def test_native_failed_admission_audit_sends_nothing(tmp_path, service):
+    """Fail closed: if the admission record cannot be written, the request is
+    refused with ``internal_error`` and nothing reaches the provider. Every
+    audit write fails because the process may not grow any file."""
+    def no_file_growth():
+        signal.signal(signal.SIGXFSZ, signal.SIG_IGN)
+        resource.setrlimit(resource.RLIMIT_FSIZE, (0, 0))
+
+    world = NativeWorld(tmp_path, service)
+    world.preexec = no_file_growth
+    with world:
+        reply = world.raw(get())
+        assert status(reply) == 502 and b'"internal_error"' in reply, reply
+        assert service.requests == []
+    assert world.audit_path.read_bytes() == b''
 
 
 def test_native_unreachable_origin(tmp_path, service):

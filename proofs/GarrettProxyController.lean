@@ -6,7 +6,8 @@ import GarrettProxyResponse
 Source: `rust/crates/aivm-secrets-garrett-core/src/proxy_controller.rs`,
 extracted by Aeneas. `garrett-proxy` calls `proxy_controller::serve` for every
 accepted guest request and supplies only three callbacks (`Upstream`): the
-session clock (`current`), the admission audit (`admitted`) and the socket
+session clock (`current`), the admission audit (`admitted`, which reports whether
+the record was durably written) and the socket
 exchange (`exchange`).
 
 Proved here, for **any** callbacks:
@@ -14,7 +15,8 @@ Proved here, for **any** callbacks:
 * `serve_not_current`: if the session is not current, nothing is admitted or
   sent and the guest gets the fixed `revoked` refusal;
 * `serve_sent_exactly_the_encoding`: if `exchange` was called at all, the
-  session was current, the admission audit ran first, and the bytes passed
+  session was current, the admission audit was acknowledged first (a failed
+  audit refuses with `internal_error` and sends nothing), and the bytes passed
   to `exchange` are exactly what the extracted `encode_upstream` produced
   (so `encode_upstream_contract` describes every byte sent upstream);
 * `serve_guest_bytes`: the guest reply is either a fixed refusal or bytes
@@ -85,12 +87,15 @@ theorem release_reply (raw : Slice U8) (request : proxy_http.Request) (forms : S
 variable {U : Type}
 
 /-- **The controller's only paths.** Every returned `serve` took exactly one
-    of three paths:
+    of four paths:
     1. the session was not current: nothing admitted or sent, `revoked`;
     2. the encoder refused: nothing admitted or sent, a fixed refusal;
-    3. the session was current, the encoder accepted and produced `wire`,
-       the admission audit ran, and **`exchange` received exactly `wire`**;
-       the reply is then `release` of the answer, or a fixed refusal. -/
+    3. the admission audit could not be recorded: nothing sent,
+       `internal_error` (fail closed);
+    4. the session was current, the encoder accepted and produced `wire`,
+       the admission audit was **acknowledged**, and **`exchange` received
+       exactly `wire`**; the reply is then `release` of the answer, or a
+       fixed refusal. -/
 theorem serve_paths (inst : Upstream U) (io : U) (request : proxy_http.Request) (host : Slice U8)
     (rules : Slice proxy_http.DenyRule) (secret : Slice U8)
     (authentication : credential_use.Authentication) (forms : Slice proxy_http.Form) (limit : Usize)
@@ -102,10 +107,15 @@ theorem serve_paths (inst : Upstream U) (io : U) (request : proxy_http.Request) 
       proxy_http.encode_upstream (alloc.vec.Vec.new U8) request host rules secret authentication =
         Result.ok (.Err refused, wire) ∧ code_of refused = Result.ok code ∧ after = io1 ∧
       stopped code .Refused = Result.ok served) ∨
+    (∃ io1 wire, inst.current io = Result.ok (true, io1) ∧
+      proxy_http.encode_upstream (alloc.vec.Vec.new U8) request host rules secret authentication =
+        Result.ok (.Ok (), wire) ∧
+      inst.admitted io1 = Result.ok (false, after) ∧
+      stopped .InternalError .Refused = Result.ok served) ∨
     (∃ io1 wire io2 answer, inst.current io = Result.ok (true, io1) ∧
       proxy_http.encode_upstream (alloc.vec.Vec.new U8) request host rules secret authentication =
         Result.ok (.Ok (), wire) ∧
-      inst.admitted io1 = Result.ok io2 ∧
+      inst.admitted io1 = Result.ok (true, io2) ∧
       inst.exchange io2 (alloc.vec.Vec.deref wire) = Result.ok (answer, after) ∧
       (match answer with
        | .Ok raw => release (alloc.vec.Vec.deref raw) request forms limit = Result.ok served
@@ -130,10 +140,18 @@ theorem serve_paths (inst : Upstream U) (io : U) (request : proxy_http.Request) 
       subst hs ha
       exact Or.inr (Or.inl ⟨io1, wire, refused, code, current, encoded, coded, rfl, stop⟩)
     | Ok u =>
-      obtain ⟨io2, admitted, h⟩ := bind_ok_inv h
-      obtain ⟨⟨answer, io3⟩, exchanged, h⟩ := bind_ok_inv h
       cases u
-      refine Or.inr (Or.inr ⟨io1, wire, io2, answer, current, encoded, admitted, ?_⟩)
+      obtain ⟨⟨acked, io2⟩, admitted, h⟩ := bind_ok_inv h
+      cases acked with
+      | false =>
+        obtain ⟨s, stop, h⟩ := bind_ok_inv h
+        simp only [Result.ok.injEq, Prod.mk.injEq] at h
+        obtain ⟨hs, ha⟩ := h
+        subst hs ha
+        exact Or.inr (Or.inr (Or.inl ⟨io1, wire, current, encoded, admitted, stop⟩))
+      | true =>
+      obtain ⟨⟨answer, io3⟩, exchanged, h⟩ := bind_ok_inv h
+      refine Or.inr (Or.inr (Or.inr ⟨io1, wire, io2, answer, current, encoded, admitted, ?_⟩))
       cases answer with
       | Ok raw =>
         obtain ⟨s, released, h⟩ := bind_ok_inv h
@@ -154,8 +172,9 @@ theorem serve_paths (inst : Upstream U) (io : U) (request : proxy_http.Request) 
     passed to `exchange` are exactly the encoder's output: for a request whose
     canonical encoding fits in memory, `UpstreamPrefix ++ HeaderPrefix ++
     secret ++ CRLF ++ UpstreamSuffix`, with a valid credential, a visible
-    target and every forwarded guest field clean. A refused request reached
-    neither `admitted` nor `exchange`. -/
+    target and every forwarded guest field clean, and the admission audit was
+    acknowledged first. A refused request never reached `exchange`; one
+    refused because the audit failed reached `admitted` only. -/
 theorem serve_upstream (inst : Upstream U) (io : U) (request : proxy_http.Request)
     (host : Slice U8) (rules : Slice proxy_http.DenyRule) (secret : Slice U8)
     (authentication : credential_use.Authentication) (forms : Slice proxy_http.Form) (limit : Usize)
@@ -164,8 +183,10 @@ theorem serve_upstream (inst : Upstream U) (io : U) (request : proxy_http.Reques
     (room : (UpstreamPrefix request host ++ HeaderPrefix authentication ++ secret.val ++ CRLF ++
       UpstreamSuffix request).length ≤ Usize.max) :
     (served.stage = .Refused ∧ ∃ current io1, inst.current io = Result.ok (current, io1) ∧ after = io1) ∨
+    (served.stage = .Refused ∧ served.code = .InternalError ∧ ∃ io1,
+      inst.current io = Result.ok (true, io1) ∧ inst.admitted io1 = Result.ok (false, after)) ∨
     (served.stage ≠ .Refused ∧ ∃ io1 io2 wire answer,
-      inst.current io = Result.ok (true, io1) ∧ inst.admitted io1 = Result.ok io2 ∧
+      inst.current io = Result.ok (true, io1) ∧ inst.admitted io1 = Result.ok (true, io2) ∧
       inst.exchange io2 (alloc.vec.Vec.deref wire) = Result.ok (answer, after) ∧
       wire.val = UpstreamPrefix request host ++ HeaderPrefix authentication ++ secret.val ++ CRLF ++
         UpstreamSuffix request ∧
@@ -173,9 +194,11 @@ theorem serve_upstream (inst : Upstream U) (io : U) (request : proxy_http.Reques
       (∀ field ∈ Forwarded request.fields.val, CleanField field)) := by
   rcases serve_paths inst io request host rules secret authentication forms limit served after h with
     ⟨io1, current, same, stop⟩ | ⟨io1, wire, refused, code, current, _, _, same, stop⟩ |
+    ⟨io1, wire, current, _, unacked, stop⟩ |
     ⟨io1, wire, io2, answer, current, encoded, admitted, exchanged, finish⟩
   · exact Or.inl ⟨(stopped_reply stop).2.1, false, io1, current, same⟩
   · exact Or.inl ⟨(stopped_reply stop).2.1, true, io1, current, same⟩
+  · exact Or.inr (Or.inl ⟨(stopped_reply stop).2.1, (stopped_reply stop).2.2.2, io1, current, unacked⟩)
   · have stage : served.stage ≠ .Refused := by
       cases answer with
       | Ok raw =>
@@ -190,8 +213,8 @@ theorem serve_upstream (inst : Upstream U) (io : U) (request : proxy_http.Reques
     simp only [Result.ok.injEq] at returned
     subst returned
     rcases post with ⟨_, valid, visible, clean, bytes⟩ | ⟨refused, _⟩
-    · refine Or.inr ⟨stage, io1, io2, wire, answer, current, admitted, exchanged, ?_, valid, visible,
-        clean⟩
+    · refine Or.inr (Or.inr ⟨stage, io1, io2, wire, answer, current, admitted, exchanged, ?_, valid,
+        visible, clean⟩)
       simpa [alloc.vec.Vec.new] using bytes
     · exact absurd rfl refused
 
@@ -218,7 +241,9 @@ theorem serve_guest_reply (inst : Upstream U) (io : U) (request : proxy_http.Req
     obtain ⟨reply, _, _, same⟩ := stopped_reply stop
     rw [reply, same]
   rcases serve_paths inst io request host rules secret authentication forms limit served after h with
-    ⟨_, _, _, stop⟩ | ⟨_, _, _, _, _, _, _, _, stop⟩ | ⟨_, _, _, answer, _, _, _, _, finish⟩
+    ⟨_, _, _, stop⟩ | ⟨_, _, _, _, _, _, _, _, stop⟩ | ⟨_, _, _, _, _, stop⟩ |
+    ⟨_, _, _, answer, _, _, _, _, finish⟩
+  · exact Or.inl (stopped_case stop)
   · exact Or.inl (stopped_case stop)
   · exact Or.inl (stopped_case stop)
   · cases answer with

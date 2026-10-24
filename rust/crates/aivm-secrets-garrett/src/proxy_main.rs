@@ -368,7 +368,9 @@ fn load(policy_path: &Path, authority: Authority<'_>, audit_path: &Path) -> Resu
 }
 
 impl Session {
-    fn record(&self, event: &str, detail: Value) {
+    /// Append one hash-chained record and sync it; false if it was not
+    /// durably written (the caller decides whether that stops the request).
+    fn record(&self, event: &str, detail: Value) -> bool {
         let stamp = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
         if let Ok(mut audit) = self.audit.lock() {
             let mut row = json!({"schema": "proxy-audit-1", "seq": audit.seq, "prev": audit.head,
@@ -386,8 +388,10 @@ impl Session {
                     .map(|b| format!("{b:02x}"))
                     .collect();
                 audit.seq += 1;
+                return true;
             }
         }
+        false
     }
     fn current(&self) -> bool {
         !self.revoked.load(Ordering::SeqCst) && Instant::now() < self.expires
@@ -407,6 +411,7 @@ fn refusal(code: &str) -> Vec<u8> {
         "unreachable" => core::Code::Unreachable,
         "credential_source" => core::Code::CredentialSource,
         "unsupported_request" => core::Code::UnsupportedRequest,
+        "internal_error" => core::Code::InternalError,
         _ => core::Code::OutcomeUnknown,
     };
     core::refusal(&code)
@@ -425,6 +430,7 @@ fn code_name(code: &core::Code) -> &'static str {
         core::Code::OutcomeUnknown => "outcome_unknown",
         core::Code::CredentialSource => "credential_source",
         core::Code::UnsupportedRequest => "unsupported_request",
+        core::Code::InternalError => "internal_error",
     }
 }
 
@@ -516,11 +522,11 @@ impl Upstream for Native<'_> {
         self.session.current()
     }
 
-    fn admitted(&mut self) {
+    fn admitted(&mut self) -> bool {
         self.session.record(
             "admitted",
             json!({"origin": self.origin.host, "method": self.method, "path": self.path}),
-        );
+        )
     }
 
     fn exchange(&mut self, wire: &[u8]) -> Result<Vec<u8>, core::Code> {
@@ -573,7 +579,10 @@ fn serve_translated(session: &Session, translator: &Translator, origin: &Origin,
         session.record("refused", json!({"code": "unsupported_request", "origin": origin.host, "method": method, "path": path}));
         return (refusal("unsupported_request"), false);
     };
-    session.record("admitted", json!({"origin": origin.host, "method": method, "path": path, "operation": operation}));
+    // Fail closed: no acknowledged admission record, no bridge call.
+    if !session.record("admitted", json!({"origin": origin.host, "method": method, "path": path, "operation": operation})) {
+        return (refusal("internal_error"), false);
+    }
     let body = arguments.to_string().into_bytes();
     if body.len() > MAX_INVOKE_ARGUMENTS {
         // The client would refuse it; say so instead of "outcome unknown".

@@ -537,13 +537,14 @@ def codeText : proxy_http.Code → String
   | .UnknownOrigin => "unknown_origin" | .Unauthenticated => "unauthenticated"
   | .Revoked => "revoked" | .Reflected => "reflected" | .Unreachable => "unreachable"
   | .OutcomeUnknown => "outcome_unknown" | .CredentialSource => "credential_source"
-  | .UnsupportedRequest => "unsupported_request"
+  | .UnsupportedRequest => "unsupported_request" | .InternalError => "internal_error"
 
 def statusText : proxy_http.Code → String
   | .InvalidRequest => "400 Bad Request" | .TooLarge => "413 Content Too Large"
   | .Unauthenticated => "407 Proxy Authentication Required"
   | .Denied | .UnknownOrigin | .Revoked | .UnsupportedRequest => "403 Forbidden"
-  | .Reflected | .Unreachable | .OutcomeUnknown | .CredentialSource => "502 Bad Gateway"
+  | .Reflected | .Unreachable | .OutcomeUnknown | .CredentialSource | .InternalError =>
+      "502 Bad Gateway"
 
 def refusalBody (code : proxy_http.Code) : String :=
   "{\"error\":{\"code\":\"" ++ codeText code ++ "\"},\"ok\":false,\"proxy\":\"aivm-secrets\"}\n"
@@ -567,7 +568,7 @@ theorem digits_two (n : Nat) (lo : 10 ≤ n) (hi : n < 100) :
   rfl
 
 /-- **Fixed refusals.** For every code, the extracted `refusal` returns exactly
-    the ASCII bytes of `refusalText code`: one of eleven fixed responses that
+    the ASCII bytes of `refusalText code`: one of twelve fixed responses that
     depend on nothing but the code, so a refusal carries no request,
     provider or credential bytes. -/
 theorem refusal_exact (code : proxy_http.Code) :

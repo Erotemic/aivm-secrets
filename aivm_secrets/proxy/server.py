@@ -311,7 +311,11 @@ class _Handler(socketserver.BaseRequestHandler):
             session.record('refused', code=refused.code, origin=origin.host,
                            method=method, path=path)
             return http1.refusal(refused.code), False
-        session.record('admitted', origin=origin.host, method=method, path=path)
+        # Fail closed: no durable admission record, no egress (as native).
+        try:
+            session.record('admitted', origin=origin.host, method=method, path=path)
+        except OSError:
+            return http1.refusal('internal_error'), False
         try:
             response = exchange(session, origin, request, wire)
             reply = guest_response(response, session.forms, keep_alive=request.keep_alive,
@@ -334,8 +338,11 @@ class _Handler(socketserver.BaseRequestHandler):
             session.record('refused', code=refused.code, origin=origin.host,
                            method=method, path=path)
             return http1.refusal(refused.code), False
-        session.record('admitted', origin=origin.host, method=method, path=path,
-                       operation=named.operation)
+        try:
+            session.record('admitted', origin=origin.host, method=method, path=path,
+                           operation=named.operation)
+        except OSError:
+            return http1.refusal('internal_error'), False
         frame = codec.dumps({'version': 1, 'capability': session.broker.capability,
                              'request': {'operation': named.operation,
                                          'arguments': dict(named.arguments)}})

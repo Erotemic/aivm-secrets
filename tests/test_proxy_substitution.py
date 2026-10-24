@@ -294,6 +294,22 @@ def test_oversize_bodies_are_refused(tmp_path, service):
         assert len(service.requests) == 1
 
 
+def test_a_failed_admission_audit_sends_nothing(world, monkeypatch):
+    """Fail closed, as the native proxy: if the admission record cannot be
+    written, the guest gets ``internal_error`` and nothing is sent."""
+    real = world.session.audit.record
+
+    def record(event, **detail):
+        if event == 'admitted':
+            raise OSError('disk full')
+        return real(event, **detail)
+
+    monkeypatch.setattr(world.session.audit, 'record', record)
+    reply = world.raw(get())
+    assert status(reply) == 502 and b'"internal_error"' in reply, reply
+    assert world.service.requests == []
+
+
 def test_an_unreachable_origin_reports_that_nothing_was_sent(tmp_path, service):
     with World(tmp_path, service) as world:
         origin = world.session.policy.origins[HOST]
