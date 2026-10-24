@@ -22,6 +22,9 @@ Proved here, for **any** callbacks:
   answer, and keeps exactly the bytes after the ones the request used;
 * `step_request_fits`: on 64-bit-sized inputs, a served request used no more
   bytes than were buffered, so the kept bytes are a true suffix.
+* `connect_head_returned`: the CONNECT head reader (`connect_head`) returns
+  only a complete head, and no shorter prefix was complete, so it never
+  consumes a byte of the TLS handshake that follows.
 
 Together with `frame_paths` (only the strict parser's requests are served)
 and `serve_guest_reply`, the guest receives only fixed refusals and
@@ -222,5 +225,105 @@ theorem tunnel_loop_open {G : Type} (inst : Guest G) (io : G) (host : Slice U8) 
   rw [tunnel_loop.eq_def]
   simp only [opened, ↓reduceIte]
   rfl
+
+/-! ## The CONNECT head reader -/
+
+theorem max_head_eq : ∃ m : Usize, proxy_http.MAX_HEAD = Result.ok m ∧ m.val = 32768 := by
+  unfold proxy_http.MAX_HEAD
+  obtain ⟨m, hm, hv⟩ := returned_of_spec (@Usize.mul_spec 32#usize 1024#usize (by scalar_tac))
+  exact ⟨m, hm, by simpa using hv⟩
+
+/-- No proper prefix of `data` was a complete head. -/
+def NoEarlierHead (data : List U8) : Prop :=
+  ∀ k < data.length, ∀ s : Slice U8, s.val = data.take k → complete s = Result.ok false
+
+/-- The reader's result for one state. -/
+def HeadOutcome (out : S × alloc.vec.Vec U8 × Bool) : Prop :=
+  out.2.2 = true → complete (alloc.vec.Vec.deref out.2.1) = Result.ok true ∧
+    NoEarlierHead out.2.1.val
+
+/-- A closed reader stops at once and returns no head. -/
+theorem closed_outcome {S : Type} (inst : HeadSource S) (source : S) (data : alloc.vec.Vec U8)
+    (out : S × alloc.vec.Vec U8 × Bool)
+    (h : connect_head_loop inst source data false = Result.ok out) : HeadOutcome out := by
+  rw [connect_head_loop.eq_def] at h
+  simp only [Bool.false_eq_true, ↓reduceIte, Result.ok.injEq] at h
+  subst h; intro e; cases e
+
+theorem connect_head_loop_returned {S : Type} (inst : HeadSource S) :
+    ∀ n (source : S) (data : alloc.vec.Vec U8) (opened : Bool) (out : S × alloc.vec.Vec U8 × Bool),
+      32770 - data.length = n → data.length ≤ 32769 → NoEarlierHead data.val →
+      connect_head_loop inst source data opened = Result.ok out → HeadOutcome out := by
+  intro n
+  induction n using Nat.strong_induction_on with
+  | h n ih =>
+    intro source data opened out measure bounded earlier h
+    rw [connect_head_loop.eq_def] at h
+    cases opened with
+    | false =>
+      rw [← connect_head_loop.eq_def] at h
+      exact closed_outcome inst source data out h
+    | true =>
+      simp only [↓reduceIte] at h
+      obtain ⟨b, hb, h⟩ := bind_ok_inv h
+      cases b with
+      | true =>
+        simp only [↓reduceIte, Result.ok.injEq] at h
+        subst h; intro _; exact ⟨hb, earlier⟩
+      | false =>
+        simp only [Bool.false_eq_true, ↓reduceIte] at h
+        obtain ⟨⟨late, source1⟩, overdue, h⟩ := bind_ok_inv h
+        cases late with
+        | true => exact closed_outcome inst source1 data out h
+        | false =>
+          obtain ⟨m, hm, hmv⟩ := max_head_eq
+          obtain ⟨limit, hlimit, h⟩ := bind_ok_inv h
+          rw [hm] at hlimit
+          simp only [Result.ok.injEq] at hlimit
+          subst hlimit
+          split at h
+          · exact closed_outcome inst source1 data out h
+          · rename_i small
+            obtain ⟨⟨o, source2⟩, read, h⟩ := bind_ok_inv h
+            cases o with
+            | none => exact closed_outcome inst source2 data out h
+            | some byte =>
+              obtain ⟨data1, pushed, h⟩ := bind_ok_inv h
+              have grown : data1.val = data.val ++ [byte] :=
+                aivm_secrets_garrett_core.route.Proofs.push_ok_val pushed
+              have len1 : data1.length = data.length + 1 := by
+                simp [alloc.vec.Vec.length, grown]
+              refine ih (32770 - data1.length) (by omega) source2 data1 true out rfl (by scalar_tac) ?_ h
+              intro k hk s hs
+              by_cases same : k = data.val.length
+              · have : s = alloc.vec.Vec.deref data := by
+                  apply Slice.ext
+                  rw [hs, grown, same, List.take_left]
+                  simp [aivm_secrets_garrett_core.http_wire.Proofs.vec_deref_val]
+                rw [this]; exact hb
+              · apply earlier k (by simp [grown] at hk; omega) s
+                rw [hs, grown, List.take_append_of_le_length (by simp [grown] at hk; omega)]
+
+/-- **The CONNECT head.** For any socket callbacks, a head `connect_head`
+    returns is complete (the extracted `head_end` finds `\r\n\r\n`), and no
+    shorter prefix was complete: the reader stops at the first complete head,
+    so no byte after it (the start of the TLS handshake) was consumed. -/
+theorem connect_head_returned {S : Type} (inst : HeadSource S) (source : S)
+    (head : alloc.vec.Vec U8) (after : S)
+    (h : connect_head inst source = Result.ok (some head, after)) :
+    complete (alloc.vec.Vec.deref head) = Result.ok true ∧ NoEarlierHead head.val := by
+  unfold connect_head at h
+  obtain ⟨⟨source1, data, opened⟩, looped, h⟩ := bind_ok_inv h
+  have outcome := connect_head_loop_returned inst _ source (alloc.vec.Vec.new U8) true _ rfl
+    (by simp [alloc.vec.Vec.new, alloc.vec.Vec.length]) (by intro k hk; simp [alloc.vec.Vec.new] at hk) looped
+  cases opened with
+  | true =>
+    have h : Result.ok (some data, source1) = Result.ok (some head, after) := h
+    simp only [Result.ok.injEq, Prod.mk.injEq, Option.some.injEq] at h
+    obtain ⟨rfl, -⟩ := h
+    exact outcome rfl
+  | false =>
+    have h : Result.ok (none, source1) = Result.ok (some head, after) := h
+    simp at h
 
 end aivm_secrets_garrett_core.proxy_controller.Proofs

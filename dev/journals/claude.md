@@ -742,3 +742,11 @@ splitOn-based segment invariant for `segments_ok_loop` is the next proof.
 positional invariant (`InteriorOk`/`FinalOk` stated over `p[i]? = some '/'`
 instead of `List.splitOn`, which kept the loop proof short). PROXY-PARSE-01's
 remaining unproved part is now only provider-side normalization.
+
+## 2026-10-23 19:49:06 -0400
+
+CONNECT head reader extracted (`proxy_controller::connect_head`, `HeadSource`
+trait) with oracle (same result and same bytes consumed as the old loop).
+`connect_head_returned` proved by induction on remaining room under
+MAX_HEAD, stated as an inversion of a returned result because callbacks may
+fail. Every sequencing loop of garrett-proxy is now extracted.

@@ -5,8 +5,8 @@
 
 use crate::credential_use::Authentication;
 use crate::proxy_http::{
-    encode_upstream, guest_response, parse_request, parse_response, refusal, Code, DenyRule, Form,
-    Parsed, Refusal, Request, MAX_HEAD,
+    encode_upstream, guest_response, head_end, parse_request, parse_response, refusal, Code,
+    DenyRule, Form, Parsed, Refusal, Request, MAX_HEAD,
 };
 
 /// What the native shell provides for one guest request.
@@ -168,6 +168,46 @@ pub fn tunnel<G: Guest>(guest: &mut G, host: &[u8], request_limit: usize) {
     };
     while state.open {
         state = step(guest, state.buffer, host, request_limit);
+    }
+}
+
+/// Where the CONNECT head comes from: the raw guest socket, before TLS.
+pub trait HeadSource {
+    /// True once the head has taken too long.
+    fn overdue(&mut self) -> bool;
+    /// The next byte; `None` at end of stream or on error.
+    fn next_byte(&mut self) -> Option<u8>;
+}
+
+/// Whether `data` holds a complete head (a `\r\n\r\n`).
+pub fn complete(data: &[u8]) -> bool {
+    match head_end(data) {
+        Some(_) => true,
+        None => false,
+    }
+}
+
+/// Read the CONNECT head one byte at a time, stopping at the first complete
+/// head, so no byte after it (the start of the TLS handshake) is consumed.
+/// `None` if the source ends or fails, the deadline passes, or the head
+/// outgrows `MAX_HEAD`.
+pub fn connect_head<S: HeadSource>(source: &mut S) -> Option<Vec<u8>> {
+    let mut data = Vec::new();
+    let mut open = true;
+    while open && !complete(&data) {
+        if source.overdue() || data.len() > MAX_HEAD {
+            open = false;
+        } else {
+            match source.next_byte() {
+                Some(byte) => data.push(byte),
+                None => open = false,
+            }
+        }
+    }
+    if open {
+        Some(data)
+    } else {
+        None
     }
 }
 
@@ -546,5 +586,60 @@ mod tests {
                 .count();
         }
         assert!(served > 100);
+    }
+
+    struct Bytes {
+        input: Vec<u8>,
+        at: usize,
+        polls: usize,
+        overdue_after: usize,
+    }
+
+    impl HeadSource for Bytes {
+        fn overdue(&mut self) -> bool {
+            self.polls += 1;
+            self.polls > self.overdue_after
+        }
+        fn next_byte(&mut self) -> Option<u8> {
+            let byte = self.input.get(self.at).copied();
+            self.at += 1;
+            byte
+        }
+    }
+
+    /// `read_head` as `garrett-proxy` ran it natively, over the same source.
+    fn legacy_head(source: &mut Bytes) -> Option<Vec<u8>> {
+        let mut data = Vec::new();
+        while head_end(&data).is_none() {
+            if source.overdue() || data.len() > MAX_HEAD {
+                return None;
+            }
+            data.push(source.next_byte()?);
+        }
+        Some(data)
+    }
+
+    #[test]
+    fn extracted_connect_head_matches_the_native_reader() {
+        let head = b"CONNECT api.example.org:443 HTTP/1.1\r\nProxy-Authorization: Basic x\r\n\r\n".to_vec();
+        let mut cases: Vec<Vec<u8>> = vec![
+            Vec::new(),
+            head.clone(),
+            [head.clone(), b"\x16\x03\x01TLS".to_vec()].concat(),
+            head[..head.len() - 1].to_vec(),
+            b"\r\n\r\n".to_vec(),
+            vec![b'a'; MAX_HEAD + 10],
+            [vec![b'a'; MAX_HEAD - 2], b"\r\n\r\n".to_vec()].concat(),
+            [vec![b'a'; MAX_HEAD], b"\r\n\r\n".to_vec()].concat(),
+        ];
+        cases.push([b"x\r\n".to_vec(), b"\r\nrest".to_vec()].concat());
+        for input in cases {
+            for overdue_after in [0, 3, 50, usize::MAX] {
+                let make = || Bytes { input: input.clone(), at: 0, polls: 0, overdue_after };
+                let (mut old, mut new) = (make(), make());
+                assert_eq!(legacy_head(&mut old), connect_head(&mut new));
+                assert_eq!(old.at, new.at, "the same number of bytes consumed");
+            }
+        }
     }
 }

@@ -13046,7 +13046,7 @@ def proxy_http.parse_request
       else ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest)
 
 /-- [aivm_secrets_garrett_core::proxy_controller::code_of]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 174:0-183:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 214:0-223:1
     Visibility: public -/
 def proxy_controller.code_of
   (refused : proxy_http.Refusal) : Result proxy_http.Code := do
@@ -13510,8 +13510,76 @@ def proxy_controller.tunnel
   proxy_controller.tunnel_loop GuestInst guest host request_limit
     { buffer := (alloc.vec.Vec.new Std.U8), «open» := true }
 
+/-- Trait declaration: [aivm_secrets_garrett_core::proxy_controller::HeadSource]
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 175:0-180:1
+    Visibility: public -/
+structure proxy_controller.HeadSource (Self : Type _) where
+  overdue : Self → Result (Bool × Self)
+  next_byte : Self → Result ((Option Std.U8) × Self)
+
+/-- [aivm_secrets_garrett_core::proxy_controller::complete]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 183:0-188:1
+    Visibility: public -/
+def proxy_controller.complete (data : Slice Std.U8) : Result Bool := do
+  let o ← proxy_http.head_end data
+  match o with
+  | none => ok false
+  | some _ => ok true
+
+/-- [aivm_secrets_garrett_core::proxy_controller::connect_head]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 197:4-206:5
+    Visibility: public -/
+@[rust_loop]
+def proxy_controller.connect_head_loop
+  {S : Type _} (HeadSourceInst : proxy_controller.HeadSource S) (source : S)
+  (data : alloc.vec.Vec Std.U8) («open» : Bool) :
+  Result (S × (alloc.vec.Vec Std.U8) × Bool)
+  := do
+  if «open»
+  then
+    let s := alloc.vec.Vec.deref data
+    let b ← proxy_controller.complete s
+    if b
+    then ok (source, data, «open»)
+    else
+      let (b1, source1) ← HeadSourceInst.overdue source
+      if b1
+      then proxy_controller.connect_head_loop HeadSourceInst source1 data false
+      else
+        let i := alloc.vec.Vec.len data
+        let i1 ← proxy_http.MAX_HEAD
+        if i > i1
+        then
+          proxy_controller.connect_head_loop HeadSourceInst source1 data false
+        else
+          let (o, source2) ← HeadSourceInst.next_byte source1
+          match o with
+          | none =>
+            proxy_controller.connect_head_loop HeadSourceInst source2 data
+              false
+          | some byte =>
+            let data1 ← alloc.vec.Vec.push data byte
+            proxy_controller.connect_head_loop HeadSourceInst source2 data1
+              «open»
+  else ok (source, data, «open»)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::proxy_controller::connect_head]:
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 194:0-212:1
+    Visibility: public -/
+def proxy_controller.connect_head
+  {S : Type _} (HeadSourceInst : proxy_controller.HeadSource S) (source : S) :
+  Result ((Option (alloc.vec.Vec Std.U8)) × S)
+  := do
+  let (source1, data, «open») ←
+    proxy_controller.connect_head_loop HeadSourceInst source (alloc.vec.Vec.new
+      Std.U8) true
+  if «open»
+  then ok (some data, source1)
+  else ok (none, source1)
+
 /-- [aivm_secrets_garrett_core::proxy_controller::stopped]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 185:0-194:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 225:0-234:1
     Visibility: public -/
 def proxy_controller.stopped
   (code : proxy_http.Code) (stage : proxy_controller.Stage) :
@@ -13521,7 +13589,7 @@ def proxy_controller.stopped
   ok { reply, keep := false, stage, code, status := 0#u16 }
 
 /-- [aivm_secrets_garrett_core::proxy_controller::is_head]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 196:0-199:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 236:0-239:1
     Visibility: public -/
 def proxy_controller.is_head (method : Slice Std.U8) : Result Bool := do
   let head ←
@@ -14338,7 +14406,7 @@ def proxy_http.parse_response
       else ok (core.result.Result.Err proxy_http.Refusal.UpstreamResponse)
 
 /-- [aivm_secrets_garrett_core::proxy_controller::release]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 202:0-220:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 242:0-260:1
     Visibility: public -/
 def proxy_controller.release
   (raw : Slice Std.U8) (request : proxy_http.Request)
@@ -14947,7 +15015,7 @@ def proxy_http.encode_upstream
   else ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest, output)
 
 /-- [aivm_secrets_garrett_core::proxy_controller::serve]:
-    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 224:0-248:1
+    Source: 'crates/aivm-secrets-garrett-core/src/proxy_controller.rs', lines 264:0-288:1
     Visibility: public -/
 def proxy_controller.serve
   {U : Type _} (UpstreamInst : proxy_controller.Upstream U) (io : U)

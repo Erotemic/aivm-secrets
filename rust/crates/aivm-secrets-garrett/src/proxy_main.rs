@@ -428,24 +428,35 @@ fn code_name(code: &core::Code) -> &'static str {
     }
 }
 
-fn read_head(stream: &mut TcpStream) -> io::Result<Vec<u8>> {
-    let started = Instant::now();
-    let mut data = Vec::new();
-    let mut byte = [0u8; 1];
-    // Byte-wise so nothing after the CONNECT head is consumed before TLS.
-    while core::head_end(&data).is_none() {
-        if started.elapsed() > HEAD_DEADLINE
-            || data.len() > core::MAX_HEAD
-            || stream.read(&mut byte)? == 0
-        {
-            return Err(io::ErrorKind::InvalidData.into());
-        }
-        data.push(byte[0]);
-    }
-    Ok(data)
+/// The raw guest socket before TLS, for the extracted `connect_head`.
+struct HeadReader<'a> {
+    stream: &'a mut TcpStream,
+    started: Instant,
 }
 
-/// Send `wire` to the pinned origin and return its raw answer.
+impl controller::HeadSource for HeadReader<'_> {
+    fn overdue(&mut self) -> bool {
+        self.started.elapsed() > HEAD_DEADLINE
+    }
+    fn next_byte(&mut self) -> Option<u8> {
+        let mut byte = [0u8; 1];
+        match self.stream.read(&mut byte) {
+            Ok(1) => Some(byte[0]),
+            _ => None,
+        }
+    }
+}
+
+fn read_head(stream: &mut TcpStream) -> io::Result<Vec<u8>> {
+    // Byte-wise so nothing after the CONNECT head is consumed before TLS;
+    // the loop is the extracted `proxy_controller::connect_head`.
+    let mut source = HeadReader {
+        stream,
+        started: Instant::now(),
+    };
+    controller::connect_head(&mut source).ok_or_else(|| io::ErrorKind::InvalidData.into())
+}
+
 fn exchange(session: &Session, origin: &Origin, wire: &[u8]) -> Result<Vec<u8>, core::Code> {
     let started = Instant::now();
     let address = (origin.address.as_str(), origin.port)
