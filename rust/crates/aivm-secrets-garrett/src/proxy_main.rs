@@ -552,7 +552,10 @@ fn serve_one(session: &Session, origin: &Origin, request: &core::Request) -> (Ve
         Stage::Completed => {
             let mut detail = detail;
             detail["status"] = json!(served.status);
-            session.record("completed", detail);
+            // Release only after the completion record is durable.
+            if !session.record("completed", detail) {
+                return (refusal("outcome_unknown"), false);
+            }
         }
         Stage::Refused | Stage::Failed => {
             let mut detail = detail;
@@ -593,7 +596,9 @@ fn serve_translated(session: &Session, translator: &Translator, origin: &Origin,
     match reply {
         Some(reply) if reply["ok"] == json!(true) && reply.get("result").is_some() => {
             let body = serde_json::to_vec(&reply["result"]).unwrap_or_default();
-            session.record("completed", json!({"origin": origin.host, "method": method, "path": path, "operation": operation, "status": 200}));
+            if !session.record("completed", json!({"origin": origin.host, "method": method, "path": path, "operation": operation, "status": 200})) {
+                return (refusal("outcome_unknown"), false);
+            }
             let mut out = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: {}\r\n\r\n",
                 body.len(),

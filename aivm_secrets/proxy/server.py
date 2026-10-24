@@ -324,8 +324,12 @@ class _Handler(socketserver.BaseRequestHandler):
             session.record('failed', code=refused.code, origin=origin.host,
                            method=method, path=path)
             return http1.refusal(refused.code), False
-        session.record('completed', origin=origin.host, method=method, path=path,
-                       status=response.status)
+        # Release only after the completion record is durable (as native).
+        try:
+            session.record('completed', origin=origin.host, method=method, path=path,
+                           status=response.status)
+        except OSError:
+            return http1.refusal('outcome_unknown'), False
         return reply, request.keep_alive
 
 
@@ -350,8 +354,11 @@ class _Handler(socketserver.BaseRequestHandler):
         if reply.get('ok') is True:
             body = codec.dumps(reply.get('result'))
             response = http1.Response(200, b'OK', ((b'content-type', b'application/json'),), body)
-            session.record('completed', origin=origin.host, method=method, path=path,
-                           operation=named.operation, status=200)
+            try:
+                session.record('completed', origin=origin.host, method=method, path=path,
+                               operation=named.operation, status=200)
+            except OSError:
+                return http1.refusal('outcome_unknown'), False
             return http1.encode_response(response, fields=response.fields,
                                          keep_alive=request.keep_alive,
                                          head=request.method == b'HEAD'), request.keep_alive

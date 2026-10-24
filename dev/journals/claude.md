@@ -773,3 +773,15 @@ record. Tests: core mock, native RLIMIT_FSIZE=0 (SIGXFSZ ignored) adversarial
 test (mutation-checked: fails with the check disabled), Python monkeypatch.
 Needs maintainer security review (changes the public refusal set: twelve
 codes now).
+
+## 2026-10-23 20:49:08 -0400
+
+Second fail-open gap, same pattern: the native proxy released the provider's
+reply even when the `completed` record failed (Python's OSError stopped the
+reply). Both proxies (direct and translated paths) now return
+`outcome_unknown` unless the completion record is durable. Native check is
+source-shape only (in `serve_one`, after the extracted `serve`); a native
+integration test would need the audit to fail on exactly the third write,
+which I judged too fragile to build with RLIMIT_FSIZE (record lengths depend
+on ports/timestamps). Candidate: move the completion record into the core so
+it is proved like admission.

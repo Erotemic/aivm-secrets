@@ -277,6 +277,10 @@ def test_native_proxy_writes_only_core_outputs():
             target == 'stream' and argument.startswith('&refusal("')), (target, argument)
     # Every request decision is the extracted controller's (PROXY-NATIVE-01).
     assert source.count('controller::serve(') == 1
+    # Fail closed around egress and release: the admission record gates the
+    # send (proved in serve_paths), the completion record gates the reply.
+    assert source.count('if !session.record("completed"') == 2
+    assert source.count('return (refusal("outcome_unknown"), false);') >= 2
     # The tunnel loop is the extracted one; `send` writes only its argument.
     assert source.count('controller::tunnel(&mut guest,') == 1
     assert source.count('self.tls.write_all(bytes)') == 1

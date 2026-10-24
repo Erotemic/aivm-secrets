@@ -310,6 +310,23 @@ def test_a_failed_admission_audit_sends_nothing(world, monkeypatch):
     assert world.service.requests == []
 
 
+def test_a_failed_completion_audit_releases_nothing(world, monkeypatch):
+    """The provider answered, but its reply is released only after the
+    completion record is durable; otherwise ``outcome_unknown``."""
+    real = world.session.audit.record
+
+    def record(event, **detail):
+        if event == 'completed':
+            raise OSError('disk full')
+        return real(event, **detail)
+
+    monkeypatch.setattr(world.session.audit, 'record', record)
+    reply = world.raw(get())
+    assert status(reply) == 502 and b'"outcome_unknown"' in reply, reply
+    assert b'demo' not in reply
+    assert len(world.service.requests) == 1
+
+
 def test_an_unreachable_origin_reports_that_nothing_was_sent(tmp_path, service):
     with World(tmp_path, service) as world:
         origin = world.session.policy.origins[HOST]
