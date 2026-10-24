@@ -68,7 +68,7 @@ enough for a reviewer to accept or reject.
 | 3.1 | Extract the grant-window check in `AccountSession::start` (`EMISSION-RUST-01`) | **Done 2026-10-24.** `credential_use::grant_window`, `grant_window_spec` |
 | 3.2 | Make renounce end the grant through the state the request path checks (`CONTROL-NATIVE-01`) | **Done 2026-10-24.** The extracted `control` marks the grant inactive itself; `renounced_grant_refuses_every_use` |
 | 3.3 | Fold `GuestFrame::from_answer`'s type mapping into extracted code (`NATIVE-GLUE-01`) | **Done 2026-10-24 (assessment).** Nothing left to fold: the error conversion is the identity (now written as such), and the reply capture is serde-to-wire, which belongs to `RUST-JSON-01` |
-| 3.4 | Comparative axiom audit, run once at the maintainer's request, against a recorded baseline | Open |
+| 3.4 | Comparative axiom audit, run once at the maintainer's request, against a recorded baseline | **Done 2026-10-24.** [axiom-audit.md](../assurance/axiom-audit.md): 1,412 theorems rest only on Lean's three standard axioms; one `bv_decide` proof that trusted the native evaluator was replaced with a kernel proof. `dev/verification/axiom_audit.py run` compares against the recorded baseline |
 | 3.5 | NR-5 review package: claim matrix, proof tour and assumption ledger reviewed together by someone other than the author | Open |
 
 ## Phase 4: a read-only release profile (OUT-5, reads only)
@@ -78,16 +78,23 @@ A release claims reads only.
 | Step | Deliverable | Status |
 | --- | --- | --- |
 | 4.1 | Versioned host/guest protocol | **Done 2026-10-24.** [protocol-v1.md](../protocol-v1.md): transport, frames, verbs, replies, the 17 error codes, versioning and retry rules |
-| 4.2 | A build that can only run the proved profile | **Done 2026-10-24.** Cargo feature `read-only`: the bridge refuses any configuration but `manifest-https-v1` with `writes = deny`, no legacy forwarding and no coordinator (`profile::read_only`, tested); the offline flow passes with it |
+| 4.2 | A build that can only run the proved profile | **Done 2026-10-24.** The `garrett-bridge-read-only` binary refuses any configuration but `manifest-https-v1` with `writes = deny`, no legacy forwarding and no coordinator (`profile::read_only`, tested); the offline flow passes with it |
 | 4.3 | Build, deploy, operate and recover instructions | **Done 2026-10-24.** [release-read-only.md](../release-read-only.md) |
-| 4.4 | Tamper-evident native audit log | Open. The native audit file is synced JSON lines without the Python reference's hash chain |
+| 4.4 | Tamper-evident native audit log | **Needs maintainer.** The native audit file is synced JSON lines without the Python reference's hash chain; adding one changes the file format and the proved record shapes |
 | 4.5 | AIVM adapter as an optional extra (`aivm[secrets]`) | Open, decided after review (repository boundary) |
 | 4.6 | Independent security review of the read-only profile | Needs a reviewer other than the author |
 
 ## Phase 5: writes (OUT-4)
 
 One narrowly scoped write, first against the synthetic provider and then
-(opt-in) against a real one. Prove that an uncertain send is never retried
+(opt-in) against a real one. **Synthetic, through a real VM: done
+2026-10-24** (`--write`). One exactly approved comment is held, approved by
+the host, sent once and single use. Already proved: the write gate, the
+approval store, that a sent write which fails is `outcome_unknown` and never
+retried, and that keyed writes reserve before and finish after the exchange
+(see the [proof tour](../assurance/native-read-proof-tour.md#out-4-first-increment-the-exact-write-gate-2026-10-23)).
+Still open: the live-repository run (maintainer), and remembering an
+uncertain write across sessions without a coordinator. Prove that an uncertain send is never retried
 automatically, carry `outcome_unknown` across sessions, and record
 Python/Rust parity for each write operation. Budgets stay unbounded in native
 until this phase decides otherwise.
@@ -101,6 +108,52 @@ path values; the condition is necessary). The translator runs in the guest,
 so its output is an ordinary guest request and the read theorems apply to it
 unchanged. Substitution stays
 the weakest profile and never claims authority confinement.
+
+## Everything else the planning documents list
+
+A sweep of every document in this directory on 2026-10-24 found the items
+below. Each one is either done, part of a phase above, waiting on a decision
+or on something only the maintainer can provide, or deferred by decision.
+Status changes are recorded here, not in the older documents.
+
+| Item | Source | Status |
+| --- | --- | --- |
+| `ca_not_after` in `identity status` | operations policy | **Done 2026-10-24**, both authorities |
+| `identity verify` | issuer API | **Done 2026-10-24** (Python reference) |
+| `identity prune-keys --superseded` | issuer API, rollback policy | **Done 2026-10-24** (Python reference; locked, audited) |
+| `rotate-issuer` skips names whose files exist | rollback policy | **Done 2026-10-24** (Python now matches native) |
+| AIVM: operator-only confirmation for `enroll`; registry writes user-owned | issuer API | **Done 2026-10-24** in AIVM (`CommandManager.operator_verb`) |
+| AIVM: `identity_enroll --replace` passes the CAS | certificate lifecycle | **Done 2026-10-24** in AIVM |
+| Read-only runtime profile gate | NR-0 evidence | **Done 2026-10-24** (`garrett-bridge-read-only`) |
+| W0 obligation statuses, CORE-12 notes, roadmap rows | several | **Done 2026-10-24** |
+| Clamp new certificates to the CA's expiry | operations policy | **Needs maintainer:** the policy calls it a planned change but does not state the minimum validity, and it changes the proved enrollment window (`authorize_client_contract`) |
+| `aivm vm identity_renew --all`, session-start expiry warning | operations policy | **Needs maintainer:** decided in this repository's policy, but AIVM's contributor rules forbid new secrets integration surfaces |
+| AIVM prompts to revoke the old enrollment on VM rename or move | managed-VM design | **Needs maintainer** (same AIVM rule) |
+| Authenticated upgrade of the forced bootstrap helper on existing guests | managed-VM design | **Done 2026-10-24** in AIVM: `aivm vm update` reinstalls `aivm-guestctl` over the pinned host key; tried on the local VM |
+| Issuer authenticates the broker session's VM against the enrolled subject (`IDENT-ENROLL-04`) | P4a enrollment | **Needs maintainer:** the subject is derived by AIVM, and the rollback policy keeps VM facts on AIVM's side of the boundary, so this is a design decision about what the issuer may be told |
+| Real-libvirt identity lifecycle tests: shutdown, restore, clone, stale enrollment, expired CA, miswired broker | P4a enrollment, assurance profiles | **Done 2026-10-24** for shutdown, guest restore, stale (revoked) enrollment, missing guest `openssl` and key rotation (`dev/aivm_identity_lifecycle_acceptance.py`, 13 checks on the local VM). Clone is `CLONE-01` (deferred). Expired CA needs a CA with a short lifetime, which `init` does not offer. Miswired broker needs a bound session, which AIVM only starts interactively |
+| Tamper-evident native audit log | Phase 4.4 | **Needs maintainer:** it changes the native audit file format and the proved record shapes, a deliberate format decision |
+| Native write campaign (OUT-4): approvals, uncertain outcomes, budgets | Phase 5, kernel spec, formal assurance | Phase 5 |
+| Idempotency keys declared in the manifest | operations policy, kernel spec | Phase 5 |
+| Retire legacy forwarding to the Python broker (`RUST-LEGACY-01`) | assumption roadmap | Kept while a deployment uses the Python broker; the read-only bridge already refuses it |
+| Coordinator client transport phases (`COORD-RUST-01`) | assumption roadmap | Open |
+| OAuth service-history theorem; OAuth login I/O refinement | Garrett verification | Open |
+| Models for the account-status and OAuth-startup profiles (W4/W5 `OTHER-PROFILES`) | W4/W5 scopes | Open |
+| Budget and scope primitives (M3); attenuation and delegation proofs (`AUTH-01`, `ATTEN-01`) | kernel spec, modular proofs, formal assurance | Open; native denies delegation |
+| Automatic upstream token revocation (RFC 7009) | OAuth implementation | Open |
+| GraphQL cursor following; `gh pr checks` commit statuses; per-command `--json` audit | 2026-10 remediation | Open |
+| Manifest schema freeze and introspection; signed manifests; least-privilege resolvers | agnostic integrations | Open |
+| `trusted-host-exec` profile; declarative plugin grammar; verified `gh` subset | credential-free tools | Six design decisions there need the maintainer first |
+| Proxy hard cases: server-sent events, cross-host `Link` pagination | HTTPS proxy profiles | Open |
+| Separate CI with a pinned cross-project compatibility workflow | repository boundary | Open |
+| VS Code launcher secrets mode | validation | Open (AIVM; same AIVM rule) |
+| Optional `aivm[secrets]` extra | repository boundary | After review |
+| Rollback journal, `accept-restore`, anchors A and B, clone detection | rollback and clone policy | **Deferred by decision** |
+| Host TPM counter or remote witness anchors (C, D); vTPM custody (`VTPM-01`) | rollback policy, vTPM policy | Deferred; needs hardware or a second host |
+| Multi-host coordinator deployment, anti-rollback ledger | core API inventory | Needs several hosts |
+| Verified JSON parsing (`RUST-JSON-01`), broad CLI parity | assumption roadmap | **Deferred by decision** |
+| Independent reviews (NR-5, OUT-5, `NATIVE-SINK-01` contract), maintainer sign-off on OUT-2 and the W0 release rules | several | Needs a reviewer other than the author |
+| Live-provider runs (GitHub GraphQL, other providers, `gh pr diff` through the gateway) | several | Needs a live credential; the maintainer runs them |
 
 ## Deferred by decision
 

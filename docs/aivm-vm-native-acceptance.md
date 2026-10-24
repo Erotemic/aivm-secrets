@@ -258,3 +258,41 @@ looking for.
 ```bash
 python dev/aivm_vm_acceptance.py --vm aivm-2404 --adversarial --agent --workspace "$RUN"
 ```
+
+
+## Approved write (`--write`)
+
+`--write` runs the broker with `writes = "approve"` and a host-only control
+socket. It then checks one comment end to end:
+1. The guest's comment is held with `approval_required` and its digest, and
+   nothing reaches the provider.
+2. The host sees exactly that normalized request pending and approves it on
+   the control socket (`aivm-secrets approve DIGEST` does the same).
+3. A different comment is still held.
+4. The approved comment reaches the provider exactly once.
+5. Asking again needs a new approval, and a comment on another repository is
+   refused.
+
+The provider is the same local synthetic one. A run against a real
+repository is the maintainer's opt-in step.
+
+```bash
+python dev/aivm_vm_acceptance.py --vm aivm-2404 --write --adversarial --agent --workspace "$RUN"
+```
+
+
+## Identity lifecycle through AIVM
+
+`dev/aivm_identity_lifecycle_acceptance.py` drives `aivm vm identity_*`
+against the active managed VM with a fresh, temporary identity authority.
+It checks each step against the authority's own `identity status`:
+enrollment, the operator-only refusal of `enroll --replace` under
+`--yes_sudo`, renewal, key rotation, renewal after a real shutdown and start,
+a guest restored to an older key (renewal refused, the retired key cannot be
+re-enrolled, recovery with a fresh key by compare-and-swap), a guest without
+`openssl` (nothing issued), and revocation. The VM's SSH host key must be
+pinned first (`aivm vm access reconcile`).
+
+```bash
+python dev/aivm_identity_lifecycle_acceptance.py --vm aivm-2404
+```

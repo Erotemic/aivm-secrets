@@ -173,7 +173,7 @@ against real libvirt/SSH hardware in this environment.**
   unverified SSH/shell channel. Explicit maintenance is needed. The
   `aivm vm identity_*` commands report this, like every expected refusal of
   the identity path, as one error line with its operator detail (for
-  example "guest helper upgrade may be required") and exit status 1, not a
+  example "the guest helper may be out of date; run `aivm vm update`") and exit status 1, not a
   traceback. A declined prompt is not such an error: it aborts the command
   as the user's decision.
 - **Guest cannot provision key/cert:** refuse the session. On public
@@ -277,8 +277,8 @@ and exportable; the host CA is per-operator, not yet a multi-tenant service.
 Do not claim this code proves VM provenance. No Rust model, Lean proof or
 real-VM smoke test has been produced by this increment.
 
-Remaining work: authenticated helper upgrade for existing guests; integration
-smokes on a disposable libvirt VM with synthetic service; signed lifecycle
+Remaining work (helper upgrade and the libvirt lifecycle smokes were done
+2026-10-24; see the [plan](aivm-secrets-active-work.md)); signed lifecycle
 journal/counter for snapshot and restore; true non-exportable vTPM identity
 and key policy; separate Rust VM binding runner and proof extraction; OAuth
 and provider credential acquisition without exposing ordinary host tokens.

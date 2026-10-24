@@ -14,7 +14,7 @@
     "native_binaries": "debug build of rust/ at the source commit",
     "credentials": "synthetic only; no live provider"
   },
-  "scope": "OUT-2 finite witnesses: approved reads, denied write, revocation, identity negatives (foreign, mismatched key, tampered, re-enrolled certificate), host TCP canary, guest-share mount inventory with alias grouping, host canary name search over every share mount as guest root (depth 4), socket disconnect and reconnect. Not an isolation proof. Also OUT-6: credential-substitution proxy (native and Python) and the guest-side constrained-http translator, each with public egress on and off (AIVM firewall.public_egress, HP-7). Also Phase 1.5: a simulated agent (dev/guest_agent.py) running 21 attacks inside the guest, judged by the provider's own request record, and a guest-root search of the whole guest filesystem and every process for the credential and its base64 forms (public egress off).",
+  "scope": "OUT-2 finite witnesses: approved reads, denied write, revocation, identity negatives (foreign, mismatched key, tampered, re-enrolled certificate), host TCP canary, guest-share mount inventory with alias grouping, host canary name search over every share mount as guest root (depth 4), socket disconnect and reconnect. Not an isolation proof. Also OUT-6: credential-substitution proxy (native and Python) and the guest-side constrained-http translator, each with public egress on and off (AIVM firewall.public_egress, HP-7). Also Phase 1.5: a simulated agent (dev/guest_agent.py) running 21 attacks inside the guest, judged by the provider's own request record, and a guest-root search of the whole guest filesystem and every process for the credential and its base64 forms (public egress off). Also an OUT-4 rehearsal: in approve mode, one exactly approved comment through the real VM (held, approved by the host on its private control socket, sent once, single use, other repository refused), with the simulated agent and guest credential search in the same session. Also the certificate-bound identity lifecycle through AIVM on the same VM (dev/aivm_identity_lifecycle_acceptance.py): enroll, operator-only refusal under --yes_sudo, renew, key rotation, renewal after rotation keeps the new key, renewal after a real shutdown and start, a restored guest cannot renew and its retired key cannot be re-enrolled, recovery with a fresh key by CAS replace, missing guest openssl issues nothing, revocation, and a clean identity verify.",
   "runs": {
     "baseline": {
       "application_socket_forwarding": "ssh-remote-unix/mTLS",
@@ -541,11 +541,175 @@
       "virtualization": "kvm",
       "vm": "aivm-2404",
       "whole_service_secrecy_proved": false
+    },
+    "approved_write_with_agent_and_adversarial": {
+      "adversarial": {
+        "identities": {
+          "certificate_key_mismatch_rejected": true,
+          "other_enrolled_subject_rejected": true,
+          "reenrolled_certificate_rejected": true,
+          "tampered_capability_rejected": true
+        },
+        "lifecycle": {
+          "authorized_read_after_reconnect": true,
+          "no_provider_effect_with_forward_disconnected": true
+        },
+        "mounts": {
+          "aliased_mounts": 3,
+          "attachment_devices": 2,
+          "attachment_mounts_observed": 4,
+          "canary_search": {
+            "as_guest_root": true,
+            "complete": true,
+            "found": false,
+            "max_depth": 4,
+            "mount_points_searched": 4
+          },
+          "host_workspace_in_mount_table": false,
+          "scope": "mount table metadata, alias grouping and a depth-4 search for the host canary name; not an exhaustive reachability proof",
+          "whole_share_root_mounts": 4
+        },
+        "network": {
+          "direct_synthetic_provider_tcp_denied": true,
+          "host_gateway_canary_denied": true,
+          "scope": "guest gateway TCP: one ephemeral canary and the host-loopback provider port"
+        },
+        "out_of_scope_read_denied": true
+      },
+      "application_socket_forwarding": "ssh-remote-unix/mTLS",
+      "approved_diff": true,
+      "approved_view": {
+        "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "number": 13861,
+        "title": "Proof repair"
+      },
+      "approved_write": {
+        "approval_single_use": true,
+        "approved_comment_sent_once": true,
+        "different_comment_still_held": true,
+        "held_for_approval": true,
+        "other_repository_refused": true,
+        "provider_requests": 2
+      },
+      "denied_write": false,
+      "filesystem_isolation_proved": false,
+      "guest_credential_search": {
+        "as_guest_root": true,
+        "files_scanned": 73718,
+        "found": false,
+        "patterns": 3,
+        "processes_scanned": 191,
+        "ran": true
+      },
+      "host_private_paths_unreadable_in_guest": true,
+      "mode": "native-rust/aivm-kvm/synthetic-local-https",
+      "ok": true,
+      "provider_requests": [
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github.diff",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "POST",
+          "path": "/repos/taucetiproject/tauceti/issues/13861/comments"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        }
+      ],
+      "revocation_fenced": true,
+      "simulated_agent": {
+        "attacks": {
+          "arguments_not_an_object": "refused",
+          "arguments_not_json": "refused",
+          "denied_write": "refused",
+          "encoded_slash_in_repository": "refused",
+          "extra_url_argument": "refused",
+          "header_injection_in_repository": "refused",
+          "missing_argument": "refused",
+          "one_megabyte_of_garbage": "closed:BrokenPipeError",
+          "other_pull_request": "refused",
+          "other_repository": "refused",
+          "oversized_argument": "refused",
+          "path_traversal_in_repository": "refused",
+          "plain_http_on_broker_socket": "answered:7",
+          "pr_as_path": "refused",
+          "pr_float": "refused",
+          "pr_huge": "refused",
+          "pr_negative": "refused",
+          "query_in_repository": "refused",
+          "tls_without_client_certificate": "refused:SSLError",
+          "unknown_operation": "refused",
+          "unlisted_write": "refused"
+        },
+        "useful_read": true,
+        "useful_read_after_attacks": true
+      },
+      "virtualization": "kvm",
+      "vm": "aivm-2404",
+      "whole_service_secrecy_proved": false
+    },
+    "identity_lifecycle": {
+      "ok": true,
+      "steps": {
+        "authority_verifies_clean": true,
+        "enrolled": true,
+        "guest_identity_restored_from_backup": true,
+        "key_rotated": true,
+        "missing_guest_openssl_issues_nothing": true,
+        "recovered_with_fresh_key": true,
+        "renewal_after_restart": true,
+        "renewal_after_rotation_keeps_new_key": true,
+        "renewed": true,
+        "replace_without_yes_refused": true,
+        "restored_guest_cannot_renew": true,
+        "retired_key_cannot_be_reenrolled": true,
+        "revoked_identity_cannot_renew": true
+      },
+      "vm": "aivm-2404"
     }
   },
   "findings": [
     "aivm cloud-init on cloud-init 25.3 failed to create the aivm-bootstrap user and logged a numeric-group groupadd failure; fixed in aivm 7952eaf before these runs.",
     "With one attached folder, the unprivileged canary search could not read AIVM's root-only staging mount and reported itself incomplete; the guest user has passwordless sudo, so the search now runs as guest root (7cfdf22) and completed with the canary not found.",
-    "dev/aivm_constrained_acceptance.py had never been run on a VM and failed with broker_failed: its policy named a different credential file than its spec, and it wrote the credential with a trailing newline that the native reader refuses. Both fixed, with a regression test."
+    "dev/aivm_constrained_acceptance.py had never been run on a VM and failed with broker_failed: its policy named a different credential file than its spec, and it wrote the credential with a trailing newline that the native reader refuses. Both fixed, with a regression test.",
+    "The identity lifecycle checks needed the bootstrap channel that the aivm cloud-init fix (7952eaf) restored; on an unfixed VM, aivm vm access reconcile and every identity verb fail."
   ]
 }

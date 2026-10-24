@@ -50,6 +50,7 @@ FAKE_TOKEN = 'github_pat_OFFLINE_DEMO_NOT_VALID_0123456789'
 HOSTNAME = 'api.example.org'
 PULL_PATH = f'/repos/{REPOSITORY.lower()}/pulls/{PR}'
 CHECKS_PATH = f'/repos/{REPOSITORY.lower()}/commits/{HEAD_SHA}/check-runs?page=1&per_page=100'
+COMMENTS_PATH = f'/repos/{REPOSITORY.lower()}/issues/{PR}/comments'
 DIFF = 'diff --git a/proof.lean b/proof.lean\n+theorem checked : True := trivial\n'
 PULL = {
     'number': PR, 'title': 'Proof repair', 'body': 'Host-controlled synthetic data',
@@ -165,6 +166,39 @@ class LocalProvider:
                 self.end_headers()
                 try:
                     self.wfile.write(body)
+                except OSError:
+                    pass
+                self.close_connection = True
+
+            def do_POST(self):
+                # Only the write a write-enabled policy may send: one comment.
+                length = int(self.headers.get('Content-Length') or 0)
+                body = self.rfile.read(min(length, 65536))
+                seen = {
+                    'method': self.command,
+                    'path': self.path,
+                    'accept': self.headers.get('Accept'),
+                    'authorization': self.headers.get('Authorization'),
+                    'api_version': self.headers.get('X-GitHub-Api-Version'),
+                    'body': body.decode('utf-8', 'replace'),
+                }
+                with parent.lock:
+                    parent.requests.append(seen)
+                if self.path == COMMENTS_PATH:
+                    try:
+                        text = json.loads(body)['body']
+                    except (ValueError, KeyError, TypeError):
+                        text = ''
+                    status, payload = 201, json.dumps({'id': 1, 'body': text}).encode()
+                else:
+                    status, payload = 404, b'{}'
+                self.send_response(status)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(payload)))
+                self.send_header('Connection', 'close')
+                self.end_headers()
+                try:
+                    self.wfile.write(payload)
                 except OSError:
                     pass
                 self.close_connection = True
@@ -465,7 +499,9 @@ def validate_sent(provider: LocalProvider, *, expected_count: int) -> list[dict]
     if len(received) != expected_count:
         raise DemoError(f'expected {expected_count} provider requests, got {len(received)}')
     for event in received:
-        if (event['method'] != 'GET'
+        allowed_method = (event['method'] == 'GET'
+                          or (event['method'] == 'POST' and event['path'] == COMMENTS_PATH))
+        if (not allowed_method
                 or event['authorization'] != 'Bearer ' + FAKE_TOKEN
                 or event['api_version'] != '2026-03-10'):
             raise DemoError('provider observed an unauthorized method, credential or API version')

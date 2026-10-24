@@ -54,8 +54,8 @@ the [plan](docs/planning/aivm-secrets-active-work.md).
   bytes once (`aivm-secrets approve`)
 - ✅ Optional multi-host coordinator for shared revocation and write
   reservations (`garrett-coordinator`, opt-in build feature)
-- ✅ A `read-only` build whose bridge refuses any configuration outside the
-  proved read profile ([release guide](docs/release-read-only.md),
+- ✅ A read-only bridge (`garrett-bridge-read-only`) that refuses any
+  configuration outside the proved read profile ([release guide](docs/release-read-only.md),
   [protocol v1](docs/protocol-v1.md))
 - ✅ Optional HTTPS proxy profiles for stock tools such as `gh` and `curl`:
   `constrained-http` (requests become named operations) and
@@ -96,7 +96,14 @@ explains each one in plain language.
   and a whole-process `strace` run shows no credential bytes in any write and
   no destination but the provider. What remains is a short contract on those
   readers for a reviewer to accept
+- ✅ An exactly approved write through a real VM: held until the host
+  approves its exact digest, sent once, never reusable
 - ⬜ Provider-side write semantics and uncertain outcomes across sessions
+  without a coordinator
+
+- ✅ An axiom audit of all 1,412 theorems: each rests only on Lean's three
+  standard axioms, with no `sorry` and no unproved assumption about the
+  extracted Rust ([audit](docs/assurance/axiom-audit.md))
 
 ### Tested end to end
 

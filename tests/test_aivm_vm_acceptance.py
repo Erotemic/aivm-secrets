@@ -429,3 +429,26 @@ def test_host_canary_detects_actual_connection_even_if_guest_reports_failure(tmp
     with pytest.raises(DemoError, match='non-allowlisted host TCP canary'):
         _probe_direct_egress(ssh, type('LocalPort', (), {'port': 8080})())
     assert calls == 2
+
+
+def test_only_the_comment_post_counts_as_an_allowed_provider_write(monkeypatch):
+    import dev.offline_native_guest as offline
+
+    class Seen:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def seen(self):
+            return self.rows
+
+    def row(method, path):
+        return {'method': method, 'path': path, 'accept': 'application/json',
+                'authorization': 'Bearer ' + offline.FAKE_TOKEN, 'api_version': '2026-03-10'}
+
+    assert len(offline.validate_sent(Seen([row('GET', offline.PULL_PATH),
+                                           row('POST', offline.COMMENTS_PATH)]),
+                                     expected_count=2)) == 2
+    for method, path in (('POST', offline.PULL_PATH), ('PATCH', offline.COMMENTS_PATH),
+                         ('DELETE', offline.COMMENTS_PATH)):
+        with pytest.raises(DemoError):
+            offline.validate_sent(Seen([row(method, path)]), expected_count=1)

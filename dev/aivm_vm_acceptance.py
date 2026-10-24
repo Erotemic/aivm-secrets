@@ -516,6 +516,61 @@ def _probe_reenrolled_certificate(ssh: GuestSSH, guest: str, host: Path, authori
     return {'reenrolled_certificate_rejected': True}
 
 
+def _invoke_json(ssh: GuestSSH, guest: str, operation: str, arguments: dict) -> dict:
+    result = ssh.call(_guest_command(guest, 'invoke', operation, '--arguments',
+                                     json.dumps(arguments, separators=(',', ':'))))
+    try:
+        reply = json.loads(result.stdout)
+    except (ValueError, UnicodeError):
+        raise DemoError(f'{operation} did not return public JSON') from None
+    if not isinstance(reply, dict):
+        raise DemoError(f'{operation} returned a non-object reply')
+    return reply
+
+
+def _approved_write(ssh: GuestSSH, guest: str, host: Path, provider: LocalProvider,
+                    count: int) -> tuple[dict, int]:
+    """One exactly approved comment, end to end (OUT-4 rehearsal).
+
+    The guest asks; the broker answers `approval_required` with a digest and
+    sends nothing. The host operator approves that digest on the private
+    control socket. A different comment still needs approval. The approved
+    comment then runs once, and asking again needs a new approval."""
+    from aivm_secrets.host.session import control_call
+
+    comment = {'repository': REPOSITORY, 'pr': PR, 'body': 'synthetic approved comment'}
+    first = _invoke_json(ssh, guest, 'pr.comment', comment)
+    if first.get('error', {}).get('code') != 'approval_required' or len(provider.seen()) != count:
+        raise DemoError('an unapproved write was not held for approval')
+    digest = first.get('approval', {}).get('digest')
+    pending = control_call(host, {'command': 'pending'}).get('pending', [])
+    # The host shows the normalized request: the repository is folded to lowercase.
+    if len(pending) != 1 or pending[0].get('arguments') != dict(comment, repository=REPOSITORY.lower()):
+        raise DemoError('the host did not see exactly the pending comment')
+    if not control_call(host, {'command': 'approve', 'digest': digest}).get('ok'):
+        raise DemoError('the host could not approve the pending comment')
+    other = _invoke_json(ssh, guest, 'pr.comment', dict(comment, body='a different comment'))
+    if other.get('error', {}).get('code') != 'approval_required' or len(provider.seen()) != count:
+        raise DemoError('an approval authorized a different comment')
+    done = _invoke_json(ssh, guest, 'pr.comment', comment)
+    if done.get('ok') is not True or done.get('result') != {'body': comment['body']}:
+        raise DemoError('the approved comment did not run')
+    sent = provider.seen()[count:]
+    posts = [row for row in sent if row['method'] == 'POST']
+    if len(posts) != 1 or json.loads(posts[0]['body']) != {'body': comment['body']}:
+        raise DemoError('the provider did not receive exactly the approved comment once')
+    count += len(sent)
+    again = _invoke_json(ssh, guest, 'pr.comment', comment)
+    if again.get('error', {}).get('code') != 'approval_required' or len(provider.seen()) != count:
+        raise DemoError('a spent approval authorized a second comment')
+    elsewhere = _invoke_json(ssh, guest, 'pr.comment', dict(comment, repository='attacker/elsewhere'))
+    if elsewhere.get('ok') is not False or len(provider.seen()) != count:
+        raise DemoError('a comment outside the grant was not refused')
+    return {'held_for_approval': True, 'different_comment_still_held': True,
+            'approved_comment_sent_once': True, 'approval_single_use': True,
+            'other_repository_refused': True, 'provider_requests': len(sent)}, count
+
+
 AGENT_ATTACK_LABELS = frozenset({
     'path_traversal_in_repository', 'encoded_slash_in_repository',
     'header_injection_in_repository', 'query_in_repository', 'other_repository',
@@ -588,7 +643,8 @@ def _guest_credential_search(ssh: GuestSSH, guest: str) -> dict:
 
 
 def run_vm_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path,
-                      *, adversarial: bool = False, agent: bool = False) -> dict:
+                      *, adversarial: bool = False, agent: bool = False,
+                      write_mode: bool = False) -> dict:
     tools = binaries(bin_dir)
     host = workspace / 'host'
     host.mkdir(mode=0o700)
@@ -649,6 +705,9 @@ def run_vm_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path,
             write(host / 'disclosure.json', releases)
             config = bridge_config(host, provider)
             config['binding']['vm'] = ssh.vm
+            if write_mode:
+                config['provider']['writes'] = 'approve'
+                config['provider']['control_socket'] = str(host / 'control.sock')
             write(host / 'bridge.json', config)
             bridge, ready = start_bridge(tools['bridge'], host)
             ssh.publish(f'{guest}/capability.jwt', ready['capability'].encode('utf-8'))
@@ -678,21 +737,26 @@ def run_vm_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path,
             requests_after_reads = len(provider.seen())
             if requests_after_reads != 3:
                 raise DemoError('unexpected provider request count after VM reads')
-            # Unlike an unsupported CLI operation, this reaches the native
-            # broker with a named write and must fail before credentialed I/O.
-            denied = ssh.call(_guest_command(
-                guest, 'invoke', 'pr.comment', '--arguments',
-                json.dumps({'repository': REPOSITORY, 'pr': PR,
-                            'body': 'not authorized'}, separators=(',', ':'))))
-            try:
-                denial = json.loads(denied.stdout)
-            except (ValueError, UnicodeError):
-                raise DemoError('VM write refusal did not return public JSON') from None
-            if (denied.returncode == 0 or denial.get('ok') is not False
-                    or denial.get('error', {}).get('code') != 'denied'):
-                raise DemoError('VM broker write was not denied')
-            if len(provider.seen()) != requests_after_reads:
-                raise DemoError('VM write refusal caused provider traffic')
+            approved_write = None
+            if write_mode:
+                approved_write, requests_after_reads = _approved_write(
+                    ssh, guest, host, provider, requests_after_reads)
+            else:
+                # Unlike an unsupported CLI operation, this reaches the native
+                # broker with a named write and must fail before credentialed I/O.
+                denied = ssh.call(_guest_command(
+                    guest, 'invoke', 'pr.comment', '--arguments',
+                    json.dumps({'repository': REPOSITORY, 'pr': PR,
+                                'body': 'not authorized'}, separators=(',', ':'))))
+                try:
+                    denial = json.loads(denied.stdout)
+                except (ValueError, UnicodeError):
+                    raise DemoError('VM write refusal did not return public JSON') from None
+                if (denied.returncode == 0 or denial.get('ok') is not False
+                        or denial.get('error', {}).get('code') != 'denied'):
+                    raise DemoError('VM broker write was not denied')
+                if len(provider.seen()) != requests_after_reads:
+                    raise DemoError('VM write refusal caused provider traffic')
             agent_report = None
             if agent:
                 agent_report = _run_simulated_agent(ssh, guest, provider, requests_after_reads)
@@ -764,7 +828,8 @@ def run_vm_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path,
                 'ok': True, 'mode': 'native-rust/aivm-kvm/synthetic-local-https',
                 'vm': ssh.vm, 'virtualization': virt,
                 'approved_view': view, 'approved_diff': True,
-                'denied_write': True, 'revocation_fenced': True,
+                'denied_write': not write_mode, 'revocation_fenced': True,
+                **({'approved_write': approved_write} if write_mode else {}),
                 'host_private_paths_unreadable_in_guest': True,
                 'application_socket_forwarding': 'ssh-remote-unix/mTLS',
                 'provider_requests': witness,
@@ -796,6 +861,8 @@ def main(argv: list[str] | None = None) -> int:
                         help='new private host evidence directory under trusted ancestors')
     parser.add_argument('--adversarial', action='store_true',
                         help='opt-in controlled VM identity/egress/socket attack checks')
+    parser.add_argument('--write', action='store_true',
+                        help='run the broker in approve mode and check one exactly approved comment')
     parser.add_argument('--agent', action='store_true',
                         help='also run dev/guest_agent.py in the guest and search the guest for the credential')
     parser.add_argument('--bin-dir', type=Path, default=REPO_ROOT / 'rust/target/debug',
@@ -810,14 +877,16 @@ def main(argv: list[str] | None = None) -> int:
                 config = ssh_configuration(workspace, vm)
                 report = run_vm_acceptance(workspace, GuestSSH(vm, config),
                                            args.bin_dir.absolute(),
-                                           adversarial=args.adversarial, agent=args.agent)
+                                           adversarial=args.adversarial, agent=args.agent,
+                                       write_mode=args.write)
         else:
             workspace = args.workspace.absolute()
             workspace.mkdir(mode=0o700, parents=True, exist_ok=False)
             config = ssh_configuration(workspace, vm)
             report = run_vm_acceptance(workspace, GuestSSH(vm, config),
                                        args.bin_dir.absolute(),
-                                       adversarial=args.adversarial, agent=args.agent)
+                                       adversarial=args.adversarial, agent=args.agent,
+                                       write_mode=args.write)
             write(workspace / 'summary.json', report)
         print(json.dumps(report, sort_keys=True, indent=2))
         return 0
