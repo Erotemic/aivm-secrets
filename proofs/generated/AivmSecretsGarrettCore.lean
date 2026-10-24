@@ -6060,6 +6060,33 @@ def coordinator_authority.operator_acknowledged
   | coordinator_authority.Action.Reserve => ok false
   | coordinator_authority.Action.Finish => ok false
 
+/-- [aivm_secrets_garrett_core::coordinator_authority::member_acknowledged]:
+    Source: 'crates/aivm-secrets-garrett-core/src/coordinator_authority.rs', lines 164:0-176:1
+    Visibility: public -/
+def coordinator_authority.member_acknowledged
+  (action : coordinator_authority.Action) (flag : Bool)
+  (revision : Option Std.I64) :
+  Result Bool
+  := do
+  match action with
+  | coordinator_authority.Action.Activate => ok false
+  | coordinator_authority.Action.Revoke => ok false
+  | coordinator_authority.Action.Status => ok false
+  | coordinator_authority.Action.Check =>
+    match revision with
+    | none => ok false
+    | some revision1 => if flag
+                        then ok (revision1 >= 1#i64)
+                        else ok false
+  | coordinator_authority.Action.Reserve =>
+    match revision with
+    | none => ok flag
+    | some _ => ok false
+  | coordinator_authority.Action.Finish =>
+    match revision with
+    | none => ok flag
+    | some _ => ok false
+
 /-- [aivm_secrets_garrett_core::credential_use::UseDenial]
     Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 5:0-10:1
     Visibility: public -/

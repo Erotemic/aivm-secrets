@@ -68,3 +68,24 @@ theorem successful_revocation_has_receipt (current : Option Principal) (result :
   simp [operator_acknowledged, property.1, bound]
 
 end aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs
+
+namespace aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs
+
+/-- What the member client accepts from the coordinator for each phase. -/
+def MemberReceipt (action : Action) (flag : Bool) (revision : Option I64) : Prop :=
+  match action with
+  | .Check => flag = true ∧ ∃ r, revision = some r ∧ 1 ≤ r.val
+  | .Reserve | .Finish => flag = true ∧ revision = none
+  | .Activate | .Revoke | .Status => False
+
+theorem member_receipt_contract (action : Action) (flag : Bool) (revision : Option I64) :
+    member_acknowledged action flag revision ⦃ out => out ↔ MemberReceipt action flag revision ⦄ := by
+  cases action <;> cases revision <;> cases flag <;>
+    simp [member_acknowledged, MemberReceipt, WP.spec_ok]
+
+/-- A reservation or completion is never acknowledged without its own flag. -/
+theorem unflagged_phase_refused (action : Action) (revision : Option I64) :
+    member_acknowledged action false revision = Result.ok false := by
+  cases action <;> cases revision <;> simp [member_acknowledged]
+
+end aivm_secrets_garrett_core.coordinator_authority.ReceiptProofs

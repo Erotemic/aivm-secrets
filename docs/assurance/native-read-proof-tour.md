@@ -723,3 +723,14 @@ only through `credential_use::nested_lifetime`; `nested_lifetime_spec` in
 it refuses unless the grant is active and `issued_at ≤ now < expires_at`, and
 otherwise returns `min(requested, expires_at - now)`, so the surrogate never
 outlives its grant. **Still assumed** (`EMISSION-RUST-01`): the clock reading.
+
+## Coordinator replies to members (2026-10-24)
+
+Before a coordinated write, the broker asks the coordinator to `check`,
+`reserve` and later `finish`. It accepts a reply only through
+`coordinator_authority::member_acknowledged`; `member_receipt_contract` in
+[`GarrettCoordinatorReply`](../../proofs/GarrettCoordinatorReply.lean) proves
+it accepts exactly the phase's own success flag, plus a revision of at least 1
+for `check` and no revision for `reserve`/`finish`. Every other reply is a
+refusal. **Still assumed** (`COORD-RUST-01`): decoding the JSON reply, TLS, and
+a coordinator that reports its committed state truthfully.

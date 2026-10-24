@@ -315,18 +315,21 @@ fn acknowledge(action: &str, value: &Value) -> Outcome<()> {
     if value.get("ok") != Some(&json!(true)) {
         return Err(Error::Revoked);
     }
-    let (fields, flag) = match action {
-        "check" => (&["ok", "active", "revision"][..], "active"),
-        "reserve" => (&["ok", "reserved"][..], "reserved"),
-        "finish" => (&["ok", "recorded"][..], "recorded"),
+    use aivm_secrets_garrett_core::coordinator_authority::{member_acknowledged, Action};
+    let (phase, fields, flag) = match action {
+        "check" => (Action::Check, &["ok", "active", "revision"][..], "active"),
+        "reserve" => (Action::Reserve, &["ok", "reserved"][..], "reserved"),
+        "finish" => (Action::Finish, &["ok", "recorded"][..], "recorded"),
         _ => return Err(Error::Revoked),
     };
     json::keys(value, fields, &[]).map_err(|_| Error::Revoked)?;
-    if value[flag] != json!(true) {
+    let revision = match value.get("revision") {
+        None => None,
+        Some(revision) => Some(json::integer(revision, 0, i64::MAX).map_err(|_| Error::Revoked)?),
+    };
+    // The acknowledgement decision is the extracted `member_acknowledged`.
+    if !member_acknowledged(phase, value[flag] == json!(true), revision) {
         return Err(Error::Revoked);
-    }
-    if action == "check" {
-        json::integer(&value["revision"], 1, i64::MAX).map_err(|_| Error::Revoked)?;
     }
     Ok(())
 }

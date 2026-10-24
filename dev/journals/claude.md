@@ -964,3 +964,15 @@ it in lib.rs, but custody.rs's `core` alias is credential_use and UseGrant
 lives there, so it belongs there. Did not run rustfmt: with paths it reports
 many pre-existing diffs in custody.rs/lib.rs (stdin check passes), so the new
 code is hand-formatted to match.
+
+## 2026-10-24 03:56:07 -0400
+
+COORD-RUST-01: native coordination::acknowledge now decides via the extracted
+member_acknowledged (member_receipt_contract), mirroring the existing
+operator_acknowledged proof. Revision is parsed from 0 and the >= 1 test moved
+into the core; both paths still map every failure to revoked, and
+outcome_unknown is still decided before (unchanged). Also recorded
+assessments: REBIND-RUST-01, OAUTH-LOGIN-RUST-01 and COORD-OPERATOR-RUST-01
+have their decisions extracted already; what is left is decoding and I/O
+order. I did not fold the rebind thumbprint comparison into permitted because
+it would change its public refusal code.

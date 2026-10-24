@@ -678,7 +678,7 @@ def review_semantics(contents: dict[str, str]) -> None:
             'coordinator transport bypasses mTLS or adds an unreviewed send')
     require('self.call("check", None)' in coordinate
             and 'value.get("ok") != Some(&json!(true))' in coordinate
-            and 'value[flag] != json!(true)' in coordinate
+            and '!member_acknowledged(phase, value[flag] == json!(true), revision)' in coordinate
             and 'Err(_) => return Err(W::OUTCOME_UNKNOWN)' in dispatch_core,
             'coordinator admission caches or accepts an untyped acknowledgement')
     require('if !aivm_secrets_garrett_core::coordination::valid_retry_key(key.as_bytes())' in request,

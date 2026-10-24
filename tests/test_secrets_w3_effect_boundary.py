@@ -255,6 +255,8 @@ def mutate(repo, filename, before, after):
      'let policy_hash = "raw-policy-digest";'),
     (RUST + 'coordination.rs',
      'value.get("ok") != Some(&json!(true))', 'false'),
+    (RUST + 'coordination.rs',
+     '!member_acknowledged(phase, value[flag] == json!(true), revision)', 'false'),
 
     (
         RUST + 'oauth_vault.rs',

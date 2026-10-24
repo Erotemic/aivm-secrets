@@ -159,6 +159,22 @@ pub fn operator_acknowledged(action: Action, active: bool, revision: Option<i64>
     }
 }
 
+/// A member phase is acknowledged only by its own success flag; a check
+/// also needs a current revision, and reserve/finish carry none.
+pub fn member_acknowledged(action: Action, flag: bool, revision: Option<i64>) -> bool {
+    match action {
+        Action::Check => match revision {
+            Some(revision) => flag && revision >= 1,
+            None => false,
+        },
+        Action::Reserve | Action::Finish => match revision {
+            Some(_) => false,
+            None => flag,
+        },
+        Action::Activate | Action::Revoke | Action::Status => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
