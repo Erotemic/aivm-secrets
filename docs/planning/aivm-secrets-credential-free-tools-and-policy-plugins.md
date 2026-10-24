@@ -447,6 +447,31 @@ Minimum end-to-end fixtures:
    existing operator-only enrollment/rotation lifecycle? Keep these concerns
    separate until the identity design explicitly supports automation.
 
+### Status of these decisions (2026-10-24, agent decisions; revisit freely)
+
+Later work answered most of them; the rest take the conservative answer.
+
+1. **Transport for stock `gh`:** the [HTTPS proxy profiles](../https-proxy-profile.md).
+   Stock tools use an ordinary `HTTPS_PROXY` with a per-session CA. The
+   constrained profile turns each request into a named operation, and
+   substitution is the separate, weaker profile. No fork of `gh`, and no
+   interception outside that explicit session CA.
+2. **What allow rules name:** typed operations. An HTTP route is only the
+   host encoding of an operation, and HP-6 (`translate_round_trip`,
+   `translate_unique`) proves that an accepted request encodes exactly one.
+3. **Short-lived credentials:** OAuth grants already run on per-session
+   leases with refresh and revocation (`GarrettServiceHistory`).
+   Repository-scoped provider tokens, such as GitHub App installation
+   tokens, are not built; they need a live provider to test.
+4. **Projection to stdout:** each operation's manifest disclosure contract,
+   frozen in [manifest schema 2](../manifest-schema-2.md). Clients print only
+   released fields.
+5. **Host executor:** none. All arbitrary execution stays in the guest, and
+   `trusted-host-exec` is not built. Nothing falls back to it.
+6. **Unattended renewal:** it stays separate from enrollment. Renewal is an
+   explicit command (`aivm vm identity_renew [--all]`), as the
+   [operations policy](aivm-secrets-garrett-operations-policy.md) decided.
+
 Success means the agent can use useful tools autonomously while the host can
 state **exactly** which provider effects were possible, which information was
 released, and which parts of those claims are proved rather than assumed.
