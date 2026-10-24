@@ -944,3 +944,14 @@ BUNDLE-RUST-01: the four local consistency decisions in identity_bundle::pair
 became the extracted bundle::consistent (consistent_iff). Behaviour: every
 failing step already returned invalid_capability, so pair's result is the
 same for all inputs; only the point of detection moved.
+
+## 2026-10-24 03:02:18 -0400
+
+OAUTH-RUST-01: moved the token-response decisions in the native
+oauth::evaluate (rotation/generation, scope narrowing, leeway freshness) into
+core oauth_state::{next_generation, within, fresh}, with specs in
+GarrettOAuth. Reused coordinator_authority::contains_peer and its proved
+contract for membership instead of writing another loop proof. fresh uses
+expires - leeway instead of checked_add; with the parsed bounds (leeway
+0..600, expires >= 1) neither overflows and the decision is the same,
+including the old overflow case, which was already "expired". Confidence high.

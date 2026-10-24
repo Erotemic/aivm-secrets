@@ -1,5 +1,6 @@
 import AivmSecretsGarrettCore
 import GarrettFoundation
+import GarrettCoordinatorAuthority
 
 open Aeneas Aeneas.Std
 open aivm_secrets_garrett_core.Proofs
@@ -272,5 +273,104 @@ theorem refresh_positive_witness {S T : Type} (ops : RefreshOps S T) (store : S)
     (logged : ops.observe store .Recorded = Result.ok (.Ok ())) :
     refresh_once ops store true .Ready true 0#i64 false = Result.ok (.Ok token) := by
   simp [refresh_once, permit_refresh, intended, quarantined, exchanged, committed, logged]
+
+
+/-! ## Token-response decisions used by the native `oauth::evaluate` -/
+
+/-- A recorded generation is exactly one more than the previous, and only when
+rotation was satisfied and the generation was below `i32::MAX`. -/
+theorem next_generation_spec (rotation previous_refresh provided same : Bool) (previous : I64) :
+    next_generation rotation previous_refresh provided same previous ⦃ out =>
+      (∀ v, out = some v → v.val = previous.val + 1 ∧
+          ¬(rotation = true ∧ previous_refresh = true ∧ (provided = false ∨ same = true)) ∧
+          previous.val < 2147483647) ∧
+      (out = none → (rotation = true ∧ previous_refresh = true ∧ (provided = false ∨ same = true)) ∨
+          2147483647 ≤ previous.val) ⦄ := by
+  unfold next_generation
+  cases rotation <;> cases previous_refresh <;> cases provided <;> cases same <;>
+    simp only [Bool.false_eq_true, ↓reduceIte] <;>
+    first
+    | (apply (WP.spec_ok _).mpr; simp)
+    | (split
+       · apply (WP.spec_ok _).mpr
+         constructor
+         · simp
+         · intro _; right; scalar_tac
+       · step*
+         constructor
+         · intro v hv; cases hv; refine ⟨by scalar_tac, by simp, by scalar_tac⟩
+         · simp)
+
+def AllFrom (scopes : Slice (alloc.vec.Vec U8)) (start : Nat)
+    (allowed : Slice (alloc.vec.Vec U8)) : Prop :=
+  ∀ (index : Nat) (inside : index < scopes.length), start ≤ index → scopes[index] ∈ allowed.val
+
+theorem within_loop_contract (iter : core.slice.iter.Iter (alloc.vec.Vec U8))
+    (allowed : Slice (alloc.vec.Vec U8)) :
+    within_loop iter allowed ⦃ out => out ↔ AllFrom iter.slice iter.i allowed ⦄ := by
+  suffices ∀ n (it : core.slice.iter.Iter (alloc.vec.Vec U8)), it.slice.length - it.i = n →
+      within_loop it allowed ⦃ out => out ↔ AllFrom it.slice it.i allowed ⦄ from this _ iter rfl
+  intro n
+  induction n using Nat.strong_induction_on with
+  | h n ih =>
+    intro it measure
+    rw [within_loop.eq_def]
+    by_cases inside : it.i < it.slice.length
+    · have next_return : core.slice.iter.IteratorSliceIter.next it =
+          Result.ok (some it.slice[it.i], {it with i := it.i + 1}) := by
+        simp [core.slice.iter.IteratorSliceIter.next, inside]
+        rfl
+      rw [next_return]
+      simp only [bind_ok]
+      change (do
+        let b ← coordinator_authority.contains_peer allowed it.slice[it.i]
+        if b then within_loop {it with i := it.i + 1} allowed else Result.ok false)
+          ⦃ out => out ↔ AllFrom it.slice it.i allowed ⦄
+      obtain ⟨member, checked, equivalent⟩ := returned_of_spec
+        (coordinator_authority.Proofs.contains_peer_contract allowed it.slice[it.i])
+      rw [checked]
+      simp only [bind_ok]
+      by_cases present : member = true
+      · simp only [present, ↓reduceIte]
+        apply WP.spec_mono (ih (it.slice.length - (it.i + 1)) (by omega)
+          {it with i := it.i + 1} rfl)
+        intro out tail
+        refine tail.trans ⟨fun rest index hi after => ?_, fun all index hi after => all index hi (by simp only at after ⊢; omega)⟩
+        by_cases same : index = it.i
+        · subst index; exact equivalent.mp present
+        · exact rest index hi (by simp; omega)
+      · have absent : member = false := by cases member <;> simp_all
+        simp only [absent, Bool.false_eq_true, ↓reduceIte]
+        apply (WP.spec_ok _).mpr
+        simp only [Bool.false_eq_true, false_iff]
+        intro all
+        exact present (equivalent.mpr (all it.i inside (Nat.le_refl _)))
+    · have next_return : core.slice.iter.IteratorSliceIter.next it = Result.ok (none, it) := by
+        simp [core.slice.iter.IteratorSliceIter.next, inside]
+      rw [next_return]
+      simp only [bind_ok]
+      apply (WP.spec_ok _).mpr
+      simp only [true_iff]
+      intro index hi after
+      omega
+
+/-- `within` holds exactly when every scope is in `allowed`. -/
+theorem within_spec (scopes allowed : Slice (alloc.vec.Vec U8)) :
+    within scopes allowed ⦃ out => out ↔ ∀ s ∈ scopes.val, s ∈ allowed.val ⦄ := by
+  unfold within
+  simp only [SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter, bind_ok]
+  apply WP.spec_mono (within_loop_contract ⟨scopes, 0⟩ allowed)
+  intro out all
+  refine all.trans ⟨fun h s member => ?_, fun h index hi _ => h _ (List.getElem_mem hi)⟩
+  obtain ⟨i, hi, equal⟩ := List.getElem_of_mem member
+  rw [← equal]; exact h i hi (Nat.zero_le _)
+
+/-- With the native bounds (`0 ≤ leeway`, `1 ≤ expires`), `fresh` is
+`now + leeway < expires`; the native caller treats `false` as expired. -/
+theorem fresh_spec (now leeway expires : I64) (nonnegative : 0 ≤ leeway.val)
+    (positive : 1 ≤ expires.val) :
+    fresh now leeway expires ⦃ out => out ↔ now.val + leeway.val < expires.val ⦄ := by
+  unfold fresh
+  step*
 
 end aivm_secrets_garrett_core.oauth_state.Proofs

@@ -189,3 +189,33 @@ pub fn refresh_once<O: RefreshOps>(
         }
     }
 }
+/// The generation a token response may record over a previous grant. With
+/// rotation required, a previous refresh token must be replaced by a new one.
+pub fn next_generation(
+    rotation: bool,
+    previous_refresh: bool,
+    provided: bool,
+    same: bool,
+    previous: i64,
+) -> Option<i64> {
+    if rotation && previous_refresh && (!provided || same) {
+        return None;
+    }
+    if previous >= 2147483647 {
+        return None;
+    }
+    Some(previous + 1)
+}
+/// Token responses may only narrow scopes: every scope is in `allowed`.
+pub fn within(scopes: &[Vec<u8>], allowed: &[Vec<u8>]) -> bool {
+    for scope in scopes {
+        if !crate::coordinator_authority::contains_peer(allowed, scope) {
+            return false;
+        }
+    }
+    true
+}
+/// A grant is usable at `now` only if it outlives the leeway.
+pub fn fresh(now: i64, leeway: i64, expires: i64) -> bool {
+    now < expires - leeway
+}

@@ -9629,6 +9629,79 @@ def oauth_state.refresh_once
       ok (core.result.Result.Err oauth_state.RefreshDenial.Storage)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
+/-- [aivm_secrets_garrett_core::oauth_state::next_generation]:
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 194:0-208:1
+    Visibility: public -/
+def oauth_state.next_generation
+  (rotation : Bool) (previous_refresh : Bool) (provided : Bool) (same : Bool)
+  (previous : Std.I64) :
+  Result (Option Std.I64)
+  := do
+  if rotation
+  then
+    if previous_refresh
+    then
+      if provided
+      then
+        if same
+        then ok none
+        else
+          if previous >= 2147483647#i64
+          then ok none
+          else let i ← previous + 1#i64
+               ok (some i)
+      else ok none
+    else
+      if previous >= 2147483647#i64
+      then ok none
+      else let i ← previous + 1#i64
+           ok (some i)
+  else
+    if previous >= 2147483647#i64
+    then ok none
+    else let i ← previous + 1#i64
+         ok (some i)
+
+/-- [aivm_secrets_garrett_core::oauth_state::within]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 211:4-217:1
+    Visibility: public -/
+@[rust_loop]
+def oauth_state.within_loop
+  (iter : core.slice.iter.Iter (alloc.vec.Vec Std.U8))
+  (allowed : Slice (alloc.vec.Vec Std.U8)) :
+  Result Bool
+  := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok true
+  | some scope =>
+    let b ← coordinator_authority.contains_peer allowed scope
+    if b
+    then oauth_state.within_loop iter1 allowed
+    else ok false
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::oauth_state::within]:
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 210:0-217:1
+    Visibility: public -/
+def oauth_state.within
+  (scopes : Slice (alloc.vec.Vec Std.U8))
+  (allowed : Slice (alloc.vec.Vec Std.U8)) :
+  Result Bool
+  := do
+  let iter ←
+    SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+      scopes
+  oauth_state.within_loop iter allowed
+
+/-- [aivm_secrets_garrett_core::oauth_state::fresh]:
+    Source: 'crates/aivm-secrets-garrett-core/src/oauth_state.rs', lines 219:0-221:1
+    Visibility: public -/
+def oauth_state.fresh
+  (now : Std.I64) (leeway : Std.I64) (expires : Std.I64) : Result Bool := do
+  let i ← expires - leeway
+  ok (now < i)
+
 /-- Trait declaration: [aivm_secrets_garrett_core::protocol::IssuanceObserver]
     Source: 'crates/aivm-secrets-garrett-core/src/protocol.rs', lines 14:0-16:1
     Visibility: public -/

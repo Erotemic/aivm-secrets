@@ -38,6 +38,9 @@ pub(crate) fn scopes(v: &Value) -> Outcome<Vec<String>> {
     }
     Ok(result.into_iter().collect())
 }
+fn bytes(scopes: &[String]) -> Vec<Vec<u8>> {
+    scopes.iter().map(|s| s.as_bytes().to_vec()).collect()
+}
 struct Grant<'a> {
     refresh: Option<&'a str>,
     expires: i64,
@@ -150,16 +153,15 @@ pub fn evaluate(v: &Value) -> Outcome<Value> {
                 Some(v) => Some(opaque(v, 8192)?),
             };
             let (refresh, generation) = if let Some(prev) = &previous {
-                if rotation
-                    && prev.refresh.is_some()
-                    && (provided.is_none() || provided == prev.refresh)
-                {
-                    return Err(Error::CredentialSource);
-                }
-                if prev.generation >= i32::MAX as i64 {
-                    return Err(Error::CredentialSource);
-                }
-                (provided.or(prev.refresh), prev.generation + 1)
+                let generation = aivm_secrets_garrett_core::oauth_state::next_generation(
+                    rotation,
+                    prev.refresh.is_some(),
+                    provided.is_some(),
+                    provided == prev.refresh,
+                    prev.generation,
+                )
+                .ok_or(Error::CredentialSource)?;
+                (provided.or(prev.refresh), generation)
             } else {
                 (provided, 0)
             };
@@ -184,14 +186,19 @@ pub fn evaluate(v: &Value) -> Outcome<Value> {
                     .filter(|s| !s.is_empty())
                     .collect();
                 effective = scopes(&json!(tokens))?;
-                if effective.iter().any(|s| !allowed.contains(s)) {
+                if !aivm_secrets_garrett_core::oauth_state::within(
+                    &bytes(&effective),
+                    &bytes(&allowed),
+                ) {
                     return Err(Error::CredentialSource);
                 }
             }
-            if previous
-                .as_ref()
-                .is_some_and(|p| effective.iter().any(|s| !p.scopes.contains(s)))
-            {
+            if previous.as_ref().is_some_and(|p| {
+                !aivm_secrets_garrett_core::oauth_state::within(
+                    &bytes(&effective),
+                    &bytes(&p.scopes),
+                )
+            }) {
                 return Err(Error::CredentialSource);
             }
             Ok(
@@ -207,7 +214,7 @@ pub fn evaluate(v: &Value) -> Outcome<Value> {
                 .map(|v| json::integer(v, 0, 600))
                 .transpose()?
                 .unwrap_or(30);
-            if now.checked_add(leeway).is_none_or(|n| n >= grant.expires) {
+            if !aivm_secrets_garrett_core::oauth_state::fresh(now, leeway, grant.expires) {
                 return Err(Error::Expired);
             }
             Ok(json!({"ok":true}))

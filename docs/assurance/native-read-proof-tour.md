@@ -698,3 +698,19 @@ certificate's thumbprint. Every failure is `invalid_capability`, as before.
 
 **Still assumed** (`BUNDLE-RUST-01`): the JSON, X.509 and base64 parsers that
 produce these inputs, SHA-256 for the thumbprint, and the filesystem reads.
+
+## OAuth token responses (2026-10-24)
+
+When a provider returns a token, the native broker decides three things,
+now all extracted and proved in [`GarrettOAuth`](../../proofs/GarrettOAuth.lean):
+
+- `next_generation_spec`: a new generation is recorded only as previous + 1,
+  only below `i32::MAX`, and, when rotation is required, only if a previous
+  refresh token was replaced by a different one.
+- `within_spec`: a returned scope list is accepted only if every scope is in
+  the allowed set and in the previous grant's scopes, so a refresh can only
+  narrow scopes. It reuses the proved `contains_peer` membership check.
+- `fresh_spec`: a grant is active only if `now + leeway < expires`.
+
+**Still assumed** (`OAUTH-RUST-01`): parsing the provider's JSON, the vault
+crypto, the filesystem and the clock.
