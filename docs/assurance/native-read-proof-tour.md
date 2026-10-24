@@ -877,6 +877,30 @@ Trusted, not proved:
 The theorem is about the model, not about the native storage, locking or
 clock code.
 
+## One OAuth login, across its whole history (2026-10-24)
+
+[`GarrettLoginHistory`](../../proofs/GarrettLoginHistory.lean) models one
+`garrett-oauth login` run. The native process keeps the pending state, the
+PKCE verifier and the stage in memory, so a crash ends the login. Each event
+runs the extracted decision the native driver calls: `claim` for a callback,
+`begin` to start the token exchange, `finish` after it.
+
+- `at_most_one_exchange`: in every history, the authorization code is
+  exchanged at most once.
+- `every_exchange_bound`: each exchange follows a callback that carried the
+  pending state, met the issuer rule, arrived inside the window and was not
+  a denial. The exchange also started inside the window.
+- `install_needs_exchange`: a grant is installed only from an exchange in
+  progress, and the login is then `Complete`.
+- `crash_is_final`: after a crash nothing leaves the host.
+- `successful_login_witness`: a good callback, one exchange and one install.
+
+Trusted, not proved:
+
+- the loopback listener parses callbacks correctly;
+- the exchange and the install are the TLS and storage adapters;
+- one process runs one login.
+
 ## Certificates near the CA's end (2026-10-24)
 
 [`authorize_client_contract`](../../proofs/GarrettEnrollment.lean) now states

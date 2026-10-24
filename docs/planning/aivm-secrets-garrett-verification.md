@@ -348,6 +348,10 @@ requirement for a local broker to prove its conditional controller properties.
    independent Python URL/store tests exercise the adapters. Complete the
    acquisition audit/concurrent I/O history refinement and broader registration
    validation before claiming the entire acquisition service is verified.
+   **History done as a model 2026-10-24:** `proofs/GarrettLoginHistory.lean`
+   (`at_most_one_exchange`, `every_exchange_bound`, `crash_is_final`) over the
+   extracted `claim`, `begin` and `finish`. The listener, TLS and storage
+   adapters are its premises.
 2. Continue the native manifest provider interpreter. The `manifest-https-v1`
    path now executes typed operations, checked facts/captures, pagination and
    fixed GraphQL reads with an explicit typed disclosure contract. Its extracted
