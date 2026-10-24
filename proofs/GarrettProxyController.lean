@@ -7,8 +7,8 @@ Source: `rust/crates/aivm-secrets-garrett-core/src/proxy_controller.rs`,
 extracted by Aeneas. `garrett-proxy` calls `proxy_controller::serve` for every
 accepted guest request and supplies only three callbacks (`Upstream`): the
 session clock (`current`), the admission audit (`admitted`, which reports whether
-the record was durably written) and the socket
-exchange (`exchange`).
+the record was durably written), the socket exchange (`exchange`) and the
+completion audit (`completed`, written before a completed reply is released).
 
 Proved here, for **any** callbacks:
 
@@ -94,8 +94,9 @@ variable {U : Type}
        `internal_error` (fail closed);
     4. the session was current, the encoder accepted and produced `wire`,
        the admission audit was **acknowledged**, and **`exchange` received
-       exactly `wire`**; the reply is then `release` of the answer, or a
-       fixed refusal. -/
+       exactly `wire`**; the reply is then `release` of the answer, released
+       only if the completion record (`completed`) was acknowledged, or a
+       fixed refusal (`outcome_unknown` when that record failed). -/
 theorem serve_paths (inst : Upstream U) (io : U) (request : proxy_http.Request) (host : Slice U8)
     (rules : Slice proxy_http.DenyRule) (secret : Slice U8)
     (authentication : credential_use.Authentication) (forms : Slice proxy_http.Form) (limit : Usize)
@@ -116,10 +117,14 @@ theorem serve_paths (inst : Upstream U) (io : U) (request : proxy_http.Request) 
       proxy_http.encode_upstream (alloc.vec.Vec.new U8) request host rules secret authentication =
         Result.ok (.Ok (), wire) ∧
       inst.admitted io1 = Result.ok (true, io2) ∧
-      inst.exchange io2 (alloc.vec.Vec.deref wire) = Result.ok (answer, after) ∧
+      ∃ io3, inst.exchange io2 (alloc.vec.Vec.deref wire) = Result.ok (answer, io3) ∧
       (match answer with
-       | .Ok raw => release (alloc.vec.Vec.deref raw) request forms limit = Result.ok served
-       | .Err code => stopped code .Failed = Result.ok served)) := by
+       | .Ok raw => ∃ released, release (alloc.vec.Vec.deref raw) request forms limit = Result.ok released ∧
+           ((released.stage ≠ .Completed ∧ served = released ∧ after = io3) ∨
+            (released.stage = .Completed ∧ ∃ acked, inst.completed io3 released.status = Result.ok (acked, after) ∧
+              ((acked = true ∧ served = released) ∨
+               (acked = false ∧ stopped .OutcomeUnknown .Failed = Result.ok served))))
+       | .Err code => stopped code .Failed = Result.ok served ∧ after = io3)) := by
   unfold serve at h
   obtain ⟨⟨b, io1⟩, current, h⟩ := bind_ok_inv h
   cases b with
@@ -151,20 +156,78 @@ theorem serve_paths (inst : Upstream U) (io : U) (request : proxy_http.Request) 
         exact Or.inr (Or.inr (Or.inl ⟨io1, wire, current, encoded, admitted, stop⟩))
       | true =>
       obtain ⟨⟨answer, io3⟩, exchanged, h⟩ := bind_ok_inv h
-      refine Or.inr (Or.inr (Or.inr ⟨io1, wire, io2, answer, current, encoded, admitted, ?_⟩))
+      refine Or.inr (Or.inr (Or.inr ⟨io1, wire, io2, answer, current, encoded, admitted, io3, exchanged, ?_⟩))
       cases answer with
       | Ok raw =>
-        obtain ⟨s, released, h⟩ := bind_ok_inv h
-        simp only [Result.ok.injEq, Prod.mk.injEq] at h
-        obtain ⟨hs, ha⟩ := h
-        subst hs ha
-        exact ⟨exchanged, released⟩
+        obtain ⟨released, rel, h⟩ := bind_ok_inv h
+        refine ⟨released, rel, ?_⟩
+        cases hst : released.stage with
+        | Refused =>
+          rw [hst] at h
+          simp only [Result.ok.injEq, Prod.mk.injEq] at h
+          exact Or.inl ⟨by simp, h.1.symm, h.2.symm⟩
+        | Failed =>
+          rw [hst] at h
+          simp only [Result.ok.injEq, Prod.mk.injEq] at h
+          exact Or.inl ⟨by simp, h.1.symm, h.2.symm⟩
+        | Completed =>
+          rw [hst] at h
+          obtain ⟨⟨acked, io4⟩, comp, h⟩ := bind_ok_inv h
+          cases acked with
+          | true =>
+            have h' : Result.ok (released, io4) = Result.ok (served, after) := h
+            simp only [Result.ok.injEq, Prod.mk.injEq] at h'
+            obtain ⟨e1, e2⟩ := h'
+            subst e2
+            exact Or.inr ⟨rfl, true, comp, Or.inl ⟨rfl, e1.symm⟩⟩
+          | false =>
+            obtain ⟨s, stop, h⟩ := bind_ok_inv h
+            simp only [Result.ok.injEq, Prod.mk.injEq] at h
+            obtain ⟨hs, ha⟩ := h
+            subst hs ha
+            exact Or.inr ⟨rfl, false, comp, Or.inr ⟨rfl, stop⟩⟩
       | Err code =>
         obtain ⟨s, stop, h⟩ := bind_ok_inv h
         simp only [Result.ok.injEq, Prod.mk.injEq] at h
         obtain ⟨hs, ha⟩ := h
         subst hs ha
-        exact ⟨exchanged, stop⟩
+        exact ⟨stop, rfl⟩
+
+/-- After an exchange, the outcome is never `Refused`, and the reply is
+    either the fixed refusal for its code or a completed release whose
+    completion record was acknowledged. -/
+theorem exchanged_outcome {inst : Upstream U} {request : proxy_http.Request} {forms : Slice proxy_http.Form}
+    {limit : Usize} {served : Served} {after io3 : U}
+    {answer : core.result.Result (alloc.vec.Vec U8) proxy_http.Code}
+    (m : match answer with
+       | .Ok raw => ∃ released, release (alloc.vec.Vec.deref raw) request forms limit = Result.ok released ∧
+           ((released.stage ≠ .Completed ∧ served = released ∧ after = io3) ∨
+            (released.stage = .Completed ∧ ∃ acked, inst.completed io3 released.status = Result.ok (acked, after) ∧
+              ((acked = true ∧ served = released) ∨
+               (acked = false ∧ stopped .OutcomeUnknown .Failed = Result.ok served))))
+       | .Err code => stopped code .Failed = Result.ok served ∧ after = io3) :
+    served.stage ≠ .Refused ∧
+    (served.reply.val = ascii (refusalText served.code) ∨
+     ∃ raw, answer = .Ok raw ∧ release (alloc.vec.Vec.deref raw) request forms limit = Result.ok served ∧
+       served.stage = .Completed ∧ inst.completed io3 served.status = Result.ok (true, after)) := by
+  cases answer with
+  | Err code =>
+    obtain ⟨stop, _⟩ := m
+    obtain ⟨reply, stage, _, same⟩ := stopped_reply stop
+    exact ⟨by rw [stage]; simp, Or.inl (by rw [reply, same])⟩
+  | Ok raw =>
+    obtain ⟨released, rel, cases⟩ := m
+    rcases cases with ⟨notdone, same, _⟩ | ⟨done, acked, comp, ⟨_, same⟩ | ⟨_, stop⟩⟩
+    · subst same
+      rcases release_reply _ request forms limit served rel with ⟨isdone, _⟩ | ⟨failed, refusal⟩
+      · exact absurd isdone notdone
+      · exact ⟨by rw [failed]; simp, Or.inl refusal⟩
+    · subst same
+      rename_i is_true
+      subst is_true
+      exact ⟨by rw [done]; simp, Or.inr ⟨raw, rfl, rel, done, comp⟩⟩
+    · obtain ⟨reply, stage, _, same⟩ := stopped_reply stop
+      exact ⟨by rw [stage]; simp, Or.inl (by rw [reply, same])⟩
 
 /-- **What goes upstream.** A request that was not refused before egress
     (`stage ≠ Refused`) passed through `exchange` exactly once, after the
@@ -187,7 +250,7 @@ theorem serve_upstream (inst : Upstream U) (io : U) (request : proxy_http.Reques
       inst.current io = Result.ok (true, io1) ∧ inst.admitted io1 = Result.ok (false, after)) ∨
     (served.stage ≠ .Refused ∧ ∃ io1 io2 wire answer,
       inst.current io = Result.ok (true, io1) ∧ inst.admitted io1 = Result.ok (true, io2) ∧
-      inst.exchange io2 (alloc.vec.Vec.deref wire) = Result.ok (answer, after) ∧
+      (∃ io3, inst.exchange io2 (alloc.vec.Vec.deref wire) = Result.ok (answer, io3)) ∧
       wire.val = UpstreamPrefix request host ++ HeaderPrefix authentication ++ secret.val ++ CRLF ++
         UpstreamSuffix request ∧
       http_auth.Proofs.ValidCredential secret ∧ (∀ byte ∈ request.target.val, Visible byte) ∧
@@ -195,17 +258,11 @@ theorem serve_upstream (inst : Upstream U) (io : U) (request : proxy_http.Reques
   rcases serve_paths inst io request host rules secret authentication forms limit served after h with
     ⟨io1, current, same, stop⟩ | ⟨io1, wire, refused, code, current, _, _, same, stop⟩ |
     ⟨io1, wire, current, _, unacked, stop⟩ |
-    ⟨io1, wire, io2, answer, current, encoded, admitted, exchanged, finish⟩
+    ⟨io1, wire, io2, answer, current, encoded, admitted, io3, exchanged, finish⟩
   · exact Or.inl ⟨(stopped_reply stop).2.1, false, io1, current, same⟩
   · exact Or.inl ⟨(stopped_reply stop).2.1, true, io1, current, same⟩
   · exact Or.inr (Or.inl ⟨(stopped_reply stop).2.1, (stopped_reply stop).2.2.2, io1, current, unacked⟩)
-  · have stage : served.stage ≠ .Refused := by
-      cases answer with
-      | Ok raw =>
-        rcases release_reply _ request forms limit served finish with ⟨done, _⟩ | ⟨failed, _⟩
-        · rw [done]; simp
-        · rw [failed]; simp
-      | Err code => rw [(stopped_reply finish).2.1]; simp
+  · have stage : served.stage ≠ .Refused := (exchanged_outcome finish).1
     obtain ⟨value, returned, post⟩ := returned_of_spec
       (encode_upstream_contract (alloc.vec.Vec.new U8) request host rules secret authentication
         (by simpa [alloc.vec.Vec.new, alloc.vec.Vec.length] using room))
@@ -213,8 +270,8 @@ theorem serve_upstream (inst : Upstream U) (io : U) (request : proxy_http.Reques
     simp only [Result.ok.injEq] at returned
     subst returned
     rcases post with ⟨_, valid, visible, clean, bytes⟩ | ⟨refused, _⟩
-    · refine Or.inr (Or.inr ⟨stage, io1, io2, wire, answer, current, admitted, exchanged, ?_, valid,
-        visible, clean⟩)
+    · refine Or.inr (Or.inr ⟨stage, io1, io2, wire, answer, current, admitted, ⟨io3, exchanged⟩, ?_,
+        valid, visible, clean⟩)
       simpa [alloc.vec.Vec.new] using bytes
     · exact absurd rfl refused
 
@@ -242,14 +299,13 @@ theorem serve_guest_reply (inst : Upstream U) (io : U) (request : proxy_http.Req
     rw [reply, same]
   rcases serve_paths inst io request host rules secret authentication forms limit served after h with
     ⟨_, _, _, stop⟩ | ⟨_, _, _, _, _, _, _, _, stop⟩ | ⟨_, _, _, _, _, stop⟩ |
-    ⟨_, _, _, answer, _, _, _, _, finish⟩
+    ⟨_, _, _, answer, _, _, _, _, _, finish⟩
   · exact Or.inl (stopped_case stop)
   · exact Or.inl (stopped_case stop)
   · exact Or.inl (stopped_case stop)
-  · cases answer with
-    | Err code => exact Or.inl (stopped_case finish)
-    | Ok raw =>
-      rcases release_reply _ request forms limit served finish with
+  · rcases (exchanged_outcome finish).2 with refusal | ⟨raw, _, rel, _, _⟩
+    · exact Or.inl refusal
+    · rcases release_reply _ request forms limit served rel with
         ⟨done, head, response, released⟩ | ⟨_, refused⟩
       · refine Or.inr ⟨done, head, response, released, fun fits form mem plain => ?_⟩
         have contract := guest_response_contract (alloc.vec.Vec.new U8) response forms

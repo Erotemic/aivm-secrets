@@ -785,3 +785,12 @@ integration test would need the audit to fail on exactly the third write,
 which I judged too fragile to build with RLIMIT_FSIZE (record lengths depend
 on ports/timestamps). Candidate: move the completion record into the core so
 it is proved like admission.
+
+## 2026-10-23 21:14:05 -0400
+
+Completion gate moved into the core: `Upstream::completed(status) -> bool`,
+called by the extracted `serve` after a completed release; failure →
+`outcome_unknown` (Failed). `serve_paths` path 4 now carries the completion
+callback; new helper `exchanged_outcome`; `serve_upstream` states the
+exchange with an existential post-state. Core mock test and the
+byte-for-byte composition oracle updated (it now expects the completed call).

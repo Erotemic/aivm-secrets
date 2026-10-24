@@ -19,6 +19,9 @@ pub trait Upstream {
     /// Send `wire` to the origin's pinned destination and return everything
     /// the origin answered before closing, or the refusal that applies.
     fn exchange(&mut self, wire: &[u8]) -> Result<Vec<u8>, Code>;
+    /// Durably record a completed request with the provider status, before
+    /// its reply is released; false if the record could not be written.
+    fn completed(&mut self, status: u16) -> bool;
 }
 
 /// Where a request stopped, for the audit.
@@ -286,7 +289,20 @@ pub fn serve<U: Upstream>(
     }
     let sent: &[u8] = &wire;
     match io.exchange(sent) {
-        Ok(raw) => release(&raw, request, forms, limit),
+        Ok(raw) => {
+            let served = release(&raw, request, forms, limit);
+            match served.stage {
+                // Release only after the completion record is durable.
+                Stage::Completed => {
+                    if io.completed(served.status) {
+                        served
+                    } else {
+                        stopped(Code::OutcomeUnknown, Stage::Failed)
+                    }
+                }
+                _ => served,
+            }
+        }
         Err(code) => stopped(code, Stage::Failed),
     }
 }
@@ -300,6 +316,7 @@ mod tests {
     struct Mock {
         current: bool,
         audit_ok: bool,
+        completion_ok: bool,
         calls: Vec<&'static str>,
         sent: Vec<Vec<u8>>,
         answer: fn() -> Result<Vec<u8>, Code>,
@@ -319,6 +336,10 @@ mod tests {
             self.sent.push(wire.to_vec());
             (self.answer)()
         }
+        fn completed(&mut self, _status: u16) -> bool {
+            self.calls.push("completed");
+            self.completion_ok
+        }
     }
 
     const HOST: &[u8] = b"api.example.org";
@@ -335,6 +356,7 @@ mod tests {
         Mock {
             current,
             audit_ok: true,
+            completion_ok: true,
             calls: Vec::new(),
             sent: Vec::new(),
             answer,
@@ -353,6 +375,16 @@ mod tests {
             &forms,
             4096,
         )
+    }
+
+    #[test]
+    fn a_failed_completion_audit_releases_nothing() {
+        let mut io = mock(true, || Ok(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok".to_vec()));
+        io.completion_ok = false;
+        let served = run(&mut io, &request(b"GET /a HTTP/1.1\r\nHost: api.example.org\r\n\r\n"), &[]);
+        assert_eq!(io.calls, ["current", "admitted", "exchange", "completed"]);
+        assert_eq!(served.reply, refusal(&Code::OutcomeUnknown));
+        assert!(matches!(served.stage, Stage::Failed) && !served.keep);
     }
 
     #[test]
@@ -405,7 +437,7 @@ mod tests {
             let mut io = mock(true, ok);
             let served = run(&mut io, &request, &[]);
             let (wire, out) = old_composition(&request, &answer);
-            assert_eq!(io.calls, ["current", "admitted", "exchange"]);
+            assert_eq!(io.calls, ["current", "admitted", "exchange", "completed"]);
             assert_eq!(io.sent, [wire]);
             assert_eq!(served.reply, out);
             assert!(matches!(served.stage, Stage::Completed));

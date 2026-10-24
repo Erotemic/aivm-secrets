@@ -279,8 +279,11 @@ def test_native_proxy_writes_only_core_outputs():
     assert source.count('controller::serve(') == 1
     # Fail closed around egress and release: the admission record gates the
     # send (proved in serve_paths), the completion record gates the reply.
-    assert source.count('if !session.record("completed"') == 2
-    assert source.count('return (refusal("outcome_unknown"), false);') >= 2
+    # The direct path's completion record is the `completed` callback the
+    # extracted `serve` calls before releasing (proved); the translated path
+    # gates its own reply.
+    assert source.count('fn completed(&mut self, status: u16) -> bool') == 1
+    assert source.count('if !session.record("completed"') == 1
     # The tunnel loop is the extracted one; `send` writes only its argument.
     assert source.count('controller::tunnel(&mut guest,') == 1
     assert source.count('self.tls.write_all(bytes)') == 1

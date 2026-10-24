@@ -529,6 +529,13 @@ impl Upstream for Native<'_> {
         )
     }
 
+    fn completed(&mut self, status: u16) -> bool {
+        self.session.record(
+            "completed",
+            json!({"origin": self.origin.host, "method": self.method, "path": self.path, "status": status}),
+        )
+    }
+
     fn exchange(&mut self, wire: &[u8]) -> Result<Vec<u8>, core::Code> {
         exchange(self.session, self.origin, wire)
     }
@@ -549,14 +556,9 @@ fn serve_one(session: &Session, origin: &Origin, request: &core::Request) -> (Ve
     );
     let detail = json!({"origin": origin.host, "method": method, "path": path});
     match served.stage {
-        Stage::Completed => {
-            let mut detail = detail;
-            detail["status"] = json!(served.status);
-            // Release only after the completion record is durable.
-            if !session.record("completed", detail) {
-                return (refusal("outcome_unknown"), false);
-            }
-        }
+        // The completion record was written by `Upstream::completed` before
+        // the extracted `serve` released the reply.
+        Stage::Completed => {}
         Stage::Refused | Stage::Failed => {
             let mut detail = detail;
             detail["code"] = json!(code_name(&served.code));
