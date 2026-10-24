@@ -6260,6 +6260,27 @@ def credential_use.use_credential
       grant.route
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
+/-- [aivm_secrets_garrett_core::credential_use::nested_lifetime]:
+    Source: 'crates/aivm-secrets-garrett-core/src/credential_use.rs', lines 137:0-147:1
+    Visibility: public -/
+def credential_use.nested_lifetime
+  (grant : credential_use.UseGrant) (now : Std.I64) (lifetime : Std.I64) :
+  Result (Option Std.I64)
+  := do
+  if grant.active
+  then
+    if now < grant.claims.issued_at
+    then ok none
+    else
+      if now >= grant.claims.expires_at
+      then ok none
+      else
+        let remaining ← grant.claims.expires_at - now
+        if lifetime < remaining
+        then ok (some lifetime)
+        else ok (some remaining)
+  else ok none
+
 /-- [aivm_secrets_garrett_core::Expectation]
     Source: 'crates/aivm-secrets-garrett-core/src/lib.rs', lines 44:0-49:1
     Visibility: public -/

@@ -714,3 +714,12 @@ now all extracted and proved in [`GarrettOAuth`](../../proofs/GarrettOAuth.lean)
 
 **Still assumed** (`OAUTH-RUST-01`): parsing the provider's JSON, the vault
 crypto, the filesystem and the clock.
+
+## Surrogates issued under a use grant (2026-10-24)
+
+The account-status session can issue a nested surrogate token. It now does so
+only through `credential_use::nested_lifetime`; `nested_lifetime_spec` in
+[`GarrettCurrentAdmission`](../../proofs/GarrettCurrentAdmission.lean) proves
+it refuses unless the grant is active and `issued_at ≤ now < expires_at`, and
+otherwise returns `min(requested, expires_at - now)`, so the surrogate never
+outlives its grant. **Still assumed** (`EMISSION-RUST-01`): the clock reading.

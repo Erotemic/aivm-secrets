@@ -431,3 +431,29 @@ theorem bound_finish_frame {W C H O X : Type} (work : dispatch.Work W H O X) (ch
   simpa [Bound.Insts.Aivm_secrets_garrett_coreDispatchWork.finish] using returned
 
 end aivm_secrets_garrett_core.current_admission.Proofs
+
+namespace aivm_secrets_garrett_core.credential_use.Proofs
+
+/-- A surrogate issued under a use grant is issued only while the grant is
+active and current, and never outlives it: its lifetime is the requested one
+capped at the grant's remaining time. -/
+theorem nested_lifetime_spec (grant : UseGrant) (now lifetime : I64)
+    (nonnegative : 0 ≤ grant.claims.issued_at.val) :
+    nested_lifetime grant now lifetime ⦃ out =>
+      (out = none ↔ ¬(grant.active = true ∧ grant.claims.issued_at.val ≤ now.val ∧
+          now.val < grant.claims.expires_at.val)) ∧
+      ∀ l, out = some l → l.val = min lifetime.val (grant.claims.expires_at.val - now.val) ⦄ := by
+  unfold nested_lifetime
+  cases grant.active <;> simp only [Bool.false_eq_true, ↓reduceIte]
+  · apply (WP.spec_ok _).mpr; simp
+  · split
+    · apply (WP.spec_ok _).mpr; constructor
+      · simp only [true_iff]; intro h; scalar_tac
+      · simp
+    · split
+      · apply (WP.spec_ok _).mpr; constructor
+        · simp only [true_iff]; intro h; scalar_tac
+        · simp
+      · step*
+
+end aivm_secrets_garrett_core.credential_use.Proofs

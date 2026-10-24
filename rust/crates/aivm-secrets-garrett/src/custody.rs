@@ -799,12 +799,8 @@ impl AccountSession {
         } else {
             now
         };
-        if !self.grant.active
-            || now < self.grant.claims.issued_at
-            || now >= self.grant.claims.expires_at
-        {
-            return Err(Error::InvalidCapability);
-        }
+        let lifetime = core::nested_lifetime(&self.grant, now, lifetime)
+            .ok_or(Error::InvalidCapability)?;
         issuer.issue_observed(
             self.executor.audit.as_ref(),
             registry,
@@ -813,7 +809,7 @@ impl AccountSession {
             subject,
             self.inner.as_bytes(),
             now,
-            lifetime.min(self.grant.claims.expires_at - now),
+            lifetime,
         )
     }
     /// Actual TLS evidence, not client-provided identity, enters the same

@@ -955,3 +955,12 @@ contract for membership instead of writing another loop proof. fresh uses
 expires - leeway instead of checked_add; with the parsed bounds (leeway
 0..600, expires >= 1) neither overflows and the decision is the same,
 including the old overflow case, which was already "expired". Confidence high.
+
+## 2026-10-24 03:30:39 -0400
+
+EMISSION-RUST-01: AccountSession::issue's grant-window check and lifetime cap
+moved into credential_use::nested_lifetime (nested_lifetime_spec). First put
+it in lib.rs, but custody.rs's `core` alias is credential_use and UseGrant
+lives there, so it belongs there. Did not run rustfmt: with paths it reports
+many pre-existing diffs in custody.rs/lib.rs (stdin check passes), so the new
+code is hand-formatted to match.

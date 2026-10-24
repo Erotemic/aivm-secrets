@@ -132,3 +132,16 @@ pub(crate) fn finish_use<E: CredentialExecutor>(
     };
     Ok(release_reply(response))
 }
+/// A surrogate issued under an active use grant lives inside that grant:
+/// `None` outside `[issued_at, expires_at)`, otherwise the capped lifetime.
+pub fn nested_lifetime(grant: &UseGrant, now: i64, lifetime: i64) -> Option<i64> {
+    if !grant.active || now < grant.claims.issued_at || now >= grant.claims.expires_at {
+        return None;
+    }
+    let remaining = grant.claims.expires_at - now;
+    if lifetime < remaining {
+        Some(lifetime)
+    } else {
+        Some(remaining)
+    }
+}
