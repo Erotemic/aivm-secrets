@@ -1527,6 +1527,26 @@ mod control_oracle {
     }
 
     #[test]
+    fn extracted_digest_preimages_match_the_serde_preimages() {
+        use aivm_secrets_garrett_core::approval::{approval_preimage, request_value};
+        let arguments = [json!({}), json!({"repo":"o/r","pr":7,"body":"é\"\\\n"}), json!({"x":[1,{"y":null}]})];
+        for args in arguments {
+            for name in ["pull.view", "issue.comment"] {
+                let old_request = crate::json::canonical(&json!({"operation":name,"arguments":args}));
+                let request = request_value(wire_text(name), crate::json::capture(&args).into_wire());
+                assert_eq!(bytes(&request), old_request);
+                for (grant, policy) in [("g", "sha256:00"), ("", "p\"")] {
+                    let old = crate::json::canonical(&json!({"policy":policy,"grant":grant,
+                        "request":{"operation":name,"arguments":args}}));
+                    let new = approval_preimage(wire_text(grant), wire_text(policy),
+                        request_value(wire_text(name), crate::json::capture(&args).into_wire()));
+                    assert_eq!(bytes(&new), old);
+                }
+            }
+        }
+    }
+
+    #[test]
     fn extracted_revocation_records_match_the_serde_records() {
         let texts = ["g-1", "", "quote\"back\\slash", "line\nbreak\u{1}", "é😀", "sha256:00ff"];
         for grant in texts {

@@ -883,3 +883,12 @@ Slices wrap `ListN`), `merge_loop_spec`/`merge_spec` (`MergeL`),
 hash-chain test. Only premise: inputs fit in usize. Sortedness of the merged
 row (given sorted, disjoint inputs) is not proved yet; the serde oracle and the
 chain test check it on real rows.
+
+## 2026-10-24 00:23:51 -0400
+
+Approval digest preimage extracted: `approval::request_value`,
+`approval::approval_preimage`; native now hashes the extracted encoding
+(byte-identical by construction since `json::canonical` was already the
+extracted encoder; oracle confirms). Proved `request_value_exact`,
+`approval_preimage_exact`. APPROVAL-RUST-01 now leaves only SHA-256/hex, the
+one decision line and the lock native.

@@ -138,3 +138,30 @@ pub fn install(store: &Vec<Approval>, slot: Approval, now: i64) -> Option<Vec<Ap
     kept.push(slot);
     Some(kept)
 }
+
+/// `{"arguments":A,"operation":O}`: the request whose canonical encoding the
+/// session hashes as the request digest.
+pub fn request_value(
+    operation: crate::json_wire::Value,
+    arguments: crate::json_wire::Value,
+) -> crate::json_wire::Value {
+    crate::json_wire::Value::Object(vec![
+        (crate::control::text_units(b"arguments"), arguments),
+        (crate::control::text_units(b"operation"), operation),
+    ])
+}
+
+/// `{"grant":G,"policy":P,"request":R}`: what an exact-write approval
+/// digest is the SHA-256 of (canonical encoding). An approval therefore names
+/// one grant, one policy and one request.
+pub fn approval_preimage(
+    grant: crate::json_wire::Value,
+    policy: crate::json_wire::Value,
+    request: crate::json_wire::Value,
+) -> crate::json_wire::Value {
+    crate::json_wire::Value::Object(vec![
+        (crate::control::text_units(b"grant"), grant),
+        (crate::control::text_units(b"policy"), policy),
+        (crate::control::text_units(b"request"), request),
+    ])
+}

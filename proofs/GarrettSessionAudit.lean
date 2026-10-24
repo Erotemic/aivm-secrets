@@ -422,4 +422,45 @@ theorem approved_record_exact {digest grant policy v : json_wire.Value}
     by simpa [Key] using text_units_ok h4, by simpa [Key] using text_units_ok h5,
     by simpa [Key] using text_units_ok h6, one_vec rfl h7⟩
 
+/-! ## Digest preimages -/
+
+/-- **The request digest's preimage.** `{"arguments":A,"operation":O}`; the
+    session hashes exactly its extracted encoding. -/
+theorem request_value_exact {operation arguments v : json_wire.Value}
+    (h : approval.request_value operation arguments = Result.ok v) :
+    ∃ (fields : alloc.vec.Vec (alloc.vec.Vec U32 × json_wire.Value)) (karguments koperation : alloc.vec.Vec U32),
+      v = .Object fields ∧ fields.val = [(karguments, arguments), (koperation, operation)] ∧
+      Key karguments [97#u8, 114#u8, 103#u8, 117#u8, 109#u8, 101#u8, 110#u8, 116#u8, 115#u8] ∧
+      Key koperation OperationKey := by
+  unfold approval.request_value at h
+  simp only [lift, Array.to_slice, Array.make, bind_ok] at h
+  obtain ⟨ka, h1, h⟩ := bind_ok_inv h
+  obtain ⟨ko, h2, h⟩ := bind_ok_inv h
+  simp only [Result.ok.injEq] at h
+  subst h
+  refine ⟨_, ka, ko, rfl, ?_, by simpa [Key] using text_units_ok h1,
+    by simpa [Key, OperationKey] using text_units_ok h2⟩
+  simp [alloc.slice.Slice.into_vec, alloc.vec.Vec.val, Slice.from_val, Array.from_val]
+
+/-- **The approval digest's preimage.** `{"grant":G,"policy":P,"request":R}`:
+    an exact-write approval digest is the SHA-256 of exactly this object's
+    encoding, so one approval names one grant, one policy and one request. -/
+theorem approval_preimage_exact {grant policy request v : json_wire.Value}
+    (h : approval.approval_preimage grant policy request = Result.ok v) :
+    ∃ (fields : alloc.vec.Vec (alloc.vec.Vec U32 × json_wire.Value)) (kgrant kpolicy krequest : alloc.vec.Vec U32),
+      v = .Object fields ∧ fields.val = [(kgrant, grant), (kpolicy, policy), (krequest, request)] ∧
+      Key kgrant [103#u8, 114#u8, 97#u8, 110#u8, 116#u8] ∧
+      Key kpolicy [112#u8, 111#u8, 108#u8, 105#u8, 99#u8, 121#u8] ∧
+      Key krequest [114#u8, 101#u8, 113#u8, 117#u8, 101#u8, 115#u8, 116#u8] := by
+  unfold approval.approval_preimage at h
+  simp only [lift, Array.to_slice, Array.make, bind_ok] at h
+  obtain ⟨kg, h1, h⟩ := bind_ok_inv h
+  obtain ⟨kp, h2, h⟩ := bind_ok_inv h
+  obtain ⟨kr, h3, h⟩ := bind_ok_inv h
+  simp only [Result.ok.injEq] at h
+  subst h
+  refine ⟨_, kg, kp, kr, rfl, ?_, by simpa [Key] using text_units_ok h1,
+    by simpa [Key] using text_units_ok h2, by simpa [Key] using text_units_ok h3⟩
+  simp [alloc.slice.Slice.into_vec, alloc.vec.Vec.val, Slice.from_val, Array.from_val]
+
 end aivm_secrets_garrett_core.session_audit.Proofs

@@ -666,10 +666,16 @@ Read the predicates `ForDigest`, `Survives` and `Unique` (three lines each):
 they are the whole specification. One behaviour changed on purpose: a full
 store used to be pruned before refusing; now a refusal leaves it untouched. This matches the Python reference kernel (`kernel/machine.py`, `approve`), which raises `exhausted` before replacing its state.
 
+**The digest's preimage (2026-10-24).** The approval digest is the SHA-256 of
+the extracted encoding of `{"grant":G,"policy":P,"request":{"arguments":A,"operation":O}}`,
+built by `approval::approval_preimage` and `approval::request_value`
+(`approval_preimage_exact`, `request_value_exact` in
+[`GarrettSessionAudit`](../../proofs/GarrettSessionAudit.lean)), so one approval
+names one grant, one policy and one request.
+
 **Still assumed:** that the session passes the gate the decision `admit`
-returned for the digest it computed for *this* request (one native line), how
-that digest is computed (canonical JSON and SHA-256), and the store's lock
-(`APPROVAL-RUST-01`). Also assumed: the production theorem's native premises,
+returned for that digest (one native line), SHA-256 and its hex text, and the
+store's lock (`APPROVAL-RUST-01`). Also assumed: the production theorem's native premises,
 and the keyed-retry and coordinator contracts for coordinated writes
 (`COORD-RUST-01`). This is not yet the full OUT-4 claim: provider-side write
 semantics and the uncertain-outcome policy across sessions still need their

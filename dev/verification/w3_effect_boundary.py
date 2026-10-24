@@ -146,7 +146,9 @@ def review_semantics(contents: dict[str, str]) -> None:
                        '.remember(&approval_digest, &canonical_request)?;')
             and request.count('run_current(') == 0 and request.count('run_approved(') == 1,
             'approval is not enforced by the extracted write gate before the controller')
-    require('self.policy.digest()' in request and '"grant":self.base.executor.audit.grant' in request
+    require('self.policy.digest()' in request
+            and 'aivm_secrets_garrett_core::approval::approval_preimage(' in request
+            and 'super::wire_text(&self.base.executor.audit.grant)' in request
             and 'self.session.require_control_active(now)' in m
             and 'fresh: &fresh,' in request,
             'approval identity or late revocation fencing bypassed')

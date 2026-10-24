@@ -425,11 +425,19 @@ impl Session {
             self.base.elapsed()?,
         )
         .map_err(use_error)?;
-        let request_hash = hex(digest::digest(
-            &digest::SHA256,
-            &json::canonical(&json!({"operation":op.name,"arguments":args})),
-        )
-        .as_ref());
+        // Both digest preimages are built by the extracted `approval`
+        // functions and encoded by the extracted encoder; only SHA-256 and the
+        // hex text are native.
+        let request_value = || {
+            aivm_secrets_garrett_core::approval::request_value(
+                super::wire_text(&op.name),
+                crate::json::capture(&json!(args)).into_wire(),
+            )
+        };
+        let encoded = |value: &aivm_secrets_garrett_core::json_wire::Value| {
+            aivm_secrets_garrett_core::json_wire::encode(value).map_err(|_| Error::InternalError)
+        };
+        let request_hash = hex(digest::digest(&digest::SHA256, &encoded(&request_value())?).as_ref());
         let current_peer = peer.thumbprint().as_bytes().to_vec();
         let current_operation = op.name.as_bytes().to_vec();
         let current_context = aivm_secrets_garrett_core::current_admission::Context::new(
@@ -456,8 +464,15 @@ impl Session {
         };
         let fresh = || current().map(|_| ());
         let canonical_request = json!({"operation":op.name,"arguments":args});
-        let approval_digest = hex(digest::digest(&digest::SHA256, &json::canonical(
-            &json!({"policy":self.policy.digest(),"grant":self.base.executor.audit.grant,"request":canonical_request}))).as_ref());
+        let approval_digest = hex(digest::digest(
+            &digest::SHA256,
+            &encoded(&aivm_secrets_garrett_core::approval::approval_preimage(
+                super::wire_text(&self.base.executor.audit.grant),
+                super::wire_text(&self.policy.digest()),
+                request_value(),
+            ))?,
+        )
+        .as_ref());
         let decision = if let Some(control) = &self.control {
             control.state.admit(&approval_digest, op.write)?
         } else {

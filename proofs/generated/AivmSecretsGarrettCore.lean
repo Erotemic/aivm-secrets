@@ -317,6 +317,115 @@ def approval.install
   else let kept1 ← alloc.vec.Vec.push kept slot1
        ok (some kept1)
 
+/-- [aivm_secrets_garrett_core::json_wire::Value]
+    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 6:0-13:1
+    Visibility: public -/
+@[discriminant isize]
+inductive json_wire.Value where
+| Null : json_wire.Value
+| Boolean : Bool → json_wire.Value
+| Number : alloc.vec.Vec Std.U8 → json_wire.Value
+| Text : alloc.vec.Vec Std.U32 → json_wire.Value
+| Array : alloc.vec.Vec json_wire.Value → json_wire.Value
+| Object :
+  alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value) →
+  json_wire.Value
+
+/-- [aivm_secrets_garrett_core::control::text]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 39:4-42:5
+    Visibility: public -/
+@[rust_loop]
+def control.text_loop
+  (bytes : Slice Std.U8) (out : alloc.vec.Vec Std.U32) (index : Std.Usize) :
+  Result (alloc.vec.Vec Std.U32)
+  := do
+  let i := Slice.len bytes
+  if index < i
+  then
+    let i1 ← Slice.index_usize bytes index
+    let i2 ← lift (UScalar.cast .U32 i1)
+    let out1 ← alloc.vec.Vec.push out i2
+    let index1 ← index + 1#usize
+    control.text_loop bytes out1 index1
+  else ok out
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::control::text]:
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 36:0-44:1
+    Visibility: public -/
+def control.text (bytes : Slice Std.U8) : Result json_wire.Value := do
+  let out ← control.text_loop bytes (alloc.vec.Vec.new Std.U32) 0#usize
+  ok (json_wire.Value.Text out)
+
+/-- [aivm_secrets_garrett_core::control::text_units]:
+    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 64:0-69:1
+    Visibility: public -/
+def control.text_units
+  (bytes : Slice Std.U8) : Result (alloc.vec.Vec Std.U32) := do
+  let v ← control.text bytes
+  match v with
+  | json_wire.Value.Null => ok (alloc.vec.Vec.new Std.U32)
+  | json_wire.Value.Boolean _ => ok (alloc.vec.Vec.new Std.U32)
+  | json_wire.Value.Number _ => ok (alloc.vec.Vec.new Std.U32)
+  | json_wire.Value.Text units => ok units
+  | json_wire.Value.Array _ => ok (alloc.vec.Vec.new Std.U32)
+  | json_wire.Value.Object _ => ok (alloc.vec.Vec.new Std.U32)
+
+/-- [aivm_secrets_garrett_core::approval::request_value]:
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 144:0-152:1
+    Visibility: public -/
+def approval.request_value
+  (operation : json_wire.Value) (arguments : json_wire.Value) :
+  Result json_wire.Value
+  := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 9#usize [
+        97#u8, 114#u8, 103#u8, 117#u8, 109#u8, 101#u8, 110#u8, 116#u8, 115#u8
+        ]))
+  let v ← control.text_units s
+  let s1 ←
+    lift (Array.to_slice
+      (Array.make 9#usize [
+        111#u8, 112#u8, 101#u8, 114#u8, 97#u8, 116#u8, 105#u8, 111#u8, 110#u8
+        ]))
+  let v1 ← control.text_units s1
+  let y ←
+    lift (Std.Array.to_slice
+      (Array.make 2#usize [ (v, arguments), (v1, operation) ] : Array
+      ((alloc.vec.Vec Std.U32) × json_wire.Value) 2#usize))
+  let ret := alloc.slice.Slice.into_vec y
+  ok (json_wire.Value.Object ret)
+
+/-- [aivm_secrets_garrett_core::approval::approval_preimage]:
+    Source: 'crates/aivm-secrets-garrett-core/src/approval.rs', lines 157:0-167:1
+    Visibility: public -/
+def approval.approval_preimage
+  (grant : json_wire.Value) (policy : json_wire.Value)
+  (request : json_wire.Value) :
+  Result json_wire.Value
+  := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 5#usize [ 103#u8, 114#u8, 97#u8, 110#u8, 116#u8 ]))
+  let v ← control.text_units s
+  let s1 ←
+    lift (Array.to_slice
+      (Array.make 6#usize [ 112#u8, 111#u8, 108#u8, 105#u8, 99#u8, 121#u8 ]))
+  let v1 ← control.text_units s1
+  let s2 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        114#u8, 101#u8, 113#u8, 117#u8, 101#u8, 115#u8, 116#u8
+        ]))
+  let v2 ← control.text_units s2
+  let y ←
+    lift (Std.Array.to_slice
+      (Array.make 3#usize [ (v, grant), (v1, policy), (v2, request) ] : Array
+      ((alloc.vec.Vec Std.U32) × json_wire.Value) 3#usize))
+  let ret := alloc.slice.Slice.into_vec y
+  ok (json_wire.Value.Object ret)
+
 /-- Trait declaration: [aivm_secrets_garrett_core::audit_record::Sink]
     Source: 'crates/aivm-secrets-garrett-core/src/audit_record.rs', lines 13:0-18:1
     Visibility: public -/
@@ -2287,20 +2396,6 @@ def
   Result (selected_conversion.WireDenial × selected_conversion.WireBuilder)
   := do
   ok (selected_conversion.WireDenial.Opaque, self)
-
-/-- [aivm_secrets_garrett_core::json_wire::Value]
-    Source: 'crates/aivm-secrets-garrett-core/src/json_wire.rs', lines 6:0-13:1
-    Visibility: public -/
-@[discriminant isize]
-inductive json_wire.Value where
-| Null : json_wire.Value
-| Boolean : Bool → json_wire.Value
-| Number : alloc.vec.Vec Std.U8 → json_wire.Value
-| Text : alloc.vec.Vec Std.U32 → json_wire.Value
-| Array : alloc.vec.Vec json_wire.Value → json_wire.Value
-| Object :
-  alloc.vec.Vec ((alloc.vec.Vec Std.U32) × json_wire.Value) →
-  json_wire.Value
 
 /-- [aivm_secrets_garrett_core::selected_conversion::{impl aivm_secrets_garrett_core::selected_conversion::Builder<aivm_secrets_garrett_core::json_wire::Value, alloc::vec::Vec<u32>, alloc::vec::Vec<(alloc::vec::Vec<u32>, aivm_secrets_garrett_core::json_wire::Value)>, aivm_secrets_garrett_core::selected_conversion::WireDenial> for aivm_secrets_garrett_core::selected_conversion::WireBuilder}::finish_object]:
     Source: 'crates/aivm-secrets-garrett-core/src/selected_conversion.rs', lines 247:4-249:5
@@ -5162,46 +5257,6 @@ inductive control.Controlled (E : Type _) where
 | Failed : E → control.Controlled E
 | Unencodable : control.Controlled E
 | Denied : control.Controlled E
-
-/-- [aivm_secrets_garrett_core::control::text]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 39:4-42:5
-    Visibility: public -/
-@[rust_loop]
-def control.text_loop
-  (bytes : Slice Std.U8) (out : alloc.vec.Vec Std.U32) (index : Std.Usize) :
-  Result (alloc.vec.Vec Std.U32)
-  := do
-  let i := Slice.len bytes
-  if index < i
-  then
-    let i1 ← Slice.index_usize bytes index
-    let i2 ← lift (UScalar.cast .U32 i1)
-    let out1 ← alloc.vec.Vec.push out i2
-    let index1 ← index + 1#usize
-    control.text_loop bytes out1 index1
-  else ok out
-partial_fixpoint
-
-/-- [aivm_secrets_garrett_core::control::text]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 36:0-44:1
-    Visibility: public -/
-def control.text (bytes : Slice Std.U8) : Result json_wire.Value := do
-  let out ← control.text_loop bytes (alloc.vec.Vec.new Std.U32) 0#usize
-  ok (json_wire.Value.Text out)
-
-/-- [aivm_secrets_garrett_core::control::text_units]:
-    Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 64:0-69:1
-    Visibility: public -/
-def control.text_units
-  (bytes : Slice Std.U8) : Result (alloc.vec.Vec Std.U32) := do
-  let v ← control.text bytes
-  match v with
-  | json_wire.Value.Null => ok (alloc.vec.Vec.new Std.U32)
-  | json_wire.Value.Boolean _ => ok (alloc.vec.Vec.new Std.U32)
-  | json_wire.Value.Number _ => ok (alloc.vec.Vec.new Std.U32)
-  | json_wire.Value.Text units => ok units
-  | json_wire.Value.Array _ => ok (alloc.vec.Vec.new Std.U32)
-  | json_wire.Value.Object _ => ok (alloc.vec.Vec.new Std.U32)
 
 /-- [aivm_secrets_garrett_core::control::described]:
     Source: 'crates/aivm-secrets-garrett-core/src/control.rs', lines 47:0-53:1
