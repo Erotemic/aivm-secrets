@@ -976,3 +976,13 @@ assessments: REBIND-RUST-01, OAUTH-LOGIN-RUST-01 and COORD-OPERATOR-RUST-01
 have their decisions extracted already; what is left is decoding and I/O
 order. I did not fold the rebind thumbprint comparison into permitted because
 it would change its public refusal code.
+
+## 2026-10-24 04:20:37 -0400
+
+Assessed COORD-AUTHORITY-RUST-01: the server ledger already calls the core
+for every decision; the rest is SQL, decoding and commit ordering. With this,
+each native-trusted entry on the roadmap now either has its decisions in
+extracted code or a recorded reason why the remainder is I/O, parsing
+(RUST-JSON-01, deferred), crypto, clock or real-VM evidence. Further
+assumption removal needs either the deferred JSON parser extraction or a
+design change (e.g. HP-6 constrained-http refinement), not more wrappers.
