@@ -845,3 +845,14 @@ the assumption. Reordered: (1) core-build the proxy's audit rows; (2) the
 approval digest needs an extracted canonical-request encoder plus a stated
 SHA-256 contract (crypto stays external-trusted) before the gate fold is worth
 doing; (3) opaque core credential type as before.
+
+## 2026-10-23 23:06:45 -0400 (branch wip/proxy-audit-rows)
+
+Started the proxy audit-row extraction on a branch, not main: core
+`proxy_audit::row` (fixed fields merged with key-sorted detail) and an oracle
+against serde `row.to_string()`. Finding: the extracted JSON encoder escapes
+non-ASCII as \uXXXX while serde emits raw UTF-8, so rows match only for ASCII
+fields (true in production: visible-ASCII targets, ASCII origins/codes). Before
+merging: rewrite `merge` with index loops (Peekable is not Aeneas-friendly),
+extract, prove sortedness and fields, wire `Session::record`, run the gate.
+Not wired into garrett-proxy yet.

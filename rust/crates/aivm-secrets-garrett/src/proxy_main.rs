@@ -894,6 +894,55 @@ mod connect_oracle {
     //! native checks it replaced (base64 crate decoding included).
     use super::*;
 
+    /// The extracted proxy audit row against the serde row it would replace.
+    #[test]
+    fn extracted_proxy_audit_rows_match_the_serde_rows() {
+        use aivm_secrets_garrett_core::json_wire::{self as wire, Value as Wire};
+        let captured = |value: &Value| match wire_of(value) {
+            Wire::Object(fields) => fields,
+            _ => panic!("object"),
+        };
+        let details = [
+            json!({"profile": "credential-substitution", "origins": ["api.example.org"]}),
+            json!({"origin": "api.example.org", "method": "GET", "path": "/v1/a?b=c&d=%2F"}),
+            json!({"origin": "h", "method": "POST", "path": "/x", "status": 201}),
+            // ASCII only: the strict parser admits only visible-ASCII targets. For
+            // non-ASCII text the extracted encoder writes `\\u00e9` where serde
+            // writes raw UTF-8, so the rows would differ there.
+            json!({"code": "denied", "origin": "h", "method": "GET", "path": "/\"q\\"}),
+            json!({"origin": "h", "method": "GET", "path": "/p", "operation": "pull.view"}),
+            json!({}),
+        ];
+        for detail in details {
+            for event in ["session_start", "admitted", "completed", "refused"] {
+                let mut old = json!({"schema": "proxy-audit-1", "seq": 7, "prev": "ab".repeat(32),
+                                     "event": event, "timestamp": 1_792_000_000u64});
+                for (k, v) in detail.as_object().unwrap() {
+                    old.as_object_mut().unwrap().insert(k.clone(), v.clone());
+                }
+                let new = aivm_secrets_garrett_core::proxy_audit::row(
+                    wire_of(&json!(event)), wire_of(&json!("ab".repeat(32))),
+                    wire_of(&json!(7)), wire_of(&json!(1_792_000_000u64)), captured(&detail));
+                assert_eq!(wire::encode(&new).ok().unwrap(), old.to_string().into_bytes(), "{old}");
+            }
+        }
+    }
+
+    fn wire_of(value: &Value) -> aivm_secrets_garrett_core::json_wire::Value {
+        use aivm_secrets_garrett_core::json_wire::Value as Wire;
+        match value {
+            Value::Null => Wire::Null,
+            Value::Bool(b) => Wire::Boolean(*b),
+            Value::Number(n) => Wire::Number(n.to_string().into_bytes()),
+            Value::String(s) => Wire::Text(s.chars().map(u32::from).collect()),
+            Value::Array(items) => Wire::Array(items.iter().map(wire_of).collect()),
+            Value::Object(fields) => Wire::Object(
+                fields.iter().map(|(k, v)| (k.chars().map(u32::from).collect(), wire_of(v))).collect(),
+            ),
+        }
+    }
+
+
     struct Legacy {
         token: Vec<u8>,
     }
