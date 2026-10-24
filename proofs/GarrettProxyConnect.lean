@@ -45,15 +45,21 @@ def ProxyAuthorization : List U8 :=
 theorem or_zero {x y : U8} (h : (x ||| y) = 0#u8) : x = 0#u8 ∧ y = 0#u8 := by
   have hb : x.bv ||| y.bv = 0#8 := by
     have := congrArg UScalar.bv h; simpa using this
-  have hx : x.bv = 0#8 := by bv_decide
-  have hy : y.bv = 0#8 := by bv_decide
+  -- Bit by bit, kernel-checked: `bv_decide` would add a native-code axiom.
+  have bits : ∀ i, x.bv.getLsbD i = false ∧ y.bv.getLsbD i = false := by
+    intro i
+    have := congrArg (fun v => v.getLsbD i) hb
+    simpa [BitVec.getLsbD_or] using this
+  have hx : x.bv = 0#8 := BitVec.eq_of_getLsbD_eq (fun i _ => by simp [(bits i).1])
+  have hy : y.bv = 0#8 := BitVec.eq_of_getLsbD_eq (fun i _ => by simp [(bits i).2])
   exact ⟨U8.bv_eq_imp_eq _ _ (by simpa using hx), U8.bv_eq_imp_eq _ _ (by simpa using hy)⟩
 
 theorem xor_zero {x y : U8} (h : (x ^^^ y) = 0#u8) : x = y := by
   have hb : x.bv ^^^ y.bv = 0#8 := by
     have := congrArg UScalar.bv h; simpa using this
   apply U8.bv_eq_imp_eq
-  bv_decide
+  calc x.bv = (x.bv ^^^ y.bv) ^^^ y.bv := by rw [BitVec.xor_assoc]; simp
+    _ = y.bv := by rw [hb]; simp
 
 theorem same_secret_loop_ok (a b : Slice U8) (same_length : a.length = b.length) :
     ∀ n (difference r : U8) (index : Usize), a.length - index.val = n →
