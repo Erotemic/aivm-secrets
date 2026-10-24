@@ -928,3 +928,12 @@ With Error = PublicError, the three native refusal maps moved into the core
 Mistake caught: I ran rustfmt on public_error.rs, which was not formatter-clean,
 and it collapsed an existing block a mutation test targets; restored from HEAD
 and re-added only my functions. Checked fa74c63 (write_gate.rs) had insertions only.
+
+## 2026-10-24 02:30:25 -0400
+
+Re-assessed what remains. NATIVE-GLUE-01: only calls into extracted
+functions, one control check and struct construction remain. NATIVE-SINK-01:
+the opaque credential type would not remove the assumption (it is a native
+reachability property over code that legitimately reads the bytes); I had
+earlier framed it as a removal pending a decision, which overstated it.
+Recorded on the roadmap.
