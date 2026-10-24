@@ -472,7 +472,8 @@ format above::
 ``aivm-secrets policy-check`` prints what it stands for: a schema-2 manifest
 for ``api.github.com`` whose ``pull`` check requires the PR's number, base
 repository, author and head repository to match before anything else is read
-or written, and which binds the head commit for ``pr.checks``. The shorthand
+or written, and which binds the head commit for ``pr.checks`` and
+``pr.statuses``. The shorthand
 and that manifest are the same policy, with the same digest. Copy the output
 (or ``docs/examples/aivm-secrets-github-pr.json``) to change anything the
 shorthand does not offer.
@@ -485,7 +486,9 @@ including the old requirement to specify ``-R`` explicitly. See
 The credential comes from the owning host user's ``gh auth token``, or from
 ``--secrets_token_file``. ``pr.comment`` and ``pr.edit`` (title and body
 only) are writes. ``pr.checks`` returns check runs for the validated head
-commit, not workflow logs. The optional ``pr.summary`` and
+commit, not workflow logs. ``pr.statuses`` (``gh pr statuses``) returns that
+commit's statuses, which are separate from check runs: a commit can pass every
+check run and still have a failing status. The optional ``pr.summary`` and
 ``pr.review-threads`` operations are **fixed**, reviewed GraphQL reads.
 A schema-1 policy must explicitly grant them. REST lists return at most
 100 records and say ``pagination.possibly_more``; the JSON compatibility

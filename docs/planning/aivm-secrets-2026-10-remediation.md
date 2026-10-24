@@ -140,8 +140,10 @@ support following GraphQL cursors.
   match all objects/derived fields of the official CLI. Check-run state
   mapping is intentionally limited. Do not replace a campaign's real `gh`
   executable globally without a command-by-command compatibility audit.
-* `gh pr checks` currently reads GitHub **check runs** for the validated
-  commit; it does not reconcile all commit statuses or retrieve CI logs.
+* `gh pr checks` reads GitHub **check runs** for the validated commit. Commit
+  statuses are a separate operation, `pr.statuses` (`gh pr statuses`, added
+  2026-10-24), because a commit can pass every check run and still have a
+  failing status. Neither retrieves CI logs.
 * GitHub GraphQL is subject to its own authentication, resource and rate
   constraints. Live API compatibility and credentialed VM smoke tests remain
   **unverified** in this overlay.

@@ -52,6 +52,7 @@ PR_READS = (
     'pr.review-threads',
     'pr.summary',
     'pr.checks',
+    'pr.statuses',
 )
 PR_WRITES = ('pr.comment', 'pr.edit')
 PR_OPERATIONS = PR_READS + PR_WRITES
@@ -123,6 +124,10 @@ def _github_operations(repo: str, numbers: list[int]) -> dict[str, Any]:
                 'at': ['check_runs'],
             },
         ),
+        # Commit statuses are separate from check runs: a commit can pass
+        # every check run and still have a failing status. GitHub returns
+        # them newest first, one row per update.
+        'pr.statuses': dict(listing, path=base + '/commits/{head_sha}/statuses'),
         # GitHub REST does not expose unresolved review threads. This query
         # is a fixed operator manifest effect; the guest can change only
         # typed, allowlisted variables, never the GraphQL document or URL.
@@ -245,7 +250,8 @@ GH_CHECKS_JSON = {
 def _gh_command(name: str, *, enhanced: bool = False) -> dict[str, Any]:
     """One declarative CLI row; guest-side inference grants no authority."""
     options = {'--repo': 'repository', '-R': 'repository'}
-    if name in ('pr.comments', 'pr.reviews', 'pr.review-comments', 'pr.checks'):
+    if name in ('pr.comments', 'pr.reviews', 'pr.review-comments', 'pr.checks',
+                'pr.statuses'):
         options['--page'] = 'page'
     if name in PR_WRITES:
         options['--body'] = 'body'

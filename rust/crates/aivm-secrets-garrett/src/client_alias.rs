@@ -12,6 +12,7 @@ enum CommandKind {
     View,
     Diff,
     Checks,
+    Statuses,
 }
 
 pub(crate) struct GitHubCommand {
@@ -49,6 +50,7 @@ impl GitHubCommand {
             "view" => CommandKind::View,
             "diff" => CommandKind::Diff,
             "checks" => CommandKind::Checks,
+            "statuses" => CommandKind::Statuses,
             _ => return Err(Error::Denied),
         };
         if args[3].is_empty()
@@ -74,6 +76,7 @@ impl GitHubCommand {
                     let allowed: &[&str] = match kind {
                         CommandKind::View => &["number", "title", "headRefOid"],
                         CommandKind::Checks => &["name", "status", "conclusion"],
+                        CommandKind::Statuses => &["context", "state", "description"],
                         CommandKind::Diff => return Err(Error::InvalidRequest),
                     };
                     let mut selected = Vec::new();
@@ -108,6 +111,7 @@ impl GitHubCommand {
             CommandKind::View => "pr.view",
             CommandKind::Diff => "pr.diff",
             CommandKind::Checks => "pr.checks",
+            CommandKind::Statuses => "pr.statuses",
         };
         value!({"version":1,"capability":capability,"request":{
             "operation":operation,
@@ -130,9 +134,14 @@ impl GitHubCommand {
                 .as_bytes()
                 .to_vec());
         }
-        let selected = if self.kind == CommandKind::Checks && !self.fields.is_empty() {
+        let list = match self.kind {
+            CommandKind::Checks => Some("checks"),
+            CommandKind::Statuses => Some("statuses"),
+            _ => None,
+        };
+        let selected = if let (Some(key), false) = (list, self.fields.is_empty()) {
             let rows = result
-                .get("checks")
+                .get(key)
                 .and_then(Value::as_array)
                 .ok_or(Error::InvalidRequest)?;
             let mut out = Vec::new();

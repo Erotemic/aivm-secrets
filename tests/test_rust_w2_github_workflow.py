@@ -261,3 +261,52 @@ def test_w2_reflected_credential_rejected_before_guest_disclosure(tmp_path):
             assert TOKEN not in json.dumps(refused)
             assert [r['target'] for r in server.seen()] == [PULL_PATH, PULL_PATH]
         assert TOKEN not in (tmp_path / 'provider-audit.jsonl').read_text()
+
+
+STATUSES_PATH = f'/repos/{REPO.lower()}/commits/{HEAD_SHA}/statuses?page=1&per_page=100'
+STATUSES = [
+    {'context': 'ci/required', 'state': 'failure', 'description': 'tests failed',
+     'target_url': 'https://ci.example/1', 'creator': {'login': 'bot'}},
+    {'context': 'ci/optional', 'state': 'success', 'description': 'ok',
+     'target_url': 'https://ci.example/2', 'creator': {'login': 'bot'}},
+]
+
+
+def test_commit_statuses_are_a_separate_read_and_a_gh_alias(tmp_path):
+    """Check runs can all pass while a commit status fails: `pr.statuses`
+    reads the statuses, and `gh pr statuses` renders the selected fields."""
+    with TLSService(provider_directory(tmp_path)) as server:
+        install_github_routes(server)
+        server.routes[('GET', STATUSES_PATH)] = STATUSES
+        policy = github_pr(github_policy(
+            operations=OPERATIONS + ['pr.statuses'], pr_numbers=[ALLOWED_PR],
+            gh_compat=2, lifetime_seconds=1800, max_requests=32))
+        policy.pop('cli', None)
+        policy['host'] = server.host
+        policy['egress'] = server.egress()
+        policy['credential_source'] = {'kind': 'file', 'path': str(tmp_path / 'credential')}
+        disclosure = dict(native_disclosure(), **{'pr.statuses': {'statuses': {
+            'at': [], 'type': 'array', 'max_items': 100,
+            'items': {'at': [], 'type': 'object', 'fields': {
+                'context': {'at': ['context'], 'type': 'text'},
+                'state': {'at': ['state'], 'type': 'text'},
+                'description': {'at': ['description'], 'type': 'text'},
+            }},
+        }}})
+        with ManifestCase(tmp_path, server, policy, disclosure) as case:
+            reply = case.invoke(operation='pr.statuses', arguments=arguments())
+            assert reply['ok'] is True, reply
+            assert reply['result'] == {'statuses': [
+                {'context': 'ci/required', 'state': 'failure', 'description': 'tests failed'},
+                {'context': 'ci/optional', 'state': 'success', 'description': 'ok'},
+            ]}
+            rendered = native_cli(case, 'pr', 'statuses', str(ALLOWED_PR), '--repo', REPO,
+                                  '--json', 'context,state')
+            assert rendered.returncode == 0, rendered.stderr
+            assert json.loads(rendered.stdout) == [
+                {'context': 'ci/required', 'state': 'failure'},
+                {'context': 'ci/optional', 'state': 'success'},
+            ]
+            unlisted = native_cli(case, 'pr', 'statuses', str(ALLOWED_PR), '--repo', REPO,
+                                  '--json', 'target_url')
+            assert unlisted.returncode != 0 and unlisted.stdout == b''
