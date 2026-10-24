@@ -662,7 +662,7 @@ oracle test replays random sequences against the old map.
 
 Read the predicates `ForDigest`, `Survives` and `Unique` (three lines each):
 they are the whole specification. One behaviour changed on purpose: a full
-store used to be pruned before refusing; now a refusal leaves it untouched.
+store used to be pruned before refusing; now a refusal leaves it untouched. This matches the Python reference kernel (`kernel/machine.py`, `approve`), which raises `exhausted` before replacing its state.
 
 **Still assumed:** that the session passes the gate the decision `admit`
 returned for the digest it computed for *this* request (one native line), how

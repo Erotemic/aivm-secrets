@@ -750,3 +750,11 @@ trait) with oracle (same result and same bytes consumed as the old loop).
 `connect_head_returned` proved by induction on remaining room under
 MAX_HEAD, stated as an inversion of a returned result because callbacks may
 fail. Every sequencing loop of garrett-proxy is now extracted.
+
+## 2026-10-23 20:12:47 -0400
+
+Parity note: the approval-store behaviour change (full store refuses without
+pruning) matches Python `kernel/machine.approve`, which is functional and
+raises `exhausted` before replacing state. Updated the claim matrix with
+today's evidence and an explicit "outside this profile" section so OUT-4/OUT-6
+proofs are not counted toward the native read claim.
