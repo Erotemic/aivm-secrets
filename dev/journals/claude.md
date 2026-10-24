@@ -1102,3 +1102,59 @@ unhelpful. The bridge's stderr is dropped because it may carry sensitive
 data. The fixed error code itself is not sensitive, though, so the
 announcement could carry it. I haven't changed that; it is a protocol-visible
 change.
+
+## 2026-10-24 15:30:00 -0400
+
+The goal was "finish everything in docs/planning". Where it stands: every item
+in the planning documents now appears in the plan's table. Each is either
+done, explained, waiting on a maintainer decision or reviewer, or still open.
+The remaining open items are compatibility features. Done this session,
+beyond Phases 1 to 3 recorded earlier:
+
+- **Phase 4.** Protocol v1; the read-only release guide; a separate
+  `garrett-bridge-read-only` binary. It is a binary and not a Cargo feature,
+  because a restricting feature broke `--all-features` builds of the general
+  bridge.
+- **Phase 3.4, the axiom audit.** 1,412 theorems rest only on Lean's three
+  standard axioms. The audit found one `bv_decide` proof that trusted the
+  native evaluator; it now has a kernel proof.
+- **Phase 5 rehearsal.** One exactly approved comment through a real VM.
+- **Phase 6, HP-6 uniqueness.** Proved when path values are single segments;
+  that condition is necessary.
+- **Identity.** In the Python reference: `ca_not_after` in status (both
+  authorities), `identity verify`, `prune-keys --superseded`, and issuer-key
+  name skipping. In AIVM: the operator-verb confirmation, the CAS on
+  `--replace`, and the helper upgrade via `aivm vm update`. The identity
+  lifecycle ran on a real VM: 13 checks.
+- **Assurance.** `admitted_stamp_had_current_lease` (each send's lease and
+  identity were current at the stamp's time). `AUTH-01` is recorded as proved
+  natively.
+- **Compatibility.** `pr.statuses` / `gh pr statuses`. A pinned AIVM
+  compatibility check, which found that AIVM's suite tests its own stale copy
+  of `aivm_secrets`.
+
+Decisions I deliberately did not make, now listed as "needs maintainer":
+- clamping certificates to the CA's expiry (the minimum validity is unstated);
+- a native audit hash chain (it changes the file format);
+- `IDENT-ENROLL-04` (a subject-derivation boundary);
+- RFC 7009 revocation (sends the refresh token to a new endpoint);
+- freezing the manifest schema;
+- new AIVM secrets surfaces (`identity_renew --all`, the session warning, the
+  VS Code mode), which AIVM's rules forbid;
+- removing AIVM's stale in-tree copy (the recorded cutover).
+
+Mistakes I made and fixed:
+- Two unquoted heredocs ran backtick spans as shell commands. One started
+  `aivm-secrets approve DIGEST`, which waited on input until I killed it. There
+  was no live session, so nothing was approved. Every heredoc that contains
+  backticks is now quoted.
+- I edited files while the gate was running, twice. The gate's own
+  stable-snapshot check caught the second time, and both runs were repeated
+  on a frozen tree.
+- The first lifecycle script kept its guest backup in `/tmp`, so a check
+  passed for the wrong reason after a reboot. Found and fixed.
+
+Confidence: high for what the proofs and the gate cover, and for the real-VM
+runs, which were all local nested KVM and run by me. Lower for anything
+labelled a rehearsal of a maintainer run. Those show the scripts work, not
+that the maintainer's environment behaves the same.
