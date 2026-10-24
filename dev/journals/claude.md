@@ -1204,3 +1204,38 @@ in the tail of this session.
 
 Confidence: high for the chain and RFC 7009, which have gate evidence and
 adversarial tests. High for `--all` logic, medium for its operator wording.
+
+## 2026-10-24 17:30:54 -0400
+
+The stop hook said the goal was not met, so I took the two proof items I
+had left open.
+
+- `GarrettServiceHistory` (`31ff65a`): a finite history model of one
+  subject's vault record and registry row. Dispatch is gated by the extracted
+  `require_current_lease` itself, and each refresh is one write per
+  `refresh_once` step. Main results: `every_emission_admitted`,
+  `fenced_session_never_emits` and `identity_fenced_session_never_emits`.
+  Uncertain publication needs no special event: the theorems quantify over
+  histories both with and without the commit. A volatile in-flight slot,
+  cleared by a crash, keeps a crashed refresh from being settled by a later,
+  unrelated event. A model without it would have been unfaithful.
+- `GarrettLoginHistory` (`0b15304`): one login over the extracted
+  `claim`, `begin` and `finish`, with `at_most_one_exchange`,
+  `every_exchange_bound` and `crash_is_final`. My first draft used
+  `split`/`rename_i` on nested matches and broke on generated names.
+  Casing on each discriminant with a named equation was robust.
+- Both models need classical decidability, because the extracted `Result`
+  is coinductive and its equality is not decidable. The witnesses are
+  therefore proved by `simp`, not `decide`.
+- The full gate passed, and the axiom audit rerun found 1,444 theorems, all
+  on the three standard axioms, with 32 additions. I updated the baseline.
+- `OTHER-PROFILES`: the scope asks for separate results per profile, and
+  those exist. I mapped them in `verified-w4-core-trace.md` instead of
+  building one model, which was my own over-reading of the plan.
+- The credential-free tools questions are now recorded as agent decisions.
+  Later work answers most of them; the host executor is not built.
+
+Left by nature: reviews and sign-offs, live-provider runs, hardware and
+multi-host work, AIVM's own decisions (the stale copy, the rename prompt),
+and refinement of the storage, lock, listener and TLS adapters, which the
+history models take as premises.
