@@ -305,7 +305,7 @@ fn main() {
             }
         }
         Err(error) => {
-            eprintln!("{}", error.code());
+            eprintln!("{}", error.name());
             std::process::exit(1);
         }
     }

@@ -27,6 +27,30 @@ pub enum PublicError {
     AuthorizationDenied,
 }
 
+impl PublicError {
+    /// The host-side spelling of the code (the same text as `code`).
+    pub fn name(self) -> &'static str {
+        match self {
+            PublicError::InvalidCapability => "invalid_capability",
+            PublicError::InvalidPolicy => "invalid_policy",
+            PublicError::ResourceMismatch => "resource_mismatch",
+            PublicError::InvalidRequest => "invalid_request",
+            PublicError::Denied => "denied",
+            PublicError::Unreachable => "unreachable",
+            PublicError::UpstreamResponse => "upstream_response",
+            PublicError::UpstreamRejected => "upstream_rejected",
+            PublicError::UpstreamError => "upstream_error",
+            PublicError::InternalError => "internal_error",
+            PublicError::UnsafeFile => "unsafe_file",
+            PublicError::OutcomeUnknown => "outcome_unknown",
+            PublicError::Exhausted => "exhausted",
+            PublicError::Revoked => "revoked",
+            PublicError::CredentialSource | PublicError::AuthorizationDenied => "credential_source",
+            PublicError::Expired => "expired",
+        }
+    }
+}
+
 /// Stable machine-readable code. `AuthorizationDenied` deliberately shares
 /// `credential_source` so the guest cannot distinguish the two causes.
 pub fn code(error: PublicError) -> Vec<u8> {

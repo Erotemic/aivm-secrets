@@ -336,7 +336,7 @@ fn main() {
             }
         }
         Err(error) => {
-            let _ = reply(&json!({"version":1,"ok":false,"error":{"code":error.code()}}));
+            let _ = reply(&json!({"version":1,"ok":false,"error":{"code":error.name()}}));
             std::process::exit(1);
         }
     }

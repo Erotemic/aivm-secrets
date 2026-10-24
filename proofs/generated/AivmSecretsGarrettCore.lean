@@ -15891,8 +15891,34 @@ def public_error.PublicError.Insts.CoreCmpEq : core.cmp.Eq
   partialEqInst := public_error.PublicError.Insts.CoreCmpPartialEqPublicError
 }
 
+/-- [aivm_secrets_garrett_core::public_error::{aivm_secrets_garrett_core::public_error::PublicError}::name]:
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 32:4-51:5
+    Visibility: public -/
+def public_error.PublicError.name
+  (self : public_error.PublicError) : Result Str := do
+  match self with
+  | public_error.PublicError.InvalidCapability =>
+    ok (toStr "invalid_capability")
+  | public_error.PublicError.InvalidPolicy => ok (toStr "invalid_policy")
+  | public_error.PublicError.ResourceMismatch => ok (toStr "resource_mismatch")
+  | public_error.PublicError.InvalidRequest => ok (toStr "invalid_request")
+  | public_error.PublicError.Denied => ok (toStr "denied")
+  | public_error.PublicError.Unreachable => ok (toStr "unreachable")
+  | public_error.PublicError.UpstreamResponse => ok (toStr "upstream_response")
+  | public_error.PublicError.UpstreamRejected => ok (toStr "upstream_rejected")
+  | public_error.PublicError.UpstreamError => ok (toStr "upstream_error")
+  | public_error.PublicError.InternalError => ok (toStr "internal_error")
+  | public_error.PublicError.UnsafeFile => ok (toStr "unsafe_file")
+  | public_error.PublicError.OutcomeUnknown => ok (toStr "outcome_unknown")
+  | public_error.PublicError.Exhausted => ok (toStr "exhausted")
+  | public_error.PublicError.Revoked => ok (toStr "revoked")
+  | public_error.PublicError.CredentialSource => ok (toStr "credential_source")
+  | public_error.PublicError.Expired => ok (toStr "expired")
+  | public_error.PublicError.AuthorizationDenied =>
+    ok (toStr "credential_source")
+
 /-- [aivm_secrets_garrett_core::public_error::code]:
-    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 32:0-54:1
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 56:0-78:1
     Visibility: public -/
 def public_error.code
   (error : public_error.PublicError) : Result (alloc.vec.Vec Std.U8) := do
@@ -16046,7 +16072,7 @@ def public_error.code
       Std.U8) s
 
 /-- [aivm_secrets_garrett_core::public_error::message]:
-    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 57:0-70:1
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 81:0-94:1
     Visibility: public -/
 def public_error.message
   (error : public_error.PublicError) : Result (alloc.vec.Vec Std.U8) := do
@@ -16235,7 +16261,7 @@ def public_error.message
       Std.U8) s
 
 /-- [aivm_secrets_garrett_core::public_error::text]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 76:4-79:5 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 100:4-103:5 -/
 @[rust_loop]
 def public_error.text_loop
   (bytes : Slice Std.U8) (out : alloc.vec.Vec Std.U32) (i : Std.Usize) :
@@ -16253,14 +16279,14 @@ def public_error.text_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::public_error::text]:
-    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 73:0-81:1 -/
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 97:0-105:1 -/
 @[reducible]
 def public_error.text
   (bytes : Slice Std.U8) : Result (alloc.vec.Vec Std.U32) := do
   public_error.text_loop bytes (alloc.vec.Vec.new Std.U32) 0#usize
 
 /-- [aivm_secrets_garrett_core::public_error::denial]:
-    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 86:0-98:1
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 110:0-122:1
     Visibility: public -/
 def public_error.denial
   (error : public_error.PublicError) : Result json_wire.Value := do
@@ -16310,7 +16336,7 @@ def public_error.denial
   ok (json_wire.Value.Object ret1)
 
 /-- [aivm_secrets_garrett_core::public_error::denial_frame]:
-    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 101:0-106:1
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 125:0-130:1
     Visibility: public -/
 def public_error.denial_frame
   (error : public_error.PublicError) (limit : Std.Usize) :
@@ -16320,7 +16346,7 @@ def public_error.denial_frame
   json_wire.prepare v limit
 
 /-- [aivm_secrets_garrett_core::public_error::answer_frame]:
-    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 111:0-119:1
+    Source: 'crates/aivm-secrets-garrett-core/src/public_error.rs', lines 135:0-143:1
     Visibility: public -/
 def public_error.answer_frame
   (answer : core.result.Result json_wire.Value public_error.PublicError)

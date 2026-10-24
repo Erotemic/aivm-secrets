@@ -93,8 +93,8 @@ fn main() -> io::Result<()> {
             })
         };
         let answer = result.unwrap_or_else(|e| {
-            if e==Error::AuthorizationDenied {json!({"ok":false,"code":e.code(),"reason":"authorization_denied"})}
-            else {json!({"ok":false,"code":if oauth_mode && e==Error::InvalidCapability {"credential_source"} else {e.code()}})}
+            if e==Error::AuthorizationDenied {json!({"ok":false,"code":e.name(),"reason":"authorization_denied"})}
+            else {json!({"ok":false,"code":if oauth_mode && e==Error::InvalidCapability {"credential_source"} else {e.name()}})}
         });
         output.write_all(&json::canonical(&answer))?;
         output.write_all(b"\n")?;

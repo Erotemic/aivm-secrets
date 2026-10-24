@@ -640,7 +640,7 @@ impl IdentityAuthority {
         for id in self.root.child("transactions")?.names()? {
             match self.read_plan(&id) {
                 Ok(plan) => entries.push(json!({"transaction":id,"operation":plan["operation"],"created_at":plan["created_at"],"plan_sha256":sha(&json::canonical(&plan)),"phase":phase(&plan,&current).map(phase_name).unwrap_or("conflict")})),
-                Err(error) => entries.push(json!({"transaction":id,"phase":"invalid-plan","error":{"code":error.code()}})),
+                Err(error) => entries.push(json!({"transaction":id,"phase":"invalid-plan","error":{"code":error.name()}})),
             }
         }
         Ok(json!({"transactions":entries}))

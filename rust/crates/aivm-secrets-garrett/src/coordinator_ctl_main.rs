@@ -45,7 +45,7 @@ fn main() {
     }
     let (mut reply, success) = match execute(&args) {
         Ok(value) => (value, true),
-        Err(error) => (json!({"ok":false,"error":{"code":error.code()}}), false),
+        Err(error) => (json!({"ok":false,"error":{"code":error.name()}}), false),
     };
     reply["version"] = json!(1);
     let mut bytes = json::canonical(&reply);

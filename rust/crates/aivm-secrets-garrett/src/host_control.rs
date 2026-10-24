@@ -124,7 +124,7 @@ fn serve(mut socket: UnixStream, state: &Shared) -> Outcome<()> {
         .and_then(|raw| json::parse(&raw, 65536).map_err(|_| Error::InvalidRequest))
         .and_then(|value| state.execute(&value));
     let reply = result
-        .unwrap_or_else(|error| json!({"version":1,"ok":false,"error":{"code":error.code()}}));
+        .unwrap_or_else(|error| json!({"version":1,"ok":false,"error":{"code":error.name()}}));
     let data = json::canonical(&reply);
     if data.len() > 1048576 {
         return Err(Error::Exhausted);

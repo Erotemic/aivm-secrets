@@ -71,7 +71,7 @@ pub struct OAuthError {
 }
 impl OAuthError {
     pub fn public_error(&self) -> Value {
-        json!({"code":self.code.code(),"reason":self.reason})
+        json!({"code":self.code.name(),"reason":self.reason})
     }
     fn refresh(error: core::RefreshDenial, prior: &core::RefreshState) -> Self {
         let (code, reason) = match error {

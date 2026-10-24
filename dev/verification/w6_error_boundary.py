@@ -16,7 +16,8 @@ ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = Path('docs/planning/aivm-secrets-read-failure-scope.json')
 TLS = Path('rust/crates/aivm-secrets-garrett/src/tls.rs')
 PUBLIC_ERROR = Path('rust/crates/aivm-secrets-garrett-core/src/public_error.rs')
-ERROR = Path('rust/crates/aivm-secrets-garrett/src/lib.rs')
+# The native Error is the extracted PublicError; its spelling is `name`.
+ERROR = Path('rust/crates/aivm-secrets-garrett-core/src/public_error.rs')
 STATUS = Path('rust/crates/aivm-secrets-garrett-core/src/provider_status.rs')
 CUSTODY = Path('rust/crates/aivm-secrets-garrett/src/custody.rs')
 MANIFEST_SESSION = Path('rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs')
@@ -99,7 +100,7 @@ def check(root: Path = ROOT) -> dict:
         ('UpstreamError', 'upstream_error'),
         ('UpstreamResponse', 'upstream_response'),
     ]:
-        require(f'Self::{variant} => "{code}"' in error,
+        require(f'PublicError::{variant} => "{code}"' in error,
                 f'{variant} public error code changed')
     status = (root / STATUS).read_text().split('#[cfg(test)]', 1)[0]
     custody = (root / CUSTODY).read_text()

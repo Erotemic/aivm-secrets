@@ -277,7 +277,7 @@ fn main() {
         serve(Path::new(&args[1]), maximum)
     })();
     if let Err(error) = result {
-        eprintln!("{}", error.code());
+        eprintln!("{}", error.name());
         std::process::exit(1);
     }
 }

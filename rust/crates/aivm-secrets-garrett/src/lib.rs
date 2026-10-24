@@ -25,77 +25,10 @@ pub mod registry;
 pub mod tls;
 pub mod tpm;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Error {
-    InvalidCapability,
-    InvalidPolicy,
-    ResourceMismatch,
-    InvalidRequest,
-    Denied,
-    Unreachable,
-    UpstreamResponse,
-    UpstreamRejected,
-    UpstreamError,
-    InternalError,
-    UnsafeFile,
-    OutcomeUnknown,
-    Exhausted,
-    Revoked,
-    CredentialSource,
-    Expired,
-    AuthorizationDenied,
-}
+/// The native error type is the extracted public error table itself
+/// (`public_error::PublicError`): there is no native-to-public mapping to trust.
+pub use aivm_secrets_garrett_core::public_error::PublicError as Error;
 pub type Outcome<T> = Result<T, Error>;
-impl Error {
-    /// Host-side spelling; equality with the extracted guest-frame table
-    /// `public_error::code` is pinned by `public_error_tests`.
-    pub fn code(self) -> &'static str {
-        match self {
-            Self::InvalidCapability => "invalid_capability",
-            Self::InvalidPolicy => "invalid_policy",
-            Self::ResourceMismatch => "resource_mismatch",
-            Self::InvalidRequest => "invalid_request",
-            Self::Denied => "denied",
-            Self::Unreachable => "unreachable",
-            Self::UpstreamResponse => "upstream_response",
-            Self::UpstreamRejected => "upstream_rejected",
-            Self::UpstreamError => "upstream_error",
-            Self::InternalError => "internal_error",
-            Self::UnsafeFile => "unsafe_file",
-            Self::OutcomeUnknown => "outcome_unknown",
-            Self::Exhausted => "exhausted",
-            Self::Revoked => "revoked",
-            Self::CredentialSource | Self::AuthorizationDenied => "credential_source",
-            Self::Expired => "expired",
-        }
-    }
-}
-// One-to-one and exhaustive: adding a native variant must extend PublicError.
-impl From<Error> for aivm_secrets_garrett_core::public_error::PublicError {
-    fn from(error: Error) -> Self {
-        use aivm_secrets_garrett_core::public_error::PublicError as P;
-        match error {
-            Error::InvalidCapability => P::InvalidCapability,
-            Error::InvalidPolicy => P::InvalidPolicy,
-            Error::ResourceMismatch => P::ResourceMismatch,
-            Error::InvalidRequest => P::InvalidRequest,
-            Error::Denied => P::Denied,
-            Error::Unreachable => P::Unreachable,
-            Error::UpstreamResponse => P::UpstreamResponse,
-            Error::UpstreamRejected => P::UpstreamRejected,
-            Error::UpstreamError => P::UpstreamError,
-            Error::InternalError => P::InternalError,
-            Error::UnsafeFile => P::UnsafeFile,
-            Error::OutcomeUnknown => P::OutcomeUnknown,
-            Error::Exhausted => P::Exhausted,
-            Error::Revoked => P::Revoked,
-            Error::CredentialSource => P::CredentialSource,
-            Error::Expired => P::Expired,
-            Error::AuthorizationDenied => P::AuthorizationDenied,
-        }
-    }
-}
-
 #[cfg(feature = "conformance")]
 pub mod conformance;
 
@@ -124,7 +57,7 @@ mod public_error_tests {
             (Error::AuthorizationDenied, "credential_source"),
             (Error::Expired, "expired"),
         ] {
-            assert_eq!(error.code(), code);
+            assert_eq!(error.name(), code);
             let public = aivm_secrets_garrett_core::public_error::code(error.into());
             assert_eq!(public, code.as_bytes());
         }

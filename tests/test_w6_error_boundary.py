@@ -36,8 +36,8 @@ def test_reviewed_public_denial_leaf_is_stable(tmp_path):
     (checker.TLS, 'write_all(wire)', 'write_all(&b"raw"[..])'),
     (checker.TLS, 'self.0.send(&mut GuestWriter(writer))',
      'unchecked_send(writer)'),
-    (checker.ERROR, 'Self::UpstreamRejected => "upstream_rejected"',
-     'Self::UpstreamRejected => "upstream_error"'),
+    (checker.ERROR, 'PublicError::UpstreamRejected => "upstream_rejected"',
+     'PublicError::UpstreamRejected => "upstream_error"'),
     (checker.STATUS, 'if status >= 400 && status < 500 {', 'if status >= 400 && status < 499 {'),
 ])
 def test_public_error_mutations_are_rejected(tmp_path, name, original, mutant):

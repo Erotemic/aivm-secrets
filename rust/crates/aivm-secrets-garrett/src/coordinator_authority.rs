@@ -16,7 +16,7 @@ pub type Result<T> = std::result::Result<T, AuthorityError>;
 impl AuthorityError {
     pub fn code(&self) -> &'static str {
         match self {
-            Self::Public(error) => error.code(),
+            Self::Public(error) => error.name(),
             Self::Storage => "audit_failed",
         }
     }

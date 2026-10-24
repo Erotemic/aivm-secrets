@@ -559,7 +559,7 @@ mod guest_frame_tests {
             }
             _ => "Broker failed closed.",
         };
-        json!({"version":1,"ok":false,"error":{"code":error.code(),"message":message}})
+        json!({"version":1,"ok":false,"error":{"code":error.name(),"message":message}})
     }
     const ALL_ERRORS: [Error; 17] = [
         Error::InvalidCapability, Error::InvalidPolicy, Error::ResourceMismatch,

@@ -913,3 +913,10 @@ happens after the (side-effect-free) pending request is constructed; the
 order of observable effects is unchanged. W3/NR-2/3/NR-4 guards and two
 mutation tests moved to the new shape; a new mutation (substituting another
 admission) is caught.
+
+## 2026-10-24 01:20:36 -0400
+
+NATIVE-GLUE-01: the native `Error` enum is now `pub use PublicError as Error`;
+`Error::code()` became the extracted `PublicError::name()` (Aeneas extracts
+`&'static str` literals as `Str`, no new axioms). The 17-arm `From` map is
+deleted. Two `AuthorityError::code()` calls kept their own method.
