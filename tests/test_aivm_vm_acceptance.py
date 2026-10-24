@@ -305,10 +305,14 @@ def test_canary_search_is_bounded_and_fails_on_a_hit(tmp_path, monkeypatch):
             return subprocess.CompletedProcess([], 0, stdout, b'')
         return call
 
-    monkeypatch.setattr(ssh, 'call', answer(b'status=0\n'))
+    monkeypatch.setattr(ssh, 'call', answer(b'as_root=1\nstatus=0\n'))
     result = target._guest_canary_search(ssh, ['/mnt/a', '/mnt/b c'], 'aivm-secrets-canary-x')
-    assert result == {'found': False, 'complete': True, 'mount_points_searched': 2, 'max_depth': 4}
-    assert 'timeout 20 find' in scripts[0] and '-maxdepth 4' in scripts[0] and "'/mnt/b c'" in scripts[0]
+    assert result == {'found': False, 'complete': True, 'as_guest_root': True,
+                      'mount_points_searched': 2, 'max_depth': 4}
+    assert 'timeout 20 $run find' in scripts[0] and '-maxdepth 4' in scripts[0]
+    assert "'/mnt/b c'" in scripts[0] and 'sudo -n true' in scripts[0]
+    monkeypatch.setattr(ssh, 'call', answer(b'as_root=0\nstatus=0\n'))
+    assert target._guest_canary_search(ssh, ['/mnt/a'], 'aivm-secrets-canary-x')['as_guest_root'] is False
     monkeypatch.setattr(ssh, 'call', answer(b'status=124\n'))
     assert target._guest_canary_search(ssh, ['/mnt/a'], 'aivm-secrets-canary-x')['complete'] is False
     monkeypatch.setattr(ssh, 'call', answer(b'/mnt/a/x/aivm-secrets-canary-x\nstatus=0\n'))

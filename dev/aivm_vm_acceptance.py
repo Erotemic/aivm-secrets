@@ -396,10 +396,17 @@ def _guest_canary_search(ssh: GuestSSH, mount_points: list[str], marker: str) ->
     """Bounded search of the guest's share mount points for the host canary
     file name. Depth and time are capped (a whole-tree walk of a large
     virtiofs share can exhaust the host daemon's file handles), so a
-    timeout is reported as incomplete, never as absence."""
+    timeout is reported as incomplete, never as absence.
+
+    The search runs as guest root when passwordless sudo is available, as it
+    is for AIVM's default guest user: an agent with that sudo reads whatever
+    root reads, including AIVM's root-only staging mounts. An unprivileged
+    search there would stop at a permission error and say nothing."""
     if not mount_points:
         return {'found': False, 'complete': True, 'mount_points_searched': 0}
-    script = ('timeout 20 find ' + ' '.join(shlex.quote(m) for m in mount_points)
+    script = ('if sudo -n true 2>/dev/null; then run="sudo -n"; echo as_root=1; '
+              'else run=""; echo as_root=0; fi; '
+              'timeout 20 $run find ' + ' '.join(shlex.quote(m) for m in mount_points)
               + ' -xdev -maxdepth 4 -name ' + shlex.quote(marker) + ' -print -quit 2>/dev/null; '
               'echo "status=$?"')
     result = ssh.call(script)
@@ -408,6 +415,7 @@ def _guest_canary_search(ssh: GuestSSH, mount_points: list[str], marker: str) ->
         raise DemoError('host custody canary is reachable through a guest share')
     status = re.search(r'status=(\d+)', text)
     return {'found': False, 'complete': bool(status) and status.group(1) == '0',
+            'as_guest_root': 'as_root=1' in text,
             'mount_points_searched': len(mount_points), 'max_depth': 4}
 
 
