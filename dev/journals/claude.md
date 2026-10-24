@@ -834,3 +834,14 @@ decision into a core `write_gate` entry that takes the store admission
 callback, removing the one native line; (2) core-build the proxy's audit rows
 (hash chain stays native) as done for the bridge sessions; (3) revisit the
 opaque core credential type once the four native byte readers are reduced.
+
+## Correction to the next-removals list
+
+Item (1), folding the approval decision into the write gate, is not a real
+removal on its own: what APPROVAL-RUST-01 assumes is that the decision belongs
+to *this request's digest*, and the digest is canonical JSON hashed with
+SHA-256 natively (ring). Moving the call into the core would move the line, not
+the assumption. Reordered: (1) core-build the proxy's audit rows; (2) the
+approval digest needs an extracted canonical-request encoder plus a stated
+SHA-256 contract (crypto stays external-trusted) before the gate fold is worth
+doing; (3) opaque core credential type as before.
