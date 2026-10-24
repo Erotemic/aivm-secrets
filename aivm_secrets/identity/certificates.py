@@ -87,13 +87,14 @@ def create_ca(*, now: int, days: int):
 
 
 def _leaf_certificate(ca_key: Any, ca_cert: Any, public_key: Any,
-                      *, name: str, now: int, days: int, server: bool):
+                      *, name: str, now: int, days: int, server: bool,
+                      not_after: int | None = None):
     x509, hashes, _, _, ExtendedKeyUsageOID, _ = _x509()
     builder = (x509.CertificateBuilder()
         .subject_name(_name(name)).issuer_name(ca_cert.subject)
         .public_key(public_key).serial_number(x509.random_serial_number())
         .not_valid_before(_utc(now - 60))
-        .not_valid_after(_utc(now + days * 86400))
+        .not_valid_after(_utc(now + days * 86400 if not_after is None else not_after))
         .add_extension(x509.BasicConstraints(ca=False, path_length=None), True)
         .add_extension(x509.SubjectKeyIdentifier.from_public_key(public_key), False)
         .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(

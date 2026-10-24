@@ -832,3 +832,13 @@ mid-refresh cannot dispatch.
 
 Not covered: histories that span crashes, a refresh running concurrently with
 a request, or a publication whose outcome is uncertain.
+
+## Certificates near the CA's end (2026-10-24)
+
+[`authorize_client_contract`](../../proofs/GarrettEnrollment.lean) now states
+the clamped window. A new client certificate ends at the earlier of seven
+days from now and one second before the CA ends, and is refused if that
+leaves less than a day. `near_ca_expiry_is_clamped` and
+`less_than_a_day_refused` are concrete witnesses. Writing the proof caught an
+overflow: with a CA expiry near `i64::MIN`, `ca_not_after - 1` could
+overflow. The window check now runs first, which rules that out.

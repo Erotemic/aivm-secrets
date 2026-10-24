@@ -44,6 +44,17 @@ MAX_SUBJECTS = 128
 CA_DAYS = 365
 SERVER_DAYS = 30
 CLIENT_DAYS = 7
+# A client leaf is cut short to end one second before the CA does, but never
+# to less than this: below it, enrollment and renewal refuse until the CA is
+# rotated. The native authority's extracted enrollment window is the same.
+MIN_CLIENT_SECONDS = 86400
+
+
+def _client_not_after(stamp: int, ca_cert: Any) -> int:
+    ca_not_after = int(ca_cert.not_valid_after_utc.timestamp())
+    if ca_not_after <= stamp + MIN_CLIENT_SECONDS:
+        raise SecretsError('expired', detail='host CA requires renewal')
+    return min(stamp + CLIENT_DAYS * 86400, ca_not_after - 1)
 MANIFEST = 'authority.json'
 REGISTRY = 'enrollments.json'
 CA_DIRECTORY = 'ca-generations'
@@ -424,11 +435,10 @@ class IdentityAuthority:
         with self._locked():
             state = self._registry()
             ca_key, ca_cert = self._load_ca()
-            if stamp + CLIENT_DAYS * 86400 >= int(ca_cert.not_valid_after_utc.timestamp()):
-                raise SecretsError('expired', detail='host CA requires renewal')
             cert = _leaf_certificate(ca_key, ca_cert, request.public_key(),
                                      name='aivm-guest', now=stamp,
-                                     days=CLIENT_DAYS, server=False)
+                                     days=CLIENT_DAYS, server=False,
+                                     not_after=_client_not_after(stamp, ca_cert))
             der = _certificate_der(cert)
             thumb = certificate_thumbprint(der)
             not_after = int(cert.not_valid_after_utc.timestamp())
@@ -512,11 +522,10 @@ class IdentityAuthority:
                 authorize_key_reuse(enrolled_key_fingerprint=enrolled,
                                     candidate_key_fingerprint=fp)
             ca_key, ca_cert = self._load_ca()
-            if stamp + CLIENT_DAYS * 86400 >= int(ca_cert.not_valid_after_utc.timestamp()):
-                raise SecretsError('expired', detail='host CA requires renewal')
             cert = _leaf_certificate(ca_key, ca_cert, request.public_key(),
                                      name='aivm-guest', now=stamp,
-                                     days=CLIENT_DAYS, server=False)
+                                     days=CLIENT_DAYS, server=False,
+                                     not_after=_client_not_after(stamp, ca_cert))
             der = _certificate_der(cert)
             thumb = certificate_thumbprint(der)
             updated = registry_model.renew(
@@ -873,8 +882,10 @@ class IdentityAuthority:
             subject for subject, row in registry['subjects'].items()
             if row['active'] and row['not_after'] <= stamp))
         left = status['ca_not_after'] - stamp
-        if left <= CLIENT_DAYS * 86400:
+        if left <= MIN_CLIENT_SECONDS:
             finding('ca_too_close_to_expiry_to_enroll', [str(left)])
+        elif left <= CLIENT_DAYS * 86400:
+            finding('new_certificates_cut_short_by_ca_expiry', [str(left)])
         return {'clean': not findings, 'findings': findings,
                 'ca_not_after': status['ca_not_after']}
 

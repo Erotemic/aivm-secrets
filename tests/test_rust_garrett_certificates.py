@@ -179,7 +179,8 @@ def test_rust_ca_generation_and_software_approval_fail_closed():
         good,
         dict(good, approve_fingerprint="0" * 64),
         dict(good, ca_key_pem=other["ca_key_pem"]),
-        dict(good, now=now + 31536000 - 604800),
+        # Less than a day before the CA's end: refused until the CA rotates.
+        dict(good, now=now + 31536000 - 86400),
         dict(good, tpm_backed=True),
         dict(good, ca_pem=bad_ca_pem),
     ]
@@ -195,6 +196,21 @@ def test_rust_ca_generation_and_software_approval_fail_closed():
             "invalid_capability",
         ]
     ]
+
+
+def test_rust_leaf_near_ca_expiry_is_cut_short_to_the_ca():
+    """A week before the CA's end, the leaf ends one second before the CA."""
+    now = int(time.time())
+    (root,) = call([dict(action="ca-create", now=now)])
+    ca = x509.load_pem_x509_certificate(root["ca_pem"].encode())
+    _, csr = request()
+    good = enrollment(dict(ca_pem=root["ca_pem"], ca_key_pem=root["key_pem"]), csr, now)
+    (late,) = call([dict(good, now=now + 31536000 - 604800)])
+    assert late["ok"], late
+    ca_end = int(ca.not_valid_after_utc.timestamp())
+    assert late["not_after"] == ca_end - 1
+    leaf = x509.load_pem_x509_certificate(late["certificate_pem"].encode())
+    assert int(leaf.not_valid_after_utc.timestamp()) == ca_end - 1
 
 
 @pytest.mark.parametrize(

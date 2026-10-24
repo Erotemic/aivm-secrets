@@ -8753,7 +8753,7 @@ structure enrollment.ClientPlan where
   assurance : enrollment.Assurance
 
 /-- [aivm_secrets_garrett_core::enrollment::authorize_client]:
-    Source: 'crates/aivm-secrets-garrett-core/src/enrollment.rs', lines 56:0-81:1
+    Source: 'crates/aivm-secrets-garrett-core/src/enrollment.rs', lines 56:0-90:1
     Visibility: public -/
 def enrollment.authorize_client
   (input : enrollment.EnrollmentInput) (approval : enrollment.Approval) :
@@ -8769,39 +8769,52 @@ def enrollment.authorize_client
       then ok (core.result.Result.Err enrollment.EnrollmentDenial.Invalid)
       else
         let not_before ← input.now - 60#i64
-        let not_after ← input.now + 604800#i64
         if not_before < input.ca_not_before
         then ok (core.result.Result.Err enrollment.EnrollmentDenial.Expired)
         else
-          if not_after >= input.ca_not_after
+          let i ← input.now + 86400#i64
+          if input.ca_not_after <= i
           then ok (core.result.Result.Err enrollment.EnrollmentDenial.Expired)
           else
-            ok (core.result.Result.Ok
-              {
-                subject := input.subject,
-                spki := input.candidate.spki,
-                not_before,
-                not_after,
-                assurance
-              })
+            let full ← input.now + 604800#i64
+            if full < input.ca_not_after
+            then
+              ok (core.result.Result.Ok
+                {
+                  subject := input.subject,
+                  spki := input.candidate.spki,
+                  not_before,
+                  not_after := full,
+                  assurance
+                })
+            else
+              let not_after ← input.ca_not_after - 1#i64
+              ok (core.result.Result.Ok
+                {
+                  subject := input.subject,
+                  spki := input.candidate.spki,
+                  not_before,
+                  not_after,
+                  assurance
+                })
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- Trait declaration: [aivm_secrets_garrett_core::enrollment::ClientSigner]
-    Source: 'crates/aivm-secrets-garrett-core/src/enrollment.rs', lines 82:0-84:1
+    Source: 'crates/aivm-secrets-garrett-core/src/enrollment.rs', lines 91:0-93:1
     Visibility: public -/
 structure enrollment.ClientSigner (Self : Type _) where
   sign : Self → enrollment.ClientPlan → Result (core.result.Result
     (alloc.vec.Vec Std.U8) enrollment.EnrollmentDenial)
 
 /-- [aivm_secrets_garrett_core::enrollment::IssuedClient]
-    Source: 'crates/aivm-secrets-garrett-core/src/enrollment.rs', lines 85:0-88:1
+    Source: 'crates/aivm-secrets-garrett-core/src/enrollment.rs', lines 94:0-97:1
     Visibility: public -/
 structure enrollment.IssuedClient where
   plan : enrollment.ClientPlan
   certificate : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::enrollment::enroll_client]:
-    Source: 'crates/aivm-secrets-garrett-core/src/enrollment.rs', lines 89:0-103:1
+    Source: 'crates/aivm-secrets-garrett-core/src/enrollment.rs', lines 98:0-112:1
     Visibility: public -/
 def enrollment.enroll_client
   {S : Type _} (ClientSignerInst : enrollment.ClientSigner S) (signer : S)

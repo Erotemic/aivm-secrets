@@ -76,3 +76,14 @@ def test_verify_flags_key_files_the_keyring_does_not_list(authority):
     stray.write_bytes(b'restore leftover')
     stray.chmod(0o600)
     assert codes(authority.verify())['unlisted_issuer_keys'] == [f'{KEY_DIRECTORY}/local-9.key']
+
+
+def test_python_leaf_near_ca_expiry_is_cut_short_and_refused_within_a_day(authority):
+    from aivm_secrets.identity import enrollment as module
+
+    ca_end = authority.status()['ca_not_after']
+    late = ca_end - 3 * 86400
+    assert module._client_not_after(late, authority._load_ca()[1]) == ca_end - 1
+    with pytest.raises(SecretsError):
+        module._client_not_after(ca_end - 86400, authority._load_ca()[1])
+    assert module._client_not_after(0, authority._load_ca()[1]) == 7 * 86400

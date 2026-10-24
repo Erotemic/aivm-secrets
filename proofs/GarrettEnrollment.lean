@@ -32,13 +32,19 @@ theorem approve_key_contract (c : Candidate) (approval : Approval) :
   rw [approve_key_exact]
   cases approval <;> simp [Decision, KeyBound] <;> split_ifs <;> simp_all
 
+/-- The CA window admits a leaf of at least a day, starting 60 seconds back. -/
 def WindowAllowed (input : EnrollmentInput) : Prop :=
   0 ≤ input.now.val ∧ input.now.val ≤ 253401695999 ∧
-    input.ca_not_before.val ≤ input.now.val - 60 ∧ input.now.val + 604800 < input.ca_not_after.val
+    input.ca_not_before.val ≤ input.now.val - 60 ∧ input.now.val + 86400 < input.ca_not_after.val
 
+/-- A planned leaf lasts seven days, cut short to end one second before the
+    CA does, and never less than a day; it lies strictly inside the CA's
+    validity. -/
 def PlanBound (input : EnrollmentInput) (approval : Approval) (plan : ClientPlan) : Prop :=
   plan.subject = input.subject ∧ plan.spki = input.candidate.spki ∧
-    plan.not_before.val = input.now.val - 60 ∧ plan.not_after.val = input.now.val + 604800 ∧
+    plan.not_before.val = input.now.val - 60 ∧
+    plan.not_after.val = min (input.now.val + 604800) (input.ca_not_after.val - 1) ∧
+    input.now.val + 86400 ≤ plan.not_after.val ∧ plan.not_after.val < input.ca_not_after.val ∧
     WindowAllowed input ∧ KeyBound input.candidate approval plan.assurance
 
 theorem authorize_client_contract (input : EnrollmentInput) (approval : Approval) :
@@ -99,7 +105,7 @@ theorem software_is_not_tpm (c : Candidate) (approved : alloc.vec.Vec U8) :
     rather than a caller-supplied boolean or an unrelated key fingerprint. -/
 theorem tpm_plan_uses_attested_key (input : EnrollmentInput) (spki : alloc.vec.Vec U8)
     (plan : ClientPlan) (bound : PlanBound input (.Tpm spki) plan) : plan.spki = spki := by
-  exact bound.2.1.trans bound.2.2.2.2.2.1
+  exact bound.2.1.trans bound.2.2.2.2.2.2.2.1
 
 theorem enroll_client_successful {S : Type} (ops : ClientSigner S) (signer : S)
     (input : EnrollmentInput) (approval : Approval) (plan : ClientPlan) (certificate : alloc.vec.Vec U8)
@@ -115,6 +121,29 @@ theorem authorize_tpm_success (subject spki fingerprint : alloc.vec.Vec U8) :
   simp [authorize_client, approve_key_exact, Decision]
   have sub : (1000#i64 - 60#i64 : Result I64) = Result.ok 940#i64 := by rfl
   have add : (1000#i64 + 604800#i64 : Result I64) = Result.ok 605800#i64 := by rfl
-  simp [sub, add]
+  have day : (1000#i64 + 86400#i64 : Result I64) = Result.ok 87400#i64 := by rfl
+  simp [sub, add, day]
+
+/-- Near the CA's end a leaf is cut short to end one second before the CA. -/
+theorem near_ca_expiry_is_clamped (subject spki fingerprint : alloc.vec.Vec U8) :
+    authorize_client
+      (EnrollmentInput.mk subject (Candidate.mk spki fingerprint) 0#i64 200000#i64 1000#i64)
+      (.Tpm spki) = Result.ok (.Ok (ClientPlan.mk subject spki 940#i64 199999#i64 .AttestedTpm)) := by
+  simp [authorize_client, approve_key_exact, Decision]
+  have sub : (1000#i64 - 60#i64 : Result I64) = Result.ok 940#i64 := by rfl
+  have add : (1000#i64 + 604800#i64 : Result I64) = Result.ok 605800#i64 := by rfl
+  have day : (1000#i64 + 86400#i64 : Result I64) = Result.ok 87400#i64 := by rfl
+  have last : (200000#i64 - 1#i64 : Result I64) = Result.ok 199999#i64 := by rfl
+  simp [sub, add, day, last]
+
+/-- Less than a day before the CA's end, enrollment is refused. -/
+theorem less_than_a_day_refused (subject spki fingerprint : alloc.vec.Vec U8) :
+    authorize_client
+      (EnrollmentInput.mk subject (Candidate.mk spki fingerprint) 0#i64 80000#i64 1000#i64)
+      (.Tpm spki) = Result.ok (.Err .Expired) := by
+  simp [authorize_client, approve_key_exact, Decision]
+  have sub : (1000#i64 - 60#i64 : Result I64) = Result.ok 940#i64 := by rfl
+  have day : (1000#i64 + 86400#i64 : Result I64) = Result.ok 87400#i64 := by rfl
+  simp [sub, day]
 
 end aivm_secrets_garrett_core.enrollment.Proofs

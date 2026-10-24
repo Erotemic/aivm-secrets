@@ -160,16 +160,18 @@ All **implemented**:
   session for that VM fails closed at its next call, because its JWT names
   the previous epoch and thumbprint. It must be restarted. A plain
   `--secrets_policy` session uses no client certificate and is unaffected.
-- `renew-client` and `enroll` refuse (`expired`, "host CA requires
-  renewal") once the CA has `CLIENT_DAYS` or less of validity left. In the
-  CA's last seven days no VM can be enrolled or renewed, however often
-  renewal runs, until an operator runs `rotate-ca` and re-enrolls every VM.
+- Since 2026-10-24 (an agent decision; revisit freely), a new client
+  certificate is cut short to end one second before the CA does, and
+  `renew-client` and `enroll` refuse (`expired`, "host CA requires
+  renewal") only once the CA has a day or less left. In that last day no VM
+  can be enrolled or renewed until an operator runs `rotate-ca` and
+  re-enrolls every VM. Both authorities do this; the native window is the
+  extracted `authorize_client` (`PlanBound`, `near_ca_expiry_is_clamped`,
+  `less_than_a_day_refused`).
   `status` reports the CA's expiry as `ca_not_after` (both authorities,
   since 2026-10-24), but AIVM still reports every
   identity-child refusal only as "identity service refused the operation",
-  so nothing tells the user why. (A planned change clamps new certificates
-  to the CA's expiry instead, down to a stated minimum validity, below
-  which the refusal remains. The CA must still be rotated before then.)
+  so nothing tells the user why. (The clamp described above, with a one-day minimum, is now implemented.)
 - **Known defect:** after `aivm vm identity_rotate_key`, the guest's
   `client.csr` still holds the CSR of the rotated-away key, and a plain
   renewal certifies whatever key the CSR carries. Every later

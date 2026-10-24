@@ -62,15 +62,24 @@ pub fn authorize_client(
         Err(error) => return Err(error),
     };
     // The supported X.509 date range is 0000..9999. A leaf is valid for seven
-    // days, with the reference's 60-second skew, strictly inside its CA window.
+    // days, with the reference's 60-second skew, strictly inside its CA
+    // window. Near the CA's end the leaf is cut short to end one second
+    // before the CA does; a leaf that would then last less than a day is
+    // refused, so the CA must be rotated before that.
     if input.now < 0 || input.now > 253401695999 {
         return Err(EnrollmentDenial::Invalid);
     }
     let not_before = input.now - 60;
-    let not_after = input.now + 604800;
-    if not_before < input.ca_not_before || not_after >= input.ca_not_after {
+    // Checked first, so `ca_not_after - 1` below cannot underflow.
+    if not_before < input.ca_not_before || input.ca_not_after <= input.now + 86400 {
         return Err(EnrollmentDenial::Expired);
     }
+    let full = input.now + 604800;
+    let not_after = if full < input.ca_not_after {
+        full
+    } else {
+        input.ca_not_after - 1
+    };
     Ok(ClientPlan {
         subject: input.subject,
         spki: input.candidate.spki,

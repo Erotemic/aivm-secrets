@@ -126,7 +126,7 @@ Status changes are recorded here, not in the older documents.
 | AIVM: `identity_enroll --replace` passes the CAS | certificate lifecycle | **Done 2026-10-24** in AIVM |
 | Read-only runtime profile gate | NR-0 evidence | **Done 2026-10-24** (`garrett-bridge-read-only`) |
 | W0 obligation statuses, CORE-12 notes, roadmap rows | several | **Done 2026-10-24** |
-| Clamp new certificates to the CA's expiry | operations policy | **Needs maintainer:** the policy calls it a planned change but does not state the minimum validity, and it changes the proved enrollment window (`authorize_client_contract`) |
+| Clamp new certificates to the CA's expiry | operations policy | **Done 2026-10-24** (agent decision: one-day minimum). Both authorities; the native window is the extracted `authorize_client` (`PlanBound`, `near_ca_expiry_is_clamped`, `less_than_a_day_refused`) |
 | `aivm vm identity_renew --all`, session-start expiry warning | operations policy | **Needs maintainer:** decided in this repository's policy, but AIVM's contributor rules forbid new secrets integration surfaces |
 | AIVM prompts to revoke the old enrollment on VM rename or move | managed-VM design | **Needs maintainer** (same AIVM rule) |
 | Authenticated upgrade of the forced bootstrap helper on existing guests | managed-VM design | **Done 2026-10-24** in AIVM: `aivm vm update` reinstalls `aivm-guestctl` over the pinned host key; tried on the local VM |
