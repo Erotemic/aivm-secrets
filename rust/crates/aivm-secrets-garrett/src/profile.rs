@@ -1,11 +1,11 @@
-//! The read-only release profile, enforced when the bridge is built with the
-//! `read-only` feature.
+//! The read-only release profile, enforced by the `garrett-bridge-read-only`
+//! binary.
 //!
 //! The native read proofs cover one configuration: a provider session with
 //! `manifest-https-v1` and `writes = "deny"`, no cross-host coordination and
 //! no forwarding to a Python broker. The same source supports other
-//! configurations, so a release that claims only reads builds the bridge with
-//! `--features read-only`, and the bridge then refuses any other
+//! configurations, so a release that claims only reads deploys
+//! `garrett-bridge-read-only`, which refuses any other
 //! configuration at startup instead of relying on the operator to pick the
 //! right one. Guest input cannot select a configuration in any build.
 use crate::{Error, Outcome};

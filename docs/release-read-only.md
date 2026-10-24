@@ -15,18 +15,23 @@ The claims, and the evidence and assumptions behind each, are in the
   [protocol v1](protocol-v1.md) over mTLS on a forwarded Unix socket.
 - No forwarding to the Python broker, and no cross-host coordinator.
 
-A bridge built with the `read-only` feature enforces this at startup: it
-refuses any configuration outside the profile (`profile::read_only`). Guest
-input cannot choose a configuration in any build.
+The `garrett-bridge-read-only` binary enforces this at startup: it refuses
+any configuration outside the profile (`profile::read_only`). It is the
+ordinary bridge with that one check added. Guest input cannot choose a
+configuration with either binary.
 
 ## Build
 
 On the trusted host, from a checkout the guest cannot write to:
 
 ```bash
-cargo build --release --locked --manifest-path rust/Cargo.toml \
-  --features read-only --bins
+cargo build --release --locked --manifest-path rust/Cargo.toml --bins
 ```
+
+Deploy `garrett-bridge-read-only` under the name `garrett-bridge` in the
+directory the session uses (`bin_dir`), next to `garrett-authority` and
+`garrett-client`, so nothing else on the host can start the general bridge
+for this deployment.
 
 The toolchain is pinned in `rust/rust-toolchain.toml`. Record the commit and
 the SHA-256 of `garrett-bridge`, `garrett-authority` and `garrett-client`

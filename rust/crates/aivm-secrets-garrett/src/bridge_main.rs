@@ -178,10 +178,10 @@ fn legacy_bridge(config: &Value) -> Outcome<(tls::Bridge, Value)> {
     let bridge = bridge.with_registry_file(PathBuf::from(field(m, "registry_path")?))?;
     Ok((bridge, announcement))
 }
-fn serve(path: &Path, maximum: Option<usize>) -> Outcome<()> {
+fn serve(path: &Path, maximum: Option<usize>, read_only: bool) -> Outcome<()> {
     let bytes = zeroize::Zeroizing::new(files::read_private(path, 65536)?);
     let config = json::parse(&bytes, 65536)?;
-    if cfg!(feature = "read-only") {
+    if read_only {
         aivm_secrets_garrett::profile::read_only(&config)?;
     }
     let now = SystemTime::now()
@@ -250,7 +250,15 @@ fn serve(path: &Path, maximum: Option<usize>) -> Outcome<()> {
     }
     Ok(())
 }
+// `garrett-bridge-read-only` includes this file as a module and calls
+// `run(true)`; this binary's own entry point is the ordinary bridge.
+#[allow(dead_code)]
 fn main() {
+    run(false)
+}
+/// Run the bridge; with `read_only`, refuse any configuration outside the
+/// proved read profile before anything starts (`profile::read_only`).
+pub fn run(read_only: bool) {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.as_slice() == ["--help"] {
         println!("garrett-bridge --config ABSOLUTE_PRIVATE_JSON [--max-connections N]\nExperimental Rust certificate-bound bridge or explicit account-status-v1 provider session.\nRuns in the foreground; requires TLS 1.3 client authentication.");
@@ -277,7 +285,7 @@ fn main() {
         } else {
             None
         };
-        serve(Path::new(&args[1]), maximum)
+        serve(Path::new(&args[1]), maximum, read_only)
     })();
     if let Err(error) = result {
         eprintln!("{}", error.name());
