@@ -240,7 +240,7 @@ def NoEarlierHead (data : List U8) : Prop :=
 /-- The reader's result for one state. -/
 def HeadOutcome (out : S × alloc.vec.Vec U8 × Bool) : Prop :=
   out.2.2 = true → complete (alloc.vec.Vec.deref out.2.1) = Result.ok true ∧
-    NoEarlierHead out.2.1.val
+    NoEarlierHead out.2.1.val ∧ out.2.1.length ≤ 32769
 
 /-- A closed reader stops at once and returns no head. -/
 theorem closed_outcome {S : Type} (inst : HeadSource S) (source : S) (data : alloc.vec.Vec U8)
@@ -269,7 +269,7 @@ theorem connect_head_loop_returned {S : Type} (inst : HeadSource S) :
       cases b with
       | true =>
         simp only [↓reduceIte, Result.ok.injEq] at h
-        subst h; intro _; exact ⟨hb, earlier⟩
+        subst h; intro _; exact ⟨hb, earlier, bounded⟩
       | false =>
         simp only [Bool.false_eq_true, ↓reduceIte] at h
         obtain ⟨⟨late, source1⟩, overdue, h⟩ := bind_ok_inv h
@@ -307,11 +307,13 @@ theorem connect_head_loop_returned {S : Type} (inst : HeadSource S) :
 /-- **The CONNECT head.** For any socket callbacks, a head `connect_head`
     returns is complete (the extracted `head_end` finds `\r\n\r\n`), and no
     shorter prefix was complete: the reader stops at the first complete head,
-    so no byte after it (the start of the TLS handshake) was consumed. -/
+    so no byte after it (the start of the TLS handshake) was consumed. It is
+    at most `MAX_HEAD + 1` (32,769) bytes long. -/
 theorem connect_head_returned {S : Type} (inst : HeadSource S) (source : S)
     (head : alloc.vec.Vec U8) (after : S)
     (h : connect_head inst source = Result.ok (some head, after)) :
-    complete (alloc.vec.Vec.deref head) = Result.ok true ∧ NoEarlierHead head.val := by
+    complete (alloc.vec.Vec.deref head) = Result.ok true ∧ NoEarlierHead head.val ∧
+      head.length ≤ 32769 := by
   unfold connect_head at h
   obtain ⟨⟨source1, data, opened⟩, looped, h⟩ := bind_ok_inv h
   have outcome := connect_head_loop_returned inst _ source (alloc.vec.Vec.new U8) true _ rfl
