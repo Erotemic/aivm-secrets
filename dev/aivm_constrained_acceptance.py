@@ -66,6 +66,20 @@ def session_spec(workspace: Path, ssh: GuestSSH, bin_dir: Path, provider, guest_
     )
 
 
+def write_session_inputs(workspace: Path, ssh: GuestSSH, bin_dir: Path, provider,
+                         guest_port: int) -> Path:
+    """Write the policy, disclosure, credential and session spec.
+
+    The policy's credential source must be the spec's credential file, and
+    the file holds the bare token: the native reader refuses a trailing
+    newline. Either mistake surfaces only as `broker_failed`."""
+    write(workspace / 'policy.json', offline.policy(workspace, provider))
+    write(workspace / 'disclosure.json', offline.disclosure())
+    write(workspace / 'credential', offline.FAKE_TOKEN)
+    return write(workspace / 'session.json',
+                 session_spec(workspace, ssh, bin_dir, provider, guest_port))
+
+
 def _curl(env: str, *words: str) -> str:
     return '. ' + shlex.quote(env) + ' && exec curl -sS --max-time 30 ' + shlex.join(words)
 
@@ -73,11 +87,7 @@ def _curl(env: str, *words: str) -> str:
 def run_constrained_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path) -> dict:
     report: dict = {'ok': False, 'profile': 'constrained-http', 'translator': 'guest'}
     with LocalProvider(workspace / 'provider') as provider:
-        write(workspace / 'policy.json', offline.policy(workspace / 'host-credential', provider))
-        write(workspace / 'disclosure.json', offline.disclosure())
-        write(workspace / 'credential', offline.FAKE_TOKEN + '\n')
-        spec = write(workspace / 'session.json',
-                     session_spec(workspace, ssh, bin_dir, provider, free_port()))
+        spec = write_session_inputs(workspace, ssh, bin_dir, provider, free_port())
         process = subprocess.Popen(
             [sys.executable, '-I', '-m', 'aivm_secrets', 'native-session', '--spec', str(spec)],
             cwd=REPO_ROOT, stdin=subprocess.PIPE, stdout=subprocess.PIPE,

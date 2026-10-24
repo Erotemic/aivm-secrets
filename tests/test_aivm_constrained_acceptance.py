@@ -40,3 +40,17 @@ def test_guest_commands_quote_their_paths():
 
 def test_the_free_port_is_unprivileged():
     assert 1024 <= acceptance.free_port() <= 65535
+
+
+def test_session_inputs_agree_on_the_credential_file(tmp_path):
+    """Both bugs found on the first real-VM run: the policy named a different
+    credential file than the spec, and the file ended in a newline."""
+    from dev import offline_native_guest as offline
+
+    ssh = GuestSSH('aivm-2404', tmp_path / 'vm-ssh.conf')
+    with offline.LocalProvider(tmp_path / 'provider') as provider:
+        spec_path = acceptance.write_session_inputs(tmp_path, ssh, tmp_path, provider, 18443)
+    spec = json.loads(spec_path.read_text())
+    policy = json.loads((tmp_path / 'policy.json').read_text())
+    assert policy['credential_source'] == {'kind': 'file', 'path': spec['credential_file']}
+    assert Path(spec['credential_file']).read_bytes() == offline.FAKE_TOKEN.encode()
