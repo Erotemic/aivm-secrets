@@ -107,7 +107,7 @@ explains each one in plain language.
 - ⬜ Provider-side write semantics and uncertain outcomes across sessions
   without a coordinator
 
-- ✅ An axiom audit of all 1,412 theorems: each rests only on Lean's three
+- ✅ An axiom audit of all 1,444 theorems: each rests only on Lean's three
   standard axioms, with no `sorry` and no unproved assumption about the
   extracted Rust ([audit](docs/assurance/axiom-audit.md))
 

@@ -21,7 +21,7 @@ opaque Rust items in the extracted model.
 
 ## Result, 2026-10-24
 
-- 1,412 written theorems in 112 modules. Lean-generated equation, size and
+- 1,444 written theorems in 114 modules (rerun after the history models; first run: 1,412 in 112). Lean-generated equation, size and
   injectivity lemmas are left out.
 - Every theorem depends only on `propext`, `Classical.choice` and
   `Quot.sound`.

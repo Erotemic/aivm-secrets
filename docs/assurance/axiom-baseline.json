@@ -8,9 +8,9 @@
    "propext"
   ],
   "model_axiom_use": {},
-  "modules": 112,
+  "modules": 114,
   "outside_allowed": {},
-  "theorems": 1412
+  "theorems": 1444
  },
  "theorems": {
   "Aeneas.Std.Array.make.hcongr_4": {
@@ -82,6 +82,110 @@
   "Garrett.History.trace_is_public": {
    "axioms": [],
    "module": "GarrettHistory"
+  },
+  "Garrett.LoginHistory.at_most_one_exchange": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettLoginHistory"
+  },
+  "Garrett.LoginHistory.begin_from": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettLoginHistory"
+  },
+  "Garrett.LoginHistory.claim_from": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettLoginHistory"
+  },
+  "Garrett.LoginHistory.claimed_bound_step": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettLoginHistory"
+  },
+  "Garrett.LoginHistory.crash_is_final": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettLoginHistory"
+  },
+  "Garrett.LoginHistory.every_exchange_bound": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettLoginHistory"
+  },
+  "Garrett.LoginHistory.finish_from": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettLoginHistory"
+  },
+  "Garrett.LoginHistory.initial_claimed_bound": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettLoginHistory"
+  },
+  "Garrett.LoginHistory.install_needs_exchange": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettLoginHistory"
+  },
+  "Garrett.LoginHistory.next_eq": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettLoginHistory"
+  },
+  "Garrett.LoginHistory.no_exchange_past_accepted": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettLoginHistory"
+  },
+  "Garrett.LoginHistory.step_facts": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettLoginHistory"
+  },
+  "Garrett.LoginHistory.successful_login_witness": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettLoginHistory"
   },
   "Garrett.Profiles.KeyCustody.ofNat_ctorIdx": {
    "axioms": [],
@@ -178,6 +282,134 @@
   "Garrett.Protocol.surrogate_can_be_public": {
    "axioms": [],
    "module": "GarrettSecrecy"
+  },
+  "Garrett.ServiceHistory.crash_leaves_in_doubt": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettServiceHistory"
+  },
+  "Garrett.ServiceHistory.every_emission_admitted": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettServiceHistory"
+  },
+  "Garrett.ServiceHistory.fenced_never_emits": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettServiceHistory"
+  },
+  "Garrett.ServiceHistory.fenced_session_never_emits": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettServiceHistory"
+  },
+  "Garrett.ServiceHistory.fenced_step": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettServiceHistory"
+  },
+  "Garrett.ServiceHistory.identity_fenced_session_never_emits": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettServiceHistory"
+  },
+  "Garrett.ServiceHistory.identity_fenced_step": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettServiceHistory"
+  },
+  "Garrett.ServiceHistory.in_doubt_blocks": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettServiceHistory"
+  },
+  "Garrett.ServiceHistory.lease_admits_iff": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettServiceHistory"
+  },
+  "Garrett.ServiceHistory.positive_and_fenced_witness": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettServiceHistory"
+  },
+  "Garrett.ServiceHistory.rejected_needs_reauthorization": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettServiceHistory"
+  },
+  "Garrett.ServiceHistory.revoke_fences": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettServiceHistory"
+  },
+  "Garrett.ServiceHistory.step_consistent": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettServiceHistory"
+  },
+  "Garrett.ServiceHistory.step_emitted_admitted": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettServiceHistory"
+  },
+  "Garrett.ServiceHistory.step_epoch_monotone": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettServiceHistory"
+  },
+  "Garrett.ServiceHistory.step_identity_epoch_monotone": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettServiceHistory"
   },
   "aivm_secrets_garrett_core.Proofs.authorized_use_positive_witness": {
    "axioms": [
@@ -2214,6 +2446,14 @@
    ],
    "module": "Garrett"
   },
+  "aivm_secrets_garrett_core.current_admission.Proofs.admitted_stamp_had_current_lease": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettCurrentAdmission"
+  },
   "aivm_secrets_garrett_core.current_admission.Proofs.bound_audit_frame": {
    "axioms": [
     "Classical.choice",
@@ -3184,6 +3424,22 @@
    "module": "GarrettEnrollment"
   },
   "aivm_secrets_garrett_core.enrollment.Proofs.enroll_client_successful": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettEnrollment"
+  },
+  "aivm_secrets_garrett_core.enrollment.Proofs.less_than_a_day_refused": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettEnrollment"
+  },
+  "aivm_secrets_garrett_core.enrollment.Proofs.near_ca_expiry_is_clamped": {
    "axioms": [
     "Classical.choice",
     "Quot.sound",
