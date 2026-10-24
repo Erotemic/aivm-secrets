@@ -367,6 +367,11 @@ requirement for a local broker to prove its conditional controller properties.
    exact trusted adapter postconditions and show that each emitted request
    has a current admitted identity and credential lease. Existing controller
    and symbolic histories are reusable, but are not that whole-service proof.
+   **Done as a model 2026-10-24:** `proofs/GarrettServiceHistory.lean`
+   (`every_emission_admitted`, `fenced_session_never_emits`,
+   `identity_fenced_session_never_emits`, `in_doubt_blocks`). Its steps take
+   the storage, lock and clock adapters' postconditions as premises. Proving
+   those adapters is still open.
 4. Validate a deployment's key-custody premise independently. Provision an AK
    trust origin, exercise the chosen physical TPM/VM isolation arrangement,
    and document who can reach its signing oracle or clone its state. Emulator

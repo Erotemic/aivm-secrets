@@ -830,8 +830,52 @@ extracted `require_current_lease`. [`current_lease_contract`](../../proofs/Garre
 shows that a revoked session, a re-enrolled one (epoch changed) or one
 mid-refresh cannot dispatch.
 
-Not covered: histories that span crashes, a refresh running concurrently with
-a request, or a publication whose outcome is uncertain.
+Histories that span crashes, concurrent refreshes and uncertain publication
+are the next section.
+
+## Across a whole history: crashes, refreshes and revocation (2026-10-24)
+
+[`GarrettServiceHistory`](../../proofs/GarrettServiceHistory.lean) models one
+subject's durable state: the OAuth vault record and the identity registry
+row. The events are:
+
+- OAuth enroll and revoke;
+- the refresh steps `quarantine`, `commit` and `settle`;
+- crash;
+- identity enroll and revoke;
+- dispatch.
+
+A dispatch is emitted only if the extracted `require_current_lease` admits it
+and the registry row is active at the session's identity epoch.
+
+- `every_emission_admitted`: in every finite history, every emitted request
+  had an active vault, a `Ready` grant, the session's own lease epoch, an
+  unexpired token, a current identity and no refresh in flight, at the step
+  it was emitted.
+- `fenced_session_never_emits` and `identity_fenced_session_never_emits`: once
+  a session's lease epoch or identity epoch is revoked or superseded, no
+  later step of any history emits a request for it. Epochs never go back
+  (`step_epoch_monotone`).
+- `in_doubt_blocks`, `crash_leaves_in_doubt` and
+  `rejected_needs_reauthorization`: a refresh that may have reached the
+  provider blocks dispatch. After a crash, only an explicit retry or a new
+  enrollment leaves `InDoubt`. A rejected refresh needs reauthorization.
+- `positive_and_fenced_witness`: a history in which a refresh commits and the
+  session keeps working, then a revoke stops it. The model is not vacuous.
+
+Why the steps match the code: `refresh_order_contract` shows that the
+extracted `refresh_once` writes `InDoubt` before any exchange and returns a
+successor only after committing it. An uncertain publication is a history
+with the commit and a history without it; the theorems quantify over both.
+
+Trusted, not proved:
+
+- each step is one atomic write under the vault lock;
+- a dispatch reads the durable record it is admitted against;
+- the registry is the active flag and epoch the identity verifier checks.
+
+The theorem is about the model, not about the native storage, locking or
+clock code.
 
 ## Certificates near the CA's end (2026-10-24)
 
