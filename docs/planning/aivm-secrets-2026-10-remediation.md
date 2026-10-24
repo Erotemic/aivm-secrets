@@ -140,6 +140,13 @@ support following GraphQL cursors.
   match all objects/derived fields of the official CLI. Check-run state
   mapping is intentionally limited. Do not replace a campaign's real `gh`
   executable globally without a command-by-command compatibility audit.
+  `python dev/gh_json_audit.py` runs that audit against the installed `gh`,
+  offline and without a login. Against `gh` 2.45 (2026-10-24): every native
+  `pr view` field is a stock field; the Python client also accepts
+  `baseRefOid`, which stock `gh pr view` lacks (a reviewed extension). `gh`
+  2.45 has no `pr checks --json`, so the checks fields (`name`, `status`,
+  `conclusion`, plus Python's `state` and `link`) still need the audit run
+  with a newer `gh`.
 * `gh pr checks` reads GitHub **check runs** for the validated commit. Commit
   statuses are a separate operation, `pr.statuses` (`gh pr statuses`, added
   2026-10-24), because a commit can pass every check run and still have a
