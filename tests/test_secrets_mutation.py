@@ -130,8 +130,17 @@ MUTANTS = [
            ('test_secrets_garrett_oauth_parity.py',)),
     Mutant('GARRETT-OAUTH-REFRESH-01', 'a request whose reply was lost counts as never sent',
            'identity/oauth_transport.py',
-           "            sent = True\n" + _TOKEN_REQUEST + "            resp = conn.getresponse()\n",
-           _TOKEN_REQUEST + "            resp = conn.getresponse()\n            sent = True\n",
+           "            sent = True\n" + _TOKEN_REQUEST + "            resp = conn.getresponse()\n"
+           "            status = ",
+           _TOKEN_REQUEST + "            resp = conn.getresponse()\n            sent = True\n"
+           "            status = ",
+           ('test_secrets_garrett_oauth_https.py',)),
+    Mutant('GARRETT-OAUTH-REFRESH-01', 'an upstream revocation whose reply was lost counts as never sent',
+           'identity/oauth_transport.py',
+           "            sent = True\n" + _TOKEN_REQUEST + "            resp = conn.getresponse()\n"
+           "            resp.read(",
+           _TOKEN_REQUEST + "            resp = conn.getresponse()\n            sent = True\n"
+           "            resp.read(",
            ('test_secrets_garrett_oauth_https.py',)),
     Mutant('GARRETT-OAUTH-REFRESH-01', 'a definitely rejected grant stays usable',
            'identity/oauth_vault.py',

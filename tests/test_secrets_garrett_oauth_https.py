@@ -455,3 +455,27 @@ def test_a_rejected_grant_requires_reauthorization(
         allowed_scopes=['read']), replace=True)
     status = vault.status(profile, 'vm-1')
     assert (status['refresh_state'], status['epoch']) == ('none', 1)
+
+
+@pytest.mark.parametrize('case', ['answered', 'refused', 'reply-lost', 'unreachable'])
+def test_actual_tls_upstream_revocation_reports_what_it_knows(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str) -> None:
+    # RFC 7009 over the real pinned transport. A request that may have
+    # reached the provider is "in_doubt", never "not_sent".
+    from dataclasses import replace
+
+    def lost(seen: dict) -> tuple[int, dict[str, str], bytes]:
+        raise ConnectionAbortedError('the reply is lost after the request')
+
+    profile = replace(_profile(), revocation_url='https://login.example.org/revoke')
+    form = {'token': 'REFRESH1', 'token_type_hint': 'refresh_token', 'client_id': 'id'}
+    with TLSService(tmp_path, host=PROVIDER_HOST) as endpoint:
+        endpoint.routes[('POST', '/revoke')] = {
+            'answered': answer(200, b''), 'refused': answer(400, b'{}'),
+            'reply-lost': lost, 'unreachable': lost}[case]
+        route(monkeypatch, closed_port() if case == 'unreachable' else endpoint.port)
+        outcome = PinnedOAuthHTTP(ca_file=str(endpoint.files['ca'])).revoke(profile, form)
+        assert outcome == {'answered': 'revoked', 'refused': 'refused',
+                           'reply-lost': 'in_doubt', 'unreachable': 'not_sent'}[case]
+        posts = endpoint.seen('POST')
+        assert len(posts) == (0 if case == 'unreachable' else 1)

@@ -46,7 +46,7 @@ fn execute(action: &str, root: &Path, request: &Value) -> OAuthOutcome<Value> {
         "status" => &[],
         "enroll" => &["replace", "now"],
         "login" => &["replace", "timeout", "transport"],
-        "revoke" => &["now"],
+        "revoke" => &["now", "transport"],
         "refresh" => &["retry_in_doubt", "transport", "now"],
         _ => &["force_refresh", "transport", "now"],
     };
@@ -84,7 +84,7 @@ fn execute(action: &str, root: &Path, request: &Value) -> OAuthOutcome<Value> {
             flag(request, "replace")?,
             now,
         )?),
-        "revoke" => Ok(vault.revoke(&provider, subject, now)?),
+        "revoke" => Ok(vault.revoke(&provider, subject, now, request.get("transport"))?),
         "refresh" => vault.refresh(
             &provider,
             subject,

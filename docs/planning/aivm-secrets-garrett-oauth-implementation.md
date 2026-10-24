@@ -176,7 +176,21 @@ example scopes broader than the profile allows, or no Bearer token type) and
 a request whose reply was lost. The operator must then revoke the grant at
 the provider. An `exchange_rejected` (400 `invalid_grant`: the code was
 refused) or `exchange_not_sent` failure issued nothing and is reported
-plainly. Automatic upstream revocation is not implemented.
+plainly.
+
+**Upstream revocation (RFC 7009), added 2026-10-24 as an agent decision.** A
+provider profile may name a `revocation_url`. It must be on the token
+endpoint's host, so the refresh token is never sent to a new destination,
+and it enters the profile digest only when present, so existing profiles
+keep theirs. `oauth-revoke` (both authorities) first deactivates the record
+locally and durably, exactly as before, and only then asks the provider to
+revoke the refresh token, or the access token if there is none. The reply
+gains `upstream`: `revoked` (the provider answered 200), `refused`,
+`not_sent`, `in_doubt` or `no_grant`. The upstream step never changes the
+local deactivation and is audited (`oauth_upstream_revoke_intent`). It is
+reachable only from the operator command, never from the guest-facing
+broker. Revocation after a failed login exchange (an orphaned grant) still
+needs the operator, because no token is stored in that case.
 
 ## Credential and lifecycle semantics
 

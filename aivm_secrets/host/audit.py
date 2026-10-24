@@ -60,6 +60,7 @@ EVENTS = (
     'oauth_refresh_not_sent',
     'oauth_refresh_rejected',
     'oauth_revoke_intent',
+    'oauth_upstream_revoke_intent',
     'oauth_recorded',
     'identity_recorded',
 )

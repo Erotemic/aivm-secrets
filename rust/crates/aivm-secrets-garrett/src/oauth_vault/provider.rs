@@ -8,6 +8,8 @@ pub struct Provider {
     pub(crate) client_id: String,
     pub(crate) token_host: String,
     pub(crate) token_path: String,
+    /// RFC 7009 endpoint path on the token host, when configured.
+    pub(crate) revocation_path: Option<String>,
     pub(crate) resource_host: String,
     pub(crate) digest: String,
     pub(crate) scopes: Vec<String>,
@@ -75,6 +77,7 @@ impl Provider {
                 "client_secret_file",
                 "refresh_rotation",
                 "fallback_ttl",
+                "revocation_url",
             ],
         )?;
         json::integer(&m["schema"], 1, 1)?;
@@ -100,6 +103,18 @@ impl Provider {
         }
         endpoint(text(value, "authorization_url")?)?;
         let (token_host, token_path) = endpoint(text(value, "token_url")?)?;
+        // Same origin as the token endpoint: never a new destination for
+        // the refresh token.
+        let revocation_path = m
+            .get("revocation_url")
+            .map(|v| {
+                let (host, path) = endpoint(v.as_str().ok_or(Error::InvalidRequest)?)?;
+                if host != token_host {
+                    return Err(Error::InvalidRequest);
+                }
+                Ok(path)
+            })
+            .transpose()?;
         let resource_host = text(value, "resource_host")?;
         hostname(resource_host)?;
         json::integer(&m["callback_port"], 1024, 65535)?;
@@ -138,7 +153,12 @@ impl Provider {
             .map(|v| json::integer(v, 1, 86400))
             .transpose()?
             .unwrap_or(3600);
-        let canonical = json!({"schema":1,"name":name,"client_id":client_id,"authorization_url":m["authorization_url"],"token_url":m["token_url"],"resource_host":resource_host,"callback_port":m["callback_port"],"scopes":scopes,"issuer_response":issuer,"client_secret_file":secret_file,"refresh_rotation":rotation,"fallback_ttl":fallback});
+        let mut canonical = json!({"schema":1,"name":name,"client_id":client_id,"authorization_url":m["authorization_url"],"token_url":m["token_url"],"resource_host":resource_host,"callback_port":m["callback_port"],"scopes":scopes,"issuer_response":issuer,"client_secret_file":secret_file,"refresh_rotation":rotation,"fallback_ttl":fallback});
+        // Only a configured endpoint enters the digest, so existing provider
+        // profiles keep theirs (the Python reference does the same).
+        if let Some(url) = m.get("revocation_url") {
+            canonical["revocation_url"] = url.clone();
+        }
         Ok(Self {
             digest: sha(&json::canonical(&canonical)),
             canonical,
@@ -146,6 +166,7 @@ impl Provider {
             client_id: client_id.into(),
             token_host,
             token_path,
+            revocation_path,
             resource_host: resource_host.into(),
             scopes,
             secret_file: secret_file.into(),

@@ -314,15 +314,23 @@ class OAuthVault:
                 'expires_at': grant.expires_at, 'epoch': epoch,
                 'scopes': list(grant.scopes), 'previous_digest': previous}
 
-    def revoke(self, provider: OAuthProvider, subject: str) -> dict:
+    def revoke(self, provider: OAuthProvider, subject: str, *,
+               transport: Any = None) -> dict:
         """Deactivate the record; this always succeeds on a readable record.
 
         At the maximum epoch the record is deactivated *without* advancing:
         revocation must never fail open. A later enrollment then refuses
         with ``exhausted``.
+
+        With a ``transport`` and a provider ``revocation_url``, the grant is
+        then also revoked at the provider (RFC 7009), refresh token first.
+        That step runs only after the local deactivation is durable, never
+        changes it, and reports its outcome as ``upstream``.
         """
+        upstream = 'not_configured'
         with self._locked():
             old = self._read(provider, subject, any_profile=True)
+            grant = old.get('grant')
             adopted = old['provider_digest'] != provider.digest
             epoch = old['epoch']
             previous = old['previous_digest']
@@ -335,8 +343,24 @@ class OAuthVault:
                     self._write(provider, subject, {
                         'active': False, 'epoch': epoch, 'grant': None,
                         'refresh_state': 'none', 'previous_digest': previous})
-        return {'provider': provider.name, 'subject': subject,
-                'active': False, 'epoch': epoch, 'previous_digest': previous}
+        if provider.revocation_url and transport is not None and grant:
+            from .oauth_transport import revoke_upstream
+            token, hint = ((grant['refresh_token'], 'refresh_token')
+                           if grant.get('refresh_token') else
+                           (grant['access_token'], 'access_token'))
+            with self._audit('oauth_upstream_revoke_intent', provider, subject,
+                             int(time.time())):
+                upstream = revoke_upstream(provider, token, hint, transport=transport,
+                                           untrusted=self.untrusted)
+        elif provider.revocation_url and not grant:
+            upstream = 'no_grant'
+        reply = {'provider': provider.name, 'subject': subject,
+                 'active': False, 'epoch': epoch, 'previous_digest': previous}
+        # Only a provider with a revocation endpoint reports an upstream
+        # outcome, so other replies are unchanged.
+        if provider.revocation_url:
+            reply['upstream'] = upstream
+        return reply
 
     def status(self, provider: OAuthProvider, subject: str) -> dict:
         """Nonsecret metadata, readable even after the profile was edited."""

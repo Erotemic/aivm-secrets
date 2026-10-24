@@ -46,6 +46,8 @@ class OAuthProvider:
     client_secret_file: str = ''
     refresh_rotation: bool = True
     fallback_ttl: int = 3600
+    # RFC 7009 endpoint on the token host; empty means none is configured.
+    revocation_url: str = ''
 
     @classmethod
     def parse(cls, data: Any) -> 'OAuthProvider':
@@ -54,7 +56,7 @@ class OAuthProvider:
             'resource_host', 'callback_port', 'scopes',
         }), frozenset({
             'issuer_response', 'client_secret_file', 'refresh_rotation',
-            'fallback_ttl',
+            'fallback_ttl', 'revocation_url',
         }), code='invalid_policy')
         if fields['schema'] != 1 or type(fields['schema']) is not int:
             raise SecretsError('invalid_policy')
@@ -65,7 +67,13 @@ class OAuthProvider:
                                   grammar.ALNUM + '-_.', 160,
                                   code='invalid_policy')
         _https_endpoint(fields['authorization_url'])
-        _https_endpoint(fields['token_url'])
+        token_host, _ = _https_endpoint(fields['token_url'])
+        revocation = fields.get('revocation_url', '')
+        if revocation:
+            # Same origin as the token endpoint: the one pinned host already
+            # trusted with the refresh token, never a new destination.
+            if type(revocation) is not str or _https_endpoint(revocation)[0] != token_host:
+                raise SecretsError('invalid_policy')
         host = grammar.hostname(fields['resource_host'])
         port = grammar.integer(fields['callback_port'], 1024, 65535,
                                code='invalid_policy')
@@ -93,10 +101,11 @@ class OAuthProvider:
                               code='invalid_policy')
         return cls(name, client_id, fields['authorization_url'],
                    fields['token_url'], host, port, scopes, issuer,
-                   secret_file, rotate, ttl)
+                   secret_file, rotate, ttl, revocation)
 
     def canonical(self) -> bytes:
-        return codec.dumps({
+        optional = {'revocation_url': self.revocation_url} if self.revocation_url else {}
+        return codec.dumps({**optional,
             'schema': 1, 'name': self.name, 'client_id': self.client_id,
             'authorization_url': self.authorization_url,
             'token_url': self.token_url, 'resource_host': self.resource_host,

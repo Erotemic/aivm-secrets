@@ -262,7 +262,13 @@ def oauth_command(args: argparse.Namespace, roots: tuple[Path, ...], *,
             from .coordination import CoordinationClient, CoordinationConfig
             CoordinationClient(CoordinationConfig.load(
                 args.coordination_config, untrusted=roots)).revoke()
-        return vault.revoke(provider, args.subject)
+        # Local deactivation happens first inside revoke and never depends on
+        # the provider; the upstream request runs only with a revocation_url.
+        upstream = None
+        if provider.revocation_url:
+            upstream = (transport if transport is not None
+                        else PinnedOAuthHTTP(untrusted=roots))
+        return vault.revoke(provider, args.subject, transport=upstream)
     if args.identity_action == 'oauth-refresh':
         # Explicit refresh; the returned token stays in this host process.
         return vault.refresh(provider, args.subject, transport=transport,

@@ -406,8 +406,8 @@ implementations must reproduce.
   No live credential smoke test or Lean proof is claimed.
 * **P1 (partly delivered):** reference manifests for GitLab, GitHub and one
   non-Git service ship as examples; the typed effect IR (`Effect`) and its
-  grammar are implemented and pinned by vectors. Still open: declaring the
-  manifest schema frozen, optional CLI wrappers outside the TCB, and explicit
+  grammar are implemented and pinned by vectors. The manifest schema is frozen
+  ([schema 2](../manifest-schema-2.md), 2026-10-24). Still open: optional CLI wrappers outside the TCB, and explicit
   identity semantics and auth-scope introspection per service.
 * **P2 (partly delivered):** Rust provider/authorization/manifest components
   and source-linked Aeneas/Lean artifacts exist. Their exact source-linked

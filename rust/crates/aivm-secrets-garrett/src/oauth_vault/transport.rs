@@ -117,6 +117,68 @@ impl TokenEndpoint {
             addresses,
         })
     }
+    /// The same pinned origin, aimed at the provider's revocation endpoint.
+    pub(crate) fn for_revocation(mut self, path: &str) -> Self {
+        self.path = path.to_owned();
+        self
+    }
+    /// One RFC 7009 request; never fails. `revoked` means the provider
+    /// answered 200, `refused` any other answer, `not_sent` that no request
+    /// byte left this host, `in_doubt` that it may have arrived.
+    pub(crate) fn revoke(&self, form: &[u8]) -> &'static str {
+        let mut sent = false;
+        let mut attempt = || -> Outcome<i64> {
+            let started = Instant::now();
+            let mut connected = None;
+            for address in &self.addresses {
+                let remaining = Duration::from_secs(10).saturating_sub(started.elapsed());
+                if remaining.is_zero() {
+                    break;
+                }
+                if let Ok(socket) =
+                    TcpStream::connect_timeout(address, remaining.min(Duration::from_secs(5)))
+                {
+                    connected = Some(socket);
+                    break;
+                }
+            }
+            let mut socket = connected.ok_or(Error::CredentialSource)?;
+            socket
+                .set_read_timeout(Some(Duration::from_secs(10)))
+                .map_err(|_| Error::CredentialSource)?;
+            socket
+                .set_write_timeout(Some(Duration::from_secs(10)))
+                .map_err(|_| Error::CredentialSource)?;
+            let killer = socket.try_clone().map_err(|_| Error::CredentialSource)?;
+            let _deadline = crate::tls::Deadline::start_for(Duration::from_secs(15), move || {
+                let _ = killer.shutdown(std::net::Shutdown::Both);
+            });
+            let name = rustls::pki_types::ServerName::try_from(self.host.clone())
+                .map_err(|_| Error::CredentialSource)?;
+            let mut connection = ClientConnection::new(self.tls.clone(), name)
+                .map_err(|_| Error::CredentialSource)?;
+            while connection.is_handshaking() {
+                connection
+                    .complete_io(&mut socket)
+                    .map_err(|_| Error::CredentialSource)?;
+            }
+            sent = true;
+            let mut stream = StreamOwned::new(connection, socket);
+            let mut request=Zeroizing::new(format!("POST {} HTTP/1.1\r\nHost: {}\r\nAccept: application/json\r\nAccept-Encoding: identity\r\nContent-Type: application/x-www-form-urlencoded\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Length: {}\r\n\r\n",self.path,self.host,form.len()).into_bytes());
+            request.extend_from_slice(form);
+            stream
+                .write_all(&request)
+                .and_then(|_| stream.flush())
+                .map_err(|_| Error::CredentialSource)?;
+            Ok(response(BufReader::new(stream), true)?.status)
+        };
+        match attempt() {
+            Ok(200) => "revoked",
+            Ok(_) => "refused",
+            Err(_) if sent => "in_doubt",
+            Err(_) => "not_sent",
+        }
+    }
     pub(crate) fn post(&self, form: &[u8]) -> Result<Value, core::ExchangeFailure> {
         let mut sent = false;
         let mut status = 0;
@@ -166,7 +228,7 @@ impl TokenEndpoint {
                 .write_all(&request)
                 .and_then(|_| stream.flush())
                 .map_err(|_| Error::CredentialSource)?;
-            let response = response(BufReader::new(stream))?;
+            let response = response(BufReader::new(stream), false)?;
             status = response.status;
             if status == 400 {
                 if response.content_type == "application/json" {
@@ -258,7 +320,9 @@ fn line(reader: &mut impl BufRead, limit: usize) -> Outcome<Vec<u8>> {
     bytes.truncate(bytes.len() - 2);
     Ok(bytes)
 }
-fn response(mut reader: impl BufRead) -> Outcome<Response> {
+/// `allow_empty`: an RFC 7009 revocation reply may have no body; a token
+/// reply never may.
+fn response(mut reader: impl BufRead, allow_empty: bool) -> Outcome<Response> {
     let raw = line(&mut reader, 4096)?;
     let status = std::str::from_utf8(&raw).map_err(|_| Error::CredentialSource)?;
     let mut fields = status.splitn(3, ' ');
@@ -377,7 +441,7 @@ fn response(mut reader: impl BufRead) -> Outcome<Response> {
         }
         _ => return Err(Error::CredentialSource),
     }
-    if body.is_empty() {
+    if body.is_empty() && !allow_empty {
         return Err(Error::CredentialSource);
     }
     Ok(Response {
@@ -396,11 +460,11 @@ mod tests {
         let fixed =
             b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}";
         assert_eq!(
-            response(&fixed[..]).ok().map(|r| r.body.to_vec()),
+            response(&fixed[..], false).ok().map(|r| r.body.to_vec()),
             Some(b"{}".to_vec())
         );
         let chunked = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n2\r\n{}\r\n0\r\n\r\n";
-        assert!(response(&chunked[..]).is_ok());
+        assert!(response(&chunked[..], false).is_ok());
         for raw in [
             "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nTransfer-Encoding: chunked\r\n\r\n{}",
             "HTTP/1.1 200 OK\r\nContent-Length: 2\r\ncontent-length: 2\r\n\r\n{}",
@@ -408,7 +472,7 @@ mod tests {
             "HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\n{}",
             "HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: 2\r\n\r\n{}",
             "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\n{}\r\n0\r\nSecret: private\r\n\r\n",
-        ] { assert!(response(raw.as_bytes()).is_err()); }
+        ] { assert!(response(raw.as_bytes(), false).is_err()); }
         assert_eq!(
             &*form(&[("refresh_token", "a&b=+%")]).unwrap(),
             b"refresh_token=a%26b%3D%2B%25"

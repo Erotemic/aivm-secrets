@@ -511,9 +511,16 @@ impl OAuthVault {
             json!({"provider":provider.name,"subject":subject,"expires_at":grant.expires,"epoch":epoch,"scopes":grant.scopes,"previous_digest":row.previous}),
         )
     }
-    pub fn revoke(&self, provider: &Provider, subject: &str, now: i64) -> Outcome<Value> {
+    pub fn revoke(
+        &self,
+        provider: &Provider,
+        subject: &str,
+        now: i64,
+        transport: Option<&Value>,
+    ) -> Outcome<Value> {
         let _lease = self.root.lock_named(".vault.lock", true)?;
         let mut row = self.read(provider, subject, true)?;
+        let grant = row.grant.take();
         if row.active || row.profile != provider.digest {
             row.epoch = (row.epoch + 1).min(i32::MAX as i64);
             if row.profile != provider.digest {
@@ -527,9 +534,44 @@ impl OAuthVault {
                 .record("oauth_recorded", now, "")
                 .map_err(|_| Error::OutcomeUnknown)?;
         }
-        Ok(
-            json!({"provider":provider.name,"subject":subject,"active":false,"epoch":row.epoch,"previous_digest":row.previous}),
-        )
+        // RFC 7009, only after the local deactivation above is durable; its
+        // outcome never changes that deactivation.
+        let upstream = match (&provider.revocation_path, transport, &grant) {
+            (None, _, _) => "not_configured",
+            (Some(_), _, None) => "no_grant",
+            (Some(_), None, Some(_)) => "not_configured",
+            (Some(path), Some(config), Some(grant)) => {
+                let (token, hint): (&str, &str) = match &grant.refresh {
+                    Some(refresh) => (refresh.as_str(), "refresh_token"),
+                    None => (grant.access.as_str(), "access_token"),
+                };
+                let client_secret = provider.client_secret()?;
+                let mut fields: Vec<(&str, &str)> = vec![
+                    ("token", token),
+                    ("token_type_hint", hint),
+                    ("client_id", provider.client_id.as_str()),
+                ];
+                if let Some(secret) = &client_secret {
+                    fields.push(("client_secret", secret.as_str()));
+                }
+                let form = transport::form(&fields)?;
+                let endpoint = TokenEndpoint::new(provider, config)?.for_revocation(path);
+                let audit = Audit::new(&self.root, provider, subject)?;
+                audit.record("oauth_upstream_revoke_intent", now, "")?;
+                let outcome = endpoint.revoke(&form);
+                audit
+                    .record("oauth_recorded", now, "")
+                    .map_err(|_| Error::OutcomeUnknown)?;
+                outcome
+            }
+        };
+        let mut reply = json!({"provider":provider.name,"subject":subject,"active":false,"epoch":row.epoch,"previous_digest":row.previous});
+        // Only a provider with a revocation endpoint reports an upstream
+        // outcome, so other replies are unchanged (as in the reference).
+        if provider.revocation_path.is_some() {
+            reply["upstream"] = json!(upstream);
+        }
+        Ok(reply)
     }
     fn refresh_locked(
         &self,

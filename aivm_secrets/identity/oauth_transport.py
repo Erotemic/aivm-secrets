@@ -208,6 +208,37 @@ class PinnedOAuthHTTP:
         self.ca_file = ca_file
         self._context = _tls_context(ca_file, tuple(Path(p) for p in untrusted))
 
+    def revoke(self, provider: OAuthProvider, fields: dict[str, str]) -> str:
+        """POST ``fields`` to the provider's revocation endpoint (RFC 7009)."""
+        from .oauth_provider import _https_endpoint
+        sent = False
+        conn = None
+        resp = None
+        try:
+            host, target = _https_endpoint(provider.revocation_url)
+            data = urlencode(fields).encode('ascii')
+            if len(data) > MAX_FORM:
+                return 'not_sent'
+            conn = http.client.HTTPSConnection(host, 443, timeout=TOKEN_TIMEOUT,
+                                               context=self._context)
+            conn.connect()
+            sent = True
+            conn.request('POST', target, data, {
+                'Host': host, 'Accept': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Cache-Control': 'no-store',
+            })
+            resp = conn.getresponse()
+            resp.read(MAX_RESPONSE + 1)
+            return 'revoked' if resp.status == 200 else 'refused'
+        except Exception:
+            return 'in_doubt' if sent else 'not_sent'
+        finally:
+            if resp is not None:
+                resp.close()
+            if conn is not None:
+                conn.close()
+
     def post(self, provider: OAuthProvider, fields: dict[str, str],
              *, untrusted: tuple = ()) -> dict:
         from .oauth_provider import _https_endpoint
@@ -258,6 +289,24 @@ class PinnedOAuthHTTP:
                 resp.close()
             if conn is not None:
                 conn.close()
+
+
+def revoke_upstream(provider: OAuthProvider, token: str, hint: str, *,
+                    transport: Any, untrusted: tuple = ()) -> str:
+    """Ask the provider to revoke ``token`` (RFC 7009); never raises.
+
+    Returns ``revoked`` (the provider answered 200), ``refused`` (it
+    answered something else), ``not_sent`` (no request byte left this
+    host) or ``in_doubt`` (the request may have arrived; the reply was lost).
+    """
+    form = {'token': token, 'token_type_hint': hint, 'client_id': provider.client_id}
+    try:
+        secret = _secret(provider, untrusted)
+    except SecretsError:
+        return 'not_sent'
+    if secret:
+        form['client_secret'] = secret
+    return transport.revoke(provider, form)
 
 
 def _secret(provider: OAuthProvider, untrusted: tuple) -> str:
