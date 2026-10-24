@@ -1001,3 +1001,16 @@ Not changed: certificates.rs PEM (padded, crate) and the proxy's Basic-auth
 decode (core decode_base64, separate).
 Also confirmed every proofs/*.lean except the opt-in Check/GarrettCheck audit
 modules is a lakefile root, so lake build compiles all proof modules.
+
+## 2026-10-24 04:54:56 -0400
+
+Checked the loose ends the goal hook raised. proxy_main's Legacy Basic-auth
+decoder is inside #[cfg(test)] mod connect_oracle (test only); production uses
+core decode_base64, whose output only feeds the token comparison. HP-6
+"translator adds no host trust": the native bridge-client mode already
+refused --credential-file, but only the Python translator had a test; added
+test_native_translator_refuses_a_credential_or_a_partial_bridge and recorded
+in the HP-6 row that the obligation is discharged by placement plus tests,
+with translation fidelity (usability, not authority) still unproved. I did
+not write a Lean theorem for it: it would only restate the NR theorems'
+universal quantification over guest input, which AGENTS.md warns against.

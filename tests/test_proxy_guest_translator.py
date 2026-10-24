@@ -218,3 +218,22 @@ def test_the_dispatcher_refuses_an_empty_client():
     with pytest.raises(PolicyError):
         BridgeDispatcher(None, [])
 
+
+
+@pytest.mark.parametrize('extra', [
+    ['--credential-file', 'guest-credential'],
+    [],
+])
+def test_native_translator_refuses_a_credential_or_a_partial_bridge(tmp_path, extra):
+    """The native guest-side mode takes no credential: exactly one authority source."""
+    credential = write_private(tmp_path / 'guest-credential', (TOKEN + '\n').encode())
+    routes_path = write_private(tmp_path / 'routes.json', b'[]')
+    command = [executable('AIVM_SECRETS_RUST_GARRETT_PROXY'),
+               '--policy', str(tmp_path / 'proxy.json'), '--audit', str(tmp_path / 'audit.jsonl'),
+               '--routes', str(routes_path)]
+    if extra:
+        command += ['--bridge-client', '["client"]', extra[0], str(credential)]
+    done = subprocess.run(command, capture_output=True, timeout=30, input=b'')
+    assert done.returncode == 1
+    assert json.loads(done.stdout) == {'version': 1, 'ready': False, 'error': 'invalid_spec'}
+    assert TOKEN.encode() not in done.stdout + done.stderr
