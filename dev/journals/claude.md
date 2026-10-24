@@ -1014,3 +1014,13 @@ in the HP-6 row that the obligation is discharged by placement plus tests,
 with translation fidelity (usability, not authority) still unproved. I did
 not write a Lean theorem for it: it would only restate the NR theorems'
 universal quantification over guest input, which AGENTS.md warns against.
+
+## 2026-10-24 05:12:40 -0400
+
+Looked for further removals after the goal hook kept firing. The only
+candidate with real substance is JSON canonical-form injectivity (same idea
+as base64), recorded on RUST-JSON-01 with what it needs and why its benefit
+is small for signed JWTs. The translator's final "exactly one match" step
+would be a filler proof. I am stopping autonomous removal here; what remains
+is the deferred JSON work, external crypto/TLS/OS/clock review, and the
+maintainer's real-VM evidence and sign-off.
