@@ -812,8 +812,13 @@ fn main() {
     let address = listener.local_addr().map(|a| a.to_string()).unwrap_or_default();
     let session = Arc::new(session);
     let profile = if session.translator.is_some() { "constrained-http" } else { "credential-substitution" };
-    session.record("session_start", json!({"profile": profile,
-        "origins": session.origins.keys().collect::<Vec<_>>()}));
+    // No audit, no session: refuse to start if the first record fails.
+    if !session.record("session_start", json!({"profile": profile,
+        "origins": session.origins.keys().collect::<Vec<_>>()}))
+    {
+        emit(&json!({"version": 1, "ready": false, "error": "internal_error"}));
+        std::process::exit(1);
+    }
     let token = String::from_utf8_lossy(&session.token).into_owned();
     let announcement = json!({
         "version": 1, "ready": true, "profile": profile,

@@ -204,21 +204,63 @@ def test_native_oversize_and_expiry(tmp_path, service):
         assert len(service.requests) == 1
 
 
-def test_native_failed_admission_audit_sends_nothing(tmp_path, service):
-    """Fail closed: if the admission record cannot be written, the request is
-    refused with ``internal_error`` and nothing reaches the provider. Every
-    audit write fails because the process may not grow any file."""
-    def no_file_growth():
+def audit_line_lengths(tmp_path, service):
+    """Byte lengths of the session_start, admitted and completed records of
+    one plain read. They are deterministic: fixed fields, a ten-digit
+    timestamp and a 64-hex chain head."""
+    scratch = tmp_path / 'measure'
+    scratch.mkdir()
+    with NativeWorld(scratch, service) as world:
+        assert status(world.raw(get())) == 200
+    lengths = [len(line) + 1 for line in world.audit_path.read_bytes().splitlines()][:3]
+    assert [row['event'] for row in world.audit()][:3] == ['session_start', 'admitted', 'completed']
+    service.requests.clear()
+    return lengths
+
+
+def limited_world(tmp_path, service, size):
+    """A native proxy that cannot grow any file past ``size`` bytes, so every
+    audit record after that point fails to write."""
+    def limit():
         signal.signal(signal.SIGXFSZ, signal.SIG_IGN)
-        resource.setrlimit(resource.RLIMIT_FSIZE, (0, 0))
+        resource.setrlimit(resource.RLIMIT_FSIZE, (size, size))
 
     world = NativeWorld(tmp_path, service)
-    world.preexec = no_file_growth
-    with world:
+    world.preexec = limit
+    return world
+
+
+def test_native_refuses_to_start_without_an_audit(tmp_path, service):
+    world = limited_world(tmp_path, service, 0)
+    process = subprocess.run(
+        [executable('AIVM_SECRETS_RUST_GARRETT_PROXY'), '--policy', str(world.policy_path),
+         '--credential-file', str(world.credential), '--audit', str(world.audit_path)],
+        capture_output=True, timeout=30, input=b'', preexec_fn=world.preexec)
+    assert process.returncode == 1
+    assert json.loads(process.stdout) == {'version': 1, 'ready': False, 'error': 'internal_error'}
+
+
+def test_native_failed_admission_audit_sends_nothing(tmp_path, service):
+    """Fail closed: if the admission record cannot be written, the request is
+    refused with ``internal_error`` and nothing reaches the provider."""
+    start, _, _ = audit_line_lengths(tmp_path, service)
+    with limited_world(tmp_path, service, start) as world:
         reply = world.raw(get())
         assert status(reply) == 502 and b'"internal_error"' in reply, reply
         assert service.requests == []
-    assert world.audit_path.read_bytes() == b''
+    assert [row['event'] for row in world.audit()] == ['session_start']
+
+
+def test_native_failed_completion_audit_releases_nothing(tmp_path, service):
+    """The provider answered, but the reply is released only after the
+    completion record is durable; otherwise ``outcome_unknown``."""
+    start, admitted, _ = audit_line_lengths(tmp_path, service)
+    with limited_world(tmp_path, service, start + admitted) as world:
+        reply = world.raw(get())
+        assert status(reply) == 502 and b'"outcome_unknown"' in reply, reply
+        assert b'demo' not in reply
+        assert len(service.requests) == 1
+    assert [row['event'] for row in world.audit()] == ['session_start', 'admitted']
 
 
 def test_native_unreachable_origin(tmp_path, service):

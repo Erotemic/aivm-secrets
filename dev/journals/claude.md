@@ -794,3 +794,11 @@ called by the extracted `serve` after a completed release; failure →
 callback; new helper `exchanged_outcome`; `serve_upstream` states the
 exchange with an existential post-state. Core mock test and the
 byte-for-byte composition oracle updated (it now expects the completed call).
+
+## 2026-10-23 21:38:24 -0400
+
+Native proxy now refuses to start if `session_start` cannot be recorded
+(`ready:false, error:internal_error`), matching Python. Native integration
+tests let exactly N audit records through via RLIMIT_FSIZE sized from a
+measured run (record lengths are deterministic): startup, admission and
+completion gates each tested live; completion test mutation-checked.
