@@ -97,6 +97,27 @@ theorem current_issued {C X : Type} (ops : Checks C X) (ctx : Context) (before a
   subst stamp
   exact ⟨by simpa [provider_exchange.Simulation.Issued, view] using authorized, identity⟩
 
+/-- **Every admission stamp had a current identity, control state and
+    credential lease at its own time.** A returned current admission ran the
+    control check and the credential-lease check (for OAuth sessions the
+    native callback is the vault's `require_current`, over the extracted
+    `require_current_lease`), both returning success at exactly the time
+    recorded in the stamp, and the presented identity was current at that
+    time too. Every provider send uses such a stamp (`dispatch_current_origin`,
+    `owned_read_driver_stamp_origin`). -/
+theorem admitted_stamp_had_current_lease {C X : Type} (ops : Checks C X) (ctx : Context)
+    (before after : C) (stamp : manifest.AdmissionStamp)
+    (returned : Context.current ops ctx before = Result.ok (.Ok stamp, after)) :
+    ∃ clocked controlled leased,
+      ops.control clocked stamp.now = Result.ok (.Ok (), controlled) ∧
+      ops.lease controlled stamp.now = Result.ok (.Ok (), leased) ∧
+      present ctx.identity ctx.expected ctx.peer stamp.now = Result.ok (.Ok ()) := by
+  obtain ⟨_, clocked, controlled, leased, now, elapsed, _, _, control, lease, identity, _, authorized⟩ :=
+    (current_success_iff ops ctx before after stamp).mp returned
+  have same := (manifest.StampProofs.current_success_iff ctx.claims ctx.grant ctx.operation ctx.operation ctx.write ctx.allowed now elapsed stamp).mp authorized |>.2
+  subst stamp
+  exact ⟨clocked, controlled, leased, control, lease, identity⟩
+
 theorem current_snapshot_accepted {C X : Type} (ops : Checks C X) (ctx : Context) (before after : C)
     (stamp : manifest.AdmissionStamp)
     (returned : Context.current ops ctx before = Result.ok (.Ok stamp, after)) :

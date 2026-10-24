@@ -815,3 +815,20 @@ writes `/repos/a/b/c` both for `owner = a/b, repo = c` and for
 `owner = a, repo = b/c`. In that case the translator picks the first matching
 route. That affects which allowed operation runs, never what is allowed: the
 host bridge authorizes whatever named operation it receives.
+
+## Each request had a current identity and credential lease (2026-10-24)
+
+[`admitted_stamp_had_current_lease`](../../proofs/GarrettCurrentAdmission.lean)
+says that a returned current admission ran the control check and the
+credential-lease check, and that both succeeded at exactly the time recorded
+in its stamp. The presented identity was current at that time too. Every
+provider send uses such a stamp (`dispatch_current_origin`,
+`owned_read_driver_stamp_origin`).
+
+For OAuth sessions the lease check is the vault's `require_current`, over the
+extracted `require_current_lease`. [`current_lease_contract`](../../proofs/GarrettOAuth.lean)
+shows that a revoked session, a re-enrolled one (epoch changed) or one
+mid-refresh cannot dispatch.
+
+Not covered: histories that span crashes, a refresh running concurrently with
+a request, or a publication whose outcome is uncertain.

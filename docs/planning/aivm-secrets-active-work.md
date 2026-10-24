@@ -136,17 +136,17 @@ Status changes are recorded here, not in the older documents.
 | Native write campaign (OUT-4): approvals, uncertain outcomes, budgets | Phase 5, kernel spec, formal assurance | Phase 5 |
 | Idempotency keys declared in the manifest | operations policy, kernel spec | Phase 5 |
 | Retire legacy forwarding to the Python broker (`RUST-LEGACY-01`) | assumption roadmap | Kept while a deployment uses the Python broker; the read-only bridge already refuses it |
-| Coordinator client transport phases (`COORD-RUST-01`) | assumption roadmap | Open |
-| OAuth service-history theorem; OAuth login I/O refinement | Garrett verification | Open |
-| Models for the account-status and OAuth-startup profiles (W4/W5 `OTHER-PROFILES`) | W4/W5 scopes | Open |
+| Coordinator client transport phases (`COORD-RUST-01`) | assumption roadmap | **Assessed 2026-10-24:** member and operator reply acceptance are extracted and proved. What stays native is canonicalizing the operator's member list (sort, de-duplicate, 1 to 32 hex names), the HTTP framing of the request, and the transport. Extracting the list check would need a proved sort; it changes no authorization decision, which the coordinator makes |
+| OAuth service-history theorem; OAuth login I/O refinement | Garrett verification | **Partly done 2026-10-24:** for each emitted request, `admitted_stamp_had_current_lease` shows the control and credential-lease checks passed at the stamp's own time with a current identity; for OAuth sessions that lease check is the extracted `require_current_lease` (`current_lease_contract`: revoked, re-enrolled or mid-refresh sessions cannot dispatch). Open: a history model across crashes, concurrent refresh and uncertain publication, and the login I/O refinement |
+| Models for the account-status and OAuth-startup profiles (W4/W5 `OTHER-PROFILES`) | W4/W5 scopes | **Partly covered:** the account-status controller has `perform_contract` and `perform_projection_noninterference` (`GarrettProtocol`); OAuth refresh and login decisions are proved (`GarrettOAuth`, `GarrettLogin`); legacy forwarding is refused by the read-only bridge. Open: a single trace model across these profiles, as the read profile has |
 | Budget and scope primitives (M3); attenuation and delegation proofs (`AUTH-01`, `ATTEN-01`) | kernel spec, modular proofs, formal assurance | Open; native denies delegation |
-| Automatic upstream token revocation (RFC 7009) | OAuth implementation | Open |
-| GraphQL cursor following; `gh pr checks` commit statuses; per-command `--json` audit | 2026-10 remediation | Open |
-| Manifest schema freeze and introspection; signed manifests; least-privilege resolvers | agnostic integrations | Open |
+| Automatic upstream token revocation (RFC 7009) | OAuth implementation | **Needs maintainer:** the document records it as unimplemented, not planned. Adding it sends the refresh token to a new endpoint and needs native parity; today the operator revokes at the provider |
+| GraphQL cursor following; `gh pr checks` commit statuses; per-command `--json` audit | 2026-10 remediation | Open; compatibility features, listed by that document under its remaining gaps. The `--json` audit needs the real `gh` |
+| Manifest schema freeze and introspection; signed manifests; least-privilege resolvers | agnostic integrations | **Needs maintainer** for the freeze (a compatibility promise). Signed manifests and a third-party adapter ecosystem are P5, long-term. Resolver isolation is `RES-01`, Python reference only |
 | `trusted-host-exec` profile; declarative plugin grammar; verified `gh` subset | credential-free tools | Six design decisions there need the maintainer first |
-| Proxy hard cases: server-sent events, cross-host `Link` pagination | HTTPS proxy profiles | Open |
+| Proxy hard cases: server-sent events, cross-host `Link` pagination | HTTPS proxy profiles | Open; compatibility features. Both are refused today (no streaming, a single pinned origin) |
 | Separate CI with a pinned cross-project compatibility workflow | repository boundary | **Done 2026-10-24:** `.github/workflows/aivm-compat.yml` runs AIVM's adapter tests at the commit pinned in `dev/compat/aivm.json` against this package (`dev/aivm_compat.py`). It found that AIVM's own suite tests AIVM's stale in-tree copy of `aivm_secrets`; removing that copy is the recorded cutover, a maintainer decision |
-| VS Code launcher secrets mode | validation | Open (AIVM; same AIVM rule) |
+| VS Code launcher secrets mode | validation | **Needs maintainer** (a new AIVM secrets surface, which AIVM's rules forbid) |
 | Optional `aivm[secrets]` extra | repository boundary | After review |
 | Rollback journal, `accept-restore`, anchors A and B, clone detection | rollback and clone policy | **Deferred by decision** |
 | Host TPM counter or remote witness anchors (C, D); vTPM custody (`VTPM-01`) | rollback policy, vTPM policy | Deferred; needs hardware or a second host |
