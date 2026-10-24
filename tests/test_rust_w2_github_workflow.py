@@ -211,7 +211,12 @@ def test_w2_narrow_gh_client_uses_native_broker_only(tmp_path):
                                 '--json', 'name,status')
             assert checks.returncode == 0, checks.stderr
             assert json.loads(checks.stdout) == [{'name': 'lean', 'status': 'completed'}]
-            assert_provider_reads(server, 5)
+            # The stock `gh pr checks --json` spelling works too.
+            stock = native_cli(case, 'pr', 'checks', str(ALLOWED_PR), '--repo', REPO,
+                               '--json', 'name,state')
+            assert stock.returncode == 0, stock.stderr
+            assert json.loads(stock.stdout) == [{'name': 'lean', 'state': 'SUCCESS'}]
+            assert_provider_reads(server, 7)
             before = server.seen()
             for words in [
                 ('pr', 'view', str(OTHER_PR), '--repo', REPO),

@@ -75,7 +75,9 @@ impl GitHubCommand {
                 "--json" if fields.is_none() && kind != CommandKind::Diff => {
                     let allowed: &[&str] = match kind {
                         CommandKind::View => &["number", "title", "headRefOid"],
-                        CommandKind::Checks => &["name", "status", "conclusion"],
+                        // `state` and `link` are stock `gh pr checks --json`
+                        // fields; `status` and `conclusion` are our extensions.
+                        CommandKind::Checks => &["name", "state", "link", "status", "conclusion"],
                         CommandKind::Statuses => &["context", "state", "description"],
                         CommandKind::Diff => return Err(Error::InvalidRequest),
                     };
@@ -163,11 +165,43 @@ impl GitHubCommand {
         let m = value.as_object().ok_or(Error::InvalidRequest)?;
         let mut result = Map::new();
         for name in &self.fields {
-            let selected = m.get(name).ok_or(Error::InvalidRequest)?;
-            result.insert(name.clone(), selected.clone());
+            let selected = match (self.kind, name.as_str()) {
+                (CommandKind::Checks, "state") => check_state(m)?,
+                (CommandKind::Checks, "link") => {
+                    m.get("details_url").ok_or(Error::InvalidRequest)?.clone()
+                }
+                _ => m.get(name).ok_or(Error::InvalidRequest)?.clone(),
+            };
+            result.insert(name.clone(), selected);
         }
         Ok(result)
     }
+}
+
+/// Stock `gh pr checks` `state` for one check run: its conclusion, or its
+/// status while it has none, in `gh`'s spelling. The Python client's
+/// `json_rules` map (`aivm_secrets/kernel/presets.py`) is the same table.
+fn check_state(run: &Map<String, Value>) -> Outcome<Value> {
+    let raw = match run.get("conclusion") {
+        Some(Value::String(conclusion)) => conclusion.as_str(),
+        Some(Value::Null) | None => run
+            .get("status")
+            .and_then(Value::as_str)
+            .ok_or(Error::InvalidRequest)?,
+        Some(_) => return Err(Error::InvalidRequest),
+    };
+    let state = match raw {
+        "success" => "SUCCESS",
+        "failure" => "FAILURE",
+        "neutral" => "NEUTRAL",
+        "cancelled" => "CANCELLED",
+        "skipped" => "SKIPPING",
+        "timed_out" => "TIMED_OUT",
+        "action_required" => "ACTION_REQUIRED",
+        "queued" | "in_progress" | "waiting" | "pending" | "completed" => "PENDING",
+        _ => return Err(Error::InvalidRequest),
+    };
+    Ok(Value::String(state.to_owned()))
 }
 
 #[cfg(test)]
@@ -241,6 +275,29 @@ mod tests {
             "Other/Repo"
         ]))
         .is_err());
+    }
+
+    #[test]
+    fn stock_check_fields_follow_gh() {
+        let checks = GitHubCommand::parse(&words(&[
+            "gh", "pr", "checks", "13861", "--repo", "TauCetiProject/TauCeti",
+            "--json", "name,state,link",
+        ]))
+        .unwrap();
+        let reply = json!({"ok":true,"result":{"checks":[
+            {"name":"lean","status":"completed","conclusion":"success","details_url":"https://ci/1"},
+            {"name":"lint","status":"in_progress","conclusion":null,"details_url":"https://ci/2"}
+        ]}});
+        assert_eq!(
+            String::from_utf8(checks.render(&reply).unwrap()).unwrap(),
+            "[{\"link\":\"https://ci/1\",\"name\":\"lean\",\"state\":\"SUCCESS\"},\
+             {\"link\":\"https://ci/2\",\"name\":\"lint\",\"state\":\"PENDING\"}]\n"
+        );
+        // An unknown conclusion fails closed rather than inventing a state.
+        let odd = json!({"ok":true,"result":{"checks":[
+            {"name":"x","status":"completed","conclusion":"stale","details_url":"u"}
+        ]}});
+        assert!(checks.render(&odd).is_err());
     }
 
     #[test]

@@ -144,9 +144,12 @@ support following GraphQL cursors.
   offline and without a login. Against `gh` 2.45 (2026-10-24): every native
   `pr view` field is a stock field; the Python client also accepts
   `baseRefOid`, which stock `gh pr view` lacks (a reviewed extension). `gh`
-  2.45 has no `pr checks --json`, so the checks fields (`name`, `status`,
-  `conclusion`, plus Python's `state` and `link`) still need the audit run
-  with a newer `gh`.
+  2.45 has no `pr checks --json`. Against `gh` 2.63.2, run the same way:
+  `baseRefOid` is stock there; on `pr checks` the native client lacked the
+  stock `state` and `link`, so a stock `--json name,state,link` was refused.
+  It now derives both, with the same mapping as the Python client. Both
+  clients still accept `status` and `conclusion`, raw check-run fields
+  that stock `gh` does not offer.
 * `gh pr checks` reads GitHub **check runs** for the validated commit. Commit
   statuses are a separate operation, `pr.statuses` (`gh pr statuses`, added
   2026-10-24), because a commit can pass every check run and still have a
