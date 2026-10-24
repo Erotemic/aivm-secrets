@@ -127,6 +127,15 @@ impl ClientRequest {
         &self.spki
     }
 }
+/// The expiry of a checked CA certificate, for operator status reports.
+pub(crate) fn ca_not_after(certificate: &[u8]) -> Outcome<i64> {
+    let der = checked_ca_der(certificate)?;
+    let (rest, cert) = X509Certificate::from_der(&der).map_err(|_| Error::InvalidCapability)?;
+    if !rest.is_empty() {
+        return Err(Error::InvalidCapability);
+    }
+    Ok(cert.validity().not_after.timestamp())
+}
 pub(crate) fn checked_ca_der(certificate: &[u8]) -> Outcome<Vec<u8>> {
     let der = decode_pem(certificate, "CERTIFICATE", 65536)?;
     let (rest, cert) = X509Certificate::from_der(&der).map_err(|_| Error::InvalidCapability)?;

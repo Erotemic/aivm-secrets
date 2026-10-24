@@ -105,12 +105,12 @@ without it name an invocation that no longer parses, and the test fails.
 | --- | --- | --- | --- | --- |
 | `init` | operator-only | implemented | none | creates a trust root, its CA and issuer keys |
 | `status` | read-only | implemented | `identity_enroll`, `identity_renew`, `identity_rotate_key` (read the CAS values) | changes nothing |
-| `verify` | read-only | planned | none | reports findings about the authority's files |
+| `verify` | read-only | implemented | none | reports findings about the authority's files: superseded and retired private keys on disk, issuer key files the keyring does not list, active rows with expired certificates, and the CA's remaining time |
 | `inspect-csr` | read-only | implemented | every enrollment path, before signing | parses an untrusted CSR in an isolated child |
 | `public-client` | read-only | implemented | certificate delivery; bound-session start | returns only public certificate material |
 | `enroll` | operator-only | implemented | `identity_enroll` | creates authority for a subject, or reactivates a revoked one at a new epoch |
 | `enroll --replace` | operator-only | implemented | `identity_enroll --replace` | displaces an active enrollment without a CAS |
-| `enroll --replace --expected-epoch --expected-certificate-sha256` | operator-only | implemented | none (`identity_enroll --replace` does not pass the CAS yet) | the CAS removes the race, but this still replaces the key a VM is enrolled with |
+| `enroll --replace --expected-epoch --expected-certificate-sha256` | operator-only | implemented | `identity_enroll --replace` (passes the CAS when the inspected row is active) | the CAS removes the race, but this still replaces the key a VM is enrolled with |
 | `renew-client` | automation-safe | implemented | `identity_renew` | CAS-guarded; same subject; a new seven-day certificate |
 | `renew-bound` | automation-safe | implemented | none | CAS renewal of the same enrolled key and a new JWT for the existing broker capability; failed issuance leaves the old epoch revoked |
 | `rotate-client-key` | automation-safe | implemented | `identity_rotate_key` | CAS-guarded; requires a different key |
@@ -124,7 +124,7 @@ without it name an invocation that no longer parses, and the test fails.
 | `rotate-ca --expected-ca-sha256` | operator-only | implemented | none | replaces the trust root and revokes every enrollment (epochs advance); the required CAS stops a stale second run from revoking later enrollments |
 | `rotate-issuer` | operator-only | implemented | none | adds a signing key; at most 8 can be enabled |
 | `retire-issuer` | operator-only | implemented | none | every live token signed by that kid fails at its next presentation |
-| `prune-keys --superseded` | operator-only | planned | never; AIVM does not wrap it | destroys private keys irreversibly |
+| `prune-keys --superseded` | operator-only | implemented | never; AIVM does not wrap it | destroys private keys irreversibly (superseded CA and server generations, retired issuer keys); locked and audited |
 | `request` | guest-side | implemented | none; guestctl runs `openssl` itself | makes a key and CSR inside a guest |
 | `install-bundle` | guest-side | implemented | none; standalone explicit local command | CAS installs one certificate/JWT snapshot, without CA authority or private-key rotation |
 | `call` | guest-side | implemented | none; the bound guest client is `aivm_secrets/guest.py` | presents one request to a bridge |

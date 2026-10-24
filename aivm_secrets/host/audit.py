@@ -53,6 +53,7 @@ EVENTS = (
     'identity_token_issue_intent',
     'identity_key_rotate_intent',
     'identity_key_retire_intent',
+    'identity_key_prune_intent',
     'oauth_enroll_intent',
     'oauth_refresh_intent',
     'oauth_refresh_in_doubt',

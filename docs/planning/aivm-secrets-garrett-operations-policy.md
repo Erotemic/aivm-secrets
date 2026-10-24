@@ -164,7 +164,8 @@ All **implemented**:
   renewal") once the CA has `CLIENT_DAYS` or less of validity left. In the
   CA's last seven days no VM can be enrolled or renewed, however often
   renewal runs, until an operator runs `rotate-ca` and re-enrolls every VM.
-  `status` does not report the CA's expiry today, and AIVM reports every
+  `status` reports the CA's expiry as `ca_not_after` (both authorities,
+  since 2026-10-24), but AIVM still reports every
   identity-child refusal only as "identity service refused the operation",
   so nothing tells the user why. (A planned change clamps new certificates
   to the CA's expiry instead, down to a stated minimum validity, below
@@ -204,8 +205,8 @@ All **implemented**:
      renews nothing and stops with one message: run `rotate-ca`, then
      re-enroll every VM. Every renewal would be refused otherwise (see
      Facts). With less than `CLIENT_DAYS` plus 48 hours left, it renews as
-     usual and warns that renewal will soon be refused. Both need `status`
-     to report the CA's `not_after`, which it does not today.
+     usual and warns that renewal will soon be refused. Both read the CA's
+     `not_after` from `status` (`ca_not_after`, available since 2026-10-24).
    - A row is **due** when it is active and `not_after - now <= 172800`
      (48 hours). Already-expired active rows count as due.
    - It skips, and reports with its reason:

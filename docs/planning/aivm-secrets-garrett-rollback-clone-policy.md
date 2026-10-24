@@ -70,8 +70,8 @@ Facts the cases below depend on (all **implemented**):
   file cannot revive a session whose broker has exited.
 - Nothing deletes private keys. `retire-issuer` only removes the kid from
   the keyring, and superseded CA and server generations stay on disk.
-  **Decided:** they are destroyed only by an explicit, locked, audited
-  `identity prune-keys --superseded`, which does not exist yet.
+  **Decided and implemented (2026-10-24):** they are destroyed only by an
+  explicit, locked, audited `identity prune-keys --superseded`.
 - After a whole-directory restore, generation numbers and issuer kid names
   can be reused, because the files of later generations are gone and the
   next free number is taken again. Trust is decided by the CA fingerprint
@@ -516,15 +516,11 @@ treat every piece of trust state as possibly stale, and run no
       key file. A restore that brought back an older keyring but left later
       `issuer-keys/` files in place (the keyring restored alone, or an
       overlay restore such as `rsync` without `--delete`) leaves that name
-      taken. `rotate-issuer` then fails with `unsafe_file` ("Host file
-      ownership, permissions, or type is unsafe") and changes nothing except
-      leaving an intent record in the audit directory. In that case, move
-      every `issuer-keys/local-N.*` file whose N is at least the keyring's
-      `next_number` out of `<root>`, into a private directory that is not
-      guest-writable, and run `rotate-issuer` again. Those kids were created
-      after the copy, and the restored keyring does not list them. (A
-      planned change makes `rotate-issuer` skip names whose files exist,
-      which removes this step.)
+      taken. Since 2026-10-24 `rotate-issuer` skips every name whose files
+      exist (both authorities), so it still succeeds. `identity verify`
+      lists those files as `unlisted_issuer_keys`; move them out of
+      `<root>` into a private directory that is not guest-writable, because
+      they hold private keys the restored keyring no longer accounts for.
    3. `identity retire-issuer --key-id K` for the kid that was active before
       step 2.
 3. `identity oauth-revoke` for every vault subject, then revoke the grant at

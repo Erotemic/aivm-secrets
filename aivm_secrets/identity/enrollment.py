@@ -634,9 +634,14 @@ class IdentityAuthority:
 
     def status(self) -> dict[str, Any]:
         selection = self._assert_current_ca()
+        _, ca_name = self._ca_names(self.ca_generation)
+        ca = _x509()[0].load_pem_x509_certificate(self._read(ca_name))
         return {'issuer': self.issuer, 'audience': self.audience,
                 'ca_sha256': self.ca_sha256,
                 'ca_generation': self.ca_generation,
+                # Enrollment and renewal refuse once the CA has CLIENT_DAYS
+                # or less left; report the expiry so an operator can see why.
+                'ca_not_after': int(ca.not_valid_after_utc.timestamp()),
                 'server_generation': selection['server']['generation'],
                 'subjects': self._registry()['subjects']}
 
@@ -785,12 +790,19 @@ class IdentityAuthority:
             state = self._keyring()
             if len(state['enabled']) >= MAX_ISSUER_KEYS:
                 raise SecretsError('exhausted')
-            kid = f'local-{state["next_number"]}'
             folder = self.root / KEY_DIRECTORY
-            if not folder.exists():
-                private_directory(folder, self.untrusted)
-            else:
-                private_directory(folder, self.untrusted)
+            private_directory(folder, self.untrusted)
+            # Never overwrite a key file. A restored keyring can name a
+            # number whose files a later rotation already wrote, so skip
+            # every taken name, as the native authority does.
+            number = state['next_number']
+            while number < 100000 and any(
+                    (folder / f'local-{number}{suffix}').exists()
+                    for suffix in ('.key', '.pub', '.aes256')):
+                number += 1
+            if number >= 100000:
+                raise SecretsError('exhausted')
+            kid = f'local-{number}'
             signer = Private.generate()
             prefix = folder / kid
             with self._audit('identity_key_rotate_intent', 'issuer', _stamp(),
@@ -802,9 +814,113 @@ class IdentityAuthority:
                 write_new(Path(str(prefix) + '.aes256'), secrets.token_bytes(32))
                 state['enabled'].append(kid)
                 state['active'] = kid
-                state['next_number'] += 1
+                state['next_number'] = number + 1
                 self._commit_keyring(state)
             return {'active': kid, 'enabled': state['enabled']}
+
+    def _key_files(self) -> dict[str, list[tuple[int, str]]]:
+        """Private-key files on disk, by kind, as (number, relative name)."""
+        found: dict[str, list[tuple[int, str]]] = {'ca': [], 'server': [], 'issuer': []}
+        for kind, directory, pattern in (
+                ('ca', CA_DIRECTORY, 'ca-{}.key'),
+                ('server', SERVER_DIRECTORY, 'server-{}.key'),
+                ('issuer', KEY_DIRECTORY, 'local-{}.key')):
+            folder = self.root / directory
+            if not folder.is_dir():
+                continue
+            prefix, suffix = pattern.split('{}')
+            for entry in sorted(os.listdir(folder)):
+                middle = entry[len(prefix):len(entry) - len(suffix)]
+                if (entry.startswith(prefix) and entry.endswith(suffix) and
+                        middle.isdigit()):
+                    found[kind].append((int(middle), f'{directory}/{entry}'))
+        return found
+
+    def verify(self, *, now: int | None = None) -> dict[str, Any]:
+        """Report findings about the authority's files; change nothing.
+
+        Superseded CA and server generations whose private keys are still on
+        disk, issuer keys the keyring no longer enables, issuer key files
+        numbered at or above the keyring's next number (only a restore leaves
+        those behind), active rows whose certificate has expired (a restored
+        registry), and how long the CA has left.
+        """
+        stamp = _stamp(now)
+        with self._locked():
+            manifest = self._manifest()
+            keyring = self._keyring()
+            registry = self._registry()
+            status = self.status()
+        files = self._key_files()
+        enabled = set(keyring['enabled'])
+        findings = []
+
+        def finding(code: str, items: list[str]) -> None:
+            if items:
+                findings.append({'code': code, 'items': items})
+
+        finding('superseded_ca_keys', [name for number, name in files['ca']
+                                       if number != manifest['ca']['generation']])
+        finding('superseded_server_keys', [name for number, name in files['server']
+                                           if number != manifest['server']['generation']])
+        finding('retired_issuer_keys', [
+            name for number, name in files['issuer']
+            if f'local-{number}' not in enabled and number < keyring['next_number']])
+        finding('unlisted_issuer_keys', [
+            name for number, name in files['issuer']
+            if f'local-{number}' not in enabled and number >= keyring['next_number']])
+        finding('active_rows_with_expired_certificates', sorted(
+            subject for subject, row in registry['subjects'].items()
+            if row['active'] and row['not_after'] <= stamp))
+        left = status['ca_not_after'] - stamp
+        if left <= CLIENT_DAYS * 86400:
+            finding('ca_too_close_to_expiry_to_enroll', [str(left)])
+        return {'clean': not findings, 'findings': findings,
+                'ca_not_after': status['ca_not_after']}
+
+    def prune_keys(self, *, superseded: bool) -> dict[str, Any]:
+        """Destroy superseded private keys; irreversible, operator-only.
+
+        Removes the private keys of superseded CA and server generations and
+        of retired issuer keys (their AEAD keys too). Public certificates stay.
+        It never touches the current generation, an enabled issuer key, or a
+        key file the keyring does not account for: `verify` reports those for
+        the operator to handle. `superseded` must be passed explicitly.
+        """
+        if superseded is not True:
+            raise SecretsError('invalid_request', detail='prune-keys needs --superseded')
+        with self._locked():
+            manifest = self._manifest()
+            keyring = self._keyring()
+            enabled = set(keyring['enabled'])
+            files = self._key_files()
+            doomed = [name for number, name in files['ca']
+                      if number != manifest['ca']['generation']]
+            doomed += [name for number, name in files['server']
+                       if number != manifest['server']['generation']]
+            for number, name in files['issuer']:
+                if f'local-{number}' not in enabled and number < keyring['next_number']:
+                    doomed.append(name)
+                    aead = f'{KEY_DIRECTORY}/local-{number}.aes256'
+                    if (self.root / aead).exists():
+                        doomed.append(aead)
+            if not doomed:
+                return {'removed': []}
+            digest = hashlib.sha256('\n'.join(sorted(doomed)).encode()).hexdigest()
+            with self._audit('identity_key_prune_intent', 'issuer', _stamp(), digest):
+                for name in sorted(doomed):
+                    # Check ownership and type the same way a read does, then
+                    # remove that name and make the removal durable.
+                    self._read(name)
+                    os.unlink(self.root / name)
+                for directory in {name.split('/', 1)[0] for name in doomed}:
+                    fd = os.open(self.root / directory,
+                                 os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+                    try:
+                        os.fsync(fd)
+                    finally:
+                        os.close(fd)
+            return {'removed': sorted(doomed)}
 
     def retire_issuer(self, kid: str) -> dict[str, Any]:
         """Stop accepting an old issuer key on the next presentation."""

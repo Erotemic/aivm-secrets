@@ -294,8 +294,9 @@ impl IdentityAuthority {
         let _lock = self.root.lock(false)?;
         let selected = self.current()?;
         let registry = read_registry(&self.root, &selected)?;
+        let ca_not_after = certificates::ca_not_after(&ca_public(&self.root, &selected)?)?;
         Ok(
-            json!({"issuer":selected["issuer"],"audience":selected["audience"],"ca_sha256":selected["ca"]["sha256"],"ca_generation":selected["ca"]["generation"],"server_generation":selected["server"]["generation"],"subjects":registry["subjects"]}),
+            json!({"issuer":selected["issuer"],"audience":selected["audience"],"ca_sha256":selected["ca"]["sha256"],"ca_generation":selected["ca"]["generation"],"ca_not_after":ca_not_after,"server_generation":selected["server"]["generation"],"subjects":registry["subjects"]}),
         )
     }
     pub fn public_client(&self, subject: &str, now: i64) -> Outcome<Value> {

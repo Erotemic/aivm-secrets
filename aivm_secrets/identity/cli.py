@@ -59,6 +59,10 @@ def add_parser(subs):
     enroll.add_argument('--expected-certificate-sha256')
 
     status = common('status')
+    common('verify')
+    prune_keys = common('prune-keys')
+    prune_keys.add_argument('--superseded', action='store_true',
+                            help='destroy superseded CA/server keys and retired issuer keys')
 
     public = common('public-client')
     public.add_argument('--subject', required=True)
@@ -473,6 +477,10 @@ def run(args: argparse.Namespace) -> int:
         result = authority.prune()
     elif args.identity_action == 'status':
         result = authority.status()
+    elif args.identity_action == 'verify':
+        result = authority.verify()
+    elif args.identity_action == 'prune-keys':
+        result = authority.prune_keys(superseded=args.superseded)
     elif args.identity_action == 'rotate-issuer':
         result = authority.rotate_issuer()
     elif args.identity_action == 'retire-issuer':
