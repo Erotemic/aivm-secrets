@@ -1,5 +1,6 @@
 import AivmSecretsGarrettCore
 import GarrettFoundation
+import GarrettTrust
 
 open Aeneas Aeneas.Std
 open aivm_secrets_garrett_core.Proofs
@@ -114,5 +115,32 @@ theorem success_exact {S : Type} (ops : BundleStore S) (store : S)
   · subst observed
     cases staged <;> cases published <;> simp [publicationResult]
   · simp [same]
+
+/-- **A guest bundle's local consistency.** `consistent` is exactly the
+    conjunction: canonical JWT header and payload, a 64-byte signature, an
+    encrypted claim of at least 29 bytes, and the token's `cnf` equal to the
+    bundled certificate's thumbprint. -/
+theorem consistent_iff (header payload : Bool) (signature encrypted : Usize)
+    (cnf thumbprint : alloc.vec.Vec U8) :
+    consistent header payload signature encrypted cnf thumbprint =
+      Result.ok (decide (header = true ∧ payload = true ∧ signature.val = 64 ∧
+        29 ≤ encrypted.val ∧ cnf = thumbprint)) := by
+  unfold consistent
+  cases header <;> cases payload <;> simp only [Bool.false_eq_true, ↓reduceIte, false_and, and_false,
+    decide_false, true_and]
+  split
+  · rename_i h64
+    have : signature.val = 64 := by rw [h64]; rfl
+    split
+    · rename_i h29
+      rw [aivm_secrets_garrett_core.trust.Proofs.bytes_eq_exact]
+      have : 29 ≤ encrypted.val := by scalar_tac
+      by_cases e : cnf = thumbprint <;> simp [*]
+    · rename_i h29
+      have : ¬ 29 ≤ encrypted.val := by scalar_tac
+      simp [*]
+  · rename_i h64
+    have : signature.val ≠ 64 := by intro e; apply h64; scalar_tac
+    simp [*]
 
 end aivm_secrets_garrett_core.bundle.Proofs

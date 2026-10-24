@@ -682,6 +682,30 @@ def bundle.install
       | core.result.Result.Err _ => ok r1
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
+/-- [aivm_secrets_garrett_core::bundle::consistent]:
+    Source: 'crates/aivm-secrets-garrett-core/src/bundle.rs', lines 42:0-55:1
+    Visibility: public -/
+def bundle.consistent
+  (header_canonical : Bool) (payload_canonical : Bool)
+  (signature_length : Std.Usize) (encrypted_length : Std.Usize)
+  (cnf : alloc.vec.Vec Std.U8) (thumbprint : alloc.vec.Vec Std.U8) :
+  Result Bool
+  := do
+  if header_canonical
+  then
+    if payload_canonical
+    then
+      if signature_length = 64#usize
+      then
+        if encrypted_length >= 29#usize
+        then
+          alloc.vec.partial_eq.PartialEqVec.eq core.cmp.PartialEqU8 cnf
+            thumbprint
+        else ok false
+      else ok false
+    else ok false
+  else ok false
+
 /-- [aivm_secrets_garrett_core::provider_io::Request]
     Source: 'crates/aivm-secrets-garrett-core/src/provider_io.rs', lines 89:0-92:1
     Visibility: public -/

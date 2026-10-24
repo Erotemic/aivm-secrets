@@ -45,12 +45,8 @@ pub fn pair(certificate: &[u8], token: &str) -> Outcome<GuestBundle> {
     crypto::token_key_id(token)?;
     let parts: Vec<_> = token.split('.').collect();
     let header = crypto::decode(parts[0], 4096)?;
-    if json::canonical(&json::parse(&header, 4096)?) != header {
-        return Err(Error::InvalidCapability);
-    }
-    if crypto::decode(parts[2], 65536)?.len() != 64 {
-        return Err(Error::InvalidCapability);
-    }
+    let header_canonical = json::canonical(&json::parse(&header, 4096)?) == header;
+    let signature_length = crypto::decode(parts[2], 65536)?.len();
     let raw = crypto::decode(parts[1], 65536)?;
     let mut payload = json::parse(&raw, 65536)?;
     json::keys(
@@ -60,19 +56,24 @@ pub fn pair(certificate: &[u8], token: &str) -> Outcome<GuestBundle> {
         ],
         &[],
     )?;
-    if json::canonical(&payload) != raw {
-        return Err(Error::InvalidCapability);
-    }
+    let payload_canonical = json::canonical(&payload) == raw;
     let encrypted = payload
         .as_object_mut()
         .ok_or(Error::InvalidCapability)?
         .remove("enc")
         .ok_or(Error::InvalidCapability)?;
-    if crypto::decode(encrypted.as_str().ok_or(Error::InvalidCapability)?, 65536)?.len() < 29 {
-        return Err(Error::InvalidCapability);
-    }
+    let encrypted_length =
+        crypto::decode(encrypted.as_str().ok_or(Error::InvalidCapability)?, 65536)?.len();
     let claims = model::claims(&payload)?;
-    if claims.certificate != thumb.as_bytes() {
+    // The consistency decision is the extracted `bundle::consistent`.
+    if !aivm_secrets_garrett_core::bundle::consistent(
+        header_canonical,
+        payload_canonical,
+        signature_length,
+        encrypted_length,
+        &claims.certificate,
+        &thumb.as_bytes().to_vec(),
+    ) {
         return Err(Error::InvalidCapability);
     }
     Ok(GuestBundle {

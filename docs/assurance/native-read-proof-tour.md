@@ -686,3 +686,15 @@ and the keyed-retry and coordinator contracts for coordinated writes
 (`COORD-RUST-01`). This is not yet the full OUT-4 claim: provider-side write
 semantics and the uncertain-outcome policy across sessions still need their
 own statements.
+
+## Identity bundle consistency (2026-10-24)
+
+When the native broker loads a guest's certificate and JWT, it accepts the
+pair only if `bundle::consistent` holds. `consistent_iff` in
+[`GarrettBundle`](../../proofs/GarrettBundle.lean) states that this is exactly
+the conjunction: canonical JWT header, canonical payload, a 64-byte signature,
+an encrypted claim of at least 29 bytes, and a `cnf` equal to the
+certificate's thumbprint. Every failure is `invalid_capability`, as before.
+
+**Still assumed** (`BUNDLE-RUST-01`): the JSON, X.509 and base64 parsers that
+produce these inputs, SHA-256 for the thumbprint, and the filesystem reads.

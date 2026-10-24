@@ -937,3 +937,10 @@ the opaque credential type would not remove the assumption (it is a native
 reachability property over code that legitimately reads the bytes); I had
 earlier framed it as a removal pending a decision, which overstated it.
 Recorded on the roadmap.
+
+## 2026-10-24 02:33:17 -0400
+
+BUNDLE-RUST-01: the four local consistency decisions in identity_bundle::pair
+became the extracted bundle::consistent (consistent_iff). Behaviour: every
+failing step already returned invalid_capability, so pair's result is the
+same for all inputs; only the point of detection moved.

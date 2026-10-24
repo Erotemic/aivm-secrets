@@ -32,3 +32,24 @@ pub fn install<S: BundleStore>(store: &S, expected: Option<Vec<u8>>) -> Result<(
         Err(_) => Err(InstallFailure::OutcomeUnknown),
     }
 }
+
+/// A guest bundle's local consistency: the JWT header and payload are in
+/// canonical form, the signature is 64 bytes, the encrypted claim is at least
+/// 29 bytes (nonce and tag), and the token's `cnf` thumbprint is the bundled
+/// certificate's. Parsing is native; the broker still authenticates both on
+/// every call.
+#[allow(clippy::too_many_arguments, clippy::ptr_arg)]
+pub fn consistent(
+    header_canonical: bool,
+    payload_canonical: bool,
+    signature_length: usize,
+    encrypted_length: usize,
+    cnf: &Vec<u8>,
+    thumbprint: &Vec<u8>,
+) -> bool {
+    header_canonical
+        && payload_canonical
+        && signature_length == 64
+        && encrypted_length >= 29
+        && *cnf == *thumbprint
+}
