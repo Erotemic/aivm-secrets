@@ -802,3 +802,18 @@ Native proxy now refuses to start if `session_start` cannot be recorded
 tests let exactly N audit records through via RLIMIT_FSIZE sized from a
 measured run (record lengths are deterministic): startup, admission and
 completion gates each tested live; completion test mutation-checked.
+
+## 2026-10-23 22:03:08 -0400
+
+Session reflection (evening). Pattern that paid off: moving a native
+decision into the core with a byte/behaviour oracle against the old code,
+then proving it, repeatedly surfaced real issues (two fail-open audit gaps in
+the native proxy; deny matching extracted as a 500-line tree until restated).
+Risks I want the maintainer to weigh: (1) `internal_error` is a new public
+proxy refusal code; (2) several W8 probes exist only as portable tests; (3) the
+RLIMIT_FSIZE live tests depend on deterministic audit line lengths (they
+measure first, so a format change shows as a failure, not a false pass).
+Uncertainty: authority-root expiry test has a 12 s window. Confidence: high
+that every committed theorem is about the production-called extracted
+function named in its docstring; medium-high on the completeness of the
+"still assumed" lists in the tour.
