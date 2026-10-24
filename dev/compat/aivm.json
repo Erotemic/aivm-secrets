@@ -1,0 +1,14 @@
+{
+  "repository": "https://github.com/Erotemic/aivm.git",
+  "ref": "99d600a02fe7e50533cb2f3844f82d2ce4a738c2",
+  "tests": [
+    "tests/test_cli_vm_identity.py",
+    "tests/test_secrets_identity_service.py",
+    "tests/test_secrets_native.py",
+    "tests/test_secrets_transport.py",
+    "tests/test_secrets_vm_binding.py",
+    "tests/test_secrets_vm_enrollment_transport.py",
+    "tests/test_secrets_vm_identity_key_rotation.py",
+    "tests/test_secrets_vm_identity_renewal.py"
+  ]
+}

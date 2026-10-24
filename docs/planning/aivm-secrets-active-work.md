@@ -145,7 +145,7 @@ Status changes are recorded here, not in the older documents.
 | Manifest schema freeze and introspection; signed manifests; least-privilege resolvers | agnostic integrations | Open |
 | `trusted-host-exec` profile; declarative plugin grammar; verified `gh` subset | credential-free tools | Six design decisions there need the maintainer first |
 | Proxy hard cases: server-sent events, cross-host `Link` pagination | HTTPS proxy profiles | Open |
-| Separate CI with a pinned cross-project compatibility workflow | repository boundary | Open |
+| Separate CI with a pinned cross-project compatibility workflow | repository boundary | **Done 2026-10-24:** `.github/workflows/aivm-compat.yml` runs AIVM's adapter tests at the commit pinned in `dev/compat/aivm.json` against this package (`dev/aivm_compat.py`). It found that AIVM's own suite tests AIVM's stale in-tree copy of `aivm_secrets`; removing that copy is the recorded cutover, a maintainer decision |
 | VS Code launcher secrets mode | validation | Open (AIVM; same AIVM rule) |
 | Optional `aivm[secrets]` extra | repository boundary | After review |
 | Rollback journal, `accept-restore`, anchors A and B, clone detection | rollback and clone policy | **Deferred by decision** |

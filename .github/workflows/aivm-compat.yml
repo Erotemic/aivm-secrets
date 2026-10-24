@@ -1,0 +1,28 @@
+name: AIVM compatibility
+
+# AIVM's secrets adapters against this package, at the AIVM commit pinned in
+# dev/compat/aivm.json. Separate from both projects' own CI on purpose.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  aivm-adapters:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.12'
+      - name: Install this package and AIVM at the pinned commit
+        run: |
+          umask 077
+          python -m pip install '.[tests]'
+          ref=$(python -c "import json; print(json.load(open('dev/compat/aivm.json'))['ref'])")
+          python -m pip install "aivm[tests] @ git+https://github.com/Erotemic/aivm.git@${ref}"
+      - name: Run AIVM's adapter tests against this package
+        run: python dev/aivm_compat.py
