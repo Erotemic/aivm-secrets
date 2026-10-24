@@ -97,7 +97,7 @@ PLAN = Diagram(
              focus=('encoder',), status='implemented',
              knowledge=_k(('any request',),
                           ('strict subset',),
-                          ('route_match::translate', 'translate_round_trip', 'then invoke on the bridge'),
+                          ('translate_round_trip', 'translated_release:', 'gates, then bridge'),
                           ('host bridge authorizes', 'the named operation'))),
         Beat('limits', 'Not confinement: the guest still has the credential\'s full authority.',
              focus=('provider',), status='assumed',
