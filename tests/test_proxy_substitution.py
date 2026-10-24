@@ -294,6 +294,23 @@ def test_oversize_bodies_are_refused(tmp_path, service):
         assert len(service.requests) == 1
 
 
+def test_the_proxy_does_not_start_without_an_audit(tmp_path, service, monkeypatch):
+    """As native: if the first record fails, nothing is left listening."""
+    import socket
+
+    world = World(tmp_path, service)
+
+    def record(event, **detail):
+        raise OSError('disk full')
+
+    monkeypatch.setattr(world.session.audit, 'record', record)
+    with pytest.raises(OSError):
+        world.__enter__()
+    port = int(world.server.address.rsplit(':', 1)[1])
+    with pytest.raises(OSError):
+        socket.create_connection(('127.0.0.1', port), timeout=2).close()
+
+
 def test_a_failed_admission_audit_sends_nothing(world, monkeypatch):
     """Fail closed, as the native proxy: if the admission record cannot be
     written, the guest gets ``internal_error`` and nothing is sent."""

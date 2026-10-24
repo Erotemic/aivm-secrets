@@ -400,9 +400,15 @@ class ProxyServer:
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
 
     def __enter__(self) -> 'ProxyServer':
+        # No audit, no session: record before serving, so a failed first
+        # record never leaves a listener running (as native).
+        try:
+            self.session.record('session_start', profile=self.session.policy.profile,
+                                origins=sorted(self.session.policy.origins))
+        except BaseException:
+            self._server.server_close()
+            raise
         self._thread.start()
-        self.session.record('session_start', profile=self.session.policy.profile,
-                            origins=sorted(self.session.policy.origins))
         return self
 
     def __exit__(self, *exc: object) -> None:
