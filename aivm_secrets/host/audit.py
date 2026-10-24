@@ -149,6 +149,40 @@ class AuditLog:
             self._stream.close()
 
 
+def verify_native(path: Path) -> tuple[int, str]:
+    """Check a native session audit file against its ``.chain`` sidecar.
+
+    The native broker keeps its records unchanged and writes one chain line
+    per record: ``{"prev":P,"record":R,"seq":N}``, where ``R`` is the
+    SHA-256 of the record's line and ``P`` of the previous chain line.
+    Returns ``(records, head digest)``; raises ``audit_failed`` naming the
+    first record whose chain line is missing or does not match.
+    """
+    path = Path(path)
+    records = read_owned(path, private=True, limit=MAX_AUDIT_BYTES)
+    chain = read_owned(path.with_name(path.name + '.chain'), private=True,
+                       limit=MAX_AUDIT_BYTES)
+    if records and not records.endswith(b'\n'):
+        raise SecretsError('audit_failed', detail=f'{path}: truncated final record')
+    lines = records.split(b'\n')[:-1]
+    entries = chain.split(b'\n')[:-1] if chain else []
+    if len(entries) != len(lines):
+        raise SecretsError('audit_failed', detail=(
+            f'{path}: {len(lines)} records but {len(entries)} chain lines'))
+    head = GENESIS
+    for number, (line, entry) in enumerate(zip(lines, entries)):
+        expected = codec.dumps({
+            'prev': head,
+            'record': hashlib.sha256(line + b'\n').hexdigest(),
+            'seq': number,
+        })
+        if entry != expected:
+            raise SecretsError('audit_failed',
+                               detail=f'{path}: record {number} breaks the chain')
+        head = hashlib.sha256(entry).hexdigest()
+    return len(lines), head
+
+
 def verify(path: Path) -> tuple[int, str]:
     """Check one audit file's chain; return ``(records, head digest)``.
 

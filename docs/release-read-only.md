@@ -107,7 +107,7 @@ credential and a local provider. The opt-in live check against GitHub is
 | Renew a guest certificate | `garrett-authority renew --root ROOT --request REQ` |
 | Rotate the issuer key | `garrett-authority rotate-issuer`, later `retire-issuer` |
 | Rotate the session CA | `garrett-authority rotate-ca` |
-| Read the audit log | One JSON record per line in the provider `audit_file`; each record is synced before the action it records |
+| Read the audit log | One JSON record per line in the provider `audit_file`; each record is synced before the action it records. `aivm-secrets audit-verify --native FILE` checks the `.chain` sidecar beside it |
 
 A guest can also end its own grant with the `renounce` verb. That is
 audited, and the grant is refused for every later request
@@ -122,10 +122,13 @@ audited, and the grant is refused for every later request
   finishes or rolls it back. `recover` needs the transaction ID and the
   SHA-256 of the plan you reviewed.
 - **Suspected credential exposure:** revoke the guest, rotate the credential
-  at the provider, and read the audit log. The native audit log is not
-  hash-chained (the Python reference's is), so its integrity rests on the
-  host file permissions. The broker cannot revoke a credential at the
-  provider.
+  at the provider, and read the audit log. Check it first with
+  `aivm-secrets audit-verify --native FILE`: each native audit file has a
+  `.chain` sidecar that detects edited, removed or reordered records. A
+  rewrite of both files is only caught if you kept the head digest it
+  printed earlier. For OAuth grants, `oauth-revoke` can also revoke at the
+  provider when the provider profile names a `revocation_url`; a static
+  token must be rotated at the provider by hand.
 - **`outcome_unknown`:** for reads this only means the reply was lost. Retry
   the read once you understand why. The broker never retries automatically.
 

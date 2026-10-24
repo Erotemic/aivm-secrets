@@ -196,20 +196,131 @@ impl InnerEnvelope {
 // Native File methods remain the deliberate external append/fsync primitives.
 // The entire fail-stop callback schedule is now source-owned and Aeneas-
 // extracted in `audit_record::append_durable_record`.
-struct AuditFile<'a>(&'a mut File);
+struct AuditFile<'a> {
+    file: &'a mut File,
+    chain: &'a mut AuditChain,
+    line: Vec<u8>,
+}
 impl aivm_secrets_garrett_core::audit_record::Sink for AuditFile<'_> {
     type Error = Error;
     const POISONED: Error = Error::InternalError;
     fn append(&mut self, bytes: &Vec<u8>) -> Outcome<()> {
-        self.0.write_all(bytes).map_err(|_| Error::InternalError)
+        self.line.extend_from_slice(bytes);
+        self.file.write_all(bytes).map_err(|_| Error::InternalError)
     }
     fn sync_record(&mut self) -> Outcome<()> {
-        self.0.sync_all().map_err(|_| Error::InternalError)
+        self.file.sync_all().map_err(|_| Error::InternalError)?;
+        // The record is durable; chain it before the append reports success,
+        // so a chain failure still stops the action the record announces.
+        self.chain.extend(&self.line)
+    }
+}
+
+/// Tamper-evident sidecar `<audit file>.chain`: one canonical JSON line per
+/// audit record, `{"prev":P,"record":R,"seq":N}`, where `R` is the SHA-256 of
+/// the record's line (newline included) and `P` the SHA-256 of the previous
+/// chain line (64 zeros first). The record file and its proved record bytes
+/// are unchanged. `aivm-secrets audit-verify --native` checks it. Like the
+/// Python reference's chain, it detects edits, removals and reordering
+/// inside the file; detecting a rewrite of both files needs the head anchored
+/// elsewhere.
+struct AuditChain {
+    file: File,
+    head: String,
+    next: u64,
+}
+const CHAIN_GENESIS: &str =
+    "0000000000000000000000000000000000000000000000000000000000000000";
+impl AuditChain {
+    fn line(head: &str, record: &[u8], seq: u64) -> Vec<u8> {
+        json::canonical(&json!({
+            "prev": head,
+            "record": hex(digest::digest(&digest::SHA256, record).as_ref()),
+            "seq": seq,
+        }))
+    }
+    /// Check the existing chain against the existing records and refuse a
+    /// mismatch; then chain any records that have no chain line yet (a log
+    /// written before the chain existed, or a crash between the record's
+    /// sync and its chain line's).
+    fn open(directory: &File, name: &std::ffi::OsStr, records: &[u8]) -> Outcome<Self> {
+        use rustix::fs::{openat, Mode, OFlags};
+        use std::io::Read;
+        use std::os::unix::fs::MetadataExt;
+        let mut chain_name = name.to_os_string();
+        chain_name.push(".chain");
+        let fd = openat(
+            directory,
+            chain_name.as_os_str(),
+            OFlags::RDWR | OFlags::CREATE | OFlags::APPEND | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+            Mode::RUSR | Mode::WUSR,
+        )
+        .map_err(|_| Error::UnsafeFile)?;
+        let mut file = File::from(fd);
+        let m = file.metadata().map_err(|_| Error::UnsafeFile)?;
+        if !m.is_file() || m.uid() != rustix::process::geteuid().as_raw() || m.mode() & 0o077 != 0 {
+            return Err(Error::UnsafeFile);
+        }
+        if m.len() > 64 * 1024 * 1024 {
+            return Err(Error::UnsafeFile);
+        }
+        let mut existing = Vec::new();
+        file.read_to_end(&mut existing).map_err(|_| Error::UnsafeFile)?;
+        if !existing.is_empty() && existing.last() != Some(&b'\n') {
+            return Err(Error::UnsafeFile);
+        }
+        let record_lines: Vec<&[u8]> = records
+            .split_inclusive(|b| *b == b'\n')
+            .collect();
+        let chain_lines: Vec<&[u8]> = existing.split(|b| *b == b'\n').filter(|l| !l.is_empty()).collect();
+        if chain_lines.len() > record_lines.len() {
+            return Err(Error::UnsafeFile);
+        }
+        let mut head = CHAIN_GENESIS.to_owned();
+        for (seq, (entry, record)) in chain_lines.iter().zip(&record_lines).enumerate() {
+            if *entry != Self::line(&head, record, seq as u64).as_slice() {
+                return Err(Error::UnsafeFile);
+            }
+            head = hex(digest::digest(&digest::SHA256, entry).as_ref());
+        }
+        let mut chain = Self { file, head, next: chain_lines.len() as u64 };
+        for record in &record_lines[chain_lines.len()..] {
+            chain.extend(record)?;
+        }
+        Ok(chain)
+    }
+    /// An empty chain on an already unlinked file, for unit tests that build
+    /// an `AuditState` directly.
+    #[cfg(test)]
+    fn scratch() -> Self {
+        let path = std::env::temp_dir().join(format!(
+            "garrett-chain-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let file = File::options().append(true).create_new(true).open(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        Self { file, head: CHAIN_GENESIS.to_owned(), next: 0 }
+    }
+    fn extend(&mut self, record: &[u8]) -> Outcome<()> {
+        let mut entry = Self::line(&self.head, record, self.next);
+        self.head = hex(digest::digest(&digest::SHA256, &entry).as_ref());
+        entry.push(b'\n');
+        self.file
+            .write_all(&entry)
+            .and_then(|_| self.file.sync_all())
+            .map_err(|_| Error::InternalError)?;
+        self.next += 1;
+        Ok(())
     }
 }
 
 struct AuditState {
     file: File,
+    chain: AuditChain,
     failed: bool,
 }
 struct Audit {
@@ -260,12 +371,24 @@ impl Audit {
                 return Err(Error::UnsafeFile);
             }
         }
+        // The verifier's bound (MAX_AUDIT_BYTES in the Python reference).
+        if length > 64 * 1024 * 1024 {
+            return Err(Error::UnsafeFile);
+        }
+        let mut records = vec![0u8; length as usize];
+        file.read_exact_at(&mut records, 0).map_err(|_| Error::UnsafeFile)?;
+        let chain = AuditChain::open(
+            &directory,
+            path.file_name().ok_or(Error::UnsafeFile)?,
+            &records,
+        )?;
         // Persist a newly created log's directory entry before its first
         // durable dispatch record can authorize any external provider I/O.
         directory.sync_all().map_err(|_| Error::InternalError)?;
         Ok(Self {
             state: Mutex::new(AuditState {
                 file,
+                chain,
                 failed: false,
             }),
             grant: text(claims, "grant_id")?.into(),
@@ -300,8 +423,8 @@ impl Audit {
         if state.failed {
             return Err(Error::InternalError);
         }
-        let AuditState { file, failed } = &mut *state;
-        let mut sink = AuditFile(file);
+        let AuditState { file, chain, failed } = &mut *state;
+        let mut sink = AuditFile { file, chain, line: Vec::new() };
         aivm_secrets_garrett_core::audit_record::append_durable_record(&mut sink, failed, &bytes)
     }
 }

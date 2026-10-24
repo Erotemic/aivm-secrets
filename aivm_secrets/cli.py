@@ -165,6 +165,8 @@ def _parser() -> argparse.ArgumentParser:
 
     verify = subs.add_parser('audit-verify', allow_abbrev=False)
     verify.add_argument('files', type=Path, nargs='+')
+    verify.add_argument('--native', action='store_true',
+                        help='native session audit files, checked against their .chain sidecar')
 
     from .identity.cli import add_parser as add_identity_parser
     add_identity_parser(subs)
@@ -519,10 +521,10 @@ def _revoke(args: argparse.Namespace) -> int:
 
 
 def _audit_verify(args: argparse.Namespace) -> int:
-    from .host.audit import verify
+    from .host.audit import verify, verify_native
 
     for path in args.files:
-        count, head = verify(path)
+        count, head = (verify_native if args.native else verify)(path)
         print(f'{path}: {count} records, chain intact, head {head}')
     return 0
 

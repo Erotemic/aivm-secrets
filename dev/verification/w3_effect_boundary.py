@@ -635,8 +635,11 @@ def review_semantics(contents: dict[str, str]) -> None:
     audit_call = part(c, '    fn write_record(&self, value: &Value)',
                       '// This private adapter alone turns the opaque credential')
     require("impl aivm_secrets_garrett_core::audit_record::Sink for AuditFile<'_>" in c
-            and 'self.0.write_all(bytes).map_err(|_| Error::InternalError)' in sink
-            and 'self.0.sync_all().map_err(|_| Error::InternalError)' in sink
+            and 'self.file.write_all(bytes).map_err(|_| Error::InternalError)' in sink
+            # The record is synced before its chain line, and a chain failure
+            # is the append's failure, so it still stops the action.
+            and same_order(sink, 'self.file.sync_all().map_err(|_| Error::InternalError)?;',
+                           'self.chain.extend(&self.line)')
             and same_order(audit, 'if *poisoned {', 'return Err(S::POISONED);',
                            '*poisoned = true;', 'sink.append(bytes)?;',
                            'let delimiter = record_delimiter();', 'sink.append(&delimiter)?;', 'sink.sync_record()?;',
@@ -644,8 +647,8 @@ def review_semantics(contents: dict[str, str]) -> None:
             and same_order(audit_call, 'self.append_bytes(&json::canonical(value))',
                            'fn append_bytes(&self, bytes: &Vec<u8>)',
                            'self.state.lock()', 'if state.failed {',
-                           'let AuditState { file, failed } = &mut *state;',
-                           'let mut sink = AuditFile(file);',
+                           'let AuditState { file, chain, failed } = &mut *state;',
+                           'let mut sink = AuditFile { file, chain, line: Vec::new() };',
                            'aivm_secrets_garrett_core::audit_record::append_durable_record(&mut sink, failed, &bytes)')
             and audit_call.count('append_durable_record(') == 1,
             'native audit bypasses payload/delimiter/sync, fail-stop, or acknowledgement order')

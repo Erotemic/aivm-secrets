@@ -52,8 +52,8 @@ process protocol; they do not import the Rust implementation. Approval displays
 the request and asks for confirmation; `--yes` selects unattended approval.
 `--ttl` accepts 1–900 seconds, default 300. Digest prefixes need at least eight
 characters and must match exactly one pending request. This interoperability
-does not make native audit files compatible with Python's audit-chain tools;
-avoid pruning a directory while its guest listener remains in use.
+does not make native audit files readable by Python's `audit-verify`; check
+them with `audit-verify --native`, which reads their `.chain` sidecar. Avoid pruning a directory while its guest listener remains in use.
 
 The guest explicitly resubmits the same request after approval. Approval binds
 the normalized policy digest, actual root grant ID and normalized operation and

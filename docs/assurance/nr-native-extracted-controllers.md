@@ -22,7 +22,11 @@ handwritten source-equivalence assumption.
 `AuditFile<'_>` is intentionally a **local newtype**. Implementing this core
 trait directly on `std::fs::File` is forbidden by Rust orphan rules. The wrapper
 has only one `append` and one `sync_record` implementation, both mapped to the
-underlying file API and `Error::InternalError` on error.
+underlying file API and `Error::InternalError` on error. Since 2026-10-24
+`sync_record` also appends the record's line to the `.chain` sidecar after the
+record is synced; a chain failure is the append's failure, so the record's
+action still stops. The chain is native glue, not part of the extracted
+controller.
 
 ## Formal theorems attempted (all three functions are to be Aeneas-extracted)
 

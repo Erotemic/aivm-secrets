@@ -1085,6 +1085,7 @@ mod wire_tests {
             let audit = Audit {
                 state: Mutex::new(AuditState {
                     file,
+                    chain: AuditChain::scratch(),
                     failed: audit_failed,
                 }),
                 grant: "synthetic-grant".into(),
@@ -1517,7 +1518,7 @@ mod wire_tests {
             let file = std::fs::OpenOptions::new().write(true).create_new(true)
                 .mode(0o600).open(&path).unwrap();
             let audit = Arc::new(Audit {
-                state: Mutex::new(AuditState { file, failed: audit_failed }),
+                state: Mutex::new(AuditState { file, chain: AuditChain::scratch(), failed: audit_failed }),
                 grant: "synthetic-grant".into(),
                 policy: "synthetic-policy".into(),
             });
@@ -1769,7 +1770,11 @@ mod wire_tests {
                 let file = std::fs::OpenOptions::new().write(true).create_new(true)
                     .mode(0o600).open(&path).unwrap();
                 let audit = Arc::new(Audit {
-                    state: Mutex::new(AuditState { file, failed: fault == Fault::Audit }),
+                    state: Mutex::new(AuditState {
+                        file,
+                        chain: AuditChain::scratch(),
+                        failed: fault == Fault::Audit,
+                    }),
                     grant: "synthetic-grant".into(),
                     policy: "synthetic-policy".into(),
                 });

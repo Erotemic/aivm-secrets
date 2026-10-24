@@ -98,7 +98,7 @@ EDGES = (
          'fn write_record(&self, value: &Value)', '// This private adapter alone',
          ('self.append_bytes(&json::canonical(value))', 'fn append_bytes(&self, bytes: &Vec<u8>)',
           'self.state.lock()', 'if state.failed {',
-          'let mut sink = AuditFile(file);',
+          'let mut sink = AuditFile { file, chain, line: Vec::new() };',
           'aivm_secrets_garrett_core::audit_record::append_durable_record(&mut sink, failed, &bytes)')),
     Edge(TLS, 'guest-frame-from-actual-answer-and-error',
          'fn from_answer(answer: Outcome<json::Reply>)',

@@ -48,7 +48,8 @@ the [plan](docs/planning/aivm-secrets-active-work.md).
   fixed GraphQL reads
 - ✅ Guest identity: certificate enrollment, renewal, revocation and key
   rotation; optional TPM-backed guest keys
-- ✅ Durable audit log; hash-chain verification (`aivm-secrets audit-verify`)
+- ✅ Durable audit log; hash-chain verification for both brokers
+  (`aivm-secrets audit-verify`, `audit-verify --native`)
 - ✅ OAuth credential vault with refresh and host-only PKCE login (native)
 - ✅ Exact-write approval: a write waits until the operator approves its exact
   bytes once (`aivm-secrets approve`)
