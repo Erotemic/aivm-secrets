@@ -92,6 +92,11 @@ explains each one in plain language.
 - ✅ An accepted `constrained-http` request is the host encoding of exactly
   one named operation and one set of arguments, when path values are single
   segments (HP-6; the condition is necessary)
+- ✅ Across every history of enrollment, refresh, revocation and crashes,
+  each request sent had a current identity and credential lease, and a
+  revoked session never sends again (a model over the extracted lease check)
+- ✅ An OAuth login exchanges its authorization code at most once, and only
+  after a callback bound to its state, issuer and time window
 - ⬜ No other native path writes the credential (`NATIVE-SINK-01`). The
   credential type is sealed at compile time, its seven readers are pinned,
   and a whole-process `strace` run shows no credential bytes in any write and
