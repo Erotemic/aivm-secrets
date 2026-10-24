@@ -102,8 +102,10 @@ explains each one in plain language.
   ([details](docs/aivm-github-live-readonly-acceptance.md))
 - ✅ A second, synthetic provider with different authentication runs through
   the same generic path with no provider-specific Rust
-- ⬜ Both proxy profiles and the no-public-egress firewall mode in a real VM
-- ⬜ Re-enrollment, alias-aware mount and host-canary probes in a real VM
+- ✅ Both proxy profiles in a real VM, with AIVM's direct internet access on
+  and off; re-enrolled certificates refused; a search of every guest share
+  (as guest root) never reaches the host's custody files
+  ([run record](dev/validation/2026-10-24-local-vm-acceptance.json))
 
 ### Review
 

@@ -37,14 +37,14 @@ guest is a faithful stand-in.
 
 | Step | Deliverable | Done when |
 | --- | --- | --- |
-| 1.1 | Create `aivm-2404` on this host with `aivm` (no secrets adapter) | `aivm status` is green; normal AIVM use needs nothing from this repo |
-| 1.2 | Rerun `dev/aivm_vm_acceptance.py`, baseline and `--adversarial` | Includes the three probes never run in a VM: re-enrollment, alias-aware mount inventory, host canary search |
-| 1.3 | Run `dev/aivm_proxy_acceptance.py` (substitution) and `dev/aivm_constrained_acceptance.py` (guest-side translator) | Both pass. The substitution run makes no authority-confinement claim |
-| 1.4 | Check the AIVM no-public-egress firewall mode (HP-7) | The guest reaches the bridge and the proxy but not a public address |
+| 1.1 | Create `aivm-2404` on this host with `aivm` (no secrets adapter) | **Done 2026-10-24.** Required two aivm fixes: `install_deps` past a broken apt source, and cloud-init errors on new VMs |
+| 1.2 | Rerun `dev/aivm_vm_acceptance.py`, baseline and `--adversarial` | **Done 2026-10-24**, with and without an attached workspace. The canary search now runs as guest root (the guest user has passwordless sudo) |
+| 1.3 | Run `dev/aivm_proxy_acceptance.py` (substitution) and `dev/aivm_constrained_acceptance.py` (guest-side translator) | **Done 2026-10-24.** The constrained script had two bugs that only a real run could show; both fixed with a test |
+| 1.4 | Check the AIVM no-public-egress firewall mode (HP-7) | **Done 2026-10-24.** No direct public connection; the proxies and the adversarial run still pass |
 | 1.5 | Write a simulated agent: a guest program that tries every attack listed in the [claim matrix](../assurance/claim-evidence-matrix.md) and also does one useful read | Repeatable script with a JSON summary. Its findings become tests |
 
 Record each run in `dev/validation/` with the checkout hash, VM image and
-summary. These runs are evidence for OUT-2 and OUT-6, not a proof of
+summary. Runs so far: [2026-10-24](../../dev/validation/2026-10-24-local-vm-acceptance.json). These runs are evidence for OUT-2 and OUT-6, not a proof of
 isolation. The maintainer still signs off on OUT-2.
 
 ## Phase 2: close the native sink premise

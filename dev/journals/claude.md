@@ -1064,3 +1064,41 @@ the Review item is the place for it.
 
 Separately, I fixed `aivm host install_deps` in the AIVM repo (see that
 repo's journal) and installed libvirt and qemu on this host for Phase 1.
+
+## 2026-10-24 12:55:00 -0400
+
+Phase 1 steps 1.1 to 1.4 are done on a VM I created here (nested KVM, guest
+`aivm-2404`, cloud-init 25.3). Everything is recorded in
+`dev/validation/2026-10-24-local-vm-acceptance.json`. Findings, in the order I
+hit them:
+
+- Two aivm bugs blocked a clean VM: `install_deps` failed when one apt source
+  was broken, and cloud-init errored on the bootstrap user and the numeric
+  primary group. Both are fixed in the aivm repo (`b8e020c`, `7952eaf`, not
+  pushed).
+- The adversarial run with no attached folder passed, but its mount checks
+  had nothing to search. With a folder attached, the canary search stopped at
+  AIVM's root-only staging mount and reported itself incomplete. The guest
+  user has passwordless sudo, so the realistic adversary is guest root. The
+  search now runs as root when it can and records `as_guest_root`, and it
+  completes with nothing found.
+- `dev/aivm_constrained_acceptance.py` had never been run on a VM. It failed
+  with `broker_failed`. To find the cause I temporarily let native-session's
+  stderr through; the change was reverted and never committed. There were two
+  bugs: the policy named `workspace/host-credential/credential` while the
+  spec's credential file was `workspace/credential`, and the credential was
+  written with a trailing newline that the native reader refuses. Fixed, with
+  a regression test (`write_session_inputs`).
+- With `firewall.public_egress = false` the guest cannot open a public
+  connection, while both proxies and the full adversarial run still pass.
+
+These were run by the agent, not the maintainer, and the docs say so. OUT-2
+sign-off stays with the maintainer. The test VM is left running with public
+egress disabled.
+
+An observation for later: `broker_failed` hides the bridge's own reason
+(`invalid_policy`, then `credential_source`). For an operator that's
+unhelpful. The bridge's stderr is dropped because it may carry sensitive
+data. The fixed error code itself is not sensitive, though, so the
+announcement could carry it. I haven't changed that; it is a protocol-visible
+change.

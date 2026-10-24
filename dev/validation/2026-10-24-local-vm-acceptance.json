@@ -1,0 +1,427 @@
+{
+  "schema": 1,
+  "status": "passed-for-listed-scopes",
+  "recorded_at": "2026-10-24T12:45:53.798923-04:00",
+  "source_commit": "7cfdf2265c7482e6135a80212b4bc71aa8cab09c",
+  "source_dirty": false,
+  "validation_source_mode": "The runs used the committed dev/aivm_vm_acceptance.py; the root canary search was run from the working tree byte-identical to 7cfdf22 before it was committed.",
+  "aivm_commit": "7952eaf8fabbc6deb39dacc25a519a699e96c71b",
+  "runner": "agent (Claude Opus 5.5), not the maintainer",
+  "environment": {
+    "host": "aivm-2404-yardrat, itself a KVM guest; nested KVM (kvm_intel nested=Y)",
+    "vm": "aivm-2404, created by aivm vm create from defaults (6 vCPU, 12 GiB); no secrets adapter",
+    "image": "ubuntu-24.04-server-cloudimg-amd64 release-20260225, cloud-init 25.3",
+    "native_binaries": "debug build of rust/ at the source commit",
+    "credentials": "synthetic only; no live provider"
+  },
+  "scope": "OUT-2 finite witnesses: approved reads, denied write, revocation, identity negatives (foreign, mismatched key, tampered, re-enrolled certificate), host TCP canary, guest-share mount inventory with alias grouping, host canary name search over every share mount as guest root (depth 4), socket disconnect and reconnect. Not an isolation proof. Also OUT-6: credential-substitution proxy (native and Python) and the guest-side constrained-http translator, each with public egress on and off (AIVM firewall.public_egress, HP-7).",
+  "runs": {
+    "baseline": {
+      "application_socket_forwarding": "ssh-remote-unix/mTLS",
+      "approved_diff": true,
+      "approved_view": {
+        "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "number": 13861,
+        "title": "Proof repair"
+      },
+      "denied_write": true,
+      "filesystem_isolation_proved": false,
+      "host_private_paths_unreadable_in_guest": true,
+      "mode": "native-rust/aivm-kvm/synthetic-local-https",
+      "ok": true,
+      "provider_requests": [
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github.diff",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        }
+      ],
+      "revocation_fenced": true,
+      "virtualization": "kvm",
+      "vm": "aivm-2404",
+      "whole_service_secrecy_proved": false
+    },
+    "adversarial_no_attachments": {
+      "adversarial": {
+        "identities": {
+          "certificate_key_mismatch_rejected": true,
+          "other_enrolled_subject_rejected": true,
+          "reenrolled_certificate_rejected": true,
+          "tampered_capability_rejected": true
+        },
+        "lifecycle": {
+          "authorized_read_after_reconnect": true,
+          "no_provider_effect_with_forward_disconnected": true
+        },
+        "mounts": {
+          "aliased_mounts": 0,
+          "attachment_devices": 0,
+          "attachment_mounts_observed": 0,
+          "canary_search": {
+            "complete": true,
+            "found": false,
+            "mount_points_searched": 0
+          },
+          "host_workspace_in_mount_table": false,
+          "scope": "mount table metadata, alias grouping and a depth-4 search for the host canary name; not an exhaustive reachability proof",
+          "whole_share_root_mounts": 0
+        },
+        "network": {
+          "direct_synthetic_provider_tcp_denied": true,
+          "host_gateway_canary_denied": true,
+          "scope": "guest gateway TCP: one ephemeral canary and the host-loopback provider port"
+        },
+        "out_of_scope_read_denied": true
+      },
+      "application_socket_forwarding": "ssh-remote-unix/mTLS",
+      "approved_diff": true,
+      "approved_view": {
+        "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "number": 13861,
+        "title": "Proof repair"
+      },
+      "denied_write": true,
+      "filesystem_isolation_proved": false,
+      "host_private_paths_unreadable_in_guest": true,
+      "mode": "native-rust/aivm-kvm/synthetic-local-https",
+      "ok": true,
+      "provider_requests": [
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github.diff",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        }
+      ],
+      "revocation_fenced": true,
+      "virtualization": "kvm",
+      "vm": "aivm-2404",
+      "whole_service_secrecy_proved": false
+    },
+    "adversarial_with_attachment_unprivileged_search": {
+      "adversarial": {
+        "identities": {
+          "certificate_key_mismatch_rejected": true,
+          "other_enrolled_subject_rejected": true,
+          "reenrolled_certificate_rejected": true,
+          "tampered_capability_rejected": true
+        },
+        "lifecycle": {
+          "authorized_read_after_reconnect": true,
+          "no_provider_effect_with_forward_disconnected": true
+        },
+        "mounts": {
+          "aliased_mounts": 3,
+          "attachment_devices": 2,
+          "attachment_mounts_observed": 4,
+          "canary_search": {
+            "complete": false,
+            "found": false,
+            "max_depth": 4,
+            "mount_points_searched": 4
+          },
+          "host_workspace_in_mount_table": false,
+          "scope": "mount table metadata, alias grouping and a depth-4 search for the host canary name; not an exhaustive reachability proof",
+          "whole_share_root_mounts": 4
+        },
+        "network": {
+          "direct_synthetic_provider_tcp_denied": true,
+          "host_gateway_canary_denied": true,
+          "scope": "guest gateway TCP: one ephemeral canary and the host-loopback provider port"
+        },
+        "out_of_scope_read_denied": true
+      },
+      "application_socket_forwarding": "ssh-remote-unix/mTLS",
+      "approved_diff": true,
+      "approved_view": {
+        "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "number": 13861,
+        "title": "Proof repair"
+      },
+      "denied_write": true,
+      "filesystem_isolation_proved": false,
+      "host_private_paths_unreadable_in_guest": true,
+      "mode": "native-rust/aivm-kvm/synthetic-local-https",
+      "ok": true,
+      "provider_requests": [
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github.diff",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        }
+      ],
+      "revocation_fenced": true,
+      "virtualization": "kvm",
+      "vm": "aivm-2404",
+      "whole_service_secrecy_proved": false
+    },
+    "adversarial_with_attachment_root_search": {
+      "adversarial": {
+        "identities": {
+          "certificate_key_mismatch_rejected": true,
+          "other_enrolled_subject_rejected": true,
+          "reenrolled_certificate_rejected": true,
+          "tampered_capability_rejected": true
+        },
+        "lifecycle": {
+          "authorized_read_after_reconnect": true,
+          "no_provider_effect_with_forward_disconnected": true
+        },
+        "mounts": {
+          "aliased_mounts": 3,
+          "attachment_devices": 2,
+          "attachment_mounts_observed": 4,
+          "canary_search": {
+            "as_guest_root": true,
+            "complete": true,
+            "found": false,
+            "max_depth": 4,
+            "mount_points_searched": 4
+          },
+          "host_workspace_in_mount_table": false,
+          "scope": "mount table metadata, alias grouping and a depth-4 search for the host canary name; not an exhaustive reachability proof",
+          "whole_share_root_mounts": 4
+        },
+        "network": {
+          "direct_synthetic_provider_tcp_denied": true,
+          "host_gateway_canary_denied": true,
+          "scope": "guest gateway TCP: one ephemeral canary and the host-loopback provider port"
+        },
+        "out_of_scope_read_denied": true
+      },
+      "application_socket_forwarding": "ssh-remote-unix/mTLS",
+      "approved_diff": true,
+      "approved_view": {
+        "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "number": 13861,
+        "title": "Proof repair"
+      },
+      "denied_write": true,
+      "filesystem_isolation_proved": false,
+      "host_private_paths_unreadable_in_guest": true,
+      "mode": "native-rust/aivm-kvm/synthetic-local-https",
+      "ok": true,
+      "provider_requests": [
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github.diff",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        }
+      ],
+      "revocation_fenced": true,
+      "virtualization": "kvm",
+      "vm": "aivm-2404",
+      "whole_service_secrecy_proved": false
+    },
+    "proxy_substitution_native": {
+      "allowed_read": true,
+      "authority_confinement_claimed": false,
+      "backend": "native",
+      "credential_absent_from_guest": true,
+      "direct_public_egress_reachable": true,
+      "guest_session_removed": true,
+      "ok": true,
+      "profile": "credential-substitution",
+      "provider_requests": 1,
+      "unlisted_origin_refused": true
+    },
+    "proxy_substitution_python": {
+      "allowed_read": true,
+      "authority_confinement_claimed": false,
+      "backend": "python",
+      "credential_absent_from_guest": true,
+      "direct_public_egress_reachable": true,
+      "guest_session_removed": true,
+      "ok": true,
+      "profile": "credential-substitution",
+      "provider_requests": 1,
+      "unlisted_origin_refused": true
+    },
+    "constrained_http_guest_translator": {
+      "allowed_read": true,
+      "credential_absent_from_guest": true,
+      "guest_session_removed": true,
+      "ok": true,
+      "outside_named_operations_refused": true,
+      "profile": "constrained-http",
+      "provider_requests": 2,
+      "translator": "guest"
+    },
+    "public_egress_disabled": {
+      "setting": "aivm networks firewall.public_egress = false, applied with aivm host fw apply",
+      "proxy_substitution_native": {
+        "allowed_read": true,
+        "authority_confinement_claimed": false,
+        "backend": "native",
+        "credential_absent_from_guest": true,
+        "direct_public_egress_reachable": false,
+        "guest_session_removed": true,
+        "ok": true,
+        "profile": "credential-substitution",
+        "provider_requests": 1,
+        "unlisted_origin_refused": true
+      },
+      "constrained_http_guest_translator": {
+        "allowed_read": true,
+        "credential_absent_from_guest": true,
+        "guest_session_removed": true,
+        "ok": true,
+        "outside_named_operations_refused": true,
+        "profile": "constrained-http",
+        "provider_requests": 2,
+        "translator": "guest"
+      },
+      "adversarial": {
+        "adversarial": {
+          "identities": {
+            "certificate_key_mismatch_rejected": true,
+            "other_enrolled_subject_rejected": true,
+            "reenrolled_certificate_rejected": true,
+            "tampered_capability_rejected": true
+          },
+          "lifecycle": {
+            "authorized_read_after_reconnect": true,
+            "no_provider_effect_with_forward_disconnected": true
+          },
+          "mounts": {
+            "aliased_mounts": 3,
+            "attachment_devices": 2,
+            "attachment_mounts_observed": 4,
+            "canary_search": {
+              "as_guest_root": true,
+              "complete": true,
+              "found": false,
+              "max_depth": 4,
+              "mount_points_searched": 4
+            },
+            "host_workspace_in_mount_table": false,
+            "scope": "mount table metadata, alias grouping and a depth-4 search for the host canary name; not an exhaustive reachability proof",
+            "whole_share_root_mounts": 4
+          },
+          "network": {
+            "direct_synthetic_provider_tcp_denied": true,
+            "host_gateway_canary_denied": true,
+            "scope": "guest gateway TCP: one ephemeral canary and the host-loopback provider port"
+          },
+          "out_of_scope_read_denied": true
+        },
+        "application_socket_forwarding": "ssh-remote-unix/mTLS",
+        "approved_diff": true,
+        "approved_view": {
+          "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "number": 13861,
+          "title": "Proof repair"
+        },
+        "denied_write": true,
+        "filesystem_isolation_proved": false,
+        "host_private_paths_unreadable_in_guest": true,
+        "mode": "native-rust/aivm-kvm/synthetic-local-https",
+        "ok": true,
+        "provider_requests": [
+          {
+            "accept": "application/vnd.github+json",
+            "credential_substituted": true,
+            "method": "GET",
+            "path": "/repos/taucetiproject/tauceti/pulls/13861"
+          },
+          {
+            "accept": "application/vnd.github+json",
+            "credential_substituted": true,
+            "method": "GET",
+            "path": "/repos/taucetiproject/tauceti/pulls/13861"
+          },
+          {
+            "accept": "application/vnd.github.diff",
+            "credential_substituted": true,
+            "method": "GET",
+            "path": "/repos/taucetiproject/tauceti/pulls/13861"
+          },
+          {
+            "accept": "application/vnd.github+json",
+            "credential_substituted": true,
+            "method": "GET",
+            "path": "/repos/taucetiproject/tauceti/pulls/13861"
+          }
+        ],
+        "revocation_fenced": true,
+        "virtualization": "kvm",
+        "vm": "aivm-2404",
+        "whole_service_secrecy_proved": false
+      }
+    }
+  },
+  "findings": [
+    "aivm cloud-init on cloud-init 25.3 failed to create the aivm-bootstrap user and logged a numeric-group groupadd failure; fixed in aivm 7952eaf before these runs.",
+    "With one attached folder, the unprivileged canary search could not read AIVM's root-only staging mount and reported itself incomplete; the guest user has passwordless sudo, so the search now runs as guest root (7cfdf22) and completed with the canary not found.",
+    "dev/aivm_constrained_acceptance.py had never been run on a VM and failed with broker_failed: its policy named a different credential file than its spec, and it wrote the credential with a trailing newline that the native reader refuses. Both fixed, with a regression test."
+  ]
+}

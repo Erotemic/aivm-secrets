@@ -59,7 +59,7 @@ still needs, the runtime witnesses, and what remains excluded.
 | Claim | The guest cannot reach host credentials, policy, privileged sockets or other identities in the tested deployment. |
 | Theorems | None; this is environment evidence. |
 | Premises | `ENV-GUEST-01`, `RUST-PRINCIPAL-01`, `HOST-01`, `LAUNCH-01`, `CHAN-01`, `MEM-01` |
-| Witnesses | Maintainer-run real KVM baseline and adversarial extension ([VM acceptance](../aivm-vm-native-acceptance.md)); `tests/test_aivm_vm_acceptance.py`; offline workflow `tests/test_offline_native_guest.py`; authority-root identity negatives (re-enrollment, live expiry, `forget` refusal) in `tests/test_rust_garrett_authority.py`. **Not yet run on a VM (2026-10-23):** the `--adversarial` re-enrollment probe, alias-aware mount inventory and host-canary search. |
+| Witnesses | Maintainer-run real KVM baseline and adversarial extension ([VM acceptance](../aivm-vm-native-acceptance.md)); `tests/test_aivm_vm_acceptance.py`; offline workflow `tests/test_offline_native_guest.py`; authority-root identity negatives (re-enrollment, live expiry, `forget` refusal) in `tests/test_rust_garrett_authority.py`. The `--adversarial` re-enrollment probe, alias-aware mount inventory and host-canary search (as guest root, over an attached workspace) passed on an agent-run nested KVM guest on 2026-10-24 ([local VM run](../../dev/validation/2026-10-24-local-vm-acceptance.json)); the maintainer has not yet re-run them. |
 | Excluded | General mount/share reachability beyond the bounded canary search, firewall rules, snapshots and clones (`CLONE-01`, `ROLLBACK-01`), vTPM custody (`VTPM-01`), the optional AIVM adapter lifecycle |
 
 ## Useful authorized actions (non-vacuity)
