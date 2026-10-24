@@ -112,7 +112,7 @@ with no retired keys. Two consequences:
 - If the old row is still active and holds the guest's current key, enrolling
   under the new subject is `denied` by the other-active-subject rule. That is
   the clone rule working as specified, since a rename is indistinguishable
-  from a clone here. Until AIVM prompts to revoke on rename, the operator
+  from a clone here. `aivm vm rename --identity_root` now revokes first; without it, the operator
   revokes the old row by hand: compute the key fingerprint in the guest
   (`openssl pkey -in client.key -pubout -outform DER | sha256sum`), find the
   row with that `key_sha256` in `identity status`, and run

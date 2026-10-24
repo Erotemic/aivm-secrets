@@ -182,7 +182,9 @@ When an automation-safe write runs as a side effect of a different user
 operation, it gets a confirmation of its own. **Decided** for VM delete,
 rename and access removal: a guarded `revoke-if-current` with its own prompt,
 under the same confirmation rule as an operator-only verb (below). A decline
-aborts the operation, and `--keep_identity` skips the step.
+aborts the operation, and `--keep_identity` skips the step. **Implemented
+2026-10-24** in AIVM, opt-in through `--identity_root` on each command;
+access removal revokes only the caller's own enrollment.
 
 **Operator-only** verbs run only as `ownership='user'` commands, never
 `'tool'`. That alone is not enough:

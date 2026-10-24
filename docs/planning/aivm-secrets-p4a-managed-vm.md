@@ -213,8 +213,8 @@ against real libvirt/SSH hardware in this environment.**
   first (see `aivm-secrets-garrett-certificate-lifecycle.md`).
 - **VM rename or store move:** the derived subject changes while the old
   enrollment may stay active and hold the guest key; if it does, enrolling
-  the renamed VM is refused until the old row is revoked by hand (AIVM does
-  not yet prompt for it). Keys retired for the old subject are not retired
+  the renamed VM is refused until the old row is revoked (`aivm vm rename
+  --identity_root` revokes it first, with its own confirmation). Keys retired for the old subject are not retired
   for the new one, so a VM that ran `identity_rotate_key` must regenerate its
   stale CSR before enrolling under the new subject (see
   `aivm-secrets-garrett-certificate-lifecycle.md`).
