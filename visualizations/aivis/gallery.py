@@ -6,6 +6,7 @@ The diagrams are generated from the same plans as the Manim animations.
 from __future__ import annotations
 
 import base64
+from html import escape as html_escape
 import json
 from pathlib import Path
 from typing import Mapping
@@ -15,9 +16,17 @@ from aivis.svg_preview import render_svg
 
 
 def build_gallery(target: Path, *, theme: str = 'dark',
-                  videos: Mapping[str, str] | None = None) -> Path:
+                  videos: Mapping[str, str] | None = None,
+                  pdfs: Mapping[str, str] | None = None) -> Path:
     deck, scenes = load_catalog()
     videos = videos or {}
+    pdfs = pdfs or {}
+    pdf_links = ' '.join(
+        f'<a href="{html_escape(pdfs[key], quote=True)}">{label}</a>'
+        for key, label in (('presentation', 'Full PDF (every beat)'),
+                           ('handout', 'Handout PDF (one per scene)'))
+        if key in pdfs
+    )
     payload = []
     for scene in scenes:
         diagram = scene.diagram()
@@ -67,6 +76,8 @@ button{cursor:pointer}button:hover{background:#28516c}input[type=range]{padding:
 #image{display:block;width:100%;height:auto;box-shadow:0 7px 35px #0009;border-radius:7px;background:#0b1422}
 #video{display:none;width:100%;max-height:76vh;aspect-ratio:16/9;background:#0b1422;border-radius:8px}
 #mode-switch{display:flex;gap:8px;margin:8px 0}
+.exports{display:flex;gap:16px;flex-wrap:wrap;margin:6px 0 12px}
+.exports:empty{display:none}.exports a{color:#74ceec;text-decoration:underline;text-underline-offset:3px}
 #mode-switch[hidden],#video[hidden]{display:none!important}
 #video[src]{display:block}
 #image[hidden]{display:none}
@@ -79,7 +90,8 @@ code{color:#f4c474;overflow-wrap:anywhere} ul{padding-left:21px;margin:9px 0;col
 </head>
 <body>
 <h1>Where information goes</h1>
-<p>Select a scene and a step. The diagrams come from editable Python plans and are shared with the Manim animation.</p>
+<p>Select a scene and a step. The diagrams come from editable Python plans and are shared with the Manim animation. Arrow keys step through the beats.</p>
+<nav class="exports" aria-label="Printable PDF exports">__PDF_LINKS__</nav>
 <div class="controls">
 <label for="scene">Scene</label><select id="scene"></select>
 <button id="previous" type="button" aria-label="Previous beat">Prev</button>
@@ -108,7 +120,8 @@ const beatRange = document.getElementById('beat');
 const player = document.getElementById('video');
 const image = document.getElementById('image');
 const modeSwitch = document.getElementById('mode-switch');
-let showMotion = true;
+// Open on the first editable diagram, not a paused black video player.
+let showMotion = false;
 function setMode(){
   const s = scenes.find(x=>x.id===sceneSelect.value)||scenes[0];
   const isVideo = Boolean(s.video) && showMotion;
@@ -165,5 +178,5 @@ sceneSelect.value=scenes[0].id;selectedChanged();
 </body></html>
 '''
     target.parent.mkdir(parents=True,exist_ok=True)
-    target.write_text(template.replace('__PAYLOAD__', encoded), encoding='utf-8')
+    target.write_text(template.replace('__PAYLOAD__', encoded).replace('__PDF_LINKS__', pdf_links), encoding='utf-8')
     return target

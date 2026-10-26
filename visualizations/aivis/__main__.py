@@ -65,7 +65,7 @@ def _render(args, *, scene_id: str | None = None) -> int:
         return 0
     if importlib.util.find_spec('manim') is None:
         print('Manim is not installed in this Python environment. From visualizations/: '
-              'uv sync --extra manim --extra test', file=sys.stderr)
+              'make setup; then make render SCENE=legend', file=sys.stderr)
         return 2
     return subprocess.run(cmd, cwd=VIS_ROOT, env=env, check=False).returncode
 
@@ -73,6 +73,7 @@ def _render(args, *, scene_id: str | None = None) -> int:
 def _all(args) -> int:
     """Refresh only changed Manim clips and the browser presentation."""
     from aivis.presentation import build_presentation, find_manim_video
+    from aivis.pdf_export import build_pdfs
 
     if args.still or args.animation is not None:
         raise ValueError('all builds videos; --still/--animation apply to render only')
@@ -82,6 +83,10 @@ def _all(args) -> int:
             _render(args, scene_id=scene.id)
         return 0
 
+    pdfs = build_pdfs(kind='both', theme=args.theme)
+    for name, (path, pages) in pdfs.items():
+        print(f'{name.capitalize()} PDF: {path} ({pages} pages)', flush=True)
+
     def render_scene(scene_id: str) -> Path:
         returncode = _render(args, scene_id=scene_id)
         if returncode:
@@ -90,7 +95,9 @@ def _all(args) -> int:
 
     output, changed = build_presentation(
         quality=args.quality, theme=args.theme, speed=args.speed,
-        force=getattr(args, 'force', False), render_scene=render_scene)
+        force=getattr(args, 'force', False), render_scene=render_scene,
+        pdfs={'presentation': '../pdfs/' + pdfs['beats'][0].name,
+              'handout': '../pdfs/' + pdfs['handout'][0].name})
     print(f'Updated {len(changed)} scene videos; {len(load_catalog()[1])-len(changed)} reused.', flush=True)
     print(f'HTML presentation: {output}', flush=True)
     if args.open_result:
@@ -126,6 +133,10 @@ def make_parser() -> argparse.ArgumentParser:
     commands.add_parser('check', help='validate scene plans, identifiers, and referenced source paths (no Manim)')
     gallery = commands.add_parser('gallery', help='build a single-file interactive storyboard, no Manim')
     gallery.add_argument('--theme', choices=['dark','light'], default='dark')
+    pdf = commands.add_parser('pdf', help='vector PDF deck: every beat and/or last beat per scene (no Manim)')
+    pdf.add_argument('scene', nargs='?', default='all', help='scene ID or all (default)')
+    pdf.add_argument('--kind', choices=['beats', 'handout', 'both'], default='both')
+    pdf.add_argument('--theme', choices=['dark', 'light'], default='dark')
     preview = commands.add_parser('preview', help='instant SVG preview of any beat (no Manim)')
     preview.add_argument('scene', help='scene ID or all')
     preview.add_argument('--beat', default='last', help='zero-based number, named beat, or last')
@@ -191,7 +202,23 @@ def main(argv: list[str] | None = None) -> int:
                 _preview(args.scene, beat=args.beat, theme=args.theme)
             return 0
         if args.action == 'gallery':
-            print(build_gallery(BUILD / 'storyboard.html', theme=args.theme))
+            suffix = '' if args.theme == 'dark' else '-light'
+            pdf_dir = BUILD / 'pdfs'
+            pdfs = {
+                key: 'pdfs/' + name
+                for key, name in (
+                    ('presentation', f'presentation{suffix}.pdf'),
+                    ('handout', f'handout{suffix}.pdf'),
+                )
+                if (pdf_dir / name).is_file()
+            }
+            print(build_gallery(BUILD / 'storyboard.html', theme=args.theme, pdfs=pdfs))
+            return 0
+        if args.action == 'pdf':
+            from aivis.pdf_export import build_pdfs
+            for name, (path, pages) in build_pdfs(scene=args.scene, kind=args.kind,
+                                                  theme=args.theme).items():
+                print(f'{name}: {path} ({pages} pages)')
             return 0
         if args.action == 'render':
             return _render(args)

@@ -11,7 +11,7 @@ import json
 import os
 from pathlib import Path
 import shutil
-from typing import Callable
+from typing import Callable, Mapping
 
 from aivis.catalog import VIS_ROOT, SceneInfo, load_catalog
 from aivis.gallery import build_gallery
@@ -65,7 +65,8 @@ def find_manim_video(scene_id: str, quality: str) -> Path:
 
 
 def build_presentation(*, quality: str='l', theme: str='dark', speed: float=1.0,
-                       force: bool=False, render_scene: Callable[[str], Path]) -> tuple[Path, tuple[str,...]]:
+                       force: bool=False, render_scene: Callable[[str], Path],
+                       pdfs: Mapping[str, str] | None = None) -> tuple[Path, tuple[str,...]]:
     """Build changed video scenes and refresh HTML; return path and scene IDs.
 
     ``render_scene`` executes a real Manim render in the CLI; injected test
@@ -102,7 +103,8 @@ def build_presentation(*, quality: str='l', theme: str='dark', speed: float=1.0,
     # HTML always regenerates: claim/narration/scene order may have changed.
     output=PRESENTATION/'index.html'
     build_gallery(output,theme=theme,
-                  videos={s.id:f'videos/{s.id}.mp4' for s in scenes})
+                  videos={s.id:f'videos/{s.id}.mp4' for s in scenes},
+                  pdfs=pdfs)
     tmp=MANIFEST.with_suffix('.json.part')
     tmp.write_text(json.dumps({'format':1,'clips':new},indent=2)+'\n')
     os.replace(tmp,MANIFEST)

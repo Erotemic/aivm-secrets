@@ -38,6 +38,7 @@ visualizations/
     svg_preview.py                 # same diagram and icons without Manim
     presentation.py                # cache changed scene videos for HTML
     gallery.py                     # browser viewer: video or stepped diagrams
+    pdf_export.py                  # vector PDF: all beats or final-beat handout
   tests/test_authoring.py
   .build/                           # generated previews and videos; not committed
 ```
@@ -62,43 +63,85 @@ visualizations/
 Editing the geometry changes *both* renderers. If you want independent Manim
 motion beyond the shared base, override `construct()` in a small scene file.
 
-## One command for the Manim + HTML presentation
+## Quick start: HTML, PDF, and videos
 
-From the visualization directory, install Manim once, then run `make all`:
+Run commands from `visualizations/`. They use the project's **own** `.venv`
+through `uv run`; an active unrelated `python`/`uvpy` environment does not
+matter. The `.python-version` file selects Python 3.13 (uv can install it if
+needed). No Rust/Lean toolchain is involved.
 
 ```bash
 cd ~/code/aivm-secrets/visualizations
-uv sync --extra manim --extra test
-make all PYTHON=.venv/bin/python QUALITY=l
+make view                    # diagrams + printable PDFs, no Manim
+xdg-open .build/storyboard.html
+```
+
+This produces a standalone, self-contained HTML storyboard and two
+**selectable-text, vector** 16:9 PDFs:
+
+| Output | Meaning |
+| --- | --- |
+| `.build/storyboard.html` | Interactive scene / beat chooser, notes, inventories; open locally |
+| `.build/pdfs/presentation.pdf` | All storyboard beats in order (102 pages in the 2026-10-26 storyboard) |
+| `.build/pdfs/handout.pdf` | Last beat of each scene, one page per scene (19 pages in the 2026-10-26 storyboard) |
+
+These PDFs are made **directly from the SVG scene plans**, not screenshots
+from video; the text, arrows, packages, and linework stay vector graphics.
+They illustrate the same storyboards as Manim but are not frame grabs of
+Manim's animated motion. They do not need Manim, FFmpeg, or a running server.
+For a smaller PDF or a light-background print version:
+
+```bash
+make pdf SCENE=packaging KIND=beats
+make pdf THEME=light
+make handout
+```
+
+A single-scene PDF is `.build/pdfs/packaging.pdf`; the light-themed full
+outputs are `presentation-light.pdf` and `handout-light.pdf`. PDFs are
+cached per beat, so unchanged visuals need not be converted again. Use
+`make pdf` for both outputs without regenerating the HTML.
+
+For animations and an HTML viewer with playable clips, run:
+
+```bash
+make all QUALITY=l
 xdg-open .build/presentation/index.html
 ```
 
-`make all` renders only **changed** scenes at draft quality, copies their MP4s
-into `.build/presentation/videos/`, and regenerates the HTML viewer. The HTML
-lets you switch between the **rendered video** and the **editable beat-by-beat
-SVG** for each scene, and lists the corresponding plan and source files.
-The HTML and videos are kept together as a folder, not embedded into a huge
-single file. Open the local `index.html`; no web server is needed.
+`make all` **installs the required Python extras through uv** and renders
+only changed Manim scenes at draft quality. It includes the same two PDFs,
+with links in the browser presentation, and stores individual MP4 clips in
+`.build/presentation/videos/`. Open `index.html` locally; it needs its
+neighboring `videos/` directory. The viewer starts on the stepped diagram,
+so it is useful immediately even before you click **Play animation**.
 
-To rebuild on edits, in a separate terminal:
+To refresh an animation after editing:
 
 ```bash
-cd ~/code/aivm-secrets/visualizations
-make watch-all PYTHON=.venv/bin/python QUALITY=l
+make watch-all QUALITY=l
 ```
 
-The watcher tracks changes to scene/plan Python files, storyboard TOML and
-local icon SVGs. It calls the same incremental builder. Changing just
-`aivis/plans/garrett_present.py` rerenders only the `garrett_present` clip;
-changing shared drawing code or an icon rerenders every clip; changing the
-storyboard narration refreshes the HTML without rerendering any videos.
-Refresh the local browser after changes. To rerender all scenes regardless of
-cache, run `python -m aivis all --quality l --force` using your Manim Python.
-The generated `.build/` folder should not be added to git.
+The watcher tracks Python plans/scene code, storyboard TOML and local icon
+SVGs. It invalidates only affected Manim clips; a narration-only change
+refreshes the HTML without rerendering videos. Changes to diagram plans
+also flow into the rebuilt PDFs. To force all Manim clips to rerender:
 
-Use `make gallery` instead if you only need the instant SVG storyboard and do
-not want to install Manim. The video builder requires Manim Community and
-its system dependencies (Cairo/Pango/FFmpeg); it does not touch Rust or Lean.
+```bash
+uv run --extra manim --extra pdf python -m aivis all --quality l --force
+```
+
+If Manim's system libraries are missing on Ubuntu, install them before
+`make all`:
+
+```bash
+sudo apt install ffmpeg pkg-config libcairo2-dev libpango1.0-dev
+```
+
+Run `make setup` to pre-install Manim, PDF, and test extras, or `make setup-pdf`
+for PDFs only. `make view` / `make pdf` do not require those system Manim
+dependencies. Python dependency versions resolve from `pyproject.toml` /
+`uv.lock`; the first run may update the lockfile for newly added PDF extras.
 
 ## Garrett scene sequence
 
@@ -132,9 +175,10 @@ otherwise roles supply defaults such as `sandbox`, `host`, and `vault`.
 
 ## What the proofs say
 
-Four scenes after `evidence` explain the production-instance Lean theorems,
-each linked by `proof_anchors` to the exact theorem names (the catalog test
-fails if a named theorem disappears):
+The proof-focused scenes after `evidence` explain the scope of the
+production-instance Lean theorems. Each scene uses `proof_anchors` to link
+back to specific theorem names (a catalog test fails if a named theorem
+is removed):
 
 - `proof_map`: which code each stage of one read runs, extracted-and-proved
   (green) or native-and-trusted (amber), with assumption IDs from
@@ -151,54 +195,44 @@ fails if a named theorem disappears):
   guest cannot tell apart, with the declassifications (selected JSON, row
   count, status class) shown explicitly.
 
-## Instant feedback (no Manim installation)
+## Editing and targeted builds
 
-From the visualization directory:
-
-```bash
-cd ~/code/aivm-secrets/visualizations
-python -m aivis list
-python -m aivis check
-python -m aivis preview packaging --beat ciphertext
-python -m aivis preview gh_diff --beat release
-python -m aivis gallery
-xdg-open .build/storyboard.html
-```
-
-`gallery` writes a **self-contained HTML file** with scene/beat controls,
-current knowledge for each party, labels of moving objects, narration and edit
-paths. No server runs in the background. You can leave this running in another
-terminal while editing the plans:
+The plans are designed for incremental authoring. Choose a beat, edit its
+nodes/links/caption in `aivis/plans/`, then preview it without rendering
+all scenes:
 
 ```bash
 cd ~/code/aivm-secrets/visualizations
-python -m aivis watch all --mode gallery
+make list
+make check
+make preview SCENE=packaging BEAT=ciphertext
+make gallery
+make render SCENE=gh_diff QUALITY=l
+make still SCENE=packaging QUALITY=l
+make test
 ```
 
-Refresh the browser after each change. The watcher only reads authored source
-files; it does not scan its own generated `.build` directory.
+`make gallery` writes `.build/storyboard.html`; its controls show the current
+knowledge for each party, moving packet labels, narration, scene sources and
+edit paths. It works without video renders. Use `make watch-gallery` for
+continuous HTML refreshes, or `make watch-preview SCENE=packaging` for an SVG
+beat. Refresh your browser after changes. The watchers ignore generated
+`.build` artifacts.
 
-## Actual Manim video
-
-In an independent visualization environment (not the Rust/Lean runtime):
+Manim output stays under `.build/media/`, while `make all` copies the finished
+clips into the presentation. Direct CLI usage is also available:
 
 ```bash
-cd ~/code/aivm-secrets/visualizations
-uv sync --extra manim --extra test
-uv run python -m aivis render gh_diff --quality l
-uv run python -m aivis render packaging --quality l --still
-uv run python -m aivis render boundary --quality l
-uv run python -m aivis all --quality l
+uv run --extra manim --extra pdf python -m aivis render gh_diff --quality l
+uv run --extra pdf python -m aivis pdf proof_write_gate --kind beats
+uv run python -m aivis render gh_diff --dry-run
 ```
 
-On Ubuntu, Manim Community may need system Cairo/Pango and FFmpeg packages.
-The plans and previews themselves have no Manim, NumPy, or LaTeX dependency.
-Manim output goes under `.build/media/`, and one scene is rendered at a time.
-
-For targeted revision, pass `--animation N,M` to Manim for its zero-based
-play-call indices, or use `--beat name` for a deterministic SVG checkpoint.
-`python -m aivis render gh_diff --dry-run` prints the command without running
-Manim. Use `python -m pytest -q tests/test_authoring.py` to check the plans.
+The `--animation N,M` Manim option renders a subset of zero-based `play`
+indices; `--beat name` instead previews a deterministic SVG checkpoint.
+Test the package without Manim using `make test` (the PDF tests use the PDF
+extra). No scene preview by itself certifies a security property: use the
+source and proof anchors to inspect each claim.
 
 ## Scope of the example
 

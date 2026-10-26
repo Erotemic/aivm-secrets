@@ -50,3 +50,17 @@ All build output belongs under `.build/`, not source control.
 An HTML presentation contains normal `.mp4` files alongside `index.html`:
 keep the whole `.build/presentation/` directory together when sharing it.
 The ability to animate a protocol is not a formal correctness claim.
+
+## Build and publishing
+
+- Use `make view` for HTML plus vector PDF outputs without Manim; use `make all`
+  for the incremental video presentation and PDFs. Do not call the active shell
+  Python from Makefile recipes; invoke the project through `uv run` with the
+  correct extras.
+- `aivis/pdf_export.py` uses the existing SVG/diagram plans as its page
+  source. Keep PDF and SVG authoring unified; avoid duplicating slide text
+  in a separate PDF generator or rasterizing videos. PDF handouts take the
+  final beat of each scene.
+- Check vector PDF readability by rendering representative pages and confirming
+  page count and selectable text. Never let a storyboard's `implemented`
+  label imply whole-service proof coverage.

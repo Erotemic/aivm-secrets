@@ -1,54 +1,79 @@
-# Run from visualizations/. No Rust/Lean setup is required for authoring.
-PYTHON ?= python
-SCENE ?= garrett_present
-BEAT ?= last
+# All recipes run through the project-managed uv environment, never the active
+# shell's Python (which may be an unrelated uvpy / system environment).
+UV      ?= uv
+SCENE   ?= all
+BEAT    ?= last
 QUALITY ?= l
+THEME   ?= dark
+KIND    ?= both
 
-.PHONY: help list storyboard check preview gallery render still watch watch-preview watch-gallery deck all watch-all test
+RUN       := $(UV) run
+RUN_PDF   := $(UV) run --extra pdf
+RUN_MANIM := $(UV) run --extra manim --extra pdf
+RUN_TEST  := $(UV) run --extra pdf --extra test
+
+.DEFAULT_GOAL := help
+.PHONY: help setup setup-pdf list storyboard check preview gallery view pdf handout \
+        render still watch watch-preview watch-gallery deck all watch-all test clean
+
 help:
-	@echo 'list                 scenes, status, editable plan files'
-	@echo 'storyboard           narrated scene outline + source mapping'
-	@echo 'preview              instant SVG using the same diagram plan as Manim'
-	@echo 'gallery              self-contained HTML with scene/beat controls (no Manim)'
-	@echo 'render               only one Manim scene at draft quality'
-	@echo 'still                last-frame Manim render (faster than video)'
-	@echo 'watch                rerender one scene after source changes'
-	@echo 'watch-preview        redraw SVG after source changes (no Manim needed)'
-	@echo 'watch-gallery        rebuild interactive HTML after edits (no Manim needed)'
-	@echo 'deck                 render all scene clips individually (legacy)'
-	@echo 'all                  render changed Manim clips + HTML presentation'
-	@echo 'watch-all            rebuild changed clips + HTML after edits'
-	@echo 'test                 standalone authoring tests'
-	@echo 'Usage: make preview SCENE=packaging BEAT=ciphertext'
-	@echo '       make watch SCENE=gh_diff QUALITY=l'
-	@echo '       make all QUALITY=l  (then open .build/presentation/index.html)'
-list:
-	$(PYTHON) -m aivis list
-storyboard:
-	$(PYTHON) -m aivis storyboard
-check:
-	$(PYTHON) -m aivis check
-preview:
-	$(PYTHON) -m aivis preview $(SCENE) --beat $(BEAT)
-gallery:
-	$(PYTHON) -m aivis gallery
-watch-gallery:
-	$(PYTHON) -m aivis watch all --mode gallery
-render:
-	$(PYTHON) -m aivis render $(SCENE) --quality $(QUALITY)
-still:
-	$(PYTHON) -m aivis render $(SCENE) --quality $(QUALITY) --still
-watch:
-	$(PYTHON) -m aivis watch $(SCENE) --mode render --quality $(QUALITY)
-watch-preview:
-	$(PYTHON) -m aivis watch $(SCENE) --mode preview --beat $(BEAT)
-deck:
-	$(PYTHON) -m aivis deck --quality $(QUALITY)
-test:
-	$(PYTHON) -m pytest -q
+	@echo 'Run from visualizations/ (uses uv-managed .venv automatically)'
+	@echo '  make view                  fast interactive HTML + two vector PDFs (no Manim)'
+	@echo '  make all                   cached Manim videos + HTML + full PDF + handout PDF'
+	@echo '  make pdf                   vector PDFs, all beats + last-beat handout (no Manim)'
+	@echo '  make pdf SCENE=packaging KIND=beats'
+	@echo '  make handout               one page per scene, no Manim'
+	@echo '  make gallery               standalone interactive HTML, no Manim'
+	@echo '  make preview SCENE=packaging BEAT=last'
+	@echo '  make render SCENE=gh_diff QUALITY=l'
+	@echo '  make still SCENE=gh_diff   Manim still image'
+	@echo '  make list | storyboard | check | test'
+	@echo '  make watch-all             watch edits and refresh videos + PDFs + HTML'
+	@echo '  make setup                 install Manim, PDF and tests in .venv'
+	@echo '  make setup-pdf             install PDF tools only'
+	@echo '  make clean                 remove generated .build/ files'
+	@echo 'PDFs: .build/pdfs/presentation.pdf and .build/pdfs/handout.pdf'
+	@echo 'HTML: .build/presentation/index.html (make all), .build/storyboard.html (make view)'
+	@echo 'Variables: SCENE=<id>|all QUALITY=l|m|h|p THEME=dark|light KIND=both|beats|handout'
 
-# This is the default for a full presentation, not the older bare `deck`.
+setup:
+	$(UV) sync --extra manim --extra pdf --extra test
+setup-pdf:
+	$(UV) sync --extra pdf
+list:
+	$(RUN) python -m aivis list
+storyboard:
+	$(RUN) python -m aivis storyboard
+check:
+	$(RUN) python -m aivis check
+preview:
+	$(RUN) python -m aivis preview $(SCENE) --beat $(BEAT) --theme $(THEME)
+gallery:
+	$(RUN) python -m aivis gallery --theme $(THEME)
+view:
+	$(RUN_PDF) python -m aivis pdf --theme $(THEME)
+	$(RUN_PDF) python -m aivis gallery --theme $(THEME)
+pdf:
+	$(RUN_PDF) python -m aivis pdf $(SCENE) --kind $(KIND) --theme $(THEME)
+handout:
+	$(RUN_PDF) python -m aivis pdf --kind handout --theme $(THEME)
+render:
+	$(RUN_MANIM) python -m aivis render $(SCENE) --quality $(QUALITY) --theme $(THEME)
+still:
+	$(RUN_MANIM) python -m aivis render $(SCENE) --quality $(QUALITY) --theme $(THEME) --still
+watch:
+	$(RUN_MANIM) python -m aivis watch $(SCENE) --mode render --quality $(QUALITY) --theme $(THEME)
+watch-preview:
+	$(RUN) python -m aivis watch $(SCENE) --mode preview --beat $(BEAT) --theme $(THEME)
+watch-gallery:
+	$(RUN) python -m aivis watch all --mode gallery --theme $(THEME)
+deck:
+	$(RUN_MANIM) python -m aivis deck --quality $(QUALITY) --theme $(THEME)
 all:
-	$(PYTHON) -m aivis all --quality $(QUALITY)
+	$(RUN_MANIM) python -m aivis all --quality $(QUALITY) --theme $(THEME)
 watch-all:
-	$(PYTHON) -m aivis watch all --mode all --quality $(QUALITY)
+	$(RUN_MANIM) python -m aivis watch all --mode all --quality $(QUALITY) --theme $(THEME)
+test:
+	$(RUN_TEST) python -m pytest -q
+clean:
+	rm -rf .build

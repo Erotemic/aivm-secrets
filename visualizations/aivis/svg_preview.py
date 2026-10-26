@@ -47,7 +47,13 @@ def _node(n: Node, colors: dict, *, highlight: bool) -> str:
              embedded_icon(icon_name(n), x=icon_x, y=y-1, size=45, color=stroke),
              f'<text x="{text_x:.1f}" y="{y-3:.1f}" text-anchor="middle" font-weight="600" '
              f'font-size="{heading_size:.1f}" fill="{colors["foreground"]}">{_xml(n.title)}</text>']
-    for i, line in enumerate(textwrap.wrap(n.subtitle, width=max(12, int(available/8.4)))[:2]):
+    # Preserve API/theorem identifiers as a whole. Arbitrarily chopping
+    # `write_gate::run_approved` makes technical diagrams harder to read.
+    subtitle_lines = textwrap.wrap(n.subtitle,
+                                   width=max(12, int(available/8.4)),
+                                   break_long_words=False,
+                                   break_on_hyphens=False)
+    for i, line in enumerate(subtitle_lines[:2]):
         subtitle_size = min(14.0, max(10.0, available / (max(1, len(line)) * 0.62)))
         parts.append(f'<text x="{text_x:.1f}" y="{y+24+i*16:.1f}" text-anchor="middle" font-size="{subtitle_size:.1f}" '
                      f'fill="{colors["muted"]}">{_xml(line)}</text>')
