@@ -1251,3 +1251,36 @@ now has the opt-in revoke before delete, rename and access removal.
 What remains needs a reviewer, a live provider, extra hardware, AIVM's own
 decision about its stale copy, or refinement of the adapters the history
 models take as premises.
+
+## 2026-10-26 12:13:32 -0400
+
+New campaign: implement Garrett's stateless architecture as a separate
+profile, `garrett-stateless-v1`, alongside the stateful AIVM profile, with
+standalone Python and Rust libraries and implementation-linked Lean proofs.
+Baseline `e9aa9fa`, clean tree.
+
+Decisions so far, recorded in `docs/garrett-stateless-v1.md`:
+
+- The proxy is fully stateless: the decision is a function of token, key set,
+  routes, acceptance policy, peer certificate and clock. The destination is
+  the route of the authenticated `prv` claim, never a request value.
+- The OAuth result cannot be pushed to an agent, so the broker keeps one
+  transient, in-memory, single-use mailbox per login. It holds only the
+  finished cert-bound surrogate, never a bare credential. Replicas get their
+  own redirect URI instead of shared state. Login correlation itself is an
+  AEAD-sealed `state` carrying the PKCE verifier and the starting peer.
+- No refresh tokens: stateless renewal re-seals the same credential up to an
+  absolute `ren` that renewal can never extend.
+- Provider JWT claims are copied only under `upstream` and never read by a
+  verifier, so collisions with authoritative claims cannot arise.
+- Pure decisions are in three new core modules (`stateless`,
+  `stateless_login`, `stateless_proxy`). They reuse `oauth_login::claim`,
+  `proxy_http::encode_upstream`/`guest_response` and
+  `proxy_controller::release`, so existing proofs apply to them.
+  Extraction adds no generated axioms (still 2); the generated Lean compiles.
+
+Process notes: there was no Python venv here; I created `.venv` with uv.
+`cargo fmt` on the core reformats several existing files that were not
+fmt-clean; I reverted those and formatted only the new files. Pushback to the
+GPT-written prompt: the commit trailer names the actual model, and I commit
+in increments rather than one commit.

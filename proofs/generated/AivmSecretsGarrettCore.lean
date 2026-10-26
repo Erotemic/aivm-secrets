@@ -20705,6 +20705,1068 @@ def session_audit.approved_record
   let ret := alloc.slice.Slice.into_vec y
   ok (json_wire.Value.Object ret)
 
+/-- [aivm_secrets_garrett_core::stateless::MAX_TIME]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 14:0-14:43
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless.MAX_TIME : Std.I64 := 9007199254740991#i64
+
+/-- [aivm_secrets_garrett_core::stateless::MAX_LIFETIME]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 16:0-16:36
+    Visibility: public -/
+@[global_simps, irreducible] def stateless.MAX_LIFETIME : Std.I64 := 86400#i64
+
+/-- [aivm_secrets_garrett_core::stateless::MAX_RENEW]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 18:0-18:35
+    Visibility: public -/
+@[global_simps, irreducible] def stateless.MAX_RENEW : Std.I64 := 2592000#i64
+
+/-- [aivm_secrets_garrett_core::stateless::MAX_SKEW]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 20:0-20:30
+    Visibility: public -/
+@[global_simps, irreducible] def stateless.MAX_SKEW : Std.I64 := 300#i64
+
+/-- [aivm_secrets_garrett_core::stateless::Rejection]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 24:0-38:1
+    Visibility: public -/
+@[discriminant isize]
+inductive stateless.Rejection where
+| Malformed : stateless.Rejection
+| UnknownKey : stateless.Rejection
+| BadSignature : stateless.Rejection
+| WrongIssuer : stateless.Rejection
+| WrongAudience : stateless.Rejection
+| UnknownProvider : stateless.Rejection
+| BadLifetime : stateless.Rejection
+| NotYetValid : stateless.Rejection
+| Expired : stateless.Rejection
+| WrongCertificate : stateless.Rejection
+| Undecryptable : stateless.Rejection
+| InvalidCredential : stateless.Rejection
+| BadPolicy : stateless.Rejection
+
+/-- [aivm_secrets_garrett_core::stateless::SurrogateClaims]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 43:0-54:1
+    Visibility: public -/
+structure stateless.SurrogateClaims where
+  issuer : alloc.vec.Vec Std.U8
+  audience : alloc.vec.Vec Std.U8
+  subject : alloc.vec.Vec Std.U8
+  token_id : alloc.vec.Vec Std.U8
+  provider : alloc.vec.Vec Std.U8
+  certificate : alloc.vec.Vec Std.U8
+  issued_at : Std.I64
+  expires_at : Std.I64
+  renew_until : Std.I64
+
+/-- [aivm_secrets_garrett_core::stateless::Verified]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 59:0-64:1
+    Visibility: public -/
+structure stateless.Verified where
+  key_issuer : alloc.vec.Vec Std.U8
+  claims : stateless.SurrogateClaims
+  aad : alloc.vec.Vec Std.U8
+  sealed : alloc.vec.Vec Std.U8
+
+/-- [aivm_secrets_garrett_core::stateless::Acceptance]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 67:0-72:1
+    Visibility: public -/
+structure stateless.Acceptance where
+  audiences : alloc.vec.Vec (alloc.vec.Vec Std.U8)
+  providers : alloc.vec.Vec (alloc.vec.Vec Std.U8)
+  max_lifetime : Std.I64
+  skew : Std.I64
+
+/-- [aivm_secrets_garrett_core::stateless::member]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 75:4-82:1
+    Visibility: public -/
+@[rust_loop]
+def stateless.member_loop
+  (iter : core.slice.iter.Iter (alloc.vec.Vec Std.U8)) (value : Slice Std.U8) :
+  Result Bool
+  := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok false
+  | some item =>
+    let item1 := alloc.vec.Vec.deref item
+    let b ← core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 item1 value
+    if b
+    then ok true
+    else stateless.member_loop iter1 value
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless::member]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 74:0-82:1
+    Visibility: public -/
+def stateless.member
+  (set : Slice (alloc.vec.Vec Std.U8)) (value : Slice Std.U8) :
+  Result Bool
+  := do
+  let iter ←
+    SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter set
+  stateless.member_loop iter value
+
+/-- [aivm_secrets_garrett_core::stateless::acceptance_valid]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 84:0-89:1
+    Visibility: public -/
+def stateless.acceptance_valid
+  (acceptance : stateless.Acceptance) : Result Bool := do
+  if acceptance.max_lifetime >= 1#i64
+  then
+    if acceptance.max_lifetime <= stateless.MAX_LIFETIME
+    then
+      if acceptance.skew >= 0#i64
+      then ok (acceptance.skew <= stateless.MAX_SKEW)
+      else ok false
+    else ok false
+  else ok false
+
+/-- [aivm_secrets_garrett_core::stateless::lifetime_valid]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 92:0-99:1
+    Visibility: public -/
+def stateless.lifetime_valid
+  (claims : stateless.SurrogateClaims) (max_lifetime : Std.I64) :
+  Result Bool
+  := do
+  if claims.issued_at >= 0#i64
+  then
+    if claims.issued_at <= stateless.MAX_TIME
+    then
+      if claims.expires_at > claims.issued_at
+      then
+        let i ← claims.expires_at - claims.issued_at
+        if i <= max_lifetime
+        then
+          if claims.renew_until >= claims.expires_at
+          then
+            let i1 ← claims.renew_until - claims.issued_at
+            ok (i1 <= stateless.MAX_RENEW)
+          else ok false
+        else ok false
+      else ok false
+    else ok false
+  else ok false
+
+/-- [aivm_secrets_garrett_core::stateless::admit]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 103:0-137:1
+    Visibility: public -/
+def stateless.admit
+  (claims : stateless.SurrogateClaims) (key_issuer : Slice Std.U8)
+  (acceptance : stateless.Acceptance) (peer : Slice Std.U8) (now : Std.I64) :
+  Result (core.result.Result Unit stateless.Rejection)
+  := do
+  let b ← stateless.acceptance_valid acceptance
+  if b
+  then
+    if now < 0#i64
+    then ok (core.result.Result.Err stateless.Rejection.BadPolicy)
+    else
+      if now > stateless.MAX_TIME
+      then ok (core.result.Result.Err stateless.Rejection.BadPolicy)
+      else
+        let issuer := alloc.vec.Vec.deref claims.issuer
+        let b1 ←
+          core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 issuer
+            key_issuer
+        if b1
+        then
+          let s := alloc.vec.Vec.deref acceptance.audiences
+          let s1 := alloc.vec.Vec.deref claims.audience
+          let b2 ← stateless.member s s1
+          if b2
+          then
+            let s2 := alloc.vec.Vec.deref acceptance.providers
+            let s3 := alloc.vec.Vec.deref claims.provider
+            let b3 ← stateless.member s2 s3
+            if b3
+            then
+              let b4 ←
+                stateless.lifetime_valid claims acceptance.max_lifetime
+              if b4
+              then
+                let i ← now + acceptance.skew
+                if i < claims.issued_at
+                then
+                  ok (core.result.Result.Err stateless.Rejection.NotYetValid)
+                else
+                  if now >= claims.expires_at
+                  then ok (core.result.Result.Err stateless.Rejection.Expired)
+                  else
+                    let certificate := alloc.vec.Vec.deref claims.certificate
+                    let b5 ←
+                      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8
+                        certificate peer
+                    if b5
+                    then ok (core.result.Result.Ok ())
+                    else
+                      ok (core.result.Result.Err
+                        stateless.Rejection.WrongCertificate)
+              else ok (core.result.Result.Err stateless.Rejection.BadLifetime)
+            else
+              ok (core.result.Result.Err stateless.Rejection.UnknownProvider)
+          else ok (core.result.Result.Err stateless.Rejection.WrongAudience)
+        else ok (core.result.Result.Err stateless.Rejection.WrongIssuer)
+  else ok (core.result.Result.Err stateless.Rejection.BadPolicy)
+
+/-- Trait declaration: [aivm_secrets_garrett_core::stateless::SurrogateOpener]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 141:0-144:1
+    Visibility: public -/
+structure stateless.SurrogateOpener (Self : Type _) where
+  verify : Self → Slice Std.U8 → Result (core.result.Result
+    stateless.Verified stateless.Rejection)
+  «unseal» : Self → stateless.Verified → Result (core.result.Result
+    (alloc.vec.Vec Std.U8) stateless.Rejection)
+
+/-- [aivm_secrets_garrett_core::stateless::Opened]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 146:0-149:1
+    Visibility: public -/
+structure stateless.Opened where
+  claims : stateless.SurrogateClaims
+  credential : alloc.vec.Vec Std.U8
+
+/-- [aivm_secrets_garrett_core::stateless::open]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 153:0-185:1
+    Visibility: public -/
+def stateless.open
+  {V : Type _} (SurrogateOpenerInst : stateless.SurrogateOpener V) (opener : V)
+  (token : Slice Std.U8) (acceptance : stateless.Acceptance)
+  (peer : Slice Std.U8) (now : Std.I64) :
+  Result (core.result.Result stateless.Opened stateless.Rejection)
+  := do
+  let r ← SurrogateOpenerInst.verify opener token
+  match r with
+  | core.result.Result.Ok verified =>
+    let s := alloc.vec.Vec.deref verified.key_issuer
+    let r1 ← stateless.admit verified.claims s acceptance peer now
+    match r1 with
+    | core.result.Result.Ok _ =>
+      let r2 ← SurrogateOpenerInst.«unseal» opener verified
+      match r2 with
+      | core.result.Result.Ok credential =>
+        let s1 := alloc.vec.Vec.deref credential
+        let b ← http_auth.valid_credential s1
+        if b
+        then
+          ok (core.result.Result.Ok { claims := verified.claims, credential })
+        else ok (core.result.Result.Err stateless.Rejection.InvalidCredential)
+      | core.result.Result.Err error => ok (core.result.Result.Err error)
+    | core.result.Result.Err error => ok (core.result.Result.Err error)
+  | core.result.Result.Err error => ok (core.result.Result.Err error)
+
+/-- [aivm_secrets_garrett_core::stateless::IssuePolicy]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 188:0-194:1
+    Visibility: public -/
+structure stateless.IssuePolicy where
+  issuer : alloc.vec.Vec Std.U8
+  audience : alloc.vec.Vec Std.U8
+  providers : alloc.vec.Vec (alloc.vec.Vec Std.U8)
+  max_lifetime : Std.I64
+  max_renew : Std.I64
+
+/-- [aivm_secrets_garrett_core::stateless::Grant]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 199:0-205:1
+    Visibility: public -/
+structure stateless.Grant where
+  provider : alloc.vec.Vec Std.U8
+  subject : alloc.vec.Vec Std.U8
+  certificate : alloc.vec.Vec Std.U8
+  certificate_expires : Std.I64
+  credential_expires : Std.I64
+
+/-- [aivm_secrets_garrett_core::stateless::Window]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 207:0-211:1
+    Visibility: public -/
+structure stateless.Window where
+  issued_at : Std.I64
+  expires_at : Std.I64
+  renew_until : Std.I64
+
+/-- [aivm_secrets_garrett_core::stateless::earlier]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 213:0-219:1
+    Visibility: public -/
+def stateless.earlier (a : Std.I64) (b : Std.I64) : Result Std.I64 := do
+  if a <= b
+  then ok a
+  else ok b
+
+/-- [aivm_secrets_garrett_core::stateless::issue_window]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 223:0-253:1
+    Visibility: public -/
+def stateless.issue_window
+  (policy : stateless.IssuePolicy) (grant : stateless.Grant) (now : Std.I64)
+  (lifetime : Std.I64) :
+  Result (core.result.Result stateless.Window stateless.Rejection)
+  := do
+  if policy.max_lifetime < 1#i64
+  then ok (core.result.Result.Err stateless.Rejection.BadPolicy)
+  else
+    if policy.max_lifetime > stateless.MAX_LIFETIME
+    then ok (core.result.Result.Err stateless.Rejection.BadPolicy)
+    else
+      if policy.max_renew < 0#i64
+      then ok (core.result.Result.Err stateless.Rejection.BadPolicy)
+      else
+        if policy.max_renew > stateless.MAX_RENEW
+        then ok (core.result.Result.Err stateless.Rejection.BadPolicy)
+        else
+          if now < 0#i64
+          then ok (core.result.Result.Err stateless.Rejection.BadPolicy)
+          else
+            let i ← stateless.MAX_TIME - stateless.MAX_RENEW
+            if now > i
+            then ok (core.result.Result.Err stateless.Rejection.BadPolicy)
+            else
+              if lifetime < 1#i64
+              then ok (core.result.Result.Err stateless.Rejection.BadLifetime)
+              else
+                if lifetime > policy.max_lifetime
+                then
+                  ok (core.result.Result.Err stateless.Rejection.BadLifetime)
+                else
+                  let cap ←
+                    stateless.earlier grant.certificate_expires
+                      grant.credential_expires
+                  let i1 ← now + policy.max_renew
+                  let renew_until ← stateless.earlier i1 cap
+                  let i2 ← now + lifetime
+                  let expires_at ← stateless.earlier i2 renew_until
+                  if expires_at <= now
+                  then ok (core.result.Result.Err stateless.Rejection.Expired)
+                  else
+                    ok (core.result.Result.Ok
+                      { issued_at := now, expires_at, renew_until })
+
+/-- [aivm_secrets_garrett_core::stateless::credential_expiry]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 256:0-271:1
+    Visibility: public -/
+def stateless.credential_expiry
+  (now : Std.I64) (has_expires_in : Bool) (expires_in : Std.I64) :
+  Result (core.result.Result Std.I64 stateless.Rejection)
+  := do
+  if now < 0#i64
+  then ok (core.result.Result.Err stateless.Rejection.BadPolicy)
+  else
+    if now > stateless.MAX_TIME
+    then ok (core.result.Result.Err stateless.Rejection.BadPolicy)
+    else
+      if has_expires_in
+      then
+        if expires_in < 1#i64
+        then ok (core.result.Result.Err stateless.Rejection.Malformed)
+        else
+          let i ← stateless.MAX_TIME - now
+          if expires_in > i
+          then ok (core.result.Result.Err stateless.Rejection.Malformed)
+          else let i1 ← now + expires_in
+               ok (core.result.Result.Ok i1)
+      else ok (core.result.Result.Ok stateless.MAX_TIME)
+
+/-- [aivm_secrets_garrett_core::stateless::claims_for]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 275:0-302:1
+    Visibility: public -/
+def stateless.claims_for
+  (policy : stateless.IssuePolicy) (grant : stateless.Grant)
+  (token_id : Slice Std.U8) (now : Std.I64) (lifetime : Std.I64) :
+  Result (core.result.Result stateless.SurrogateClaims stateless.Rejection)
+  := do
+  let s := alloc.vec.Vec.deref policy.providers
+  let s1 := alloc.vec.Vec.deref grant.provider
+  let b ← stateless.member s s1
+  if b
+  then
+    let r ← stateless.issue_window policy grant now lifetime
+    match r with
+    | core.result.Result.Ok window =>
+      let issuer := alloc.vec.Vec.deref policy.issuer
+      let audience := alloc.vec.Vec.deref policy.audience
+      let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 issuer
+      let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 audience
+      let v2 ← alloc.slice.Slice.to_vec core.clone.CloneU8 token_id
+      ok (core.result.Result.Ok
+        {
+          issuer := v,
+          audience := v1,
+          subject := grant.subject,
+          token_id := v2,
+          provider := grant.provider,
+          certificate := grant.certificate,
+          issued_at := window.issued_at,
+          expires_at := window.expires_at,
+          renew_until := window.renew_until
+        })
+    | core.result.Result.Err error => ok (core.result.Result.Err error)
+  else ok (core.result.Result.Err stateless.Rejection.UnknownProvider)
+
+/-- Trait declaration: [aivm_secrets_garrett_core::stateless::SurrogateSealer]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 305:0-307:1
+    Visibility: public -/
+structure stateless.SurrogateSealer (Self : Type _) where
+  «seal» : Self → stateless.SurrogateClaims → Slice Std.U8 → Result
+    (core.result.Result (alloc.vec.Vec Std.U8) stateless.Rejection)
+
+/-- [aivm_secrets_garrett_core::stateless::Issued]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 309:0-312:1
+    Visibility: public -/
+structure stateless.Issued where
+  claims : stateless.SurrogateClaims
+  token : alloc.vec.Vec Std.U8
+
+/-- [aivm_secrets_garrett_core::stateless::issue]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 316:0-337:1
+    Visibility: public -/
+def stateless.issue
+  {S : Type _} (SurrogateSealerInst : stateless.SurrogateSealer S) (sealer : S)
+  (policy : stateless.IssuePolicy) (grant : stateless.Grant)
+  (credential : Slice Std.U8) (token_id : Slice Std.U8) (now : Std.I64)
+  (lifetime : Std.I64) :
+  Result (core.result.Result stateless.Issued stateless.Rejection)
+  := do
+  let b ← http_auth.valid_credential credential
+  if b
+  then
+    let r ← stateless.claims_for policy grant token_id now lifetime
+    match r with
+    | core.result.Result.Ok claims =>
+      let r1 ← SurrogateSealerInst.«seal» sealer claims credential
+      match r1 with
+      | core.result.Result.Ok token =>
+        ok (core.result.Result.Ok { claims, token })
+      | core.result.Result.Err error => ok (core.result.Result.Err error)
+    | core.result.Result.Err error => ok (core.result.Result.Err error)
+  else ok (core.result.Result.Err stateless.Rejection.InvalidCredential)
+
+/-- [aivm_secrets_garrett_core::stateless::renewal_grant]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 341:0-352:1
+    Visibility: public -/
+def stateless.renewal_grant
+  (claims : stateless.SurrogateClaims) (certificate_expires : Std.I64) :
+  Result stateless.Grant
+  := do
+  let provider := alloc.vec.Vec.deref claims.provider
+  let subject := alloc.vec.Vec.deref claims.subject
+  let certificate := alloc.vec.Vec.deref claims.certificate
+  let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 provider
+  let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 subject
+  let v2 ← alloc.slice.Slice.to_vec core.clone.CloneU8 certificate
+  ok
+    {
+      provider := v,
+      subject := v1,
+      certificate := v2,
+      certificate_expires,
+      credential_expires := claims.renew_until
+    }
+
+/-- [aivm_secrets_garrett_core::stateless::renew]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 357:0-383:1
+    Visibility: public -/
+def stateless.renew
+  {V : Type _} {S : Type _} (SurrogateOpenerInst : stateless.SurrogateOpener V)
+  (SurrogateSealerInst : stateless.SurrogateSealer S) (opener : V) (sealer : S)
+  (acceptance : stateless.Acceptance) (policy : stateless.IssuePolicy)
+  (token : Slice Std.U8) (peer : Slice Std.U8) (certificate_expires : Std.I64)
+  (token_id : Slice Std.U8) (now : Std.I64) (lifetime : Std.I64) :
+  Result (core.result.Result stateless.Issued stateless.Rejection)
+  := do
+  let r ← stateless.open SurrogateOpenerInst opener token acceptance peer now
+  match r with
+  | core.result.Result.Ok opened =>
+    let grant ← stateless.renewal_grant opened.claims certificate_expires
+    let s := alloc.vec.Vec.deref opened.credential
+    stateless.issue SurrogateSealerInst sealer policy grant s token_id now
+      lifetime
+  | core.result.Result.Err error => ok (core.result.Result.Err error)
+
+/-- [aivm_secrets_garrett_core::stateless_login::MAX_LOGIN]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 16:0-16:31
+    Visibility: public -/
+@[global_simps, irreducible] def stateless_login.MAX_LOGIN : Std.I64 := 600#i64
+
+/-- [aivm_secrets_garrett_core::stateless_login::DELIVERY_GRACE]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 18:0-18:36
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_login.DELIVERY_GRACE : Std.I64 := 300#i64
+
+/-- [aivm_secrets_garrett_core::stateless_login::LoginState]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 21:0-33:1
+    Visibility: public -/
+structure stateless_login.LoginState where
+  login : alloc.vec.Vec Std.U8
+  provider : alloc.vec.Vec Std.U8
+  certificate : alloc.vec.Vec Std.U8
+  subject : alloc.vec.Vec Std.U8
+  certificate_expires : Std.I64
+  replica : alloc.vec.Vec Std.U8
+  scope : alloc.vec.Vec Std.U8
+  verifier : alloc.vec.Vec Std.U8
+  issued_at : Std.I64
+  expires_at : Std.I64
+
+/-- [aivm_secrets_garrett_core::stateless_login::LoginPolicy]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 35:0-39:1
+    Visibility: public -/
+structure stateless_login.LoginPolicy where
+  replica : alloc.vec.Vec Std.U8
+  providers : alloc.vec.Vec (alloc.vec.Vec Std.U8)
+  ttl : Std.I64
+
+/-- [aivm_secrets_garrett_core::stateless_login::Entry]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 42:0-49:1
+    Visibility: public -/
+structure stateless_login.Entry where
+  login : alloc.vec.Vec Std.U8
+  provider : alloc.vec.Vec Std.U8
+  certificate : alloc.vec.Vec Std.U8
+  issued_at : Std.I64
+  expires_at : Std.I64
+  stage : oauth_login.Stage
+
+/-- [aivm_secrets_garrett_core::stateless_login::begin]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 54:0-87:1
+    Visibility: public -/
+def stateless_login.begin
+  (policy : stateless_login.LoginPolicy) (provider : Slice Std.U8)
+  (peer : Slice Std.U8) (subject : Slice Std.U8)
+  (certificate_expires : Std.I64) (login : Slice Std.U8)
+  (verifier : Slice Std.U8) (scope : Slice Std.U8) (now : Std.I64) :
+  Result (core.result.Result stateless_login.LoginState stateless.Rejection)
+  := do
+  if policy.ttl < 1#i64
+  then ok (core.result.Result.Err stateless.Rejection.BadPolicy)
+  else
+    if policy.ttl > stateless_login.MAX_LOGIN
+    then ok (core.result.Result.Err stateless.Rejection.BadPolicy)
+    else
+      if now < 0#i64
+      then ok (core.result.Result.Err stateless.Rejection.BadPolicy)
+      else
+        let i ← stateless.MAX_TIME - stateless_login.MAX_LOGIN
+        if now > i
+        then ok (core.result.Result.Err stateless.Rejection.BadPolicy)
+        else
+          let s := alloc.vec.Vec.deref policy.providers
+          let b ← stateless.member s provider
+          if b
+          then
+            if certificate_expires <= now
+            then ok (core.result.Result.Err stateless.Rejection.Expired)
+            else
+              let replica := alloc.vec.Vec.deref policy.replica
+              let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 login
+              let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 provider
+              let v2 ← alloc.slice.Slice.to_vec core.clone.CloneU8 peer
+              let v3 ← alloc.slice.Slice.to_vec core.clone.CloneU8 subject
+              let v4 ← alloc.slice.Slice.to_vec core.clone.CloneU8 replica
+              let v5 ← alloc.slice.Slice.to_vec core.clone.CloneU8 scope
+              let v6 ← alloc.slice.Slice.to_vec core.clone.CloneU8 verifier
+              let i1 ← now + policy.ttl
+              ok (core.result.Result.Ok
+                {
+                  login := v,
+                  provider := v1,
+                  certificate := v2,
+                  subject := v3,
+                  certificate_expires,
+                  replica := v4,
+                  scope := v5,
+                  verifier := v6,
+                  issued_at := now,
+                  expires_at := i1
+                })
+          else ok (core.result.Result.Err stateless.Rejection.UnknownProvider)
+
+/-- [aivm_secrets_garrett_core::stateless_login::entry_of]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 90:0-102:1
+    Visibility: public -/
+def stateless_login.entry_of
+  (state : stateless_login.LoginState) : Result stateless_login.Entry := do
+  let login := alloc.vec.Vec.deref state.login
+  let provider := alloc.vec.Vec.deref state.provider
+  let certificate := alloc.vec.Vec.deref state.certificate
+  let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 login
+  let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 provider
+  let v2 ← alloc.slice.Slice.to_vec core.clone.CloneU8 certificate
+  ok
+    {
+      login := v,
+      provider := v1,
+      certificate := v2,
+      issued_at := state.issued_at,
+      expires_at := state.expires_at,
+      stage := oauth_login.Stage.Pending
+    }
+
+/-- [aivm_secrets_garrett_core::stateless_login::rule_copy]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 104:0-112:1
+    Visibility: public -/
+def stateless_login.rule_copy
+  (rule : oauth_login.IssuerRule) : Result oauth_login.IssuerRule := do
+  match rule with
+  | oauth_login.IssuerRule.Absent => ok oauth_login.IssuerRule.Absent
+  | oauth_login.IssuerRule.Exact issuer =>
+    let issuer1 := alloc.vec.Vec.deref issuer
+    let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 issuer1
+    ok (oauth_login.IssuerRule.Exact v)
+
+/-- [aivm_secrets_garrett_core::stateless_login::pending_of]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 115:0-123:1
+    Visibility: public -/
+def stateless_login.pending_of
+  (entry : stateless_login.Entry) (rule : oauth_login.IssuerRule) :
+  Result oauth_login.Pending
+  := do
+  let login := alloc.vec.Vec.deref entry.login
+  let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 login
+  let ir ← stateless_login.rule_copy rule
+  ok
+    {
+      state := v,
+      issuer := ir,
+      issued_at := entry.issued_at,
+      expires_at := entry.expires_at
+    }
+
+/-- [aivm_secrets_garrett_core::stateless_login::same_login]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 126:0-141:1
+    Visibility: public -/
+def stateless_login.same_login
+  (policy : stateless_login.LoginPolicy) (entry : stateless_login.Entry)
+  (state : stateless_login.LoginState) :
+  Result Bool
+  := do
+  let replica := alloc.vec.Vec.deref state.replica
+  let own := alloc.vec.Vec.deref policy.replica
+  let login := alloc.vec.Vec.deref entry.login
+  let provider := alloc.vec.Vec.deref entry.provider
+  let certificate := alloc.vec.Vec.deref entry.certificate
+  let state_login := alloc.vec.Vec.deref state.login
+  let state_provider := alloc.vec.Vec.deref state.provider
+  let state_certificate := alloc.vec.Vec.deref state.certificate
+  let b ← core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 replica own
+  if b
+  then
+    let b1 ←
+      core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 login state_login
+    if b1
+    then
+      let b2 ←
+        core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 provider
+          state_provider
+      if b2
+      then
+        let b3 ←
+          core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 certificate
+            state_certificate
+        if b3
+        then
+          if entry.issued_at = state.issued_at
+          then ok (entry.expires_at = state.expires_at)
+          else ok false
+        else ok false
+      else ok false
+    else ok false
+  else ok false
+
+/-- [aivm_secrets_garrett_core::stateless_login::accept_callback]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 147:0-169:1
+    Visibility: public -/
+def stateless_login.accept_callback
+  (policy : stateless_login.LoginPolicy) (entry : stateless_login.Entry)
+  (state : stateless_login.LoginState) (rule : oauth_login.IssuerRule)
+  (issuer : Slice Std.U8) (has_issuer : Bool) (denied : Bool) (now : Std.I64) :
+  Result (core.result.Result oauth_login.Stage oauth_login.LoginDenial)
+  := do
+  let b ← stateless_login.same_login policy entry state
+  if b
+  then
+    let pending ← stateless_login.pending_of entry rule
+    let login := alloc.vec.Vec.deref state.login
+    let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 login
+    let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 issuer
+    oauth_login.claim entry.stage pending
+      { state := v, issuer := v1, has_issuer, denied } now
+  else ok (core.result.Result.Err oauth_login.LoginDenial.Invalid)
+
+/-- [aivm_secrets_garrett_core::stateless_login::begin_exchange]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 172:0-175:1
+    Visibility: public -/
+def stateless_login.begin_exchange
+  (entry : stateless_login.Entry) (rule : oauth_login.IssuerRule)
+  (now : Std.I64) :
+  Result (core.result.Result oauth_login.Stage oauth_login.LoginDenial)
+  := do
+  let pending ← stateless_login.pending_of entry rule
+  oauth_login.begin entry.stage pending now
+
+/-- [aivm_secrets_garrett_core::stateless_login::grant_of]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 180:0-191:1
+    Visibility: public -/
+def stateless_login.grant_of
+  (entry : stateless_login.Entry) (state : stateless_login.LoginState)
+  (credential_expires : Std.I64) :
+  Result stateless.Grant
+  := do
+  let provider := alloc.vec.Vec.deref entry.provider
+  let certificate := alloc.vec.Vec.deref entry.certificate
+  let subject := alloc.vec.Vec.deref state.subject
+  let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 provider
+  let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 subject
+  let v2 ← alloc.slice.Slice.to_vec core.clone.CloneU8 certificate
+  ok
+    {
+      provider := v,
+      subject := v1,
+      certificate := v2,
+      certificate_expires := state.certificate_expires,
+      credential_expires
+    }
+
+/-- [aivm_secrets_garrett_core::stateless_login::complete]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 196:0-217:1
+    Visibility: public -/
+def stateless_login.complete
+  {S : Type _} (statelessSurrogateSealerInst : stateless.SurrogateSealer S)
+  (sealer : S) (login_policy : stateless_login.LoginPolicy)
+  (policy : stateless.IssuePolicy) (entry : stateless_login.Entry)
+  (state : stateless_login.LoginState) (credential : Slice Std.U8)
+  (credential_expires : Std.I64) (token_id : Slice Std.U8) (now : Std.I64)
+  (lifetime : Std.I64) :
+  Result (core.result.Result stateless.Issued stateless.Rejection)
+  := do
+  match entry.stage with
+  | oauth_login.Stage.Pending =>
+    ok (core.result.Result.Err stateless.Rejection.Malformed)
+  | oauth_login.Stage.Accepted =>
+    ok (core.result.Result.Err stateless.Rejection.Malformed)
+  | oauth_login.Stage.Denied =>
+    ok (core.result.Result.Err stateless.Rejection.Malformed)
+  | oauth_login.Stage.Exchanging =>
+    let b ← stateless_login.same_login login_policy entry state
+    if b
+    then
+      let grant ← stateless_login.grant_of entry state credential_expires
+      stateless.issue statelessSurrogateSealerInst sealer policy grant
+        credential token_id now lifetime
+    else ok (core.result.Result.Err stateless.Rejection.Malformed)
+  | oauth_login.Stage.Complete =>
+    ok (core.result.Result.Err stateless.Rejection.Malformed)
+  | oauth_login.Stage.Uncertain =>
+    ok (core.result.Result.Err stateless.Rejection.Malformed)
+
+/-- [aivm_secrets_garrett_core::stateless_login::Delivery]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 220:0-227:1
+    Visibility: public -/
+@[discriminant isize]
+inductive stateless_login.Delivery where
+| Pending : stateless_login.Delivery
+| Deliver : stateless_login.Delivery
+| WrongCertificate : stateless_login.Delivery
+| Denied : stateless_login.Delivery
+| Failed : stateless_login.Delivery
+| Expired : stateless_login.Delivery
+
+/-- [aivm_secrets_garrett_core::stateless_login::deliver]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 231:0-251:1
+    Visibility: public -/
+def stateless_login.deliver
+  (entry : stateless_login.Entry) (peer : Slice Std.U8) (now : Std.I64) :
+  Result stateless_login.Delivery
+  := do
+  let certificate := alloc.vec.Vec.deref entry.certificate
+  let b ←
+    core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 certificate peer
+  if b
+  then
+    let i ← stateless.MAX_TIME - stateless_login.DELIVERY_GRACE
+    if entry.expires_at > i
+    then ok stateless_login.Delivery.Expired
+    else
+      let i1 ← entry.expires_at + stateless_login.DELIVERY_GRACE
+      if now >= i1
+      then ok stateless_login.Delivery.Expired
+      else
+        match entry.stage with
+        | oauth_login.Stage.Pending =>
+          if now >= entry.expires_at
+          then ok stateless_login.Delivery.Expired
+          else ok stateless_login.Delivery.Pending
+        | oauth_login.Stage.Accepted =>
+          if now >= entry.expires_at
+          then ok stateless_login.Delivery.Expired
+          else ok stateless_login.Delivery.Pending
+        | oauth_login.Stage.Denied => ok stateless_login.Delivery.Denied
+        | oauth_login.Stage.Exchanging =>
+          if now >= entry.expires_at
+          then ok stateless_login.Delivery.Expired
+          else ok stateless_login.Delivery.Pending
+        | oauth_login.Stage.Complete => ok stateless_login.Delivery.Deliver
+        | oauth_login.Stage.Uncertain => ok stateless_login.Delivery.Failed
+  else ok stateless_login.Delivery.WrongCertificate
+
+/-- [aivm_secrets_garrett_core::stateless_proxy::Route]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 21:0-27:1
+    Visibility: public -/
+structure stateless_proxy.Route where
+  provider : alloc.vec.Vec Std.U8
+  host : alloc.vec.Vec Std.U8
+  rules : alloc.vec.Vec proxy_http.DenyRule
+  authentication : credential_use.Authentication
+
+/-- Trait declaration: [aivm_secrets_garrett_core::stateless_proxy::Origin]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 30:0-41:1
+    Visibility: public -/
+structure stateless_proxy.Origin (Self : Type _) where
+  rejected : Self → stateless.Rejection → Result Self
+  admitted : Self → stateless.SurrogateClaims → Std.Usize → Result (Bool
+    × Self)
+  exchange : Self → Std.Usize → Slice Std.U8 → Result
+    ((core.result.Result (alloc.vec.Vec Std.U8) proxy_http.Code) × Self)
+  completed : Self → Std.U16 → Result (Bool × Self)
+
+/-- [aivm_secrets_garrett_core::stateless_proxy::surrogate_value]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 45:0-51:1
+    Visibility: public -/
+def stateless_proxy.surrogate_value
+  (value : Slice Std.U8) : Result (Option (alloc.vec.Vec Std.U8)) := do
+  let token ←
+    lift (Array.to_slice
+      (Array.make 6#usize [ 116#u8, 111#u8, 107#u8, 101#u8, 110#u8, 32#u8 ]))
+  let b ← proxy_connect.scheme_is value token
+  if b
+  then
+    let s ←
+      core.slice.index.Slice.index
+        (core.slice.index.SliceIndexRangeFromUsizeSlice Std.U8) value
+        { start := 6#usize }
+    let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 s
+    ok (some v)
+  else proxy_connect.presented value
+
+/-- [aivm_secrets_garrett_core::stateless_proxy::surrogate_of]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 54:0-63:1
+    Visibility: public -/
+def stateless_proxy.surrogate_of
+  (fields : Slice proxy_http.Field) :
+  Result (Option (alloc.vec.Vec Std.U8))
+  := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 13#usize [
+        97#u8, 117#u8, 116#u8, 104#u8, 111#u8, 114#u8, 105#u8, 122#u8, 97#u8,
+        116#u8, 105#u8, 111#u8, 110#u8
+        ]))
+  let i ← proxy_http.count_named fields s
+  if i != 1#usize
+  then ok none
+  else
+    let s1 ←
+      lift (Array.to_slice
+        (Array.make 13#usize [
+          97#u8, 117#u8, 116#u8, 104#u8, 111#u8, 114#u8, 105#u8, 122#u8, 97#u8,
+          116#u8, 105#u8, 111#u8, 110#u8
+          ]))
+    let index ← proxy_http.first_named fields s1
+    let i1 := Slice.len fields
+    if index >= i1
+    then ok none
+    else
+      let f ← Slice.index_usize fields index
+      let s2 := alloc.vec.Vec.deref f.value
+      stateless_proxy.surrogate_value s2
+
+/-- [aivm_secrets_garrett_core::stateless_proxy::provides]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 65:0-68:1
+    Visibility: public -/
+def stateless_proxy.provides
+  (route : stateless_proxy.Route) (provider : Slice Std.U8) : Result Bool := do
+  let own := alloc.vec.Vec.deref route.provider
+  core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 own provider
+
+/-- [aivm_secrets_garrett_core::stateless_proxy::route_of]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 73:4-75:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_proxy.route_of_loop
+  (routes : Slice stateless_proxy.Route) (provider : Slice Std.U8)
+  (index : Std.Usize) :
+  Result Std.Usize
+  := do
+  let i := Slice.len routes
+  if index < i
+  then
+    let r ← Slice.index_usize routes index
+    let b ← stateless_proxy.provides r provider
+    if b
+    then ok index
+    else
+      let index1 ← index + 1#usize
+      stateless_proxy.route_of_loop routes provider index1
+  else ok index
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_proxy::route_of]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 71:0-77:1
+    Visibility: public -/
+@[reducible]
+def stateless_proxy.route_of
+  (routes : Slice stateless_proxy.Route) (provider : Slice Std.U8) :
+  Result Std.Usize
+  := do
+  stateless_proxy.route_of_loop routes provider 0#usize
+
+/-- [aivm_secrets_garrett_core::stateless_proxy::unauthorized]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 80:0-89:1
+    Visibility: public -/
+def stateless_proxy.unauthorized : Result (alloc.vec.Vec Std.U8) := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 27#usize [
+        72#u8, 84#u8, 84#u8, 80#u8, 47#u8, 49#u8, 46#u8, 49#u8, 32#u8, 52#u8,
+        48#u8, 49#u8, 32#u8, 85#u8, 110#u8, 97#u8, 117#u8, 116#u8, 104#u8,
+        111#u8, 114#u8, 105#u8, 122#u8, 101#u8, 100#u8, 13#u8, 10#u8
+        ]))
+  let out ←
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
+      Std.U8) s
+  let s1 ←
+    lift (Array.to_slice
+      (Array.make 75#usize [
+        87#u8, 87#u8, 87#u8, 45#u8, 65#u8, 117#u8, 116#u8, 104#u8, 101#u8,
+        110#u8, 116#u8, 105#u8, 99#u8, 97#u8, 116#u8, 101#u8, 58#u8, 32#u8,
+        66#u8, 101#u8, 97#u8, 114#u8, 101#u8, 114#u8, 32#u8, 114#u8, 101#u8,
+        97#u8, 108#u8, 109#u8, 61#u8, 34#u8, 103#u8, 97#u8, 114#u8, 114#u8,
+        101#u8, 116#u8, 116#u8, 45#u8, 115#u8, 116#u8, 97#u8, 116#u8, 101#u8,
+        108#u8, 101#u8, 115#u8, 115#u8, 34#u8, 44#u8, 32#u8, 101#u8, 114#u8,
+        114#u8, 111#u8, 114#u8, 61#u8, 34#u8, 105#u8, 110#u8, 118#u8, 97#u8,
+        108#u8, 105#u8, 100#u8, 95#u8, 116#u8, 111#u8, 107#u8, 101#u8, 110#u8,
+        34#u8, 13#u8, 10#u8
+        ]))
+  let out1 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 out s1
+  let s2 ←
+    lift (Array.to_slice
+      (Array.make 52#usize [
+        67#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8, 45#u8, 84#u8,
+        121#u8, 112#u8, 101#u8, 58#u8, 32#u8, 97#u8, 112#u8, 112#u8, 108#u8,
+        105#u8, 99#u8, 97#u8, 116#u8, 105#u8, 111#u8, 110#u8, 47#u8, 106#u8,
+        115#u8, 111#u8, 110#u8, 13#u8, 10#u8, 67#u8, 111#u8, 110#u8, 116#u8,
+        101#u8, 110#u8, 116#u8, 45#u8, 76#u8, 101#u8, 110#u8, 103#u8, 116#u8,
+        104#u8, 58#u8, 32#u8, 50#u8, 54#u8, 13#u8, 10#u8
+        ]))
+  let out2 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 out1 s2
+  let s3 ←
+    lift (Array.to_slice
+      (Array.make 47#usize [
+        67#u8, 111#u8, 110#u8, 110#u8, 101#u8, 99#u8, 116#u8, 105#u8, 111#u8,
+        110#u8, 58#u8, 32#u8, 99#u8, 108#u8, 111#u8, 115#u8, 101#u8, 13#u8,
+        10#u8, 13#u8, 10#u8, 123#u8, 34#u8, 101#u8, 114#u8, 114#u8, 111#u8,
+        114#u8, 34#u8, 58#u8, 34#u8, 105#u8, 110#u8, 118#u8, 97#u8, 108#u8,
+        105#u8, 100#u8, 95#u8, 116#u8, 111#u8, 107#u8, 101#u8, 110#u8, 34#u8,
+        125#u8, 10#u8
+        ]))
+  alloc.vec.Vec.extend_from_slice core.clone.CloneU8 out2 s3
+
+/-- [aivm_secrets_garrett_core::stateless_proxy::unauthorized_served]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 92:0-100:1
+    Visibility: public -/
+def stateless_proxy.unauthorized_served : Result proxy_controller.Served := do
+  let v ← stateless_proxy.unauthorized
+  ok
+    {
+      reply := v,
+      keep := false,
+      stage := proxy_controller.Stage.Refused,
+      code := proxy_http.Code.Unauthenticated,
+      status := 0#u16
+    }
+
+/-- [aivm_secrets_garrett_core::stateless_proxy::serve]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 104:0-169:1
+    Visibility: public -/
+def stateless_proxy.serve
+  {V : Type _} {O : Type _} (statelessSurrogateOpenerInst :
+  stateless.SurrogateOpener V) (OriginInst : stateless_proxy.Origin O)
+  (opener : V) (origin : O) (request : proxy_http.Request)
+  (routes : Slice stateless_proxy.Route) (acceptance : stateless.Acceptance)
+  (peer : Slice Std.U8) (now : Std.I64) (limit : Std.Usize) :
+  Result (proxy_controller.Served × O)
+  := do
+  let s := alloc.vec.Vec.deref request.fields
+  let o ← stateless_proxy.surrogate_of s
+  match o with
+  | none =>
+    let origin1 ← OriginInst.rejected origin stateless.Rejection.Malformed
+    let s1 ← stateless_proxy.unauthorized_served
+    ok (s1, origin1)
+  | some token =>
+    let s1 := alloc.vec.Vec.deref token
+    let r ←
+      stateless.open statelessSurrogateOpenerInst opener s1 acceptance peer now
+    match r with
+    | core.result.Result.Ok opened =>
+      let s2 := alloc.vec.Vec.deref opened.claims.provider
+      let index ← stateless_proxy.route_of routes s2
+      let i := Slice.len routes
+      if index >= i
+      then
+        let s3 ←
+          proxy_controller.stopped proxy_http.Code.UnknownOrigin
+            proxy_controller.Stage.Refused
+        ok (s3, origin)
+      else
+        let route ← Slice.index_usize routes index
+        let s3 := alloc.vec.Vec.deref route.host
+        let s4 := alloc.vec.Vec.deref route.rules
+        let s5 := alloc.vec.Vec.deref opened.credential
+        let (r1, wire) ←
+          proxy_http.encode_upstream (alloc.vec.Vec.new Std.U8) request s3 s4
+            s5 route.authentication
+        match r1 with
+        | core.result.Result.Ok _ =>
+          let (b, origin1) ← OriginInst.admitted origin opened.claims index
+          if b
+          then
+            let s6 := alloc.vec.Vec.deref opened.credential
+            let forms ← proxy_http.reflection_forms s6
+            let sent := alloc.vec.Vec.deref wire
+            let (r2, origin2) ← OriginInst.exchange origin1 index sent
+            match r2 with
+            | core.result.Result.Ok raw =>
+              let s7 := alloc.vec.Vec.deref raw
+              let s8 := alloc.vec.Vec.deref forms
+              let served ← proxy_controller.release s7 request s8 limit
+              match served.stage with
+              | proxy_controller.Stage.Refused => ok (served, origin2)
+              | proxy_controller.Stage.Failed => ok (served, origin2)
+              | proxy_controller.Stage.Completed =>
+                let (b1, origin3) ←
+                  OriginInst.completed origin2 served.status
+                if b1
+                then ok (served, origin3)
+                else
+                  let s9 ←
+                    proxy_controller.stopped proxy_http.Code.OutcomeUnknown
+                      proxy_controller.Stage.Failed
+                  ok (s9, origin3)
+            | core.result.Result.Err code =>
+              let s7 ←
+                proxy_controller.stopped code proxy_controller.Stage.Failed
+              ok (s7, origin2)
+          else
+            let s6 ←
+              proxy_controller.stopped proxy_http.Code.InternalError
+                proxy_controller.Stage.Refused
+            ok (s6, origin1)
+        | core.result.Result.Err refusal =>
+          let c ← proxy_controller.code_of refusal
+          let s6 ← proxy_controller.stopped c proxy_controller.Stage.Refused
+          ok (s6, origin)
+    | core.result.Result.Err rejection =>
+      let origin1 ← OriginInst.rejected origin rejection
+      let s2 ← stateless_proxy.unauthorized_served
+      ok (s2, origin1)
+
 /-- [aivm_secrets_garrett_core::trust::TrustDenial]
     Source: 'crates/aivm-secrets-garrett-core/src/trust.rs', lines 5:0-9:1
     Visibility: public -/
