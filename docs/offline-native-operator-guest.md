@@ -122,14 +122,17 @@ already current; run a normal `cargo ... build --bins` only after Rust changed.
    mTLS and receives only an approved view and text diff. The provider records
    three actual credentialed GET requests (one view preflight; one diff
    preflight and one final diff).
-4. The guest submits a **real named write** to the broker using `invoke
+4. The demo also enrolls an independently keyed second guest, gives it a
+   copy of the first guest's surrogate, and checks it cannot cause a provider
+   call. This is a copied-**token** test, not a copied-software-key test.
+5. The guest submits a **real named write** to the broker using `invoke
    pr.comment`; the broker's `writes=deny` returns a structured denial without
    a POST or other additional provider request. This does **not** merely test
    rejection of an unsupported guest-side `gh` alias.
-5. The native operator authority revokes the subject while the broker is still
+6. The native operator authority revokes the subject while the broker is still
    running. A subsequent guest read is rejected, and the provider sees no
    additional HTTP request.
-6. The operator checks the actual provider-observed Authorization header, HTTP
+7. The operator checks the actual provider-observed Authorization header, HTTP
    method and API version, the presence of the host audit, the absence of the
    synthetic bearer token and surrogate from the host audit, and the absence
    of private provider fields and the bearer token from guest distribution
@@ -137,7 +140,8 @@ already current; run a normal `cargo ... build --bins` only after Rust changed.
    JSON summary if `--workspace` was specified.
 
 A passing run reports `ok: true`, `denied_write: true`,
-`revocation_fenced: true`, and an exact list of three provider-observed GETs.
+`revocation_fenced: true`, `stolen_surrogate_denied: true`, and an exact list
+of three provider-observed GETs.
 The provider's synthetic token is never printed or persisted to a guest file.
 The `guest_distribution_contains_provider_credential: false` field refers to
 distributed files only, **not** the guest's OS-level filesystem access.

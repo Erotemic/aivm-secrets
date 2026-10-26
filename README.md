@@ -166,6 +166,18 @@ cargo build --manifest-path rust/Cargo.toml --bins
 python dev/offline_native_guest.py
 ```
 
+For a guided, offline synthetic-credential walkthrough of the **real Rust**
+authority, read-only bridge and guest client, without configuring a VM:
+
+```bash
+bash scripts/garrett-container-demo.sh --pause
+```
+
+The first build downloads dependencies; the running container has no external
+network. This is a functional demo, not isolation evidence. See the
+[walkthrough](examples/garrett-demo/README.md) and the
+[correspondence with Garrett's original proposal](docs/assurance/garrett-proposal-implementation-map.md).
+
 The full check builds the native code, runs every test with no skips allowed,
 and compiles the proofs. It needs the Lean and Aeneas toolchains:
 

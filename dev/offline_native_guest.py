@@ -362,7 +362,8 @@ def authority_action(binary: Path, host: Path, action: str, **kwargs) -> dict:
     return data['result']
 
 
-def make_client(host: Path, guest: Path, authority: Path, client: Path) -> None:
+def make_client(host: Path, guest: Path, authority: Path, client: Path,
+                *, subject: str = 'offline-guest') -> None:
     key = guest / 'client.key'
     csr = guest / 'client.csr'
     # Guest-side native key creation: the operator never constructs/loads the
@@ -378,9 +379,9 @@ def make_client(host: Path, guest: Path, authority: Path, client: Path) -> None:
     fingerprint = inspect_csr(csr.read_bytes())
     if issued.get('key_fingerprint') != fingerprint:
         raise DemoError('CSR fingerprint changed between native guest and operator')
-    authority_action(authority, host, 'enroll', subject='offline-guest',
+    authority_action(authority, host, 'enroll', subject=subject,
                      csr_file=str(csr), approve_fingerprint=fingerprint)
-    public = authority_action(authority, host, 'public-client', subject='offline-guest')
+    public = authority_action(authority, host, 'public-client', subject=subject)
     distribute_guest_certificates(guest, public)
 
 
@@ -519,8 +520,29 @@ def _successful_json(result: subprocess.CompletedProcess, stage: str):
         raise DemoError(f'{stage} did not return valid JSON') from None
 
 
-def demonstrate(workspace: Path, bin_dir: Path, *, interactive: bool = False) -> dict:
-    """Execute four real client operations, deny a write, then revoke live."""
+def walkthrough_step(title: str, explanation: str, *, enabled: bool,
+                     pause: bool = False) -> None:
+    """Display public narrative only; never render private native diagnostics."""
+    if not enabled:
+        return
+    print(f'\n=== {title} ===\n{explanation}', file=sys.stderr, flush=True)
+    if pause:
+        print('Press Enter to continue.', file=sys.stderr, flush=True)
+        if not sys.stdin.readline():
+            raise DemoError('walkthrough input closed before continuing')
+
+
+def demonstrate(workspace: Path, bin_dir: Path, *, interactive: bool = False,
+                walkthrough: bool = False, pause: bool = False) -> dict:
+    """Execute real native reads, a denied write, and revocation; optionally narrate."""
+    def explain(title: str, explanation: str) -> None:
+        walkthrough_step(title, explanation, enabled=walkthrough, pause=pause)
+
+    explain('0 / 9  Scope of the demonstration',
+            'Real native Rust authority, bridge and guest client; a disposable local '
+            'TLS provider and synthetic credential. Host and guest are separate '
+            'directories under one Unix account, NOT separate security domains. '
+            'No live provider, VM isolation, TPM or OAuth login is exercised.')
     tools = binaries(bin_dir)
     host, guest = mkdir(workspace / 'host'), mkdir(workspace / 'guest')
     mkdir(host / 'provider')
@@ -531,20 +553,39 @@ def demonstrate(workspace: Path, bin_dir: Path, *, interactive: bool = False) ->
         validate_disclosure_coverage(manifest, releases)
         write(host / 'policy.json', manifest)
         write(host / 'disclosure.json', releases)
+        explain('1 / 9  Host policy and credential custody',
+                'The operator prepares a private synthetic bearer token, a pinned '
+                'loopback HTTPS provider, four named operations and selected response '
+                'fields. No real credential is used. pr.comment is declared but '
+                'the native session will set writes=deny.')
         authority_action(tools['authority'], host, 'init',
                          issuer='aivm.test', audience='aivm-secrets.remote')
         make_client(host, guest, tools['authority'], tools['client'])
+        explain('2 / 9  Client identity and enrollment',
+                'The native guest client created a software signing key and CSR. '
+                'The native authority checked the operator-approved key fingerprint '
+                'and issued a client certificate. This does not claim TPM custody.')
         write(host / 'bridge.json', bridge_config(host, provider))
         process, startup = start_bridge(tools['bridge'], host)
         try:
             jwt = startup['capability']
             write(guest / 'capability.jwt', jwt)
             write(guest / 'client.json', guest_config(host, guest))
+            explain('3 / 9  Bound surrogate and authenticated bridge',
+                    'The real TLS bridge started with manifest-https-v1, '
+                    'authenticated enrollment and a certificate-bound surrogate. '
+                    'The guest has its key, public certificates, client config '
+                    'and surrogate, but not the upstream bearer token.')
             view = _successful_json(guest_call(
                 tools['client'], guest, 'gh', 'pr', 'view', str(PR),
                 '--repo', REPOSITORY, '--json', 'number,title,headRefOid'), 'approved pr view')
             if view != {'number': PR, 'title': 'Proof repair', 'headRefOid': HEAD_SHA}:
                 raise DemoError('native selected PR view differs from approved output')
+            explain('4 / 9  Authorized read and field selection',
+                    'The guest requested a single approved PR through the native '
+                    'client. It received only the declared number, title and head SHA. '
+                    'The private_diagnostic field was not released. '
+                    'Public response: ' + json.dumps(view, sort_keys=True))
             diff = guest_call(tools['client'], guest, 'gh', 'pr', 'diff', str(PR),
                               '--repo', REPOSITORY)
             if diff.returncode != 0 or diff.stdout.decode() != DIFF:
@@ -552,6 +593,33 @@ def demonstrate(workspace: Path, bin_dir: Path, *, interactive: bool = False) ->
             requests_after_reads = len(provider.seen())
             if requests_after_reads != 3:  # view preflight + diff preflight/final
                 raise DemoError('unexpected provider request count for two approved guest reads')
+            explain('5 / 9  Real credential substitution at the provider',
+                    'The guest received the allowed synthetic diff. The local HTTPS '
+                    'provider has recorded three GET requests (preflight/final) '
+                    'with its expected bearer credential, inserted by the native '
+                    'host broker. The guest was never given that credential.')
+            # The attacker has a *different* valid CA-signed mTLS identity and
+            # the same stolen surrogate. It must not reach the provider.
+            other_guest = mkdir(workspace / 'other-guest')
+            make_client(host, other_guest, tools['authority'], tools['client'],
+                        subject='other-guest')
+            write(other_guest / 'client.json', guest_config(host, other_guest))
+            write(other_guest / 'capability.jwt', jwt)
+            stolen = guest_call(tools['client'], other_guest, 'gh', 'pr', 'view',
+                                str(PR), '--repo', REPOSITORY, '--json', 'number')
+            if stolen.returncode == 0:
+                raise DemoError('foreign enrolled client accepted a stolen surrogate')
+            if len(provider.seen()) != requests_after_reads:
+                raise DemoError('stolen surrogate reached the provider')
+            for item in other_guest.iterdir():
+                if item.is_file() and FAKE_TOKEN.encode() in item.read_bytes():
+                    raise DemoError('stolen-surrogate guest distribution received provider token')
+            explain('6 / 9  Stolen surrogate from another enrolled peer',
+                    'A second native client received its own separately enrolled '
+                    'CA-signed certificate, and a copy of the original surrogate. '
+                    'The attempted read failed and the provider saw no new call. '
+                    'This does not establish that a copied software key is safe: '
+                    'copying the original key and certificate permits impersonation.')
             # Send the WRITE to the broker, not just an unsupported gh alias.
             # A denial by the guest parser alone would not exercise writes=deny.
             denied = guest_call(tools['client'], guest, 'invoke', 'pr.comment',
@@ -568,6 +636,10 @@ def demonstrate(workspace: Path, bin_dir: Path, *, interactive: bool = False) ->
                 raise DemoError('unapproved broker write did not fail closed')
             if len(provider.seen()) != requests_after_reads:
                 raise DemoError('unapproved guest write reached the provider')
+            explain('7 / 9  Forbidden write blocked by the broker',
+                    'An actual pr.comment request reached the native broker, '
+                    'which denied it under writes=deny. The provider request '
+                    'count did not increase. This is not merely a CLI-side refusal.')
             if interactive:
                 print('Native Garrett broker is running. Try this guest command:',
                       file=sys.stderr)
@@ -586,13 +658,25 @@ def demonstrate(workspace: Path, bin_dir: Path, *, interactive: bool = False) ->
                 raise DemoError('revoked guest could still read')
             if len(provider.seen()) != requests_after_reads:
                 raise DemoError('revoked guest reached provider')
+            explain('8 / 9  Identity revocation',
+                    'The native authority revoked this guest. A fresh attempt '
+                    'with the previously issued surrogate failed, and no new '
+                    'provider request occurred.')
             check_workspace(host, guest, jwt)
             witness = validate_sent(provider, expected_count=3)
             write(host / 'provider-observations.json', {'requests': witness})
+            explain('9 / 9  Observable checks and limitations',
+                    'The local provider received the expected authorized requests. '
+                    'The guest distribution and host audit contain neither the '
+                    'synthetic provider token nor an unselected private field. '
+                    'These are bounded runtime observations, not a proof of '
+                    'whole-process secrecy or container/VM isolation. The JSON '
+                    'report on stdout summarizes the completed run.')
             return {
                 'ok': True, 'mode': 'real-native-rust/synthetic-local-https',
                 'approved': {'view': view, 'diff': DIFF},
-                'denied_write': True, 'revocation_fenced': True,
+                'denied_write': True, 'stolen_surrogate_denied': True,
+                'revocation_fenced': True,
                 'provider_requests': witness,
                 'guest_distribution_contains_provider_credential': False,
                 'filesystem_isolation_proved': False,
@@ -610,7 +694,15 @@ def main(argv: list[str] | None = None) -> int:
                         help='new output directory; must not already exist; otherwise ephemeral')
     parser.add_argument('--interactive', action='store_true',
                         help='pause for manual guest CLI calls before revocation')
+    parser.add_argument('--walkthrough', action='store_true',
+                        help='narrate the real native run, without changing its checks')
+    parser.add_argument('--pause', action='store_true',
+                        help='with --walkthrough, wait for Enter after each stage (TTY only)')
     args = parser.parse_args(argv)
+    if args.pause and not args.walkthrough:
+        parser.error('--pause requires --walkthrough')
+    if args.pause and not sys.stdin.isatty():
+        parser.error('--pause requires a terminal')
     try:
         # Fail before creating a persistent workspace if the native tools are
         # missing. There is deliberately no fallback to a Python fake broker.
@@ -618,14 +710,16 @@ def main(argv: list[str] | None = None) -> int:
         if args.workspace is None:
             with tempfile.TemporaryDirectory(prefix='garrett-offline-') as temporary:
                 report = demonstrate(Path(temporary), args.bin_dir.absolute(),
-                                     interactive=args.interactive)
+                                     interactive=args.interactive,
+                                     walkthrough=args.walkthrough, pause=args.pause)
                 report.pop('host_audit')  # removed with temporary directory
         else:
             workspace = args.workspace.absolute()
             # No overwrite and no following existing symlinks to host secrets.
             workspace.mkdir(mode=0o700, parents=True, exist_ok=False)
             report = demonstrate(workspace, args.bin_dir.absolute(),
-                                 interactive=args.interactive)
+                                 interactive=args.interactive,
+                                 walkthrough=args.walkthrough, pause=args.pause)
             write(workspace / 'summary.json', report)
         print(json.dumps(report, sort_keys=True, indent=2))
         return 0

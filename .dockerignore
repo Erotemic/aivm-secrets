@@ -1,0 +1,17 @@
+# Keep local Rust/Lean build trees, credentials, and the repository history out
+# of the image build context. The demo needs only these sources.
+**
+!rust/
+!rust/Cargo.toml
+!rust/Cargo.lock
+!rust/rust-toolchain.toml
+!rust/crates/
+!rust/crates/**
+!aivm_secrets/
+!aivm_secrets/**
+!dev/
+!dev/offline_native_guest.py
+# Do not copy local output, caches, or bytecode even below included roots.
+rust/target/
+**/__pycache__/
+**/*.pyc
