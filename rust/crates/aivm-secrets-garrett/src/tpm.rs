@@ -320,11 +320,20 @@ pub fn identity(
     certificate: &[u8],
     server_ca: &[u8],
 ) -> Outcome<client::AuthenticatedClientConfig> {
+    client::signing_resolver(server_ca, resolver(configuration, certificate)?)
+}
+
+/// The TPM-backed client-certificate resolver alone, for TLS clients other
+/// than this crate's (the standalone `garrett-stateless` agent).
+pub fn resolver(
+    configuration: Configuration,
+    certificate: &[u8],
+) -> Outcome<Arc<dyn rustls::client::ResolvesClientCert>> {
     let key = load_key(configuration)?;
     let certificates = rustls_pemfile::certs(&mut &*certificate)
         .collect::<Result<Vec<_>, _>>()
         .map_err(|_| Error::InvalidCapability)?;
     let key = CertifiedKey::new(certificates, Arc::new(key));
     key.keys_match().map_err(|_| Error::InvalidCapability)?;
-    client::signing_resolver(server_ca, Arc::new(SingleCertAndKey::from(key)))
+    Ok(Arc::new(SingleCertAndKey::from(key)))
 }

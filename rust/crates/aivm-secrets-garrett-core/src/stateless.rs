@@ -55,8 +55,10 @@ pub struct SurrogateClaims {
 
 /// A token whose header and signature the opener has verified under one
 /// configured key. `key_issuer` is the issuer configured for that key;
-/// `aad` and `sealed` are opaque to this module and returned to `unseal`.
+/// `key`, `aad` and `sealed` are opaque to this module and returned to
+/// `unseal`.
 pub struct Verified {
+    pub key: usize,
     pub key_issuer: Vec<u8>,
     pub claims: SurrogateClaims,
     pub aad: Vec<u8>,
@@ -416,6 +418,7 @@ mod tests {
     impl SurrogateOpener for Fixed {
         fn verify(&self, _token: &[u8]) -> Result<Verified, Rejection> {
             Ok(Verified {
+                key: 0,
                 key_issuer: b"https://broker".to_vec(),
                 claims: (self.claims)(),
                 aad: Vec::new(),

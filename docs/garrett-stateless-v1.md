@@ -152,13 +152,22 @@ broker claim. Here is how the broker treats each case:
 - If the provider access token is **opaque** (not three b64url parts whose
   middle part decodes to a JSON object without duplicate keys), `upstream` is
   omitted.
-- Otherwise every member of the provider payload is copied **under
-  `upstream`**, keeping its name, when the name is 1-128 bytes of 0x21-0x7e
-  excluding `"` and `\` and the value is one of: a string of 0-1024 printable
-  ASCII bytes, an integer with magnitude `<= 2^53 - 1`, `true`, `false`,
-  `null`, or an array of at most 32 such scalars. Any other member is
-  **omitted** (not an error). Non-integer numbers, objects and non-ASCII
+- Otherwise members of the provider payload are copied **under `upstream`**,
+  keeping their names, when the provider's **claim policy** (`copy_claims`,
+  section 12) allows the name, the name is 1-128 bytes of 0x21-0x7e
+  excluding `"` and `\`, and the value is one of: a string of 0-1024
+  printable ASCII bytes, an integer with magnitude `<= 2^53 - 1`, `true`,
+  `false`, `null`, or an array of at most 32 such scalars. Any other member
+  is **omitted** (not an error). Non-integer numbers, objects and non-ASCII
   strings are omitted as well.
+- The claim policy matters because provider claims can be **personal data**
+  (names, e-mail addresses, group memberships), and the agent environment is
+  untrusted. The default (`copy_claims` absent) copies only claims that
+  describe the *access*, which is what Garrett gives as the reason to copy:
+  `aud`, `azp`, `client_id`, `exp`, `iat`, `iss`, `jti`, `nbf`, `scope`,
+  `scp`. `"copy_claims": "all"` copies every copyable claim, which is Garrett's
+  proposal as written. A list copies exactly the named claims. Operator
+  minting uses the provider's policy as well.
 - If `canonical(upstream)` would exceed 4096 bytes, `upstream` is omitted
   entirely.
 - **Collisions cannot happen**: upstream `iss`, `aud`, `exp`, `cnf`, `sub` and
@@ -375,6 +384,19 @@ callback for a login therefore returns to the replica that created it, and the
 agent polls that same replica's agent API (the `authorization_url` names it).
 Replicas share keys and configuration, but no mutable state.
 
+Garrett's article does not say how the browser's result reaches the agent.
+The mailbox is this profile's answer, and it is transient state that Garrett
+did not specify. The surrogate it holds is still a capability (useless without
+the agent's key, but bound to it), so the mailbox follows these rules:
+
+- **authenticated retrieval**: only an mTLS peer whose certificate equals
+  the login's `cnf` receives the surrogate (`stateless_login::deliver`). Any
+  other peer gets `403` and the entry is untouched;
+- **single use**: a delivered surrogate is removed;
+- **expiry and cleanup**: an entry is unusable after `exp` (pending) or
+  `exp + 300` (complete) and is pruned on every insertion. Nothing reaches
+  disk.
+
 What pure statelessness **cannot** provide:
 
 - immediate revocation of one surrogate;
@@ -397,6 +419,11 @@ client-certificate expiry instead.
    (default 1 hour) and, through renewal, by `ren`.
 4. The login-state key MAY be rotated at any time. Logins in progress then
    fail.
+5. Client-certificate **revocation lists are not checked** by this profile's
+   broker or proxy; only the certificate's validity period and chain are.
+   Revoking an agent therefore means retiring its CA, waiting for its
+   certificate (and so its surrogates, which never outlive it) to expire, or
+   retiring the key set.
 
 ## 11. Proxy
 
@@ -471,8 +498,11 @@ Provider file (shared by broker and tooling):
  "authorization_url":"https://github.com/login/oauth/authorize",
  "token_url":"https://github.com/login/oauth/access_token","token_address":null,"token_ca_file":null,
  "client_id":"...","client_secret_file":null,"issuer":null,
- "scopes":["read:user","repo"],"default_scope":"read:user"}
+ "scopes":["read:user","repo"],"default_scope":"read:user","copy_claims":null}
 ```
+
+`copy_claims` is `null` (access-describing claims only), `"all"`, or a list of
+claim names (section 4.4).
 
 Endpoints MUST be `https`. `token_address` optionally pins the TCP address.
 `token_ca_file` optionally pins the CA. The client secret, if any, is read
@@ -490,18 +520,38 @@ from a private file and never logged.
 
 ## 14. Relationship to Garrett's proposal
 
+Garrett's article does not use the words "OAuth" or "stateless". It describes
+the behaviour: a browser-mediated login whose result returns to the broker,
+and "no persistent data is ever held in the broker or the proxy", with
+encryption keys as the only state. The tables below keep what the article
+requires separate from what this profile chose to fill in.
+
+### 14.1 What Garrett's design requires, and where it is here
+
 | Garrett | Here |
 | --- | --- |
-| Broker obtains real token through browser redirect to the broker | §8, authorization code + PKCE, broker-owned callback |
-| Wrapper JWT copies original claims | §4.4, namespaced under `upstream`, never authoritative |
-| Encrypted real token in a new claim | §4.3 `enc`, AES-256-GCM with AAD over header and claims |
-| Representation of the client certificate | §4.2 `cnf` (`x5t#S256`) |
-| Broker signs with its own key | §4.5 Ed25519, `kid`-selected, no negotiation |
-| Proxy requires mTLS, compares certificate, decrypts, swaps, forwards | §5 and §11 |
-| No persistent data; scale by adding instances | §9: no persistent data; one transient login mailbox |
-| Opaque tokens wrapped the same way | §4.4, `upstream` omitted |
-| Hardware/hypervisor-backed instance key | §6, optional TPM mode, with the distinctions listed there |
-| *(not discussed)* revocation | §10: expiry, renewal cap, key retirement |
-| *(not discussed)* token refresh | §7: stateless renewal up to `ren`; refresh tokens discarded |
-| *(not discussed)* response leakage | §11 step 7: reflected credentials refused |
-| *(not discussed)* destination confinement | §11 step 4: destination chosen by the authenticated `prv` |
+| Agent asks the broker for a token, presenting its client certificate | §8.1 step 1, over mTLS |
+| Broker returns a URL; the human authenticates in a browser; the identity provider redirects back to the broker, which obtains the real token | §8.1 steps 2-8 |
+| Wrapper JWT copies the original token's (non-secret) claims so the agent can inspect its access | §4.4, under `upstream`, filtered by a claim policy |
+| A new claim holds an encrypted copy of the real token | §4.3 `enc` |
+| A representation of the client certificate in the token | §4.2 `cnf` (`x5t#S256`) |
+| Broker signs with its own key | §4.5 |
+| Proxy requires mTLS, checks the certificate against the token, decrypts, swaps in the real token, forwards | §5, §11 |
+| No persistent data in broker or proxy; keys injected at startup; scale by starting instances | §1, §9 |
+| Opaque provider tokens are wrapped the same way | §4.4 (`upstream` omitted) |
+| Instance-bound, hardware- or hypervisor-backed private key | §6, optional TPM mode, with the distinctions listed there |
+
+### 14.2 Engineering choices this profile adds (not in the article)
+
+| Choice | Why |
+| --- | --- |
+| OAuth 2.0 authorization code with PKCE (S256), RFC 9207 `iss` checking | standard, widely supported realisation of the browser flow; PKCE protects the code |
+| AEAD-sealed `state` carrying the verifier and the starting peer | correlates the callback with no stored login record |
+| Transient in-memory login mailbox | the article does not say how the result reaches the agent (§9) |
+| Interstitial page with a confirmation code | lets the human detect a login started by someone else's agent |
+| Claim names, compact JWS-like encoding, Ed25519, AES-256-GCM, AAD layout | the article names no format or algorithms |
+| Claim-copy policy defaulting to access claims | provider claims can be personal data |
+| `exp`/`ren` lifetimes, stateless renewal, no refresh tokens | the article does not discuss expiry or refresh |
+| Key-set rotation and `kid` retirement as bulk revocation | the article does not discuss revocation |
+| Reverse proxy; destination chosen by the authenticated `prv`; deny rules; reflected-credential refusal | the article says "a proxy" without a shape; these keep it from being an open relay |
+| Python and Rust implementations, conformance vectors, Lean proofs | this project's assurance goals |

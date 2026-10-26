@@ -1,0 +1,32 @@
+[package]
+name = "garrett-stateless"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "garrett-stateless-v1: certificate-bound surrogate JWTs, an OAuth broker and a stateless mTLS credential-substitution proxy, after Matthew Garrett's \"Securing agentic identity\""
+readme = "README.md"
+keywords = ["oauth", "mtls", "jwt", "proxy", "agents"]
+categories = ["authentication", "network-programming"]
+# Release-ready but not published: publishing needs the maintainer's approval.
+publish = false
+
+[features]
+default = []
+# TPM 2.0 client keys through the existing aivm-secrets-garrett signer (tpm2-tools).
+tpm = ["dep:aivm-secrets-garrett"]
+
+[dependencies]
+aivm-secrets-garrett-core = { path = "../aivm-secrets-garrett-core", version = "0.1.0" }
+aivm-secrets-garrett = { path = "../aivm-secrets-garrett", version = "0.1.0", optional = true }
+ring = "0.17"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-pemfile = "2"
+webpki-roots = "1"
+x509-parser = "0.18"
+rcgen = { version = "=0.14.10", default-features = false, features = ["ring", "pem", "x509-parser", "zeroize"] }
+time = "0.3"
+zeroize = "1"
+
+[[bin]]
+name = "garrett-stateless"
+path = "src/bin/garrett-stateless.rs"

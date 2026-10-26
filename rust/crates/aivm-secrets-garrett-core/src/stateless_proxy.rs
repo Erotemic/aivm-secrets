@@ -183,6 +183,7 @@ mod tests {
                 return Err(Rejection::BadSignature);
             }
             Ok(Verified {
+                key: 0,
                 key_issuer: b"iss".to_vec(),
                 claims: SurrogateClaims {
                     issuer: b"iss".to_vec(),

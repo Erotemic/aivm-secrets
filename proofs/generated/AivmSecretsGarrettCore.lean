@@ -20760,16 +20760,17 @@ structure stateless.SurrogateClaims where
   renew_until : Std.I64
 
 /-- [aivm_secrets_garrett_core::stateless::Verified]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 59:0-64:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 60:0-66:1
     Visibility: public -/
 structure stateless.Verified where
+  key : Std.Usize
   key_issuer : alloc.vec.Vec Std.U8
   claims : stateless.SurrogateClaims
   aad : alloc.vec.Vec Std.U8
   sealed : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::stateless::Acceptance]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 67:0-72:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 69:0-74:1
     Visibility: public -/
 structure stateless.Acceptance where
   audiences : alloc.vec.Vec (alloc.vec.Vec Std.U8)
@@ -20778,7 +20779,7 @@ structure stateless.Acceptance where
   skew : Std.I64
 
 /-- [aivm_secrets_garrett_core::stateless::member]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 75:4-82:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 77:4-84:1
     Visibility: public -/
 @[rust_loop]
 def stateless.member_loop
@@ -20797,7 +20798,7 @@ def stateless.member_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::stateless::member]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 74:0-82:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 76:0-84:1
     Visibility: public -/
 def stateless.member
   (set : Slice (alloc.vec.Vec Std.U8)) (value : Slice Std.U8) :
@@ -20808,7 +20809,7 @@ def stateless.member
   stateless.member_loop iter value
 
 /-- [aivm_secrets_garrett_core::stateless::acceptance_valid]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 84:0-89:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 86:0-91:1
     Visibility: public -/
 def stateless.acceptance_valid
   (acceptance : stateless.Acceptance) : Result Bool := do
@@ -20823,7 +20824,7 @@ def stateless.acceptance_valid
   else ok false
 
 /-- [aivm_secrets_garrett_core::stateless::lifetime_valid]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 92:0-99:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 94:0-101:1
     Visibility: public -/
 def stateless.lifetime_valid
   (claims : stateless.SurrogateClaims) (max_lifetime : Std.I64) :
@@ -20849,7 +20850,7 @@ def stateless.lifetime_valid
   else ok false
 
 /-- [aivm_secrets_garrett_core::stateless::admit]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 103:0-137:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 105:0-139:1
     Visibility: public -/
 def stateless.admit
   (claims : stateless.SurrogateClaims) (key_issuer : Slice Std.U8)
@@ -20910,7 +20911,7 @@ def stateless.admit
   else ok (core.result.Result.Err stateless.Rejection.BadPolicy)
 
 /-- Trait declaration: [aivm_secrets_garrett_core::stateless::SurrogateOpener]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 141:0-144:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 143:0-146:1
     Visibility: public -/
 structure stateless.SurrogateOpener (Self : Type _) where
   verify : Self → Slice Std.U8 → Result (core.result.Result
@@ -20919,14 +20920,14 @@ structure stateless.SurrogateOpener (Self : Type _) where
     (alloc.vec.Vec Std.U8) stateless.Rejection)
 
 /-- [aivm_secrets_garrett_core::stateless::Opened]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 146:0-149:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 148:0-151:1
     Visibility: public -/
 structure stateless.Opened where
   claims : stateless.SurrogateClaims
   credential : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::stateless::open]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 153:0-185:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 155:0-187:1
     Visibility: public -/
 def stateless.open
   {V : Type _} (SurrogateOpenerInst : stateless.SurrogateOpener V) (opener : V)
@@ -20955,7 +20956,7 @@ def stateless.open
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [aivm_secrets_garrett_core::stateless::IssuePolicy]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 188:0-194:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 190:0-196:1
     Visibility: public -/
 structure stateless.IssuePolicy where
   issuer : alloc.vec.Vec Std.U8
@@ -20965,7 +20966,7 @@ structure stateless.IssuePolicy where
   max_renew : Std.I64
 
 /-- [aivm_secrets_garrett_core::stateless::Grant]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 199:0-205:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 201:0-207:1
     Visibility: public -/
 structure stateless.Grant where
   provider : alloc.vec.Vec Std.U8
@@ -20975,7 +20976,7 @@ structure stateless.Grant where
   credential_expires : Std.I64
 
 /-- [aivm_secrets_garrett_core::stateless::Window]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 207:0-211:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 209:0-213:1
     Visibility: public -/
 structure stateless.Window where
   issued_at : Std.I64
@@ -20983,7 +20984,7 @@ structure stateless.Window where
   renew_until : Std.I64
 
 /-- [aivm_secrets_garrett_core::stateless::earlier]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 213:0-219:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 215:0-221:1
     Visibility: public -/
 def stateless.earlier (a : Std.I64) (b : Std.I64) : Result Std.I64 := do
   if a <= b
@@ -20991,7 +20992,7 @@ def stateless.earlier (a : Std.I64) (b : Std.I64) : Result Std.I64 := do
   else ok b
 
 /-- [aivm_secrets_garrett_core::stateless::issue_window]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 223:0-253:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 225:0-255:1
     Visibility: public -/
 def stateless.issue_window
   (policy : stateless.IssuePolicy) (grant : stateless.Grant) (now : Std.I64)
@@ -21038,7 +21039,7 @@ def stateless.issue_window
                       { issued_at := now, expires_at, renew_until })
 
 /-- [aivm_secrets_garrett_core::stateless::credential_expiry]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 256:0-271:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 258:0-273:1
     Visibility: public -/
 def stateless.credential_expiry
   (now : Std.I64) (has_expires_in : Bool) (expires_in : Std.I64) :
@@ -21063,7 +21064,7 @@ def stateless.credential_expiry
       else ok (core.result.Result.Ok stateless.MAX_TIME)
 
 /-- [aivm_secrets_garrett_core::stateless::claims_for]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 275:0-302:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 277:0-304:1
     Visibility: public -/
 def stateless.claims_for
   (policy : stateless.IssuePolicy) (grant : stateless.Grant)
@@ -21099,21 +21100,21 @@ def stateless.claims_for
   else ok (core.result.Result.Err stateless.Rejection.UnknownProvider)
 
 /-- Trait declaration: [aivm_secrets_garrett_core::stateless::SurrogateSealer]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 305:0-307:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 307:0-309:1
     Visibility: public -/
 structure stateless.SurrogateSealer (Self : Type _) where
   «seal» : Self → stateless.SurrogateClaims → Slice Std.U8 → Result
     (core.result.Result (alloc.vec.Vec Std.U8) stateless.Rejection)
 
 /-- [aivm_secrets_garrett_core::stateless::Issued]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 309:0-312:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 311:0-314:1
     Visibility: public -/
 structure stateless.Issued where
   claims : stateless.SurrogateClaims
   token : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::stateless::issue]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 316:0-337:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 318:0-339:1
     Visibility: public -/
 def stateless.issue
   {S : Type _} (SurrogateSealerInst : stateless.SurrogateSealer S) (sealer : S)
@@ -21137,7 +21138,7 @@ def stateless.issue
   else ok (core.result.Result.Err stateless.Rejection.InvalidCredential)
 
 /-- [aivm_secrets_garrett_core::stateless::renewal_grant]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 341:0-352:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 343:0-354:1
     Visibility: public -/
 def stateless.renewal_grant
   (claims : stateless.SurrogateClaims) (certificate_expires : Std.I64) :
@@ -21159,7 +21160,7 @@ def stateless.renewal_grant
     }
 
 /-- [aivm_secrets_garrett_core::stateless::renew]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 357:0-383:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 359:0-385:1
     Visibility: public -/
 def stateless.renew
   {V : Type _} {S : Type _} (SurrogateOpenerInst : stateless.SurrogateOpener V)
