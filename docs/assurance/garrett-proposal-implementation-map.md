@@ -17,12 +17,45 @@ browser authentication, then substituted on a certificate-bound mTLS proxy.
 | --- | --- | --- |
 | Trusted broker acquires OAuth tokens with browser redirect | Implemented natively, with host-side PKCE, code exchange and encrypted vault; Python reference too | Synthetic HTTPS callback/exchange tests; not an end-to-end live identity-provider guarantee. `GarrettLogin`, `GarrettLoginHistory`, `GarrettOAuth` prove selected extracted transitions under adapter contracts. The offline native demo uses a synthetic static bearer token, **not** OAuth acquisition. |
 | Agent gets a signed surrogate instead of a real credential | Implemented: signed Ed25519 JWT, AES-GCM outer envelope, `aivs1` inner capability, bound identity | The versioned **nested** format is a project-specific profile. Exact Rust binding/admission controllers are extracted and proved (`Garrett.lean`, `GarrettBundle`, `GarrettClientMaterial`); signature/decryption primitives are assumed to satisfy their contracts. No general JWS/JWE compliance or arbitrary JWT compatibility claim. |
-| Surrogate token carries encrypted credential, permitting stateless brokers/proxies | **Not equivalent in the principal native read workflow** | The current `manifest-https-v1` process maintains enrollment/grant, policy, provider credential custody, an audit log and optional OAuth vault. An inner sealed capability may contain credential material in a versioned profile, but current admission and authorization depend on server-side state. No claim that a freshly started broker can run using only the surrogate and encryption keys. |
+| Surrogate token carries encrypted credential, permitting stateless brokers/proxies | **Implemented in the separate `garrett-stateless-v1` profile** (2026-10-26, see below); **not** the principal native read workflow | The current `manifest-https-v1` process maintains enrollment/grant, policy, provider credential custody, an audit log and optional OAuth vault. An inner sealed capability may contain credential material in a versioned profile, but current admission and authorization depend on server-side state. No claim that a freshly started broker can run using only the surrogate and encryption keys. |
 | mTLS proves the original client possesses the bound certificate's key | Implemented in native client/bridge | Extracted binding checks compare claims against an opaque, authenticated peer identity; real TLS/X.509 chain validation and the signing library remain trusted, tested adapters. A copied **software** key and certificate are an explicit impersonation counterexample. |
 | Provider sees the real credential, never the surrogate | Implemented for supported pinned HTTPS operations | Real native provider dispatch, exact request-byte/authorization properties and selective release are tested and partly implementation-linked proved for `manifest-https-v1`. The broker does **not** expose an unrestricted `gh api`, arbitrary URL or arbitrary caller-supplied headers. |
 | Instance-bound key in physical TPM or vTPM | Native TPM signing, checked key attributes and synthetic attestation implemented | Isolated swtpm/emulator tests do not establish independent real hardware provenance, secure hypervisor state, clone resistance, signing-oracle isolation or rollback protection. The basic container demo uses a software key only. |
 | Safe handling of opaque bearer tokens from ordinary providers | Implemented for supported native pinned providers | Provider auth attaches host-held bearer at egress, selected response fields are released. Endpoint semantics and selected-field disclosure are operator/provider contracts, not an all-provider theorem. |
-| Stateless multi-zone distribution without persistent secret storage | **Not implemented as specified** | The project deliberately adds stateful registry, revocation, approval, audit, OAuth vault and host policy. Multi-host coordinator support is optional, not a demonstration of stateless horizontal scaling. |
+| Stateless multi-zone distribution without persistent secret storage | **Implemented in `garrett-stateless-v1`** for credential use (any number of independent proxies); the AIVM profile remains stateful by design | The project deliberately adds stateful registry, revocation, approval, audit, OAuth vault and host policy. Multi-host coordinator support is optional, not a demonstration of stateless horizontal scaling. |
+
+## The `garrett-stateless-v1` profile (2026-10-26)
+
+A separate profile now implements the architecture as the article describes
+it: [specification](../garrett-stateless-v1.md),
+[usage](../garrett-stateless-usage.md) and [proofs](../verified-garrett-stateless.md).
+The article uses neither "OAuth" nor "stateless", but it describes both
+behaviours: a browser login whose result returns to the broker, and "no
+persistent data is ever held in the broker or the proxy". Its section 14
+separates what the article requires from the engineering choices added here:
+
+- OAuth code flow with PKCE;
+- an AEAD-sealed `state`;
+- a transient login mailbox (the article does not say how the result reaches
+  the agent);
+- a claim-copy policy that defaults to access claims, because provider claims
+  can be personal data;
+- renewal up to an absolute cap, and key retirement as revocation;
+- a reverse proxy whose destination is chosen by the authenticated provider
+  claim.
+
+| Article feature | `garrett-stateless-v1` | Evidence |
+| --- | --- | --- |
+| Agent asks a central broker, authenticated by its certificate | mTLS agent API | Python and Rust, four-way interop |
+| Browser login whose redirect returns to the broker | authorization code + PKCE; broker-owned callback; sealed state; confirmation code | synthetic HTTPS IdP; `GarrettStatelessLogin` |
+| Wrapper JWT: copied claims, encrypted real token, certificate representation, broker signature | `garrett-stateless-v1+jwt`; `upstream`, `enc`, `cnf`, Ed25519 | shared vectors; `GarrettStateless` |
+| Proxy: mTLS, certificate match, decrypt, swap, forward | stateless mTLS reverse proxy | `GarrettStatelessProxy` (`serve_dispatch_exact`, `serve_rejected_never_sends`) |
+| No persistent data; scale by starting instances | the proxy decision has no adapter-state input; restart and replica tests | `replicas_decide_alike`; tests and demo |
+| JWT and opaque provider tokens | both | tests, vectors |
+| Hardware or hypervisor-backed instance key | optional TPM signer (Rust agent) | swtpm test only; no hardware provenance |
+
+This is a project-specific wire profile, not an interoperable standard (the
+article specifies no wire format). It is experimental and unaudited.
 
 ## Precisely scoped Lean results
 
@@ -73,8 +106,8 @@ computational crypto proof, or a replacement for an independent review.
 3. Hardware-backed non-exportability with authenticated AK/EK provenance,
    VM cloning and rollback, and authenticated-signing-oracle isolation are
    not established for a general deployment.
-4. The original stateless architecture and unrestricted proxy translation
-   are not the current native read profile. Broad Python/Rust feature parity,
+4. The stateless architecture is the separate `garrett-stateless-v1` profile
+   (above), not the current native read profile. Broad Python/Rust feature parity,
    delegation, native budgets, live OAuth/provider combinations and
    cross-session uncertain writes are separate scopes.
 5. Human NR-5 and OUT-5 review and claim acceptance remain outstanding in
@@ -98,15 +131,30 @@ internet access once. The existing local acceptance test is
 
 ## Proposed description to the original author
 
-> I implemented a working Rust/Python credential-brokering system inspired by
-> your agent identity proposal: signed, encrypted, certificate-bound surrogate
-> capabilities, mTLS, host-held provider credentials, OAuth acquisition and
-> pinned-provider dispatch. I've also proved a substantial subset of the
-> extracted Rust authorization, binding, emission and disclosure logic in Lean.
-> It's not a byte-for-byte implementation of your proposed stateless proxy,
-> and the security claims are scoped to explicit configurations and trusted
-> boundaries. There's a fully synthetic, runnable native walkthrough if you'd
-> be interested in reviewing the design and its proof assumptions.
+> I implemented the architecture from your "Securing agentic identity" post as
+> a separate profile, `garrett-stateless-v1`, in both Python and Rust:
+> - a central broker running the browser login (OAuth code flow with PKCE);
+> - a broker-signed surrogate JWT that carries the real token encrypted, copies
+>   the provider's access claims, and is bound to the agent's client
+>   certificate;
+> - a stateless mTLS proxy that swaps the real token in.
+>
+> Independent proxy replicas accept the same surrogate with no shared state,
+> and the two implementations interoperate. I proved the Rust decision code in
+> Lean, through Aeneas extraction:
+> - admission, binding and authentication-before-decryption;
+> - login binding;
+> - the exact substituted request;
+> - no egress on rejection;
+> - that the proxy's decision has no adapter-state input.
+>
+> Crypto, TLS, the provider and the socket shells are stated assumptions.
+> Where your post left details open, I made choices and listed them: PKCE, a
+> sealed state, a short-lived login mailbox for delivery, an access-only
+> default for copied claims (they can be personal data), renewal caps, and key
+> retirement for revocation. There's a one-command offline container
+> walkthrough if you'd like to look.
 
-A stronger phrasing such as "your *full* protocol is implemented and formally
-verified" is not supported by the above matrix.
+Still unsupported: "your protocol is formally verified" (the whole service,
+the cryptography and TLS are not), "production-ready", or "interoperable with
+other implementations" (there is no common wire standard).

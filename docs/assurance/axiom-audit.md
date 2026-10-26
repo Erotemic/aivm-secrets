@@ -19,6 +19,16 @@ The allowed set is Lean's three standard axioms (`propext`,
 `Classical.choice`, `Quot.sound`) plus the named axioms Aeneas emits for
 opaque Rust items in the extracted model.
 
+## Result, 2026-10-26 (garrett-stateless-v1)
+
+- 1,497 written theorems in 117 modules. The 53 additions are the three
+  `GarrettStateless*` modules (48 theorems, plus the step-attribute
+  auxiliaries Lean generates for them).
+- `outside_allowed` and `model_axiom_use` are both empty: every theorem still
+  depends only on `propext`, `Classical.choice` and `Quot.sound`.
+- No theorem was removed or changed its axiom set. The baseline was
+  re-recorded after this run.
+
 ## Result, 2026-10-24
 
 - 1,444 written theorems in 114 modules (rerun after the history models; first run: 1,412 in 112). Lean-generated equation, size and

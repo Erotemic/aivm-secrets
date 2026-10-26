@@ -1054,6 +1054,13 @@ def inputs() -> list[str]:
         "tests/secrets_vectors/coordination/authority-v1.jsonl",
         "tests/secrets_vectors/coordination/operator-replies-v1.jsonl",
         "proofs/GarrettProfiles.lean",
+        "proofs/GarrettProxyHttp.lean",
+        "proofs/GarrettProxyResponse.lean",
+        "proofs/GarrettProxyController.lean",
+        "proofs/GarrettStateless.lean",
+        "proofs/GarrettStatelessLogin.lean",
+        "proofs/GarrettStatelessProxy.lean",
+        "dev/garrett_stateless_vectors.py",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
         "dev/verification/freshness.py",
@@ -1061,7 +1068,7 @@ def inputs() -> list[str]:
         "tests/test_secrets_identity_mtls.py",
         *TESTS,
     }
-    for name in ["aivm-secrets-garrett", "aivm-secrets-garrett-core"]:
+    for name in ["aivm-secrets-garrett", "aivm-secrets-garrett-core", "garrett-stateless"]:
         directory = ROOT / "rust/crates" / name
         files.add(str((directory / "Cargo.toml").relative_to(ROOT)))
         files.update(str(p.relative_to(ROOT)) for p in directory.rglob("*.rs"))
@@ -2242,6 +2249,41 @@ def mutate(pattern: str | None = None) -> None:
         (rebinding, "rebind inactive target accepted", "    target.active\n", "    true\n"),
         (rebinding, "rebind admission before open bypassed", "if !permitted(", "if false && !permitted("),
     ]
+    # garrett-stateless-v1: each mutant is an actual defect in the Rust the
+    # stateless broker and proxy run; GarrettStateless*.lean must reject it.
+    stateless = source.with_name("stateless.rs")
+    stateless_login = source.with_name("stateless_login.rs")
+    stateless_proxy = source.with_name("stateless_proxy.rs")
+    mutations += [
+        (stateless, "stateless certificate binding removed", "if !(certificate == peer) {", "if false {"),
+        (stateless, "stateless expired token accepted", "if now >= claims.expires_at {", "if now > claims.expires_at {"),
+        (stateless, "stateless audience not checked", "if !member(&acceptance.audiences, &claims.audience) {",
+         "if false {"),
+        (stateless, "stateless verifying key issuer not checked", "if !(issuer == key_issuer) {", "if false {"),
+        (stateless, "stateless decrypted before admission",
+         "    match admit(\n        &verified.claims,\n        &verified.key_issuer,\n        acceptance,\n        peer,\n        now,\n    ) {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }\n"
+         "    let credential = match opener.unseal(&verified) {\n        Ok(credential) => credential,\n        Err(error) => return Err(error),\n    };\n",
+         "    let credential = match opener.unseal(&verified) {\n        Ok(credential) => credential,\n        Err(error) => return Err(error),\n    };\n"
+         "    match admit(\n        &verified.claims,\n        &verified.key_issuer,\n        acceptance,\n        peer,\n        now,\n    ) {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }\n"),
+        (stateless, "stateless issuance binds the wrong certificate", "        certificate: grant.certificate,\n",
+         "        certificate: token_id.to_vec(),\n"),
+        (stateless, "stateless renewal extends ren", "        credential_expires: claims.renew_until,\n",
+         "        credential_expires: MAX_TIME,\n"),
+        (stateless_login, "stateless login binds a request value instead of the peer",
+         "        certificate: peer.to_vec(),\n", "        certificate: subject.to_vec(),\n"),
+        (stateless_login, "stateless login callback state not checked",
+         "    if !same_login(policy, entry, state) {\n        return Err(LoginDenial::Invalid);",
+         "    if false {\n        return Err(LoginDenial::Invalid);"),
+        (stateless_login, "stateless login delivered to any peer", "if !(certificate == peer) {", "if false {"),
+        (stateless_proxy, "stateless proxy wrong provider destination",
+         "let index = route_of(routes, &opened.claims.provider);", "let index: usize = 0;"),
+        (stateless_proxy, "stateless proxy egress without acknowledged admission",
+         "if !origin.admitted(&opened.claims, index) {", "if false {"),
+        (stateless_proxy, "stateless proxy surrogate forwarded instead of credential",
+         "        &opened.credential,\n        &route.authentication,", "        &token,\n        &route.authentication,"),
+        (stateless_proxy, "stateless proxy credential reflection unchecked",
+         "let forms = reflection_forms(&opened.credential);", "let forms = reflection_forms(b\"\");"),
+    ]
     total = len(mutations)
     if pattern is not None:
         mutations = [mutation for mutation in mutations if re.search(pattern, mutation[1])]
@@ -2426,7 +2468,7 @@ def mutate(pattern: str | None = None) -> None:
                 ]:
                     modules.remove(dependency)
                 modules[1:1] = ["GarrettLogin", "GarrettManifest", "GarrettDisclosure"]
-            if label.startswith(("trace origin ", "request context ", "provider io ", "provider channel ", "provider wire ", "json string ", "json wire ")):
+            if label.startswith(("trace origin ", "request context ", "provider io ", "provider channel ", "provider wire ", "json string ", "json wire ", "stateless ")):
                 # Rebuild the actual local import closure against this mutant;
                 # cached proof objects are never substituted for dependencies.
                 closure: list[str] = []
@@ -2442,7 +2484,7 @@ def mutate(pattern: str | None = None) -> None:
                             visit(imported)
                     closure.append(module)
 
-                visit("GarrettJsonFrame" if label.startswith("json wire ") else "GarrettJsonString" if label.startswith("json string ") else "GarrettProviderWire" if label.startswith("provider wire ") else "GarrettProviderChannel" if label.startswith("provider channel ") else "GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
+                visit("GarrettStatelessProxy" if source.name == "stateless_proxy.rs" else "GarrettStatelessLogin" if source.name == "stateless_login.rs" else "GarrettStateless" if source.name == "stateless.rs" else "GarrettJsonFrame" if label.startswith("json wire ") else "GarrettJsonString" if label.startswith("json string ") else "GarrettProviderWire" if label.startswith("provider wire ") else "GarrettProviderChannel" if label.startswith("provider channel ") else "GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
                 modules = closure + [module for module in modules if module not in seen]
             for module in modules:
                 proof = temporary / (module + ".lean")

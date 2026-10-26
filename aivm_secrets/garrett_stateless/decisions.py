@@ -134,7 +134,7 @@ class IssuePolicy:
 
 
 @dataclass(frozen=True)
-class Grant:
+class SurrogateGrant:
     provider: str
     subject: str
     certificate: str
@@ -149,7 +149,7 @@ class Window:
     renew_until: int
 
 
-def issue_window(policy: IssuePolicy, grant: Grant, now: int, lifetime: int) -> Window:
+def issue_window(policy: IssuePolicy, grant: SurrogateGrant, now: int, lifetime: int) -> Window:
     if not 1 <= policy.max_lifetime <= MAX_LIFETIME or not 0 <= policy.max_renew <= MAX_RENEW:
         raise Rejection('bad_policy')
     if not 0 <= now <= MAX_TIME - MAX_RENEW:
@@ -174,7 +174,7 @@ def credential_expiry(now: int, expires_in: int | None) -> int:
     return now + expires_in
 
 
-def claims_for(policy: IssuePolicy, grant: Grant, token_id: str, now: int, lifetime: int) -> SurrogateClaims:
+def claims_for(policy: IssuePolicy, grant: SurrogateGrant, token_id: str, now: int, lifetime: int) -> SurrogateClaims:
     if grant.provider not in policy.providers:
         raise Rejection('unknown_provider')
     window = issue_window(policy, grant, now, lifetime)
@@ -188,7 +188,7 @@ class Issued:
     token: bytes
 
 
-def issue(sealer: SurrogateSealer, policy: IssuePolicy, grant: Grant, credential: bytes,
+def issue(sealer: SurrogateSealer, policy: IssuePolicy, grant: SurrogateGrant, credential: bytes,
           token_id: str, now: int, lifetime: int) -> Issued:
     if not valid_credential(credential):
         raise Rejection('invalid_credential')
@@ -196,8 +196,8 @@ def issue(sealer: SurrogateSealer, policy: IssuePolicy, grant: Grant, credential
     return Issued(claims, sealer.seal(claims, credential))
 
 
-def renewal_grant(claims: SurrogateClaims, certificate_expires: int) -> Grant:
-    return Grant(claims.provider, claims.subject, claims.certificate, certificate_expires, claims.renew_until)
+def renewal_grant(claims: SurrogateClaims, certificate_expires: int) -> SurrogateGrant:
+    return SurrogateGrant(claims.provider, claims.subject, claims.certificate, certificate_expires, claims.renew_until)
 
 
 def renew(opener: SurrogateOpener, sealer: SurrogateSealer, acceptance: Acceptance, policy: IssuePolicy,
@@ -319,8 +319,8 @@ def finish(stage: Stage, installed: bool) -> Stage:
     return Stage.COMPLETE if installed else Stage.UNCERTAIN
 
 
-def grant_of(entry: Entry, state: LoginState, credential_expires: int) -> Grant:
-    return Grant(entry.provider, state.subject, entry.certificate, state.certificate_expires, credential_expires)
+def grant_of(entry: Entry, state: LoginState, credential_expires: int) -> SurrogateGrant:
+    return SurrogateGrant(entry.provider, state.subject, entry.certificate, state.certificate_expires, credential_expires)
 
 
 def complete(sealer: SurrogateSealer, login_policy: LoginPolicy, policy: IssuePolicy, entry: Entry,

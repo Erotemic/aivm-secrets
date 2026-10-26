@@ -40,6 +40,15 @@ proof, whole-service secrecy, or approval for unattended AIVM agent use. The
 host-only GitHub credential must never enter the guest, Git or ordinary CI.
 Read `docs/aivm-github-live-readonly-acceptance.md` before optional live runs.
 
+**`garrett-stateless-v1` (2026-10-26):** Garrett's stateless architecture is
+a separate profile, never a change to the stateful AIVM profile. Its status and
+the remaining external validations are in
+`docs/planning/aivm-secrets-garrett-stateless.md`. Decisions live in the
+extracted core (`stateless*.rs`; proofs `proofs/GarrettStateless*.lean`;
+mutants labelled `stateless `). The Python `garrett_stateless/decisions.py`
+mirrors them, and the two implementations must stay byte-compatible with
+`tests/secrets_vectors/garrett-stateless-v1.jsonl`.
+
 **Formalization-first overnight work:** when the operator assigns an extended
 proof campaign, follow `docs/planning/aivm-secrets-overnight-formalization.md`
 and the concise `dev/agent_prompts/overnight-native-read-formalization.md`.

@@ -8,9 +8,9 @@
    "propext"
   ],
   "model_axiom_use": {},
-  "modules": 114,
+  "modules": 117,
   "outside_allowed": {},
-  "theorems": 1444
+  "theorems": 1497
  },
  "theorems": {
   "Aeneas.Std.Array.make.hcongr_4": {
@@ -11004,6 +11004,429 @@
     "propext"
    ],
    "module": "GarrettSessionAudit"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.acceptance_valid_spec": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.acceptance_valid_spec.mvcgen_spec": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.admit_ok_iff": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.admit_spec": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.admitted_iff": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.claims_for_trace": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.earlier_spec": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.earlier_spec.mvcgen_spec": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.issue_invalid_never_seals": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.issue_trace": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.issue_window_ok": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.issue_window_spec": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.issued_only_opens_for_its_certificate": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.issued_refused_on_other_certificate": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.lifetime_valid_spec": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.lifetime_valid_spec.mvcgen_spec": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.member_from_step": {
+   "axioms": [
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.member_loop_contract": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.member_spec": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.member_spec.mvcgen_spec": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.open_binds_peer": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.open_contract": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.open_ok_trace": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.open_one_peer": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.open_unadmitted_never_unseals": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.open_unverified": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.renew_trace": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.renewal_grant_val": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.to_vec_eq": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless.Proofs.to_vec_val": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStateless"
+  },
+  "aivm_secrets_garrett_core.stateless_login.Proofs.accept_callback_trace": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessLogin"
+  },
+  "aivm_secrets_garrett_core.stateless_login.Proofs.begin_spec": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessLogin"
+  },
+  "aivm_secrets_garrett_core.stateless_login.Proofs.begin_trace": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessLogin"
+  },
+  "aivm_secrets_garrett_core.stateless_login.Proofs.claim_ok": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessLogin"
+  },
+  "aivm_secrets_garrett_core.stateless_login.Proofs.complete_trace": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessLogin"
+  },
+  "aivm_secrets_garrett_core.stateless_login.Proofs.deliver_other_peer": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessLogin"
+  },
+  "aivm_secrets_garrett_core.stateless_login.Proofs.deliver_spec": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessLogin"
+  },
+  "aivm_secrets_garrett_core.stateless_login.Proofs.deliver_trace": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessLogin"
+  },
+  "aivm_secrets_garrett_core.stateless_login.Proofs.entry_of_eq": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessLogin"
+  },
+  "aivm_secrets_garrett_core.stateless_login.Proofs.grant_of_eq": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessLogin"
+  },
+  "aivm_secrets_garrett_core.stateless_login.Proofs.login_surrogate_bound_to_starting_peer": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessLogin"
+  },
+  "aivm_secrets_garrett_core.stateless_login.Proofs.rule_copy_eq": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessLogin"
+  },
+  "aivm_secrets_garrett_core.stateless_login.Proofs.same_login_spec": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessLogin"
+  },
+  "aivm_secrets_garrett_core.stateless_login.Proofs.same_login_spec.mvcgen_spec": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessLogin"
+  },
+  "aivm_secrets_garrett_core.stateless_login.Proofs.vec_deref_mk": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessLogin"
+  },
+  "aivm_secrets_garrett_core.stateless_proxy.Proofs.dispatch_trace": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessProxy"
+  },
+  "aivm_secrets_garrett_core.stateless_proxy.Proofs.dispatched_reply": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessProxy"
+  },
+  "aivm_secrets_garrett_core.stateless_proxy.Proofs.replicas_decide_alike": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessProxy"
+  },
+  "aivm_secrets_garrett_core.stateless_proxy.Proofs.route_of_loop_contract": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessProxy"
+  },
+  "aivm_secrets_garrett_core.stateless_proxy.Proofs.serve_dispatch_exact": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessProxy"
+  },
+  "aivm_secrets_garrett_core.stateless_proxy.Proofs.serve_follows_decision": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessProxy"
+  },
+  "aivm_secrets_garrett_core.stateless_proxy.Proofs.serve_guest_reply": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessProxy"
+  },
+  "aivm_secrets_garrett_core.stateless_proxy.Proofs.serve_rejected_never_sends": {
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "module": "GarrettStatelessProxy"
   },
   "aivm_secrets_garrett_core.trust.Proofs.activated_recovery_positive": {
    "axioms": [

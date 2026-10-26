@@ -385,7 +385,7 @@ def mint_with(keys: BrokerKeys, policy: d.IssuePolicy, provider: str, credential
               copy: tok.ClaimCopy, lifetime: int, now: int) -> IssuedToken:
     peer = tls.PeerIdentity.from_der(certificate_der)
     info = tok.Informational(upstream=tok.copy_upstream(credential.decode('ascii', 'replace'), copy))
-    grant = d.Grant(provider, peer.subject, peer.thumbprint, peer.not_after)
+    grant = d.SurrogateGrant(provider, peer.subject, peer.thumbprint, peer.not_after)
     issued = d.issue(tok.Sealer(keys.active_entry(), info), policy, grant, credential, enc.random_id(), now, lifetime)
     return IssuedToken(issued.token.decode('ascii'), issued.claims.expires_at, issued.claims.renew_until)
 

@@ -93,7 +93,7 @@ def test_login_state_and_pkce():
 def test_issue_window(row):
     p = row['policy']
     policy = d.IssuePolicy(p['issuer'], p['audience'], tuple(p['providers']), p['max_lifetime'], p['max_renew'])
-    grant = d.Grant('api', 'agent', 'c', row['certificate_expires'], row['credential_expires'])
+    grant = d.SurrogateGrant('api', 'agent', 'c', row['certificate_expires'], row['credential_expires'])
     if 'rejection' in row['expect']:
         with pytest.raises(d.Rejection) as caught:
             d.issue_window(policy, grant, row['now'], row['lifetime'])

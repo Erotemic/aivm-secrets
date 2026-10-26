@@ -390,7 +390,7 @@ impl Broker {
 
     /// Spec section 8.1 steps 5-8: one provider redirect.
     pub fn callback(&self, request: &Request) -> Result<()> {
-        let bad = |_| Error::Protocol("invalid_callback");
+        let bad = |_: Error| Error::Protocol("invalid_callback");
         let state_text = request
             .param("state")
             .map_err(bad)?
@@ -654,7 +654,7 @@ impl Broker {
                 let wait = match request.param("wait") {
                     Ok(Some(w)) => w.parse::<u64>().unwrap_or(0).min(MAX_WAIT),
                     Ok(None) => 0,
-                    Err(()) => return error(400, "invalid_request"),
+                    Err(_) => return error(400, "invalid_request"),
                 };
                 let deadline = std::time::Instant::now() + Duration::from_secs(wait);
                 loop {

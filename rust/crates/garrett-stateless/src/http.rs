@@ -31,12 +31,12 @@ impl Request {
             .find(|(n, _)| n.eq_ignore_ascii_case(name))
             .map(|(_, v)| v.as_str())
     }
-    /// A query parameter that occurs exactly once (or `None`).
-    pub fn param(&self, name: &str) -> std::result::Result<Option<&str>, ()> {
+    /// A query parameter that occurs at most once; a repeated one is an error.
+    pub fn param(&self, name: &str) -> Result<Option<&str>> {
         let mut found = self.query.iter().filter(|(n, _)| n == name);
         let first = found.next().map(|(_, v)| v.as_str());
         if found.next().is_some() {
-            return Err(());
+            return Err(bad());
         }
         Ok(first)
     }

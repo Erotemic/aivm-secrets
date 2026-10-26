@@ -68,7 +68,8 @@ def _keys(args) -> None:
         _line({'active': keys.active, 'kids': [e.kid for e in keys.entries]})
     else:
         keys = BrokerKeys.load(Path(args.keys))
-        write_private(Path(args.out), keys.export_proxy().to_json())
+        # Re-exporting after a rotation replaces the previous proxy key set atomically.
+        replace_private(Path(args.out), keys.export_proxy().to_json())
         _line({'kids': [e.kid for e in keys.entries]})
 
 

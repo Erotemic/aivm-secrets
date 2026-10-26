@@ -109,6 +109,15 @@ so its output is an ordinary guest request and the read theorems apply to it
 unchanged. Substitution stays
 the weakest profile and never claims authority confinement.
 
+## Phase 7: Garrett's stateless architecture (`garrett-stateless-v1`)
+
+A separate profile beside the stateful AIVM profile: standalone Python and
+Rust libraries, a stateless mTLS proxy, an OAuth broker and Lean proofs of the
+extracted Rust decisions. **Implemented 2026-10-26.** Status, evidence and the
+remaining external validations (live provider, hardware TPM, independent
+review, release decision) are in
+[aivm-secrets-garrett-stateless.md](aivm-secrets-garrett-stateless.md).
+
 ## Everything else the planning documents list
 
 A sweep of every document in this directory on 2026-10-24 found the items

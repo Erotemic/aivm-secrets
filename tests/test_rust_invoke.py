@@ -298,6 +298,9 @@ def test_invoke_retains_public_errors_and_invalid_replies_stay_uncertain(
     from tests.test_rust_line_framing import ReplyPeer, TOKEN as OUTER
     from tests.test_secrets_identity_mtls import certificates
 
+    # Resolve (or skip) before the peer starts: a skip raised inside the peer
+    # context would surface as the peer's own accept timeout.
+    client = executable("AIVM_SECRETS_RUST_GARRETT_CLIENT")
     certs = certificates(tmp_path)
     for path in [certs["ca"], certs["client1"][0]]:
         path.chmod(0o600)
@@ -316,7 +319,7 @@ def test_invoke_retains_public_errors_and_invalid_replies_stay_uncertain(
             ),
         )
         command = [
-            executable("AIVM_SECRETS_RUST_GARRETT_CLIENT"),
+            client,
             "--config",
             str(cfg),
             "--capability-file",

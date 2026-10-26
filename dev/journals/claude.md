@@ -1284,3 +1284,73 @@ Process notes: there was no Python venv here; I created `.venv` with uv.
 fmt-clean; I reverted those and formatted only the new files. Pushback to the
 GPT-written prompt: the commit trailer names the actual model, and I commit
 in increments rather than one commit.
+
+## 2026-10-26 13:57:24 -0400
+
+`garrett-stateless-v1` is implemented end to end. Commits `f0f48af` through
+this session's last commit, in dependency order:
+- spec and extracted core;
+- the Rust crate;
+- the Python library and four-way interop;
+- vectors;
+- Lean;
+- the demo;
+- TPM mode;
+- gates and documentation.
+
+Evidence:
+- Python and Rust pass the 72 shared vectors byte for byte.
+- 78 stateless tests pass. They include the Python×Rust broker/proxy matrix
+  over real TLS and an swtpm-backed login.
+- The container demo reports `ok: true` with `--network none`.
+- The wheel installs in a clean venv and runs `library_example.py`; the only
+  third-party import is `cryptography`.
+- 48 theorems over the extracted controllers. The full default `lake build`
+  passes.
+- All 14 stateless Rust mutants are rejected.
+- The opt-in axiom audit: 1,497 theorems, standard axioms only. I
+  re-recorded the baseline.
+
+Design notes worth keeping:
+- Replica equivalence is stated as `serve_follows_decision` plus
+  `replicas_decide_alike`. `decide_request` is the literal prefix of `serve`
+  built from extracted functions and has no origin argument. A determinism
+  theorem would have been vacuous.
+- GPT's review of the plan, relayed by the user, led to two changes:
+  - the article/choices split in spec section 14;
+  - an access-only default for copied claims, since provider claims can be
+    personal data.
+- A first draft of `serve_guest_reply` had a vacuous `∨ True`. I replaced it
+  before committing with the real statement (the raw credential does not
+  occur in a completed release).
+
+Gate maintenance I did and want reviewed:
+- Re-pinned hashes in the following, after a full build and a W5 `prove`
+  passed:
+  - `proofs/manifest.json`: Cargo files and the lakefile only, following the
+    2026-10-23 precedent;
+  - the NR-0, W4, W5 and read-path scope files: the generated Lean,
+    `lib.rs` and the Cargo files.
+- Added the new crate's fingerprints to the W3 inventory. This records only
+  my own review, and the crate is outside W3's `manifest-https-v1` scope.
+- Allowed the two new stateless socket modules in the purity test's network
+  list, with a check that nothing outside `garrett_stateless` imports it.
+- Renamed the Python `Grant` to `SurrogateGrant` so the kernel-only
+  construction check stays strict.
+- Fixed a pre-existing `test_rust_invoke` bug: a skip raised inside
+  `ReplyPeer` surfaced as its accept timeout. It failed identically at
+  `e9aa9fa`.
+
+Uncertain or left open:
+- Live OAuth providers (GitHub supports PKCE) and a hardware TPM.
+- Multi-replica broker routing.
+- A syscall witness for the stateless proxy.
+- Independent review.
+- Python strict-JSON parity with Rust holds for the vector corpus; corner
+  cases outside it (huge exponents, for example) both map to "not an
+  integer", but I have not fuzzed them.
+- The proxy accepts only HTTP/1.1 upstream responses. That is documented,
+  and found by the library example.
+
+Confidence: high in the Rust decisions as stated; medium-high in the shells
+(tested, not proved).

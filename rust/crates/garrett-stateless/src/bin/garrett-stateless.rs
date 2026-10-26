@@ -137,7 +137,8 @@ fn keys(args: &Args) -> Result<()> {
         }
         Some("export") => {
             let keys = BrokerKeys::load(&args.path("--keys")?)?;
-            write_private(&args.path("--out")?, &keys.export_proxy().to_json())?;
+            // Re-exporting after a rotation replaces the previous proxy key set atomically.
+            replace_private(&args.path("--out")?, &keys.export_proxy().to_json())?;
             let kids = keys.entries.iter().map(|e| json::text(&e.kid)).collect();
             line(json::object([("kids", Value::Array(kids))]));
         }

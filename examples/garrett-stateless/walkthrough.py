@@ -282,7 +282,6 @@ class Demo:
             new key set.''')
         self.run(self.rust + ['keys', 'rotate', '--keys', 'broker-keys.json', '--kid', 'k2'])
         self.run(self.rust + ['keys', 'retire', '--keys', 'broker-keys.json', '--kid', 'k1'])
-        os.unlink(self.root / 'proxy-keys.json')
         self.run(self.rust + ['keys', 'export', '--keys', 'broker-keys.json', '--out', 'proxy-keys.json'])
         diagnostics += self.stop(proxy)
         proxy, proxy_addr = self.serve(self.rust + ['proxy', '--config', 'proxy.json'])

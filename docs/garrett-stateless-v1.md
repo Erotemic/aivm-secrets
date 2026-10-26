@@ -471,7 +471,9 @@ Every request on a kept-alive connection is admitted independently.
 Methods, request bodies, query strings and status codes pass through within
 the limits of the strict HTTP/1.1 subset documented in
 [HTTPS proxy profiles](https-proxy-profile.md). Not supported: `Upgrade`,
-`Expect`, `Range`, request trailers, HTTP/2, and compressed response encodings.
+`Expect`, `Range`, request trailers, HTTP/2, compressed response encodings, and
+upstream responses other than HTTP/1.1 (an `HTTP/1.0` status line is refused
+as `outcome_unknown`).
 The proxy does not restrict *which* provider API operations a token can call
 (beyond deny rules). Authority confinement is the provider's scope or the
 stateful profile's job.

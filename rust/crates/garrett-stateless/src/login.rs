@@ -121,7 +121,7 @@ pub fn open_state(state_key: &[u8; 32], text: &str) -> std::result::Result<Login
         .open_in_place(
             Nonce::assume_unique_for_key(nonce),
             Aad::from(LOGIN_LABEL),
-            &mut *data,
+            &mut data,
         )
         .map_err(|_| Rejection::Undecryptable)?;
     let value = json::parse(plain, MAX_STATE, 2).map_err(|_| Rejection::Malformed)?;
