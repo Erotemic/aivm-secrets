@@ -22,11 +22,13 @@ dependencies = ["cryptography>=46.0.0"]
 
 [project.scripts]
 aivm-secrets = "aivm_secrets.cli:main"
+garrett-stateless = "aivm_secrets.garrett_stateless.cli:main"
 
 [tool.setuptools]
 include-package-data = false
 packages = [
   "aivm_secrets",
+  "aivm_secrets.garrett_stateless",
   "aivm_secrets.host",
   "aivm_secrets.identity",
   "aivm_secrets.identity.garrett",
