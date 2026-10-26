@@ -1,8 +1,9 @@
 //! The OAuth broker (spec sections 7 and 8).
 //!
-//! Every decision is an extracted `stateless`/`stateless_login` controller;
-//! this module supplies randomness, the clock, sealing, the token request
-//! and the transient mailbox, and serves the two HTTPS listeners.
+//! Every decision is an extracted `stateless`/`stateless_login` controller,
+//! and the transient mailbox is the extracted `stateless_mailbox`, changed
+//! only through its transitions. This module supplies randomness, the clock,
+//! sealing, the token request, and serves the two HTTPS listeners.
 use crate::config::{BrokerConfig, ProviderConfig};
 use crate::encoding::{is_credential, is_scope, random_id};
 use crate::error::{rejection_name, Error, Result};
@@ -10,12 +11,15 @@ use crate::files::{read_private, read_public};
 use crate::http::{self, Request};
 use crate::json::{self, Value};
 use crate::keys::BrokerKeys;
-use crate::login::{self, Mailbox};
+use crate::login;
 use crate::tls::{self, PeerIdentity};
 use crate::token::{self, Informational, Opener, Sealer};
-use aivm_secrets_garrett_core::oauth_login::{self, IssuerRule, LoginDenial, Stage};
+use aivm_secrets_garrett_core::oauth_login::{IssuerRule, LoginDenial};
 use aivm_secrets_garrett_core::stateless::{self, Acceptance, Grant, IssuePolicy, MAX_TIME};
-use aivm_secrets_garrett_core::stateless_login::{self, Delivery, LoginPolicy};
+use aivm_secrets_garrett_core::stateless_login::LoginPolicy;
+use aivm_secrets_garrett_core::stateless_mailbox::{
+    self, CodeExchange, Mailbox, MailboxError, Polled, Token,
+};
 use rustls::{ServerConfig, ServerConnection, StreamOwned};
 use std::io::Write;
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -77,6 +81,58 @@ pub fn token_response(status: u16, body: &[u8]) -> Result<TokenResponse> {
         expires_in,
         scope,
     })
+}
+
+/// The broker's side of one permitted code exchange: the token request to the
+/// provider the permit names, with the login's verifier.
+struct ProviderExchange<'a> {
+    broker: &'a Broker,
+    scope: Option<String>,
+    error: Option<Error>,
+}
+
+impl CodeExchange for ProviderExchange<'_> {
+    fn token(&mut self, provider: &[u8], code: &[u8], verifier: &[u8]) -> Option<Token> {
+        let attempt = (|| {
+            let name =
+                std::str::from_utf8(provider).map_err(|_| Error::Protocol("unknown_provider"))?;
+            let (index, config) = self.broker.provider(name)?;
+            let code =
+                std::str::from_utf8(code).map_err(|_| Error::Protocol("invalid_callback"))?;
+            let verifier = Zeroizing::new(
+                std::str::from_utf8(verifier)
+                    .map_err(|_| Error::Protocol("internal_error"))?
+                    .to_owned(),
+            );
+            let redirect = self.broker.redirect_uri();
+            let mut fields = vec![
+                ("grant_type", "authorization_code"),
+                ("code", code),
+                ("redirect_uri", redirect.as_str()),
+                ("client_id", config.client_id.as_str()),
+                ("code_verifier", verifier.as_str()),
+            ];
+            if let Some(secret) = &self.broker.secrets[index] {
+                fields.push(("client_secret", secret.as_str()));
+            }
+            let form = Zeroizing::new(http::form(&fields));
+            self.broker.endpoint.exchange(config, &form)
+        })();
+        match attempt {
+            Ok(response) => {
+                self.scope = response.scope.clone();
+                Some(Token {
+                    credential: response.access_token.as_bytes().to_vec(),
+                    has_expires_in: response.expires_in.is_some(),
+                    expires_in: response.expires_in.unwrap_or(0),
+                })
+            }
+            Err(error) => {
+                self.error = Some(error);
+                None
+            }
+        }
+    }
 }
 
 /// POST the form to the provider's pinned token endpoint.
@@ -167,6 +223,20 @@ fn denial(denial: LoginDenial) -> Error {
     })
 }
 
+/// The stable public code of a refused mailbox transition.
+fn mailbox_error(error: MailboxError) -> Error {
+    match error {
+        MailboxError::Rejected(rejection) => Error::Rejected(rejection_name(&rejection)),
+        MailboxError::Refused(refused) => denial(refused),
+        MailboxError::TooMany => Error::Protocol("too_many_logins"),
+        MailboxError::Duplicate | MailboxError::Exhausted => Error::Protocol("internal_error"),
+        MailboxError::Unknown => Error::Protocol("login_unknown"),
+        MailboxError::Consumed => Error::Protocol("login_consumed"),
+        MailboxError::Expired => Error::Protocol("login_expired"),
+        MailboxError::Denied => Error::Protocol("login_denied"),
+    }
+}
+
 impl Broker {
     pub fn new(
         config: BrokerConfig,
@@ -193,7 +263,7 @@ impl Broker {
         Ok(Self {
             config,
             keys,
-            mailbox: Mutex::new(Mailbox::default()),
+            mailbox: Mutex::new(stateless_mailbox::empty()),
             endpoint,
             secrets,
             clock: Arc::new(now_seconds),
@@ -219,6 +289,12 @@ impl Broker {
 
     fn now(&self) -> i64 {
         (self.clock)()
+    }
+
+    fn locked(&self) -> Result<std::sync::MutexGuard<'_, Mailbox>> {
+        self.mailbox
+            .lock()
+            .map_err(|_| Error::Protocol("internal_error"))
     }
 
     fn provider(&self, name: &str) -> Result<(usize, &ProviderConfig)> {
@@ -289,7 +365,8 @@ impl Broker {
         let login = random_id()?;
         let verifier = login::pkce_verifier()?;
         let now = self.now();
-        let state = stateless_login::begin(
+        let state = stateless_mailbox::start(
+            &mut *self.locked()?,
             &self.login_policy(),
             provider.as_bytes(),
             peer.thumbprint.as_bytes(),
@@ -299,13 +376,9 @@ impl Broker {
             verifier.as_bytes(),
             scope.as_bytes(),
             now,
-        )?;
+        )
+        .map_err(mailbox_error)?;
         let sealed = login::seal_state(self.keys.state_key(), &state)?;
-        let entry = stateless_login::entry_of(&state);
-        self.mailbox
-            .lock()
-            .map_err(|_| Error::Protocol("internal_error"))?
-            .insert(login.clone(), entry, now)?;
         Ok(LoginStarted {
             authorization_url: format!(
                 "{}authorize?{}",
@@ -347,23 +420,8 @@ impl Broker {
             .map_err(|_| Error::Protocol("invalid_state"))?;
         let now = self.now();
         let login = String::from_utf8_lossy(&state.login).into_owned();
-        {
-            let mut mailbox = self
-                .mailbox
-                .lock()
-                .map_err(|_| Error::Protocol("internal_error"))?;
-            let slot = mailbox
-                .get_mut(&login)
-                .ok_or(Error::Protocol("login_unknown"))?;
-            if !stateless_login::same_login(&self.login_policy(), &slot.entry, &state)
-                || !matches!(slot.entry.stage, Stage::Pending)
-            {
-                return Err(Error::Protocol("login_consumed"));
-            }
-            if now >= slot.entry.expires_at {
-                return Err(Error::Protocol("login_expired"));
-            }
-        }
+        stateless_mailbox::pending(&*self.locked()?, &self.login_policy(), &state, now)
+            .map_err(mailbox_error)?;
         let provider_name = String::from_utf8_lossy(&state.provider).into_owned();
         let (_, provider) = self.provider(&provider_name)?;
         let url = self.provider_url(
@@ -404,108 +462,62 @@ impl Broker {
         let state = login::open_state(self.keys.state_key(), state_text)
             .map_err(|_| Error::Protocol("invalid_state"))?;
         let provider_name = String::from_utf8_lossy(&state.provider).into_owned();
-        let (index, provider) = self.provider(&provider_name)?;
+        let (_, provider) = self.provider(&provider_name)?;
         let rule = Self::issuer_rule(provider);
-        let login = String::from_utf8_lossy(&state.login).into_owned();
         let policy = self.login_policy();
-        let now = self.now();
-        {
-            let mut mailbox = self
-                .mailbox
-                .lock()
-                .map_err(|_| Error::Protocol("internal_error"))?;
-            let slot = mailbox
-                .get_mut(&login)
-                .ok_or(Error::Protocol("login_unknown"))?;
-            let stage = stateless_login::accept_callback(
-                &policy,
-                &slot.entry,
-                &state,
-                &rule,
-                issuer.unwrap_or("").as_bytes(),
-                issuer.is_some(),
-                denied,
-                now,
-            )
-            .map_err(denial)?;
-            slot.entry.stage = stage;
-            if denied {
-                return Err(Error::Protocol("login_denied"));
-            }
-            slot.entry.stage =
-                stateless_login::begin_exchange(&slot.entry, &rule, now).map_err(denial)?;
-        }
-        // The mailbox is unlocked during the network exchange.
-        let verifier = Zeroizing::new(String::from_utf8_lossy(&state.verifier).into_owned());
-        let redirect = self.redirect_uri();
-        let mut fields = vec![
-            ("grant_type", "authorization_code"),
-            ("code", code.unwrap_or("")),
-            ("redirect_uri", redirect.as_str()),
-            ("client_id", provider.client_id.as_str()),
-            ("code_verifier", verifier.as_str()),
-        ];
-        if let Some(secret) = &self.secrets[index] {
-            fields.push(("client_secret", secret.as_str()));
-        }
-        let form = Zeroizing::new(http::form(&fields));
-        let exchanged = self.endpoint.exchange(provider, &form);
-        let now = self.now();
-        let mut mailbox = self
-            .mailbox
-            .lock()
-            .map_err(|_| Error::Protocol("internal_error"))?;
-        let slot = mailbox
-            .get_mut(&login)
-            .ok_or(Error::Protocol("login_unknown"))?;
-        let issued = exchanged.and_then(|response| {
-            let expires = stateless::credential_expiry(
-                now,
-                response.expires_in.is_some(),
-                response.expires_in.unwrap_or(0),
-            )?;
-            let info = Informational {
+        let permit = stateless_mailbox::accept(
+            &mut *self.locked()?,
+            &policy,
+            &state,
+            &rule,
+            issuer.unwrap_or("").as_bytes(),
+            issuer.is_some(),
+            denied,
+            self.now(),
+        )
+        .map_err(mailbox_error)?;
+        // The mailbox is unlocked during the network exchange. The answer
+        // can only reach the login the permit was made for.
+        let mut exchanger = ProviderExchange {
+            broker: self,
+            scope: None,
+            error: None,
+        };
+        let exchanged =
+            stateless_mailbox::exchange(&mut exchanger, permit, code.unwrap_or("").as_bytes());
+        let info = match stateless_mailbox::exchanged_token(&exchanged) {
+            Some(token) => Informational {
                 scope: Some(
-                    response
+                    exchanger
                         .scope
                         .clone()
                         .unwrap_or_else(|| String::from_utf8_lossy(&state.scope).into_owned()),
                 )
                 .filter(|s| !s.is_empty()),
-                upstream: token::copy_upstream(&response.access_token, &provider.copy_claims),
-            };
-            let sealer = Sealer {
-                entry: self.keys.active_entry(),
-                info,
-            };
-            let token_id = random_id()?;
-            let issued = stateless_login::complete(
-                &sealer,
-                &policy,
-                &self.issue_policy(),
-                &slot.entry,
-                &state,
-                response.access_token.as_bytes(),
-                expires,
-                token_id.as_bytes(),
-                now,
-                self.config.max_lifetime,
-            )?;
-            Ok(issued)
-        });
-        let installed = issued.is_ok();
-        slot.entry.stage =
-            oauth_login::finish(&slot.entry.stage, installed).unwrap_or(Stage::Uncertain);
-        match issued {
-            Ok(issued) => {
-                slot.token = Some((
-                    String::from_utf8(issued.token)
-                        .map_err(|_| Error::Protocol("internal_error"))?,
-                    issued.claims.expires_at,
-                ));
-                Ok(())
-            }
-            Err(error) => Err(error),
+                upstream: std::str::from_utf8(&token.credential)
+                    .ok()
+                    .and_then(|text| token::copy_upstream(text, &provider.copy_claims)),
+            },
+            None => Informational::default(),
+        };
+        let sealer = Sealer {
+            entry: self.keys.active_entry(),
+            info,
+        };
+        // A failed random draw leaves an invalid `jti`, which fails issuance.
+        let token_id = random_id().unwrap_or_default();
+        let finished = stateless_mailbox::finish(
+            &mut *self.locked()?,
+            exchanged,
+            &sealer,
+            &self.issue_policy(),
+            token_id.as_bytes(),
+            self.now(),
+            self.config.max_lifetime,
+        );
+        match exchanger.error {
+            Some(error) => Err(error),
+            None => finished.map_err(mailbox_error),
         }
     }
 
@@ -515,31 +527,29 @@ impl Broker {
             return Poll::Refused(502, "internal_error");
         };
         let now = self.now();
-        let Some(slot) = mailbox.get_mut(login) else {
-            return Poll::Refused(404, "login_unknown");
-        };
-        match stateless_login::deliver(&slot.entry, peer.thumbprint.as_bytes(), now) {
-            Delivery::Pending => Poll::Pending,
-            Delivery::WrongCertificate => Poll::Refused(403, "wrong_certificate"),
-            Delivery::Denied => Poll::Refused(410, "login_denied"),
-            Delivery::Failed => Poll::Refused(410, "login_failed"),
-            Delivery::Expired => {
-                mailbox.remove(login);
-                Poll::Refused(410, "login_expired")
-            }
-            Delivery::Deliver => match mailbox.remove(login).and_then(|slot| slot.token) {
-                Some((token, expires_at)) => {
-                    let renew_until = token::inspect(&token)
-                        .ok()
-                        .and_then(|(_, p)| p.get("ren").and_then(Value::as_int))
-                        .unwrap_or(expires_at);
-                    Poll::Ready(IssuedToken {
-                        token,
-                        expires_at,
-                        renew_until,
-                    })
-                }
-                None => Poll::Refused(410, "login_failed"),
+        match stateless_mailbox::poll(
+            &mut mailbox,
+            peer.thumbprint.as_bytes(),
+            login.as_bytes(),
+            now,
+        ) {
+            Polled::Pending => Poll::Pending,
+            Polled::Unknown => Poll::Refused(404, "login_unknown"),
+            Polled::WrongCertificate => Poll::Refused(403, "wrong_certificate"),
+            Polled::Denied => Poll::Refused(410, "login_denied"),
+            Polled::Failed => Poll::Refused(410, "login_failed"),
+            Polled::Expired => Poll::Refused(410, "login_expired"),
+            Polled::Ready {
+                token,
+                expires_at,
+                renew_until,
+            } => match String::from_utf8(token) {
+                Ok(token) => Poll::Ready(IssuedToken {
+                    token,
+                    expires_at,
+                    renew_until,
+                }),
+                Err(_) => Poll::Refused(410, "login_failed"),
             },
         }
     }

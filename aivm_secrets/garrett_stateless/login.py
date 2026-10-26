@@ -1,21 +1,18 @@
-"""The sealed login state (spec section 8.2), PKCE, and the transient login
-mailbox (section 9)."""
+"""The sealed login state (spec section 8.2) and PKCE. The transient login
+mailbox (section 9) is ``decisions.Mailbox``."""
 from __future__ import annotations
 
 import hashlib
 import os
-import threading
-from dataclasses import dataclass
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from . import encoding as enc
-from .decisions import DELIVERY_GRACE, Entry, LoginState, Rejection
+from .decisions import LoginState, Rejection
 
 STATE_PREFIX = 'gs1.'
 MAX_STATE = 4096
-MAX_PENDING = 1024
 LOGIN_LABEL = b'garrett-stateless-v1/login\0'
 
 
@@ -93,28 +90,3 @@ def pkce_challenge(verifier: str) -> str:
 def confirmation(login: str) -> str:
     upper = login.upper()
     return f'{upper[:4]}-{upper[4:8]}'
-
-
-@dataclass
-class Slot:
-    entry: Entry
-    token: tuple[str, int, int] | None = None  # (surrogate, exp, ren)
-
-
-class Mailbox:
-    """The broker's only mutable state: logins in progress, in memory."""
-
-    def __init__(self) -> None:
-        self.lock = threading.Lock()
-        self.slots: dict[str, Slot] = {}
-
-    def prune(self, now: int) -> None:
-        self.slots = {k: s for k, s in self.slots.items() if now < s.entry.expires_at + DELIVERY_GRACE}
-
-    def insert(self, login: str, entry: Entry, now: int) -> None:
-        self.prune(now)
-        if len(self.slots) >= MAX_PENDING:
-            raise Rejection('too_many_logins')
-        if login in self.slots:
-            raise Rejection('malformed')
-        self.slots[login] = Slot(entry)

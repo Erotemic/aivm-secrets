@@ -21214,18 +21214,20 @@ structure stateless_login.LoginPolicy where
   ttl : Std.I64
 
 /-- [aivm_secrets_garrett_core::stateless_login::Entry]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 42:0-49:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 43:0-52:1
     Visibility: public -/
 structure stateless_login.Entry where
   login : alloc.vec.Vec Std.U8
   provider : alloc.vec.Vec Std.U8
   certificate : alloc.vec.Vec Std.U8
+  subject : alloc.vec.Vec Std.U8
+  certificate_expires : Std.I64
   issued_at : Std.I64
   expires_at : Std.I64
   stage : oauth_login.Stage
 
 /-- [aivm_secrets_garrett_core::stateless_login::begin]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 54:0-87:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 57:0-90:1
     Visibility: public -/
 def stateless_login.begin
   (policy : stateless_login.LoginPolicy) (provider : Slice Std.U8)
@@ -21279,28 +21281,32 @@ def stateless_login.begin
           else ok (core.result.Result.Err stateless.Rejection.UnknownProvider)
 
 /-- [aivm_secrets_garrett_core::stateless_login::entry_of]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 90:0-102:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 93:0-108:1
     Visibility: public -/
 def stateless_login.entry_of
   (state : stateless_login.LoginState) : Result stateless_login.Entry := do
   let login := alloc.vec.Vec.deref state.login
   let provider := alloc.vec.Vec.deref state.provider
   let certificate := alloc.vec.Vec.deref state.certificate
+  let subject := alloc.vec.Vec.deref state.subject
   let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 login
   let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 provider
   let v2 ← alloc.slice.Slice.to_vec core.clone.CloneU8 certificate
+  let v3 ← alloc.slice.Slice.to_vec core.clone.CloneU8 subject
   ok
     {
       login := v,
       provider := v1,
       certificate := v2,
+      subject := v3,
+      certificate_expires := state.certificate_expires,
       issued_at := state.issued_at,
       expires_at := state.expires_at,
       stage := oauth_login.Stage.Pending
     }
 
 /-- [aivm_secrets_garrett_core::stateless_login::rule_copy]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 104:0-112:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 110:0-118:1
     Visibility: public -/
 def stateless_login.rule_copy
   (rule : oauth_login.IssuerRule) : Result oauth_login.IssuerRule := do
@@ -21312,7 +21318,7 @@ def stateless_login.rule_copy
     ok (oauth_login.IssuerRule.Exact v)
 
 /-- [aivm_secrets_garrett_core::stateless_login::pending_of]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 115:0-123:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 121:0-129:1
     Visibility: public -/
 def stateless_login.pending_of
   (entry : stateless_login.Entry) (rule : oauth_login.IssuerRule) :
@@ -21330,7 +21336,7 @@ def stateless_login.pending_of
     }
 
 /-- [aivm_secrets_garrett_core::stateless_login::same_login]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 126:0-141:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 132:0-151:1
     Visibility: public -/
 def stateless_login.same_login
   (policy : stateless_login.LoginPolicy) (entry : stateless_login.Entry)
@@ -21345,6 +21351,8 @@ def stateless_login.same_login
   let state_login := alloc.vec.Vec.deref state.login
   let state_provider := alloc.vec.Vec.deref state.provider
   let state_certificate := alloc.vec.Vec.deref state.certificate
+  let subject := alloc.vec.Vec.deref entry.subject
+  let state_subject := alloc.vec.Vec.deref state.subject
   let b ← core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 replica own
   if b
   then
@@ -21362,8 +21370,17 @@ def stateless_login.same_login
             state_certificate
         if b3
         then
-          if entry.issued_at = state.issued_at
-          then ok (entry.expires_at = state.expires_at)
+          let b4 ←
+            core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 subject
+              state_subject
+          if b4
+          then
+            if entry.certificate_expires = state.certificate_expires
+            then
+              if entry.issued_at = state.issued_at
+              then ok (entry.expires_at = state.expires_at)
+              else ok false
+            else ok false
           else ok false
         else ok false
       else ok false
@@ -21371,7 +21388,7 @@ def stateless_login.same_login
   else ok false
 
 /-- [aivm_secrets_garrett_core::stateless_login::accept_callback]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 147:0-169:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 157:0-179:1
     Visibility: public -/
 def stateless_login.accept_callback
   (policy : stateless_login.LoginPolicy) (entry : stateless_login.Entry)
@@ -21391,7 +21408,7 @@ def stateless_login.accept_callback
   else ok (core.result.Result.Err oauth_login.LoginDenial.Invalid)
 
 /-- [aivm_secrets_garrett_core::stateless_login::begin_exchange]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 172:0-175:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 182:0-185:1
     Visibility: public -/
 def stateless_login.begin_exchange
   (entry : stateless_login.Entry) (rule : oauth_login.IssuerRule)
@@ -21402,16 +21419,15 @@ def stateless_login.begin_exchange
   oauth_login.begin entry.stage pending now
 
 /-- [aivm_secrets_garrett_core::stateless_login::grant_of]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 180:0-191:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 189:0-200:1
     Visibility: public -/
 def stateless_login.grant_of
-  (entry : stateless_login.Entry) (state : stateless_login.LoginState)
-  (credential_expires : Std.I64) :
+  (entry : stateless_login.Entry) (credential_expires : Std.I64) :
   Result stateless.Grant
   := do
   let provider := alloc.vec.Vec.deref entry.provider
   let certificate := alloc.vec.Vec.deref entry.certificate
-  let subject := alloc.vec.Vec.deref state.subject
+  let subject := alloc.vec.Vec.deref entry.subject
   let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 provider
   let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 subject
   let v2 ← alloc.slice.Slice.to_vec core.clone.CloneU8 certificate
@@ -21420,20 +21436,18 @@ def stateless_login.grant_of
       provider := v,
       subject := v1,
       certificate := v2,
-      certificate_expires := state.certificate_expires,
+      certificate_expires := entry.certificate_expires,
       credential_expires
     }
 
 /-- [aivm_secrets_garrett_core::stateless_login::complete]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 196:0-217:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 205:0-221:1
     Visibility: public -/
 def stateless_login.complete
   {S : Type _} (statelessSurrogateSealerInst : stateless.SurrogateSealer S)
-  (sealer : S) (login_policy : stateless_login.LoginPolicy)
-  (policy : stateless.IssuePolicy) (entry : stateless_login.Entry)
-  (state : stateless_login.LoginState) (credential : Slice Std.U8)
-  (credential_expires : Std.I64) (token_id : Slice Std.U8) (now : Std.I64)
-  (lifetime : Std.I64) :
+  (sealer : S) (policy : stateless.IssuePolicy) (entry : stateless_login.Entry)
+  (credential : Slice Std.U8) (credential_expires : Std.I64)
+  (token_id : Slice Std.U8) (now : Std.I64) (lifetime : Std.I64) :
   Result (core.result.Result stateless.Issued stateless.Rejection)
   := do
   match entry.stage with
@@ -21444,20 +21458,16 @@ def stateless_login.complete
   | oauth_login.Stage.Denied =>
     ok (core.result.Result.Err stateless.Rejection.Malformed)
   | oauth_login.Stage.Exchanging =>
-    let b ← stateless_login.same_login login_policy entry state
-    if b
-    then
-      let grant ← stateless_login.grant_of entry state credential_expires
-      stateless.issue statelessSurrogateSealerInst sealer policy grant
-        credential token_id now lifetime
-    else ok (core.result.Result.Err stateless.Rejection.Malformed)
+    let grant ← stateless_login.grant_of entry credential_expires
+    stateless.issue statelessSurrogateSealerInst sealer policy grant credential
+      token_id now lifetime
   | oauth_login.Stage.Complete =>
     ok (core.result.Result.Err stateless.Rejection.Malformed)
   | oauth_login.Stage.Uncertain =>
     ok (core.result.Result.Err stateless.Rejection.Malformed)
 
 /-- [aivm_secrets_garrett_core::stateless_login::Delivery]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 220:0-227:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 224:0-231:1
     Visibility: public -/
 @[discriminant isize]
 inductive stateless_login.Delivery where
@@ -21469,7 +21479,7 @@ inductive stateless_login.Delivery where
 | Expired : stateless_login.Delivery
 
 /-- [aivm_secrets_garrett_core::stateless_login::deliver]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 231:0-251:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 235:0-255:1
     Visibility: public -/
 def stateless_login.deliver
   (entry : stateless_login.Entry) (peer : Slice Std.U8) (now : Std.I64) :
@@ -21505,6 +21515,680 @@ def stateless_login.deliver
         | oauth_login.Stage.Complete => ok stateless_login.Delivery.Deliver
         | oauth_login.Stage.Uncertain => ok stateless_login.Delivery.Failed
   else ok stateless_login.Delivery.WrongCertificate
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::MAX_PENDING]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 26:0-26:36
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_mailbox.MAX_PENDING : Std.Usize := 1024#usize
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::LAST_SERIAL]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 28:0-28:50
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_mailbox.LAST_SERIAL : Std.U64 := 18446744073709551615#u64
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::Slot]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 31:0-39:1
+    Visibility: public -/
+structure stateless_mailbox.Slot where
+  entry : stateless_login.Entry
+  serial : Std.U64
+  token : alloc.vec.Vec Std.U8
+  expires_at : Std.I64
+  renew_until : Std.I64
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::Mailbox]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 41:0-44:1
+    Visibility: public -/
+structure stateless_mailbox.Mailbox where
+  slots : alloc.vec.Vec (Option stateless_mailbox.Slot)
+  next : Std.U64
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::empty]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 46:0-51:1
+    Visibility: public -/
+def stateless_mailbox.empty : Result stateless_mailbox.Mailbox := do
+  ok
+    {
+      slots := (alloc.vec.Vec.new (Option stateless_mailbox.Slot)),
+      next := 0#u64
+    }
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::MailboxError]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 54:0-66:1
+    Visibility: public -/
+@[discriminant isize]
+inductive stateless_mailbox.MailboxError where
+| Rejected : stateless.Rejection → stateless_mailbox.MailboxError
+| Refused : oauth_login.LoginDenial → stateless_mailbox.MailboxError
+| TooMany : stateless_mailbox.MailboxError
+| Duplicate : stateless_mailbox.MailboxError
+| Exhausted : stateless_mailbox.MailboxError
+| Unknown : stateless_mailbox.MailboxError
+| Consumed : stateless_mailbox.MailboxError
+| Expired : stateless_mailbox.MailboxError
+| Denied : stateless_mailbox.MailboxError
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::Permit]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 70:0-75:1
+    Visibility: public -/
+structure stateless_mailbox.Permit where
+  serial : Std.U64
+  login : alloc.vec.Vec Std.U8
+  provider : alloc.vec.Vec Std.U8
+  verifier : alloc.vec.Vec Std.U8
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::Token]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 78:0-82:1
+    Visibility: public -/
+structure stateless_mailbox.Token where
+  credential : alloc.vec.Vec Std.U8
+  has_expires_in : Bool
+  expires_in : Std.I64
+
+/-- Trait declaration: [aivm_secrets_garrett_core::stateless_mailbox::CodeExchange]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 86:0-88:1
+    Visibility: public -/
+structure stateless_mailbox.CodeExchange (Self : Type _) where
+  token : Self → Slice Std.U8 → Slice Std.U8 → Slice Std.U8 → Result
+    ((Option stateless_mailbox.Token) × Self)
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::Exchanged]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 92:0-95:1
+    Visibility: public -/
+structure stateless_mailbox.Exchanged where
+  permit : stateless_mailbox.Permit
+  token : Option stateless_mailbox.Token
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::exchanged_token]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 98:0-103:1
+    Visibility: public -/
+def stateless_mailbox.exchanged_token
+  (exchanged : stateless_mailbox.Exchanged) :
+  Result (Option stateless_mailbox.Token)
+  := do
+  match exchanged.token with
+  | none => ok none
+  | some _ => ok exchanged.token
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::kept]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 107:0-115:1
+    Visibility: public -/
+def stateless_mailbox.kept
+  (slot : Option stateless_mailbox.Slot) (now : Std.I64) : Result Bool := do
+  match slot with
+  | none => ok false
+  | some slot1 =>
+    let i ← stateless.MAX_TIME - stateless_login.DELIVERY_GRACE
+    if slot1.entry.expires_at <= i
+    then
+      let i1 ← slot1.entry.expires_at + stateless_login.DELIVERY_GRACE
+      ok (now < i1)
+    else ok false
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::prune]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 120:4-125:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_mailbox.prune_loop
+  (mailbox : stateless_mailbox.Mailbox) (now : Std.I64) (index : Std.Usize) :
+  Result ((alloc.vec.Vec (Option stateless_mailbox.Slot)) × Std.U64)
+  := do
+  let i := alloc.vec.Vec.len mailbox.slots
+  if index < i
+  then
+    let o ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice (Option
+        stateless_mailbox.Slot)) mailbox.slots index
+    let b ← stateless_mailbox.kept o now
+    let v ←
+      if b
+      then ok mailbox.slots
+      else
+        do
+        let (_, index_mut_back) ←
+          alloc.vec.Vec.index_mut (core.slice.index.SliceIndexUsizeSlice
+            (Option stateless_mailbox.Slot)) mailbox.slots index
+        ok (index_mut_back none)
+    let index1 ← index + 1#usize
+    stateless_mailbox.prune_loop { mailbox with slots := v } now index1
+  else ok (mailbox.slots, mailbox.next)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::prune]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 118:0-126:1
+    Visibility: public -/
+def stateless_mailbox.prune
+  (mailbox : stateless_mailbox.Mailbox) (now : Std.I64) :
+  Result stateless_mailbox.Mailbox
+  := do
+  let (v, i) ← stateless_mailbox.prune_loop mailbox now 0#usize
+  ok { slots := v, next := i }
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::live]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 132:4-138:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_mailbox.live_loop
+  (slots : Slice (Option stateless_mailbox.Slot)) (count : Std.Usize)
+  (index : Std.Usize) :
+  Result Std.Usize
+  := do
+  let i := Slice.len slots
+  if index < i
+  then
+    let o ← Slice.index_usize slots index
+    let count1 ← match o with
+                   | none => ok count
+                   | some _ => count + 1#usize
+    let index1 ← index + 1#usize
+    stateless_mailbox.live_loop slots count1 index1
+  else ok count
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::live]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 129:0-140:1
+    Visibility: public -/
+@[reducible]
+def stateless_mailbox.live
+  (slots : Slice (Option stateless_mailbox.Slot)) : Result Std.Usize := do
+  stateless_mailbox.live_loop slots 0#usize 0#usize
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::live_count]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 142:0-144:1
+    Visibility: public -/
+def stateless_mailbox.live_count
+  (mailbox : stateless_mailbox.Mailbox) : Result Std.Usize := do
+  let s := alloc.vec.Vec.deref mailbox.slots
+  stateless_mailbox.live s
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::holds]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 146:0-154:1
+    Visibility: public -/
+def stateless_mailbox.holds
+  (slot : Option stateless_mailbox.Slot) (login : Slice Std.U8) :
+  Result Bool
+  := do
+  match slot with
+  | none => ok false
+  | some slot1 =>
+    let own := alloc.vec.Vec.deref slot1.entry.login
+    core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 own login
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::find]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 159:4-161:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_mailbox.find_loop
+  (slots : Slice (Option stateless_mailbox.Slot)) (login : Slice Std.U8)
+  (index : Std.Usize) :
+  Result Std.Usize
+  := do
+  let i := Slice.len slots
+  if index < i
+  then
+    let o ← Slice.index_usize slots index
+    let b ← stateless_mailbox.holds o login
+    if b
+    then ok index
+    else
+      let index1 ← index + 1#usize
+      stateless_mailbox.find_loop slots login index1
+  else ok index
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::find]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 157:0-163:1
+    Visibility: public -/
+@[reducible]
+def stateless_mailbox.find
+  (slots : Slice (Option stateless_mailbox.Slot)) (login : Slice Std.U8) :
+  Result Std.Usize
+  := do
+  stateless_mailbox.find_loop slots login 0#usize
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::occupied]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 165:0-170:1
+    Visibility: public -/
+def stateless_mailbox.occupied
+  (slot : Option stateless_mailbox.Slot) : Result Bool := do
+  match slot with
+  | none => ok false
+  | some _ => ok true
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::vacancy]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 175:4-177:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_mailbox.vacancy_loop
+  (slots : Slice (Option stateless_mailbox.Slot)) (index : Std.Usize) :
+  Result Std.Usize
+  := do
+  let i := Slice.len slots
+  if index < i
+  then
+    let o ← Slice.index_usize slots index
+    let b ← stateless_mailbox.occupied o
+    if b
+    then
+      let index1 ← index + 1#usize
+      stateless_mailbox.vacancy_loop slots index1
+    else ok index
+  else ok index
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::vacancy]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 173:0-179:1
+    Visibility: public -/
+@[reducible]
+def stateless_mailbox.vacancy
+  (slots : Slice (Option stateless_mailbox.Slot)) : Result Std.Usize := do
+  stateless_mailbox.vacancy_loop slots 0#usize
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::start]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 185:0-236:1
+    Visibility: public -/
+def stateless_mailbox.start
+  (mailbox : stateless_mailbox.Mailbox) (policy : stateless_login.LoginPolicy)
+  (provider : Slice Std.U8) (peer : Slice Std.U8) (subject : Slice Std.U8)
+  (certificate_expires : Std.I64) (login : Slice Std.U8)
+  (verifier : Slice Std.U8) (scope : Slice Std.U8) (now : Std.I64) :
+  Result ((core.result.Result stateless_login.LoginState
+    stateless_mailbox.MailboxError) × stateless_mailbox.Mailbox)
+  := do
+  let r ←
+    stateless_login.begin policy provider peer subject certificate_expires
+      login verifier scope now
+  match r with
+  | core.result.Result.Ok state =>
+    let mailbox1 ← stateless_mailbox.prune mailbox now
+    let s := alloc.vec.Vec.deref mailbox1.slots
+    let i ← stateless_mailbox.live s
+    if i >= stateless_mailbox.MAX_PENDING
+    then
+      ok (core.result.Result.Err stateless_mailbox.MailboxError.TooMany,
+        mailbox1)
+    else
+      let s1 := alloc.vec.Vec.deref mailbox1.slots
+      let s2 := alloc.vec.Vec.deref state.login
+      let i1 ← stateless_mailbox.find s1 s2
+      let i2 := alloc.vec.Vec.len mailbox1.slots
+      if i1 < i2
+      then
+        ok (core.result.Result.Err stateless_mailbox.MailboxError.Duplicate,
+          mailbox1)
+      else
+        if mailbox1.next = stateless_mailbox.LAST_SERIAL
+        then
+          ok (core.result.Result.Err stateless_mailbox.MailboxError.Exhausted,
+            mailbox1)
+        else
+          let e ← stateless_login.entry_of state
+          let i3 ← mailbox1.next + 1#u64
+          let s3 := alloc.vec.Vec.deref mailbox1.slots
+          let index ← stateless_mailbox.vacancy s3
+          let i4 := alloc.vec.Vec.len mailbox1.slots
+          if index < i4
+          then
+            let (_, index_mut_back) ←
+              alloc.vec.Vec.index_mut (core.slice.index.SliceIndexUsizeSlice
+                (Option stateless_mailbox.Slot)) mailbox1.slots index
+            let v :=
+              index_mut_back (some
+                {
+                  entry := e,
+                  serial := mailbox1.next,
+                  token := (alloc.vec.Vec.new Std.U8),
+                  expires_at := 0#i64,
+                  renew_until := 0#i64
+                })
+            ok (core.result.Result.Ok state, { slots := v, next := i3 })
+          else
+            let v ←
+              alloc.vec.Vec.push mailbox1.slots (some
+                ({
+                   entry := e,
+                   serial := mailbox1.next,
+                   token := (alloc.vec.Vec.new Std.U8),
+                   expires_at := 0#i64,
+                   renew_until := 0#i64
+                 } : stateless_mailbox.Slot))
+            ok (core.result.Result.Ok state, { slots := v, next := i3 })
+  | core.result.Result.Err rejection =>
+    ok (core.result.Result.Err (stateless_mailbox.MailboxError.Rejected
+      rejection), mailbox)
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::pending]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 240:0-266:1
+    Visibility: public -/
+def stateless_mailbox.pending
+  (mailbox : stateless_mailbox.Mailbox) (policy : stateless_login.LoginPolicy)
+  (state : stateless_login.LoginState) (now : Std.I64) :
+  Result (core.result.Result Unit stateless_mailbox.MailboxError)
+  := do
+  let s := alloc.vec.Vec.deref mailbox.slots
+  let s1 := alloc.vec.Vec.deref state.login
+  let index ← stateless_mailbox.find s s1
+  let i := alloc.vec.Vec.len mailbox.slots
+  if index >= i
+  then ok (core.result.Result.Err stateless_mailbox.MailboxError.Unknown)
+  else
+    let o ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice (Option
+        stateless_mailbox.Slot)) mailbox.slots index
+    match o with
+    | none =>
+      ok (core.result.Result.Err stateless_mailbox.MailboxError.Unknown)
+    | some slot =>
+      let b ← stateless_login.same_login policy slot.entry state
+      if b
+      then
+        match slot.entry.stage with
+        | oauth_login.Stage.Pending =>
+          if now >= slot.entry.expires_at
+          then
+            ok (core.result.Result.Err stateless_mailbox.MailboxError.Expired)
+          else ok (core.result.Result.Ok ())
+        | oauth_login.Stage.Accepted =>
+          ok (core.result.Result.Err stateless_mailbox.MailboxError.Consumed)
+        | oauth_login.Stage.Denied =>
+          ok (core.result.Result.Err stateless_mailbox.MailboxError.Consumed)
+        | oauth_login.Stage.Exchanging =>
+          ok (core.result.Result.Err stateless_mailbox.MailboxError.Consumed)
+        | oauth_login.Stage.Complete =>
+          ok (core.result.Result.Err stateless_mailbox.MailboxError.Consumed)
+        | oauth_login.Stage.Uncertain =>
+          ok (core.result.Result.Err stateless_mailbox.MailboxError.Consumed)
+      else ok (core.result.Result.Err stateless_mailbox.MailboxError.Consumed)
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::accept]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 272:0-322:1
+    Visibility: public -/
+def stateless_mailbox.accept
+  (mailbox : stateless_mailbox.Mailbox) (policy : stateless_login.LoginPolicy)
+  (state : stateless_login.LoginState) (rule : oauth_login.IssuerRule)
+  (issuer : Slice Std.U8) (has_issuer : Bool) (denied : Bool) (now : Std.I64) :
+  Result ((core.result.Result stateless_mailbox.Permit
+    stateless_mailbox.MailboxError) × stateless_mailbox.Mailbox)
+  := do
+  let s := alloc.vec.Vec.deref mailbox.slots
+  let s1 := alloc.vec.Vec.deref state.login
+  let index ← stateless_mailbox.find s s1
+  let i := alloc.vec.Vec.len mailbox.slots
+  if index >= i
+  then
+    ok (core.result.Result.Err stateless_mailbox.MailboxError.Unknown, mailbox)
+  else
+    let (o, index_mut_back) ←
+      alloc.vec.Vec.index_mut (core.slice.index.SliceIndexUsizeSlice (Option
+        stateless_mailbox.Slot)) mailbox.slots index
+    match o with
+    | none =>
+      let v := index_mut_back none
+      ok (core.result.Result.Err stateless_mailbox.MailboxError.Unknown,
+        { mailbox with slots := v })
+    | some slot =>
+      let r ←
+        stateless_login.accept_callback policy slot.entry state rule issuer
+          has_issuer denied now
+      match r with
+      | core.result.Result.Ok stage =>
+        if denied
+        then
+          let v :=
+            index_mut_back (some
+              { slot with entry := { slot.entry with stage } })
+          ok (core.result.Result.Err stateless_mailbox.MailboxError.Denied,
+            { mailbox with slots := v })
+        else
+          let r1 ←
+            stateless_login.begin_exchange { slot.entry with stage } rule now
+          match r1 with
+          | core.result.Result.Ok stage1 =>
+            let login := alloc.vec.Vec.deref slot.entry.login
+            let provider := alloc.vec.Vec.deref slot.entry.provider
+            let verifier := alloc.vec.Vec.deref state.verifier
+            let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 login
+            let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 provider
+            let v2 ← alloc.slice.Slice.to_vec core.clone.CloneU8 verifier
+            let v3 :=
+              index_mut_back (some
+                { slot with entry := { slot.entry with stage := stage1 } })
+            ok (core.result.Result.Ok
+              {
+                serial := slot.serial,
+                login := v,
+                provider := v1,
+                verifier := v2
+              }, { mailbox with slots := v3 })
+          | core.result.Result.Err denial =>
+            let v :=
+              index_mut_back (some
+                { slot with entry := { slot.entry with stage } })
+            ok (core.result.Result.Err (stateless_mailbox.MailboxError.Refused
+              denial), { mailbox with slots := v })
+      | core.result.Result.Err denial =>
+        let v := index_mut_back o
+        ok (core.result.Result.Err (stateless_mailbox.MailboxError.Refused
+          denial), { mailbox with slots := v })
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::exchange]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 326:0-329:1
+    Visibility: public -/
+def stateless_mailbox.exchange
+  {E : Type _} (CodeExchangeInst : stateless_mailbox.CodeExchange E)
+  (exchanger : E) (permit : stateless_mailbox.Permit) (code : Slice Std.U8) :
+  Result (stateless_mailbox.Exchanged × E)
+  := do
+  let s := alloc.vec.Vec.deref permit.provider
+  let s1 := alloc.vec.Vec.deref permit.verifier
+  let (token, exchanger1) ← CodeExchangeInst.token exchanger s code s1
+  ok ({ permit, token }, exchanger1)
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::issued]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 334:0-357:1
+    Visibility: public -/
+def stateless_mailbox.issued
+  {S : Type _} (statelessSurrogateSealerInst : stateless.SurrogateSealer S)
+  (sealer : S) (policy : stateless.IssuePolicy) (entry : stateless_login.Entry)
+  (token : stateless_mailbox.Token) (token_id : Slice Std.U8) (now : Std.I64)
+  (lifetime : Std.I64) :
+  Result (core.result.Result stateless.Issued stateless.Rejection)
+  := do
+  let r ←
+    stateless.credential_expiry now token.has_expires_in token.expires_in
+  match r with
+  | core.result.Result.Ok expires =>
+    let s := alloc.vec.Vec.deref token.credential
+    stateless_login.complete statelessSurrogateSealerInst sealer policy entry s
+      expires token_id now lifetime
+  | core.result.Result.Err rejection => ok (core.result.Result.Err rejection)
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::finish]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 363:0-411:1
+    Visibility: public -/
+def stateless_mailbox.finish
+  {S : Type _} (statelessSurrogateSealerInst : stateless.SurrogateSealer S)
+  (mailbox : stateless_mailbox.Mailbox)
+  (exchanged : stateless_mailbox.Exchanged) (sealer : S)
+  (policy : stateless.IssuePolicy) (token_id : Slice Std.U8) (now : Std.I64)
+  (lifetime : Std.I64) :
+  Result ((core.result.Result Unit stateless_mailbox.MailboxError) ×
+    stateless_mailbox.Mailbox)
+  := do
+  let s := alloc.vec.Vec.deref mailbox.slots
+  let s1 := alloc.vec.Vec.deref exchanged.permit.login
+  let index ← stateless_mailbox.find s s1
+  let i := alloc.vec.Vec.len mailbox.slots
+  if index >= i
+  then
+    ok (core.result.Result.Err stateless_mailbox.MailboxError.Unknown, mailbox)
+  else
+    let (o, index_mut_back) ←
+      alloc.vec.Vec.index_mut (core.slice.index.SliceIndexUsizeSlice (Option
+        stateless_mailbox.Slot)) mailbox.slots index
+    match o with
+    | none =>
+      let v := index_mut_back none
+      ok (core.result.Result.Err stateless_mailbox.MailboxError.Unknown,
+        { mailbox with slots := v })
+    | some slot =>
+      if slot.serial != exchanged.permit.serial
+      then
+        let v := index_mut_back o
+        ok (core.result.Result.Err stateless_mailbox.MailboxError.Unknown,
+          { mailbox with slots := v })
+      else
+        match slot.entry.stage with
+        | oauth_login.Stage.Pending =>
+          let v := index_mut_back o
+          ok (core.result.Result.Err stateless_mailbox.MailboxError.Consumed,
+            { mailbox with slots := v })
+        | oauth_login.Stage.Accepted =>
+          let v := index_mut_back o
+          ok (core.result.Result.Err stateless_mailbox.MailboxError.Consumed,
+            { mailbox with slots := v })
+        | oauth_login.Stage.Denied =>
+          let v := index_mut_back o
+          ok (core.result.Result.Err stateless_mailbox.MailboxError.Consumed,
+            { mailbox with slots := v })
+        | oauth_login.Stage.Exchanging =>
+          let result ←
+            match exchanged.token with
+            | none =>
+              ok (core.result.Result.Err stateless.Rejection.InvalidCredential)
+            | some token =>
+              stateless_mailbox.issued statelessSurrogateSealerInst sealer
+                policy slot.entry token token_id now lifetime
+          match result with
+          | core.result.Result.Ok issued =>
+            let r ← oauth_login.finish oauth_login.Stage.Exchanging true
+            match r with
+            | core.result.Result.Ok stage =>
+              let v :=
+                index_mut_back (some
+                  {
+                    slot
+                      with
+                      entry := { slot.entry with stage },
+                      token := issued.token,
+                      expires_at := issued.claims.expires_at,
+                      renew_until := issued.claims.renew_until
+                  })
+              ok (core.result.Result.Ok (), { mailbox with slots := v })
+            | core.result.Result.Err _ =>
+              let v :=
+                index_mut_back (some
+                  {
+                    slot
+                      with
+                      entry :=
+                        { slot.entry with stage := oauth_login.Stage.Uncertain
+                        },
+                      token := issued.token,
+                      expires_at := issued.claims.expires_at,
+                      renew_until := issued.claims.renew_until
+                  })
+              ok (core.result.Result.Ok (), { mailbox with slots := v })
+          | core.result.Result.Err rejection =>
+            let r ← oauth_login.finish oauth_login.Stage.Exchanging false
+            match r with
+            | core.result.Result.Ok stage =>
+              let v :=
+                index_mut_back (some
+                  { slot with entry := { slot.entry with stage } })
+              ok (core.result.Result.Err
+                (stateless_mailbox.MailboxError.Rejected rejection),
+                { mailbox with slots := v })
+            | core.result.Result.Err _ =>
+              let v :=
+                index_mut_back (some
+                  {
+                    slot
+                      with
+                      entry :=
+                        { slot.entry with stage := oauth_login.Stage.Uncertain
+                        }
+                  })
+              ok (core.result.Result.Err
+                (stateless_mailbox.MailboxError.Rejected rejection),
+                { mailbox with slots := v })
+        | oauth_login.Stage.Complete =>
+          let v := index_mut_back o
+          ok (core.result.Result.Err stateless_mailbox.MailboxError.Consumed,
+            { mailbox with slots := v })
+        | oauth_login.Stage.Uncertain =>
+          let v := index_mut_back o
+          ok (core.result.Result.Err stateless_mailbox.MailboxError.Consumed,
+            { mailbox with slots := v })
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::Polled]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 414:0-426:1
+    Visibility: public -/
+@[discriminant isize]
+inductive stateless_mailbox.Polled where
+| Pending : stateless_mailbox.Polled
+| Ready :
+  alloc.vec.Vec Std.U8 →
+  Std.I64 →
+  Std.I64 →
+  stateless_mailbox.Polled
+| Unknown : stateless_mailbox.Polled
+| WrongCertificate : stateless_mailbox.Polled
+| Denied : stateless_mailbox.Polled
+| Failed : stateless_mailbox.Polled
+| Expired : stateless_mailbox.Polled
+
+/-- [aivm_secrets_garrett_core::stateless_mailbox::poll]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_mailbox.rs', lines 431:0-461:1
+    Visibility: public -/
+def stateless_mailbox.poll
+  (mailbox : stateless_mailbox.Mailbox) (peer : Slice Std.U8)
+  (login : Slice Std.U8) (now : Std.I64) :
+  Result (stateless_mailbox.Polled × stateless_mailbox.Mailbox)
+  := do
+  let s := alloc.vec.Vec.deref mailbox.slots
+  let index ← stateless_mailbox.find s login
+  let i := alloc.vec.Vec.len mailbox.slots
+  if index >= i
+  then ok (stateless_mailbox.Polled.Unknown, mailbox)
+  else
+    let o ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice (Option
+        stateless_mailbox.Slot)) mailbox.slots index
+    match o with
+    | none => ok (stateless_mailbox.Polled.Unknown, mailbox)
+    | some slot =>
+      let delivery ← stateless_login.deliver slot.entry peer now
+      match delivery with
+      | stateless_login.Delivery.Pending =>
+        ok (stateless_mailbox.Polled.Pending, mailbox)
+      | stateless_login.Delivery.Deliver =>
+        let (o1, index_mut_back) ←
+          alloc.vec.Vec.index_mut (core.slice.index.SliceIndexUsizeSlice
+            (Option stateless_mailbox.Slot)) mailbox.slots index
+        let (taken, o2) := core.mem.replace o1 none
+        match taken with
+        | none =>
+          let v := index_mut_back o2
+          ok (stateless_mailbox.Polled.Unknown, { mailbox with slots := v })
+        | some slot1 =>
+          let v := index_mut_back o2
+          ok (stateless_mailbox.Polled.Ready slot1.token slot1.expires_at
+            slot1.renew_until, { mailbox with slots := v })
+      | stateless_login.Delivery.WrongCertificate =>
+        ok (stateless_mailbox.Polled.WrongCertificate, mailbox)
+      | stateless_login.Delivery.Denied =>
+        ok (stateless_mailbox.Polled.Denied, mailbox)
+      | stateless_login.Delivery.Failed =>
+        ok (stateless_mailbox.Polled.Failed, mailbox)
+      | stateless_login.Delivery.Expired =>
+        let (_, index_mut_back) ←
+          alloc.vec.Vec.index_mut (core.slice.index.SliceIndexUsizeSlice
+            (Option stateless_mailbox.Slot)) mailbox.slots index
+        let v := index_mut_back none
+        ok (stateless_mailbox.Polled.Expired, { mailbox with slots := v })
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::Route]
     Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 21:0-27:1

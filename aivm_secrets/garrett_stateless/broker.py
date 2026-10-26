@@ -107,7 +107,8 @@ class Broker:
         self.keys = keys
         self.endpoint = endpoint or HttpsTokenEndpoint()
         self.clock = clock or (lambda: int(time.time()))
-        self.mailbox = login.Mailbox()
+        self.mailbox = d.Mailbox()
+        self.mailbox_lock = threading.Lock()
         self._secrets = {p.name: (read_private(p.client_secret_file, 4096).decode('utf-8').strip()
                                   if p.client_secret_file else None) for p in config.providers}
 
@@ -146,11 +147,13 @@ class Broker:
             raise wire.ProtocolError('invalid_scope') from None
         login_id = enc.random_id()
         now = self.clock()
-        state = d.begin_login(self._login_policy(), provider, peer.thumbprint, peer.subject, peer.not_after,
-                              login_id, login.pkce_verifier(), scope, now)
+        with self.mailbox_lock:
+            try:
+                state = d.mailbox_start(self.mailbox, self._login_policy(), provider, peer.thumbprint, peer.subject,
+                                        peer.not_after, login_id, login.pkce_verifier(), scope, now)
+            except d.MailboxError as error:
+                raise wire.ProtocolError(error.code) from None
         sealed = login.seal_state(self.keys.state, state)
-        with self.mailbox.lock:
-            self.mailbox.insert(login_id, d.entry_of(state), now)
         url = self.config.public_url.url() + 'authorize?' + wire.form([('state', sealed)])
         return LoginStarted(login_id, url, login.confirmation(login_id), state.expires_at)
 
@@ -167,14 +170,11 @@ class Broker:
             state = login.open_state(self.keys.state, state_text)
         except d.Rejection:
             raise wire.ProtocolError('invalid_state') from None
-        with self.mailbox.lock:
-            slot = self.mailbox.slots.get(state.login)
-            if slot is None:
-                raise wire.ProtocolError('login_unknown')
-            if not d.same_login(self._login_policy(), slot.entry, state) or slot.entry.stage is not d.Stage.PENDING:
-                raise wire.ProtocolError('login_consumed')
-            if self.clock() >= slot.entry.expires_at:
-                raise wire.ProtocolError('login_expired')
+        with self.mailbox_lock:
+            try:
+                d.mailbox_pending(self.mailbox, self._login_policy(), state, self.clock())
+            except d.MailboxError as error:
+                raise wire.ProtocolError(error.code) from None
         provider = self._provider(state.provider)
         url = self._provider_url(provider, state_text, state.scope, state.verifier)
         e = html.escape
@@ -203,74 +203,62 @@ class Broker:
             raise wire.ProtocolError('invalid_state') from None
         provider = self._provider(state.provider)
         policy = self._login_policy()
-        with self.mailbox.lock:
-            slot = self.mailbox.slots.get(state.login)
-            if slot is None:
-                raise wire.ProtocolError('login_unknown')
-            now = self.clock()
+        with self.mailbox_lock:
             try:
-                stage = d.accept_callback(policy, slot.entry, state, provider.issuer, issuer, denied, now)
-                slot.entry = d.with_stage(slot.entry, stage)
-                if denied:
-                    raise wire.ProtocolError('login_denied')
-                slot.entry = d.with_stage(slot.entry, d.begin_exchange(slot.entry, now))
-            except d.LoginDenial as denial:
-                raise wire.ProtocolError({'invalid': 'invalid_callback', 'expired': 'login_expired',
-                                          'consumed': 'login_consumed'}[denial.code]) from None
-        # The mailbox is unlocked during the network exchange.
-        fields = [('grant_type', 'authorization_code'), ('code', code), ('redirect_uri', self.redirect_uri()),
-                  ('client_id', provider.client_id), ('code_verifier', state.verifier)]
-        if self._secrets.get(provider.name):
-            fields.append(('client_secret', self._secrets[provider.name]))
-        issued = None
+                permit = d.mailbox_accept(self.mailbox, policy, state, provider.issuer, issuer, denied, self.clock())
+            except d.MailboxError as error:
+                raise wire.ProtocolError(error.code) from None
+        # The mailbox is unlocked during the network exchange; the answer can
+        # only reach the login the permit was made for.
         failure: Exception | None = None
-        try:
-            response = self.endpoint.exchange(provider, wire.form(fields))
-        except (wire.ProtocolError, OSError, ssl.SSLError) as error:
-            failure, response = error, None
-        with self.mailbox.lock:
-            slot = self.mailbox.slots.get(state.login)
-            if slot is None:
-                raise wire.ProtocolError('login_unknown')
-            if response is not None:
-                try:
-                    now = self.clock()
-                    expires = d.credential_expiry(now, response.expires_in)
-                    info = tok.Informational(scope=(response.scope if response.scope is not None else state.scope) or None,
-                                             upstream=tok.copy_upstream(response.access_token, provider.copy_claims))
-                    sealer = tok.Sealer(self.keys.active_entry(), info)
-                    issued = d.complete(sealer, policy, self.issue_policy(), slot.entry, state,
-                                        response.access_token.encode('ascii'), expires, enc.random_id(), now,
-                                        self.config.max_lifetime)
-                except d.Rejection as rejection:
-                    failure = rejection
+        scope: str | None = None
+
+        def token(provider_name: str, code_: str, verifier: str) -> d.Token | None:
+            nonlocal failure, scope
+            config = self._provider(provider_name)
+            fields = [('grant_type', 'authorization_code'), ('code', code_), ('redirect_uri', self.redirect_uri()),
+                      ('client_id', config.client_id), ('code_verifier', verifier)]
+            if self._secrets.get(config.name):
+                fields.append(('client_secret', self._secrets[config.name]))
             try:
-                slot.entry = d.with_stage(slot.entry, d.finish(slot.entry.stage, issued is not None))
-            except d.LoginDenial:
-                slot.entry = d.with_stage(slot.entry, d.Stage.UNCERTAIN)
-            if issued is not None:
-                slot.token = (issued.token.decode('ascii'), issued.claims.expires_at, issued.claims.renew_until)
-        if issued is None:
+                response = self.endpoint.exchange(config, wire.form(fields))
+            except (wire.ProtocolError, OSError, ssl.SSLError) as error:
+                failure = error
+                return None
+            scope = response.scope
+            return d.Token(response.access_token.encode('ascii'), response.expires_in)
+
+        exchanged = d.mailbox_exchange(token, permit, code)
+        sealer = None
+        if exchanged.token is not None:
+            info = tok.Informational(scope=(scope if scope is not None else state.scope) or None,
+                                     upstream=tok.copy_upstream(exchanged.token.credential.decode('ascii'),
+                                                                provider.copy_claims))
+            sealer = tok.Sealer(self.keys.active_entry(), info)
+        with self.mailbox_lock:
+            try:
+                d.mailbox_finish(self.mailbox, exchanged, sealer, self.issue_policy(), enc.random_id(), self.clock(),
+                                 self.config.max_lifetime)
+            except d.MailboxError as error:
+                if failure is None:
+                    failure = error
+        if failure is not None:
             code_ = getattr(failure, 'code', 'login_failed')
             raise wire.ProtocolError(code_ if isinstance(code_, str) else 'login_failed')
 
     def poll(self, peer: tls.PeerIdentity, login_id: str) -> IssuedToken | tuple[int, str] | None:
         """``None`` while pending, an :class:`IssuedToken`, or ``(status, code)``."""
-        with self.mailbox.lock:
-            slot = self.mailbox.slots.get(login_id)
-            if slot is None:
-                return 404, 'login_unknown'
-            outcome = d.deliver(slot.entry, peer.thumbprint, self.clock())
-            if outcome == 'pending':
-                return None
-            if outcome == 'wrong_certificate':
-                return 403, 'wrong_certificate'
-            if outcome in ('denied', 'failed'):
-                return 410, f'login_{outcome}'
-            del self.mailbox.slots[login_id]
-            if outcome == 'expired' or slot.token is None:
-                return 410, 'login_expired' if outcome == 'expired' else 'login_failed'
-            return IssuedToken(*slot.token)
+        with self.mailbox_lock:
+            outcome, slot = d.mailbox_poll(self.mailbox, peer.thumbprint, login_id, self.clock())
+        if outcome == 'pending':
+            return None
+        if outcome == 'unknown':
+            return 404, 'login_unknown'
+        if outcome == 'wrong_certificate':
+            return 403, 'wrong_certificate'
+        if outcome in ('denied', 'failed', 'expired'):
+            return 410, f'login_{outcome}'
+        return IssuedToken(slot.token.decode('ascii'), slot.expires_at, slot.renew_until)
 
     def renew(self, peer: tls.PeerIdentity, token: str) -> IssuedToken:
         raw = token.encode('ascii', 'replace')

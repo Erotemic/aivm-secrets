@@ -1,5 +1,5 @@
-//! The sealed login state (spec section 8.2), PKCE, and the transient
-//! login mailbox (section 9).
+//! The sealed login state (spec section 8.2) and PKCE. The transient login
+//! mailbox (section 9) is the extracted `stateless_mailbox`.
 use crate::encoding::{
     b64url, from_b64url, is_id, is_kid, is_provider, is_scope, is_text, is_thumbprint, random,
 };
@@ -7,14 +7,12 @@ use crate::error::{Error, Result};
 use crate::json::{self, Value, MAX_INTEGER};
 use aivm_secrets_garrett_core::oauth_login::Stage;
 use aivm_secrets_garrett_core::stateless::Rejection;
-use aivm_secrets_garrett_core::stateless_login::{Entry, LoginState};
+use aivm_secrets_garrett_core::stateless_login::LoginState;
 use ring::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
-use std::collections::HashMap;
 use zeroize::Zeroizing;
 
 pub const STATE_PREFIX: &str = "gs1.";
 pub const MAX_STATE: usize = 4096;
-pub const MAX_PENDING: usize = 1024;
 const LOGIN_LABEL: &[u8] = b"garrett-stateless-v1/login\0";
 
 fn key(state_key: &[u8; 32]) -> LessSafeKey {
@@ -157,49 +155,6 @@ pub fn pkce_challenge(verifier: &str) -> String {
 pub fn confirmation(login: &str) -> String {
     let upper = login.to_ascii_uppercase();
     format!("{}-{}", &upper[..4], &upper[4..8])
-}
-
-/// One mailbox slot: the transient entry and, once issued, its surrogate.
-pub struct Slot {
-    pub entry: Entry,
-    pub token: Option<(String, i64)>,
-}
-
-/// The broker's only mutable state: logins in progress, in memory.
-#[derive(Default)]
-pub struct Mailbox {
-    slots: HashMap<String, Slot>,
-}
-
-impl Mailbox {
-    pub fn prune(&mut self, now: i64) {
-        self.slots.retain(|_, slot| {
-            now < slot.entry.expires_at + aivm_secrets_garrett_core::stateless_login::DELIVERY_GRACE
-        });
-    }
-    pub fn insert(&mut self, login: String, entry: Entry, now: i64) -> Result<()> {
-        self.prune(now);
-        if self.slots.len() >= MAX_PENDING {
-            return Err(Error::Protocol("too_many_logins"));
-        }
-        if self.slots.contains_key(&login) {
-            return Err(Error::Protocol("internal_error"));
-        }
-        self.slots.insert(login, Slot { entry, token: None });
-        Ok(())
-    }
-    pub fn get_mut(&mut self, login: &str) -> Option<&mut Slot> {
-        self.slots.get_mut(login)
-    }
-    pub fn remove(&mut self, login: &str) -> Option<Slot> {
-        self.slots.remove(login)
-    }
-    pub fn len(&self) -> usize {
-        self.slots.len()
-    }
-    pub fn is_empty(&self) -> bool {
-        self.slots.is_empty()
-    }
 }
 
 /// The stable name of a login stage, for diagnostics.

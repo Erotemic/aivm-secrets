@@ -19,13 +19,15 @@ Proved:
   entry of the same login, peer, provider, window and replica, only while
   pending and inside the window, and only under the provider's RFC 9207
   issuer rule (through the proved `oauth_login::claim`);
-* `complete_trace`: a surrogate is issued only for an exchanging entry and
-  its own state, bound to the entry's certificate and provider;
+* `complete_trace`: a surrogate is issued only for an exchanging entry,
+  bound to the entry's certificate, provider and subject;
 * `deliver_trace`, `deliver_other_peer`: only the entry's certificate can
   collect, only once complete and within the delivery grace;
-* `login_surrogate_bound_to_starting_peer`: when the mailbox only changes an
-  entry's stage, the surrogate a login produces is bound to the peer that
-  began it, and the only peer that can collect it is that peer.
+
+The mailbox that holds the entries between these steps is extracted too
+(`stateless_mailbox`); `GarrettStatelessMailbox` proves, over every history
+of broker transitions, that entries never change except in stage, and
+derives the end-to-end binding from that.
 -/
 
 open Aeneas Aeneas.Std
@@ -76,13 +78,15 @@ theorem begin_trace {policy : LoginPolicy} {provider peer subject : Slice U8} {c
 theorem entry_of_eq (s : LoginState) :
     entry_of s = Result.ok
       { login := s.login, provider := s.provider, certificate := s.certificate,
+        subject := s.subject, certificate_expires := s.certificate_expires,
         issued_at := s.issued_at, expires_at := s.expires_at, stage := .Pending } := by
   simp only [entry_of, to_vec_eq, bind_ok, vec_deref_mk]
 
 /-- The entry and the state belong to the same login on this replica. -/
 def SameLogin (policy : LoginPolicy) (e : Entry) (s : LoginState) : Prop :=
   s.replica.val = policy.replica.val ∧ e.login.val = s.login.val ∧ e.provider.val = s.provider.val ∧
-  e.certificate.val = s.certificate.val ∧ e.issued_at = s.issued_at ∧ e.expires_at = s.expires_at
+  e.certificate.val = s.certificate.val ∧ e.subject.val = s.subject.val ∧
+  e.certificate_expires = s.certificate_expires ∧ e.issued_at = s.issued_at ∧ e.expires_at = s.expires_at
 
 @[step]
 theorem same_login_spec (policy : LoginPolicy) (e : Entry) (s : LoginState) :
@@ -146,38 +150,29 @@ theorem accept_callback_trace {policy : LoginPolicy} {e : Entry} {s : LoginState
       simpa [alloc.vec.Vec.deref, alloc.vec.Vec.val] using this
   · simp at h
 
-theorem grant_of_eq (e : Entry) (s : LoginState) (credExpires : I64) :
-    grant_of e s credExpires = Result.ok
-      { provider := e.provider, subject := s.subject, certificate := e.certificate,
-        certificate_expires := s.certificate_expires, credential_expires := credExpires } := by
+theorem grant_of_eq (e : Entry) (credExpires : I64) :
+    grant_of e credExpires = Result.ok
+      { provider := e.provider, subject := e.subject, certificate := e.certificate,
+        certificate_expires := e.certificate_expires, credential_expires := credExpires } := by
   simp only [grant_of, to_vec_eq, bind_ok, vec_deref_mk]
 
 /-- **Issuance at completion.** A login yields a surrogate only from an
-    exchanging entry and its own state; the surrogate is bound to the entry's
-    certificate, provider and the state's subject, and is what the sealer
-    produced (`issue_trace`). -/
+    exchanging entry; the surrogate is bound to the entry's certificate,
+    provider and subject, and is what the sealer produced (`issue_trace`). -/
 theorem complete_trace {S : Type} (ops : stateless.SurrogateSealer S) (sealer : S)
-    {lp : LoginPolicy} {p : stateless.IssuePolicy} {e : Entry} {s : LoginState}
+    {p : stateless.IssuePolicy} {e : Entry}
     {credential : Slice U8} {credExpires : I64} {tokenId : Slice U8} {now lifetime : I64}
     {issued : stateless.Issued}
-    (h : complete ops sealer lp p e s credential credExpires tokenId now lifetime = Result.ok (.Ok issued)) :
-    e.stage = .Exchanging ∧ SameLogin lp e s ∧
+    (h : complete ops sealer p e credential credExpires tokenId now lifetime = Result.ok (.Ok issued)) :
+    e.stage = .Exchanging ∧
       issued.claims.certificate = e.certificate ∧ issued.claims.provider = e.provider ∧
-      issued.claims.subject = s.subject ∧ http_auth.Proofs.ValidCredential credential ∧
+      issued.claims.subject = e.subject ∧ http_auth.Proofs.ValidCredential credential ∧
       ops.«seal» sealer issued.claims credential = Result.ok (.Ok issued.token) := by
   unfold complete at h
   cases hs : e.stage <;> rw [hs] at h <;> try simp at h
-  obtain ⟨b, hb, h⟩ := bind_ok_inv h
-  obtain ⟨b', hb', same⟩ := returned_of_spec (same_login_spec lp e s)
-  rw [hb'] at hb
-  simp only [Result.ok.injEq] at hb
-  subst hb
-  split at h
-  · rename_i yes
-    simp only [grant_of_eq, bind_ok] at h
-    obtain ⟨valid, ⟨_, _, _, subject, provider, certificate, _⟩, sealed⟩ := issue_trace ops sealer h
-    exact ⟨rfl, same.mp yes, certificate, provider, subject, valid, sealed⟩
-  · simp at h
+  simp only [grant_of_eq, bind_ok] at h
+  obtain ⟨valid, ⟨_, _, _, subject, provider, certificate, _⟩, sealed⟩ := issue_trace ops sealer h
+  exact ⟨rfl, certificate, provider, subject, valid, sealed⟩
 
 /-- **Delivery.** A surrogate is delivered only to the entry's certificate,
     only once complete, and only within the delivery grace. -/
@@ -202,42 +197,5 @@ theorem deliver_other_peer (e : Entry) (peer : Slice U8) (now : I64)
     (different : e.certificate.val ≠ peer.val) :
     deliver e peer now = Result.ok .WrongCertificate := by
   simp [deliver, proxy_http.Proofs.slice_eq_eq, alloc.vec.Vec.deref, different]
-
-/-- The mailbox changed nothing but the stage of the entry `begin` created. -/
-def StageOnly (e0 e : Entry) : Prop :=
-  e.login = e0.login ∧ e.provider = e0.provider ∧ e.certificate = e0.certificate ∧
-  e.issued_at = e0.issued_at ∧ e.expires_at = e0.expires_at
-
-/-- **OAuth binding, end to end.** A login begun by `peer0` creates an entry;
-    if the mailbox only ever changes that entry's stage, then any surrogate
-    `complete` issues for it — whatever (authenticated) state the callback
-    carried — is bound to `peer0`'s certificate, and the only peer to which
-    `deliver` hands it over is `peer0`. -/
-theorem login_surrogate_bound_to_starting_peer {S : Type} (ops : stateless.SurrogateSealer S) (sealer : S)
-    {policy : LoginPolicy} {provider peer0 subject : Slice U8} {certExpires : I64}
-    {login verifier scope : Slice U8} {now0 : I64} {s0 : LoginState} {e0 : Entry}
-    (begun : «begin» policy provider peer0 subject certExpires login verifier scope now0 = Result.ok (.Ok s0))
-    (created : entry_of s0 = Result.ok e0)
-    {p : stateless.IssuePolicy} {e1 : Entry} {s1 : LoginState} {credential : Slice U8}
-    {credExpires : I64} {tokenId : Slice U8} {now1 lifetime : I64} {issued : stateless.Issued}
-    (kept1 : StageOnly e0 e1)
-    (completed : complete ops sealer policy p e1 s1 credential credExpires tokenId now1 lifetime =
-      Result.ok (.Ok issued))
-    {e2 : Entry} {peer : Slice U8} {now2 : I64}
-    (kept2 : StageOnly e0 e2)
-    (delivered : deliver e2 peer now2 = Result.ok .Deliver) :
-    issued.claims.certificate.val = peer0.val ∧ peer.val = peer0.val := by
-  have start := (begin_trace begun).1
-  rw [entry_of_eq] at created
-  simp only [Result.ok.injEq] at created
-  subst created
-  obtain ⟨_, _, certificate, _⟩ := complete_trace ops sealer completed
-  obtain ⟨_, _, c1, _⟩ := kept1
-  obtain ⟨_, _, c2, _⟩ := kept2
-  have collected := (deliver_trace e2 peer now2 delivered).1
-  rw [c2] at collected
-  refine ⟨?_, ?_⟩
-  · rw [certificate, c1]; exact start
-  · rw [← collected]; exact start
 
 end aivm_secrets_garrett_core.stateless_login.Proofs

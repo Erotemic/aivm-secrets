@@ -38,11 +38,14 @@ pub struct LoginPolicy {
     pub ttl: i64,
 }
 
-/// The broker's transient record of one login.
+/// The broker's transient record of one login. Everything the surrogate is
+/// bound to comes from here, never from the state the browser carried back.
 pub struct Entry {
     pub login: Vec<u8>,
     pub provider: Vec<u8>,
     pub certificate: Vec<u8>,
+    pub subject: Vec<u8>,
+    pub certificate_expires: i64,
     pub issued_at: i64,
     pub expires_at: i64,
     pub stage: Stage,
@@ -91,10 +94,13 @@ pub fn entry_of(state: &LoginState) -> Entry {
     let login: &[u8] = &state.login;
     let provider: &[u8] = &state.provider;
     let certificate: &[u8] = &state.certificate;
+    let subject: &[u8] = &state.subject;
     Entry {
         login: login.to_vec(),
         provider: provider.to_vec(),
         certificate: certificate.to_vec(),
+        subject: subject.to_vec(),
+        certificate_expires: state.certificate_expires,
         issued_at: state.issued_at,
         expires_at: state.expires_at,
         stage: Stage::Pending,
@@ -132,10 +138,14 @@ pub fn same_login(policy: &LoginPolicy, entry: &Entry, state: &LoginState) -> bo
     let state_login: &[u8] = &state.login;
     let state_provider: &[u8] = &state.provider;
     let state_certificate: &[u8] = &state.certificate;
+    let subject: &[u8] = &entry.subject;
+    let state_subject: &[u8] = &state.subject;
     replica == own
         && login == state_login
         && provider == state_provider
         && certificate == state_certificate
+        && subject == state_subject
+        && entry.certificate_expires == state.certificate_expires
         && entry.issued_at == state.issued_at
         && entry.expires_at == state.expires_at
 }
@@ -174,31 +184,28 @@ pub fn begin_exchange(entry: &Entry, rule: &IssuerRule, now: i64) -> Result<Stag
     oauth_login::begin(&entry.stage, &pending, now)
 }
 
-/// The grant for an exchanged login: the provider and the certificate of
-/// the entry (the peer that began the login), the subject and certificate
-/// expiry recorded in its state.
-pub fn grant_of(entry: &Entry, state: &LoginState, credential_expires: i64) -> Grant {
+/// The grant for an exchanged login: the provider, certificate, subject and
+/// certificate expiry the entry recorded when the peer began the login.
+pub fn grant_of(entry: &Entry, credential_expires: i64) -> Grant {
     let provider: &[u8] = &entry.provider;
     let certificate: &[u8] = &entry.certificate;
-    let subject: &[u8] = &state.subject;
+    let subject: &[u8] = &entry.subject;
     Grant {
         provider: provider.to_vec(),
         subject: subject.to_vec(),
         certificate: certificate.to_vec(),
-        certificate_expires: state.certificate_expires,
+        certificate_expires: entry.certificate_expires,
         credential_expires,
     }
 }
 
 /// Issue the surrogate for an exchanged login. Only an entry that is
-/// exchanging, and whose state is its own, can produce a surrogate.
+/// exchanging can produce a surrogate, and its binding is the entry's.
 #[allow(clippy::too_many_arguments)]
 pub fn complete<S: SurrogateSealer>(
     sealer: &S,
-    login_policy: &LoginPolicy,
     policy: &IssuePolicy,
     entry: &Entry,
-    state: &LoginState,
     credential: &[u8],
     credential_expires: i64,
     token_id: &[u8],
@@ -209,10 +216,7 @@ pub fn complete<S: SurrogateSealer>(
         Stage::Exchanging => (),
         _ => return Err(Rejection::Malformed),
     }
-    if !same_login(login_policy, entry, state) {
-        return Err(Rejection::Malformed);
-    }
-    let grant = grant_of(entry, state, credential_expires);
+    let grant = grant_of(entry, credential_expires);
     stateless::issue(sealer, policy, grant, credential, token_id, now, lifetime)
 }
 

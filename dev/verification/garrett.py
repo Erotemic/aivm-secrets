@@ -35,6 +35,13 @@ PROFILES = [
     "native-coordinator-authority-v1",
     "native-exact-write-approval-v1",
 ]
+# The proof module that must reject a mutant of each garrett-stateless-v1 source.
+STATELESS_PROOFS = {
+    "stateless.rs": "GarrettStateless",
+    "stateless_login.rs": "GarrettStatelessLogin",
+    "stateless_mailbox.rs": "GarrettStatelessMailbox",
+    "stateless_proxy.rs": "GarrettStatelessProxy",
+}
 THEOREMS = [
     'aivm_secrets_garrett_core.read_transition.Proofs.request_facts_returned_iff',
     'aivm_secrets_garrett_core.read_transition.Proofs.finish_request_returned_iff',
@@ -1060,6 +1067,7 @@ def inputs() -> list[str]:
         "proofs/GarrettStateless.lean",
         "proofs/GarrettStatelessLogin.lean",
         "proofs/GarrettStatelessProxy.lean",
+        "proofs/GarrettStatelessMailbox.lean",
         "dev/garrett_stateless_vectors.py",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
@@ -2254,6 +2262,7 @@ def mutate(pattern: str | None = None) -> None:
     stateless = source.with_name("stateless.rs")
     stateless_login = source.with_name("stateless_login.rs")
     stateless_proxy = source.with_name("stateless_proxy.rs")
+    stateless_mailbox = source.with_name("stateless_mailbox.rs")
     mutations += [
         (stateless, "stateless certificate binding removed", "if !(certificate == peer) {", "if false {"),
         (stateless, "stateless expired token accepted", "if now >= claims.expires_at {", "if now > claims.expires_at {"),
@@ -2283,6 +2292,19 @@ def mutate(pattern: str | None = None) -> None:
          "        &opened.credential,\n        &route.authentication,", "        &token,\n        &route.authentication,"),
         (stateless_proxy, "stateless proxy credential reflection unchecked",
          "let forms = reflection_forms(&opened.credential);", "let forms = reflection_forms(b\"\");"),
+        (stateless_mailbox, "stateless mailbox duplicate login accepted",
+         "if find(&mailbox.slots, &state.login) < mailbox.slots.len() {", "if false {"),
+        (stateless_mailbox, "stateless mailbox serial reused", "        serial: mailbox.next,\n", "        serial: 0,\n"),
+        (stateless_mailbox, "stateless mailbox capacity not enforced", "if live(&mailbox.slots) >= MAX_PENDING {",
+         "if false {"),
+        (stateless_mailbox, "stateless mailbox exchange answer reaches another login",
+         "if slot.serial != exchanged.permit.serial {", "if false {"),
+        (stateless_mailbox, "stateless mailbox finish ignores the stage",
+         "            match slot.entry.stage {\n                Stage::Exchanging => (),\n                _ => return Err(MailboxError::Consumed),\n            }\n            let result",
+         "            let result"),
+        (stateless_mailbox, "stateless mailbox poll ignores the peer",
+         "Some(slot) => stateless_login::deliver(&slot.entry, peer, now),",
+         "Some(slot) => stateless_login::deliver(&slot.entry, &slot.entry.certificate, now),"),
     ]
     total = len(mutations)
     if pattern is not None:
@@ -2484,7 +2506,7 @@ def mutate(pattern: str | None = None) -> None:
                             visit(imported)
                     closure.append(module)
 
-                visit("GarrettStatelessProxy" if source.name == "stateless_proxy.rs" else "GarrettStatelessLogin" if source.name == "stateless_login.rs" else "GarrettStateless" if source.name == "stateless.rs" else "GarrettJsonFrame" if label.startswith("json wire ") else "GarrettJsonString" if label.startswith("json string ") else "GarrettProviderWire" if label.startswith("provider wire ") else "GarrettProviderChannel" if label.startswith("provider channel ") else "GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
+                visit(STATELESS_PROOFS[source.name] if source.name in STATELESS_PROOFS else "GarrettJsonFrame" if label.startswith("json wire ") else "GarrettJsonString" if label.startswith("json string ") else "GarrettProviderWire" if label.startswith("provider wire ") else "GarrettProviderChannel" if label.startswith("provider channel ") else "GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
                 modules = closure + [module for module in modules if module not in seen]
             for module in modules:
                 proof = temporary / (module + ".lean")
