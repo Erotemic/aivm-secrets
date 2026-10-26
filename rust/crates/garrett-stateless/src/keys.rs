@@ -290,7 +290,9 @@ impl BrokerKeys {
             .find(|e| e.kid == self.active)
             .expect("validated active kid")
     }
-    pub(crate) fn state_key(&self) -> &[u8; 32] {
+    /// The login-state key (broker only; exposed for conformance tests).
+    #[doc(hidden)]
+    pub fn state_key(&self) -> &[u8; 32] {
         &self.state
     }
     /// Every entry, for opening surrogates at renewal.

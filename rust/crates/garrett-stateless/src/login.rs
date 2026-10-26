@@ -29,6 +29,11 @@ fn text(bytes: &[u8]) -> Result<Value> {
 
 /// Seal a login state under the broker's login-state key.
 pub fn seal_state(state_key: &[u8; 32], state: &LoginState) -> Result<String> {
+    seal_plaintext(state_key, &state_plaintext(state)?, random::<12>()?)
+}
+
+/// The canonical plaintext of a login state.
+pub fn state_plaintext(state: &LoginState) -> Result<Vec<u8>> {
     let plain = json::object([
         (
             "cert_exp",
@@ -44,11 +49,7 @@ pub fn seal_state(state_key: &[u8; 32], state: &LoginState) -> Result<String> {
         ("sub", text(&state.subject)?),
         ("verifier", text(&state.verifier)?),
     ]);
-    seal_plaintext(
-        state_key,
-        &json::canonical(&plain).map_err(|_| Error::Protocol("invalid_request"))?,
-        random::<12>()?,
-    )
+    json::canonical(&plain).map_err(|_| Error::Protocol("invalid_request"))
 }
 
 /// Deterministic sealing for conformance vectors.
