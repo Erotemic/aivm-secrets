@@ -204,6 +204,7 @@ def main() -> None:
     parser.add_argument('--jwt', action='store_true')
     parser.add_argument('--issuer')
     parser.add_argument('--client-id', default='synthetic-client')
+    parser.add_argument('--until-stdin-eof', action='store_true', help='the default; accepted for symmetry')
     args = parser.parse_args()
     _, idp, api = start(args.cert, args.key, args.idp_listen, args.api_listen, args.log, args.jwt, args.issuer,
                         args.client_id)
