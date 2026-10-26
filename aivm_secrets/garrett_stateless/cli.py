@@ -35,6 +35,9 @@ def _hold(args) -> None:
 
 
 def _agent(args) -> Agent:
+    if args.tpm is not None or args.key is None:
+        raise SystemExit('the Python agent supports --key only; TPM keys need the Rust client '
+                         '(garrett-stateless built with --features tpm)')
     return Agent(Path(args.ca), Path(args.cert), Path(args.key))
 
 
@@ -156,8 +159,10 @@ def agent_parser() -> argparse.ArgumentParser:
     for name in ('--broker', '--proxy', '--connect', '--provider', '--scope', '--out', '--token-file',
                  '--data', '--data-file', '-X'):
         agent.add_argument(name)
-    for name in ('--ca', '--cert', '--key'):
+    for name in ('--ca', '--cert'):
         agent.add_argument(name, required=True)
+    agent.add_argument('--key')
+    agent.add_argument('--tpm')
     agent.add_argument('-H', action='append')
     agent.add_argument('--timeout', type=float, default=600)
     agent.add_argument('target', nargs='?')

@@ -43,12 +43,18 @@ def create_ca(name: str, days: int = 30) -> Issued:
 
 
 def issue(ca: Issued, *, server_names: list[str] | None = None, client_name: str | None = None,
-          uri: str | None = None, days: int = 30) -> Issued:
-    """A server certificate for ``server_names`` or a client one for ``client_name``."""
+          uri: str | None = None, days: int = 30, public_key=None) -> Issued:
+    """A server certificate for ``server_names`` or a client one for ``client_name``.
+
+    With ``public_key`` (for example a TPM-resident key's public part), the
+    certificate is issued for that key and no private key is returned: the
+    caller's CA is then responsible for having verified where the key lives.
+    """
     ca_cert = x509.load_pem_x509_certificate(ca.certificate)
     ca_key = serialization.load_pem_private_key(ca.key, None)
-    key = ec.generate_private_key(ec.SECP256R1())
-    builder = (x509.CertificateBuilder().issuer_name(ca_cert.subject).public_key(key.public_key())
+    key = ec.generate_private_key(ec.SECP256R1()) if public_key is None else None
+    builder = (x509.CertificateBuilder().issuer_name(ca_cert.subject)
+               .public_key(public_key if public_key is not None else key.public_key())
                .serial_number(x509.random_serial_number())
                .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
                .add_extension(x509.KeyUsage(True, False, False, False, False, False, False, False, False), critical=True)
@@ -70,4 +76,4 @@ def issue(ca: Issued, *, server_names: list[str] | None = None, client_name: str
                                             critical=False)
         builder = builder.add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH]), critical=False)
     cert = _window(builder, days).sign(ca_key, hashes.SHA256())
-    return Issued(cert.public_bytes(serialization.Encoding.PEM), _pem_key(key))
+    return Issued(cert.public_bytes(serialization.Encoding.PEM), b'' if key is None else _pem_key(key))

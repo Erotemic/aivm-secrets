@@ -29,9 +29,9 @@ const USAGE: &str = "usage: garrett-stateless <command> ...
   proxy --config FILE [--until-stdin-eof]
   mint --config BROKER --provider NAME --credential-file FILE --certificate PEM [--lifetime N] [--out FILE]
   inspect (--token-file FILE | TOKEN)
-  agent login --broker URL [--connect ADDR] --ca FILE --cert FILE --key FILE --provider NAME [--scope S] [--timeout N] [--out FILE]
-  agent renew --broker URL [--connect ADDR] --ca FILE --cert FILE --key FILE --token-file FILE [--out FILE]
-  agent request --proxy URL [--connect ADDR] --ca FILE --cert FILE --key FILE --token-file FILE
+  agent login --broker URL [--connect ADDR] --ca FILE --cert FILE (--key FILE|--tpm FILE) --provider NAME [--scope S] [--timeout N] [--out FILE]
+  agent renew --broker URL [--connect ADDR] --ca FILE --cert FILE (--key FILE|--tpm FILE) --token-file FILE [--out FILE]
+  agent request --proxy URL [--connect ADDR] --ca FILE --cert FILE (--key FILE|--tpm FILE) --token-file FILE
                 [-X METHOD] [-H 'Name: value']... [--data TEXT | --data-file FILE] TARGET";
 
 struct Args {
@@ -191,8 +191,50 @@ fn hold(args: &Args) {
 fn agent(args: &Args) -> Result<Agent> {
     let ca = read_public(&args.path("--ca")?, 1 << 20)?;
     let certificate = read_public(&args.path("--cert")?, 1 << 20)?;
-    let key = read_private(&args.path("--key")?, 1 << 20)?;
-    Agent::new(&ca, ClientIdentity::Software { certificate, key })
+    let identity = match (args.get("--key"), args.get("--tpm")) {
+        (Some(key), None) => ClientIdentity::Software {
+            certificate,
+            key: read_private(Path::new(key), 1 << 20)?,
+        },
+        (None, Some(config)) => tpm_identity(Path::new(config), &certificate)?,
+        _ => return Err(usage("exactly one of --key and --tpm is required")),
+    };
+    Agent::new(&ca, identity)
+}
+
+/// `--tpm CONFIG`: `{"tcti", "persistent_handle", "authorization_file",
+/// "public_area_file", "work_directory"}`; the key never leaves the TPM.
+#[cfg(feature = "tpm")]
+fn tpm_identity(config: &Path, certificate: &[u8]) -> Result<ClientIdentity> {
+    let value = json::parse(&read_private(config, 65536)?, 65536, 4)
+        .map_err(|_| usage("--tpm: not strict JSON"))?;
+    let text = |name: &str| {
+        value
+            .get(name)
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .ok_or_else(|| usage(&format!("--tpm: {name}")))
+    };
+    let handle = value
+        .get("persistent_handle")
+        .and_then(Value::as_int)
+        .and_then(|h| u32::try_from(h).ok())
+        .ok_or_else(|| usage("--tpm: persistent_handle"))?;
+    let configuration = aivm_secrets_garrett::tpm::Configuration {
+        tcti: text("tcti")?,
+        persistent_handle: handle,
+        authorization_file: PathBuf::from(text("authorization_file")?),
+        public_area_file: PathBuf::from(text("public_area_file")?),
+        work_directory: PathBuf::from(text("work_directory")?),
+    };
+    ClientIdentity::tpm(configuration, certificate)
+}
+
+#[cfg(not(feature = "tpm"))]
+fn tpm_identity(_config: &Path, _certificate: &[u8]) -> Result<ClientIdentity> {
+    Err(usage(
+        "--tpm needs a build with the tpm feature (cargo build --features tpm)",
+    ))
 }
 
 fn token_file(args: &Args) -> Result<String> {
