@@ -47,9 +47,9 @@ separates what the article requires from the engineering choices added here:
 | Article feature | `garrett-stateless-v1` | Evidence |
 | --- | --- | --- |
 | Agent asks a central broker, authenticated by its certificate | mTLS agent API | Python and Rust, four-way interop |
-| Browser login whose redirect returns to the broker | authorization code + PKCE; broker-owned callback; sealed state; confirmation code | synthetic HTTPS IdP; `GarrettStatelessLogin` |
-| Wrapper JWT: copied claims, encrypted real token, certificate representation, broker signature | `garrett-stateless-v1+jwt`; `upstream`, `enc`, `cnf`, Ed25519 | shared vectors; `GarrettStateless` |
-| Proxy: mTLS, certificate match, decrypt, swap, forward | stateless mTLS reverse proxy | `GarrettStatelessProxy` (`serve_dispatch_exact`, `serve_rejected_never_sends`) |
+| Browser login whose redirect returns to the broker | authorization code + PKCE; broker-owned callback; sealed state; confirmation code | synthetic HTTPS IdP; `GarrettStatelessLogin`, `GarrettStatelessMailbox`, `GarrettStatelessState` |
+| Wrapper JWT: copied claims, encrypted real token, certificate representation, broker signature | `garrett-stateless-v1+jwt`; `upstream`, `enc`, `cnf`, Ed25519 | shared vectors; `GarrettStateless`, `GarrettStatelessToken` (`verify_token_sound`, `seal_token_ok`) |
+| Proxy: mTLS, certificate match, decrypt, swap, forward | stateless mTLS reverse proxy | `GarrettStatelessProxy`, `GarrettStatelessConnection`, `GarrettStatelessProtocol` (`send_origin`) |
 | No persistent data; scale by starting instances | the proxy decision has no adapter-state input; restart and replica tests | `replicas_decide_alike`; tests and demo |
 | JWT and opaque provider tokens | both | tests, vectors |
 | Hardware or hypervisor-backed instance key | optional TPM signer (Rust agent) | swtpm test only; no hardware provenance |
@@ -82,6 +82,14 @@ article specifies no wire format). It is experimental and unaudited.
   prove non-derivability in an ideal-cryptography trace model under explicit
   provider-release and key-custody premises. This is distinct from a
   computational proof for AES-GCM, Ed25519, TLS or real process I/O.
+- **The internal `garrett-stateless-v1` protocol.** `GarrettStatelessProtocol`
+  composes the extracted mailbox, token codec, key set, admission, renewal and
+  proxy connection loop into `protocol_safety`, over every finite execution
+  with arbitrary clocks, randomness, peers, OAuth answers and channel
+  behaviour. Its only premises are the external boundary of
+  `GarrettStatelessBoundary` (AES-GCM correctness for paired keys; no
+  Ed25519 forgery in the execution). The native shells' I/O is checked by a
+  source guard, not proved ([details](../verified-garrett-stateless.md)).
 - **Other scoped transitions.** `GarrettLogin`, `GarrettOAuth`,
   `GarrettServiceHistory`, `GarrettAuthority`, `GarrettTrust`,
   `GarrettEnrollment`, `GarrettWriteGate`, `GarrettApprovalStore` and proxy

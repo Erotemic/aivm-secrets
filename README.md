@@ -25,8 +25,10 @@ encrypted and is bound to the agent's client certificate. A stateless mTLS
 proxy swaps the real token in for ordinary API requests. Any number of proxy
 replicas accept the same surrogate without shared state. It ships as the
 Python package `aivm_secrets.garrett_stateless` and the Rust crate
-`rust/crates/garrett-stateless`, and the two interoperate. The Rust decisions
-are proved in Lean ([what is proved](docs/verified-garrett-stateless.md)).
+`rust/crates/garrett-stateless`, and the two interoperate. Its Rust decisions,
+codecs and transitions are proved in Lean and composed into one internal
+protocol theorem whose only premises are the external cryptography boundary
+([what is proved](docs/verified-garrett-stateless.md)).
 See the [usage guide](docs/garrett-stateless-usage.md), or run
 `bash scripts/garrett-stateless-demo.sh`.
 

@@ -1,89 +1,187 @@
 # `garrett-stateless-v1`: what the Lean proofs establish
 
-**Scope.** These are implementation-linked theorems about the Rust controllers
-that the `garrett-stateless` broker and proxy run. The controllers live in
-`rust/crates/aivm-secrets-garrett-core/src/stateless{,_login,_proxy}.rs`. Aeneas
-extracts them into `proofs/generated/AivmSecretsGarrettCore.lean`, and the
-theorems are in `proofs/GarrettStateless{,Login,Proxy}.lean`. This is
-experimental, unaudited work. It is not a proof of the whole service, of the
-cryptography, or of TLS. The specification is
+**Scope.** Implementation-linked theorems about the Rust that the
+`garrett-stateless` broker and proxy run. Every decision, codec and transition
+lives in `rust/crates/aivm-secrets-garrett-core/src/stateless*.rs`; Aeneas
+extracts them into `proofs/generated/AivmSecretsGarrettCore.lean`; the theorems
+are in `proofs/GarrettStateless*.lean`. This is experimental, unaudited work.
+It proves the **internal** protocol, our own code, over every execution. It is
+not a proof of the cryptography, of TLS, of the operating system, of the
+native shells' I/O, or of the toolchain. The specification is
 [`garrett-stateless-v1.md`](garrett-stateless-v1.md).
 
-Every theorem quantifies over **arbitrary** adapters: opener and sealer
-(signature and AEAD), origin (sockets and diagnostics), and the mailbox. So
-each one says exactly what the extracted decision code guarantees, given only
-the adapter facts it names.
+## The internal protocol theorem
+
+`stateless_protocol.protocol_safety` (`proofs/GarrettStatelessProtocol.lean`)
+is stated over a transition system whose every step runs one extracted Rust
+function on arbitrary inputs:
+
+| Step | Extracted function |
+| --- | --- |
+| a login start, browser check, callback, code exchange, finish or poll | `stateless_mailbox::{start, pending, accept, exchange, finish, poll}` |
+| a renewal | `stateless::renew` with the `KeySet` opener and the `TokenSealer` |
+| an operator mint | `stateless::issue` with the `TokenSealer` |
+| any finite prefix of a proxy connection, closed or still open | `stateless_proxy::connection_step`, from the state `connection` starts in |
+
+The inputs are arbitrary: any clock value, random draw (login ids, PKCE
+verifiers, nonces, token ids), TLS peer, OAuth endpoint answer, `Channel`
+behaviour (reads, writes, deadlines, failures), configured key set and
+signing key. Steps interleave arbitrarily. The mailbox is one mutex in
+`broker.rs`, so its transitions are atomic; renewal and the proxy share no
+state with anything, so running each atomically loses no interleaving.
+
+For every reachable world, the theorem proves:
+
+1. **Every credential-bearing provider write has an authorized origin.** Each
+   `sent` record follows, in the same connection, the acknowledged admission
+   of the same claims and route; it was decided by `decide_request` for the
+   connection's own TLS peer; the surrogate is one this broker issued, bound
+   to exactly that peer's certificate, for the route's provider; the bytes are
+   exactly the encoder's request carrying exactly the issued credential; and
+   that credential descends from a login or a mint (`send_origin`). More
+   precisely, it is an operator-minted credential for that certificate, or
+   the token returned by the code exchange of a login started by a client
+   holding exactly the sending connection's certificate (`send_root`).
+2. **A rejection creates no send, and no request sends twice**
+   (`rejection_never_sends`).
+3. **Every delivered surrogate belongs to its initiator**: it goes only to the
+   certificate that began its login, is bound to it, and is the one issued
+   for that login. **No login is exchanged, issued or delivered twice**, and
+   a failed or uncertain exchange issues and delivers nothing
+   (`delivered_to_initiator`, `login_once`, `failed_login_quiet`).
+4. **Renewal never extends the absolute limit or changes the surrogate**,
+   over any number of renewals: every issued surrogate has a login or mint
+   root with the same certificate, provider and credential and a `ren` no
+   later than the root's (`lineage`).
+5. **Outputs disclose no credential.** Every proxy record is one of the
+   permitted forms (`log_permitted`): the guest's own request; a rejection
+   code; the admission of an issued surrogate for this peer, whose claims do
+   not contain its credential; exactly the encoder's request (the one
+   permitted effect); a status or refusal code; or guest bytes that are a fixed
+   refusal or a `guest_response` release in which the raw credential does not
+   occur. No issued surrogate shows its credential in its header, public
+   payload or claims (`issued_secret`); it leaves the broker only as the
+   plaintext of the AEAD `seal` primitive.
+
+Also proved, outside the summary statement: **informational claims have no
+influence** — two tokens sealed over the same claims by the same entry verify
+to the same claims, key and key issuer, whatever their `scope` and `upstream`
+(`informational_no_influence`); **key retirement** — under a
+configured key set a token opens only if its header `kid` names an entry of
+that set (`kid_configured`, `retired_never_opens`); and **replica
+equivalence** — `decide_request` (`replicas_decide_alike`) and `renew` take no
+replica state, so replicas with the same configuration decide alike.
+
+### The premises: only the external boundary
+
+`protocol_safety` has exactly these premises, all about code we do not own
+(`proofs/GarrettStatelessBoundary.lean`):
+
+| Premise | External operation | Form |
+| --- | --- | --- |
+| `aead : ∀ S V, Paired S V → AeadInverse inst S V` | AES-256-GCM `seal`/`open` (`ring`) | correctness: what a key seals, its pair opens under the same nonce and AAD; the ciphertext is the plaintext and a 16-byte tag |
+| `Unforged … keys` at each renewal (a field of the `renew` step) and for each proxy key set | Ed25519 `verify` (`ring`) | the idealized EUF-CMA boundary: in this execution, an entry verifies only signed parts of tokens this broker issued with a key paired to it |
+| `Paired : M → M → Prop` | key management (`keys.rs` rotate/export) | which verification material belongs to which signing key |
+
+`Unforged` is stated per step for renewals, at the moment they verify, so a
+renewal can never rest on a token issued later. Configuration (`Config`,
+`KeySet::new`) and the key material are public inputs. **No premise is about
+the correctness of code we own**: the codec premise the earlier theorem
+`issued_only_opens_for_its_certificate` took is now proved
+(`accepts_sealed`, `issued_codec`, `issued_opens_only_for_its_certificate`).
+No global axiom is added; the proofs use only Lean's standard axioms (see
+the end-of-campaign audit below).
+
+**Positive witnesses.** `seal_then_open` (`GarrettStatelessRoundTrip`): a
+`seal_token` output verifies under any configured set holding its `kid` and
+unseals to exactly the sealed credential, for any informational claims.
+`issue_then_open` (`GarrettStatelessWitness`): a surrogate `stateless::issue`
+produced opens with `stateless::open` for every peer and time admission
+accepts, with exactly the issued claims and credential. Their only premises
+are the correctness contracts `SignVerifies` and `AeadInverse`. Delivery
+through `poll` is witnessed by the Rust and Python workflow tests, not by a
+Lean theorem.
 
 ## Build and check
 
 ```bash
 cd proofs && lake exe cache get
-lake build GarrettStateless GarrettStatelessLogin GarrettStatelessProxy   # focused
-python dev/verification/garrett.py mutate --mutation-filter '^stateless '  # 14 Rust mutants
+lake build GarrettStatelessProtocol GarrettStatelessWitness GarrettStatelessState   # focused
+python dev/verification/garrett.py mutate --mutation-filter '^stateless '            # Rust mutants
+python dev/verification/stateless_shell.py check                                    # shell guard
 ```
 
-## Theorem map
+## Theorem-to-Rust coverage map
 
-| Property (assignment wording) | Theorem | Extracted Rust function |
+| Lean module | Theorems | Extracted Rust (`aivm-secrets-garrett-core/src/`) |
+| --- | --- | --- |
+| `GarrettStatelessCodec` | `from_b64url_sound`, `from_b64url_complete` (strict url-b64: exactly the canonical encoding), `natural_some`/`natural_of` (canonical decimals ≤ 2^53−1), `plain_string_some`/`_of`, `word_some`/`_of`/`_absent`, `payload_bytes_ok` | `stateless_token.rs`: `from_b64url`, `group`, `symbol_value`, `natural`, `digits`, `plain_string`, `word`, `append*`, `payload_bytes` |
+| `GarrettStatelessGrammar` | exact Boolean characterizations `is_text_eq`, `is_provider_eq`, `is_kid_eq`, `is_id_eq`, `is_thumbprint_true`, `is_scope_true`, `is_verifier_eq`; `payload_valid_true`, `state_valid_true`; `select_spec`, `keys_valid_true`, `select_unique` (key selection is unambiguous); `header_bytes_ok`, `header_kid_spec`, `header_kid_of`; `segments_spec`; `occurs_spec`; `b64url_spec` | `is_*`, `payload_valid`, `state_valid`, `select`, `named`, `keys_valid`, `entry_valid`, `header_bytes`, `header_kid`, `ascii`, `dot_from`, `segments`, `occurs`, `b64url` |
+| `GarrettStatelessToken` | `parse_payload_sound` (accepted bytes are exactly the canonical payload, which is valid), `parse_payload_complete`; `verify_token_ok`, `verify_token_sound` (the exact signed header and payload are what authorization uses; the AAD is exactly label, header, zero, public payload); `unseal_token_ok` (decryption uses the entry the verified `kid` selected); `seal_token_ok` (credential absent from header and public payload; exact AAD; signature over exactly the first two segments); `b64url_fits` | `parse_payload`, `field`, `number`, `verify_token`, `unseal_token`, `seal_token`, `associated`, `copy_claims`, `copy_info` |
+| `GarrettStatelessState` | `state_bytes_ok`, `parse_state_sound`, `parse_state_complete`, `seal_state_ok`, `open_state_ok`, `seal_open_state` | `state_bytes`, `parse_state`, `seal_state`, `open_state` |
+| `GarrettStatelessRoundTrip` | `seal_then_open` | `seal_token`, `verify_token`, `unseal_token` |
+| `GarrettStatelessMailbox` | `reachable_inv`; `slot_from_start`, `accepted_matches_start`, `at_most_once`, `issued_for_starting_peer`, `delivered_to_starting_peer`, `failed_never_delivered`, `delivered_is_gone` | `stateless_mailbox.rs`: `start`, `pending`, `accept`, `exchange`, `finish`, `poll` and their loops |
+| `GarrettStatelessConnection` | `connection_runs`, `step_logged`, `connection_logged`, `seg_sent`, `connection_egress_authorized`, `connection_sends_once_per_request`, `connection_guest_bytes` | `stateless_proxy.rs`: `connection`, `connection_step`, `serve` |
+| `GarrettStatelessProtocol` | `accepts_sealed`, `informational_no_influence`, `opened_issued`, `lineage`, `login_root`, `send_origin`, `send_root`, `rejection_never_sends`, `kid_configured`, `retired_never_opens`, `issued_secret`, `log_permitted`, `delivered_to_initiator`, `login_once`, `failed_login_quiet`, `prefix_logged`, `connection_prefix`, **`protocol_safety`** | all of the above, composed |
+| `GarrettStatelessWitness` | `issue_then_open`, `issued_codec`, `issued_opens_only_for_its_certificate` | `stateless::issue`, `stateless::open`, the `KeySet`/`TokenSealer` instances |
+
+The earlier theorems remain and are reused:
+
+| Property | Theorem | Extracted Rust |
 | --- | --- | --- |
 | Admission is exactly the specification | `admit_spec`, `admit_ok_iff` (`Admitted`) | `stateless::admit` |
-| **Binding correctness** (an opened surrogate is bound to this peer; one token opens for one peer) | `open_binds_peer`, `open_one_peer` | `stateless::open` |
-| **Binding correctness, end to end** (issued for C, refused for D ≠ C) | `issued_only_opens_for_its_certificate`, `issued_refused_on_other_certificate` | `stateless::issue`, `stateless::open` |
-| **Authentication before decryption** | `open_unadmitted_never_unseals` (result independent of `unseal`), `open_unverified`, `open_ok_trace` (unseal called on the verified envelope only after admission) | `stateless::open` |
-| What an opened surrogate is | `open_contract` | `stateless::open` |
-| **Issuance correctness** | `issue_trace` (`IssuedFor`), `issue_window_spec` (`WindowSpec`), `claims_for_trace`, `issue_invalid_never_seals` | `stateless::issue`, `claims_for`, `issue_window` |
-| Stateless renewal never extends `ren`, keeps binding and credential | `renew_trace` | `stateless::renew`, `renewal_grant` |
-| **OAuth binding**: a login belongs to its starting peer | `begin_spec`, `begin_trace` | `stateless_login::begin` |
-| **OAuth binding**: callback acceptance (same login, peer, provider, window, replica; pending; RFC 9207 rule; denial) | `accept_callback_trace` (through the existing `oauth_login.Proofs.claim_contract`) | `stateless_login::accept_callback`, `oauth_login::claim` |
-| **OAuth binding**: completion issues for the entry's certificate only | `complete_trace` | `stateless_login::complete` |
-| **OAuth binding**: only the starting peer collects | `deliver_trace`, `deliver_other_peer` | `stateless_login::deliver` |
-| **OAuth binding, end to end** | `login_surrogate_bound_to_starting_peer` (premise `StageOnly`: the mailbox changes only the stage) | all of the above |
-| `serve` acts only on its pre-egress decision | `serve_follows_decision` (`decide_request`, `Dispatched`) | `stateless_proxy::serve` |
-| **Provider-use authorization** | `dispatch_trace`: one surrogate, opened for this peer, route in range and serving the token's provider, encoder accepted | `serve`, `surrogate_of`, `route_of`, `stateless::open`, `proxy_http::encode_upstream` |
-| **Credential substitution correctness** (exact bytes at the exchange boundary) | `serve_dispatch_exact`: `exchange` receives `UpstreamPrefix ++ HeaderPrefix ++ credential ++ CRLF ++ UpstreamSuffix` for the route's host and scheme, with the credential `unseal` returned for the admitted envelope, after an acknowledged admission | `serve`, `encode_upstream` (`encode_upstream_contract`) |
-| **No dispatch on rejection / failure safety** | `serve_rejected_never_sends`: a missing, duplicate, malformed, forged, expired, wrong-certificate, wrong-audience, unknown-provider or undecryptable surrogate, no route, or an encoder refusal never reaches `admitted` or `exchange` | `serve` |
-| **Credential confinement in replies** | `serve_guest_reply`: the reply is the fixed `401` (a closed term), a fixed refusal, or a `guest_response` release in which the raw substituted credential does not occur | `serve`, `proxy_controller::release`, `proxy_http::guest_response` |
-| **Stateless replica equivalence** | `replicas_decide_alike`: two origin adapters of any types, in any states, follow the same `decide_request` decision for the same opener, request, routes, acceptance, peer and clock, and refuse with identical replies | `serve` |
-| Route selection | `route_of_loop_contract` | `stateless_proxy::route_of` |
+| Binding (opened ⇒ bound to this peer; one token, one peer) | `open_binds_peer`, `open_one_peer` | `stateless::open` |
+| Authentication before decryption | `open_unadmitted_never_unseals`, `open_unverified`, `open_ok_trace` | `stateless::open` |
+| Issuance | `issue_trace` (`IssuedFor`), `issue_window_spec`, `claims_for_trace`, `issue_invalid_never_seals` | `stateless::issue`, `claims_for`, `issue_window` |
+| One renewal | `renew_trace` | `stateless::renew`, `renewal_grant` |
+| Login binding | `begin_spec`, `begin_trace`, `accept_callback_trace`, `complete_trace`, `deliver_trace`, `deliver_other_peer` | `stateless_login.rs` |
+| `serve` acts on its pre-egress decision | `serve_follows_decision`, `dispatch_trace`, `serve_dispatch_exact`, `serve_rejected_never_sends`, `serve_guest_reply`, `replicas_decide_alike` | `stateless_proxy::serve` |
 
-**Replica equivalence, precisely.** `decide_request` is not a new model. It is
-the literal prefix of `serve`, composed from extracted functions.
-`serve_follows_decision` proves that `serve` acts on it. Its parameters contain
-no origin or adapter state, so what a proxy decides depends only on the key-set
-adapter, the request, the configuration, the authenticated peer and the clock.
-Determinism of a pure function would be trivial. The content here is that no
-mutable adapter state is an input. The A/B/C restart tests and the four-way
-interoperability matrix check the same property at runtime.
+## Section 5 audit: endpoints and privileged paths
+
+Each public endpoint makes its decision in extracted code; the shell does I/O.
+`dev/verification/stateless_shell.py` (tested by
+`tests/test_garrett_stateless_shell.py`) pins the shell side: one provider
+write, of `egress_wire` of a core-made `Egress`, only from `Origin::exchange`
+and never retried; every proxied and every broker agent decision uses the
+mutual-TLS peer of its handshake; sealing only through `issue`, `renew` or the
+mailbox's `finish`, each from one endpoint; the access token becomes a `Token`
+only in the permitted exchange, and a refresh token is dropped; audit records
+name claims, routes, statuses and codes only. This is a source guard, not a
+proof.
+
+| Endpoint | Decision (proved) | Success | Failure, partial failure, retry |
+| --- | --- | --- | --- |
+| `POST /v1/logins` (agent mTLS) | `stateless_mailbox::start`, `seal_state` | 201: login id, confirmation, URL; the slot is bound to the peer | refusal codes; a seal failure after `start` leaves a slot that expires unused |
+| `GET /authorize` (browser) | `open_state`, `pending` (read-only) | interstitial page | `invalid_state` |
+| `GET /callback` (browser) | `open_state`, `accept`, `exchange` (the `Permit` is moved, so at most once), `finish` | issued surrogate stored for that login | denial, failed or uncertain exchange → `Failed`/`Uncertain`, never issued or delivered (`failed_login_quiet`); a replayed callback is refused (`login_once`) |
+| `GET /v1/logins/{id}` (agent mTLS) | `poll` | the surrogate, once, to the starting certificate | wrong peer refused; **attempted vs completed delivery**: the slot is removed when `poll` returns it (`delivered_is_gone`), so a reply lost in transit is not resent; the agent starts a new login |
+| `POST /v1/renewals` (agent mTLS) | `stateless::renew` | a new surrogate, same binding/provider/credential, `ren` not later | any refusal is 401; a retried renewal issues another surrogate within the same limit (`lineage`) |
+| `mint` (operator) | `stateless::issue` | a surrogate for the operator's certificate and credential | refusal before any seal (`issue_invalid_never_seals`) |
+| proxy (agent mTLS) | `stateless_proxy::connection` | exactly one `sent` per admitted request | **attempted vs completed**: `sent` is the hand-off to `Origin::exchange`; `completed` records a provider answer; a native write or read failure is `OutcomeUnknown` and is never retried |
+| key rotation, retirement, export | `KeySet::new` (`keys_valid_true`) | a valid set: 1–8 entries, unique `kid`s | an invalid set is refused; retirement removes a `kid` from proxies (`retired_never_opens`) |
 
 ## Implementation linkage: mutation evidence
 
-`garrett.py mutate --mutation-filter '^stateless '` applies 14 defects to the
-**Rust source**, re-extracts with Charon/Aeneas, and recompiles the whole proof
-import closure against each mutant. Each mutant must break a proof:
+`garrett.py mutate --mutation-filter '^stateless '` applies each defect to the
+**Rust source**, re-extracts with Charon/Aeneas, and recompiles the proof
+import closure against the mutant. Each must break a proof.
 
-| Mutant (Rust) | Assignment item |
+| Mutant (Rust) | Rejected by |
 | --- | --- |
-| certificate binding removed (`admit`) | removing certificate binding |
-| expired token accepted (`>=` → `>`) | accepting an expired token |
-| verifying key issuer not checked | signature/issuer confusion (signature verification itself is the adapter) |
-| decrypted before admission (unseal moved before admit) | decrypting before authentication |
-| audience not checked | accepting a surrogate without the expected audience |
-| issuance binds the wrong certificate | changing the client identity used during issuance |
-| renewal extends `ren` | renewal widening |
-| login binds a request value instead of the peer | changing the client identity used during issuance |
-| login callback state not checked | bypassing OAuth state validation |
-| login delivered to any peer | delivery to an unrelated client |
-| proxy wrong provider destination | substituting the wrong provider destination |
-| proxy egress without acknowledged admission | treating a rejected request as an authorized send |
-| proxy surrogate forwarded instead of credential | credential substitution |
-| proxy credential reflection unchecked | emitting the real credential to the client |
+| certificate binding removed; expired token accepted; audience not checked; verifying key issuer not checked; decrypted before admission; issuance binds the wrong certificate; renewal extends `ren` | `GarrettStateless` |
+| login binds a request value instead of the peer; callback state not checked; delivered to any peer | `GarrettStatelessLogin` |
+| mailbox: duplicate login accepted; serial reused; capacity not enforced; exchange answer reaches another login; finish ignores the stage; poll ignores the peer | `GarrettStatelessMailbox` |
+| proxy: wrong provider destination; egress without acknowledged admission; surrogate forwarded instead of credential; credential reflection unchecked | `GarrettStatelessProxy` (within the `GarrettStatelessConnection` closure) |
+| proxy connection decides for the authority, not the peer | `GarrettStatelessConnection` |
+| token: `kid` not used to select the key; duplicate `kid` accepted in a key set; header prefix not checked; provider grammar not checked | `GarrettStatelessGrammar` |
+| token: non-canonical base64 accepted | `GarrettStatelessCodec` |
+| token: associated data omits the header; payload with trailing bytes accepted; signature checked over the payload only; decrypted with the first key; credential allowed in the public payload | `GarrettStatelessToken` |
+| login state: label not bound | `GarrettStatelessState` |
 
-**Result, 2026-10-26: all 14 mutants rejected.** Seven were rejected by
-`GarrettStateless`, three by `GarrettStatelessLogin` and four by
-`GarrettStatelessProxy`. Each was a real error in the recompiled proof
-closure, not a cached object. The opt-in axiom audit of the same tree found
-1,497 theorems depending only on `propext`, `Classical.choice` and
-`Quot.sound` ([axiom-audit.md](assurance/axiom-audit.md)).
+**Result, 2026-10-26: all 32 stateless mutants are rejected** against the
+final tree of this campaign (two runs of 16), each by a real error in the
+recompiled closure, not a cached object.
 
 ## What remains trusted
 
@@ -92,41 +190,38 @@ The assumption ledger entries are `STATELESS-NATIVE-01`, `STATELESS-CRYPTO-01`,
 `STATELESS-CLAIMS-01` and `STATELESS-PY-01`
 ([ledger](planning/aivm-secrets-assumptions.json)). In short:
 
-- **Cryptography and codec.** Ed25519 verification, AES-256-GCM and the
-  strict JSON/b64url codec (`ring`; Python `cryptography`) are adapters.
-  `issued_only_opens_for_its_certificate` takes the premise that a verified
-  issued token decodes to the claims sealed into it. No computational proof is
-  claimed. The existing symbolic model `GarrettSecrecy.lean`
-  (`provider_credential_not_derivable`) states the corresponding Dolev-Yao
-  argument for credentials carried only under keys the attacker lacks. It is
-  a symbolic result, not a proof about this code.
-- **TLS and X.509.** The peer thumbprint must come from the certificate the
-  TLS stack verified. CRLs are not checked.
-- **Native shells.** The proxy must call `serve` for every request with the
-  handshake peer and send `exchange`'s argument only to the route's pinned
-  address. The broker must change mailbox entries only by stage.
-- **Event distinctions.** A controller returning a dispatch, an `exchange`
-  call, bytes written to the upstream TLS writer, a completed provider
-  request, a provider-side effect, and a reply released to the client are
-  different events. The theorems cover the decision, the arguments of the
-  `exchange` callback, and the reply bytes `serve` returns. That the native
-  `exchange` writes exactly those bytes to that socket is the adapter
-  contract. Delivery and provider-side effects are not covered.
-- **Responses.** Only the raw credential (and, through `guest_response`, the
-  unfolded reflection forms) is excluded from replies. A provider that
-  transforms or derives from the credential in other ways is not covered,
-  and nothing is claimed about timing or other response content.
-- **Python.** `aivm_secrets.garrett_stateless` mirrors the controllers and is
-  tested against the same vectors and in the interop matrix. It is not
-  proved.
+- **Primitives.** Ed25519 and AES-256-GCM (`ring`) satisfy the three boundary
+  propositions above; no computational proof is claimed, and `Unforged` is
+  the idealized form of EUF-CMA (the guarantees hold for executions without a
+  forgery). `StateAeadInverse` is used only by the positive login-state
+  round trip; login safety does not depend on it, because the mailbox accepts
+  only a callback that matches its own pending entry.
+- **Native shells.** The shell must do what `stateless_shell.py` checks: pass
+  the handshake peer, write exactly `egress_wire` to the route's pinned
+  address over verified TLS, and write only `served.reply` to the guest. That
+  the native `exchange` writes exactly its argument to that socket, and that
+  a provider-side effect follows, are not proved.
+- **TLS and X.509.** The peer thumbprint must be that of the certificate the
+  TLS stack verified; CRLs are not consulted.
+- **Rust ownership.** `Permit`, `Exchanged` and `Egress` have private fields
+  and are moved into the call that consumes them, so a permit is exchanged at
+  most once and an egress is sent at most once. The mailbox model's `exchange`
+  step takes this as its `held`/`unspent` premises; rustc, not Lean, checks it.
+- **Toolchain.** Charon/Aeneas translation, their standard library models,
+  the Lean kernel and the Rust compiler are trusted.
+- **Responses.** Only the raw credential (and, through `guest_response`, its
+  unfolded reflection forms) is excluded from replies; providers that echo
+  transformed credentials, and timing, are not covered.
+- **Python.** `aivm_secrets.garrett_stateless` mirrors the Rust and is tested
+  against the same vectors and the interop matrix; it is not proved.
 
 ## Claim categories
 
 | Category | Items |
 | --- | --- |
-| Implemented and tested | Python and Rust libraries; full OAuth login with PKCE against a synthetic HTTPS provider; JWT and opaque tokens; substitution through the stateless proxy; refusals; renewal; key rotation and retirement; 4-way interop; container demo; swtpm-backed agent key |
-| Implementation-linked formally proved | The theorems above, about the extracted Rust controllers |
-| Proved only in a symbolic model | Credential non-derivability (`GarrettSecrecy.lean`, existing model) |
-| Assumed from an external adapter | Ed25519, AES-GCM, rustls/webpki/OpenSSL, the strict codec, OS sockets, the provider's OAuth behaviour |
-| Validated only in a particular environment | swtpm (not hardware provenance); single-host loopback; the container demo |
-| Not established | Live identity providers and provider APIs; hardware TPM provenance and relay resistance; whole-process I/O refinement of the stateless shells; computational cryptography; independent review |
+| Implemented and tested | Python and Rust libraries; OAuth login with PKCE against a synthetic HTTPS provider; JWT and opaque tokens; substitution through the stateless proxy; refusals; renewal; key rotation and retirement; 4-way interop; container demo; swtpm-backed agent key |
+| Implementation-linked formally proved | the theorems above, about the extracted Rust, including `protocol_safety` |
+| Proved only in a symbolic model | credential non-derivability (`GarrettSecrecy.lean`) |
+| Assumed from an external interface | Ed25519, AES-GCM, rustls/webpki/OpenSSL, OS sockets and clock, randomness, the provider's OAuth behaviour |
+| Checked by a source guard only | the shell's privileged call sites (`stateless_shell.py`) |
+| Not established | live identity providers and APIs; hardware TPM provenance; whole-process I/O refinement of the shells; computational cryptography; independent review |

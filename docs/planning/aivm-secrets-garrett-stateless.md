@@ -13,13 +13,14 @@ the article from our choices), [usage](../garrett-stateless-usage.md),
 
 | Piece | Location |
 | --- | --- |
-| Extracted decisions (Rust) | `rust/crates/aivm-secrets-garrett-core/src/stateless{,_login,_proxy}.rs` |
+| Extracted decisions (Rust) | `rust/crates/aivm-secrets-garrett-core/src/stateless{,_login,_proxy,_mailbox,_token}.rs` |
 | Rust library and CLI | `rust/crates/garrett-stateless` (`tests/workflow.rs`, `tests/vectors.rs`) |
 | Python library and CLI | `aivm_secrets/garrett_stateless/` (`decisions.py` mirrors the core) |
-| Lean | `proofs/GarrettStateless{,Login,Proxy}.lean` (default `lake build` roots) |
+| Lean | `proofs/GarrettStateless*.lean` (default `lake build` roots); the global theorem is `protocol_safety` in `GarrettStatelessProtocol.lean`, the external boundary is `GarrettStatelessBoundary.lean` |
+| Shell guard | `dev/verification/stateless_shell.py check` (`tests/test_garrett_stateless_shell.py`) |
 | Mutants | `dev/verification/garrett.py`, labels starting `stateless ` |
 | Vectors | `tests/secrets_vectors/garrett-stateless-v1.jsonl` (generator `dev/garrett_stateless_vectors.py`; regenerate only on a deliberate format change) |
-| Tests | `tests/test_garrett_stateless{,_vectors,_interop,_tpm}.py` |
+| Tests | `tests/test_garrett_stateless{,_vectors,_interop,_tpm,_shell}.py`; `rust/crates/garrett-stateless/tests/codec_agreement.rs` |
 | Synthetic IdP/API fixture | `examples/garrett-stateless/synthetic_provider.py` |
 | Demo | `scripts/garrett-stateless-demo.sh`, `examples/garrett-stateless/` |
 | Assumptions | ledger IDs `STATELESS-*` |
@@ -30,9 +31,11 @@ the article from our choices), [usage](../garrett-stateless-usage.md),
 | --- | --- |
 | `cargo test -p garrett-stateless -p aivm-secrets-garrett-core` | pass (unit, 72 vectors, end-to-end over TLS) |
 | `pytest tests/test_garrett_stateless*.py` | 78 pass (including the 4-way interop matrix and the swtpm test, with both Rust builds present) |
-| Full default `lake build` (1909 jobs) | pass; `garrett.py record-sources` re-recorded the manifest |
-| Stateless Rust mutants (`garrett.py mutate --mutation-filter '^stateless '`) | 14 of 14 rejected (7 by `GarrettStateless`, 3 by `GarrettStatelessLogin`, 4 by `GarrettStatelessProxy`) |
-| Opt-in axiom audit | 1,497 theorems, all on Lean's three standard axioms; baseline re-recorded |
+| Full default `lake build` (1919 jobs) | pass; `garrett.py record-sources` re-recorded the manifest |
+| Stateless Rust mutants (`garrett.py mutate --mutation-filter '^stateless '`) | 32 of 32 rejected (2026-10-26, final tree of the protocol campaign) |
+| Opt-in axiom audit | 1,885 theorems, all on Lean's three standard axioms; baseline re-recorded |
+| `protocol_safety` (global internal theorem) | compiles; premises are only the external boundary |
+| Shell guard `stateless_shell.py check` | pass (8 checks) |
 | Container demo | pass, `ok: true`, `--network none` |
 | External project depending on the crate (stable 1.98) | builds and runs |
 
@@ -50,9 +53,12 @@ The mutant and audit runs are also recorded in `dev/journals/claude.md`
    certifies the key. The profile does not check it.
 3. **Independent review** of the specification, the trusted shells
    (`STATELESS-NATIVE-01`) and the proof map. An agent cannot self-certify it.
-4. **Stronger linkage (optional).** Extract the connection-loop glue and the
-   mailbox stage update. Add a whole-process syscall witness for the stateless
-   proxy, like `dev/native_syscall_witness.py`.
+4. **Stronger linkage (optional).** The connection loop, the mailbox, the
+   token and login-state codecs and the key set are now extracted and proved,
+   and composed into `protocol_safety` (2026-10-26). What remains outside is
+   the shell's I/O (guarded, not proved) and a whole-process syscall witness
+   for the stateless proxy, like `dev/native_syscall_witness.py`. A Lean
+   witness of delivery through `poll` would complete the positive witnesses.
 5. **Release (maintainer decision).** The crate has `publish = false`.
    Publishing the crate or the Python distribution needs approval and a
    version decision.

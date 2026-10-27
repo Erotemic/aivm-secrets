@@ -1354,3 +1354,62 @@ Uncertain or left open:
 
 Confidence: high in the Rust decisions as stated; medium-high in the shells
 (tested, not proved).
+
+## 2026-10-26 21:05:00 -0400
+
+Formalized the internal `garrett-stateless-v1` protocol over every execution
+(Claude Opus 5.5; the exact weights/config variant is not available to me).
+
+What I did, by section of the assignment:
+- Login state (M1, committed in `ddc22f8`): the mailbox and its transitions are
+  extracted (`stateless_mailbox.rs`) and proved over every history
+  (`GarrettStatelessMailbox`); the old `StageOnly` premise is gone.
+- Token codec (M2): moved the codec, the key set and the login-state codec
+  into the core (`stateless_token.rs`), refactored loops until Aeneas
+  extracted them, and proved strict parsing (sound and complete), exact
+  serialization, unambiguous key selection, the exact AAD, decryption with the
+  verified entry and the seal's guarantees. Two forks proved the grammars,
+  keys and segments (`GarrettStatelessGrammar`) and the login-state codec
+  (`GarrettStatelessState`); a third proved the positive round trip
+  (`GarrettStatelessRoundTrip`).
+- Proxy boundary (M3): the connection loop is extracted and the provider
+  write is an `Egress` capability only the core makes; the logged-connection
+  theorems are in `GarrettStatelessConnection`.
+- Composition (M4): `GarrettStatelessProtocol` is one transition system of the
+  extracted steps; `protocol_safety` composes send origin, rejection, delivery,
+  once-only logins, renewal lineage and disclosure. Its premises are only
+  `AeadInverse` for paired keys and `Unforged` (idealized EUF-CMA) in
+  `GarrettStatelessBoundary`. The earlier `codec` premise is discharged
+  (`issued_codec`).
+- Audit (section 5): `dev/verification/stateless_shell.py` pins the shell's
+  privileged call sites; the endpoint table is in
+  `docs/verified-garrett-stateless.md`.
+
+Decisions and reflections:
+- I modelled signature unforgeability as a per-execution proposition
+  (`Unforged`), required at the moment each renewal verifies. A whole-history
+  version would have let a renewal rest on a token issued later, which breaks
+  the lineage induction. I think this is the honest form of EUF-CMA here, but
+  a reviewer should check it.
+- `Paired` (which verification material belongs to which signing key) is a
+  parameter of the model. It is a key-management fact, external to our code.
+- Partway through I noticed the world recorded a proxy connection only once
+  its loop returned. A keep-alive connection writes to providers while open,
+  so I changed the step to any finite prefix of connection steps
+  (`Prefix`, `prefix_logged`, `connection_prefix`).
+- The `exchange` step of the mailbox model keeps `held`/`unspent` premises:
+  they are Rust move semantics of `Permit`, checked by rustc, not Lean. I
+  listed this explicitly under what remains trusted.
+- Delivery through `poll` has no Lean positive witness; the workflow tests
+  cover it. Issue-then-open and seal-then-open are proved.
+- A successful `b64url` implies its own size premise (checked arithmetic in
+  `encode_unpadded`), so `seal_token_ok` needs no AEAD length assumption.
+
+Verification: all 32 stateless Rust mutants (12 new) were rejected against the final tree. Full `lake build` passes; Rust and Python
+stateless tests pass; W0/W3 checks pass after re-pinning. Axiom audit (opt-in, end of campaign): 1,885 theorems, all on Lean's three standard axioms; 388 added, 1 removed (the `StageOnly` theorem), 0 changed; baseline re-recorded.
+
+Uncertain or left open: whole-process I/O refinement of the shells (guarded,
+not proved); computational cryptography; live providers; hardware TPM;
+independent review. Confidence: high that the theorems state what the
+extracted Rust does; medium that the boundary propositions are the right
+idealization (review requested).

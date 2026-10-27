@@ -47,7 +47,11 @@ the remaining external validations are in
 extracted core (`stateless*.rs`; proofs `proofs/GarrettStateless*.lean`;
 mutants labelled `stateless `). The Python `garrett_stateless/decisions.py`
 mirrors them, and the two implementations must stay byte-compatible with
-`tests/secrets_vectors/garrett-stateless-v1.jsonl`.
+`tests/secrets_vectors/garrett-stateless-v1.jsonl`. The composed internal theorem is
+`protocol_safety` (`proofs/GarrettStatelessProtocol.lean`); its only premises
+are the external boundary in `GarrettStatelessBoundary.lean`. Run
+`python dev/verification/stateless_shell.py check` after changing the
+`garrett-stateless` shell.
 
 **Formalization-first overnight work:** when the operator assigns an extended
 proof campaign, follow `docs/planning/aivm-secrets-overnight-formalization.md`
