@@ -19,16 +19,16 @@
     "non_committing_work": "requires_reconcile",
     "compaction_usage": "measured_signals_only_when_runtime_omits_usage"
   },
-  "through": "2026-10-26T18:14:42.901476+00:00",
-  "ledger_rows": 237,
-  "commits_accounted": 230,
-  "turns": 6064,
+  "through": "2026-10-27T02:21:26.041408+00:00",
+  "ledger_rows": 243,
+  "commits_accounted": 234,
+  "turns": 6887,
   "tokens": {
-    "input": 3932609,
-    "cache_write": 7940877,
-    "cache_read": 2353774856,
-    "output": 5076909,
-    "billable_input": 2365648342
+    "input": 3934293,
+    "cache_write": 10408818,
+    "cache_read": 2737084195,
+    "output": 6136383,
+    "billable_input": 2751427306
   },
   "by_model": {
     "gpt-6.1-sol": {
@@ -38,18 +38,18 @@
       "output": 1607585
     },
     "claude-opus-5-5": {
-      "input": 8488,
-      "cache_write": 7940877,
-      "cache_read": 1938184456,
-      "output": 3469324
+      "input": 10172,
+      "cache_write": 10408818,
+      "cache_read": 2321493795,
+      "output": 4528798
     }
   },
   "by_activity": {
     "unlabeled": {
-      "input": 3932609,
-      "cache_write": 7940877,
-      "cache_read": 2353774856,
-      "output": 5076909
+      "input": 3934293,
+      "cache_write": 10408818,
+      "cache_read": 2737084195,
+      "output": 6136383
     }
   },
   "by_agent": {
@@ -60,10 +60,10 @@
       "output": 1607585
     },
     "claude-code": {
-      "input": 8488,
-      "cache_write": 7940877,
-      "cache_read": 1938184456,
-      "output": 3469324
+      "input": 10172,
+      "cache_write": 10408818,
+      "cache_read": 2321493795,
+      "output": 4528798
     }
   },
   "server_tool_calls": {
@@ -71,12 +71,12 @@
     "web_fetch": 0
   },
   "time": {
-    "wall_clock_s": 253993.1
+    "wall_clock_s": 283165.3
   },
   "compaction_signals": {
-    "events": 6,
-    "peak_context_tokens": 5088129,
-    "summary_chars": 118153
+    "events": 8,
+    "peak_context_tokens": 6872671,
+    "summary_chars": 164152
   },
   "modeled_post_hoc": "inference_seconds, energy_kwh, carbon_gco2e, usd — derived from the measurements above by `estimate`; not stored here."
 }
