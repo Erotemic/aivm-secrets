@@ -267,8 +267,8 @@ def begin_login(policy: LoginPolicy, provider: str, peer: str, subject: str, cer
         raise Rejection('unknown_provider')
     if certificate_expires <= now:
         raise Rejection('expired')
-    return LoginState(login, provider, peer, subject, certificate_expires, policy.replica, scope, verifier,
-                      now, now + policy.ttl)
+    return LoginState(login, provider, peer, subject, min(certificate_expires, MAX_TIME), policy.replica, scope,
+                      verifier, now, now + policy.ttl)
 
 
 def entry_of(state: LoginState) -> Entry:

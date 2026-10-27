@@ -13,13 +13,14 @@ use crate::json::{self, Value};
 use crate::keys::BrokerKeys;
 use crate::login;
 use crate::tls::{self, PeerIdentity};
-use crate::token::{self, Informational, Opener, Sealer};
+use crate::token::{self, Informational, RingKey};
 use aivm_secrets_garrett_core::oauth_login::{IssuerRule, LoginDenial};
 use aivm_secrets_garrett_core::stateless::{self, Acceptance, Grant, IssuePolicy, MAX_TIME};
 use aivm_secrets_garrett_core::stateless_login::LoginPolicy;
 use aivm_secrets_garrett_core::stateless_mailbox::{
     self, CodeExchange, Mailbox, MailboxError, Polled, Token,
 };
+use aivm_secrets_garrett_core::stateless_token::{KeySet, TokenSealer};
 use rustls::{ServerConfig, ServerConnection, StreamOwned};
 use std::io::Write;
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -209,6 +210,8 @@ pub type Clock = Arc<dyn Fn() -> i64 + Send + Sync>;
 pub struct Broker {
     config: BrokerConfig,
     keys: BrokerKeys,
+    /// Every configured key, for opening surrogates at renewal.
+    verification: KeySet<RingKey>,
     mailbox: Mutex<Mailbox>,
     endpoint: Box<dyn TokenEndpoint>,
     secrets: Vec<Option<Zeroizing<String>>>,
@@ -262,6 +265,7 @@ impl Broker {
         }
         Ok(Self {
             config,
+            verification: keys.key_set()?,
             keys,
             mailbox: Mutex::new(stateless_mailbox::empty()),
             endpoint,
@@ -500,10 +504,10 @@ impl Broker {
             },
             None => Informational::default(),
         };
-        let sealer = Sealer {
-            entry: self.keys.active_entry(),
-            info,
-        };
+        // A sealer that cannot be built (no random nonce, an unencodable
+        // claim) still finishes the login: it refuses to seal.
+        let sealer = token::sealer(self.keys.active_entry(), &info)
+            .unwrap_or_else(|_| refusing_sealer(self.keys.active_entry()));
         // A failed random draw leaves an invalid `jti`, which fails issuance.
         let token_id = random_id().unwrap_or_default();
         let finished = stateless_mailbox::finish(
@@ -558,16 +562,14 @@ impl Broker {
     pub fn renew(&self, peer: &PeerIdentity, token: &str) -> Result<IssuedToken> {
         let info = token::informational(token.as_bytes())
             .map_err(|r| Error::Rejected(rejection_name(&r)))?;
-        let opener = Opener {
-            keys: self.keys.verification(),
-        };
-        let sealer = Sealer {
-            entry: self.keys.active_entry(),
+        let sealer = TokenSealer {
+            entry: self.keys.active_entry().core(),
             info,
+            nonce: crate::encoding::random::<12>()?.to_vec(),
         };
         let token_id = random_id()?;
         let issued = stateless::renew(
-            &opener,
+            &self.verification,
             &sealer,
             &self.acceptance(),
             &self.issue_policy(),
@@ -761,13 +763,14 @@ pub fn mint_with(
     let peer = PeerIdentity::from_der(certificate_der)?;
     let text =
         std::str::from_utf8(credential).map_err(|_| Error::Rejected("invalid_credential"))?;
-    let sealer = Sealer {
-        entry: keys.active_entry(),
-        info: Informational {
+    let sealer = token::sealer(
+        keys.active_entry(),
+        &Informational {
             scope: None,
             upstream: token::copy_upstream(text, copy),
         },
-    };
+    )
+    .map_err(|r| Error::Rejected(rejection_name(&r)))?;
     let grant = Grant {
         provider: provider.as_bytes().to_vec(),
         subject: peer.subject.into_bytes(),
@@ -790,6 +793,20 @@ pub fn mint_with(
         expires_at: issued.claims.expires_at,
         renew_until: issued.claims.renew_until,
     })
+}
+
+/// A sealer that refuses every issuance (its nonce is invalid).
+fn refusing_sealer(entry: &crate::keys::KeyEntry) -> TokenSealer<RingKey> {
+    TokenSealer {
+        entry: entry.core(),
+        info: aivm_secrets_garrett_core::stateless_token::Informational {
+            has_scope: false,
+            scope: Vec::new(),
+            has_upstream: false,
+            upstream: Vec::new(),
+        },
+        nonce: Vec::new(),
+    }
 }
 
 fn escape(text: &str) -> String {

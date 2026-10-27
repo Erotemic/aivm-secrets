@@ -9,7 +9,7 @@ use garrett_stateless::json::{self, Value};
 use garrett_stateless::keys::BrokerKeys;
 use garrett_stateless::login;
 use garrett_stateless::tls::PeerIdentity;
-use garrett_stateless::token::{copy_upstream, ClaimCopy, Informational, Opener, Sealer};
+use garrett_stateless::token::{copy_upstream, fixture_seal, ClaimCopy, Informational};
 
 fn rows() -> Vec<Value> {
     let path = concat!(
@@ -146,14 +146,15 @@ fn every_vector() {
                         .and_then(Value::as_object)
                         .cloned(),
                 };
-                let token = Sealer { entry, info }
-                    .fixture_seal(
-                        &claims(row.get("claims").unwrap()),
-                        s(row, "credential").as_bytes(),
-                        unhex(s(row, "nonce")),
-                    )
-                    .ok()
-                    .unwrap();
+                let token = fixture_seal(
+                    entry,
+                    &info,
+                    &claims(row.get("claims").unwrap()),
+                    s(row, "credential").as_bytes(),
+                    unhex(s(row, "nonce")),
+                )
+                .ok()
+                .unwrap();
                 assert_eq!(
                     String::from_utf8(token).unwrap(),
                     s(row, "token"),
@@ -168,9 +169,7 @@ fn every_vector() {
                     max_lifetime: i(a, "max_lifetime"),
                     skew: i(a, "skew"),
                 };
-                let opener = Opener {
-                    keys: &proxy.entries,
-                };
+                let opener = proxy.key_set().unwrap();
                 let result = stateless::open(
                     &opener,
                     s(row, "token").as_bytes(),

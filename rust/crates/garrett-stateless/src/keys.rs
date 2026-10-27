@@ -1,7 +1,12 @@
-//! Key sets (spec section 3) and rotation (section 10).
+//! Key-set files (spec section 3) and rotation (section 10). Which entry a
+//! token selects, and what makes a key set valid, is the extracted
+//! `stateless_token`; this module reads and writes the files and generates
+//! key material.
 use crate::encoding::{b64url, from_b64url, is_kid, is_text, random};
 use crate::error::{config, Error, Result};
 use crate::json::{self, Value};
+use crate::token::RingKey;
+use aivm_secrets_garrett_core::stateless_token::{self, KeySet};
 use ring::signature::{Ed25519KeyPair, KeyPair};
 use zeroize::Zeroizing;
 
@@ -23,12 +28,17 @@ impl KeyEntry {
     pub fn seal_key(&self) -> &[u8; 32] {
         &self.seal
     }
-    pub(crate) fn signer(&self) -> Result<Ed25519KeyPair> {
-        let seed = self
-            .sign
-            .as_ref()
-            .ok_or_else(|| config("key has no signing seed"))?;
-        Ed25519KeyPair::from_seed_unchecked(&seed[..]).map_err(|_| config("invalid signing seed"))
+    /// The codec's entry: `kid`, issuer and `ring` key material.
+    pub fn core(&self) -> stateless_token::KeyEntry<RingKey> {
+        stateless_token::KeyEntry {
+            kid: self.kid.as_bytes().to_vec(),
+            issuer: self.issuer.as_bytes().to_vec(),
+            material: RingKey {
+                verify: self.verify,
+                seal: self.seal.clone(),
+                sign: self.sign.clone(),
+            },
+        }
     }
     fn public(&self) -> Value {
         json::object([
@@ -120,12 +130,20 @@ fn entries_of(value: Option<&Value>, broker: bool) -> Result<Vec<KeyEntry>> {
     Ok(entries)
 }
 
+/// The extracted key set of these entries, refused unless it is valid.
+pub fn key_set(entries: &[KeyEntry]) -> Result<KeySet<RingKey>> {
+    KeySet::new(entries.iter().map(KeyEntry::core).collect()).map_err(|_| config("invalid key set"))
+}
+
 /// The keys a proxy needs: verification and sealing keys, no signing seed.
 pub struct ProxyKeys {
     pub entries: Vec<KeyEntry>,
 }
 
 impl ProxyKeys {
+    pub fn key_set(&self) -> Result<KeySet<RingKey>> {
+        key_set(&self.entries)
+    }
     pub fn parse(bytes: &[u8]) -> Result<Self> {
         let value =
             json::parse(bytes, 65536, 8).map_err(|_| config("key file is not strict JSON"))?;
@@ -298,6 +316,9 @@ impl BrokerKeys {
     /// Every entry, for opening surrogates at renewal.
     pub fn verification(&self) -> &[KeyEntry] {
         &self.entries
+    }
+    pub fn key_set(&self) -> Result<KeySet<RingKey>> {
+        key_set(&self.entries)
     }
 }
 

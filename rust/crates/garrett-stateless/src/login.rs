@@ -1,67 +1,40 @@
 //! The sealed login state (spec section 8.2) and PKCE. The transient login
 //! mailbox (section 9) is the extracted `stateless_mailbox`.
-use crate::encoding::{
-    b64url, from_b64url, is_id, is_kid, is_provider, is_scope, is_text, is_thumbprint, random,
-};
+use crate::encoding::{b64url, random};
 use crate::error::{Error, Result};
-use crate::json::{self, Value, MAX_INTEGER};
+use crate::token::RingStateKey;
 use aivm_secrets_garrett_core::oauth_login::Stage;
 use aivm_secrets_garrett_core::stateless::Rejection;
 use aivm_secrets_garrett_core::stateless_login::LoginState;
-use ring::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
+use aivm_secrets_garrett_core::stateless_token::{self, StateKey};
 use zeroize::Zeroizing;
 
 pub const STATE_PREFIX: &str = "gs1.";
 pub const MAX_STATE: usize = 4096;
-const LOGIN_LABEL: &[u8] = b"garrett-stateless-v1/login\0";
 
-fn key(state_key: &[u8; 32]) -> LessSafeKey {
-    LessSafeKey::new(UnboundKey::new(&AES_256_GCM, state_key).expect("32-byte AES key"))
-}
-
-fn text(bytes: &[u8]) -> Result<Value> {
-    Ok(json::text(
-        std::str::from_utf8(bytes).map_err(|_| Error::Protocol("invalid_request"))?,
-    ))
-}
-
-/// Seal a login state under the broker's login-state key.
+/// Seal a login state under the broker's login-state key (the extracted
+/// `stateless_token::seal_state`, with a fresh nonce).
 pub fn seal_state(state_key: &[u8; 32], state: &LoginState) -> Result<String> {
-    seal_plaintext(state_key, &state_plaintext(state)?, random::<12>()?)
+    let sealed = stateless_token::seal_state(&RingStateKey(state_key), state, &random::<12>()?)
+        .ok_or(Error::Protocol("invalid_request"))?;
+    String::from_utf8(sealed).map_err(|_| Error::Protocol("internal_error"))
 }
 
 /// The canonical plaintext of a login state.
 pub fn state_plaintext(state: &LoginState) -> Result<Vec<u8>> {
-    let plain = json::object([
-        (
-            "cert_exp",
-            Value::Int(state.certificate_expires.min(MAX_INTEGER)),
-        ),
-        ("cnf", text(&state.certificate)?),
-        ("exp", Value::Int(state.expires_at)),
-        ("iat", Value::Int(state.issued_at)),
-        ("login", text(&state.login)?),
-        ("prv", text(&state.provider)?),
-        ("rep", text(&state.replica)?),
-        ("scope", text(&state.scope)?),
-        ("sub", text(&state.subject)?),
-        ("verifier", text(&state.verifier)?),
-    ]);
-    json::canonical(&plain).map_err(|_| Error::Protocol("invalid_request"))
+    if !stateless_token::state_valid(state) {
+        return Err(Error::Protocol("invalid_request"));
+    }
+    Ok(stateless_token::state_bytes(state))
 }
 
-/// Deterministic sealing for conformance vectors.
+/// Deterministic sealing of a plaintext, for conformance vectors.
 pub fn seal_plaintext(state_key: &[u8; 32], plaintext: &[u8], nonce: [u8; 12]) -> Result<String> {
-    let mut data = Zeroizing::new(plaintext.to_vec());
-    key(state_key)
-        .seal_in_place_append_tag(
-            Nonce::assume_unique_for_key(nonce),
-            Aad::from(LOGIN_LABEL),
-            &mut *data,
-        )
-        .map_err(|_| Error::Protocol("internal_error"))?;
+    let ciphertext = RingStateKey(state_key)
+        .seal(&nonce, stateless_token::LOGIN_LABEL, plaintext)
+        .ok_or(Error::Protocol("internal_error"))?;
     let mut sealed = nonce.to_vec();
-    sealed.extend_from_slice(&data);
+    sealed.extend_from_slice(&ciphertext);
     let out = format!("{STATE_PREFIX}{}", b64url(&sealed));
     if out.len() > MAX_STATE {
         return Err(Error::Protocol("invalid_request"));
@@ -69,76 +42,9 @@ pub fn seal_plaintext(state_key: &[u8; 32], plaintext: &[u8], nonce: [u8; 12]) -
     Ok(out)
 }
 
-fn field(
-    map: &std::collections::BTreeMap<String, Value>,
-    name: &str,
-    valid: fn(&str) -> bool,
-) -> std::result::Result<Vec<u8>, Rejection> {
-    let value = map
-        .get(name)
-        .and_then(Value::as_str)
-        .ok_or(Rejection::Malformed)?;
-    if !valid(value) {
-        return Err(Rejection::Malformed);
-    }
-    Ok(value.as_bytes().to_vec())
-}
-
-fn number(
-    map: &std::collections::BTreeMap<String, Value>,
-    name: &str,
-) -> std::result::Result<i64, Rejection> {
-    map.get(name)
-        .and_then(Value::as_int)
-        .filter(|v| *v >= 0)
-        .ok_or(Rejection::Malformed)
-}
-
-fn is_verifier(value: &str) -> bool {
-    (43..=128).contains(&value.len())
-        && value
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~'))
-}
-
-/// Open a `state` parameter. Any forgery, truncation or foreign key fails.
+/// Open a `state` parameter (the extracted `stateless_token::open_state`).
 pub fn open_state(state_key: &[u8; 32], text: &str) -> std::result::Result<LoginState, Rejection> {
-    if text.len() > MAX_STATE {
-        return Err(Rejection::Malformed);
-    }
-    let encoded = text
-        .strip_prefix(STATE_PREFIX)
-        .ok_or(Rejection::Malformed)?;
-    let sealed = from_b64url(encoded).ok_or(Rejection::Malformed)?;
-    if sealed.len() < 12 + 16 + 1 {
-        return Err(Rejection::Malformed);
-    }
-    let nonce: [u8; 12] = sealed[..12].try_into().map_err(|_| Rejection::Malformed)?;
-    let mut data = Zeroizing::new(sealed[12..].to_vec());
-    let plain = key(state_key)
-        .open_in_place(
-            Nonce::assume_unique_for_key(nonce),
-            Aad::from(LOGIN_LABEL),
-            &mut data,
-        )
-        .map_err(|_| Rejection::Undecryptable)?;
-    let value = json::parse(plain, MAX_STATE, 2).map_err(|_| Rejection::Malformed)?;
-    let map = value.as_object().ok_or(Rejection::Malformed)?;
-    if map.len() != 10 {
-        return Err(Rejection::Malformed);
-    }
-    Ok(LoginState {
-        login: field(map, "login", is_id)?,
-        provider: field(map, "prv", is_provider)?,
-        certificate: field(map, "cnf", is_thumbprint)?,
-        subject: field(map, "sub", is_text)?,
-        certificate_expires: number(map, "cert_exp")?,
-        replica: field(map, "rep", is_kid)?,
-        scope: field(map, "scope", is_scope)?,
-        verifier: field(map, "verifier", is_verifier)?,
-        issued_at: number(map, "iat")?,
-        expires_at: number(map, "exp")?,
-    })
+    stateless_token::open_state(&RingStateKey(state_key), text.as_bytes())
 }
 
 /// A fresh PKCE verifier (32 random bytes, b64url).

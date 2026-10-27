@@ -1,27 +1,91 @@
-//! The surrogate token codec (spec section 4): the signing and sealing
-//! adapter behind the extracted `stateless::SurrogateSealer`, and the
-//! verifying and unsealing adapter behind `stateless::SurrogateOpener`.
-use crate::encoding::{
-    b64url, from_b64url, is_id, is_kid, is_provider, is_scope, is_text, is_thumbprint, random,
-};
-use crate::json::{self, Value, MAX_INTEGER};
-use crate::keys::KeyEntry;
-use aivm_secrets_garrett_core::stateless::{
-    Rejection, SurrogateClaims, SurrogateOpener, SurrogateSealer, Verified,
+//! The surrogate token's primitives and the broker's claim copying (spec
+//! section 4). The codec itself, every byte signed, sealed and accepted, key
+//! selection, and the opener and sealer the controllers use, is the
+//! extracted `stateless_token`. This module supplies `ring`'s Ed25519 and
+//! AES-256-GCM behind its `KeyMaterial`, and builds the informational claims.
+use crate::encoding::{from_b64url, random};
+use crate::json::{self, Value};
+use aivm_secrets_garrett_core::stateless::{Rejection, SurrogateClaims};
+use aivm_secrets_garrett_core::stateless_token::{
+    self, KeyMaterial, StateKey, TokenSealer, MAX_TOKEN,
 };
 use ring::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
-use ring::signature::{UnparsedPublicKey, ED25519};
+use ring::signature::{Ed25519KeyPair, UnparsedPublicKey, ED25519};
 use std::collections::BTreeMap;
 use zeroize::Zeroizing;
 
 pub const TYP: &str = "garrett-stateless-v1+jwt";
-pub const MAX_TOKEN: usize = 16384;
 pub const MAX_UPSTREAM: usize = 4096;
-const CREDENTIAL_LABEL: &[u8] = b"garrett-stateless-v1/credential\0";
-const REQUIRED: [&str; 10] = [
-    "aud", "cnf", "enc", "exp", "iat", "iss", "jti", "prv", "ren", "sub",
-];
-const OPTIONAL: [&str; 2] = ["scope", "upstream"];
+
+/// One key's material: the Ed25519 public key, the AES-256-GCM sealing key
+/// and, for a broker key, the Ed25519 seed.
+#[derive(Clone)]
+pub struct RingKey {
+    pub verify: [u8; 32],
+    pub seal: Zeroizing<[u8; 32]>,
+    pub sign: Option<Zeroizing<[u8; 32]>>,
+}
+
+fn aes(key: &[u8; 32]) -> LessSafeKey {
+    LessSafeKey::new(UnboundKey::new(&AES_256_GCM, key).expect("32-byte AES key"))
+}
+
+fn aes_seal(key: &[u8; 32], nonce: &[u8], aad: &[u8], plaintext: &[u8]) -> Option<Vec<u8>> {
+    let nonce: [u8; 12] = nonce.try_into().ok()?;
+    let mut data = plaintext.to_vec();
+    aes(key)
+        .seal_in_place_append_tag(
+            Nonce::assume_unique_for_key(nonce),
+            Aad::from(aad),
+            &mut data,
+        )
+        .ok()?;
+    Some(data)
+}
+
+fn aes_open(key: &[u8; 32], nonce: &[u8], aad: &[u8], sealed: &[u8]) -> Option<Vec<u8>> {
+    let nonce: [u8; 12] = nonce.try_into().ok()?;
+    let mut data = Zeroizing::new(sealed.to_vec());
+    let plain = aes(key)
+        .open_in_place(
+            Nonce::assume_unique_for_key(nonce),
+            Aad::from(aad),
+            &mut data,
+        )
+        .ok()?;
+    Some(plain.to_vec())
+}
+
+impl KeyMaterial for RingKey {
+    fn verify(&self, message: &[u8], signature: &[u8]) -> bool {
+        UnparsedPublicKey::new(&ED25519, &self.verify)
+            .verify(message, signature)
+            .is_ok()
+    }
+    fn open(&self, nonce: &[u8], aad: &[u8], sealed: &[u8]) -> Option<Vec<u8>> {
+        aes_open(&self.seal, nonce, aad, sealed)
+    }
+    fn sign(&self, message: &[u8]) -> Option<Vec<u8>> {
+        let seed = self.sign.as_ref()?;
+        let pair = Ed25519KeyPair::from_seed_unchecked(&seed[..]).ok()?;
+        Some(pair.sign(message).as_ref().to_vec())
+    }
+    fn seal(&self, nonce: &[u8], aad: &[u8], plaintext: &[u8]) -> Option<Vec<u8>> {
+        aes_seal(&self.seal, nonce, aad, plaintext)
+    }
+}
+
+/// The broker's login-state key.
+pub struct RingStateKey<'a>(pub &'a [u8; 32]);
+
+impl StateKey for RingStateKey<'_> {
+    fn seal(&self, nonce: &[u8], aad: &[u8], plaintext: &[u8]) -> Option<Vec<u8>> {
+        aes_seal(self.0, nonce, aad, plaintext)
+    }
+    fn open(&self, nonce: &[u8], aad: &[u8], sealed: &[u8]) -> Option<Vec<u8>> {
+        aes_open(self.0, nonce, aad, sealed)
+    }
+}
 
 /// Claims that inform the agent but never authorize anything.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -30,320 +94,76 @@ pub struct Informational {
     pub upstream: Option<BTreeMap<String, Value>>,
 }
 
-fn header(kid: &str) -> Value {
-    json::object([
-        ("alg", json::text("EdDSA")),
-        ("kid", json::text(kid)),
-        ("typ", json::text(TYP)),
-    ])
-}
-
-fn utf8(bytes: &[u8]) -> Result<&str, Rejection> {
-    std::str::from_utf8(bytes).map_err(|_| Rejection::Malformed)
-}
-
-fn int(value: i64) -> Result<Value, Rejection> {
-    if !(0..=MAX_INTEGER).contains(&value) {
-        return Err(Rejection::Malformed);
-    }
-    Ok(Value::Int(value))
-}
-
-/// The payload without `enc`, after checking every grammar.
-fn public_payload(
-    claims: &SurrogateClaims,
-    info: &Informational,
-) -> Result<BTreeMap<String, Value>, Rejection> {
-    let issuer = utf8(&claims.issuer)?;
-    let audience = utf8(&claims.audience)?;
-    let subject = utf8(&claims.subject)?;
-    let token_id = utf8(&claims.token_id)?;
-    let provider = utf8(&claims.provider)?;
-    let certificate = utf8(&claims.certificate)?;
-    if !is_text(issuer)
-        || !is_text(audience)
-        || !is_text(subject)
-        || !is_id(token_id)
-        || !is_provider(provider)
-        || !is_thumbprint(certificate)
-    {
-        return Err(Rejection::Malformed);
-    }
-    let mut map = BTreeMap::new();
-    map.insert("iss".into(), json::text(issuer));
-    map.insert("aud".into(), json::text(audience));
-    map.insert("sub".into(), json::text(subject));
-    map.insert("jti".into(), json::text(token_id));
-    map.insert("prv".into(), json::text(provider));
-    map.insert(
-        "cnf".into(),
-        json::object([("x5t#S256", json::text(certificate))]),
-    );
-    map.insert("iat".into(), int(claims.issued_at)?);
-    map.insert("exp".into(), int(claims.expires_at)?);
-    map.insert("ren".into(), int(claims.renew_until)?);
-    if let Some(scope) = &info.scope {
-        if !is_scope(scope) {
-            return Err(Rejection::Malformed);
-        }
-        map.insert("scope".into(), json::text(scope));
-    }
-    if let Some(upstream) = &info.upstream {
-        map.insert("upstream".into(), Value::Object(upstream.clone()));
-    }
-    Ok(map)
-}
-
-fn associated(header: &[u8], public: &[u8]) -> Vec<u8> {
-    let mut aad = CREDENTIAL_LABEL.to_vec();
-    aad.extend_from_slice(header);
-    aad.push(0);
-    aad.extend_from_slice(public);
-    aad
-}
-
-fn sealing_key(entry: &KeyEntry) -> LessSafeKey {
-    LessSafeKey::new(UnboundKey::new(&AES_256_GCM, entry.seal_key()).expect("32-byte AES key"))
-}
-
-/// Signs with one broker key entry. The informational claims are carried
-/// by the adapter; the extracted controller chooses every other claim.
-pub struct Sealer<'a> {
-    pub entry: &'a KeyEntry,
-    pub info: Informational,
-}
-
-impl Sealer<'_> {
-    fn seal_with_nonce(
-        &self,
-        claims: &SurrogateClaims,
-        credential: &[u8],
-        nonce: [u8; 12],
-    ) -> Result<Vec<u8>, Rejection> {
-        if !crate::encoding::is_credential(credential) || !is_kid(&self.entry.kid) {
-            return Err(Rejection::InvalidCredential);
-        }
-        let header = json::canonical(&header(&self.entry.kid)).map_err(|_| Rejection::Malformed)?;
-        let mut payload = public_payload(claims, &self.info)?;
-        let public =
-            json::canonical(&Value::Object(payload.clone())).map_err(|_| Rejection::Malformed)?;
-        let mut sealed = Zeroizing::new(credential.to_vec());
-        sealing_key(self.entry)
-            .seal_in_place_append_tag(
-                Nonce::assume_unique_for_key(nonce),
-                Aad::from(associated(&header, &public)),
-                &mut *sealed,
-            )
-            .map_err(|_| Rejection::Undecryptable)?;
-        let mut enc = nonce.to_vec();
-        enc.extend_from_slice(&sealed);
-        payload.insert("enc".into(), json::text(&b64url(&enc)));
-        let payload = json::canonical(&Value::Object(payload)).map_err(|_| Rejection::Malformed)?;
-        let body = format!("{}.{}", b64url(&header), b64url(&payload));
-        let signature = self
-            .entry
-            .signer()
-            .map_err(|_| Rejection::UnknownKey)?
-            .sign(body.as_bytes());
-        let token = format!("{}.{}", body, b64url(signature.as_ref()));
-        if token.len() > MAX_TOKEN {
-            return Err(Rejection::Malformed);
-        }
-        Ok(token.into_bytes())
-    }
-
-    /// Deterministic sealing for conformance vectors only.
-    pub fn fixture_seal(
-        &self,
-        claims: &SurrogateClaims,
-        credential: &[u8],
-        nonce: [u8; 12],
-    ) -> Result<Vec<u8>, Rejection> {
-        self.seal_with_nonce(claims, credential, nonce)
-    }
-}
-
-impl SurrogateSealer for Sealer<'_> {
-    fn seal(&self, claims: &SurrogateClaims, credential: &[u8]) -> Result<Vec<u8>, Rejection> {
-        let nonce = random::<12>().map_err(|_| Rejection::Undecryptable)?;
-        self.seal_with_nonce(claims, credential, nonce)
-    }
-}
-
-/// Verifies against a set of configured key entries (any `kid` listed).
-pub struct Opener<'a> {
-    pub keys: &'a [KeyEntry],
-}
-
-fn string_claim(
-    map: &BTreeMap<String, Value>,
-    name: &str,
-    valid: fn(&str) -> bool,
-) -> Result<Vec<u8>, Rejection> {
-    let text = map
-        .get(name)
-        .and_then(Value::as_str)
-        .ok_or(Rejection::Malformed)?;
-    if !valid(text) {
-        return Err(Rejection::Malformed);
-    }
-    Ok(text.as_bytes().to_vec())
-}
-
-fn time_claim(map: &BTreeMap<String, Value>, name: &str) -> Result<i64, Rejection> {
-    let value = map
-        .get(name)
-        .and_then(Value::as_int)
-        .ok_or(Rejection::Malformed)?;
-    if value < 0 {
-        return Err(Rejection::Malformed);
-    }
-    Ok(value)
-}
-
-/// The three segments of a token, each strictly decoded.
-fn segments(token: &[u8]) -> Result<(&str, &str, &str), Rejection> {
-    if token.len() > MAX_TOKEN || !token.is_ascii() {
-        return Err(Rejection::Malformed);
-    }
-    let text = utf8(token)?;
-    let mut parts = text.split('.');
-    let (Some(h), Some(p), Some(s), None) =
-        (parts.next(), parts.next(), parts.next(), parts.next())
-    else {
-        return Err(Rejection::Malformed);
-    };
-    Ok((h, p, s))
-}
-
-/// The header's `kid`, if the header is exactly the version-1 header.
-fn header_kid(encoded: &str) -> Result<(String, Vec<u8>), Rejection> {
-    let bytes = from_b64url(encoded).ok_or(Rejection::Malformed)?;
-    let value = json::parse(&bytes, 1024, 2).map_err(|_| Rejection::Malformed)?;
-    let kid = value
-        .get("kid")
-        .and_then(Value::as_str)
-        .filter(|k| is_kid(k))
-        .ok_or(Rejection::Malformed)?;
-    if value != header(kid) || json::canonical(&value).map_err(|_| Rejection::Malformed)? != bytes {
-        return Err(Rejection::Malformed);
-    }
-    Ok((kid.to_owned(), bytes))
-}
-
-impl SurrogateOpener for Opener<'_> {
-    fn verify(&self, token: &[u8]) -> Result<Verified, Rejection> {
-        let (h, p, s) = segments(token)?;
-        let (kid, header_bytes) = header_kid(h)?;
-        let key = self
-            .keys
-            .iter()
-            .position(|e| e.kid == kid)
-            .ok_or(Rejection::UnknownKey)?;
-        let entry = &self.keys[key];
-        let signature = from_b64url(s)
-            .filter(|sig| sig.len() == 64)
-            .ok_or(Rejection::Malformed)?;
-        let signed = &token[..h.len() + 1 + p.len()];
-        UnparsedPublicKey::new(&ED25519, &entry.verify)
-            .verify(signed, &signature)
-            .map_err(|_| Rejection::BadSignature)?;
-        // Authenticated from here on; still strictly parsed.
-        let payload_bytes = from_b64url(p).ok_or(Rejection::Malformed)?;
-        let payload =
-            json::parse(&payload_bytes, MAX_TOKEN, 16).map_err(|_| Rejection::Malformed)?;
-        if json::canonical(&payload).map_err(|_| Rejection::Malformed)? != payload_bytes {
-            return Err(Rejection::Malformed);
-        }
-        let mut map = payload.as_object().ok_or(Rejection::Malformed)?.clone();
-        if !REQUIRED.iter().all(|k| map.contains_key(*k))
-            || !map
-                .keys()
-                .all(|k| REQUIRED.contains(&k.as_str()) || OPTIONAL.contains(&k.as_str()))
-        {
-            return Err(Rejection::Malformed);
-        }
-        if let Some(scope) = map.get("scope") {
-            if !scope.as_str().is_some_and(is_scope) {
-                return Err(Rejection::Malformed);
+impl Informational {
+    /// The codec's form: the scope bytes and the canonical upstream object.
+    pub fn encoded(&self) -> Result<stateless_token::Informational, Rejection> {
+        let upstream = match &self.upstream {
+            Some(map) => {
+                json::canonical(&Value::Object(map.clone())).map_err(|_| Rejection::Malformed)?
             }
-        }
-        if let Some(upstream) = map.get("upstream") {
-            upstream.as_object().ok_or(Rejection::Malformed)?;
-        }
-        let cnf = map
-            .get("cnf")
-            .and_then(Value::as_object)
-            .ok_or(Rejection::Malformed)?;
-        if cnf.len() != 1 {
-            return Err(Rejection::Malformed);
-        }
-        let certificate = string_claim(cnf, "x5t#S256", is_thumbprint)?;
-        let claims = SurrogateClaims {
-            issuer: string_claim(&map, "iss", is_text)?,
-            audience: string_claim(&map, "aud", is_text)?,
-            subject: string_claim(&map, "sub", is_text)?,
-            token_id: string_claim(&map, "jti", is_id)?,
-            provider: string_claim(&map, "prv", is_provider)?,
-            certificate,
-            issued_at: time_claim(&map, "iat")?,
-            expires_at: time_claim(&map, "exp")?,
-            renew_until: time_claim(&map, "ren")?,
+            None => Vec::new(),
         };
-        let enc = map.remove("enc").ok_or(Rejection::Malformed)?;
-        let sealed = enc
-            .as_str()
-            .and_then(from_b64url)
-            .ok_or(Rejection::Malformed)?;
-        if sealed.len() < 12 + 16 + 1 {
-            return Err(Rejection::Malformed);
-        }
-        let public = json::canonical(&Value::Object(map)).map_err(|_| Rejection::Malformed)?;
-        Ok(Verified {
-            key,
-            key_issuer: entry.issuer.as_bytes().to_vec(),
-            claims,
-            aad: associated(&header_bytes, &public),
-            sealed,
+        Ok(stateless_token::Informational {
+            has_scope: self.scope.is_some(),
+            scope: self.scope.clone().unwrap_or_default().into_bytes(),
+            has_upstream: self.upstream.is_some(),
+            upstream,
         })
     }
-
-    fn unseal(&self, verified: &Verified) -> Result<Vec<u8>, Rejection> {
-        let entry = self.keys.get(verified.key).ok_or(Rejection::UnknownKey)?;
-        let nonce: [u8; 12] = verified.sealed[..12]
-            .try_into()
-            .map_err(|_| Rejection::Malformed)?;
-        let mut data = Zeroizing::new(verified.sealed[12..].to_vec());
-        let plain = sealing_key(entry)
-            .open_in_place(
-                Nonce::assume_unique_for_key(nonce),
-                Aad::from(verified.aad.clone()),
-                &mut data,
-            )
-            .map_err(|_| Rejection::Undecryptable)?;
-        Ok(plain.to_vec())
-    }
 }
 
-/// The informational claims of an authenticated token, to carry across a
-/// renewal. Only call after `stateless::open` accepted the same bytes.
-pub fn informational(token: &[u8]) -> Result<Informational, Rejection> {
-    let (_, p, _) = segments(token)?;
-    let payload = json::parse(&from_b64url(p).ok_or(Rejection::Malformed)?, MAX_TOKEN, 16)
-        .map_err(|_| Rejection::Malformed)?;
-    Ok(Informational {
-        scope: payload
-            .get("scope")
-            .and_then(Value::as_str)
-            .map(str::to_owned),
-        upstream: payload.get("upstream").and_then(Value::as_object).cloned(),
+/// The extracted sealer for one issuance by `entry`, with a fresh nonce.
+pub fn sealer(
+    entry: &crate::keys::KeyEntry,
+    info: &Informational,
+) -> Result<TokenSealer<RingKey>, Rejection> {
+    sealer_with_nonce(
+        entry,
+        info,
+        random::<12>().map_err(|_| Rejection::Undecryptable)?,
+    )
+}
+
+/// The same sealer with a given nonce (conformance vectors only).
+pub fn sealer_with_nonce(
+    entry: &crate::keys::KeyEntry,
+    info: &Informational,
+    nonce: [u8; 12],
+) -> Result<TokenSealer<RingKey>, Rejection> {
+    Ok(TokenSealer {
+        entry: entry.core(),
+        info: info.encoded()?,
+        nonce: nonce.to_vec(),
     })
+}
+
+/// Deterministic sealing for conformance vectors.
+pub fn fixture_seal(
+    entry: &crate::keys::KeyEntry,
+    info: &Informational,
+    claims: &SurrogateClaims,
+    credential: &[u8],
+    nonce: [u8; 12],
+) -> Result<Vec<u8>, Rejection> {
+    let sealer = sealer_with_nonce(entry, info, nonce)?;
+    stateless_token::seal_token(
+        &sealer.entry,
+        &sealer.info,
+        claims,
+        credential,
+        &sealer.nonce,
+    )
 }
 
 /// Decode a surrogate's header and payload **without verifying** it, for an
 /// agent to inspect what it holds. Never use the result for a decision.
 pub fn inspect(token: &str) -> Result<(Value, Value), Rejection> {
-    let (h, p, _) = segments(token.as_bytes())?;
+    let mut parts = token.split('.');
+    let (Some(h), Some(p), Some(_), None) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
+        return Err(Rejection::Malformed);
+    };
     let header = json::parse(&from_b64url(h).ok_or(Rejection::Malformed)?, 1024, 2)
         .map_err(|_| Rejection::Malformed)?;
     let payload = json::parse(&from_b64url(p).ok_or(Rejection::Malformed)?, MAX_TOKEN, 16)
@@ -434,11 +254,20 @@ pub fn copy_upstream(access_token: &str, policy: &ClaimCopy) -> Option<BTreeMap<
     Some(copied)
 }
 
+/// The informational claims of an authenticated token, to carry across a
+/// renewal. Only call after `stateless::open` accepted the same bytes.
+pub fn informational(token: &[u8]) -> Result<stateless_token::Informational, Rejection> {
+    stateless_token::informational(token).ok_or(Rejection::Malformed)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::encoding::b64url;
     use crate::keys::BrokerKeys;
-    use aivm_secrets_garrett_core::stateless::{self, Acceptance};
+    use aivm_secrets_garrett_core::stateless::{
+        self, Acceptance, SurrogateOpener, SurrogateSealer,
+    };
 
     fn claims(peer: &str) -> SurrogateClaims {
         SurrogateClaims {
@@ -468,15 +297,11 @@ mod tests {
     #[test]
     fn seal_then_open() {
         let keys = BrokerKeys::generate("https://broker.test", "k1").unwrap();
-        let sealer = Sealer {
-            entry: keys.active_entry(),
-            info: Informational::default(),
-        };
+        let sealer = sealer(keys.active_entry(), &Informational::default())
+            .ok()
+            .unwrap();
         let token = sealer.seal(&claims(PEER), b"real-token").ok().unwrap();
-        let proxy = keys.export_proxy();
-        let opener = Opener {
-            keys: &proxy.entries,
-        };
+        let opener = keys.export_proxy().key_set().unwrap();
         let opened = stateless::open(&opener, &token, &acceptance(), PEER.as_bytes(), 1500)
             .ok()
             .unwrap();
@@ -489,16 +314,12 @@ mod tests {
     #[test]
     fn tampering_is_rejected() {
         let keys = BrokerKeys::generate("https://broker.test", "k1").unwrap();
-        let sealer = Sealer {
-            entry: keys.active_entry(),
-            info: Informational::default(),
-        };
+        let sealer = sealer(keys.active_entry(), &Informational::default())
+            .ok()
+            .unwrap();
         let token =
             String::from_utf8(sealer.seal(&claims(PEER), b"real-token").ok().unwrap()).unwrap();
-        let proxy = keys.export_proxy();
-        let opener = Opener {
-            keys: &proxy.entries,
-        };
+        let opener = keys.export_proxy().key_set().unwrap();
         let mut bytes = token.clone().into_bytes();
         let middle = token.find('.').unwrap() + 5;
         bytes[middle] = if bytes[middle] == b'A' { b'B' } else { b'A' };
@@ -508,14 +329,24 @@ mod tests {
         ));
         let unknown = BrokerKeys::generate("https://broker.test", "k9")
             .unwrap()
-            .export_proxy();
+            .export_proxy()
+            .key_set()
+            .unwrap();
         assert!(matches!(
-            Opener {
-                keys: &unknown.entries
-            }
-            .verify(token.as_bytes()),
+            unknown.verify(token.as_bytes()),
             Err(Rejection::UnknownKey)
         ));
+    }
+
+    #[test]
+    fn a_credential_in_the_public_claims_is_never_sealed() {
+        let keys = BrokerKeys::generate("https://broker.test", "k1").unwrap();
+        let info = Informational {
+            scope: Some("read the-real-token".into()),
+            upstream: None,
+        };
+        let sealer = sealer(keys.active_entry(), &info).ok().unwrap();
+        assert!(sealer.seal(&claims(PEER), b"the-real-token").is_err());
     }
 
     #[test]

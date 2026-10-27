@@ -267,3 +267,4 @@ pub mod stateless;
 pub mod stateless_login;
 pub mod stateless_mailbox;
 pub mod stateless_proxy;
+pub mod stateless_token;

@@ -92,7 +92,7 @@ def Dispatched (inst : Origin O) (io : O) (request : proxy_http.Request) (limit 
     proxy_controller.stopped .InternalError .Refused = Result.ok served) ∨
   (∃ io1 forms answer io2, inst.admitted io opened.claims index = Result.ok (true, io1) ∧
     proxy_http.reflection_forms (alloc.vec.Vec.deref opened.credential) = Result.ok forms ∧
-    inst.exchange io1 index (alloc.vec.Vec.deref wire) = Result.ok (answer, io2) ∧
+    inst.exchange io1 { route := index, wire := wire } = Result.ok (answer, io2) ∧
     match answer with
     | .Ok raw => ∃ released, proxy_controller.release (alloc.vec.Vec.deref raw) request
           (alloc.vec.Vec.deref forms) limit = Result.ok released ∧

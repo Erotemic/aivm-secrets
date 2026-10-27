@@ -80,7 +80,8 @@ pub fn begin(
         provider: provider.to_vec(),
         certificate: peer.to_vec(),
         subject: subject.to_vec(),
-        certificate_expires,
+        // Every time this profile writes is at most `2^53 - 1`.
+        certificate_expires: stateless::earlier(certificate_expires, MAX_TIME),
         replica: replica.to_vec(),
         scope: scope.to_vec(),
         verifier: verifier.to_vec(),

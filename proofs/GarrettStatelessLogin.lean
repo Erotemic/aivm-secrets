@@ -50,7 +50,8 @@ def BeginSpec (policy : LoginPolicy) (provider peer subject : Slice U8) (certExp
   s.certificate.val = peer.val ∧ s.provider.val = provider.val ∧
   Member (alloc.vec.Vec.deref policy.providers) provider ∧ s.replica.val = policy.replica.val ∧
   s.subject.val = subject.val ∧ s.login.val = login.val ∧ s.verifier.val = verifier.val ∧
-  s.scope.val = scope.val ∧ s.certificate_expires = certExpires ∧ now.val < certExpires.val ∧
+  s.scope.val = scope.val ∧ s.certificate_expires.val = min certExpires.val 9007199254740991 ∧
+  now.val < certExpires.val ∧
   s.issued_at = now ∧ s.expires_at.val = now.val + policy.ttl.val ∧
   1 ≤ policy.ttl.val ∧ policy.ttl.val ≤ 600
 

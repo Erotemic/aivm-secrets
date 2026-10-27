@@ -40,7 +40,12 @@ STATELESS_PROOFS = {
     "stateless.rs": "GarrettStateless",
     "stateless_login.rs": "GarrettStatelessLogin",
     "stateless_mailbox.rs": "GarrettStatelessMailbox",
-    "stateless_proxy.rs": "GarrettStatelessProxy",
+    "stateless_proxy.rs": "GarrettStatelessConnection",
+    "stateless_token.rs": "GarrettStatelessProtocol",
+}
+# Mutants whose defect is rejected by a module outside their file's default.
+STATELESS_MUTANT_PROOFS = {
+    "stateless state login label not bound": "GarrettStatelessState",
 }
 THEOREMS = [
     'aivm_secrets_garrett_core.read_transition.Proofs.request_facts_returned_iff',
@@ -1068,6 +1073,15 @@ def inputs() -> list[str]:
         "proofs/GarrettStatelessLogin.lean",
         "proofs/GarrettStatelessProxy.lean",
         "proofs/GarrettStatelessMailbox.lean",
+        "proofs/GarrettStatelessConnection.lean",
+        "proofs/GarrettStatelessCodec.lean",
+        "proofs/GarrettStatelessGrammar.lean",
+        "proofs/GarrettStatelessToken.lean",
+        "proofs/GarrettStatelessBoundary.lean",
+        "proofs/GarrettStatelessState.lean",
+        "proofs/GarrettStatelessProtocol.lean",
+        "proofs/GarrettStatelessRoundTrip.lean",
+        "proofs/GarrettStatelessWitness.lean",
         "dev/garrett_stateless_vectors.py",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
@@ -2263,6 +2277,7 @@ def mutate(pattern: str | None = None) -> None:
     stateless_login = source.with_name("stateless_login.rs")
     stateless_proxy = source.with_name("stateless_proxy.rs")
     stateless_mailbox = source.with_name("stateless_mailbox.rs")
+    stateless_token = source.with_name("stateless_token.rs")
     mutations += [
         (stateless, "stateless certificate binding removed", "if !(certificate == peer) {", "if false {"),
         (stateless, "stateless expired token accepted", "if now >= claims.expires_at {", "if now > claims.expires_at {"),
@@ -2305,6 +2320,34 @@ def mutate(pattern: str | None = None) -> None:
         (stateless_mailbox, "stateless mailbox poll ignores the peer",
          "Some(slot) => stateless_login::deliver(&slot.entry, peer, now),",
          "Some(slot) => stateless_login::deliver(&slot.entry, &slot.entry.certificate, now),"),
+        (stateless_proxy, "stateless proxy connection decides for the authority, not the peer",
+         "                peer,\n                now,\n                limit,\n",
+         "                authority,\n                now,\n                limit,\n"),
+        (stateless_token, "stateless token kid not used to select the key",
+         "while index < entries.len() && !named(&entries[index], kid) {",
+         "while false && !named(&entries[index], kid) {"),
+        (stateless_token, "stateless token duplicate kid accepted in a key set",
+         "&& select(entries, &entry.kid) == index", "&& true"),
+        (stateless_token, "stateless token associated data omits the header",
+         "    append(&mut aad, header);", "    let _ = header;"),
+        (stateless_token, "stateless token payload with trailing bytes accepted",
+         "if i + 1 != bytes.len() {", "if i + 1 > bytes.len() {"),
+        (stateless_token, "stateless token signature checked over the payload only",
+         "if !entry.material.verify(&token[..second], &signature) {",
+         "if !entry.material.verify(&token[first + 1..second], &signature) {"),
+        (stateless_token, "stateless token decrypted with the first key",
+         "    match entries[verified.key]", "    match entries[0]"),
+        (stateless_token, "stateless token credential allowed in the public payload",
+         "if occurs(&header, credential) || occurs(&public, credential) {", "if occurs(&header, credential) {"),
+        (stateless_token, "stateless token header prefix not checked",
+         "if start != HEADER_START || ending != HEADER_END {", "if ending != HEADER_END {"),
+        (stateless_token, "stateless token non-canonical base64 accepted",
+         "    if same != text {", "    if false && same != text {"),
+        (stateless_token, "stateless token provider grammar not checked",
+         "        && is_provider(&claims.provider)\n", "\n"),
+        (stateless_token, "stateless state login label not bound",
+         "let ciphertext = match key.seal(nonce, LOGIN_LABEL, &state_bytes(state)) {",
+         "let ciphertext = match key.seal(nonce, CREDENTIAL_LABEL, &state_bytes(state)) {"),
     ]
     total = len(mutations)
     if pattern is not None:
@@ -2506,7 +2549,7 @@ def mutate(pattern: str | None = None) -> None:
                             visit(imported)
                     closure.append(module)
 
-                visit(STATELESS_PROOFS[source.name] if source.name in STATELESS_PROOFS else "GarrettJsonFrame" if label.startswith("json wire ") else "GarrettJsonString" if label.startswith("json string ") else "GarrettProviderWire" if label.startswith("provider wire ") else "GarrettProviderChannel" if label.startswith("provider channel ") else "GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
+                visit(STATELESS_MUTANT_PROOFS.get(label, STATELESS_PROOFS.get(source.name, "")) if source.name in STATELESS_PROOFS else "GarrettJsonFrame" if label.startswith("json wire ") else "GarrettJsonString" if label.startswith("json string ") else "GarrettProviderWire" if label.startswith("provider wire ") else "GarrettProviderChannel" if label.startswith("provider channel ") else "GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
                 modules = closure + [module for module in modules if module not in seen]
             for module in modules:
                 proof = temporary / (module + ".lean")

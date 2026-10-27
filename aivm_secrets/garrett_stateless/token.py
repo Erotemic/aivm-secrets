@@ -75,6 +75,9 @@ class Sealer:
         header_bytes = enc.canonical(header(self.entry.kid))
         payload = _public_payload(claims, self.info)
         public = enc.canonical(payload)
+        if credential in header_bytes or credential in public:
+            # The credential never appears outside its sealed form.
+            raise Rejection('malformed')
         sealed = AESGCM(self.entry.seal).encrypt(nonce, credential, _associated(header_bytes, public))
         payload['enc'] = enc.b64url(nonce + sealed)
         body = enc.b64url(header_bytes) + '.' + enc.b64url(enc.canonical(payload))

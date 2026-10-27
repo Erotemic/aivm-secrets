@@ -32,7 +32,17 @@ def state_plaintext(state: LoginState) -> bytes:
     })
 
 
+def state_valid(state: LoginState) -> bool:
+    return (enc.is_thumbprint(state.certificate) and enc.is_id(state.login) and enc.is_provider(state.provider)
+            and enc.is_kid(state.replica) and enc.is_scope(state.scope) and enc.is_text(state.subject)
+            and _is_verifier(state.verifier)
+            and all(type(v) is int and 0 <= v <= enc.MAX_INTEGER
+                    for v in (state.certificate_expires, state.issued_at, state.expires_at)))
+
+
 def seal_state(state_key: bytes, state: LoginState) -> str:
+    if not state_valid(state):
+        raise Rejection('malformed')
     return seal_plaintext(state_key, state_plaintext(state), os.urandom(12))
 
 
@@ -53,6 +63,9 @@ def open_state(state_key: bytes, text: str) -> LoginState:
         raise Rejection('undecryptable') from None
     try:
         value = enc.parse(plain, MAX_STATE, 2)
+        # Only the one canonical plaintext of a state is accepted.
+        if enc.canonical(value) != plain:
+            raise Rejection('malformed')
     except enc.JsonError:
         raise Rejection('malformed') from None
     if not isinstance(value, dict) or len(value) != 10:

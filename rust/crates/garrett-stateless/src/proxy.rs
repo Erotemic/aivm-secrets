@@ -1,11 +1,13 @@
 //! The stateless mTLS reverse proxy (spec section 11).
 //!
-//! Per connection: a TLS 1.3 handshake requiring an agent certificate,
-//! then the extracted `proxy_controller::step` framing, and for each
-//! request the extracted `stateless_proxy::serve`, which opens the
-//! surrogate for this connection's peer, picks the route of its
-//! authenticated provider and encodes the upstream request. This module only
-//! moves bytes and keeps no record of any token.
+//! Per connection: a TLS 1.3 handshake requiring an agent certificate, then
+//! the extracted `stateless_proxy::connection` for the peer of that
+//! handshake. It frames the guest's bytes and, for each request, opens the
+//! surrogate for this peer, picks the route of its authenticated provider,
+//! encodes the upstream request and releases the reply. This module only
+//! moves bytes and keeps no record of any token. The only code that writes
+//! to a provider is [`Proxy::send_upstream`], which needs an `Egress`, which
+//! only the extracted controller can make.
 use crate::broker::Clock;
 use crate::config::{Authentication as RouteAuthentication, ProxyConfig};
 use crate::error::{rejection_name, Error, Result};
@@ -13,12 +15,14 @@ use crate::files::{read_private, read_public};
 use crate::json::{self, Value};
 use crate::keys::ProxyKeys;
 use crate::tls::{self, PeerIdentity};
-use crate::token::Opener;
+use crate::token::RingKey;
 use aivm_secrets_garrett_core::credential_use::Authentication;
-use aivm_secrets_garrett_core::proxy_controller::{self, Answer, Guest, Stage};
 use aivm_secrets_garrett_core::proxy_http::{self as core_http, Code, DenyRule, Request};
 use aivm_secrets_garrett_core::stateless::{Acceptance, Rejection, SurrogateClaims};
-use aivm_secrets_garrett_core::stateless_proxy::{self, Origin, Route};
+use aivm_secrets_garrett_core::stateless_proxy::{
+    self, egress_route, egress_wire, Channel, Egress, Origin, Route,
+};
+use aivm_secrets_garrett_core::stateless_token::KeySet;
 use rustls::pki_types::ServerName;
 use rustls::{ClientConfig, ClientConnection, ServerConfig, ServerConnection, StreamOwned};
 use std::io::{Read, Write};
@@ -42,7 +46,7 @@ struct Upstream {
 
 pub struct Proxy {
     config: ProxyConfig,
-    keys: ProxyKeys,
+    keys: KeySet<RingKey>,
     routes: Vec<Route>,
     upstream: Vec<Upstream>,
     acceptance: Acceptance,
@@ -115,7 +119,7 @@ impl Proxy {
         };
         Ok(Self {
             config,
-            keys,
+            keys: keys.key_set()?,
             routes,
             upstream,
             acceptance,
@@ -157,33 +161,6 @@ impl Proxy {
                 true
             }
         }
-    }
-
-    /// Serve one request for `peer` (also usable without sockets, in tests).
-    pub fn serve_request(
-        &self,
-        request: &Request,
-        peer: &PeerIdentity,
-    ) -> proxy_controller::Served {
-        let opener = Opener {
-            keys: &self.keys.entries,
-        };
-        let mut origin = Native {
-            proxy: self,
-            peer,
-            method: String::from_utf8_lossy(&request.method).into_owned(),
-            claims: None,
-        };
-        stateless_proxy::serve(
-            &opener,
-            &mut origin,
-            request,
-            &self.routes,
-            &self.acceptance,
-            peer.thumbprint.as_bytes(),
-            (self.clock)(),
-            self.config.request_limit,
-        )
     }
 
     pub fn serve(self: Arc<Self>) -> Result<RunningProxy> {
@@ -234,27 +211,39 @@ impl Proxy {
                 .complete_io(&mut stream.sock)
                 .map_err(|e| Error::Tls(format!("handshake: {}", e.kind())))?;
         }
-        // The peer is the certificate rustls verified in this handshake.
+        // The peer is the certificate rustls verified in this handshake; the
+        // extracted connection loop serves every request for it alone.
         let peer = PeerIdentity::from_connection(&stream.conn)?;
-        let mut guest = Connection {
+        let mut session = Session {
             proxy: self,
             stream,
-            peer,
+            peer: peer.thumbprint.clone(),
             started: Instant::now(),
             chunk: vec![0; 65536],
+            method: String::new(),
+            claims: None,
         };
-        proxy_controller::tunnel(
-            &mut guest,
+        stateless_proxy::connection(
+            &self.keys,
+            &mut session,
+            &self.routes,
+            &self.acceptance,
             self.config.authority.as_bytes(),
+            peer.thumbprint.as_bytes(),
             self.config.request_limit,
         );
-        guest.stream.conn.send_close_notify();
-        let _ = guest.stream.conn.complete_io(&mut guest.stream.sock);
+        session.stream.conn.send_close_notify();
+        let _ = session.stream.conn.complete_io(&mut session.stream.sock);
         Ok(())
     }
 
-    fn exchange(&self, route: usize, wire: &[u8]) -> std::result::Result<Vec<u8>, Code> {
-        let upstream = self.upstream.get(route).ok_or(Code::UnknownOrigin)?;
+    /// The one upstream write: the egress bytes, once, to its route's pinned
+    /// address over verified TLS. No retry.
+    fn send_upstream(&self, egress: Egress) -> std::result::Result<Vec<u8>, Code> {
+        let upstream = self
+            .upstream
+            .get(egress_route(&egress))
+            .ok_or(Code::UnknownOrigin)?;
         let started = Instant::now();
         let address = (upstream.address.as_str(), upstream.port)
             .to_socket_addrs()
@@ -278,7 +267,9 @@ impl Proxy {
                 .complete_io(&mut tls.sock)
                 .map_err(|_| Code::Unreachable)?;
         }
-        tls.write_all(wire).map_err(|_| Code::OutcomeUnknown)?;
+        tls.write_all(egress_wire(&egress))
+            .map_err(|_| Code::OutcomeUnknown)?;
+        drop(egress);
         tls.flush().map_err(|_| Code::OutcomeUnknown)?;
         let mut data = Vec::new();
         let mut chunk = [0u8; 65536];
@@ -302,23 +293,26 @@ impl Proxy {
     }
 }
 
-/// The native callbacks of one request.
-struct Native<'a> {
-    proxy: &'a Proxy,
-    peer: &'a PeerIdentity,
-    method: String,
-    claims: Option<(String, String)>,
-}
-
 fn text(bytes: &[u8]) -> Value {
     json::text(&String::from_utf8_lossy(bytes))
 }
 
-impl Origin for Native<'_> {
+/// The native side of one authenticated connection.
+struct Session<'a> {
+    proxy: &'a Proxy,
+    stream: StreamOwned<ServerConnection, TcpStream>,
+    peer: String,
+    started: Instant,
+    chunk: Vec<u8>,
+    method: String,
+    claims: Option<(String, String)>,
+}
+
+impl Origin for Session<'_> {
     fn rejected(&mut self, rejection: &Rejection) {
         self.proxy.record(json::object([
             ("event", json::text("rejected")),
-            ("peer", json::text(&self.peer.thumbprint)),
+            ("peer", json::text(&self.peer)),
             ("reason", json::text(rejection_name(rejection))),
         ]));
     }
@@ -336,11 +330,11 @@ impl Origin for Native<'_> {
             ("sub", text(&claims.subject)),
         ]))
     }
-    fn exchange(&mut self, route: usize, wire: &[u8]) -> std::result::Result<Vec<u8>, Code> {
-        self.proxy.exchange(route, wire)
+    fn exchange(&mut self, egress: Egress) -> std::result::Result<Vec<u8>, Code> {
+        self.proxy.send_upstream(egress)
     }
     fn completed(&mut self, status: u16) -> bool {
-        let (jti, provider) = self.claims.clone().unwrap_or_default();
+        let (jti, provider) = self.claims.take().unwrap_or_default();
         self.proxy.record(json::object([
             ("event", json::text("completed")),
             ("jti", json::text(&jti)),
@@ -350,15 +344,7 @@ impl Origin for Native<'_> {
     }
 }
 
-struct Connection<'a> {
-    proxy: &'a Proxy,
-    stream: StreamOwned<ServerConnection, TcpStream>,
-    peer: PeerIdentity,
-    started: Instant,
-    chunk: Vec<u8>,
-}
-
-impl Guest for Connection<'_> {
+impl Channel for Session<'_> {
     fn overdue(&mut self) -> bool {
         self.started.elapsed() > REQUEST_DEADLINE
     }
@@ -382,21 +368,21 @@ impl Guest for Connection<'_> {
             ("code", text(&name)),
         ]));
     }
-    fn serve(&mut self, request: &Request) -> Answer {
-        let served = self.proxy.serve_request(request, &self.peer);
+    fn stopped(&mut self, code: &Code) {
+        let mut name = Vec::new();
+        core_http::append_code(&mut name, code);
+        self.proxy.record(json::object([
+            ("event", json::text("stopped")),
+            ("code", text(&name)),
+        ]));
+    }
+    fn begin(&mut self, request: &Request) -> i64 {
+        self.method = String::from_utf8_lossy(&request.method).into_owned();
+        self.claims = None;
+        (self.proxy.clock)()
+    }
+    fn restart(&mut self) {
         self.started = Instant::now();
-        if !matches!(served.stage, Stage::Completed) {
-            let mut name = Vec::new();
-            core_http::append_code(&mut name, &served.code);
-            self.proxy.record(json::object([
-                ("event", json::text("stopped")),
-                ("code", text(&name)),
-            ]));
-        }
-        Answer {
-            reply: served.reply,
-            keep: served.keep,
-        }
     }
 }
 

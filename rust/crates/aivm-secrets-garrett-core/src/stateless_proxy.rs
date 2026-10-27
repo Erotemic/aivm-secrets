@@ -1,19 +1,30 @@
-//! The per-request controller of the `garrett-stateless-v1` mTLS reverse
-//! proxy (`docs/garrett-stateless-v1.md` section 11).
+//! The connection loop and per-request controller of the
+//! `garrett-stateless-v1` mTLS reverse proxy (`docs/garrett-stateless-v1.md`
+//! section 11).
 //!
-//! The native shell supplies the parsed request, the peer thumbprint from
-//! the completed handshake, the clock, the key-set adapter and the socket
-//! exchange ([`Origin`]). Everything else is decided here, from those
-//! inputs only: which surrogate the request presents, whether it opens for
-//! this peer, which configured route its authenticated `prv` selects, the
-//! exact upstream bytes (`proxy_http::encode_upstream`) and the released
-//! reply (`proxy_controller::release`).
+//! The native shell completes the TLS handshake, then calls [`connection`]
+//! with the peer thumbprint of that handshake and supplies only socket reads
+//! and writes, the clock, diagnostics and the upstream exchange
+//! ([`Channel`], [`Origin`]). Everything else is decided here: how the
+//! guest's bytes are framed, which surrogate a request presents, whether it
+//! opens for this connection's peer, which configured route its
+//! authenticated `prv` selects, the exact upstream bytes
+//! (`proxy_http::encode_upstream`) and the released reply
+//! (`proxy_controller::release`).
+//!
+//! Credential-bearing egress is closed: the upstream bytes reach the native
+//! shell only inside an [`Egress`], which only [`serve`] can build (its fields
+//! are private) and only after an acknowledged admission, and which
+//! [`Origin::exchange`] consumes.
 
 use crate::credential_use::Authentication;
 use crate::proxy_connect;
-use crate::proxy_controller::{code_of, release, stopped, Served, Stage};
+use crate::proxy_controller::{
+    code_of, frame, release, remainder, stopped, Framed, Served, Stage, Tunnel,
+};
 use crate::proxy_http::{
-    count_named, encode_upstream, first_named, reflection_forms, Code, DenyRule, Field, Request,
+    count_named, encode_upstream, first_named, reflection_forms, refusal, Code, DenyRule, Field,
+    Request,
 };
 use crate::stateless::{self, Acceptance, Rejection, SurrogateClaims, SurrogateOpener};
 
@@ -26,18 +37,55 @@ pub struct Route {
     pub authentication: Authentication,
 }
 
+/// One credential-bearing upstream request: the route and the exact bytes.
+/// Only [`serve`] makes one, after an acknowledged admission.
+pub struct Egress {
+    route: usize,
+    wire: Vec<u8>,
+}
+
+/// The route an egress is for.
+pub fn egress_route(egress: &Egress) -> usize {
+    egress.route
+}
+
+/// The exact bytes an egress sends.
+pub fn egress_wire(egress: &Egress) -> &[u8] {
+    &egress.wire
+}
+
 /// What the native shell provides for one request.
 pub trait Origin {
     /// A surrogate was refused, for diagnostics; the reason only.
     fn rejected(&mut self, rejection: &Rejection);
     /// Record an admitted request before anything is sent; false refuses.
     fn admitted(&mut self, claims: &SurrogateClaims, route: usize) -> bool;
-    /// Send `wire` to the pinned destination of route `route` and return
-    /// everything it answered before closing, or the refusal that applies.
-    fn exchange(&mut self, route: usize, wire: &[u8]) -> Result<Vec<u8>, Code>;
+    /// Send the egress bytes, once, to the pinned destination of its route
+    /// and return everything it answered before closing, or the refusal
+    /// that applies.
+    fn exchange(&mut self, egress: Egress) -> Result<Vec<u8>, Code>;
     /// Record a completed request before its reply is released; false
     /// withholds the reply.
     fn completed(&mut self, status: u16) -> bool;
+}
+
+/// What the native shell provides for one authenticated connection.
+pub trait Channel: Origin {
+    /// True once a partly received request has taken too long.
+    fn overdue(&mut self) -> bool;
+    /// The next bytes from the guest; `None` at end of stream or on error.
+    fn read(&mut self) -> Option<Vec<u8>>;
+    /// Write `bytes` to the guest; false on error.
+    fn send(&mut self, bytes: &[u8]) -> bool;
+    /// Audit a framing refusal before it is sent.
+    fn refused(&mut self, code: &Code);
+    /// Audit a request that did not complete.
+    fn stopped(&mut self, code: &Code);
+    /// A request is about to be served (its method, for diagnostics); the
+    /// clock, read once per request.
+    fn begin(&mut self, request: &Request) -> i64;
+    /// Restart the request deadline after a served request.
+    fn restart(&mut self);
 }
 
 /// The surrogate one `Authorization` value presents: `Bearer T`, `token T`
@@ -149,8 +197,7 @@ pub fn serve<V: SurrogateOpener, O: Origin>(
         return stopped(Code::InternalError, Stage::Refused);
     }
     let forms = reflection_forms(&opened.credential);
-    let sent: &[u8] = &wire;
-    match origin.exchange(index, sent) {
+    match origin.exchange(Egress { route: index, wire }) {
         Ok(raw) => {
             let served = release(&raw, request, &forms, limit);
             match served.stage {
@@ -165,6 +212,114 @@ pub fn serve<V: SurrogateOpener, O: Origin>(
             }
         }
         Err(code) => stopped(code, Stage::Failed),
+    }
+}
+
+/// One step of an authenticated connection: give up on an overdue partial
+/// request, refuse what the strict framing refuses, read more, or serve
+/// exactly the parsed request for this connection's `peer` and keep only the
+/// bytes after it.
+// `len` rather than `is_empty`: Aeneas models only the former.
+#[allow(clippy::too_many_arguments, clippy::len_zero)]
+pub fn connection_step<V: SurrogateOpener, C: Channel>(
+    opener: &V,
+    channel: &mut C,
+    buffer: Vec<u8>,
+    routes: &[Route],
+    acceptance: &Acceptance,
+    authority: &[u8],
+    peer: &[u8],
+    limit: usize,
+) -> Tunnel {
+    if buffer.len() != 0 && channel.overdue() {
+        return Tunnel {
+            buffer,
+            open: false,
+        };
+    }
+    match frame(&buffer, authority, limit) {
+        Framed::Refuse(code) => {
+            channel.refused(&code);
+            let _ = channel.send(&refusal(&code));
+            Tunnel {
+                buffer,
+                open: false,
+            }
+        }
+        Framed::More => match channel.read() {
+            None => Tunnel {
+                buffer,
+                open: false,
+            },
+            Some(bytes) => {
+                if bytes.len() == 0 {
+                    return Tunnel {
+                        buffer,
+                        open: false,
+                    };
+                }
+                let mut grown = buffer;
+                grown.extend_from_slice(&bytes);
+                Tunnel {
+                    buffer: grown,
+                    open: true,
+                }
+            }
+        },
+        Framed::Request(parsed) => {
+            let rest = remainder(&buffer, parsed.used);
+            let now = channel.begin(&parsed.request);
+            let served = serve(
+                opener,
+                channel,
+                &parsed.request,
+                routes,
+                acceptance,
+                peer,
+                now,
+                limit,
+            );
+            match served.stage {
+                Stage::Completed => (),
+                _ => channel.stopped(&served.code),
+            }
+            channel.restart();
+            let sent = channel.send(&served.reply);
+            Tunnel {
+                buffer: rest,
+                open: sent && served.keep,
+            }
+        }
+    }
+}
+
+/// A whole authenticated connection, for the `peer` its handshake verified:
+/// steps until one closes it.
+#[allow(clippy::too_many_arguments)]
+pub fn connection<V: SurrogateOpener, C: Channel>(
+    opener: &V,
+    channel: &mut C,
+    routes: &[Route],
+    acceptance: &Acceptance,
+    authority: &[u8],
+    peer: &[u8],
+    limit: usize,
+) {
+    let mut state = Tunnel {
+        buffer: Vec::new(),
+        open: true,
+    };
+    while state.open {
+        state = connection_step(
+            opener,
+            channel,
+            state.buffer,
+            routes,
+            acceptance,
+            authority,
+            peer,
+            limit,
+        );
     }
 }
 
@@ -218,8 +373,9 @@ mod tests {
         fn admitted(&mut self, _claims: &SurrogateClaims, _route: usize) -> bool {
             true
         }
-        fn exchange(&mut self, route: usize, wire: &[u8]) -> Result<Vec<u8>, Code> {
-            self.sent.push((route, wire.to_vec()));
+        fn exchange(&mut self, egress: Egress) -> Result<Vec<u8>, Code> {
+            self.sent
+                .push((egress_route(&egress), egress_wire(&egress).to_vec()));
             Ok(self.answer.clone())
         }
         fn completed(&mut self, _status: u16) -> bool {
@@ -322,6 +478,88 @@ mod tests {
         let twice = b"GET / HTTP/1.1\r\nHost: proxy.test:8443\r\nAuthorization: Bearer GOOD\r\nAuthorization: Bearer GOOD\r\n\r\n";
         let (_, origin) = run(twice, b"PEER", OK);
         assert!(origin.sent.is_empty());
+    }
+
+    /// A guest that sends `input` in two reads, over one authenticated connection.
+    struct Guest {
+        reads: Vec<Vec<u8>>,
+        written: Vec<u8>,
+        origin: Recorder,
+        stopped: usize,
+    }
+    impl Origin for Guest {
+        fn rejected(&mut self, rejection: &Rejection) {
+            self.origin.rejected(rejection)
+        }
+        fn admitted(&mut self, claims: &SurrogateClaims, route: usize) -> bool {
+            self.origin.admitted(claims, route)
+        }
+        fn exchange(&mut self, egress: Egress) -> Result<Vec<u8>, Code> {
+            self.origin.exchange(egress)
+        }
+        fn completed(&mut self, status: u16) -> bool {
+            self.origin.completed(status)
+        }
+    }
+    impl Channel for Guest {
+        fn overdue(&mut self) -> bool {
+            false
+        }
+        fn read(&mut self) -> Option<Vec<u8>> {
+            if self.reads.is_empty() {
+                None
+            } else {
+                Some(self.reads.remove(0))
+            }
+        }
+        fn send(&mut self, bytes: &[u8]) -> bool {
+            self.written.extend_from_slice(bytes);
+            true
+        }
+        fn refused(&mut self, _code: &Code) {}
+        fn stopped(&mut self, _code: &Code) {
+            self.stopped += 1;
+        }
+        fn begin(&mut self, _request: &Request) -> i64 {
+            150
+        }
+        fn restart(&mut self) {}
+    }
+
+    #[test]
+    fn a_connection_serves_each_request_for_its_peer() {
+        let one = b"GET /a HTTP/1.1\r\nHost: proxy.test:8443\r\nAuthorization: Bearer GOOD\r\n\r\n";
+        let two = b"GET /b HTTP/1.1\r\nHost: proxy.test:8443\r\nAuthorization: Bearer BAD\r\n\r\n";
+        let mut input = one.to_vec();
+        input.extend_from_slice(two);
+        let mut guest = Guest {
+            reads: vec![input[..20].to_vec(), input[20..].to_vec()],
+            written: Vec::new(),
+            origin: Recorder {
+                answer: b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi".to_vec(),
+                ..Default::default()
+            },
+            stopped: 0,
+        };
+        connection(
+            &Keys,
+            &mut guest,
+            &routes(),
+            &acceptance(),
+            AUTHORITY,
+            b"PEER",
+            4096,
+        );
+        assert_eq!(
+            guest.origin.sent.len(),
+            1,
+            "only the admitted request goes upstream"
+        );
+        assert_eq!(guest.origin.rejected, 1);
+        assert_eq!(guest.stopped, 1);
+        let written = String::from_utf8(guest.written).unwrap();
+        assert!(written.starts_with("HTTP/1.1 200 OK"));
+        assert!(written.contains("invalid_token"));
     }
 
     #[test]

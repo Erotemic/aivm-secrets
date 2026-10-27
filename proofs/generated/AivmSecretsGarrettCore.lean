@@ -21227,7 +21227,7 @@ structure stateless_login.Entry where
   stage : oauth_login.Stage
 
 /-- [aivm_secrets_garrett_core::stateless_login::begin]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 57:0-90:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 57:0-91:1
     Visibility: public -/
 def stateless_login.begin
   (policy : stateless_login.LoginPolicy) (provider : Slice Std.U8)
@@ -21261,27 +21261,29 @@ def stateless_login.begin
               let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 provider
               let v2 ← alloc.slice.Slice.to_vec core.clone.CloneU8 peer
               let v3 ← alloc.slice.Slice.to_vec core.clone.CloneU8 subject
+              let i1 ←
+                stateless.earlier certificate_expires stateless.MAX_TIME
               let v4 ← alloc.slice.Slice.to_vec core.clone.CloneU8 replica
               let v5 ← alloc.slice.Slice.to_vec core.clone.CloneU8 scope
               let v6 ← alloc.slice.Slice.to_vec core.clone.CloneU8 verifier
-              let i1 ← now + policy.ttl
+              let i2 ← now + policy.ttl
               ok (core.result.Result.Ok
                 {
                   login := v,
                   provider := v1,
                   certificate := v2,
                   subject := v3,
-                  certificate_expires,
+                  certificate_expires := i1,
                   replica := v4,
                   scope := v5,
                   verifier := v6,
                   issued_at := now,
-                  expires_at := i1
+                  expires_at := i2
                 })
           else ok (core.result.Result.Err stateless.Rejection.UnknownProvider)
 
 /-- [aivm_secrets_garrett_core::stateless_login::entry_of]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 93:0-108:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 94:0-109:1
     Visibility: public -/
 def stateless_login.entry_of
   (state : stateless_login.LoginState) : Result stateless_login.Entry := do
@@ -21306,7 +21308,7 @@ def stateless_login.entry_of
     }
 
 /-- [aivm_secrets_garrett_core::stateless_login::rule_copy]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 110:0-118:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 111:0-119:1
     Visibility: public -/
 def stateless_login.rule_copy
   (rule : oauth_login.IssuerRule) : Result oauth_login.IssuerRule := do
@@ -21318,7 +21320,7 @@ def stateless_login.rule_copy
     ok (oauth_login.IssuerRule.Exact v)
 
 /-- [aivm_secrets_garrett_core::stateless_login::pending_of]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 121:0-129:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 122:0-130:1
     Visibility: public -/
 def stateless_login.pending_of
   (entry : stateless_login.Entry) (rule : oauth_login.IssuerRule) :
@@ -21336,7 +21338,7 @@ def stateless_login.pending_of
     }
 
 /-- [aivm_secrets_garrett_core::stateless_login::same_login]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 132:0-151:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 133:0-152:1
     Visibility: public -/
 def stateless_login.same_login
   (policy : stateless_login.LoginPolicy) (entry : stateless_login.Entry)
@@ -21388,7 +21390,7 @@ def stateless_login.same_login
   else ok false
 
 /-- [aivm_secrets_garrett_core::stateless_login::accept_callback]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 157:0-179:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 158:0-180:1
     Visibility: public -/
 def stateless_login.accept_callback
   (policy : stateless_login.LoginPolicy) (entry : stateless_login.Entry)
@@ -21408,7 +21410,7 @@ def stateless_login.accept_callback
   else ok (core.result.Result.Err oauth_login.LoginDenial.Invalid)
 
 /-- [aivm_secrets_garrett_core::stateless_login::begin_exchange]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 182:0-185:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 183:0-186:1
     Visibility: public -/
 def stateless_login.begin_exchange
   (entry : stateless_login.Entry) (rule : oauth_login.IssuerRule)
@@ -21419,7 +21421,7 @@ def stateless_login.begin_exchange
   oauth_login.begin entry.stage pending now
 
 /-- [aivm_secrets_garrett_core::stateless_login::grant_of]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 189:0-200:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 190:0-201:1
     Visibility: public -/
 def stateless_login.grant_of
   (entry : stateless_login.Entry) (credential_expires : Std.I64) :
@@ -21441,7 +21443,7 @@ def stateless_login.grant_of
     }
 
 /-- [aivm_secrets_garrett_core::stateless_login::complete]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 205:0-221:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 206:0-222:1
     Visibility: public -/
 def stateless_login.complete
   {S : Type _} (statelessSurrogateSealerInst : stateless.SurrogateSealer S)
@@ -21467,7 +21469,7 @@ def stateless_login.complete
     ok (core.result.Result.Err stateless.Rejection.Malformed)
 
 /-- [aivm_secrets_garrett_core::stateless_login::Delivery]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 224:0-231:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 225:0-232:1
     Visibility: public -/
 @[discriminant isize]
 inductive stateless_login.Delivery where
@@ -21479,7 +21481,7 @@ inductive stateless_login.Delivery where
 | Expired : stateless_login.Delivery
 
 /-- [aivm_secrets_garrett_core::stateless_login::deliver]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 235:0-255:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_login.rs', lines 236:0-256:1
     Visibility: public -/
 def stateless_login.deliver
   (entry : stateless_login.Entry) (peer : Slice Std.U8) (now : Std.I64) :
@@ -22191,7 +22193,7 @@ def stateless_mailbox.poll
         ok (stateless_mailbox.Polled.Expired, { mailbox with slots := v })
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::Route]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 21:0-27:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 32:0-38:1
     Visibility: public -/
 structure stateless_proxy.Route where
   provider : alloc.vec.Vec Std.U8
@@ -22199,19 +22201,53 @@ structure stateless_proxy.Route where
   rules : alloc.vec.Vec proxy_http.DenyRule
   authentication : credential_use.Authentication
 
+/-- [aivm_secrets_garrett_core::stateless_proxy::Egress]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 42:0-45:1
+    Visibility: public -/
+structure stateless_proxy.Egress where
+  route : Std.Usize
+  wire : alloc.vec.Vec Std.U8
+
+/-- [aivm_secrets_garrett_core::stateless_proxy::egress_route]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 48:0-50:1
+    Visibility: public -/
+def stateless_proxy.egress_route
+  (egress : stateless_proxy.Egress) : Result Std.Usize := do
+  ok egress.route
+
+/-- [aivm_secrets_garrett_core::stateless_proxy::egress_wire]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 53:0-55:1
+    Visibility: public -/
+def stateless_proxy.egress_wire
+  (egress : stateless_proxy.Egress) : Result (Slice Std.U8) := do
+  ok (alloc.vec.Vec.deref egress.wire)
+
 /-- Trait declaration: [aivm_secrets_garrett_core::stateless_proxy::Origin]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 30:0-41:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 58:0-70:1
     Visibility: public -/
 structure stateless_proxy.Origin (Self : Type _) where
   rejected : Self → stateless.Rejection → Result Self
   admitted : Self → stateless.SurrogateClaims → Std.Usize → Result (Bool
     × Self)
-  exchange : Self → Std.Usize → Slice Std.U8 → Result
-    ((core.result.Result (alloc.vec.Vec Std.U8) proxy_http.Code) × Self)
+  exchange : Self → stateless_proxy.Egress → Result ((core.result.Result
+    (alloc.vec.Vec Std.U8) proxy_http.Code) × Self)
   completed : Self → Std.U16 → Result (Bool × Self)
 
+/-- Trait declaration: [aivm_secrets_garrett_core::stateless_proxy::Channel]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 73:0-89:1
+    Visibility: public -/
+structure stateless_proxy.Channel (Self : Type _) where
+  OriginInst : stateless_proxy.Origin Self
+  overdue : Self → Result (Bool × Self)
+  read : Self → Result ((Option (alloc.vec.Vec Std.U8)) × Self)
+  send : Self → Slice Std.U8 → Result (Bool × Self)
+  refused : Self → proxy_http.Code → Result Self
+  stopped : Self → proxy_http.Code → Result Self
+  begin : Self → proxy_http.Request → Result (Std.I64 × Self)
+  restart : Self → Result Self
+
 /-- [aivm_secrets_garrett_core::stateless_proxy::surrogate_value]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 45:0-51:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 93:0-99:1
     Visibility: public -/
 def stateless_proxy.surrogate_value
   (value : Slice Std.U8) : Result (Option (alloc.vec.Vec Std.U8)) := do
@@ -22230,7 +22266,7 @@ def stateless_proxy.surrogate_value
   else proxy_connect.presented value
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::surrogate_of]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 54:0-63:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 102:0-111:1
     Visibility: public -/
 def stateless_proxy.surrogate_of
   (fields : Slice proxy_http.Field) :
@@ -22262,7 +22298,7 @@ def stateless_proxy.surrogate_of
       stateless_proxy.surrogate_value s2
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::provides]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 65:0-68:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 113:0-116:1
     Visibility: public -/
 def stateless_proxy.provides
   (route : stateless_proxy.Route) (provider : Slice Std.U8) : Result Bool := do
@@ -22270,7 +22306,7 @@ def stateless_proxy.provides
   core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 own provider
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::route_of]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 73:4-75:5
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 121:4-123:5
     Visibility: public -/
 @[rust_loop]
 def stateless_proxy.route_of_loop
@@ -22292,7 +22328,7 @@ def stateless_proxy.route_of_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::route_of]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 71:0-77:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 119:0-125:1
     Visibility: public -/
 @[reducible]
 def stateless_proxy.route_of
@@ -22302,7 +22338,7 @@ def stateless_proxy.route_of
   stateless_proxy.route_of_loop routes provider 0#usize
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::unauthorized]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 80:0-89:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 128:0-137:1
     Visibility: public -/
 def stateless_proxy.unauthorized : Result (alloc.vec.Vec Std.U8) := do
   let s ←
@@ -22353,7 +22389,7 @@ def stateless_proxy.unauthorized : Result (alloc.vec.Vec Std.U8) := do
   alloc.vec.Vec.extend_from_slice core.clone.CloneU8 out2 s3
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::unauthorized_served]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 92:0-100:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 140:0-148:1
     Visibility: public -/
 def stateless_proxy.unauthorized_served : Result proxy_controller.Served := do
   let v ← stateless_proxy.unauthorized
@@ -22367,7 +22403,7 @@ def stateless_proxy.unauthorized_served : Result proxy_controller.Served := do
     }
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::serve]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 104:0-169:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 152:0-216:1
     Visibility: public -/
 def stateless_proxy.serve
   {V : Type _} {O : Type _} (statelessSurrogateOpenerInst :
@@ -22414,8 +22450,8 @@ def stateless_proxy.serve
           then
             let s6 := alloc.vec.Vec.deref opened.credential
             let forms ← proxy_http.reflection_forms s6
-            let sent := alloc.vec.Vec.deref wire
-            let (r2, origin2) ← OriginInst.exchange origin1 index sent
+            let (r2, origin2) ←
+              OriginInst.exchange origin1 { route := index, wire }
             match r2 with
             | core.result.Result.Ok raw =>
               let s7 := alloc.vec.Vec.deref raw
@@ -22451,6 +22487,3356 @@ def stateless_proxy.serve
       let origin1 ← OriginInst.rejected origin rejection
       let s2 ← stateless_proxy.unauthorized_served
       ok (s2, origin1)
+
+/-- [aivm_secrets_garrett_core::stateless_proxy::connection_step]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 224:0-294:1
+    Visibility: public -/
+def stateless_proxy.connection_step
+  {V : Type _} {C : Type _} (statelessSurrogateOpenerInst :
+  stateless.SurrogateOpener V) (ChannelInst : stateless_proxy.Channel C)
+  (opener : V) (channel : C) (buffer : alloc.vec.Vec Std.U8)
+  (routes : Slice stateless_proxy.Route) (acceptance : stateless.Acceptance)
+  (authority : Slice Std.U8) (peer : Slice Std.U8) (limit : Std.Usize) :
+  Result (proxy_controller.Tunnel × C)
+  := do
+  let i := alloc.vec.Vec.len buffer
+  if i != 0#usize
+  then
+    let (b, channel1) ← ChannelInst.overdue channel
+    if b
+    then ok ({ buffer, «open» := false }, channel1)
+    else
+      let s := alloc.vec.Vec.deref buffer
+      let f ← proxy_controller.frame s authority limit
+      match f with
+      | proxy_controller.Framed.More =>
+        let (o, channel2) ← ChannelInst.read channel1
+        match o with
+        | none => ok ({ buffer, «open» := false }, channel2)
+        | some bytes =>
+          let i1 := alloc.vec.Vec.len bytes
+          if i1 = 0#usize
+          then ok ({ buffer, «open» := false }, channel2)
+          else
+            let s1 := alloc.vec.Vec.deref bytes
+            let buffer1 ←
+              alloc.vec.Vec.extend_from_slice core.clone.CloneU8 buffer s1
+            ok ({ buffer := buffer1, «open» := true }, channel2)
+      | proxy_controller.Framed.Refuse code =>
+        let channel2 ← ChannelInst.refused channel1 code
+        let v ← proxy_http.refusal code
+        let s1 := alloc.vec.Vec.deref v
+        let (_, channel3) ← ChannelInst.send channel2 s1
+        ok ({ buffer, «open» := false }, channel3)
+      | proxy_controller.Framed.Request parsed =>
+        let s1 := alloc.vec.Vec.deref buffer
+        let rest ← proxy_controller.remainder s1 parsed.used
+        let (now, channel2) ← ChannelInst.begin channel1 parsed.request
+        let (served, channel3) ←
+          stateless_proxy.serve statelessSurrogateOpenerInst
+            ChannelInst.OriginInst opener channel2 parsed.request routes
+            acceptance peer now limit
+        let channel4 ←
+          match served.stage with
+          | proxy_controller.Stage.Refused =>
+            ChannelInst.stopped channel3 served.code
+          | proxy_controller.Stage.Failed =>
+            ChannelInst.stopped channel3 served.code
+          | proxy_controller.Stage.Completed => ok channel3
+        let channel5 ← ChannelInst.restart channel4
+        let s2 := alloc.vec.Vec.deref served.reply
+        let (sent, channel6) ← ChannelInst.send channel5 s2
+        if sent
+        then ok ({ buffer := rest, «open» := served.keep }, channel6)
+        else ok ({ buffer := rest, «open» := false }, channel6)
+  else
+    let s := alloc.vec.Vec.deref buffer
+    let f ← proxy_controller.frame s authority limit
+    match f with
+    | proxy_controller.Framed.More =>
+      let (o, channel1) ← ChannelInst.read channel
+      match o with
+      | none => ok ({ buffer, «open» := false }, channel1)
+      | some bytes =>
+        let i1 := alloc.vec.Vec.len bytes
+        if i1 = 0#usize
+        then ok ({ buffer, «open» := false }, channel1)
+        else
+          let s1 := alloc.vec.Vec.deref bytes
+          let buffer1 ←
+            alloc.vec.Vec.extend_from_slice core.clone.CloneU8 buffer s1
+          ok ({ buffer := buffer1, «open» := true }, channel1)
+    | proxy_controller.Framed.Refuse code =>
+      let channel1 ← ChannelInst.refused channel code
+      let v ← proxy_http.refusal code
+      let s1 := alloc.vec.Vec.deref v
+      let (_, channel2) ← ChannelInst.send channel1 s1
+      ok ({ buffer, «open» := false }, channel2)
+    | proxy_controller.Framed.Request parsed =>
+      let s1 := alloc.vec.Vec.deref buffer
+      let rest ← proxy_controller.remainder s1 parsed.used
+      let (now, channel1) ← ChannelInst.begin channel parsed.request
+      let (served, channel2) ←
+        stateless_proxy.serve statelessSurrogateOpenerInst
+          ChannelInst.OriginInst opener channel1 parsed.request routes
+          acceptance peer now limit
+      let channel3 ←
+        match served.stage with
+        | proxy_controller.Stage.Refused =>
+          ChannelInst.stopped channel2 served.code
+        | proxy_controller.Stage.Failed =>
+          ChannelInst.stopped channel2 served.code
+        | proxy_controller.Stage.Completed => ok channel2
+      let channel4 ← ChannelInst.restart channel3
+      let s2 := alloc.vec.Vec.deref served.reply
+      let (sent, channel5) ← ChannelInst.send channel4 s2
+      if sent
+      then ok ({ buffer := rest, «open» := served.keep }, channel5)
+      else ok ({ buffer := rest, «open» := false }, channel5)
+
+/-- [aivm_secrets_garrett_core::stateless_proxy::connection]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 312:4-323:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_proxy.connection_loop
+  {V : Type _} {C : Type _} (statelessSurrogateOpenerInst :
+  stateless.SurrogateOpener V) (ChannelInst : stateless_proxy.Channel C)
+  (opener : V) (channel : C) (routes : Slice stateless_proxy.Route)
+  (acceptance : stateless.Acceptance) (authority : Slice Std.U8)
+  (peer : Slice Std.U8) (limit : Std.Usize) (state : proxy_controller.Tunnel) :
+  Result C
+  := do
+  if state.open
+  then
+    let (state1, channel1) ←
+      stateless_proxy.connection_step statelessSurrogateOpenerInst ChannelInst
+        opener channel state.buffer routes acceptance authority peer limit
+    stateless_proxy.connection_loop statelessSurrogateOpenerInst ChannelInst
+      opener channel1 routes acceptance authority peer limit state1
+  else ok channel
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_proxy::connection]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 299:0-324:1
+    Visibility: public -/
+@[reducible]
+def stateless_proxy.connection
+  {V : Type _} {C : Type _} (statelessSurrogateOpenerInst :
+  stateless.SurrogateOpener V) (ChannelInst : stateless_proxy.Channel C)
+  (opener : V) (channel : C) (routes : Slice stateless_proxy.Route)
+  (acceptance : stateless.Acceptance) (authority : Slice Std.U8)
+  (peer : Slice Std.U8) (limit : Std.Usize) :
+  Result C
+  := do
+  stateless_proxy.connection_loop statelessSurrogateOpenerInst ChannelInst
+    opener channel routes acceptance authority peer limit
+    { buffer := (alloc.vec.Vec.new Std.U8), «open» := true }
+
+/-- [aivm_secrets_garrett_core::stateless_token::MAX_TOKEN]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 27:0-27:35
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.MAX_TOKEN : Std.Usize := 16384#usize
+
+/-- [aivm_secrets_garrett_core::stateless_token::MAX_INTEGER]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 29:0-29:46
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.MAX_INTEGER : Std.I64 := 9007199254740991#i64
+
+/-- [aivm_secrets_garrett_core::stateless_token::MAX_KEYS]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 30:0-30:30
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.MAX_KEYS : Std.Usize := 8#usize
+
+/-- [aivm_secrets_garrett_core::stateless_token::MAX_DEPTH]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 32:0-32:32
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.MAX_DEPTH : Std.Usize := 16#usize
+
+/-- [aivm_secrets_garrett_core::stateless_token::NONCE]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 33:0-33:28
+    Visibility: public -/
+@[global_simps, irreducible] def stateless_token.NONCE : Std.Usize := 12#usize
+
+/-- [aivm_secrets_garrett_core::stateless_token::TAG]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 34:0-34:26
+    Visibility: public -/
+@[global_simps, irreducible] def stateless_token.TAG : Std.Usize := 16#usize
+
+/-- [aivm_secrets_garrett_core::stateless_token::SIGNATURE]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 35:0-35:32
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.SIGNATURE : Std.Usize := 64#usize
+
+/-- [aivm_secrets_garrett_core::stateless_token::CREDENTIAL_LABEL]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 37:0-37:73
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.CREDENTIAL_LABEL : Slice Std.U8 :=
+  Array.to_slice
+    (Array.make 32#usize [
+      103#u8, 97#u8, 114#u8, 114#u8, 101#u8, 116#u8, 116#u8, 45#u8, 115#u8,
+      116#u8, 97#u8, 116#u8, 101#u8, 108#u8, 101#u8, 115#u8, 115#u8, 45#u8,
+      118#u8, 49#u8, 47#u8, 99#u8, 114#u8, 101#u8, 100#u8, 101#u8, 110#u8,
+      116#u8, 105#u8, 97#u8, 108#u8, 0#u8
+      ])
+
+/-- [aivm_secrets_garrett_core::stateless_token::HEADER_START]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 38:0-38:65
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.HEADER_START : Slice Std.U8 :=
+  Array.to_slice
+    (Array.make 22#usize [
+      123#u8, 34#u8, 97#u8, 108#u8, 103#u8, 34#u8, 58#u8, 34#u8, 69#u8, 100#u8,
+      68#u8, 83#u8, 65#u8, 34#u8, 44#u8, 34#u8, 107#u8, 105#u8, 100#u8, 34#u8,
+      58#u8, 34#u8
+      ])
+
+/-- [aivm_secrets_garrett_core::stateless_token::HEADER_END]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 39:0-39:74
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.HEADER_END : Slice Std.U8 :=
+  Array.to_slice
+    (Array.make 35#usize [
+      34#u8, 44#u8, 34#u8, 116#u8, 121#u8, 112#u8, 34#u8, 58#u8, 34#u8, 103#u8,
+      97#u8, 114#u8, 114#u8, 101#u8, 116#u8, 116#u8, 45#u8, 115#u8, 116#u8,
+      97#u8, 116#u8, 101#u8, 108#u8, 101#u8, 115#u8, 115#u8, 45#u8, 118#u8,
+      49#u8, 43#u8, 106#u8, 119#u8, 116#u8, 34#u8, 125#u8
+      ])
+
+/-- Trait declaration: [aivm_secrets_garrett_core::stateless_token::KeyMaterial]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 42:0-51:1
+    Visibility: public -/
+structure stateless_token.KeyMaterial (Self : Type _) where
+  verify : Self → Slice Std.U8 → Slice Std.U8 → Result Bool
+  «open» : Self → Slice Std.U8 → Slice Std.U8 → Slice Std.U8 → Result
+    (Option (alloc.vec.Vec Std.U8))
+  sign : Self → Slice Std.U8 → Result (Option (alloc.vec.Vec Std.U8))
+  «seal» : Self → Slice Std.U8 → Slice Std.U8 → Slice Std.U8 → Result
+    (Option (alloc.vec.Vec Std.U8))
+
+/-- [aivm_secrets_garrett_core::stateless_token::KeyEntry]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 54:0-58:1
+    Visibility: public -/
+structure stateless_token.KeyEntry (M : Type _) where
+  kid : alloc.vec.Vec Std.U8
+  issuer : alloc.vec.Vec Std.U8
+  material : M
+
+/-- [aivm_secrets_garrett_core::stateless_token::KeySet]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 61:0-63:1
+    Visibility: public -/
+structure stateless_token.KeySet (M : Type _) where
+  entries : alloc.vec.Vec (stateless_token.KeyEntry M)
+
+/-- [aivm_secrets_garrett_core::stateless_token::b64url]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 67:0-69:1
+    Visibility: public -/
+def stateless_token.b64url
+  (bytes : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
+  proxy_http.encode_unpadded bytes true
+
+/-- [aivm_secrets_garrett_core::stateless_token::symbol_value]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 72:0-86:1
+    Visibility: public -/
+def stateless_token.symbol_value (symbol : Std.U8) : Result Std.U32 := do
+  if symbol >= 65#u8
+  then
+    if symbol <= 90#u8
+    then let i ← symbol - 65#u8
+         ok (UScalar.cast .U32 i)
+    else
+      if symbol >= 97#u8
+      then
+        if symbol <= 122#u8
+        then
+          let i ← symbol - 97#u8
+          let i1 ← lift (UScalar.cast .U32 i)
+          i1 + 26#u32
+        else
+          if symbol >= 48#u8
+          then
+            if symbol <= 57#u8
+            then
+              let i ← symbol - 48#u8
+              let i1 ← lift (UScalar.cast .U32 i)
+              i1 + 52#u32
+            else
+              if symbol = 45#u8
+              then ok 62#u32
+              else if symbol = 95#u8
+                   then ok 63#u32
+                   else ok 64#u32
+          else
+            if symbol = 45#u8
+            then ok 62#u32
+            else if symbol = 95#u8
+                 then ok 63#u32
+                 else ok 64#u32
+      else
+        if symbol >= 48#u8
+        then
+          if symbol <= 57#u8
+          then
+            let i ← symbol - 48#u8
+            let i1 ← lift (UScalar.cast .U32 i)
+            i1 + 52#u32
+          else
+            if symbol = 45#u8
+            then ok 62#u32
+            else if symbol = 95#u8
+                 then ok 63#u32
+                 else ok 64#u32
+        else
+          if symbol = 45#u8
+          then ok 62#u32
+          else if symbol = 95#u8
+               then ok 63#u32
+               else ok 64#u32
+  else
+    if symbol >= 97#u8
+    then
+      if symbol <= 122#u8
+      then
+        let i ← symbol - 97#u8
+        let i1 ← lift (UScalar.cast .U32 i)
+        i1 + 26#u32
+      else
+        if symbol >= 48#u8
+        then
+          if symbol <= 57#u8
+          then
+            let i ← symbol - 48#u8
+            let i1 ← lift (UScalar.cast .U32 i)
+            i1 + 52#u32
+          else
+            if symbol = 45#u8
+            then ok 62#u32
+            else if symbol = 95#u8
+                 then ok 63#u32
+                 else ok 64#u32
+        else
+          if symbol = 45#u8
+          then ok 62#u32
+          else if symbol = 95#u8
+               then ok 63#u32
+               else ok 64#u32
+    else
+      if symbol >= 48#u8
+      then
+        if symbol <= 57#u8
+        then
+          let i ← symbol - 48#u8
+          let i1 ← lift (UScalar.cast .U32 i)
+          i1 + 52#u32
+        else
+          if symbol = 45#u8
+          then ok 62#u32
+          else if symbol = 95#u8
+               then ok 63#u32
+               else ok 64#u32
+      else
+        if symbol = 45#u8
+        then ok 62#u32
+        else if symbol = 95#u8
+             then ok 63#u32
+             else ok 64#u32
+
+/-- [aivm_secrets_garrett_core::stateless_token::group]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 99:4-111:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.group_loop
+  (text : Slice Std.U8) (index : Std.Usize) (count : Std.Usize)
+  (value : Std.U32) (valid : Bool) (position : Std.Usize) :
+  Result (Std.U32 × Bool)
+  := do
+  if position < 4#usize
+  then
+    let symbol ←
+      if position < count
+      then
+        do
+        let i ← index + position
+        let i1 ← Slice.index_usize text i
+        stateless_token.symbol_value i1
+      else ok 0#u32
+    let (value1, valid1) ←
+      if symbol >= 64#u32
+      then ok (value, false)
+      else
+        do
+        let i ← value * 64#u32
+        let value2 ← i + symbol
+        ok (value2, valid)
+    let position1 ← position + 1#usize
+    stateless_token.group_loop text index count value1 valid1 position1
+  else ok (value, valid)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::group]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 90:0-116:1
+    Visibility: public -/
+def stateless_token.group
+  (text : Slice Std.U8) (index : Std.Usize) :
+  Result (Option (Std.U32 × Std.Usize))
+  := do
+  let i := Slice.len text
+  let i1 ← i - index
+  let count ←
+    if i1 < 4#usize
+    then let i2 := Slice.len text
+         i2 - index
+    else ok 4#usize
+  let (value, valid) ←
+    stateless_token.group_loop text index count 0#u32 true 0#usize
+  if valid
+  then ok (some (value, count))
+  else ok none
+
+/-- [aivm_secrets_garrett_core::stateless_token::from_b64url]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 127:4-141:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.from_b64url_loop
+  (text : Slice Std.U8) (out : alloc.vec.Vec Std.U8) (valid : Bool)
+  (index : Std.Usize) :
+  Result ((alloc.vec.Vec Std.U8) × Bool)
+  := do
+  if valid
+  then
+    let i := Slice.len text
+    if index < i
+    then
+      let o ← stateless_token.group text index
+      match o with
+      | none => stateless_token.from_b64url_loop text out false index
+      | some p =>
+        let (value, count) := p
+        let i1 ← value / 65536#u32
+        let i2 ← lift (UScalar.cast .U8 i1)
+        let out1 ← alloc.vec.Vec.push out i2
+        let out2 ←
+          if count > 2#usize
+          then
+            do
+            let i3 ← value / 256#u32
+            let i4 ← i3 % 256#u32
+            let i5 ← lift (UScalar.cast .U8 i4)
+            alloc.vec.Vec.push out1 i5
+          else ok out1
+        let out3 ←
+          if count > 3#usize
+          then
+            do
+            let i3 ← value % 256#u32
+            let i4 ← lift (UScalar.cast .U8 i3)
+            alloc.vec.Vec.push out2 i4
+          else ok out2
+        let index1 ← index + count
+        stateless_token.from_b64url_loop text out3 valid index1
+    else ok (out, valid)
+  else ok (out, valid)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::from_b64url]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 120:0-151:1
+    Visibility: public -/
+def stateless_token.from_b64url
+  (text : Slice Std.U8) : Result (Option (alloc.vec.Vec Std.U8)) := do
+  let i := Slice.len text
+  let i1 ← i % 4#usize
+  if i1 = 1#usize
+  then ok none
+  else
+    let (out, valid) ←
+      stateless_token.from_b64url_loop text (alloc.vec.Vec.new Std.U8) true
+        0#usize
+    if valid
+    then
+      let s := alloc.vec.Vec.deref out
+      let encoded ← proxy_http.encode_unpadded s true
+      let same := alloc.vec.Vec.deref encoded
+      let b ←
+        core.cmp.impls.PartialEqShared.ne (Slice.Insts.CoreCmpPartialEqSlice
+          core.cmp.PartialEqU8) same text
+      if b
+      then ok none
+      else ok (some out)
+    else ok none
+
+/-- [aivm_secrets_garrett_core::stateless_token::plain]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 156:0-158:1
+    Visibility: public -/
+def stateless_token.plain (byte : Std.U8) : Result Bool := do
+  if byte >= 33#u8
+  then
+    if byte <= 126#u8
+    then if byte != 34#u8
+         then ok (byte != 92#u8)
+         else ok false
+    else ok false
+  else ok false
+
+/-- [aivm_secrets_garrett_core::stateless_token::lower_or_digit]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 160:0-162:1
+    Visibility: public -/
+def stateless_token.lower_or_digit (byte : Std.U8) : Result Bool := do
+  if byte >= 97#u8
+  then
+    if byte <= 122#u8
+    then ok true
+    else if byte >= 48#u8
+         then ok (byte <= 57#u8)
+         else ok false
+  else if byte >= 48#u8
+       then ok (byte <= 57#u8)
+       else ok false
+
+/-- [aivm_secrets_garrett_core::stateless_token::alphanumeric]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 164:0-166:1
+    Visibility: public -/
+def stateless_token.alphanumeric (byte : Std.U8) : Result Bool := do
+  if byte >= 65#u8
+  then if byte <= 90#u8
+       then ok true
+       else stateless_token.lower_or_digit byte
+  else stateless_token.lower_or_digit byte
+
+/-- [aivm_secrets_garrett_core::stateless_token::is_text]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 174:4-181:1
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.is_text_loop
+  (value : Slice Std.U8) (index : Std.Usize) : Result Bool := do
+  let i := Slice.len value
+  if index < i
+  then
+    let i1 ← Slice.index_usize value index
+    let b ← stateless_token.plain i1
+    if b
+    then
+      let index1 ← index + 1#usize
+      stateless_token.is_text_loop value index1
+    else ok false
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::is_text]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 169:0-181:1
+    Visibility: public -/
+def stateless_token.is_text (value : Slice Std.U8) : Result Bool := do
+  let i := Slice.len value
+  if i < 1#usize
+  then ok false
+  else
+    let i1 := Slice.len value
+    if i1 > 256#usize
+    then ok false
+    else stateless_token.is_text_loop value 0#usize
+
+/-- [aivm_secrets_garrett_core::stateless_token::is_provider]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 189:4-197:1
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.is_provider_loop
+  (value : Slice Std.U8) (index : Std.Usize) : Result Bool := do
+  let i := Slice.len value
+  if index < i
+  then
+    let byte ← Slice.index_usize value index
+    let b ← stateless_token.lower_or_digit byte
+    if b
+    then
+      let index1 ← index + 1#usize
+      stateless_token.is_provider_loop value index1
+    else
+      if byte != 46#u8
+      then
+        if byte != 95#u8
+        then
+          if byte != 45#u8
+          then ok false
+          else
+            let index1 ← index + 1#usize
+            stateless_token.is_provider_loop value index1
+        else
+          let index1 ← index + 1#usize
+          stateless_token.is_provider_loop value index1
+      else
+        let index1 ← index + 1#usize
+        stateless_token.is_provider_loop value index1
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::is_provider]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 184:0-197:1
+    Visibility: public -/
+def stateless_token.is_provider (value : Slice Std.U8) : Result Bool := do
+  let i := Slice.len value
+  if i < 1#usize
+  then ok false
+  else
+    let i1 := Slice.len value
+    if i1 > 64#usize
+    then ok false
+    else
+      let i2 ← Slice.index_usize value 0#usize
+      let b ← stateless_token.lower_or_digit i2
+      if b
+      then stateless_token.is_provider_loop value 0#usize
+      else ok false
+
+/-- [aivm_secrets_garrett_core::stateless_token::is_kid]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 205:4-213:1
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.is_kid_loop
+  (value : Slice Std.U8) (index : Std.Usize) : Result Bool := do
+  let i := Slice.len value
+  if index < i
+  then
+    let byte ← Slice.index_usize value index
+    let b ← stateless_token.alphanumeric byte
+    if b
+    then
+      let index1 ← index + 1#usize
+      stateless_token.is_kid_loop value index1
+    else
+      if byte != 95#u8
+      then
+        if byte != 45#u8
+        then ok false
+        else
+          let index1 ← index + 1#usize
+          stateless_token.is_kid_loop value index1
+      else
+        let index1 ← index + 1#usize
+        stateless_token.is_kid_loop value index1
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::is_kid]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 200:0-213:1
+    Visibility: public -/
+def stateless_token.is_kid (value : Slice Std.U8) : Result Bool := do
+  let i := Slice.len value
+  if i < 1#usize
+  then ok false
+  else
+    let i1 := Slice.len value
+    if i1 > 32#usize
+    then ok false
+    else
+      let i2 ← Slice.index_usize value 0#usize
+      let b ← stateless_token.alphanumeric i2
+      if b
+      then stateless_token.is_kid_loop value 0#usize
+      else ok false
+
+/-- [aivm_secrets_garrett_core::stateless_token::is_id]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 221:4-229:1
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.is_id_loop
+  (value : Slice Std.U8) (index : Std.Usize) : Result Bool := do
+  let i := Slice.len value
+  if index < i
+  then
+    let byte ← Slice.index_usize value index
+    if byte >= 48#u8
+    then
+      if byte <= 57#u8
+      then
+        let index1 ← index + 1#usize
+        stateless_token.is_id_loop value index1
+      else
+        if byte >= 97#u8
+        then
+          if byte <= 102#u8
+          then
+            let index1 ← index + 1#usize
+            stateless_token.is_id_loop value index1
+          else ok false
+        else ok false
+    else
+      if byte >= 97#u8
+      then
+        if byte <= 102#u8
+        then
+          let index1 ← index + 1#usize
+          stateless_token.is_id_loop value index1
+        else ok false
+      else ok false
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::is_id]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 216:0-229:1
+    Visibility: public -/
+def stateless_token.is_id (value : Slice Std.U8) : Result Bool := do
+  let i := Slice.len value
+  if i != 32#usize
+  then ok false
+  else stateless_token.is_id_loop value 0#usize
+
+/-- [aivm_secrets_garrett_core::stateless_token::is_thumbprint]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 232:0-240:1
+    Visibility: public -/
+def stateless_token.is_thumbprint (value : Slice Std.U8) : Result Bool := do
+  let i := Slice.len value
+  if i != 43#usize
+  then ok false
+  else
+    let o ← stateless_token.from_b64url value
+    match o with
+    | none => ok false
+    | some bytes => let i1 := alloc.vec.Vec.len bytes
+                    ok (i1 = 32#usize)
+
+/-- [aivm_secrets_garrett_core::stateless_token::is_scope]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 250:4-264:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.is_scope_loop
+  (value : Slice Std.U8) (valid : Bool) (after_space : Bool)
+  (index : Std.Usize) :
+  Result (Bool × Bool)
+  := do
+  let i := Slice.len value
+  if index < i
+  then
+    let byte ← Slice.index_usize value index
+    let (valid1, after_space1) ←
+      if byte = 32#u8
+      then do
+           let b ← if after_space
+                     then ok false
+                     else ok valid
+           ok (b, true)
+      else
+        do
+        let b ← stateless_token.plain byte
+        let b1 ← if b
+                   then ok valid
+                   else ok false
+        ok (b1, false)
+    let index1 ← index + 1#usize
+    stateless_token.is_scope_loop value valid1 after_space1 index1
+  else ok (valid, after_space)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::is_scope]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 243:0-266:1
+    Visibility: public -/
+def stateless_token.is_scope (value : Slice Std.U8) : Result Bool := do
+  let i := Slice.len value
+  if i > 1024#usize
+  then ok false
+  else
+    let (valid, after_space) ←
+      stateless_token.is_scope_loop value true true 0#usize
+    if valid
+    then
+      let i1 := Slice.len value
+      if i1 = 0#usize
+      then ok true
+      else ok (¬ after_space)
+    else ok false
+
+/-- [aivm_secrets_garrett_core::stateless_token::is_verifier]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 274:4-282:1
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.is_verifier_loop
+  (value : Slice Std.U8) (index : Std.Usize) : Result Bool := do
+  let i := Slice.len value
+  if index < i
+  then
+    let byte ← Slice.index_usize value index
+    let b ← stateless_token.alphanumeric byte
+    if b
+    then
+      let index1 ← index + 1#usize
+      stateless_token.is_verifier_loop value index1
+    else
+      if byte != 45#u8
+      then
+        if byte != 46#u8
+        then
+          if byte != 95#u8
+          then
+            if byte != 126#u8
+            then ok false
+            else
+              let index1 ← index + 1#usize
+              stateless_token.is_verifier_loop value index1
+          else
+            let index1 ← index + 1#usize
+            stateless_token.is_verifier_loop value index1
+        else
+          let index1 ← index + 1#usize
+          stateless_token.is_verifier_loop value index1
+      else
+        let index1 ← index + 1#usize
+        stateless_token.is_verifier_loop value index1
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::is_verifier]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 269:0-282:1
+    Visibility: public -/
+def stateless_token.is_verifier (value : Slice Std.U8) : Result Bool := do
+  let i := Slice.len value
+  if i < 43#usize
+  then ok false
+  else
+    let i1 := Slice.len value
+    if i1 > 128#usize
+    then ok false
+    else stateless_token.is_verifier_loop value 0#usize
+
+/-- [aivm_secrets_garrett_core::stateless_token::hex_value]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 286:0-294:1
+    Visibility: public -/
+def stateless_token.hex_value (byte : Std.U8) : Result Std.U32 := do
+  if byte >= 48#u8
+  then
+    if byte <= 57#u8
+    then let i ← byte - 48#u8
+         ok (UScalar.cast .U32 i)
+    else
+      if byte >= 97#u8
+      then
+        if byte <= 102#u8
+        then
+          let i ← byte - 97#u8
+          let i1 ← lift (UScalar.cast .U32 i)
+          i1 + 10#u32
+        else ok 16#u32
+      else ok 16#u32
+  else
+    if byte >= 97#u8
+    then
+      if byte <= 102#u8
+      then
+        let i ← byte - 97#u8
+        let i1 ← lift (UScalar.cast .U32 i)
+        i1 + 10#u32
+      else ok 16#u32
+    else ok 16#u32
+
+/-- [aivm_secrets_garrett_core::stateless_token::hex4]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 304:4-312:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.hex4_loop
+  (bytes : Slice Std.U8) («at» : Std.Usize) (value : Std.U32) (valid : Bool)
+  (index : Std.Usize) :
+  Result (Std.U32 × Bool)
+  := do
+  if index < 4#usize
+  then
+    let i ← «at» + index
+    let i1 ← Slice.index_usize bytes i
+    let digit ← stateless_token.hex_value i1
+    let (value1, valid1) ←
+      if digit >= 16#u32
+      then ok (value, false)
+      else
+        do
+        let i2 ← value * 16#u32
+        let value2 ← i2 + digit
+        ok (value2, valid)
+    let index1 ← index + 1#usize
+    stateless_token.hex4_loop bytes «at» value1 valid1 index1
+  else ok (value, valid)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::hex4]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 297:0-317:1
+    Visibility: public -/
+def stateless_token.hex4
+  (bytes : Slice Std.U8) («at» : Std.Usize) : Result (Option Std.U32) := do
+  let i ← «at» + 4#usize
+  let i1 := Slice.len bytes
+  if i > i1
+  then ok none
+  else
+    let (value, valid) ←
+      stateless_token.hex4_loop bytes «at» 0#u32 true 0#usize
+    if valid
+    then ok (some value)
+    else ok none
+
+/-- [aivm_secrets_garrett_core::stateless_token::escape]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 321:0-378:1
+    Visibility: public -/
+def stateless_token.escape
+  (bytes : Slice Std.U8) («at» : Std.Usize) :
+  Result (Option (Std.U32 × Std.Usize))
+  := do
+  let i ← «at» + 1#usize
+  let i1 := Slice.len bytes
+  if i >= i1
+  then ok none
+  else
+    let kind ← Slice.index_usize bytes i
+    if kind = 34#u8
+    then let i2 ← «at» + 2#usize
+         ok (some (34#u32, i2))
+    else
+      if kind = 92#u8
+      then let i2 ← «at» + 2#usize
+           ok (some (92#u32, i2))
+      else
+        if kind = 98#u8
+        then let i2 ← «at» + 2#usize
+             ok (some (8#u32, i2))
+        else
+          if kind = 102#u8
+          then let i2 ← «at» + 2#usize
+               ok (some (12#u32, i2))
+          else
+            if kind = 110#u8
+            then let i2 ← «at» + 2#usize
+                 ok (some (10#u32, i2))
+            else
+              if kind = 114#u8
+              then let i2 ← «at» + 2#usize
+                   ok (some (13#u32, i2))
+              else
+                if kind = 116#u8
+                then let i2 ← «at» + 2#usize
+                     ok (some (9#u32, i2))
+                else
+                  if kind != 117#u8
+                  then ok none
+                  else
+                    let i2 ← «at» + 2#usize
+                    let o ← stateless_token.hex4 bytes i2
+                    match o with
+                    | none => ok none
+                    | some value =>
+                      if value >= 56320#u32
+                      then
+                        if value <= 57343#u32
+                        then ok none
+                        else
+                          if value >= 55296#u32
+                          then
+                            if value <= 56319#u32
+                            then
+                              let i3 ← «at» + 12#usize
+                              let i4 := Slice.len bytes
+                              if i3 > i4
+                              then ok none
+                              else
+                                let i5 ← «at» + 6#usize
+                                let i6 ← Slice.index_usize bytes i5
+                                if i6 != 92#u8
+                                then ok none
+                                else
+                                  let i7 ← «at» + 7#usize
+                                  let i8 ← Slice.index_usize bytes i7
+                                  if i8 != 117#u8
+                                  then ok none
+                                  else
+                                    let i9 ← «at» + 8#usize
+                                    let o1 ← stateless_token.hex4 bytes i9
+                                    match o1 with
+                                    | none => ok none
+                                    | some value1 =>
+                                      if value1 < 56320#u32
+                                      then ok none
+                                      else
+                                        if value1 > 57343#u32
+                                        then ok none
+                                        else
+                                          let i10 ← value - 55296#u32
+                                          let i11 ← i10 * 1024#u32
+                                          let i12 ← 65536#u32 + i11
+                                          let i13 ← value1 - 56320#u32
+                                          let i14 ← i12 + i13
+                                          ok (some (i14, i3))
+                            else
+                              if value = 8#u32
+                              then ok none
+                              else
+                                if value = 9#u32
+                                then ok none
+                                else
+                                  if value = 10#u32
+                                  then ok none
+                                  else
+                                    if value = 12#u32
+                                    then ok none
+                                    else
+                                      if value = 13#u32
+                                      then ok none
+                                      else
+                                        if value >= 32#u32
+                                        then
+                                          if value <= 126#u32
+                                          then ok none
+                                          else
+                                            let i3 ← «at» + 6#usize
+                                            ok (some (value, i3))
+                                        else
+                                          let i3 ← «at» + 6#usize
+                                          ok (some (value, i3))
+                          else
+                            if value = 8#u32
+                            then ok none
+                            else
+                              if value = 9#u32
+                              then ok none
+                              else
+                                if value = 10#u32
+                                then ok none
+                                else
+                                  if value = 12#u32
+                                  then ok none
+                                  else
+                                    if value = 13#u32
+                                    then ok none
+                                    else
+                                      if value >= 32#u32
+                                      then
+                                        if value <= 126#u32
+                                        then ok none
+                                        else
+                                          let i3 ← «at» + 6#usize
+                                          ok (some (value, i3))
+                                      else
+                                        let i3 ← «at» + 6#usize
+                                        ok (some (value, i3))
+                      else
+                        if value >= 55296#u32
+                        then
+                          if value <= 56319#u32
+                          then
+                            let i3 ← «at» + 12#usize
+                            let i4 := Slice.len bytes
+                            if i3 > i4
+                            then ok none
+                            else
+                              let i5 ← «at» + 6#usize
+                              let i6 ← Slice.index_usize bytes i5
+                              if i6 != 92#u8
+                              then ok none
+                              else
+                                let i7 ← «at» + 7#usize
+                                let i8 ← Slice.index_usize bytes i7
+                                if i8 != 117#u8
+                                then ok none
+                                else
+                                  let i9 ← «at» + 8#usize
+                                  let o1 ← stateless_token.hex4 bytes i9
+                                  match o1 with
+                                  | none => ok none
+                                  | some value1 =>
+                                    if value1 < 56320#u32
+                                    then ok none
+                                    else
+                                      if value1 > 57343#u32
+                                      then ok none
+                                      else
+                                        let i10 ← value - 55296#u32
+                                        let i11 ← i10 * 1024#u32
+                                        let i12 ← 65536#u32 + i11
+                                        let i13 ← value1 - 56320#u32
+                                        let i14 ← i12 + i13
+                                        ok (some (i14, i3))
+                          else
+                            if value = 8#u32
+                            then ok none
+                            else
+                              if value = 9#u32
+                              then ok none
+                              else
+                                if value = 10#u32
+                                then ok none
+                                else
+                                  if value = 12#u32
+                                  then ok none
+                                  else
+                                    if value = 13#u32
+                                    then ok none
+                                    else
+                                      if value >= 32#u32
+                                      then
+                                        if value <= 126#u32
+                                        then ok none
+                                        else
+                                          let i3 ← «at» + 6#usize
+                                          ok (some (value, i3))
+                                      else
+                                        let i3 ← «at» + 6#usize
+                                        ok (some (value, i3))
+                        else
+                          if value = 8#u32
+                          then ok none
+                          else
+                            if value = 9#u32
+                            then ok none
+                            else
+                              if value = 10#u32
+                              then ok none
+                              else
+                                if value = 12#u32
+                                then ok none
+                                else
+                                  if value = 13#u32
+                                  then ok none
+                                  else
+                                    if value >= 32#u32
+                                    then
+                                      if value <= 126#u32
+                                      then ok none
+                                      else
+                                        let i3 ← «at» + 6#usize
+                                        ok (some (value, i3))
+                                    else
+                                      let i3 ← «at» + 6#usize
+                                      ok (some (value, i3))
+
+/-- [aivm_secrets_garrett_core::stateless_token::characters]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 382:0-406:1
+    Visibility: public -/
+def stateless_token.characters
+  (bytes : Slice Std.U8) (index : Std.Usize) (scalars : alloc.vec.Vec Std.U32)
+  :
+  Result (Option ((alloc.vec.Vec Std.U32) × Std.Usize))
+  := do
+  let i := Slice.len bytes
+  if index >= i
+  then ok none
+  else
+    let byte ← Slice.index_usize bytes index
+    if byte = 34#u8
+    then let i1 ← index + 1#usize
+         ok (some (scalars, i1))
+    else
+      if byte = 92#u8
+      then
+        let o ← stateless_token.escape bytes index
+        match o with
+        | none => ok none
+        | some p =>
+          let (scalar, next) := p
+          let scalars1 ← alloc.vec.Vec.push scalars scalar
+          stateless_token.characters bytes next scalars1
+      else
+        if byte < 32#u8
+        then ok none
+        else
+          if byte > 126#u8
+          then ok none
+          else
+            let i1 ← lift (UScalar.cast .U32 byte)
+            let scalars1 ← alloc.vec.Vec.push scalars i1
+            let i2 ← index + 1#usize
+            stateless_token.characters bytes i2 scalars1
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::string]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 410:0-415:1
+    Visibility: public -/
+def stateless_token.string
+  (bytes : Slice Std.U8) («at» : Std.Usize) :
+  Result (Option ((alloc.vec.Vec Std.U32) × Std.Usize))
+  := do
+  let i := Slice.len bytes
+  if «at» >= i
+  then ok none
+  else
+    let i1 ← Slice.index_usize bytes «at»
+    if i1 != 34#u8
+    then ok none
+    else
+      let i2 ← «at» + 1#usize
+      stateless_token.characters bytes i2 (alloc.vec.Vec.new Std.U32)
+
+/-- [aivm_secrets_garrett_core::stateless_token::digit]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 417:0-419:1
+    Visibility: public -/
+def stateless_token.digit (byte : Std.U8) : Result Bool := do
+  if byte >= 48#u8
+  then ok (byte <= 57#u8)
+  else ok false
+
+/-- [aivm_secrets_garrett_core::stateless_token::digits]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 427:4-435:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.digits_loop
+  (bytes : Slice Std.U8) (value : Std.I64) (valid : Bool) («at» : Std.Usize)
+  :
+  Result (Std.I64 × Std.Usize × Bool)
+  := do
+  if valid
+  then
+    let i := Slice.len bytes
+    if «at» < i
+    then
+      let i1 ← Slice.index_usize bytes «at»
+      let b ← stateless_token.digit i1
+      if b
+      then
+        let i2 ← i1 - 48#u8
+        let next ← lift (UScalar.hcast .I64 i2)
+        let i3 ← stateless_token.MAX_INTEGER - next
+        let i4 ← i3 / 10#i64
+        if value > i4
+        then stateless_token.digits_loop bytes value false «at»
+        else
+          let i5 ← value * 10#i64
+          let value1 ← i5 + next
+          let at1 ← «at» + 1#usize
+          stateless_token.digits_loop bytes value1 valid at1
+      else ok (value, «at», valid)
+    else ok (value, «at», valid)
+  else ok (value, «at», valid)
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::digits]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 423:0-437:1
+    Visibility: public -/
+@[reducible]
+def stateless_token.digits
+  (bytes : Slice Std.U8) (index : Std.Usize) :
+  Result (Std.I64 × Std.Usize × Bool)
+  := do
+  stateless_token.digits_loop bytes 0#i64 true index
+
+/-- [aivm_secrets_garrett_core::stateless_token::fraction_at]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 441:0-443:1
+    Visibility: public -/
+def stateless_token.fraction_at
+  (bytes : Slice Std.U8) (index : Std.Usize) : Result Bool := do
+  let i := Slice.len bytes
+  if index < i
+  then
+    let i1 ← Slice.index_usize bytes index
+    if i1 = 46#u8
+    then ok true
+    else if i1 = 101#u8
+         then ok true
+         else ok (i1 = 69#u8)
+  else ok false
+
+/-- [aivm_secrets_garrett_core::stateless_token::integer]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 447:0-469:1
+    Visibility: public -/
+def stateless_token.integer
+  (bytes : Slice Std.U8) («at» : Std.Usize) : Result (Option Std.Usize) := do
+  let i := Slice.len bytes
+  let index ←
+    if «at» < i
+    then
+      do
+      let i1 ← Slice.index_usize bytes «at»
+      if i1 = 45#u8
+      then «at» + 1#usize
+      else ok «at»
+    else ok «at»
+  let i1 := Slice.len bytes
+  if index >= i1
+  then ok none
+  else
+    let i2 ← Slice.index_usize bytes index
+    let b ← stateless_token.digit i2
+    if b
+    then
+      if i2 = 48#u8
+      then
+        if index > «at»
+        then ok none
+        else
+          let i3 ← index + 1#usize
+          let i4 := Slice.len bytes
+          if i3 < i4
+          then
+            let i5 ← Slice.index_usize bytes i3
+            let b1 ← stateless_token.digit i5
+            if b1
+            then ok none
+            else
+              let b2 ← stateless_token.fraction_at bytes i3
+              if b2
+              then ok none
+              else ok (some i3)
+          else
+            let b1 ← stateless_token.fraction_at bytes i3
+            if b1
+            then ok none
+            else ok (some i3)
+      else
+        let (_, stop, valid) ← stateless_token.digits bytes index
+        if valid
+        then
+          let b1 ← stateless_token.fraction_at bytes stop
+          if b1
+          then ok none
+          else ok (some stop)
+        else ok none
+    else ok none
+
+/-- [aivm_secrets_garrett_core::stateless_token::before]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 474:4-476:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.before_loop
+  (a : Slice Std.U32) (b : Slice Std.U32) (index : Std.Usize) :
+  Result Std.Usize
+  := do
+  let i := Slice.len a
+  if index < i
+  then
+    let i1 := Slice.len b
+    if index < i1
+    then
+      let i2 ← Slice.index_usize a index
+      let i3 ← Slice.index_usize b index
+      if i2 = i3
+      then
+        let index1 ← index + 1#usize
+        stateless_token.before_loop a b index1
+      else ok index
+    else ok index
+  else ok index
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::before]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 472:0-481:1
+    Visibility: public -/
+def stateless_token.before
+  (a : Slice Std.U32) (b : Slice Std.U32) : Result Bool := do
+  let index ← stateless_token.before_loop a b 0#usize
+  let i := Slice.len a
+  if index < i
+  then
+    let i1 := Slice.len b
+    if index < i1
+    then
+      let i2 ← Slice.index_usize a index
+      let i3 ← Slice.index_usize b index
+      ok (i2 < i3)
+    else let i2 := Slice.len a
+         let i3 := Slice.len b
+         ok (i2 < i3)
+  else let i1 := Slice.len a
+       let i2 := Slice.len b
+       ok (i1 < i2)
+
+/-- [aivm_secrets_garrett_core::stateless_token::word]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 514:0-523:1
+    Visibility: public -/
+def stateless_token.word
+  (bytes : Slice Std.U8) («at» : Std.Usize) (literal : Slice Std.U8) :
+  Result (Option Std.Usize)
+  := do
+  let i := Slice.len literal
+  let i1 ← «at» + i
+  let i2 := Slice.len bytes
+  if i1 > i2
+  then ok none
+  else
+    let i3 := Slice.len literal
+    let i4 ← «at» + i3
+    let found ←
+      core.slice.index.Slice.index (core.slice.index.SliceIndexRangeUsizeSlice
+        Std.U8) bytes { start := «at», «end» := i4 }
+    let b ←
+      core.cmp.impls.PartialEqShared.ne (Slice.Insts.CoreCmpPartialEqSlice
+        core.cmp.PartialEqU8) found literal
+    if b
+    then ok none
+    else let i5 := Slice.len literal
+         let i6 ← «at» + i5
+         ok (some i6)
+
+mutual
+
+/-- [aivm_secrets_garrett_core::stateless_token::value]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 484:0-511:1
+    Visibility: public -/
+def stateless_token.value
+  (bytes : Slice Std.U8) («at» : Std.Usize) (level : Std.Usize) :
+  Result (Option Std.Usize)
+  := do
+  let i := Slice.len bytes
+  if «at» >= i
+  then ok none
+  else
+    let first ← Slice.index_usize bytes «at»
+    if first = 123#u8
+    then stateless_token.object bytes «at» level
+    else
+      if first = 91#u8
+      then stateless_token.array bytes «at» level
+      else
+        if first = 34#u8
+        then
+          let o ← stateless_token.string bytes «at»
+          match o with
+          | none => ok none
+          | some p => let (_, next) := p
+                      ok (some next)
+        else
+          if first = 116#u8
+          then
+            let s ←
+              lift (Array.to_slice
+                (Array.make 4#usize [ 116#u8, 114#u8, 117#u8, 101#u8 ]))
+            stateless_token.word bytes «at» s
+          else
+            if first = 102#u8
+            then
+              let s ←
+                lift (Array.to_slice
+                  (Array.make 5#usize [
+                    102#u8, 97#u8, 108#u8, 115#u8, 101#u8
+                    ]))
+              stateless_token.word bytes «at» s
+            else
+              if first = 110#u8
+              then
+                let s ←
+                  lift (Array.to_slice
+                    (Array.make 4#usize [ 110#u8, 117#u8, 108#u8, 108#u8 ]))
+                stateless_token.word bytes «at» s
+              else stateless_token.integer bytes «at»
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::elements]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 527:0-542:1
+    Visibility: public -/
+def stateless_token.elements
+  (bytes : Slice Std.U8) (index : Std.Usize) (level : Std.Usize) :
+  Result (Option Std.Usize)
+  := do
+  let i ← level + 1#usize
+  let o ← stateless_token.value bytes index i
+  match o with
+  | none => ok none
+  | some next =>
+    let i1 := Slice.len bytes
+    if next >= i1
+    then ok none
+    else
+      let i2 ← Slice.index_usize bytes next
+      if i2 = 93#u8
+      then let i3 ← next + 1#usize
+           ok (some i3)
+      else
+        if i2 != 44#u8
+        then ok none
+        else let i3 ← next + 1#usize
+             stateless_token.elements bytes i3 level
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::array]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 545:0-553:1
+    Visibility: public -/
+def stateless_token.array
+  (bytes : Slice Std.U8) («at» : Std.Usize) (level : Std.Usize) :
+  Result (Option Std.Usize)
+  := do
+  if level >= stateless_token.MAX_DEPTH
+  then ok none
+  else
+    let i ← «at» + 1#usize
+    let i1 := Slice.len bytes
+    if i < i1
+    then
+      let i2 ← Slice.index_usize bytes i
+      if i2 = 93#u8
+      then let i3 ← «at» + 2#usize
+           ok (some i3)
+      else stateless_token.elements bytes i level
+    else stateless_token.elements bytes i level
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::members]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 557:0-588:1
+    Visibility: public -/
+def stateless_token.members
+  (bytes : Slice Std.U8) (index : Std.Usize) (level : Std.Usize) (first : Bool)
+  (previous : Slice Std.U32) :
+  Result (Option Std.Usize)
+  := do
+  let o ← stateless_token.string bytes index
+  match o with
+  | none => ok none
+  | some found =>
+    let (key, next) := found
+    if first
+    then
+      let i := Slice.len bytes
+      if next >= i
+      then ok none
+      else
+        let i1 ← Slice.index_usize bytes next
+        if i1 != 58#u8
+        then ok none
+        else
+          let i2 ← next + 1#usize
+          let i3 ← level + 1#usize
+          let o1 ← stateless_token.value bytes i2 i3
+          match o1 with
+          | none => ok none
+          | some after =>
+            let i4 := Slice.len bytes
+            if after >= i4
+            then ok none
+            else
+              let i5 ← Slice.index_usize bytes after
+              if i5 = 125#u8
+              then let i6 ← after + 1#usize
+                   ok (some i6)
+              else
+                if i5 != 44#u8
+                then ok none
+                else
+                  let i6 ← after + 1#usize
+                  let s := alloc.vec.Vec.deref key
+                  stateless_token.members bytes i6 level false s
+    else
+      let s := alloc.vec.Vec.deref key
+      let b ← stateless_token.before previous s
+      if b
+      then
+        let i := Slice.len bytes
+        if next >= i
+        then ok none
+        else
+          let i1 ← Slice.index_usize bytes next
+          if i1 != 58#u8
+          then ok none
+          else
+            let i2 ← next + 1#usize
+            let i3 ← level + 1#usize
+            let o1 ← stateless_token.value bytes i2 i3
+            match o1 with
+            | none => ok none
+            | some after =>
+              let i4 := Slice.len bytes
+              if after >= i4
+              then ok none
+              else
+                let i5 ← Slice.index_usize bytes after
+                if i5 = 125#u8
+                then let i6 ← after + 1#usize
+                     ok (some i6)
+                else
+                  if i5 != 44#u8
+                  then ok none
+                  else
+                    let i6 ← after + 1#usize
+                    let s1 := alloc.vec.Vec.deref key
+                    stateless_token.members bytes i6 level false s1
+      else ok none
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::object]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 591:0-599:1
+    Visibility: public -/
+def stateless_token.object
+  (bytes : Slice Std.U8) («at» : Std.Usize) (level : Std.Usize) :
+  Result (Option Std.Usize)
+  := do
+  if level >= stateless_token.MAX_DEPTH
+  then ok none
+  else
+    let i ← «at» + 1#usize
+    let i1 := Slice.len bytes
+    if i < i1
+    then
+      let i2 ← Slice.index_usize bytes i
+      if i2 = 125#u8
+      then let i3 ← «at» + 2#usize
+           ok (some i3)
+      else
+        let s ← lift (Array.to_slice (Std.Array.empty Std.U32))
+        stateless_token.members bytes i level true s
+    else
+      let s ← lift (Array.to_slice (Std.Array.empty Std.U32))
+      stateless_token.members bytes i level true s
+partial_fixpoint
+
+end
+
+/-- [aivm_secrets_garrett_core::stateless_token::upstream_object]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 603:0-611:1
+    Visibility: public -/
+def stateless_token.upstream_object (bytes : Slice Std.U8) : Result Bool := do
+  let i := Slice.len bytes
+  if i = 0#usize
+  then ok false
+  else
+    let i1 ← Slice.index_usize bytes 0#usize
+    if i1 != 123#u8
+    then ok false
+    else
+      let o ← stateless_token.object bytes 0#usize 1#usize
+      match o with
+      | none => ok false
+      | some stop => let i2 := Slice.len bytes
+                     ok (stop = i2)
+
+/-- [aivm_secrets_garrett_core::stateless_token::append]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 615:0-617:1
+    Visibility: public -/
+def stateless_token.append
+  (out : alloc.vec.Vec Std.U8) (bytes : Slice Std.U8) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  alloc.vec.Vec.extend_from_slice core.clone.CloneU8 out bytes
+
+/-- [aivm_secrets_garrett_core::stateless_token::header_bytes]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 620:0-626:1
+    Visibility: public -/
+def stateless_token.header_bytes
+  (kid : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
+  let out ←
+    stateless_token.append (alloc.vec.Vec.new Std.U8)
+      stateless_token.HEADER_START
+  let out1 ← stateless_token.append out kid
+  stateless_token.append out1 stateless_token.HEADER_END
+
+/-- [aivm_secrets_garrett_core::stateless_token::header_kid]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 629:0-645:1
+    Visibility: public -/
+def stateless_token.header_kid
+  (bytes : Slice Std.U8) : Result (Option (alloc.vec.Vec Std.U8)) := do
+  let i := Slice.len stateless_token.HEADER_START
+  let i1 := Slice.len stateless_token.HEADER_END
+  let fixed ← i + i1
+  let i2 := Slice.len bytes
+  if i2 < fixed
+  then ok none
+  else
+    let i3 := Slice.len bytes
+    let i4 := Slice.len stateless_token.HEADER_END
+    let tail ← i3 - i4
+    let i5 := Slice.len stateless_token.HEADER_START
+    let start ←
+      core.slice.index.Slice.index
+        (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) bytes
+        { «end» := i5 }
+    let ending ←
+      core.slice.index.Slice.index
+        (core.slice.index.SliceIndexRangeFromUsizeSlice Std.U8) bytes
+        { start := tail }
+    let b ←
+      core.cmp.impls.PartialEqShared.ne (Slice.Insts.CoreCmpPartialEqSlice
+        core.cmp.PartialEqU8) start stateless_token.HEADER_START
+    if b
+    then ok none
+    else
+      let b1 ←
+        core.cmp.impls.PartialEqShared.ne (Slice.Insts.CoreCmpPartialEqSlice
+          core.cmp.PartialEqU8) ending stateless_token.HEADER_END
+      if b1
+      then ok none
+      else
+        let i6 := Slice.len stateless_token.HEADER_START
+        let kid ←
+          core.slice.index.Slice.index
+            (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) bytes
+            { start := i6, «end» := tail }
+        let b2 ← stateless_token.is_kid kid
+        if b2
+        then
+          let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 kid
+          ok (some v)
+        else ok none
+
+/-- [aivm_secrets_garrett_core::stateless_token::append_natural]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 648:0-653:1
+    Visibility: public -/
+def stateless_token.append_natural
+  (out : alloc.vec.Vec Std.U8) (value : Std.I64) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let out1 ←
+    if value >= 10#i64
+    then do
+         let i ← value / 10#i64
+         stateless_token.append_natural out i
+    else ok out
+  let i ← value % 10#i64
+  let i1 ← lift (IScalar.hcast .U8 i)
+  let i2 ← 48#u8 + i1
+  alloc.vec.Vec.push out1 i2
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::natural]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 656:0-668:1
+    Visibility: public -/
+def stateless_token.natural
+  (bytes : Slice Std.U8) («at» : Std.Usize) :
+  Result (Option (Std.I64 × Std.Usize))
+  := do
+  let i := Slice.len bytes
+  if «at» >= i
+  then ok none
+  else
+    let i1 ← Slice.index_usize bytes «at»
+    let b ← stateless_token.digit i1
+    if b
+    then
+      if i1 = 48#u8
+      then let i2 ← «at» + 1#usize
+           ok (some (0#i64, i2))
+      else
+        let (value, stop, valid) ← stateless_token.digits bytes «at»
+        if valid
+        then ok (some (value, stop))
+        else ok none
+    else ok none
+
+/-- [aivm_secrets_garrett_core::stateless_token::plain_string]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 677:4-679:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.plain_string_loop
+  (bytes : Slice Std.U8) (index : Std.Usize) : Result Std.Usize := do
+  let i := Slice.len bytes
+  if index < i
+  then
+    let i1 ← Slice.index_usize bytes index
+    if i1 != 34#u8
+    then
+      if i1 != 92#u8
+      then
+        let index1 ← index + 1#usize
+        stateless_token.plain_string_loop bytes index1
+      else ok index
+    else ok index
+  else ok index
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::plain_string]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 672:0-685:1
+    Visibility: public -/
+def stateless_token.plain_string
+  (bytes : Slice Std.U8) («at» : Std.Usize) :
+  Result (Option ((alloc.vec.Vec Std.U8) × Std.Usize))
+  := do
+  let i := Slice.len bytes
+  if «at» >= i
+  then ok none
+  else
+    let i1 ← Slice.index_usize bytes «at»
+    if i1 != 34#u8
+    then ok none
+    else
+      let index ← «at» + 1#usize
+      let index1 ← stateless_token.plain_string_loop bytes index
+      let i2 := Slice.len bytes
+      if index1 >= i2
+      then ok none
+      else
+        let i3 ← Slice.index_usize bytes index1
+        if i3 != 34#u8
+        then ok none
+        else
+          let i4 ← «at» + 1#usize
+          let found ←
+            core.slice.index.Slice.index
+              (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) bytes
+              { start := i4, «end» := index1 }
+          let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 found
+          let i5 ← index1 + 1#usize
+          ok (some (v, i5))
+
+/-- [aivm_secrets_garrett_core::stateless_token::Informational]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 688:0-694:1
+    Visibility: public -/
+structure stateless_token.Informational where
+  has_scope : Bool
+  scope : alloc.vec.Vec Std.U8
+  has_upstream : Bool
+  upstream : alloc.vec.Vec Std.U8
+
+/-- [aivm_secrets_garrett_core::stateless_token::Payload]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 697:0-702:1
+    Visibility: public -/
+structure stateless_token.Payload where
+  claims : stateless.SurrogateClaims
+  enc : alloc.vec.Vec Std.U8
+  info : stateless_token.Informational
+
+/-- [aivm_secrets_garrett_core::stateless_token::append_quoted]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 704:0-708:1
+    Visibility: public -/
+def stateless_token.append_quoted
+  (out : alloc.vec.Vec Std.U8) (bytes : Slice Std.U8) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let out1 ← alloc.vec.Vec.push out 34#u8
+  let out2 ← stateless_token.append out1 bytes
+  alloc.vec.Vec.push out2 34#u8
+
+/-- [aivm_secrets_garrett_core::stateless_token::payload_bytes]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 712:0-748:1
+    Visibility: public -/
+def stateless_token.payload_bytes
+  (payload : stateless_token.Payload) (with_enc : Bool) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        123#u8, 34#u8, 97#u8, 117#u8, 100#u8, 34#u8, 58#u8
+        ]))
+  let out ← stateless_token.append (alloc.vec.Vec.new Std.U8) s
+  let s1 := alloc.vec.Vec.deref payload.claims.audience
+  let out1 ← stateless_token.append_quoted out s1
+  let s2 ←
+    lift (Array.to_slice
+      (Array.make 19#usize [
+        44#u8, 34#u8, 99#u8, 110#u8, 102#u8, 34#u8, 58#u8, 123#u8, 34#u8,
+        120#u8, 53#u8, 116#u8, 35#u8, 83#u8, 50#u8, 53#u8, 54#u8, 34#u8, 58#u8
+        ]))
+  let out2 ← stateless_token.append out1 s2
+  let s3 := alloc.vec.Vec.deref payload.claims.certificate
+  let out3 ← stateless_token.append_quoted out2 s3
+  let out4 ← alloc.vec.Vec.push out3 125#u8
+  let out5 ←
+    if with_enc
+    then
+      do
+      let s4 ←
+        lift (Array.to_slice
+          (Array.make 7#usize [
+            44#u8, 34#u8, 101#u8, 110#u8, 99#u8, 34#u8, 58#u8
+            ]))
+      let out6 ← stateless_token.append out4 s4
+      let s5 := alloc.vec.Vec.deref payload.enc
+      stateless_token.append_quoted out6 s5
+    else ok out4
+  let s4 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 101#u8, 120#u8, 112#u8, 34#u8, 58#u8
+        ]))
+  let out6 ← stateless_token.append out5 s4
+  let out7 ← stateless_token.append_natural out6 payload.claims.expires_at
+  let s5 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 105#u8, 97#u8, 116#u8, 34#u8, 58#u8
+        ]))
+  let out8 ← stateless_token.append out7 s5
+  let out9 ← stateless_token.append_natural out8 payload.claims.issued_at
+  let s6 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 105#u8, 115#u8, 115#u8, 34#u8, 58#u8
+        ]))
+  let out10 ← stateless_token.append out9 s6
+  let s7 := alloc.vec.Vec.deref payload.claims.issuer
+  let out11 ← stateless_token.append_quoted out10 s7
+  let s8 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 106#u8, 116#u8, 105#u8, 34#u8, 58#u8
+        ]))
+  let out12 ← stateless_token.append out11 s8
+  let s9 := alloc.vec.Vec.deref payload.claims.token_id
+  let out13 ← stateless_token.append_quoted out12 s9
+  let s10 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 112#u8, 114#u8, 118#u8, 34#u8, 58#u8
+        ]))
+  let out14 ← stateless_token.append out13 s10
+  let s11 := alloc.vec.Vec.deref payload.claims.provider
+  let out15 ← stateless_token.append_quoted out14 s11
+  let s12 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 114#u8, 101#u8, 110#u8, 34#u8, 58#u8
+        ]))
+  let out16 ← stateless_token.append out15 s12
+  let out17 ← stateless_token.append_natural out16 payload.claims.renew_until
+  let out18 ←
+    if payload.info.has_scope
+    then
+      do
+      let s13 ←
+        lift (Array.to_slice
+          (Array.make 9#usize [
+            44#u8, 34#u8, 115#u8, 99#u8, 111#u8, 112#u8, 101#u8, 34#u8, 58#u8
+            ]))
+      let out19 ← stateless_token.append out17 s13
+      let s14 := alloc.vec.Vec.deref payload.info.scope
+      stateless_token.append_quoted out19 s14
+    else ok out17
+  let s13 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 115#u8, 117#u8, 98#u8, 34#u8, 58#u8
+        ]))
+  let out19 ← stateless_token.append out18 s13
+  let s14 := alloc.vec.Vec.deref payload.claims.subject
+  let out20 ← stateless_token.append_quoted out19 s14
+  let out21 ←
+    if payload.info.has_upstream
+    then
+      do
+      let s15 ←
+        lift (Array.to_slice
+          (Array.make 12#usize [
+            44#u8, 34#u8, 117#u8, 112#u8, 115#u8, 116#u8, 114#u8, 101#u8,
+            97#u8, 109#u8, 34#u8, 58#u8
+            ]))
+      let out22 ← stateless_token.append out20 s15
+      let s16 := alloc.vec.Vec.deref payload.info.upstream
+      stateless_token.append out22 s16
+    else ok out20
+  alloc.vec.Vec.push out21 125#u8
+
+/-- [aivm_secrets_garrett_core::stateless_token::payload_valid]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 751:0-767:1
+    Visibility: public -/
+def stateless_token.payload_valid
+  (payload : stateless_token.Payload) : Result Bool := do
+  let s := alloc.vec.Vec.deref payload.claims.issuer
+  let b ← stateless_token.is_text s
+  if b
+  then
+    let s1 := alloc.vec.Vec.deref payload.claims.audience
+    let b1 ← stateless_token.is_text s1
+    if b1
+    then
+      let s2 := alloc.vec.Vec.deref payload.claims.subject
+      let b2 ← stateless_token.is_text s2
+      if b2
+      then
+        let s3 := alloc.vec.Vec.deref payload.claims.token_id
+        let b3 ← stateless_token.is_id s3
+        if b3
+        then
+          let s4 := alloc.vec.Vec.deref payload.claims.provider
+          let b4 ← stateless_token.is_provider s4
+          if b4
+          then
+            let s5 := alloc.vec.Vec.deref payload.claims.certificate
+            let b5 ← stateless_token.is_thumbprint s5
+            if b5
+            then
+              if payload.claims.issued_at >= 0#i64
+              then
+                if payload.claims.issued_at <= stateless_token.MAX_INTEGER
+                then
+                  if payload.claims.expires_at >= 0#i64
+                  then
+                    if payload.claims.expires_at <= stateless_token.MAX_INTEGER
+                    then
+                      if payload.claims.renew_until >= 0#i64
+                      then
+                        if payload.claims.renew_until <=
+                          stateless_token.MAX_INTEGER
+                        then
+                          if payload.info.has_scope
+                          then
+                            let s6 := alloc.vec.Vec.deref payload.info.scope
+                            let b6 ← stateless_token.is_scope s6
+                            if b6
+                            then
+                              if payload.info.has_upstream
+                              then
+                                let s7 :=
+                                  alloc.vec.Vec.deref payload.info.upstream
+                                stateless_token.upstream_object s7
+                              else ok true
+                            else ok false
+                          else
+                            if payload.info.has_upstream
+                            then
+                              let s6 :=
+                                alloc.vec.Vec.deref payload.info.upstream
+                              stateless_token.upstream_object s6
+                            else ok true
+                        else ok false
+                      else ok false
+                    else ok false
+                  else ok false
+                else ok false
+              else ok false
+            else ok false
+          else ok false
+        else ok false
+      else ok false
+    else ok false
+  else ok false
+
+/-- [aivm_secrets_garrett_core::stateless_token::field]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 770:0-775:1
+    Visibility: public -/
+def stateless_token.field
+  (bytes : Slice Std.U8) («at» : Std.Usize) (key : Slice Std.U8) :
+  Result (Option ((alloc.vec.Vec Std.U8) × Std.Usize))
+  := do
+  let o ← stateless_token.word bytes «at» key
+  match o with
+  | none => ok none
+  | some next => stateless_token.plain_string bytes next
+
+/-- [aivm_secrets_garrett_core::stateless_token::number]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 778:0-783:1
+    Visibility: public -/
+def stateless_token.number
+  (bytes : Slice Std.U8) («at» : Std.Usize) (key : Slice Std.U8) :
+  Result (Option (Std.I64 × Std.Usize))
+  := do
+  let o ← stateless_token.word bytes «at» key
+  match o with
+  | none => ok none
+  | some next => stateless_token.natural bytes next
+
+/-- [aivm_secrets_garrett_core::stateless_token::parse_payload]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 786:0-877:1
+    Visibility: public -/
+def stateless_token.parse_payload
+  (bytes : Slice Std.U8) : Result (Option stateless_token.Payload) := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        123#u8, 34#u8, 97#u8, 117#u8, 100#u8, 34#u8, 58#u8
+        ]))
+  let o ← stateless_token.field bytes 0#usize s
+  match o with
+  | none => ok none
+  | some found =>
+    let (audience, i) := found
+    let s1 ←
+      lift (Array.to_slice
+        (Array.make 19#usize [
+          44#u8, 34#u8, 99#u8, 110#u8, 102#u8, 34#u8, 58#u8, 123#u8, 34#u8,
+          120#u8, 53#u8, 116#u8, 35#u8, 83#u8, 50#u8, 53#u8, 54#u8, 34#u8,
+          58#u8
+          ]))
+    let o1 ← stateless_token.field bytes i s1
+    match o1 with
+    | none => ok none
+    | some found1 =>
+      let (certificate, i1) := found1
+      let s2 ← lift (Array.to_slice (Array.make 1#usize [ 125#u8 ]))
+      let o2 ← stateless_token.word bytes i1 s2
+      match o2 with
+      | none => ok none
+      | some next =>
+        let s3 ←
+          lift (Array.to_slice
+            (Array.make 7#usize [
+              44#u8, 34#u8, 101#u8, 110#u8, 99#u8, 34#u8, 58#u8
+              ]))
+        let o3 ← stateless_token.field bytes next s3
+        match o3 with
+        | none => ok none
+        | some found2 =>
+          let (enc, i2) := found2
+          let s4 ←
+            lift (Array.to_slice
+              (Array.make 7#usize [
+                44#u8, 34#u8, 101#u8, 120#u8, 112#u8, 34#u8, 58#u8
+                ]))
+          let o4 ← stateless_token.number bytes i2 s4
+          match o4 with
+          | none => ok none
+          | some found3 =>
+            let (expires_at, i3) := found3
+            let s5 ←
+              lift (Array.to_slice
+                (Array.make 7#usize [
+                  44#u8, 34#u8, 105#u8, 97#u8, 116#u8, 34#u8, 58#u8
+                  ]))
+            let o5 ← stateless_token.number bytes i3 s5
+            match o5 with
+            | none => ok none
+            | some found4 =>
+              let (issued_at, i4) := found4
+              let s6 ←
+                lift (Array.to_slice
+                  (Array.make 7#usize [
+                    44#u8, 34#u8, 105#u8, 115#u8, 115#u8, 34#u8, 58#u8
+                    ]))
+              let o6 ← stateless_token.field bytes i4 s6
+              match o6 with
+              | none => ok none
+              | some found5 =>
+                let (issuer, i5) := found5
+                let s7 ←
+                  lift (Array.to_slice
+                    (Array.make 7#usize [
+                      44#u8, 34#u8, 106#u8, 116#u8, 105#u8, 34#u8, 58#u8
+                      ]))
+                let o7 ← stateless_token.field bytes i5 s7
+                match o7 with
+                | none => ok none
+                | some found6 =>
+                  let (token_id, i6) := found6
+                  let s8 ←
+                    lift (Array.to_slice
+                      (Array.make 7#usize [
+                        44#u8, 34#u8, 112#u8, 114#u8, 118#u8, 34#u8, 58#u8
+                        ]))
+                  let o8 ← stateless_token.field bytes i6 s8
+                  match o8 with
+                  | none => ok none
+                  | some found7 =>
+                    let (provider, i7) := found7
+                    let s9 ←
+                      lift (Array.to_slice
+                        (Array.make 7#usize [
+                          44#u8, 34#u8, 114#u8, 101#u8, 110#u8, 34#u8, 58#u8
+                          ]))
+                    let o9 ← stateless_token.number bytes i7 s9
+                    match o9 with
+                    | none => ok none
+                    | some found8 =>
+                      let (renew_until, i8) := found8
+                      let s10 ←
+                        lift (Array.to_slice
+                          (Array.make 9#usize [
+                            44#u8, 34#u8, 115#u8, 99#u8, 111#u8, 112#u8,
+                            101#u8, 34#u8, 58#u8
+                            ]))
+                      let o10 ← stateless_token.field bytes i8 s10
+                      let (has_scope, scope, i9) ←
+                        match o10 with
+                        | none => ok (false, alloc.vec.Vec.new Std.U8, i8)
+                        | some p =>
+                          let (scope1, next1) := p
+                          ok (true, scope1, next1)
+                      let s11 ←
+                        lift (Array.to_slice
+                          (Array.make 7#usize [
+                            44#u8, 34#u8, 115#u8, 117#u8, 98#u8, 34#u8, 58#u8
+                            ]))
+                      let o11 ← stateless_token.field bytes i9 s11
+                      match o11 with
+                      | none => ok none
+                      | some found9 =>
+                        let (subject, i10) := found9
+                        let s12 ←
+                          lift (Array.to_slice
+                            (Array.make 12#usize [
+                              44#u8, 34#u8, 117#u8, 112#u8, 115#u8, 116#u8,
+                              114#u8, 101#u8, 97#u8, 109#u8, 34#u8, 58#u8
+                              ]))
+                        let o12 ← stateless_token.word bytes i10 s12
+                        match o12 with
+                        | none =>
+                          let i11 ← i10 + 1#usize
+                          let i12 := Slice.len bytes
+                          if i11 != i12
+                          then ok none
+                          else
+                            let i13 := Slice.len bytes
+                            let i14 ← i13 - 1#usize
+                            let i15 ← Slice.index_usize bytes i14
+                            if i15 != 125#u8
+                            then ok none
+                            else
+                              let b ←
+                                stateless_token.payload_valid
+                                  {
+                                    claims :=
+                                      {
+                                        issuer,
+                                        audience,
+                                        subject,
+                                        token_id,
+                                        provider,
+                                        certificate,
+                                        issued_at,
+                                        expires_at,
+                                        renew_until
+                                      },
+                                    enc,
+                                    info :=
+                                      {
+                                        has_scope,
+                                        scope,
+                                        has_upstream := false,
+                                        upstream := (alloc.vec.Vec.new Std.U8)
+                                      }
+                                  }
+                              if b
+                              then
+                                ok (some
+                                  {
+                                    claims :=
+                                      {
+                                        issuer,
+                                        audience,
+                                        subject,
+                                        token_id,
+                                        provider,
+                                        certificate,
+                                        issued_at,
+                                        expires_at,
+                                        renew_until
+                                      },
+                                    enc,
+                                    info :=
+                                      {
+                                        has_scope,
+                                        scope,
+                                        has_upstream := false,
+                                        upstream := (alloc.vec.Vec.new Std.U8)
+                                      }
+                                  })
+                              else ok none
+                        | some next1 =>
+                          let i11 := Slice.len bytes
+                          if next1 >= i11
+                          then ok none
+                          else
+                            let i12 := Slice.len bytes
+                            let i13 ← i12 - 1#usize
+                            let found10 ←
+                              core.slice.index.Slice.index
+                                (core.slice.index.SliceIndexRangeUsizeSlice
+                                Std.U8) bytes
+                                { start := next1, «end» := i13 }
+                            let upstream ←
+                              alloc.slice.Slice.to_vec core.clone.CloneU8
+                                found10
+                            let i14 := Slice.len bytes
+                            let i15 ← i14 - 1#usize
+                            let i16 ← Slice.index_usize bytes i15
+                            if i16 != 125#u8
+                            then ok none
+                            else
+                              let b ←
+                                stateless_token.payload_valid
+                                  {
+                                    claims :=
+                                      {
+                                        issuer,
+                                        audience,
+                                        subject,
+                                        token_id,
+                                        provider,
+                                        certificate,
+                                        issued_at,
+                                        expires_at,
+                                        renew_until
+                                      },
+                                    enc,
+                                    info :=
+                                      {
+                                        has_scope,
+                                        scope,
+                                        has_upstream := true,
+                                        upstream
+                                      }
+                                  }
+                              if b
+                              then
+                                ok (some
+                                  {
+                                    claims :=
+                                      {
+                                        issuer,
+                                        audience,
+                                        subject,
+                                        token_id,
+                                        provider,
+                                        certificate,
+                                        issued_at,
+                                        expires_at,
+                                        renew_until
+                                      },
+                                    enc,
+                                    info :=
+                                      {
+                                        has_scope,
+                                        scope,
+                                        has_upstream := true,
+                                        upstream
+                                      }
+                                  })
+                              else ok none
+
+/-- [aivm_secrets_garrett_core::stateless_token::associated]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 881:0-888:1
+    Visibility: public -/
+def stateless_token.associated
+  (header : Slice Std.U8) («public» : Slice Std.U8) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let aad ←
+    stateless_token.append (alloc.vec.Vec.new Std.U8)
+      stateless_token.CREDENTIAL_LABEL
+  let aad1 ← stateless_token.append aad header
+  let aad2 ← alloc.vec.Vec.push aad1 0#u8
+  stateless_token.append aad2 «public»
+
+/-- [aivm_secrets_garrett_core::stateless_token::named]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 901:0-904:1
+    Visibility: public -/
+def stateless_token.named
+  {M : Type _} (entry : stateless_token.KeyEntry M) (kid : Slice Std.U8) :
+  Result Bool
+  := do
+  let own := alloc.vec.Vec.deref entry.kid
+  core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 own kid
+
+/-- [aivm_secrets_garrett_core::stateless_token::select]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 895:4-897:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.select_loop
+  {M : Type _} (entries : Slice (stateless_token.KeyEntry M))
+  (kid : Slice Std.U8) (index : Std.Usize) :
+  Result Std.Usize
+  := do
+  let i := Slice.len entries
+  if index < i
+  then
+    let ke ← Slice.index_usize entries index
+    let b ← stateless_token.named ke kid
+    if b
+    then ok index
+    else
+      let index1 ← index + 1#usize
+      stateless_token.select_loop entries kid index1
+  else ok index
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::select]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 893:0-899:1
+    Visibility: public -/
+@[reducible]
+def stateless_token.select
+  {M : Type _} (entries : Slice (stateless_token.KeyEntry M))
+  (kid : Slice Std.U8) :
+  Result Std.Usize
+  := do
+  stateless_token.select_loop entries kid 0#usize
+
+/-- [aivm_secrets_garrett_core::stateless_token::entry_valid]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 924:0-927:1
+    Visibility: public -/
+def stateless_token.entry_valid
+  {M : Type _} (entries : Slice (stateless_token.KeyEntry M))
+  (index : Std.Usize) :
+  Result Bool
+  := do
+  let entry ← Slice.index_usize entries index
+  let s := alloc.vec.Vec.deref entry.kid
+  let b ← stateless_token.is_kid s
+  if b
+  then
+    let s1 := alloc.vec.Vec.deref entry.issuer
+    let b1 ← stateless_token.is_text s1
+    if b1
+    then
+      let s2 := alloc.vec.Vec.deref entry.kid
+      let i ← stateless_token.select entries s2
+      ok (i = index)
+    else ok false
+  else ok false
+
+/-- [aivm_secrets_garrett_core::stateless_token::keys_valid]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 914:4-919:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.keys_valid_loop
+  {M : Type _} (entries : Slice (stateless_token.KeyEntry M)) (valid : Bool)
+  (index : Std.Usize) :
+  Result Bool
+  := do
+  let i := Slice.len entries
+  if index < i
+  then
+    let b ← stateless_token.entry_valid entries index
+    let valid1 ← if b
+                   then ok valid
+                   else ok false
+    let index1 ← index + 1#usize
+    stateless_token.keys_valid_loop entries valid1 index1
+  else ok valid
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::keys_valid]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 908:0-921:1
+    Visibility: public -/
+def stateless_token.keys_valid
+  {M : Type _} (entries : Slice (stateless_token.KeyEntry M)) :
+  Result Bool
+  := do
+  let i := Slice.len entries
+  if i < 1#usize
+  then ok false
+  else
+    let i1 := Slice.len entries
+    if i1 > stateless_token.MAX_KEYS
+    then ok false
+    else stateless_token.keys_valid_loop entries true 0#usize
+
+/-- [aivm_secrets_garrett_core::stateless_token::KeyError]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 929:0-931:1
+    Visibility: public -/
+@[discriminant isize]
+inductive stateless_token.KeyError where
+| Invalid : stateless_token.KeyError
+
+/-- [aivm_secrets_garrett_core::stateless_token::{aivm_secrets_garrett_core::stateless_token::KeySet<M>}::new]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 935:4-940:5
+    Visibility: public -/
+def stateless_token.KeySet.new
+  {M : Type _} (entries : alloc.vec.Vec (stateless_token.KeyEntry M)) :
+  Result (core.result.Result (stateless_token.KeySet M)
+    stateless_token.KeyError)
+  := do
+  let s := alloc.vec.Vec.deref entries
+  let b ← stateless_token.keys_valid s
+  if b
+  then ok (core.result.Result.Ok { entries })
+  else ok (core.result.Result.Err stateless_token.KeyError.Invalid)
+
+/-- [aivm_secrets_garrett_core::stateless_token::{aivm_secrets_garrett_core::stateless_token::KeySet<M>}::entries]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 942:4-944:5
+    Visibility: public -/
+def stateless_token.KeySet.impl.entries
+  {M : Type _} (self : stateless_token.KeySet M) :
+  Result (Slice (stateless_token.KeyEntry M))
+  := do
+  ok (alloc.vec.Vec.deref self.entries)
+
+/-- [aivm_secrets_garrett_core::stateless_token::ascii]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 952:4-959:1
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.ascii_loop
+  (token : Slice Std.U8) (index : Std.Usize) : Result Bool := do
+  let i := Slice.len token
+  if index < i
+  then
+    let i1 ← Slice.index_usize token index
+    if i1 > 127#u8
+    then ok false
+    else let index1 ← index + 1#usize
+         stateless_token.ascii_loop token index1
+  else ok true
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::ascii]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 950:0-959:1
+    Visibility: public -/
+@[reducible]
+def stateless_token.ascii (token : Slice Std.U8) : Result Bool := do
+  stateless_token.ascii_loop token 0#usize
+
+/-- [aivm_secrets_garrett_core::stateless_token::dot_from]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 964:4-966:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.dot_from_loop
+  (token : Slice Std.U8) (index : Std.Usize) : Result Std.Usize := do
+  let i := Slice.len token
+  if index < i
+  then
+    let i1 ← Slice.index_usize token index
+    if i1 != 46#u8
+    then
+      let index1 ← index + 1#usize
+      stateless_token.dot_from_loop token index1
+    else ok index
+  else ok index
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::dot_from]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 962:0-968:1
+    Visibility: public -/
+@[reducible]
+def stateless_token.dot_from
+  (token : Slice Std.U8) («from» : Std.Usize) : Result Std.Usize := do
+  stateless_token.dot_from_loop token «from»
+
+/-- [aivm_secrets_garrett_core::stateless_token::segments]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 971:0-984:1
+    Visibility: public -/
+def stateless_token.segments
+  (token : Slice Std.U8) : Result (Option (Std.Usize × Std.Usize)) := do
+  let i := Slice.len token
+  if i > stateless_token.MAX_TOKEN
+  then ok none
+  else
+    let b ← stateless_token.ascii token
+    if b
+    then
+      let first ← stateless_token.dot_from token 0#usize
+      let i1 := Slice.len token
+      if first >= i1
+      then ok none
+      else
+        let i2 ← first + 1#usize
+        let second ← stateless_token.dot_from token i2
+        let i3 := Slice.len token
+        if second >= i3
+        then ok none
+        else
+          let i4 ← second + 1#usize
+          let i5 ← stateless_token.dot_from token i4
+          let i6 := Slice.len token
+          if i5 < i6
+          then ok none
+          else ok (some (first, second))
+    else ok none
+
+/-- [aivm_secrets_garrett_core::stateless_token::verify_token]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 988:0-1045:1
+    Visibility: public -/
+def stateless_token.verify_token
+  {M : Type _} (KeyMaterialInst : stateless_token.KeyMaterial M)
+  (entries : Slice (stateless_token.KeyEntry M)) (token : Slice Std.U8) :
+  Result (core.result.Result stateless.Verified stateless.Rejection)
+  := do
+  let o ← stateless_token.segments token
+  match o with
+  | none => ok (core.result.Result.Err stateless.Rejection.Malformed)
+  | some found =>
+    let (first, second) := found
+    let s ←
+      core.slice.index.Slice.index
+        (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) token
+        { «end» := first }
+    let o1 ← stateless_token.from_b64url s
+    match o1 with
+    | none => ok (core.result.Result.Err stateless.Rejection.Malformed)
+    | some header =>
+      let s1 := alloc.vec.Vec.deref header
+      let o2 ← stateless_token.header_kid s1
+      match o2 with
+      | none => ok (core.result.Result.Err stateless.Rejection.Malformed)
+      | some kid =>
+        let s2 := alloc.vec.Vec.deref kid
+        let key ← stateless_token.select entries s2
+        let i := Slice.len entries
+        if key >= i
+        then ok (core.result.Result.Err stateless.Rejection.UnknownKey)
+        else
+          let entry ← Slice.index_usize entries key
+          let i1 ← second + 1#usize
+          let s3 ←
+            core.slice.index.Slice.index
+              (core.slice.index.SliceIndexRangeFromUsizeSlice Std.U8) token
+              { start := i1 }
+          let o3 ← stateless_token.from_b64url s3
+          match o3 with
+          | none => ok (core.result.Result.Err stateless.Rejection.Malformed)
+          | some signature =>
+            let i2 := alloc.vec.Vec.len signature
+            if i2 != stateless_token.SIGNATURE
+            then ok (core.result.Result.Err stateless.Rejection.Malformed)
+            else
+              let s4 ←
+                core.slice.index.Slice.index
+                  (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) token
+                  { «end» := second }
+              let s5 := alloc.vec.Vec.deref signature
+              let b ← KeyMaterialInst.verify entry.material s4 s5
+              if b
+              then
+                let i3 ← first + 1#usize
+                let s6 ←
+                  core.slice.index.Slice.index
+                    (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) token
+                    { start := i3, «end» := second }
+                let o4 ← stateless_token.from_b64url s6
+                match o4 with
+                | none =>
+                  ok (core.result.Result.Err stateless.Rejection.Malformed)
+                | some bytes =>
+                  let s7 := alloc.vec.Vec.deref bytes
+                  let o5 ← stateless_token.parse_payload s7
+                  match o5 with
+                  | none =>
+                    ok (core.result.Result.Err stateless.Rejection.Malformed)
+                  | some payload =>
+                    let s8 := alloc.vec.Vec.deref payload.enc
+                    let o6 ← stateless_token.from_b64url s8
+                    match o6 with
+                    | none =>
+                      ok (core.result.Result.Err stateless.Rejection.Malformed)
+                    | some sealed =>
+                      let i4 := alloc.vec.Vec.len sealed
+                      let i5 ← stateless_token.NONCE + stateless_token.TAG
+                      let i6 ← i5 + 1#usize
+                      if i4 < i6
+                      then
+                        ok (core.result.Result.Err
+                          stateless.Rejection.Malformed)
+                      else
+                        let «public» ←
+                          stateless_token.payload_bytes payload false
+                        let s9 := alloc.vec.Vec.deref header
+                        let s10 := alloc.vec.Vec.deref «public»
+                        let aad ← stateless_token.associated s9 s10
+                        let issuer := alloc.vec.Vec.deref entry.issuer
+                        let v ←
+                          alloc.slice.Slice.to_vec core.clone.CloneU8 issuer
+                        ok (core.result.Result.Ok
+                          {
+                            key,
+                            key_issuer := v,
+                            claims := payload.claims,
+                            aad,
+                            sealed
+                          })
+              else ok (core.result.Result.Err stateless.Rejection.BadSignature)
+
+/-- [aivm_secrets_garrett_core::stateless_token::unseal_token]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1048:0-1064:1
+    Visibility: public -/
+def stateless_token.unseal_token
+  {M : Type _} (KeyMaterialInst : stateless_token.KeyMaterial M)
+  (entries : Slice (stateless_token.KeyEntry M))
+  (verified : stateless.Verified) :
+  Result (core.result.Result (alloc.vec.Vec Std.U8) stateless.Rejection)
+  := do
+  let i := Slice.len entries
+  if verified.key >= i
+  then ok (core.result.Result.Err stateless.Rejection.UnknownKey)
+  else
+    let i1 := alloc.vec.Vec.len verified.sealed
+    let i2 ← stateless_token.NONCE + stateless_token.TAG
+    let i3 ← i2 + 1#usize
+    if i1 < i3
+    then ok (core.result.Result.Err stateless.Rejection.UnknownKey)
+    else
+      let nonce ←
+        alloc.vec.Vec.index (core.slice.index.SliceIndexRangeToUsizeSlice
+          Std.U8) verified.sealed { «end» := stateless_token.NONCE }
+      let sealed ←
+        alloc.vec.Vec.index (core.slice.index.SliceIndexRangeFromUsizeSlice
+          Std.U8) verified.sealed { start := stateless_token.NONCE }
+      let ke ← Slice.index_usize entries verified.key
+      let s := alloc.vec.Vec.deref verified.aad
+      let o ← KeyMaterialInst.«open» ke.material nonce s sealed
+      match o with
+      | none => ok (core.result.Result.Err stateless.Rejection.Undecryptable)
+      | some plain => ok (core.result.Result.Ok plain)
+
+/-- [aivm_secrets_garrett_core::stateless_token::{impl aivm_secrets_garrett_core::stateless::SurrogateOpener for aivm_secrets_garrett_core::stateless_token::KeySet<M>}::unseal]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1070:4-1072:5
+    Visibility: public -/
+def
+  stateless_token.KeySet.Insts.Aivm_secrets_garrett_coreStatelessSurrogateOpener.unseal
+  {M : Type _} (KeyMaterialInst : stateless_token.KeyMaterial M)
+  (self : stateless_token.KeySet M) (verified : stateless.Verified) :
+  Result (core.result.Result (alloc.vec.Vec Std.U8) stateless.Rejection)
+  := do
+  let s := alloc.vec.Vec.deref self.entries
+  stateless_token.unseal_token KeyMaterialInst s verified
+
+/-- [aivm_secrets_garrett_core::stateless_token::{impl aivm_secrets_garrett_core::stateless::SurrogateOpener for aivm_secrets_garrett_core::stateless_token::KeySet<M>}::verify]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1067:4-1069:5
+    Visibility: public -/
+def
+  stateless_token.KeySet.Insts.Aivm_secrets_garrett_coreStatelessSurrogateOpener.verify
+  {M : Type _} (KeyMaterialInst : stateless_token.KeyMaterial M)
+  (self : stateless_token.KeySet M) (token : Slice Std.U8) :
+  Result (core.result.Result stateless.Verified stateless.Rejection)
+  := do
+  let s := alloc.vec.Vec.deref self.entries
+  stateless_token.verify_token KeyMaterialInst s token
+
+/-- Trait implementation: [aivm_secrets_garrett_core::stateless_token::{impl aivm_secrets_garrett_core::stateless::SurrogateOpener for aivm_secrets_garrett_core::stateless_token::KeySet<M>}]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1066:0-1073:1 -/
+@[reducible]
+def
+  stateless_token.KeySet.Insts.Aivm_secrets_garrett_coreStatelessSurrogateOpener
+  {M : Type _} (KeyMaterialInst : stateless_token.KeyMaterial M) :
+  stateless.SurrogateOpener (stateless_token.KeySet M) := {
+  verify :=
+    stateless_token.KeySet.Insts.Aivm_secrets_garrett_coreStatelessSurrogateOpener.verify
+    KeyMaterialInst
+  «unseal» :=
+    stateless_token.KeySet.Insts.Aivm_secrets_garrett_coreStatelessSurrogateOpener.unseal
+    KeyMaterialInst
+}
+
+/-- [aivm_secrets_garrett_core::stateless_token::occurs]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1084:4-1090:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.occurs_loop
+  (haystack : Slice Std.U8) (needle : Slice Std.U8) (found : Bool)
+  (start : Std.Usize) :
+  Result Bool
+  := do
+  if found
+  then ok found
+  else
+    let i := Slice.len needle
+    let i1 ← start + i
+    let i2 := Slice.len haystack
+    if i1 <= i2
+    then
+      let i3 := Slice.len needle
+      let i4 ← start + i3
+      let window ←
+        core.slice.index.Slice.index
+          (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) haystack
+          { start, «end» := i4 }
+      let b ←
+        core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 window needle
+      let found1 ← if b
+                     then ok true
+                     else ok found
+      let start1 ← start + 1#usize
+      stateless_token.occurs_loop haystack needle found1 start1
+    else ok found
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_token::occurs]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1078:0-1092:1
+    Visibility: public -/
+def stateless_token.occurs
+  (haystack : Slice Std.U8) (needle : Slice Std.U8) : Result Bool := do
+  let i := Slice.len needle
+  if i = 0#usize
+  then ok true
+  else stateless_token.occurs_loop haystack needle false 0#usize
+
+/-- [aivm_secrets_garrett_core::stateless_token::copy_info]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1167:0-1176:1
+    Visibility: public -/
+def stateless_token.copy_info
+  (info : stateless_token.Informational) :
+  Result stateless_token.Informational
+  := do
+  let scope := alloc.vec.Vec.deref info.scope
+  let upstream := alloc.vec.Vec.deref info.upstream
+  let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 scope
+  let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 upstream
+  ok { info with scope := v, upstream := v1 }
+
+/-- [aivm_secrets_garrett_core::stateless_token::copy_claims]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1147:0-1165:1
+    Visibility: public -/
+def stateless_token.copy_claims
+  (claims : stateless.SurrogateClaims) : Result stateless.SurrogateClaims := do
+  let issuer := alloc.vec.Vec.deref claims.issuer
+  let audience := alloc.vec.Vec.deref claims.audience
+  let subject := alloc.vec.Vec.deref claims.subject
+  let token_id := alloc.vec.Vec.deref claims.token_id
+  let provider := alloc.vec.Vec.deref claims.provider
+  let certificate := alloc.vec.Vec.deref claims.certificate
+  let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 issuer
+  let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 audience
+  let v2 ← alloc.slice.Slice.to_vec core.clone.CloneU8 subject
+  let v3 ← alloc.slice.Slice.to_vec core.clone.CloneU8 token_id
+  let v4 ← alloc.slice.Slice.to_vec core.clone.CloneU8 provider
+  let v5 ← alloc.slice.Slice.to_vec core.clone.CloneU8 certificate
+  ok
+    {
+      claims
+        with
+        issuer := v,
+        audience := v1,
+        subject := v2,
+        token_id := v3,
+        provider := v4,
+        certificate := v5
+    }
+
+/-- [aivm_secrets_garrett_core::stateless_token::seal_token]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1096:0-1145:1
+    Visibility: public -/
+def stateless_token.seal_token
+  {M : Type _} (KeyMaterialInst : stateless_token.KeyMaterial M)
+  (entry : stateless_token.KeyEntry M) (info : stateless_token.Informational)
+  (claims : stateless.SurrogateClaims) (credential : Slice Std.U8)
+  (nonce : Slice Std.U8) :
+  Result (core.result.Result (alloc.vec.Vec Std.U8) stateless.Rejection)
+  := do
+  let b ← http_auth.valid_credential credential
+  if b
+  then
+    let s := alloc.vec.Vec.deref entry.kid
+    let b1 ← stateless_token.is_kid s
+    if b1
+    then
+      let i := Slice.len nonce
+      if i != stateless_token.NONCE
+      then ok (core.result.Result.Err stateless.Rejection.InvalidCredential)
+      else
+        let s1 := alloc.vec.Vec.deref entry.kid
+        let header ← stateless_token.header_bytes s1
+        let sc ← stateless_token.copy_claims claims
+        let i1 ← stateless_token.copy_info info
+        let b2 ←
+          stateless_token.payload_valid
+            { claims := sc, enc := (alloc.vec.Vec.new Std.U8), info := i1 }
+        if b2
+        then
+          let «public» ←
+            stateless_token.payload_bytes
+              { claims := sc, enc := (alloc.vec.Vec.new Std.U8), info := i1 }
+              false
+          let s2 := alloc.vec.Vec.deref header
+          let b3 ← stateless_token.occurs s2 credential
+          if b3
+          then ok (core.result.Result.Err stateless.Rejection.Malformed)
+          else
+            let s3 := alloc.vec.Vec.deref «public»
+            let b4 ← stateless_token.occurs s3 credential
+            if b4
+            then ok (core.result.Result.Err stateless.Rejection.Malformed)
+            else
+              let s4 := alloc.vec.Vec.deref header
+              let s5 := alloc.vec.Vec.deref «public»
+              let aad ← stateless_token.associated s4 s5
+              let s6 := alloc.vec.Vec.deref aad
+              let o ←
+                KeyMaterialInst.«seal» entry.material nonce s6 credential
+              match o with
+              | none =>
+                ok (core.result.Result.Err stateless.Rejection.Undecryptable)
+              | some ciphertext =>
+                let sealed ←
+                  stateless_token.append (alloc.vec.Vec.new Std.U8) nonce
+                let s7 := alloc.vec.Vec.deref ciphertext
+                let sealed1 ← stateless_token.append sealed s7
+                let s8 := alloc.vec.Vec.deref sealed1
+                let v ← stateless_token.b64url s8
+                let s9 := alloc.vec.Vec.deref header
+                let body ← stateless_token.b64url s9
+                let body1 ← alloc.vec.Vec.push body 46#u8
+                let v1 ←
+                  stateless_token.payload_bytes
+                    { claims := sc, enc := v, info := i1 } true
+                let s10 := alloc.vec.Vec.deref v1
+                let v2 ← stateless_token.b64url s10
+                let s11 := alloc.vec.Vec.deref v2
+                let body2 ← stateless_token.append body1 s11
+                let s12 := alloc.vec.Vec.deref body2
+                let o1 ← KeyMaterialInst.sign entry.material s12
+                match o1 with
+                | none =>
+                  ok (core.result.Result.Err stateless.Rejection.UnknownKey)
+                | some signature =>
+                  let i2 := alloc.vec.Vec.len signature
+                  if i2 != stateless_token.SIGNATURE
+                  then
+                    ok (core.result.Result.Err stateless.Rejection.UnknownKey)
+                  else
+                    let body3 ← alloc.vec.Vec.push body2 46#u8
+                    let s13 := alloc.vec.Vec.deref signature
+                    let v3 ← stateless_token.b64url s13
+                    let s14 := alloc.vec.Vec.deref v3
+                    let body4 ← stateless_token.append body3 s14
+                    let i3 := alloc.vec.Vec.len body4
+                    if i3 > stateless_token.MAX_TOKEN
+                    then
+                      ok (core.result.Result.Err stateless.Rejection.Malformed)
+                    else ok (core.result.Result.Ok body4)
+        else ok (core.result.Result.Err stateless.Rejection.Malformed)
+    else ok (core.result.Result.Err stateless.Rejection.InvalidCredential)
+  else ok (core.result.Result.Err stateless.Rejection.InvalidCredential)
+
+/-- [aivm_secrets_garrett_core::stateless_token::TokenSealer]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1180:0-1184:1
+    Visibility: public -/
+structure stateless_token.TokenSealer (M : Type _) where
+  entry : stateless_token.KeyEntry M
+  info : stateless_token.Informational
+  nonce : alloc.vec.Vec Std.U8
+
+/-- [aivm_secrets_garrett_core::stateless_token::{impl aivm_secrets_garrett_core::stateless::SurrogateSealer for aivm_secrets_garrett_core::stateless_token::TokenSealer<M>}::seal]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1187:4-1189:5
+    Visibility: public -/
+def
+  stateless_token.TokenSealer.Insts.Aivm_secrets_garrett_coreStatelessSurrogateSealer.seal
+  {M : Type _} (KeyMaterialInst : stateless_token.KeyMaterial M)
+  (self : stateless_token.TokenSealer M) (claims : stateless.SurrogateClaims)
+  (credential : Slice Std.U8) :
+  Result (core.result.Result (alloc.vec.Vec Std.U8) stateless.Rejection)
+  := do
+  let s := alloc.vec.Vec.deref self.nonce
+  stateless_token.seal_token KeyMaterialInst self.entry self.info claims
+    credential s
+
+/-- Trait implementation: [aivm_secrets_garrett_core::stateless_token::{impl aivm_secrets_garrett_core::stateless::SurrogateSealer for aivm_secrets_garrett_core::stateless_token::TokenSealer<M>}]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1186:0-1190:1 -/
+@[reducible]
+def
+  stateless_token.TokenSealer.Insts.Aivm_secrets_garrett_coreStatelessSurrogateSealer
+  {M : Type _} (KeyMaterialInst : stateless_token.KeyMaterial M) :
+  stateless.SurrogateSealer (stateless_token.TokenSealer M) := {
+  «seal» :=
+    stateless_token.TokenSealer.Insts.Aivm_secrets_garrett_coreStatelessSurrogateSealer.seal
+    KeyMaterialInst
+}
+
+/-- [aivm_secrets_garrett_core::stateless_token::informational]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1194:0-1207:1
+    Visibility: public -/
+def stateless_token.informational
+  (token : Slice Std.U8) : Result (Option stateless_token.Informational) := do
+  let o ← stateless_token.segments token
+  match o with
+  | none => ok none
+  | some found =>
+    let (first, second) := found
+    let i ← first + 1#usize
+    let s ←
+      core.slice.index.Slice.index (core.slice.index.SliceIndexRangeUsizeSlice
+        Std.U8) token { start := i, «end» := second }
+    let o1 ← stateless_token.from_b64url s
+    match o1 with
+    | none => ok none
+    | some bytes =>
+      let s1 := alloc.vec.Vec.deref bytes
+      let o2 ← stateless_token.parse_payload s1
+      match o2 with
+      | none => ok none
+      | some payload => ok (some payload.info)
+
+/-- [aivm_secrets_garrett_core::stateless_token::STATE_PREFIX]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1211:0-1211:40
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.STATE_PREFIX : Slice Std.U8 :=
+  Array.to_slice (Array.make 4#usize [ 103#u8, 115#u8, 49#u8, 46#u8 ])
+
+/-- [aivm_secrets_garrett_core::stateless_token::MAX_STATE]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1212:0-1212:34
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.MAX_STATE : Std.Usize := 4096#usize
+
+/-- [aivm_secrets_garrett_core::stateless_token::LOGIN_LABEL]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1213:0-1213:63
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.LOGIN_LABEL : Slice Std.U8 :=
+  Array.to_slice
+    (Array.make 27#usize [
+      103#u8, 97#u8, 114#u8, 114#u8, 101#u8, 116#u8, 116#u8, 45#u8, 115#u8,
+      116#u8, 97#u8, 116#u8, 101#u8, 108#u8, 101#u8, 115#u8, 115#u8, 45#u8,
+      118#u8, 49#u8, 47#u8, 108#u8, 111#u8, 103#u8, 105#u8, 110#u8, 0#u8
+      ])
+
+/-- Trait declaration: [aivm_secrets_garrett_core::stateless_token::StateKey]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1216:0-1219:1
+    Visibility: public -/
+structure stateless_token.StateKey (Self : Type _) where
+  «seal» : Self → Slice Std.U8 → Slice Std.U8 → Slice Std.U8 → Result
+    (Option (alloc.vec.Vec Std.U8))
+  «open» : Self → Slice Std.U8 → Slice Std.U8 → Slice Std.U8 → Result
+    (Option (alloc.vec.Vec Std.U8))
+
+/-- [aivm_secrets_garrett_core::stateless_token::state_valid]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1222:0-1236:1
+    Visibility: public -/
+def stateless_token.state_valid
+  (state : stateless_login.LoginState) : Result Bool := do
+  let s := alloc.vec.Vec.deref state.certificate
+  let b ← stateless_token.is_thumbprint s
+  if b
+  then
+    let s1 := alloc.vec.Vec.deref state.login
+    let b1 ← stateless_token.is_id s1
+    if b1
+    then
+      let s2 := alloc.vec.Vec.deref state.provider
+      let b2 ← stateless_token.is_provider s2
+      if b2
+      then
+        let s3 := alloc.vec.Vec.deref state.replica
+        let b3 ← stateless_token.is_kid s3
+        if b3
+        then
+          let s4 := alloc.vec.Vec.deref state.scope
+          let b4 ← stateless_token.is_scope s4
+          if b4
+          then
+            let s5 := alloc.vec.Vec.deref state.subject
+            let b5 ← stateless_token.is_text s5
+            if b5
+            then
+              let s6 := alloc.vec.Vec.deref state.verifier
+              let b6 ← stateless_token.is_verifier s6
+              if b6
+              then
+                if state.certificate_expires >= 0#i64
+                then
+                  if state.certificate_expires <= stateless_token.MAX_INTEGER
+                  then
+                    if state.issued_at >= 0#i64
+                    then
+                      if state.issued_at <= stateless_token.MAX_INTEGER
+                      then
+                        if state.expires_at >= 0#i64
+                        then
+                          ok (state.expires_at <= stateless_token.MAX_INTEGER)
+                        else ok false
+                      else ok false
+                    else ok false
+                  else ok false
+                else ok false
+              else ok false
+            else ok false
+          else ok false
+        else ok false
+      else ok false
+    else ok false
+  else ok false
+
+/-- [aivm_secrets_garrett_core::stateless_token::state_bytes]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1239:0-1263:1
+    Visibility: public -/
+def stateless_token.state_bytes
+  (state : stateless_login.LoginState) : Result (alloc.vec.Vec Std.U8) := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 12#usize [
+        123#u8, 34#u8, 99#u8, 101#u8, 114#u8, 116#u8, 95#u8, 101#u8, 120#u8,
+        112#u8, 34#u8, 58#u8
+        ]))
+  let out ← stateless_token.append (alloc.vec.Vec.new Std.U8) s
+  let out1 ← stateless_token.append_natural out state.certificate_expires
+  let s1 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 99#u8, 110#u8, 102#u8, 34#u8, 58#u8
+        ]))
+  let out2 ← stateless_token.append out1 s1
+  let s2 := alloc.vec.Vec.deref state.certificate
+  let out3 ← stateless_token.append_quoted out2 s2
+  let s3 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 101#u8, 120#u8, 112#u8, 34#u8, 58#u8
+        ]))
+  let out4 ← stateless_token.append out3 s3
+  let out5 ← stateless_token.append_natural out4 state.expires_at
+  let s4 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 105#u8, 97#u8, 116#u8, 34#u8, 58#u8
+        ]))
+  let out6 ← stateless_token.append out5 s4
+  let out7 ← stateless_token.append_natural out6 state.issued_at
+  let s5 ←
+    lift (Array.to_slice
+      (Array.make 9#usize [
+        44#u8, 34#u8, 108#u8, 111#u8, 103#u8, 105#u8, 110#u8, 34#u8, 58#u8
+        ]))
+  let out8 ← stateless_token.append out7 s5
+  let s6 := alloc.vec.Vec.deref state.login
+  let out9 ← stateless_token.append_quoted out8 s6
+  let s7 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 112#u8, 114#u8, 118#u8, 34#u8, 58#u8
+        ]))
+  let out10 ← stateless_token.append out9 s7
+  let s8 := alloc.vec.Vec.deref state.provider
+  let out11 ← stateless_token.append_quoted out10 s8
+  let s9 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 114#u8, 101#u8, 112#u8, 34#u8, 58#u8
+        ]))
+  let out12 ← stateless_token.append out11 s9
+  let s10 := alloc.vec.Vec.deref state.replica
+  let out13 ← stateless_token.append_quoted out12 s10
+  let s11 ←
+    lift (Array.to_slice
+      (Array.make 9#usize [
+        44#u8, 34#u8, 115#u8, 99#u8, 111#u8, 112#u8, 101#u8, 34#u8, 58#u8
+        ]))
+  let out14 ← stateless_token.append out13 s11
+  let s12 := alloc.vec.Vec.deref state.scope
+  let out15 ← stateless_token.append_quoted out14 s12
+  let s13 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 115#u8, 117#u8, 98#u8, 34#u8, 58#u8
+        ]))
+  let out16 ← stateless_token.append out15 s13
+  let s14 := alloc.vec.Vec.deref state.subject
+  let out17 ← stateless_token.append_quoted out16 s14
+  let s15 ←
+    lift (Array.to_slice
+      (Array.make 12#usize [
+        44#u8, 34#u8, 118#u8, 101#u8, 114#u8, 105#u8, 102#u8, 105#u8, 101#u8,
+        114#u8, 34#u8, 58#u8
+        ]))
+  let out18 ← stateless_token.append out17 s15
+  let s16 := alloc.vec.Vec.deref state.verifier
+  let out19 ← stateless_token.append_quoted out18 s16
+  alloc.vec.Vec.push out19 125#u8
+
+/-- [aivm_secrets_garrett_core::stateless_token::parse_state]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1266:0-1326:1
+    Visibility: public -/
+def stateless_token.parse_state
+  (bytes : Slice Std.U8) : Result (Option stateless_login.LoginState) := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 12#usize [
+        123#u8, 34#u8, 99#u8, 101#u8, 114#u8, 116#u8, 95#u8, 101#u8, 120#u8,
+        112#u8, 34#u8, 58#u8
+        ]))
+  let o ← stateless_token.number bytes 0#usize s
+  match o with
+  | none => ok none
+  | some found =>
+    let (certificate_expires, i) := found
+    let s1 ←
+      lift (Array.to_slice
+        (Array.make 7#usize [
+          44#u8, 34#u8, 99#u8, 110#u8, 102#u8, 34#u8, 58#u8
+          ]))
+    let o1 ← stateless_token.field bytes i s1
+    match o1 with
+    | none => ok none
+    | some found1 =>
+      let (certificate, i1) := found1
+      let s2 ←
+        lift (Array.to_slice
+          (Array.make 7#usize [
+            44#u8, 34#u8, 101#u8, 120#u8, 112#u8, 34#u8, 58#u8
+            ]))
+      let o2 ← stateless_token.number bytes i1 s2
+      match o2 with
+      | none => ok none
+      | some found2 =>
+        let (expires_at, i2) := found2
+        let s3 ←
+          lift (Array.to_slice
+            (Array.make 7#usize [
+              44#u8, 34#u8, 105#u8, 97#u8, 116#u8, 34#u8, 58#u8
+              ]))
+        let o3 ← stateless_token.number bytes i2 s3
+        match o3 with
+        | none => ok none
+        | some found3 =>
+          let (issued_at, i3) := found3
+          let s4 ←
+            lift (Array.to_slice
+              (Array.make 9#usize [
+                44#u8, 34#u8, 108#u8, 111#u8, 103#u8, 105#u8, 110#u8, 34#u8,
+                58#u8
+                ]))
+          let o4 ← stateless_token.field bytes i3 s4
+          match o4 with
+          | none => ok none
+          | some found4 =>
+            let (login, i4) := found4
+            let s5 ←
+              lift (Array.to_slice
+                (Array.make 7#usize [
+                  44#u8, 34#u8, 112#u8, 114#u8, 118#u8, 34#u8, 58#u8
+                  ]))
+            let o5 ← stateless_token.field bytes i4 s5
+            match o5 with
+            | none => ok none
+            | some found5 =>
+              let (provider, i5) := found5
+              let s6 ←
+                lift (Array.to_slice
+                  (Array.make 7#usize [
+                    44#u8, 34#u8, 114#u8, 101#u8, 112#u8, 34#u8, 58#u8
+                    ]))
+              let o6 ← stateless_token.field bytes i5 s6
+              match o6 with
+              | none => ok none
+              | some found6 =>
+                let (replica, i6) := found6
+                let s7 ←
+                  lift (Array.to_slice
+                    (Array.make 9#usize [
+                      44#u8, 34#u8, 115#u8, 99#u8, 111#u8, 112#u8, 101#u8,
+                      34#u8, 58#u8
+                      ]))
+                let o7 ← stateless_token.field bytes i6 s7
+                match o7 with
+                | none => ok none
+                | some found7 =>
+                  let (scope, i7) := found7
+                  let s8 ←
+                    lift (Array.to_slice
+                      (Array.make 7#usize [
+                        44#u8, 34#u8, 115#u8, 117#u8, 98#u8, 34#u8, 58#u8
+                        ]))
+                  let o8 ← stateless_token.field bytes i7 s8
+                  match o8 with
+                  | none => ok none
+                  | some found8 =>
+                    let (subject, i8) := found8
+                    let s9 ←
+                      lift (Array.to_slice
+                        (Array.make 12#usize [
+                          44#u8, 34#u8, 118#u8, 101#u8, 114#u8, 105#u8, 102#u8,
+                          105#u8, 101#u8, 114#u8, 34#u8, 58#u8
+                          ]))
+                    let o9 ← stateless_token.field bytes i8 s9
+                    match o9 with
+                    | none => ok none
+                    | some found9 =>
+                      let (verifier, i9) := found9
+                      let i10 ← i9 + 1#usize
+                      let i11 := Slice.len bytes
+                      if i10 != i11
+                      then ok none
+                      else
+                        let i12 ← Slice.index_usize bytes i9
+                        if i12 != 125#u8
+                        then ok none
+                        else
+                          let b ←
+                            stateless_token.state_valid
+                              {
+                                login,
+                                provider,
+                                certificate,
+                                subject,
+                                certificate_expires,
+                                replica,
+                                scope,
+                                verifier,
+                                issued_at,
+                                expires_at
+                              }
+                          if b
+                          then
+                            ok (some
+                              {
+                                login,
+                                provider,
+                                certificate,
+                                subject,
+                                certificate_expires,
+                                replica,
+                                scope,
+                                verifier,
+                                issued_at,
+                                expires_at
+                              })
+                          else ok none
+
+/-- [aivm_secrets_garrett_core::stateless_token::seal_state]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1329:0-1347:1
+    Visibility: public -/
+def stateless_token.seal_state
+  {K : Type _} (StateKeyInst : stateless_token.StateKey K) (key : K)
+  (state : stateless_login.LoginState) (nonce : Slice Std.U8) :
+  Result (Option (alloc.vec.Vec Std.U8))
+  := do
+  let i := Slice.len nonce
+  if i != stateless_token.NONCE
+  then ok none
+  else
+    let b ← stateless_token.state_valid state
+    if b
+    then
+      let v ← stateless_token.state_bytes state
+      let s := alloc.vec.Vec.deref v
+      let o ← StateKeyInst.«seal» key nonce stateless_token.LOGIN_LABEL s
+      match o with
+      | none => ok none
+      | some ciphertext =>
+        let sealed ← stateless_token.append (alloc.vec.Vec.new Std.U8) nonce
+        let s1 := alloc.vec.Vec.deref ciphertext
+        let sealed1 ← stateless_token.append sealed s1
+        let out ←
+          stateless_token.append (alloc.vec.Vec.new Std.U8)
+            stateless_token.STATE_PREFIX
+        let s2 := alloc.vec.Vec.deref sealed1
+        let v1 ← stateless_token.b64url s2
+        let s3 := alloc.vec.Vec.deref v1
+        let out1 ← stateless_token.append out s3
+        let i1 := alloc.vec.Vec.len out1
+        if i1 > stateless_token.MAX_STATE
+        then ok none
+        else ok (some out1)
+    else ok none
+
+/-- [aivm_secrets_garrett_core::stateless_token::open_state]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_token.rs', lines 1350:0-1373:1
+    Visibility: public -/
+def stateless_token.open_state
+  {K : Type _} (StateKeyInst : stateless_token.StateKey K) (key : K)
+  (text : Slice Std.U8) :
+  Result (core.result.Result stateless_login.LoginState stateless.Rejection)
+  := do
+  let i := Slice.len text
+  if i > stateless_token.MAX_STATE
+  then ok (core.result.Result.Err stateless.Rejection.Malformed)
+  else
+    let i1 := Slice.len text
+    let i2 := Slice.len stateless_token.STATE_PREFIX
+    if i1 < i2
+    then ok (core.result.Result.Err stateless.Rejection.Malformed)
+    else
+      let i3 := Slice.len stateless_token.STATE_PREFIX
+      let «prefix» ←
+        core.slice.index.Slice.index
+          (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) text
+          { «end» := i3 }
+      let b ←
+        core.cmp.impls.PartialEqShared.ne (Slice.Insts.CoreCmpPartialEqSlice
+          core.cmp.PartialEqU8) «prefix» stateless_token.STATE_PREFIX
+      if b
+      then ok (core.result.Result.Err stateless.Rejection.Malformed)
+      else
+        let i4 := Slice.len stateless_token.STATE_PREFIX
+        let s ←
+          core.slice.index.Slice.index
+            (core.slice.index.SliceIndexRangeFromUsizeSlice Std.U8) text
+            { start := i4 }
+        let o ← stateless_token.from_b64url s
+        match o with
+        | none => ok (core.result.Result.Err stateless.Rejection.Malformed)
+        | some sealed =>
+          let i5 := alloc.vec.Vec.len sealed
+          let i6 ← stateless_token.NONCE + stateless_token.TAG
+          let i7 ← i6 + 1#usize
+          if i5 < i7
+          then ok (core.result.Result.Err stateless.Rejection.Malformed)
+          else
+            let s1 ←
+              alloc.vec.Vec.index (core.slice.index.SliceIndexRangeToUsizeSlice
+                Std.U8) sealed { «end» := stateless_token.NONCE }
+            let s2 ←
+              alloc.vec.Vec.index
+                (core.slice.index.SliceIndexRangeFromUsizeSlice Std.U8) sealed
+                { start := stateless_token.NONCE }
+            let o1 ←
+              StateKeyInst.«open» key s1 stateless_token.LOGIN_LABEL s2
+            match o1 with
+            | none =>
+              ok (core.result.Result.Err stateless.Rejection.Undecryptable)
+            | some plain =>
+              let s3 := alloc.vec.Vec.deref plain
+              let o2 ← stateless_token.parse_state s3
+              match o2 with
+              | none =>
+                ok (core.result.Result.Err stateless.Rejection.Malformed)
+              | some state => ok (core.result.Result.Ok state)
 
 /-- [aivm_secrets_garrett_core::trust::TrustDenial]
     Source: 'crates/aivm-secrets-garrett-core/src/trust.rs', lines 5:0-9:1
