@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import ast
+import os
+import re
 from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
@@ -11,7 +13,17 @@ from aivis.diagram import Diagram, validate
 
 VIS_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = VIS_ROOT.parent
-STORYBOARD = VIS_ROOT / 'storyboards/overview.toml'
+# A named storyboard selects a separate, independent presentation.  The
+# default stays backward-compatible with the original visualization deck.
+STORYBOARD_NAME = os.environ.get('AIVIS_STORYBOARD', 'overview')
+if not re.fullmatch(r'[a-z][a-z0-9_]*', STORYBOARD_NAME):
+    raise ValueError('AIVIS_STORYBOARD must be a simple storyboard name')
+STORYBOARD = VIS_ROOT / 'storyboards' / f'{STORYBOARD_NAME}.toml'
+
+
+def build_root() -> Path:
+    base = VIS_ROOT / '.build'
+    return base if STORYBOARD_NAME == 'overview' else base / STORYBOARD_NAME
 STATUSES = {'architecture', 'source-linked-controller', 'conditional-model', 'assumption', 'open'}
 
 
@@ -54,16 +66,16 @@ def load_catalog(path: Path = STORYBOARD) -> tuple[dict, tuple[SceneInfo, ...]]:
     return deck, scenes
 
 
-def get_scene(scene_id: str) -> SceneInfo:
-    _, scenes = load_catalog()
+def get_scene(scene_id: str, *, path: Path = STORYBOARD) -> SceneInfo:
+    _, scenes = load_catalog(path)
     for scene in scenes:
         if scene.id == scene_id:
             return scene
     raise ValueError(f'unknown scene {scene_id!r}; choose: {", ".join(s.id for s in scenes)}')
 
 
-def validate_catalog() -> tuple[SceneInfo, ...]:
-    _, scenes = load_catalog()
+def validate_catalog(path: Path = STORYBOARD) -> tuple[SceneInfo, ...]:
+    _, scenes = load_catalog(path)
     for scene in scenes:
         if scene.status not in STATUSES or not scene.claim.strip() or not scene.narration.strip():
             raise ValueError(f'{scene.id}: missing classification / claim / narration')

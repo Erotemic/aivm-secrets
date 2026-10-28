@@ -64,3 +64,15 @@ The ability to animate a protocol is not a formal correctness claim.
 - Check vector PDF readability by rendering representative pages and confirming
   page count and selectable text. Never let a storyboard's `implemented`
   label imply whole-service proof coverage.
+
+## Separate original Garrett protocol storyboard
+
+`storyboards/garrett_protocol.toml` is selected with
+`AIVIS_STORYBOARD=garrett_protocol`; it must remain an independent deck from
+`overview.toml`. Edit `aivis/plans/garrett_protocol_*.py` for geometry and
+beats. Select it with `make garrett-gallery` or `make garrett-all`.
+The build root `.build/garrett_protocol/` must stay separate from the default
+`.build/` outputs. Do not mix the stateful `aivs1` grant envelope into this
+stateless JWT (`enc` contains the original provider credential directly).
+This is a pedagogical explanation; distinguish blog design, v1-specific
+wire/crypto choices and proven implementation properties.

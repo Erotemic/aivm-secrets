@@ -65,7 +65,7 @@ def build_gallery(target: Path, *, theme: str = 'dark',
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>aivm-secrets | where information goes</title>
+<title>__DECK_TITLE__</title>
 <style>
 :root{color-scheme:dark;font-family:system-ui,-apple-system,"DejaVu Sans",sans-serif;background:#0b1422;color:#eff6fb}
 *{box-sizing:border-box} body{max-width:1500px;margin:0 auto;padding:18px 22px 40px}
@@ -178,5 +178,5 @@ sceneSelect.value=scenes[0].id;selectedChanged();
 </body></html>
 '''
     target.parent.mkdir(parents=True,exist_ok=True)
-    target.write_text(template.replace('__PAYLOAD__', encoded).replace('__PDF_LINKS__', pdf_links), encoding='utf-8')
+    target.write_text(template.replace('__PAYLOAD__', encoded).replace('__PDF_LINKS__', pdf_links).replace('__DECK_TITLE__', html_escape(deck['title'])), encoding='utf-8')
     return target

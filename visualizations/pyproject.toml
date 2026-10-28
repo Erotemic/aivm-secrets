@@ -6,7 +6,7 @@ requires-python = ">=3.11,<3.15"
 dependencies = []
 
 [project.optional-dependencies]
-manim = ["manim>=0.19,<0.20"]
+manim = ["manim>=0.19,<0.20", "manim-slides>=5.1,<6"]
 pdf = ["cairosvg>=2.7,<3", "pypdf>=5,<7"]
 test = ["pytest>=8"]
 

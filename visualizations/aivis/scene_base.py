@@ -6,8 +6,13 @@ Manim methods. Heavy Manim imports are isolated here, not in pure plans.
 from __future__ import annotations
 
 import os
+from pathlib import Path
+
 from manim import (Circumscribe, Create, FadeIn, FadeOut, MoveAlongPath,
-                   RoundedRectangle, Scene, Text, VGroup, DOWN, UP)
+                   RoundedRectangle, Text, VGroup, DOWN, UP)
+from manim import ManimColor
+from manim_slides import Slide
+
 
 from aivis.components.graphics import (
     edge_group, knowledge_card, link_path, node_card, package_group,
@@ -15,10 +20,27 @@ from aivis.components.graphics import (
 )
 from aivis.diagram import Diagram, layer_geometry, validate
 from aivis.palette import palette
+from aivis.catalog import VIS_ROOT
 
 
-class DiagramScene(Scene):
+class DiagramScene(Slide):
+    """Animated storyboard: one presenter-controlled build per Beat.
+
+    Identical to the DKPS Manim Slides model. Each scene renders independently
+    and the converter presents the ordered scenes as a single linear deck.
+    """
     PLAN: Diagram
+    skip_reversing = True
+
+    def __init__(self, *args, **kwargs):
+        # BaseSlide accepts a pathlib.Path and uses `/` to append "files".
+        # Environment variables (and CLI paths) are strings; normalize at the
+        # boundary so a complete render does not fail when writing slide JSON.
+        folder = kwargs.get('output_folder')
+        if folder is None:
+            folder = os.environ.get('AIVIS_SLIDES_DIR') or VIS_ROOT / '.build/slides'
+        kwargs['output_folder'] = Path(folder)
+        super().__init__(*args, **kwargs)
 
     def construct(self) -> None:
         self.draw_plan()
@@ -30,7 +52,7 @@ class DiagramScene(Scene):
         speed=float(os.environ.get('AIVIS_SPEED','1.0'))
         if not 0.1 <= speed <= 10:
             raise ValueError('AIVIS_SPEED must be in [0.1,10]')
-        self.camera.background_color=colors['background']
+        self.camera.background_color = ManimColor.from_hex(colors["background"])
         title=text_label(plan.title,colors,font_size=36)
         title.move_to(xy((-1.0,3.36)))
         # Fit the subtitle between the frame's left edge and the status badge.
@@ -59,7 +81,11 @@ class DiagramScene(Scene):
         prev_caption=None
         prev_status=None
         for beat_index, stage in enumerate(plan.beats):
-            self.next_section(stage.key)
+            # The first build plays on opening this scene. After it finishes,
+            # presentation waits for a click before starting the next beat.
+            # Slide.next_section is an alias of next_slide: do not call both.
+            if beat_index:
+                self.next_slide(notes=f'{stage.caption}\n\nStatus: {stage.status}')
             motion=[Create(routes[k]) for k in stage.links if k not in shown_links]
             motion += [FadeIn(cards[k],shift=UP*0.04) for k in stage.nodes if k not in shown_nodes]
             for pk in plan.visible_packages(beat_index):
@@ -116,3 +142,6 @@ class DiagramScene(Scene):
                                                    fade_out=True,time_width=0.5),
                                       run_time=0.55/speed)
             self.wait(stage.hold/speed)
+        # Preserve the last fully drawn frame when Manim cuts the movie into
+        # presenter-controlled build clips.
+        self.wait(0.1)

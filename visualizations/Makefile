@@ -29,6 +29,8 @@ help:
 	@echo '  make still SCENE=gh_diff   Manim still image'
 	@echo '  make list | storyboard | check | test'
 	@echo '  make watch-all             watch edits and refresh videos + PDFs + HTML'
+	@echo '  make garrett-gallery       standalone original Garrett protocol, HTML (no Manim)'
+	@echo '  make garrett-all           standalone original Garrett protocol, 8 Manim videos'
 	@echo '  make setup                 install Manim, PDF and tests in .venv'
 	@echo '  make setup-pdf             install PDF tools only'
 	@echo '  make clean                 remove generated .build/ files'
@@ -77,3 +79,21 @@ test:
 	$(RUN_TEST) python -m pytest -q
 clean:
 	rm -rf .build
+
+# Independently rendered Garrett blog-protocol deck; does not alter overview.
+.PHONY: garrett-check garrett-gallery garrett-pdf garrett-render garrett-all
+
+garrett-check:
+	AIVIS_STORYBOARD=garrett_protocol $(RUN) python -m aivis check
+
+garrett-gallery:
+	AIVIS_STORYBOARD=garrett_protocol $(RUN) python -m aivis gallery --theme $(THEME)
+
+garrett-pdf:
+	AIVIS_STORYBOARD=garrett_protocol $(RUN_PDF) python -m aivis pdf --kind both --theme $(THEME)
+
+garrett-render:
+	AIVIS_STORYBOARD=garrett_protocol $(RUN_MANIM) python -m aivis render $(SCENE) --quality $(QUALITY) --theme $(THEME)
+
+garrett-all:
+	AIVIS_STORYBOARD=garrett_protocol $(RUN_MANIM) python -m aivis all --quality $(QUALITY) --theme $(THEME)

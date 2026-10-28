@@ -13,11 +13,11 @@ from pathlib import Path
 import shutil
 from typing import Callable, Mapping
 
-from aivis.catalog import VIS_ROOT, SceneInfo, load_catalog
+from aivis.catalog import VIS_ROOT, SceneInfo, build_root, load_catalog
 from aivis.gallery import build_gallery
 
-MEDIA = VIS_ROOT / '.build/media'
-PRESENTATION = VIS_ROOT / '.build/presentation'
+MEDIA = build_root() / 'media'
+PRESENTATION = build_root() / 'presentation'
 MANIFEST = PRESENTATION / 'manifest.json'
 COMMON_SOURCES = (
     'aivis/diagram.py',
@@ -41,6 +41,8 @@ def scene_fingerprint(scene: SceneInfo, *, quality: str, theme: str,
     """
     hasher=hashlib.sha256()
     inputs=[scene.file, scene.plan.replace('.','/')+'.py', *COMMON_SOURCES]
+    if scene.id.startswith('gp_'):
+        inputs.append('aivis/plans/garrett_protocol_helpers.py')
     inputs+=sorted(str(p.relative_to(VIS_ROOT))
                    for p in (VIS_ROOT/'aivis/assets/icons').glob('*.svg'))
     for rel in sorted(set(inputs)):

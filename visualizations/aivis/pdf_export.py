@@ -12,10 +12,10 @@ import os
 from pathlib import Path
 from typing import Iterable
 
-from aivis.catalog import VIS_ROOT, SceneInfo, get_scene, load_catalog
+from aivis.catalog import VIS_ROOT, SceneInfo, build_root, get_scene, load_catalog
 from aivis.svg_preview import render_svg
 
-PDF_DIR = VIS_ROOT / '.build' / 'pdfs'
+PDF_DIR = build_root() / 'pdfs'
 
 
 def _pdf_dependencies():

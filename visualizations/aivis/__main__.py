@@ -15,12 +15,12 @@ import subprocess
 import sys
 import time
 
-from aivis.catalog import VIS_ROOT, get_scene, load_catalog, validate_catalog
+from aivis.catalog import VIS_ROOT, build_root, get_scene, load_catalog, validate_catalog
 from aivis.svg_preview import write_preview
 from aivis.gallery import build_gallery
 
 
-BUILD = VIS_ROOT / '.build'
+BUILD = build_root()
 
 
 def render_command(scene_id: str, *, quality: str = 'l', still: bool = False,

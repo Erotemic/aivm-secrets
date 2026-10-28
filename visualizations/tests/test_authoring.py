@@ -162,6 +162,10 @@ def test_cli_render_is_safe_and_per_scene(capsys):
     assert '-s' in cmd and '-ql' in cmd
     assert env['AIVIS_THEME']=='light'
     assert env['AIVIS_SPEED']=='1.4'
+    assert env['AIVIS_SLIDES_DIR'].endswith('/.build/slides')
+    motion, _ = render_command('gh_diff', quality='l')
+    assert motion[1:5] == ['-m', 'manim_slides', 'render', '--quality=l']
+    assert motion[-2:] == cmd[-2:]
     assert main(['list'])==0
     assert 'packaging' in capsys.readouterr().out
     assert main(['storyboard'])==0
@@ -245,48 +249,95 @@ def test_party_icons_shared_by_svg_and_manim():
         icon_art('nonexistent.svg')
 
 
-def test_presentation_build_renders_only_changed_scenes(tmp_path,monkeypatch):
+def test_presentation_build_renders_only_changed_scenes(tmp_path, monkeypatch):
     from aivis import presentation
-    destination=tmp_path/'presentation'
-    monkeypatch.setattr(presentation,'PRESENTATION',destination)
-    monkeypatch.setattr(presentation,'MANIFEST',destination/'manifest.json')
-    revisions={}
-    fingerprint=presentation.scene_fingerprint
-    monkeypatch.setattr(presentation,'scene_fingerprint',
-                        lambda info,**kw:fingerprint(info,**kw)+str(revisions.get(info.id,0)))
-    calls=[]
+    destination = tmp_path / 'presentation'
+    slides_dir = tmp_path / 'slides'
+    monkeypatch.setattr(presentation, 'PRESENTATION', destination)
+    monkeypatch.setattr(presentation, 'MANIFEST', destination / 'manifest.json')
+    monkeypatch.setattr(presentation, 'SLIDES', slides_dir)
+    revisions = {}
+    fingerprint = presentation.scene_fingerprint
+    monkeypatch.setattr(presentation, 'scene_fingerprint',
+                        lambda info, **kw: fingerprint(info, **kw) + str(revisions.get(info.id, 0)))
+    calls = []
+    conversions = []
+
     def render(scene_id):
         calls.append(scene_id)
-        path=tmp_path/'renders'/f'{scene_id}.mp4'
-        path.parent.mkdir(exist_ok=True)
-        path.write_bytes((scene_id+' '+str(len(calls))).encode())
-        return path
-    output,changed=presentation.build_presentation(render_scene=render)
-    assert list(changed)==SCENES
-    assert output.is_file()
-    assert all((destination/'videos'/f'{scene}.mp4').is_file() for scene in SCENES)
-    assert 'videos/garrett_present.mp4' in output.read_text()
+        scene = get_scene(scene_id)
+        clip = tmp_path / 'rendered' / f'{scene_id}.mp4'
+        clip.parent.mkdir(exist_ok=True)
+        clip.write_bytes((scene_id + ' ' + str(len(calls))).encode())
+        metadata = presentation.slide_metadata(scene)
+        metadata.parent.mkdir(exist_ok=True)
+        metadata.write_text(json.dumps({'slides': [{'file': str(clip)}]}))
+        return metadata
+
+    def convert(output):
+        conversions.append(output)
+        output.write_text('<html><body>linear Manim Slides presentation</body></html>')
+        return output
+
+    output, changed = presentation.build_presentation(render_scene=render, convert=convert)
+    assert list(changed) == SCENES
+    assert 'linear Manim Slides presentation' in output.read_text()
+    assert len(conversions) == 1
+    assert all(presentation.valid_slide_metadata(get_scene(scene)) for scene in SCENES)
+    assert json.loads(presentation.MANIFEST.read_text())['format'] == 2
+
     calls.clear()
-    output,changed=presentation.build_presentation(render_scene=render)
-    assert changed==() and calls==[]
-    revisions['garrett_enroll']=1
-    output,changed=presentation.build_presentation(render_scene=render)
-    assert changed==('garrett_enroll',) and calls==['garrett_enroll']
+    output, changed = presentation.build_presentation(render_scene=render, convert=convert)
+    assert changed == () and calls == []
+    assert len(conversions) == 2  # HTML rebuilt even when cached animations remain
+
+    revisions['garrett_enroll'] = 1
+    output, changed = presentation.build_presentation(render_scene=render, convert=convert)
+    assert changed == ('garrett_enroll',) and calls == ['garrett_enroll']
     calls.clear()
-    output,changed=presentation.build_presentation(render_scene=render,theme='light')
-    assert len(changed)==len(SCENES)
-    assert calls==SCENES
-    assert 'id="video"' in output.read_text()
-    assert 'id="motion"' in output.read_text()
+
+    output, changed = presentation.build_presentation(render_scene=render, convert=convert, theme='light')
+    assert len(changed) == len(SCENES)
+    assert calls == SCENES
+
+    # Missing Manim Slides metadata or a deleted fragment must force rebuild.
+    calls.clear()
+    scene = get_scene('garrett_issue')
+    path = presentation.slide_metadata(scene)
+    path.unlink()
+    assert not presentation.valid_slide_metadata(scene)
+    output, changed = presentation.build_presentation(render_scene=render, convert=convert, theme='light')
+    assert changed == ('garrett_issue',) and calls == ['garrett_issue']
 
 
-def test_presentation_failed_scene_does_not_commit_cache(tmp_path,monkeypatch):
+def test_presentation_failed_scene_does_not_commit_cache(tmp_path, monkeypatch):
     from aivis import presentation
-    dest=tmp_path/'presentation'
-    monkeypatch.setattr(presentation,'PRESENTATION',dest)
-    monkeypatch.setattr(presentation,'MANIFEST',dest/'manifest.json')
+    dest = tmp_path / 'presentation'
+    slides_dir = tmp_path / 'slides'
+    monkeypatch.setattr(presentation, 'PRESENTATION', dest)
+    monkeypatch.setattr(presentation, 'MANIFEST', dest / 'manifest.json')
+    monkeypatch.setattr(presentation, 'SLIDES', slides_dir)
+
     def abort(scene_id):
         raise RuntimeError('Manim failed')
-    with pytest.raises(RuntimeError,match='Manim failed'):
+
+    with pytest.raises(RuntimeError, match='Manim failed'):
         presentation.build_presentation(render_scene=abort)
-    assert not (dest/'manifest.json').exists()
+    assert not (dest / 'manifest.json').exists()
+
+    def render(scene_id):
+        scene = get_scene(scene_id)
+        clip = tmp_path / 'rendered' / f'{scene_id}.mp4'
+        clip.parent.mkdir(exist_ok=True)
+        clip.write_bytes(b'clip')
+        path = presentation.slide_metadata(scene)
+        path.parent.mkdir(exist_ok=True)
+        path.write_text(json.dumps({'slides': [{'file': str(clip)}]}))
+        return path
+
+    def abort_convert(output):
+        raise RuntimeError('converter failed')
+
+    with pytest.raises(RuntimeError, match='converter failed'):
+        presentation.build_presentation(render_scene=render, convert=abort_convert)
+    assert not (dest / 'manifest.json').exists()

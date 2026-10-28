@@ -255,3 +255,54 @@ The extracted Rust controller proofs cover selected authorization and
 projection decisions. **W6 still needs to connect them to every concrete I/O
 path; W8 covers the deployment's VM/channel isolation assumptions.** The
 animations never stand in for those obligations.
+
+## Separate deck: Garrett's **original stateless protocol**
+
+The main `overview.toml` mixes the AIVM host's stateful `aivs1` capability
+and policy architecture with some Garrett-inspired concepts. It must **not**
+be presented as a literal depiction of the protocol in Matthew Garrett's
+[July 2, 2026 article](https://codon.org.uk/~mjg59/blog/p/securing-agentic-identity/).
+
+A new, independently selected storyboard in
+`storyboards/garrett_protocol.toml` explains **the original stateless surrogate
+protocol** using eight animated scenes. The same `Diagram` source drives
+Manim, vector SVG and the HTML storyboard. Its program and key inventories
+show which processes hold `Kseal`, `skIssuer`, `pkIssuer`, and `skAgent`;
+its X-ray distinguishes a *signed, readable JWT* from the `enc` field that
+contains the AES-GCM ciphertext. It does **not** insert an inner `aivs1`
+capability or credential database that Garrett's proposal does not require.
+
+```bash
+cd visualizations
+make garrett-check
+make garrett-gallery         # no Manim; open .build/garrett_protocol/storyboard.html
+make garrett-pdf             # optional pdf extra; prints every animation beat
+make garrett-render SCENE=gp_keys QUALITY=l
+make garrett-render SCENE=gp_packet QUALITY=l
+make garrett-all QUALITY=l # all eight Manim clips + independent HTML presentation
+```
+
+The standalone outputs live under `.build/garrett_protocol/` instead of
+`.build/presentation/`, so rendering this deck cannot overwrite the existing
+presentation. To preview a specific animation checkpoint without Manim:
+
+```bash
+AIVIS_STORYBOARD=garrett_protocol uv run python -m aivis preview gp_request --beat binding
+```
+
+The storyboard order is: `gp_programs`, `gp_keys`, `gp_issue`, `gp_packet`,
+`gp_request`, `gp_replay`, `gp_replicas`, `gp_compromise`.
+
+This is an **architecture explanation**, not a formal verification result.
+`garrett-stateless-v1` is the concrete implementation used for the diagram's
+algorithm and claim names (Ed25519, AES-256-GCM, JWT `enc`, `cnf`). Garrett's
+blog does not prescribe those particular encodings. The login example uses
+OAuth, but credential acquisition is separable from the sealing mechanism.
+
+The broker transiently receives the original provider token and could decrypt
+compatible surrogates because it has `Kseal`; the proxy likewise has `Kseal`.
+Neither needs a token database. mTLS prevents a stolen surrogate from being
+used through an honest proxy without the bound client private key; it does
+**not** prevent a fully compromised proxy with `Kseal` from decrypting a
+captured surrogate. No general provider-response sanitization guarantee is
+implied by Garrett's original proposal.
