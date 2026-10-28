@@ -275,8 +275,15 @@ for the same `prv`, `cnf`, `sub`, `scope`, `upstream` and credential, with
 credential, provider and agent certificate directly, for API keys or
 synthetic tests. It uses the same window and sealing. It reads only the broker
 configuration's issuance policy (issuer, audience, providers, lifetimes) and
-the broker key file: it starts no listener and reads no OAuth client or client
-secret, and it refuses an active key whose issuer is not the broker's.
+the broker key file: it starts no listener, never opens the configuration's
+TLS certificate, key or CA files (they are parsed as paths only), reads no
+OAuth client or client secret, and refuses an active key whose issuer is not
+the broker's. `mint` accepts any configured provider. For an `oauth` provider
+it is a **trusted operator override**: the operator vouches for a credential
+the broker did not obtain, whose lifetime the broker does not know
+(`credential_expires = +∞`, as for `provisioned`). The protocol model treats
+every mint as an issuance root (`Source.mint`), whatever the provider's
+adapter.
 
 ### 7.1 Credential acquisition adapters
 
@@ -300,7 +307,8 @@ interface:
 Neither adapter's answer is an authorization decision. A `scope` the provider
 reports is copied into the informational `scope` claim, which no decision
 reads; what a surrogate may do at the provider is decided by the provider's
-own credential and, at the proxy, by the deny rules.
+own credential and, at the proxy, by the deny rules and the operation policy
+(section 11.1).
 
 ## 8. Agent-initiated OAuth acquisition
 
@@ -510,7 +518,8 @@ The proxy is an mTLS **reverse proxy**. Clients point their API base URL at
 `bearer` (`Authorization: Bearer <credential>`) or `api-key`
 (`X-API-Key: <credential>`). `ca_file: null` means the system web PKI roots.
 `stateless` is `"standard"` (the default) or `"strict"` (section 9; refuses
-`audit`). Per request, the extracted `stateless_proxy::decide` makes the
+`audit`). `read_only`, when present, makes this a read-only proxy (section
+11.1). Per request, the extracted `stateless_proxy::decide` makes the
 decision (steps 1-5) and `stateless_proxy::serve` performs it (steps 6-7):
 
 1. Parse the request strictly (the existing `proxy_http::parse_request`). The
@@ -518,12 +527,16 @@ decision (steps 1-5) and `stateless_proxy::serve` performs it (steps 6-7):
 2. Exactly one `Authorization` field, of the form `Bearer <surrogate>`,
    `token <surrogate>`, or `Basic b64(<user>:<surrogate>)` (for stock Git and
    GitHub clients). Anything else → `401`.
-3. Open the surrogate (section 5) with `peer` from this connection's
-   handshake. Any rejection → the fixed `401` response
+3. Authenticate the surrogate (section 5: verify, then admit) with `peer`
+   from this connection's handshake. Any rejection → the fixed `401` response
    (`WWW-Authenticate: Bearer realm="garrett-stateless", error="invalid_token"`).
    The reason goes to the proxy's diagnostics, not to the client.
 4. The route is the one whose `provider` equals the token's `prv`. **The
    destination is chosen by the authenticated token, never by the request.**
+   Then the proxy's operation policy (section 11.1) decides the request's
+   operation for the authenticated claims; a refusal is `403`, `denied`.
+   Only then is the credential decrypted (section 5's last step; a failure is
+   the fixed `401`).
 5. Encode the upstream request with the existing `proxy_http::encode_upstream`:
    - drop the client's credential-bearing and hop-by-hop fields;
    - set `Host` to the route `host`;
@@ -544,9 +557,49 @@ the limits of the strict HTTP/1.1 subset documented in
 `Expect`, `Range`, request trailers, HTTP/2, compressed response encodings, and
 upstream responses other than HTTP/1.1 (an `HTTP/1.0` status line is refused
 as `outcome_unknown`).
-The proxy does not restrict *which* provider API operations a token can call
-(beyond deny rules). Authority confinement is the provider's scope or the
-stateful profile's job.
+Garrett's proxy (no `read_only`) does not restrict *which* provider API
+operations a token can call, beyond deny rules: the surrogate alone
+authorizes. A read-only proxy does (section 11.1). Finer authority
+confinement is the provider's scope or the stateful profile's job.
+
+### 11.1 Operation policies
+
+Every proxy has exactly one static **operation policy**, a closed choice of
+two (`stateless_policy`; there is no policy plugin interface):
+
+| | Garrett's proxy (`unrestricted`, the default) | read-only proxy (`read-only`) |
+| --- | --- | --- |
+| Configured by | no `read_only` member | `"read_only": [resource, ...]` (1-64) |
+| Permits | every operation (deny rules still apply in step 5) | `GET` or `HEAD`, with no body, matching a resource |
+| Destination | the route of the surrogate's `prv` | the same, and `prv` must be a resource's `provider` |
+
+A resource is `{"provider": P, "path": "/x", "method": "GET"}`. `provider`
+must name a route; `method` is optional (`GET` or `HEAD`; absent means
+either); `path` is matched like a deny rule's path: exactly, with one added
+trailing `/`, and, for a path ending in `/`, that path without its `/` or
+anything under it. The path compared is the request target up to any `?`, the
+same path the deny rules check; the query is forwarded unchanged.
+
+```json
+"read_only":[{"provider":"github","path":"/user"},
+             {"provider":"github","method":"GET","path":"/repos/octo/demo/"}]
+```
+
+The policy is a pure function of the surrogate's **authenticated claims** and
+the request's `Operation` (method, path, body length). It never sees the
+credential, the surrogate or any upstream bytes, it is consulted before the
+credential is decrypted, and it is configuration, not state: two replicas
+with the same configuration decide alike, and a read-only proxy needs nothing
+the strict profile refuses. It is **not** a statelessness property, and the
+statelessness of section 9 is not an authorization property.
+
+What a read-only proxy guarantees is the request it lets through: its method,
+path, body and provider (`GarrettStatelessComposition`). That such a request
+only reads is the provider's API semantics: a provider that changes state on
+`GET`, honours a method override in the query string, or routes variant
+spellings of a path elsewhere is outside the guarantee
+(`STATELESS-OPS-01`). Each proxy prints its policy in its startup line
+(`"operations": "unrestricted"` or `"read-only"`).
 
 The proxy MAY write a diagnostics/audit line per request (route, status,
 `jti`, rejection reason; never credential or surrogate bytes). When an audit
@@ -642,4 +695,5 @@ requires separate from what this profile chose to fill in.
 | `exp`/`ren` lifetimes, stateless renewal, no refresh tokens | the article does not discuss expiry or refresh |
 | Key-set rotation and `kid` retirement as bulk revocation | the article does not discuss revocation |
 | Reverse proxy; destination chosen by the authenticated `prv`; deny rules; reflected-credential refusal | the article says "a proxy" without a shape; these keep it from being an open relay |
+| Static operation policy: Garrett's unrestricted proxy, or a read-only proxy (§11.1) | the article authorizes by the token alone; a read-only proxy narrows what one surrogate can do without any state |
 | Python and Rust implementations, conformance vectors, Lean proofs | this project's assurance goals |

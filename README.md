@@ -26,7 +26,8 @@ proxy swaps the real token in for ordinary API requests. Any number of proxy
 replicas accept the same surrogate without shared state. OAuth is optional: an
 API key the operator provisions needs no OAuth client or browser, and a
 `"stateless": "strict"` deployment keeps nothing but its keys and
-configuration. It ships as the
+configuration. A proxy can also be configured read-only, so that the same
+surrogate is limited to listed `GET`/`HEAD` resources there. It ships as the
 Python package `aivm_secrets.garrett_stateless` and the Rust crate
 `rust/crates/garrett-stateless`, and the two interoperate. Its Rust decisions,
 codecs and transitions are proved in Lean and composed into one internal
