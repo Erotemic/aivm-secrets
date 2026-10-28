@@ -1,0 +1,86 @@
+# Standalone explainer of Matthew Garrett's *stateless* broker/proxy proposal.
+# Do not confuse with the stateful aivs1 + grant composition in overview.toml.
+[deck]
+name = "garrett-protocol"
+title = "Garrett's stateless credential proxy"
+audience = "engineers and security reviewers learning the protocol"
+
+[[scene]]
+id = "gp_programs"
+file = "aivis/scenes/garrett_protocol_programs.py"
+class = "GarrettProtocolProgramsScene"
+plan = "aivis.plans.garrett_protocol_programs"
+status = "architecture"
+claim = "The browser, identity provider, broker, agent, proxy and API are six different roles; the real credential never needs to enter the agent process."
+narration = "Follow the color-coded messages. The browser handles human login, the identity provider issues real T to the trusted broker, and the broker returns surrogate S to the agent. Later the agent presents S to the trusted proxy, which opens it and contacts the provider API using real T. These roles might run on different machines."
+sources = ["docs/garrett-stateless-v1.md", "rust/crates/garrett-stateless/src/broker.rs", "rust/crates/garrett-stateless/src/proxy.rs"]
+
+[[scene]]
+id = "gp_keys"
+file = "aivis/scenes/garrett_protocol_keys.py"
+class = "GarrettProtocolKeysScene"
+plan = "aivis.plans.garrett_protocol_keys"
+status = "architecture"
+claim = "The broker has the signing private key and shared sealing key; the proxy has the signing public key and shared sealing key; the agent has only its own client identity private key and surrogate."
+narration = "The agent's skAgent proves its client identity over mTLS; it is not an AES decryption share. Kseal is available to broker and proxy, and either can decrypt any compatible captured surrogate. Real token T is transient in those trusted processes. The v1 broker also has a separate OAuth login-state key, never given to proxies."
+sources = ["docs/garrett-stateless-v1.md", "rust/crates/garrett-stateless/src/keys.rs"]
+
+[[scene]]
+id = "gp_issue"
+file = "aivis/scenes/garrett_protocol_issue.py"
+class = "GarrettProtocolIssueScene"
+plan = "aivis.plans.garrett_protocol_issue"
+status = "architecture"
+claim = "After authenticating the intended agent certificate, the broker receives real T, seals it with Kseal, includes its ciphertext in a JWT claim, signs the JWT with skIssuer and returns S without persisting T."
+narration = "Garrett's post describes browser authentication and OAuth credential acquisition. The agent supplies an authenticated client certificate for binding. The credential T goes to the broker rather than the agent. The broker constructs S and can forget T: all the information required to recover it is inside the encrypted enc claim. OAuth itself is not cryptographically required by this isolation pattern."
+sources = ["docs/garrett-stateless-v1.md", "rust/crates/garrett-stateless/src/token.rs", "rust/crates/garrett-stateless/src/broker.rs"]
+
+[[scene]]
+id = "gp_packet"
+file = "aivis/scenes/garrett_protocol_packet.py"
+class = "GarrettProtocolPacketScene"
+plan = "aivis.plans.garrett_protocol_packet"
+status = "architecture"
+claim = "A signed JWT has readable header and payload; one field, enc, is AES-GCM ciphertext of T, authenticated with other claims as AAD."
+narration = "This is an X-ray diagram for the viewer. The agent can decode public JWT claims, including certificate binding, without learning T. The JWT signature proves broker issuance and detects tampering but provides no confidentiality. Only the enc field is encrypted. The original credential T is the plaintext inside that field; it is not an additional inner aivs1 vault capability."
+sources = ["docs/garrett-stateless-v1.md", "rust/crates/garrett-stateless/src/token.rs"]
+
+[[scene]]
+id = "gp_request"
+file = "aivis/scenes/garrett_protocol_request.py"
+class = "GarrettProtocolRequestScene"
+plan = "aivis.plans.garrett_protocol_request"
+status = "architecture"
+claim = "On a valid mTLS connection, the proxy verifies signature, policy, expiry and certificate binding before decrypting enc; only the recovered T is sent to the provider API."
+narration = "The proxy uses pkIssuer to verify the signed JWT. The mTLS stack authenticates the current client certificate, which must match the cnf thumbprint signed into S. Only then does the honest proxy use Kseal to recover T. The upstream provider receives real T and no surrogate. The proxy has decryption authority independently of the agent private key."
+sources = ["docs/garrett-stateless-v1.md", "rust/crates/garrett-stateless/src/token.rs", "rust/crates/garrett-stateless/src/proxy.rs"]
+
+[[scene]]
+id = "gp_replay"
+file = "aivis/scenes/garrett_protocol_replay.py"
+class = "GarrettProtocolReplayScene"
+plan = "aivis.plans.garrett_protocol_replay"
+status = "architecture"
+claim = "A stolen surrogate alone is not enough to make an honest proxy act; the presenter's mTLS private key must match the certificate bound into the surrogate."
+narration = "The attack Garrett discusses is an attacker who can reach the honest proxy from another machine and has copied S from an agent. Binding S to the agent certificate prevents replay by another certificate owner. It does not prevent a compromised original agent from using skAgent, or full proxy compromise."
+sources = ["docs/garrett-stateless-v1.md", "rust/crates/garrett-stateless/src/token.rs", "rust/crates/garrett-stateless/src/proxy.rs"]
+
+[[scene]]
+id = "gp_replicas"
+file = "aivis/scenes/garrett_protocol_replicas.py"
+class = "GarrettProtocolReplicasScene"
+plan = "aivis.plans.garrett_protocol_replicas"
+status = "architecture"
+claim = "Each replica has startup-injected cryptographic configuration; neither broker nor proxy needs a persistent database of issued credentials or an S-to-T mapping."
+narration = "Each surrogate is self-contained. Two broker replicas can issue compatible surrogates with the signing and sealing keys; two proxy replicas can independently verify and open them. No per-token lookup is required. This is the blog's operational simplification, not a claim that keys no longer need secure provisioning or rotation. Our actual OAuth login adapter has volatile pending-login state that may require routing."
+sources = ["docs/garrett-stateless-v1.md", "rust/crates/garrett-stateless/src/keys.rs", "rust/crates/garrett-stateless/src/proxy.rs"]
+
+[[scene]]
+id = "gp_compromise"
+file = "aivis/scenes/garrett_protocol_compromise.py"
+class = "GarrettProtocolCompromiseScene"
+plan = "aivis.plans.garrett_protocol_compromise"
+status = "architecture"
+claim = "A fully compromised proxy can leak the shared sealing key or transient plaintext credentials; mTLS binding is not a cryptographic barrier to offline decryption."
+narration = "Accessing the legitimate proxy over the network is not the same as controlling its process. A proxy with Kseal can decrypt any obtained compatible surrogate, even if the associated agent is absent. Statelessness avoids a centralized credential database, but protecting Kseal and the proxy process remains essential."
+sources = ["docs/garrett-stateless-v1.md", "rust/crates/garrett-stateless/src/keys.rs", "rust/crates/garrett-stateless/src/token.rs"]

@@ -1,0 +1,50 @@
+"""One authorized request: certificate binding BEFORE decryption."""
+from aivis.diagram import Beat, Diagram, Link, Node
+from aivis.plans.garrett_protocol_helpers import knowledge
+
+PLAN = Diagram(
+    key='gp_request',title='Garrett / use the credential',
+    kicker='The proxy verifies the peer and signature, then opens the token and forwards T.',
+    nodes=(
+        Node('agent','Agent process','Holds skAgent + S',(-4.68,1.85),3.08,1.10,'guest',icon='sandbox'),
+        Node('proxy','Trusted proxy','Holds Kseal + pkIssuer',(0,1.85),3.08,1.10,'broker',icon='host'),
+        Node('api','Provider API','Expects real T',(4.68,1.85),3.08,1.10,'provider',icon='cloud'),
+    ),
+    links=(
+        Link('present','agent','proxy','mTLS + S',((-3.14,1.85),(-1.54,1.85)),'guest',label_xy=(-2.35,2.25)),
+        Link('send','proxy','api','real T',((1.54,1.85),(3.14,1.85)),'secret',label_xy=(2.35,2.25)),
+        Link('response','api','proxy','provider reply',((4.68,1.30),(4.68,0.94),(0,0.94),(0,1.30)),
+             'provider',label_xy=(2.32,0.98)),
+        Link('release','proxy','agent','proxy reply',((0,1.30),(0,0.76),(-4.68,0.76),(-4.68,1.30)),
+             'broker',label_xy=(-2.35,0.79)),
+    ),
+    beats=(
+        Beat('mtls','The agent proves possession of skAgent during the mTLS connection to the proxy.',
+             nodes=('agent','proxy','api'),links=('present',),packet='present',packet_label='S',
+             knowledge=knowledge(['skAgent (stays private)','cert A','signed surrogate S'],
+                                 ['Kseal + pkIssuer','Authenticated peer cert A','No T until admitted'],
+                                 ['Accepts provider token T','Not the surrogate S'],
+                                 names=('agent','proxy','api')),status='explainer'),
+        Beat('signature','The proxy validates the broker signature, issuer, audience, provider and time.',
+             focus=('proxy',),
+             knowledge=knowledge(['S and skAgent','No Kseal'],['Verify S with pkIssuer','Check expiry + provider','No decryption yet'],
+                                 ['No request yet'],names=('agent','proxy','api')),status='explainer'),
+        Beat('binding','The proxy compares cnf(cert A) in S with the certificate authenticated by mTLS.',
+             focus=('proxy',),
+             knowledge=knowledge(['cert A + skAgent','Surrogate S'],['mTLS peer == signed cnf','Reject mismatch before open'],
+                                 ['No request yet'],names=('agent','proxy','api')),status='explainer'),
+        Beat('decrypt','Only now the honest proxy uses Kseal to decrypt the enc field and recover T.',
+             focus=('proxy',),
+             knowledge=knowledge(['S only','Still cannot decrypt enc'],['Use Kseal to open enc','Plaintext T, transient','skAgent NOT used for AES'],
+                                 ['No request yet'],names=('agent','proxy','api')),status='explainer'),
+        Beat('forward','The proxy substitutes T for S on a new, trusted upstream connection to the provider.',
+             links=('send',),packet='send',packet_label='T',
+             knowledge=knowledge(['S + skAgent','No T'],['T in upstream header','No token DB lookup'],
+                                 ['Sees real T','Never sees surrogate S'],names=('agent','proxy','api')),status='explainer'),
+        Beat('reply','The provider replies to the proxy; the proxy returns an HTTP response to the agent.',
+             links=('response','release'),packet='release',packet_label='HTTP response',
+             knowledge=knowledge(['Provider HTTP response','No automatic content scrub'],['Response from provider','No guaranteed reflection filter'],
+                                 ['Processed request with T'],names=('agent','proxy','api')),status='explainer'),
+    ),
+    footer='mTLS binds use of S to agent identity; it does NOT supply a cryptographic share needed to decrypt enc.',
+)
