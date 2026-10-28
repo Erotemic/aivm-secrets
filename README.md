@@ -23,7 +23,10 @@ can start a broker session for a VM. AIVM never requires this package.
 An OAuth broker mints a signed surrogate token that carries the provider token
 encrypted and is bound to the agent's client certificate. A stateless mTLS
 proxy swaps the real token in for ordinary API requests. Any number of proxy
-replicas accept the same surrogate without shared state. It ships as the
+replicas accept the same surrogate without shared state. OAuth is optional: an
+API key the operator provisions needs no OAuth client or browser, and a
+`"stateless": "strict"` deployment keeps nothing but its keys and
+configuration. It ships as the
 Python package `aivm_secrets.garrett_stateless` and the Rust crate
 `rust/crates/garrett-stateless`, and the two interoperate. Its Rust decisions,
 codecs and transitions are proved in Lean and composed into one internal

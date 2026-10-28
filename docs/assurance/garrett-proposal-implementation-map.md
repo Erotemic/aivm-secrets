@@ -50,7 +50,8 @@ separates what the article requires from the engineering choices added here:
 | Browser login whose redirect returns to the broker | authorization code + PKCE; broker-owned callback; sealed state; confirmation code | synthetic HTTPS IdP; `GarrettStatelessLogin`, `GarrettStatelessMailbox`, `GarrettStatelessState` |
 | Wrapper JWT: copied claims, encrypted real token, certificate representation, broker signature | `garrett-stateless-v1+jwt`; `upstream`, `enc`, `cnf`, Ed25519 | shared vectors; `GarrettStateless`, `GarrettStatelessToken` (`verify_token_sound`, `seal_token_ok`) |
 | Proxy: mTLS, certificate match, decrypt, swap, forward | stateless mTLS reverse proxy | `GarrettStatelessProxy`, `GarrettStatelessConnection`, `GarrettStatelessProtocol` (`send_origin`) |
-| No persistent data; scale by starting instances | the proxy decision has no adapter-state input; restart and replica tests | `replicas_decide_alike`; tests and demo |
+| No persistent data; scale by starting instances | the pure `stateless_proxy::decide`; restart and replica tests; an optional strict mode that refuses the OAuth mailbox and the audit file, the only state beyond keys and configuration | `replicas_decide_alike`, `replicas_differ_only_by_answers`, `strict_no_login_state`; tests and demo |
+| Opaque provider tokens and API keys | `oauth` or `provisioned` providers; minting needs no OAuth client | spec section 7.1; strict interop tests |
 | JWT and opaque provider tokens | both | tests, vectors |
 | Hardware or hypervisor-backed instance key | optional TPM signer (Rust agent) | swtpm test only; no hardware provenance |
 

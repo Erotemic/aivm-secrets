@@ -1413,3 +1413,56 @@ not proved); computational cryptography; live providers; hardware TPM;
 independent review. Confidence: high that the theorems state what the
 extracted Rust does; medium that the boundary propositions are the right
 idealization (review requested).
+
+## 2026-10-27 19:40:00 -0400
+
+Task: composable Garrett credential isolation, sections 1-3 of the pasted
+prompt (understand the code; preserve and state statelessness; separate
+acquisition from isolation). One working increment, proved and tested.
+
+Done:
+- Rust `stateless_proxy::decide` is the pure request decision; `serve` acts on
+  it. In Lean `decide_request` is now that extracted function, so the existing
+  `send_origin`/`protocol_safety` statements are about `decide` with no new
+  bridge. New: `serve_outcome` (the reply is a function of the decision and
+  the adapter's three answers) and `replicas_differ_only_by_answers` (equal
+  decisions, outcomes that may differ by network answers only).
+- Acquisition is a closed choice: `provisioned` or `oauth` providers (spec
+  section 7.1, ledger `STATELESS-ACQ-01`). A provisioned-only broker has no
+  browser listener; `mint` no longer constructs a `Broker`, so it reads no
+  OAuth client secret, and now checks the active key's issuer itself.
+- `"stateless": "strict"` refuses OAuth providers (broker) and `audit`
+  (proxy). `GarrettStatelessStrict`: a login policy with no providers keeps
+  the mailbox empty over every history; lifted to every protocol world. The
+  shell builds the login policy from OAuth providers only; the guard checks
+  that and that no other mutable state or file write exists (11 checks).
+- Python mirrors all of it (`decide`, config, CLI); new 4-way strict interop
+  test; Rust workflow test for the strict provisioned path.
+
+Decisions and reflections:
+- I kept the Lean `Decision` type and mapped the extracted one onto it
+  (`ofCore`) rather than renaming constructors, because `.refused` clashes with
+  `ProxyEvent.refused`; downstream proofs compiled unchanged.
+- Strict mode is explicit configuration so a deployment can demand it and
+  fail closed; standard stays the default for compatibility.
+- I evaluated fd-based key injection and did not implement it: a tmpfs secret
+  mount through the existing path works; documented in section 9. I first
+  wrote that key files are owner-checked; they are only group/other-checked,
+  and I corrected the text.
+- The mailbox is still Garrett-incompatible state for OAuth; removing it is a
+  protocol change, recorded as a separate increment.
+
+Verification: full `lake build` (1920 jobs) passes; Rust core and shell tests
+pass; stateless Python tests and the new strict matrix pass; full pytest 2818
+passed, 779 skipped, 1 failure (`test_bound_call_reports_a_refused_certificate_as_unreachable`,
+identity service, passes 3/3 alone; it ran under mutation-run load; a
+later full re-run without that load: 2819 passed, 779 skipped, 0 failed); `python
+-m build` passes; W0/W3 pass after re-pinning (my own refactor of covered
+files; maintainer re-review wanted). All 34 stateless mutants are rejected
+(the new strict-profile mutant first by the existing login proof).
+
+Uncertain or left open: the strict guarantees for the shell (no extra state,
+no file writes) are a source guard, not a proof; acquisition adapters are
+trusted for the binding they report (provisioned: the operator).
+Confidence: high for the extracted-code theorems; medium for the guard's
+completeness.

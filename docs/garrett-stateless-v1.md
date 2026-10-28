@@ -273,7 +273,34 @@ for the same `prv`, `cnf`, `sub`, `scope`, `upstream` and credential, with
 
 **Direct minting** (operator tool `mint`): the trusted operator gives the
 credential, provider and agent certificate directly, for API keys or
-synthetic tests. It uses the same window and sealing.
+synthetic tests. It uses the same window and sealing. It reads only the broker
+configuration's issuance policy (issuer, audience, providers, lifetimes) and
+the broker key file: it starts no listener and reads no OAuth client or client
+secret, and it refuses an active key whose issuer is not the broker's.
+
+### 7.1 Credential acquisition adapters
+
+Issuance consumes one **acquisition result**: a provider name, the credential,
+its expiry (or none) and the agent binding (`cnf`, `sub`, certificate expiry).
+The surrogate, renewal and the proxy do not depend on which adapter produced
+it, and `prv` names the provider, never the adapter. Each provider file names
+its adapter in `acquisition`. There are exactly two adapters, and no plugin
+interface:
+
+| | `provisioned` | `oauth` (default) |
+| --- | --- | --- |
+| Credential from | the operator (`mint --credential-file`) | the provider's token endpoint, after a browser login the agent started (section 8) |
+| Trusted for | the credential, the provider it is for, and the agent certificate it is bound to | the token endpoint's TLS identity and answer; the human's approval; the provider's PKCE and `state` handling |
+| Provider identity | the provider file's `name`, chosen by the operator | the provider file, whose pinned endpoints the login used |
+| Credential lifetime | unknown: `credential_expires = +∞`, so `ren` is capped by `max_renew` and the certificate | `now + expires_in` when the provider gave one |
+| Binding | the certificate the operator names | the mTLS peer that **started** the login |
+| Needs | the broker key file | an OAuth client registration, the browser listener, the token endpoint, the login mailbox (section 9) |
+| Refresh tokens | none | discarded, never stored |
+
+Neither adapter's answer is an authorization decision. A `scope` the provider
+reports is copied into the informational `scope` claim, which no decision
+reads; what a surrogate may do at the provider is decided by the provider's
+own credential and, at the proxy, by the deny rules.
 
 ## 8. Agent-initiated OAuth acquisition
 
@@ -358,15 +385,42 @@ follows:
 
 ## 9. Transient state, and what statelessness means
 
-**Credential use is fully stateless.** A proxy decides from (token, key set,
-routes, acceptance policy, peer certificate, clock) alone. It has no token
-table, registry, vault or broker connection. Any number of independent proxy
-replicas with the same configuration accept the same surrogates. A restarted
-proxy accepts surrogates issued before it started.
+Garrett: "The only state is the encryption keys, and those can be injected into
+the environment at startup." This profile distinguishes two properties:
 
-**Issuance has exactly one piece of transient state, the login mailbox.**
-After the browser callback, the broker holds a finished surrogate that it
-cannot push to the agent. The agent must collect it. The mailbox is:
+1. **No persistent application state.** Nothing created or updated during
+   credential acquisition or use is written to disk: no credential store, no
+   token registry, no per-token key, no session or grant database. The broker
+   and proxy satisfy this in every configuration, **except** a proxy with an
+   `audit` file (section 11), which appends one line per request.
+2. **No mutable process state except keys and static configuration.** A
+   request is decided from the keys, the static configuration, the request,
+   the authenticated peer and the clock alone. The proxy always satisfies
+   this. The broker satisfies it **only without OAuth providers**: the OAuth
+   adapter keeps the login mailbox described below.
+
+Transient data for one request and the listeners' stop flags and connection
+counters are not state in either sense; they decide nothing.
+
+A **strict** deployment demands both properties and refuses anything that
+would break them: `"stateless": "strict"` in a broker configuration refuses
+every `oauth` provider (so the broker has no mailbox in use and only renews
+surrogates), and in a proxy configuration refuses `audit`. Each server
+reports its mode in its startup line (`"stateless": "strict"` or
+`"standard"`). Strict brokers serve provisioned providers (section 7.1).
+
+**Credential use is fully stateless.** A proxy decides from (token, key set,
+routes, acceptance policy, peer certificate, clock) alone
+(`stateless_proxy::decide`). It has no token table, registry, vault or broker
+connection. Any number of independent proxy replicas with the same
+configuration make the same decision for the same request; their eventual
+replies can still differ, because each one's upstream exchange can succeed or
+fail on its own. A restarted proxy accepts surrogates issued before it
+started.
+
+**OAuth acquisition has exactly one piece of transient state, the login
+mailbox.** After the browser callback, the broker holds a finished surrogate
+that it cannot push to the agent. The agent must collect it. The mailbox is:
 
 - in memory only, never written to disk;
 - bounded at 1024 entries per replica, with each entry living at most
@@ -375,14 +429,19 @@ cannot push to the agent. The agent must collect it. The mailbox is:
   surrogate when there is one);
 - **not a credential store**: the provider credential is sealed inside the
   surrogate under the proxy sealing key, and the surrogate is bound to `cnf`;
-- consumed on first successful delivery.
+- consumed on first successful delivery;
+- used only for `oauth` providers: its policy names them alone, so a broker
+  without one never holds an entry.
 
 Losing it (restart, other replica) only loses logins in progress. The agent
 starts a new login. **Replicas:** each broker replica has its own name (`rep`)
 and its own browser URL, registered as a redirect URI with the provider. The
 callback for a login therefore returns to the replica that created it, and the
 agent polls that same replica's agent API (the `authorization_url` names it).
-Replicas share keys and configuration, but no mutable state.
+Replicas share keys and configuration, but no mutable state. Removing the
+mailbox (for instance, by having the agent hold an encrypted login handle and
+the broker answer the callback with the surrogate for the agent to fetch by
+that handle) would change this protocol and is a separate increment.
 
 Garrett's article does not say how the browser's result reaches the agent.
 The mailbox is this profile's answer, and it is transient state that Garrett
@@ -396,6 +455,15 @@ the agent's key, but bound to it), so the mailbox follows these rules:
 - **expiry and cleanup**: an entry is unusable after `exp` (pending) or
   `exp + 300` (complete) and is pruned on every insertion. Nothing reaches
   disk.
+
+**Keys at startup.** The broker and proxy read their key files once, at
+startup, and refuse a key file that group or others can access; they never
+write them. The `keys` commands that create, rotate, retire and export key
+files are operator tools, run outside credential use. Any path works, so keys
+can come from a tmpfs-backed secret mount whose files carry such a mode,
+without a secret service. Passing keys through an inherited file descriptor would add only the
+property that no path names them, at the cost of a second loading path in both
+implementations; this profile does not offer it.
 
 What pure statelessness **cannot** provide:
 
@@ -441,7 +509,9 @@ The proxy is an mTLS **reverse proxy**. Clients point their API base URL at
 `routes` has 1-16 entries with distinct providers. `authentication` is
 `bearer` (`Authorization: Bearer <credential>`) or `api-key`
 (`X-API-Key: <credential>`). `ca_file: null` means the system web PKI roots.
-Per request (`stateless_proxy::serve`, extracted):
+`stateless` is `"standard"` (the default) or `"strict"` (section 9; refuses
+`audit`). Per request, the extracted `stateless_proxy::decide` makes the
+decision (steps 1-5) and `stateless_proxy::serve` performs it (steps 6-7):
 
 1. Parse the request strictly (the existing `proxy_http::parse_request`). The
    `Host` must equal `authority`.
@@ -493,6 +563,12 @@ an operational sink, never an input to authorization.
  "max_lifetime":3600,"max_renew":604800,"login_ttl":600}
 ```
 
+`browser_listen` and `public_url` are required when an `oauth` provider is
+configured and refused otherwise; without them the broker serves only the
+agent API (renewal). `stateless` is `"standard"` (the default) or `"strict"`
+(section 9; refuses `oauth` providers). `login_ttl` applies only to OAuth
+logins.
+
 Provider file (shared by broker and tooling):
 
 ```json
@@ -501,6 +577,14 @@ Provider file (shared by broker and tooling):
  "token_url":"https://github.com/login/oauth/access_token","token_address":null,"token_ca_file":null,
  "client_id":"...","client_secret_file":null,"issuer":null,
  "scopes":["read:user","repo"],"default_scope":"read:user","copy_claims":null}
+```
+
+`acquisition` is `"oauth"` (the default) or `"provisioned"` (section 7.1). A
+provisioned provider file has only `schema`, `name`, `acquisition` and,
+optionally, `copy_claims`:
+
+```json
+{"schema":"garrett-stateless-v1/provider","name":"example-api","acquisition":"provisioned"}
 ```
 
 `copy_claims` is `null` (access-describing claims only), `"all"`, or a list of
@@ -550,6 +634,8 @@ requires separate from what this profile chose to fill in.
 | OAuth 2.0 authorization code with PKCE (S256), RFC 9207 `iss` checking | standard, widely supported realisation of the browser flow; PKCE protects the code |
 | AEAD-sealed `state` carrying the verifier and the starting peer | correlates the callback with no stored login record |
 | Transient in-memory login mailbox | the article does not say how the result reaches the agent (§9) |
+| `provisioned` providers and offline `mint` | API keys need no OAuth client, browser or token endpoint (§7.1) |
+| `"stateless": "strict"` | lets a deployment demand Garrett's "only the keys" literally: no mailbox, no audit file (§9) |
 | Interstitial page with a confirmation code | lets the human detect a login started by someone else's agent |
 | Claim names, compact JWS-like encoding, Ed25519, AES-256-GCM, AAD layout | the article names no format or algorithms |
 | Claim-copy policy defaulting to access claims | provider claims can be personal data |

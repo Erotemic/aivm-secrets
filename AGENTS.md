@@ -49,7 +49,13 @@ mutants labelled `stateless `). The Python `garrett_stateless/decisions.py`
 mirrors them, and the two implementations must stay byte-compatible with
 `tests/secrets_vectors/garrett-stateless-v1.jsonl`. The composed internal theorem is
 `protocol_safety` (`proofs/GarrettStatelessProtocol.lean`); its only premises
-are the external boundary in `GarrettStatelessBoundary.lean`. Run
+are the external boundary in `GarrettStatelessBoundary.lean`. Requests are
+decided by the pure `stateless_proxy::decide`. Credential acquisition is a
+closed choice of two adapters (`provisioned`, `oauth`; spec section 7.1), and
+OAuth is optional: never make the isolation core depend on it. The OAuth login
+mailbox is the profile's only mutable process state; a `"stateless": "strict"`
+configuration refuses it and the proxy audit file (`GarrettStatelessStrict.lean`,
+spec section 9). Run
 `python dev/verification/stateless_shell.py check` after changing the
 `garrett-stateless` shell.
 

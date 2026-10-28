@@ -69,12 +69,27 @@ garrett-stateless agent renew --broker https://broker.example:9443 \
 ```
 
 Operator issuance for a credential you already hold (an API key, or a test
-token) uses no OAuth:
+token) uses no OAuth. `mint` reads only the broker key file and the issuance
+policy of `broker.json`; it starts nothing and reads no OAuth client secret:
 
 ```bash
 garrett-stateless mint --config broker.json --provider api --credential-file key.txt \
     --certificate agent.pem --out surrogate
 ```
+
+**API keys without OAuth, strict mode.** A provider whose credentials are
+always minted needs no OAuth registration at all (spec section 7.1):
+
+```json
+{"schema":"garrett-stateless-v1/provider","name":"api","acquisition":"provisioned"}
+```
+
+A broker whose providers are all provisioned has no browser listener (omit
+`browser_listen` and `public_url`) and serves only renewal. Add
+`"stateless": "strict"` to `broker.json` and `proxy.json` to make each server
+refuse anything that keeps state beyond its keys and configuration: an OAuth
+provider (whose logins need the transient mailbox) and a proxy `audit` file
+(spec section 9). Both print `"stateless": "strict"` in their startup line.
 
 Key rotation, and revocation by retiring a key:
 
@@ -108,11 +123,11 @@ Lower-level pieces:
 
 | Module | Use |
 | --- | --- |
-| `decisions` | The decision functions (`admit`, `open_surrogate`, `issue`, `renew`, `begin_login`, `accept_callback`, `deliver`, `serve`), mirrored from the extracted Rust |
+| `decisions` | The decision functions (`admit`, `open_surrogate`, `issue`, `renew`, `begin_login`, `accept_callback`, `deliver`, `decide`, `serve`), mirrored from the extracted Rust |
 | `token` | `Sealer`, `Opener`, `ClaimCopy`, `copy_upstream`, `inspect` |
 | `keys` | `BrokerKeys` (`generate`, `rotate`, `retire`, `export_proxy`), `ProxyKeys` |
-| `config` | `BrokerConfig`, `ProxyConfig`, `ProviderConfig` |
-| `broker` | `Broker`, `TokenEndpoint` (plug in another token exchange), `HttpsTokenEndpoint`, `mint_with` |
+| `config` | `BrokerConfig`, `ProxyConfig`, `ProviderConfig` (`oauth` is an `OAuthClient`, or `None` for a provisioned provider) |
+| `broker` | `Broker`, `TokenEndpoint` (plug in another token exchange), `HttpsTokenEndpoint`, `issue_policy`, `mint_with` |
 | `login` | Sealed state, PKCE, the transient `Mailbox` |
 | `tls` | Server and client contexts, `PeerIdentity` |
 | `pki` | Development CA and certificates |
@@ -120,8 +135,8 @@ Lower-level pieces:
 Errors are typed: `Rejection` (surrogate refused or not issued, `.code`),
 `ProtocolError` (broker or proxy exchange, `.code`), `ConfigError`,
 `KeyFileError`. No public return value contains a provider credential, except
-`Opener.unseal` and `decisions.open_surrogate`. Those are the proxy-side
-privileged calls.
+`Opener.unseal`, `decisions.open_surrogate` and a `dispatch` `decisions.decide`
+result. Those are the proxy-side privileged calls.
 
 ## Rust API
 
