@@ -249,7 +249,8 @@ world below records any finite prefix of a connection's steps. -/
 section prefixes
 open stateless_proxy.Proofs
 
-variable {V C : Type} (ops : stateless.SurrogateOpener V) (ch : stateless_proxy.Channel C) (opener : V)
+variable {V C P : Type} (ops : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P)
+  (ch : stateless_proxy.Channel C) (opener : V) (policy : P)
   (routes : Slice stateless_proxy.Route) (a : stateless.Acceptance) (authority peer : Slice U8) (limit : Usize)
 
 /-- The first steps of a connection: from `state` with the channel at `io`
@@ -258,14 +259,14 @@ variable {V C : Type} (ops : stateless.SurrogateOpener V) (ch : stateless_proxy.
 inductive Prefix : C → proxy_controller.Tunnel → C → proxy_controller.Tunnel → Prop where
   | here {io : C} {state : proxy_controller.Tunnel} : Prefix io state io state
   | step {io io1 after : C} {state next final : proxy_controller.Tunnel} (running : state.open = true)
-      (stepped : stateless_proxy.connection_step ops ch opener io state.buffer routes a authority peer limit =
+      (stepped : stateless_proxy.connection_step ops pol ch opener policy io state.buffer routes a authority peer limit =
         Result.ok (next, io1))
       (rest : Prefix io1 next after final) : Prefix io state after final
 
 /-- A connection that returned is one of its prefixes. -/
 theorem runs_prefix {io after : C} {state : proxy_controller.Tunnel}
-    (run : Runs ops ch opener routes a authority peer limit io state after) :
-    ∃ final, Prefix ops ch opener routes a authority peer limit io state after final := by
+    (run : Runs ops pol ch opener policy routes a authority peer limit io state after) :
+    ∃ final, Prefix ops pol ch opener policy routes a authority peer limit io state after final := by
   induction run with
   | closed _ => exact ⟨_, .here⟩
   | step running stepped _ ih =>
@@ -273,20 +274,20 @@ theorem runs_prefix {io after : C} {state : proxy_controller.Tunnel}
     exact ⟨final, .step running stepped rest⟩
 
 theorem connection_prefix {io after : C}
-    (h : stateless_proxy.connection ops ch opener io routes a authority peer limit = Result.ok after) :
-    ∃ final, Prefix ops ch opener routes a authority peer limit io
+    (h : stateless_proxy.connection ops pol ch opener policy io routes a authority peer limit = Result.ok after) :
+    ∃ final, Prefix ops pol ch opener policy routes a authority peer limit io
       { buffer := alloc.vec.Vec.new U8, «open» := true } after final :=
-  runs_prefix ops ch opener routes a authority peer limit (connection_runs ops ch opener routes a authority peer limit io after h)
+  runs_prefix ops pol ch opener policy routes a authority peer limit (connection_runs ops pol ch opener policy routes a authority peer limit io after h)
 
 /-- Every prefix of a logged connection logged one `StepLog` segment per step. -/
 theorem prefix_logged {io after : C × List ProxyEvent} {state final : proxy_controller.Tunnel}
-    (run : Prefix ops (logged ch) opener routes a authority peer limit io state after final) :
+    (run : Prefix ops pol (logged ch) opener policy routes a authority peer limit io state after final) :
     ∃ segs : List (List ProxyEvent), after.2 = io.2 ++ segs.flatten ∧
-      ∀ seg ∈ segs, StepLog ops opener routes a peer seg := by
+      ∀ seg ∈ segs, StepLog ops pol opener policy routes a peer seg := by
   induction run with
   | here => exact ⟨[], by simp, by simp⟩
   | @step io io1 after state next final running stepped rest ih =>
-    obtain ⟨seg, log1, ok1⟩ := step_logged ops opener routes a authority peer limit ch io.1 io.2 state.buffer
+    obtain ⟨seg, log1, ok1⟩ := step_logged ops pol opener policy routes a authority peer limit ch io.1 io.2 state.buffer
       next io1 stepped
     obtain ⟨segs, log2, ok2⟩ := ih
     refine ⟨seg :: segs, by rw [log2, log1]; simp, ?_⟩
@@ -308,7 +309,7 @@ interleave arbitrarily. The mailbox is shared state, guarded by one mutex in
 state with anything (they read only their configuration and their inputs),
 so running each atomically loses no interleaving. -/
 
-variable {M : Type}
+variable {M P : Type}
 
 /-- The broker's sealer: `seal_token` with one signing entry, one set of
     informational claims and one nonce (`impl SurrogateSealer for TokenSealer`). -/
@@ -330,13 +331,16 @@ theorem opening_unseal (inst : KeyMaterial M) (ks : KeySet M) (v : stateless.Ver
     (Opening inst).unseal ks v = unseal_token inst (alloc.vec.Vec.deref ks.entries) v := rfl
 
 /-- The public configuration of one deployment. Replicas share it. -/
-structure Config where
+structure Config (P : Type) where
   login : stateless_login.LoginPolicy
   issue : stateless.IssuePolicy
   acceptance : stateless.Acceptance
   routes : Slice stateless_proxy.Route
   authority : Slice U8
   limit : Usize
+  /-- The proxy's static operation policy (`stateless_policy`). -/
+  policyInst : stateless_policy.OperationPolicy P
+  policy : P
 
 /-- Every broker and proxy action besides the mailbox's own history. -/
 inductive Act (M : Type) where
@@ -364,7 +368,7 @@ open stateless_mailbox.Proofs in
 /-- **The broker issued `token`**, sealing `credential` under `claims` with
     `sealer`: as the end of a login, as a renewal of a token that opened to
     that credential, or as an operator mint. -/
-def IssuedIn (inst : KeyMaterial M) (cfg : Config) (W : World M) (sealer : TokenSealer M)
+def IssuedIn (inst : KeyMaterial M) (cfg : Config P) (W : World M) (sealer : TokenSealer M)
     (claims : stateless.SurrogateClaims) (credential : Slice U8) (token : alloc.vec.Vec U8) : Source → Prop
   | .login σ => ∃ iss x tok, Event.finished σ (some iss) ∈ W.logins ∧ Event.exchanged x ∈ W.logins ∧
       x.permit.serial = σ ∧ x.token = some tok ∧ alloc.vec.Vec.deref tok.credential = credential ∧
@@ -381,7 +385,7 @@ def IssuedIn (inst : KeyMaterial M) (cfg : Config) (W : World M) (sealer : Token
 /-- **No forgery so far** (the Ed25519 boundary, `SignaturesAuthentic`, for
     this world): every byte string an entry of `keys` verifies is the signed
     part of a token this broker issued with a key paired to it. -/
-def Unforged (inst : KeyMaterial M) (Paired : M → M → Prop) (cfg : Config) (W : World M) (keys : KeySet M) : Prop :=
+def Unforged (inst : KeyMaterial M) (Paired : M → M → Prop) (cfg : Config P) (W : World M) (keys : KeySet M) : Prop :=
   ∀ e ∈ keys.entries.val, ∀ (msg sig : Slice U8), inst.verify e.material msg sig = Result.ok true →
     ∃ sealer claims credential token src, IssuedIn inst cfg W sealer claims credential token src ∧
       Paired sealer.entry.material e.material ∧ SignedPart token.val msg.val
@@ -389,7 +393,7 @@ def Unforged (inst : KeyMaterial M) (Paired : M → M → Prop) (cfg : Config) (
 /-- A key set as the shell builds one (`KeySet::new`). -/
 def Configured (keys : KeySet M) : Prop := keys_valid (alloc.vec.Vec.deref keys.entries) = Result.ok true
 
-inductive Step (inst : KeyMaterial M) (Paired : M → M → Prop) (cfg : Config) : World M → World M → Prop where
+inductive Step (inst : KeyMaterial M) (Paired : M → M → Prop) (cfg : Config P) : World M → World M → Prop where
   /-- One mailbox transition: start, pending, accept, exchange, finish or poll. -/
   | login {W : World M} {mb' : stateless_mailbox.Mailbox} {L' : List stateless_mailbox.Proofs.Event}
       (run : stateless_mailbox.Proofs.Step (Sealing inst) cfg.login (W.mb, W.logins) (mb', L')) :
@@ -412,18 +416,18 @@ inductive Step (inst : KeyMaterial M) (Paired : M → M → Prop) (cfg : Config)
   | serve {W : World M} {C : Type} (ch : stateless_proxy.Channel C) (io : C) {keys : KeySet M} {peer : Slice U8}
       {after : C × List stateless_proxy.Proofs.ProxyEvent} {final : proxy_controller.Tunnel}
       (configured : Configured keys)
-      (run : Prefix (Opening inst) (stateless_proxy.Proofs.logged ch) keys cfg.routes cfg.acceptance cfg.authority
+      (run : Prefix (Opening inst) cfg.policyInst (stateless_proxy.Proofs.logged ch) keys cfg.policy cfg.routes cfg.acceptance cfg.authority
         peer cfg.limit (io, []) { buffer := alloc.vec.Vec.new U8, «open» := true } after final) :
       Step inst Paired cfg W { W with acts := W.acts ++ [.served keys peer after.2] }
 
-inductive Reachable (inst : KeyMaterial M) (Paired : M → M → Prop) (cfg : Config) : World M → Prop where
+inductive Reachable (inst : KeyMaterial M) (Paired : M → M → Prop) (cfg : Config P) : World M → Prop where
   | init {mb : stateless_mailbox.Mailbox} (made : stateless_mailbox.empty = Result.ok mb) :
       Reachable inst Paired cfg ⟨mb, [], []⟩
   | step {W W' : World M} (before : Reachable inst Paired cfg W) (move : Step inst Paired cfg W W') :
       Reachable inst Paired cfg W'
 
 /-- The login part of every reachable world is a reachable mailbox. -/
-theorem mailbox_reachable {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config} {W : World M}
+theorem mailbox_reachable {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config P} {W : World M}
     (reach : Reachable inst Paired cfg W) :
     stateless_mailbox.Proofs.Reachable (Sealing inst) cfg.login (W.mb, W.logins) := by
   induction reach with
@@ -435,7 +439,7 @@ theorem mailbox_reachable {inst : KeyMaterial M} {Paired : M → M → Prop} {cf
     | mint => exact ih
     | serve => exact ih
 
-theorem issued_sealed {inst : KeyMaterial M} {cfg : Config} {W : World M} {sealer : TokenSealer M}
+theorem issued_sealed {inst : KeyMaterial M} {cfg : Config P} {W : World M} {sealer : TokenSealer M}
     {claims : stateless.SurrogateClaims} {credential : Slice U8} {token : alloc.vec.Vec U8} {src : Source}
     (h : IssuedIn inst cfg W sealer claims credential token src) :
     (Sealing inst).seal sealer claims credential = Result.ok (.Ok token) := by
@@ -456,7 +460,7 @@ theorem configured_keys {keys : KeySet M} (h : Configured keys) : KeysValid keys
     the claims it admitted are the issued claims, and — if the AEAD primitive
     is correct for paired keys — the credential it decrypted is the issued
     credential. -/
-theorem opened_issued {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config} {W : World M}
+theorem opened_issued {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config P} {W : World M}
     {keys : KeySet M} (configured : Configured keys) (unforged : Unforged inst Paired cfg W keys)
     (aead : ∀ S V, Paired S V → stateless_boundary.AeadInverse inst S V)
     {t peer : Slice U8} {a : stateless.Acceptance} {now : I64} {opened : stateless.Opened}
@@ -502,7 +506,7 @@ theorem mailbox_step_extends {S : Type} {ops : stateless.SurrogateSealer S} {pol
   | poll => exact ⟨_, rfl⟩
 
 /-- Records only accumulate: whatever a world issued, every later world issued. -/
-theorem issued_mono {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config} {W W' : World M}
+theorem issued_mono {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config P} {W W' : World M}
     (move : Step inst Paired cfg W W') {sealer : TokenSealer M} {claims : stateless.SurrogateClaims}
     {credential : Slice U8} {token : alloc.vec.Vec U8} {src : Source}
     (h : IssuedIn inst cfg W sealer claims credential token src) : IssuedIn inst cfg W' sealer claims credential token src := by
@@ -527,20 +531,20 @@ theorem issued_mono {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Co
 
 /-- `token` descends from a root issuance (a login's end or an operator mint)
     with the same binding, provider and credential, and a `ren` no later. -/
-def Lineage (inst : KeyMaterial M) (cfg : Config) (W : World M) (claims : stateless.SurrogateClaims)
+def Lineage (inst : KeyMaterial M) (cfg : Config P) (W : World M) (claims : stateless.SurrogateClaims)
     (credential : Slice U8) : Prop :=
   ∃ sealer0 claims0 credential0 token0 src0, IssuedIn inst cfg W sealer0 claims0 credential0 token0 src0 ∧
     (src0 = .mint ∨ ∃ σ, src0 = .login σ) ∧
     claims.certificate.val = claims0.certificate.val ∧ claims.provider.val = claims0.provider.val ∧
     claims.renew_until.val ≤ claims0.renew_until.val ∧ credential.val = credential0.val
 
-theorem lineage_mono {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config} {W W' : World M}
+theorem lineage_mono {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config P} {W W' : World M}
     (move : Step inst Paired cfg W W') {claims : stateless.SurrogateClaims} {credential : Slice U8}
     (h : Lineage inst cfg W claims credential) : Lineage inst cfg W' claims credential := by
   obtain ⟨s0, c0, k0, t0, src0, iss, root, rest⟩ := h
   exact ⟨s0, c0, k0, t0, src0, issued_mono move iss, root, rest⟩
 
-theorem root_lineage {inst : KeyMaterial M} {cfg : Config} {W : World M} {sealer : TokenSealer M}
+theorem root_lineage {inst : KeyMaterial M} {cfg : Config P} {W : World M} {sealer : TokenSealer M}
     {claims : stateless.SurrogateClaims} {credential : Slice U8} {token : alloc.vec.Vec U8} {src : Source}
     (h : IssuedIn inst cfg W sealer claims credential token src) (root : src = .mint ∨ ∃ σ, src = .login σ) :
     Lineage inst cfg W claims credential :=
@@ -552,7 +556,7 @@ theorem root_lineage {inst : KeyMaterial M} {cfg : Config} {W : World M} {sealer
     mint: same certificate binding, same provider, same credential, and an
     absolute limit (`ren`) no later than the root's — over any number of
     renewals. -/
-theorem lineage {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config}
+theorem lineage {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config P}
     (aead : ∀ S V, Paired S V → stateless_boundary.AeadInverse inst S V) {W : World M}
     (reach : Reachable inst Paired cfg W) :
     ∀ {sealer claims credential token src}, IssuedIn inst cfg W sealer claims credential token src →
@@ -609,7 +613,7 @@ theorem lineage {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config
 
 /-- A login's surrogate is bound to the certificate, provider and subject
     of the client that started that login (`issued_for_starting_peer`). -/
-theorem login_root {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config} {W : World M}
+theorem login_root {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config P} {W : World M}
     (reach : Reachable inst Paired cfg W) {sealer : TokenSealer M} {claims : stateless.SurrogateClaims}
     {credential : Slice U8} {token : alloc.vec.Vec U8} {σ : U64}
     (h : IssuedIn inst cfg W sealer claims credential token (.login σ)) :
@@ -624,11 +628,11 @@ theorem login_root {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Con
 
 /-- Every recorded connection is a prefix of a run of the extracted
     connection loop, and so a sequence of per-request `StepLog` segments. -/
-theorem served_segs {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config} {W : World M}
+theorem served_segs {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config P} {W : World M}
     (reach : Reachable inst Paired cfg W) {keys : KeySet M} {peer : Slice U8}
     {log : List stateless_proxy.Proofs.ProxyEvent} (m : Act.served keys peer log ∈ W.acts) :
     Configured keys ∧ ∃ segs : List (List stateless_proxy.Proofs.ProxyEvent), log = segs.flatten ∧
-      ∀ seg ∈ segs, stateless_proxy.Proofs.StepLog (Opening inst) keys cfg.routes cfg.acceptance peer seg := by
+      ∀ seg ∈ segs, stateless_proxy.Proofs.StepLog (Opening inst) cfg.policyInst keys cfg.policy cfg.routes cfg.acceptance peer seg := by
   induction reach with
   | init _ => simp at m
   | step _ move ih =>
@@ -648,18 +652,19 @@ theorem served_segs {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Co
       · simp only [List.mem_singleton, Act.served.injEq] at m'
         obtain ⟨ek, ep, el⟩ := m'
         subst ek ep el
-        obtain ⟨segs, log, ok⟩ := prefix_logged _ _ _ _ _ _ _ _ run
+        obtain ⟨segs, log, ok⟩ := prefix_logged _ _ _ _ _ _ _ _ _ _ run
         exact ⟨configured, segs, by simpa using log, ok⟩
 
 section guest
 open stateless_proxy.Proofs
 
 /-- What one segment writes to the guest. -/
-theorem seg_guest {V : Type} {ops : stateless.SurrogateOpener V} {opener : V} {routes : Slice stateless_proxy.Route}
-    {a : stateless.Acceptance} {peer : Slice U8} {seg : List ProxyEvent} (ok : StepLog ops opener routes a peer seg)
+theorem seg_guest {V P : Type} {ops : stateless.SurrogateOpener V} {pol : stateless_policy.OperationPolicy P} {opener : V}
+    {policy : P} {routes : Slice stateless_proxy.Route}
+    {a : stateless.Acceptance} {peer : Slice U8} {seg : List ProxyEvent} (ok : StepLog ops pol opener policy routes a peer seg)
     {bytes : List U8} (inSeg : ProxyEvent.guestSent bytes ∈ seg) :
     (∃ code refusal, proxy_http.refusal code = Result.ok refusal ∧ bytes = refusal.val) ∨
-    ∃ request now served, GuestReply ops opener routes a peer request now served ∧ bytes = served.reply.val := by
+    ∃ request now served, GuestReply ops pol opener policy routes a peer request now served ∧ bytes = served.reply.val := by
   rcases ok with e | ⟨code, refusal, hr, e⟩ | ⟨request, now, d, E, served, _, slog, reply, shape⟩
   · subst e; cases inSeg
   · subst e
@@ -692,13 +697,13 @@ end guest
     peer's certificate, for the route's provider — and the bytes sent are
     exactly the encoder's request carrying exactly the issued credential,
     which descends from a login or mint root. -/
-theorem send_origin {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config}
+theorem send_origin {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config P}
     (aead : ∀ S V, Paired S V → stateless_boundary.AeadInverse inst S V) {W : World M}
     (reach : Reachable inst Paired cfg W) {keys : KeySet M} {peer : Slice U8}
     {log : List stateless_proxy.Proofs.ProxyEvent} (m : Act.served keys peer log ∈ W.acts)
     (unforged : Unforged inst Paired cfg W keys)
     {r : Usize} {w : alloc.vec.Vec U8} (sent : stateless_proxy.Proofs.ProxyEvent.sent r w ∈ log) :
-    ∃ request now opened, stateless_proxy.Proofs.decide_request (Opening inst) keys request cfg.routes
+    ∃ request now opened, stateless_proxy.Proofs.decide_request (Opening inst) cfg.policyInst keys cfg.policy request cfg.routes
         cfg.acceptance peer now = Result.ok (.dispatch r w opened) ∧
       (∃ A B, log = A ++ [.admitted opened.claims r true, .sent r w] ++ B) ∧
       ∃ sealer claims credential token src, IssuedIn inst cfg W sealer claims credential token src ∧
@@ -714,12 +719,12 @@ theorem send_origin {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Co
   obtain ⟨configured, segs, log, ok⟩ := served_segs reach m
   rw [log] at sent ⊢
   obtain ⟨seg, inSegs, inSeg⟩ := List.mem_flatten.mp sent
-  obtain ⟨request, now, opened, hd, A, B, e⟩ := stateless_proxy.Proofs.seg_sent (Opening inst) keys cfg.routes
+  obtain ⟨request, now, opened, hd, A, B, e⟩ := stateless_proxy.Proofs.seg_sent (Opening inst) cfg.policyInst keys cfg.policy cfg.routes
     cfg.acceptance peer (ok seg inSegs) inSeg
   have order : ∃ A B, segs.flatten = A ++ [.admitted opened.claims r true, .sent r w] ++ B := by
     obtain ⟨s1, s2, split⟩ := List.append_of_mem inSegs
     exact ⟨s1.flatten ++ A, B ++ s2.flatten, by rw [split, e]; simp⟩
-  obtain ⟨token, _, ho, inside, prov, wire⟩ := stateless_proxy.Proofs.dispatch_trace (Opening inst) keys request
+  obtain ⟨token, _, ho, inside, prov, wire⟩ := stateless_proxy.Proofs.dispatch_trace (Opening inst) cfg.policyInst keys cfg.policy request
     cfg.routes cfg.acceptance peer now hd
   obtain ⟨sealer, claims, credential, tok, src, iss, oc, ok, _⟩ := opened_issued configured unforged aead ho
   have bound := (stateless.Proofs.open_binds_peer (Opening inst) keys _ cfg.acceptance peer now opened ho).1
@@ -729,14 +734,15 @@ theorem send_origin {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Co
 section logs
 open stateless_proxy.Proofs
 
-variable {V : Type} {ops : stateless.SurrogateOpener V} {opener : V} {routes : Slice stateless_proxy.Route}
+variable {V P : Type} {ops : stateless.SurrogateOpener V} {pol : stateless_policy.OperationPolicy P} {opener : V}
+    {policy : P} {routes : Slice stateless_proxy.Route}
   {a : stateless.Acceptance} {peer : Slice U8}
 
 /-- An admission record comes only from a dispatch decision, and records
     the claims of the surrogate that decision opened. -/
-theorem seg_admitted {seg : List ProxyEvent} (ok : StepLog ops opener routes a peer seg)
+theorem seg_admitted {seg : List ProxyEvent} (ok : StepLog ops pol opener policy routes a peer seg)
     {claims : stateless.SurrogateClaims} {r : Usize} {acked : Bool} (m : ProxyEvent.admitted claims r acked ∈ seg) :
-    ∃ request now wire opened, decide_request ops opener request routes a peer now =
+    ∃ request now wire opened, decide_request ops pol opener policy request routes a peer now =
       Result.ok (.dispatch r wire opened) ∧ claims = opened.claims := by
   rcases ok with e | ⟨code, bytes, _, e⟩ | ⟨request, now, d, E, served, hd, slog, _, shape⟩
   · subst e; cases m
@@ -753,11 +759,11 @@ theorem seg_admitted {seg : List ProxyEvent} (ok : StepLog ops opener routes a p
 
 /-- A request refused before egress — its surrogate rejected, or any
     pre-egress refusal — records no `sent`; and no request records two. -/
-theorem seg_rejected_quiet {seg : List ProxyEvent} (ok : StepLog ops opener routes a peer seg)
+theorem seg_rejected_quiet {seg : List ProxyEvent} (ok : StepLog ops pol opener policy routes a peer seg)
     {rej : stateless.Rejection} (m : ProxyEvent.rejected rej ∈ seg) {r : Usize} {w : alloc.vec.Vec U8} :
     ProxyEvent.sent r w ∉ seg := by
   intro ms
-  obtain ⟨request, now, opened, hd, A, B, e⟩ := seg_sent ops opener routes a peer ok ms
+  obtain ⟨request, now, opened, hd, A, B, e⟩ := seg_sent ops pol opener policy routes a peer ok ms
   rcases ok with e' | ⟨code, bytes, _, e'⟩ | ⟨request', now', d, E, served, hd', slog, _, shape⟩
   · subst e'; cases m
   · subst e'; simp at m
@@ -776,7 +782,7 @@ end logs
 /-- **A rejection creates no send.** Every recorded connection's log is a
     sequence of per-request segments; a segment with a rejection has no
     `sent`, and no segment has more than one. -/
-theorem rejection_never_sends {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config} {W : World M}
+theorem rejection_never_sends {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config P} {W : World M}
     (reach : Reachable inst Paired cfg W) {keys : KeySet M} {peer : Slice U8}
     {log : List stateless_proxy.Proofs.ProxyEvent} (m : Act.served keys peer log ∈ W.acts) :
     ∃ segs : List (List stateless_proxy.Proofs.ProxyEvent), log = segs.flatten ∧ ∀ seg ∈ segs,
@@ -784,7 +790,7 @@ theorem rejection_never_sends {inst : KeyMaterial M} {Paired : M → M → Prop}
       ∀ rej, stateless_proxy.Proofs.ProxyEvent.rejected rej ∈ seg →
         ∀ r w, stateless_proxy.Proofs.ProxyEvent.sent r w ∉ seg := by
   obtain ⟨_, segs, log, ok⟩ := served_segs reach m
-  exact ⟨segs, log, fun seg ms => ⟨stateless_proxy.Proofs.seg_sends_at_most_once (Opening inst) keys cfg.routes
+  exact ⟨segs, log, fun seg ms => ⟨stateless_proxy.Proofs.seg_sends_at_most_once (Opening inst) cfg.policyInst keys cfg.policy cfg.routes
     cfg.acceptance peer (ok seg ms), fun rej mr r w => seg_rejected_quiet (ok seg ms) mr⟩⟩
 
 /-! ## Key retirement -/
@@ -849,7 +855,7 @@ theorem claim_fields_public (p : Payload) : ∀ f ∈ ClaimFields p.claims, f <:
     issued, the credential occurs in neither the signed header nor any public
     member of the payload — in particular in no claim; it leaves the broker
     only as the plaintext of the AEAD `seal` primitive. -/
-theorem issued_secret {inst : KeyMaterial M} {cfg : Config} {W : World M} {sealer : TokenSealer M}
+theorem issued_secret {inst : KeyMaterial M} {cfg : Config P} {W : World M} {sealer : TokenSealer M}
     {claims : stateless.SurrogateClaims} {credential : Slice U8} {token : alloc.vec.Vec U8} {src : Source}
     (h : IssuedIn inst cfg W sealer claims credential token src) :
     ¬ credential.val <:+: (HS ++ sealer.entry.kid.val ++ HE) ∧
@@ -861,19 +867,19 @@ theorem issued_secret {inst : KeyMaterial M} {cfg : Config} {W : World M} {seale
   refine ⟨notH, ⟨p, pc, notP⟩, fun f mf inf => notP (inf.trans (claim_fields_public p f (by rw [pc]; exact mf)))⟩
 
 /-- What a proxy record may carry. -/
-def Permitted (inst : KeyMaterial M) (cfg : Config) (W : World M) (keys : KeySet M) (peer : Slice U8) :
+def Permitted (inst : KeyMaterial M) (cfg : Config P) (W : World M) (keys : KeySet M) (peer : Slice U8) :
     stateless_proxy.Proofs.ProxyEvent → Prop
   -- the claims of a surrogate this broker issued, which never contain its credential
   | .admitted claims _ _ => ∃ sealer credential token src, IssuedIn inst cfg W sealer claims credential token src ∧
       claims.certificate.val = peer.val ∧ ∀ f ∈ ClaimFields claims, ¬ credential.val <:+: f
   -- exactly the encoder's request for an issued credential, on its route
-  | .sent r w => ∃ request now opened, stateless_proxy.Proofs.decide_request (Opening inst) keys request cfg.routes
+  | .sent r w => ∃ request now opened, stateless_proxy.Proofs.decide_request (Opening inst) cfg.policyInst keys cfg.policy request cfg.routes
         cfg.acceptance peer now = Result.ok (.dispatch r w opened) ∧
       ∃ sealer claims credential token src, IssuedIn inst cfg W sealer claims credential token src ∧
         opened.credential.val = credential.val ∧ claims.certificate.val = peer.val
   -- a fixed refusal, or a reply released by `guest_response`
   | .guestSent bytes => (∃ code refusal, proxy_http.refusal code = Result.ok refusal ∧ bytes = refusal.val) ∨
-      ∃ request now served, stateless_proxy.Proofs.GuestReply (Opening inst) keys cfg.routes cfg.acceptance peer
+      ∃ request now served, stateless_proxy.Proofs.GuestReply (Opening inst) cfg.policyInst keys cfg.policy cfg.routes cfg.acceptance peer
         request now served ∧ bytes = served.reply.val
   -- codes, statuses and the guest's own request: nothing of a credential
   | .began _ | .rejected _ | .completed _ _ | .refused _ | .stopped _ => True
@@ -886,7 +892,7 @@ def Permitted (inst : KeyMaterial M) (cfg : Config) (W : World M) (keys : KeySet
     credential (the one permitted effect); a status or refusal code; or bytes
     to the guest that are a fixed refusal or a `guest_response` release (in
     which the raw credential does not occur, `serve_guest_reply`). -/
-theorem log_permitted {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config}
+theorem log_permitted {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config P}
     (aead : ∀ S V, Paired S V → stateless_boundary.AeadInverse inst S V) {W : World M}
     (reach : Reachable inst Paired cfg W) {keys : KeySet M} {peer : Slice U8}
     {log : List stateless_proxy.Proofs.ProxyEvent} (m : Act.served keys peer log ∈ W.acts)
@@ -900,7 +906,7 @@ theorem log_permitted {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : 
   cases ev with
   | admitted claims r acked =>
     obtain ⟨request, now, wire, opened, hd, ce⟩ := seg_admitted (ok seg inSegs) inSeg
-    obtain ⟨_, _, ho, _⟩ := stateless_proxy.Proofs.dispatch_trace (Opening inst) keys request cfg.routes
+    obtain ⟨_, _, ho, _⟩ := stateless_proxy.Proofs.dispatch_trace (Opening inst) cfg.policyInst keys cfg.policy request cfg.routes
       cfg.acceptance peer now hd
     obtain ⟨sealer, c, credential, token, src, iss, oc, _, _⟩ := opened_issued configured unforged aead ho
     have bound := (stateless.Proofs.open_binds_peer (Opening inst) keys _ cfg.acceptance peer now opened ho).1
@@ -927,7 +933,7 @@ open stateless_mailbox.Proofs
     mailbox hands out goes to the certificate that began its login, is the
     surrogate issued for that login, is bound to that certificate, and is one
     this broker issued (so `issued_secret` applies to it). -/
-theorem delivered_to_initiator {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config} {W : World M}
+theorem delivered_to_initiator {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config P} {W : World M}
     (reach : Reachable inst Paired cfg W) {σ : U64} {peer : List U8} {t : alloc.vec.Vec U8}
     (del : Event.delivered σ peer t ∈ W.logins) :
     ∃ st0 sealer claims credential, Event.started st0 σ ∈ W.logins ∧ peer = st0.certificate.val ∧
@@ -939,14 +945,14 @@ theorem delivered_to_initiator {inst : KeyMaterial M} {Paired : M → M → Prop
 
 /-- **No login is exchanged, issued or delivered twice**, whatever the
     interleaving of callbacks, polls and replays. -/
-theorem login_once {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config} {W : World M}
+theorem login_once {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config P} {W : World M}
     (reach : Reachable inst Paired cfg W) (σ : U64) :
     cnt (isAcc σ) W.logins ≤ 1 ∧ cnt (isExch σ) W.logins ≤ 1 ∧ cnt (isFin σ) W.logins ≤ 1 ∧
       cnt (isDel σ) W.logins ≤ 1 :=
   at_most_once (mailbox_reachable reach) σ
 
 /-- **A failed or uncertain exchange issues and delivers nothing.** -/
-theorem failed_login_quiet {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config} {W : World M}
+theorem failed_login_quiet {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config P} {W : World M}
     (reach : Reachable inst Paired cfg W) {σ : U64} (failed : Event.finished σ none ∈ W.logins) :
     (∀ peer t, Event.delivered σ peer t ∉ W.logins) ∧ ∀ iss, Event.finished σ (some iss) ∉ W.logins :=
   failed_never_delivered (mailbox_reachable reach) failed
@@ -957,13 +963,13 @@ end logins
     sends is either one an operator minted for a certificate, or the token
     that the code exchange of a login returned — a login started by a client
     holding exactly the certificate of the connection that sends it. -/
-theorem send_root {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config}
+theorem send_root {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config P}
     (aead : ∀ S V, Paired S V → stateless_boundary.AeadInverse inst S V) {W : World M}
     (reach : Reachable inst Paired cfg W) {keys : KeySet M} {peer : Slice U8}
     {log : List stateless_proxy.Proofs.ProxyEvent} (m : Act.served keys peer log ∈ W.acts)
     (unforged : Unforged inst Paired cfg W keys)
     {r : Usize} {w : alloc.vec.Vec U8} (sent : stateless_proxy.Proofs.ProxyEvent.sent r w ∈ log) :
-    ∃ opened : stateless.Opened, (∃ request now, stateless_proxy.Proofs.decide_request (Opening inst) keys request
+    ∃ opened : stateless.Opened, (∃ request now, stateless_proxy.Proofs.decide_request (Opening inst) cfg.policyInst keys cfg.policy request
         cfg.routes cfg.acceptance peer now = Result.ok (.dispatch r w opened)) ∧
       ((∃ sealer0 claims0 credential0 token0, IssuedIn inst cfg W sealer0 claims0 credential0 token0 .mint ∧
           claims0.certificate.val = peer.val ∧ opened.credential.val = credential0.val) ∨
@@ -1001,13 +1007,13 @@ theorem send_root {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Conf
        credential, however many times it is applied;
     5. every proxy record is one of the permitted forms, and no issued
        surrogate shows its credential in its header, payload or claims. -/
-theorem protocol_safety {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config}
+theorem protocol_safety {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config P}
     (aead : ∀ S V, Paired S V → stateless_boundary.AeadInverse inst S V) {W : World M}
     (reach : Reachable inst Paired cfg W) :
     -- 1, 2, 5: every connection under a key set without forgery
     (∀ keys peer log, Act.served keys peer log ∈ W.acts → Unforged inst Paired cfg W keys →
       (∀ r w, stateless_proxy.Proofs.ProxyEvent.sent r w ∈ log →
-        ∃ request now opened, stateless_proxy.Proofs.decide_request (Opening inst) keys request cfg.routes
+        ∃ request now opened, stateless_proxy.Proofs.decide_request (Opening inst) cfg.policyInst keys cfg.policy request cfg.routes
             cfg.acceptance peer now = Result.ok (.dispatch r w opened) ∧
           (∃ A B, log = A ++ [.admitted opened.claims r true, .sent r w] ++ B) ∧
           ∃ sealer claims credential token src, IssuedIn inst cfg W sealer claims credential token src ∧

@@ -9,7 +9,7 @@
 //! to a provider is [`Proxy::send_upstream`], which needs an `Egress`, which
 //! only the extracted controller can make.
 use crate::broker::Clock;
-use crate::config::{Authentication as RouteAuthentication, ProxyConfig};
+use crate::config::{Authentication as RouteAuthentication, Operations, ProxyConfig};
 use crate::error::{rejection_name, Error, Result};
 use crate::files::{read_private, read_public};
 use crate::json::{self, Value};
@@ -19,6 +19,7 @@ use crate::token::RingKey;
 use aivm_secrets_garrett_core::credential_use::Authentication;
 use aivm_secrets_garrett_core::proxy_http::{self as core_http, Code, DenyRule, Request};
 use aivm_secrets_garrett_core::stateless::{Acceptance, Rejection, SurrogateClaims};
+use aivm_secrets_garrett_core::stateless_policy::{ReadOnly, Resource, Unrestricted};
 use aivm_secrets_garrett_core::stateless_proxy::{
     self, egress_route, egress_wire, Channel, Egress, Origin, Route,
 };
@@ -48,6 +49,8 @@ pub struct Proxy {
     config: ProxyConfig,
     keys: KeySet<RingKey>,
     routes: Vec<Route>,
+    /// `Some` for a read-only proxy; Garrett's unrestricted policy otherwise.
+    read_only: Option<ReadOnly>,
     upstream: Vec<Upstream>,
     acceptance: Acceptance,
     audit: Option<Mutex<std::fs::File>>,
@@ -107,6 +110,19 @@ impl Proxy {
             max_lifetime: config.max_lifetime,
             skew: config.skew,
         };
+        let read_only = match &config.operations {
+            Operations::Unrestricted => None,
+            Operations::ReadOnly(resources) => Some(ReadOnly {
+                resources: resources
+                    .iter()
+                    .map(|r| Resource {
+                        provider: r.provider.as_bytes().to_vec(),
+                        method: r.method.as_bytes().to_vec(),
+                        path: r.path.as_bytes().to_vec(),
+                    })
+                    .collect(),
+            }),
+        };
         let audit = match &config.audit {
             Some(path) => Some(Mutex::new(
                 std::fs::OpenOptions::new()
@@ -121,6 +137,7 @@ impl Proxy {
             config,
             keys: keys.key_set()?,
             routes,
+            read_only,
             upstream,
             acceptance,
             audit,
@@ -223,15 +240,29 @@ impl Proxy {
             method: String::new(),
             claims: None,
         };
-        stateless_proxy::connection(
-            &self.keys,
-            &mut session,
-            &self.routes,
-            &self.acceptance,
-            self.config.authority.as_bytes(),
-            peer.thumbprint.as_bytes(),
-            self.config.request_limit,
-        );
+        // The configured policy is one of the core's two extracted ones.
+        match &self.read_only {
+            None => stateless_proxy::connection(
+                &self.keys,
+                &Unrestricted,
+                &mut session,
+                &self.routes,
+                &self.acceptance,
+                self.config.authority.as_bytes(),
+                peer.thumbprint.as_bytes(),
+                self.config.request_limit,
+            ),
+            Some(read_only) => stateless_proxy::connection(
+                &self.keys,
+                read_only,
+                &mut session,
+                &self.routes,
+                &self.acceptance,
+                self.config.authority.as_bytes(),
+                peer.thumbprint.as_bytes(),
+                self.config.request_limit,
+            ),
+        }
         session.stream.conn.send_close_notify();
         let _ = session.stream.conn.complete_io(&mut session.stream.sock);
         Ok(())

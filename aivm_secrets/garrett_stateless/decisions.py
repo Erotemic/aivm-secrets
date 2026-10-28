@@ -114,6 +114,21 @@ def admit(claims: SurrogateClaims, key_issuer: str, acceptance: Acceptance, peer
         raise Rejection('wrong_certificate')
 
 
+def authenticate(opener: SurrogateOpener, token: bytes, acceptance: Acceptance, peer: str, now: int) -> Verified:
+    """The first half of ``open``: verify, then admit, without decrypting."""
+    verified = opener.verify(token)
+    admit(verified.claims, verified.key_issuer, acceptance, peer, now)
+    return verified
+
+
+def decrypt(opener: SurrogateOpener, verified: Verified) -> Opened:
+    """The second half of ``open``: unseal and check the credential."""
+    credential = opener.unseal(verified)
+    if not valid_credential(credential):
+        raise Rejection('invalid_credential')
+    return Opened(verified.claims, credential)
+
+
 def open_surrogate(opener: SurrogateOpener, token: bytes, acceptance: Acceptance, peer: str, now: int) -> Opened:
     """Verify, then admit, then (only then) decrypt."""
     verified = opener.verify(token)
@@ -510,6 +525,60 @@ def mailbox_poll(mailbox: Mailbox, peer: str, login: str, now: int) -> tuple[str
     return ('ready' if outcome == 'deliver' else outcome), slot
 
 
+# --- operation policies (stateless_policy) ----------------------------------
+
+@dataclass(frozen=True)
+class Operation:
+    """What a policy sees of a request: never its credential-bearing fields."""
+    method: bytes
+    path: bytes
+    body: int
+
+
+def operation_of(request: http1.Request) -> Operation:
+    return Operation(request.method, request.target.split(b'?', 1)[0], len(request.body))
+
+
+class OperationPolicy(Protocol):
+    def permits(self, claims: SurrogateClaims, operation: Operation) -> bool: ...
+
+
+@dataclass(frozen=True)
+class Unrestricted:
+    """Garrett's proxy: every operation is authorized by the surrogate alone."""
+
+    def permits(self, claims: SurrogateClaims, operation: Operation) -> bool:
+        return True
+
+
+@dataclass(frozen=True)
+class Resource:
+    provider: str
+    method: str  # '' for GET or HEAD
+    path: str
+
+
+def path_matches(rule: bytes, path: bytes) -> bool:
+    """``proxy_http::path_matches``: exact, one added ``/``, and for a
+    ``/``-ending rule the rule without its ``/`` or anything under it."""
+    if path == rule or path == rule + b'/':
+        return True
+    return rule.endswith(b'/') and (rule == path + b'/' or path.startswith(rule))
+
+
+@dataclass(frozen=True)
+class ReadOnly:
+    """The constrained read-only proxy: ``GET`` or ``HEAD`` without a body,
+    on an allowed provider and path."""
+    resources: tuple[Resource, ...]
+
+    def permits(self, claims: SurrogateClaims, operation: Operation) -> bool:
+        if operation.method not in (b'GET', b'HEAD') or operation.body != 0:
+            return False
+        return any(r.provider == claims.provider and r.method.encode() in (b'', operation.method)
+                   and path_matches(r.path.encode(), operation.path) for r in self.resources)
+
+
 # --- proxy (stateless_proxy) -------------------------------------------------
 
 @dataclass(frozen=True)
@@ -642,20 +711,27 @@ class Decision:
         return f'Decision({self.kind!r}, route={self.route})'
 
 
-def decide(opener: SurrogateOpener, request: http1.Request, routes: tuple[Route, ...], acceptance: Acceptance,
-           peer: str, now: int) -> Decision:
+def decide(opener: SurrogateOpener, policy: OperationPolicy, request: http1.Request, routes: tuple[Route, ...],
+           acceptance: Acceptance, peer: str, now: int) -> Decision:
     """The pure authorization decision for one request (``stateless_proxy::decide``):
-    keys (through ``opener``), routes, acceptance policy, peer and clock only."""
+    keys (through ``opener``), operation policy, routes, acceptance policy,
+    peer and clock only. The policy is consulted before decryption."""
     token = surrogate_of(request.fields)
     if token is None:
         return Decision('unauthorized')
     try:
-        opened = open_surrogate(opener, token, acceptance, peer, now)
+        verified = authenticate(opener, token, acceptance, peer, now)
     except Rejection as rejection:
         return Decision('unauthorized', rejection=rejection.code)
-    index = route_of(routes, opened.claims.provider)
+    index = route_of(routes, verified.claims.provider)
     if index >= len(routes):
         return Decision('refused', code='unknown_origin')
+    if not policy.permits(verified.claims, operation_of(request)):
+        return Decision('refused', code='denied')
+    try:
+        opened = decrypt(opener, verified)
+    except Rejection as rejection:
+        return Decision('unauthorized', rejection=rejection.code)
     try:
         wire = encode_upstream(request, routes[index], opened.credential)
     except http1.Refused as refused:
@@ -663,9 +739,9 @@ def decide(opener: SurrogateOpener, request: http1.Request, routes: tuple[Route,
     return Decision('dispatch', route=index, wire=wire, opened=opened)
 
 
-def serve(opener: SurrogateOpener, origin: Origin, request: http1.Request, routes: tuple[Route, ...],
-          acceptance: Acceptance, peer: str, now: int, limit: int) -> Served:
-    decision = decide(opener, request, routes, acceptance, peer, now)
+def serve(opener: SurrogateOpener, policy: OperationPolicy, origin: Origin, request: http1.Request,
+          routes: tuple[Route, ...], acceptance: Acceptance, peer: str, now: int, limit: int) -> Served:
+    decision = decide(opener, policy, request, routes, acceptance, peer, now)
     if decision.kind == 'unauthorized':
         origin.rejected(decision.rejection or 'malformed')
         return unauthorized()

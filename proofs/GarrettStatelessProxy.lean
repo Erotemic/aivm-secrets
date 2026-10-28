@@ -12,22 +12,30 @@ socket exchange to a route's pinned destination, and the completion
 record) and the key-set opener.
 
 `Decision` / `decide_request` compose the extracted pieces `serve` runs
-before any adapter state matters (`surrogate_of`, `stateless.open`,
-`route_of`, `encode_upstream`). It is not a second implementation: it is
-literally the prefix of `serve`, and `serve_follows_decision` proves `serve`
-acts on it. Its arguments are the opener, the request, the routes, the
-acceptance policy, the peer and the clock, and **no origin state**.
+before any adapter state matters (`surrogate_of`, `stateless.authenticate`,
+`route_of`, the operation policy's `permits`, `stateless.decrypt`,
+`encode_upstream`). It is not a second implementation: it is literally the
+prefix of `serve`, and `serve_follows_decision` proves `serve` acts on it. Its
+arguments are the opener, the operation policy, the request, the routes, the
+acceptance policy, the peer and the clock, and **no origin state**. Every
+theorem here holds for any operation policy; `GarrettStatelessComposition`
+gives the policies' contracts and the composed theorem.
 
 Proved:
 
 * `serve_follows_decision`: every run of `serve`, for any origin adapter,
   either refuses exactly as `decide_request` decided (with no exchange), or
   dispatches the decided route and bytes, after an acknowledged admission;
-* `dispatch_trace`: a dispatch decision means the request presented exactly
-  one surrogate, it opened (`open_ok_trace`) for this peer, the route is the
-  first route of the token's authenticated provider, and the bytes are the
-  extracted encoder's output for that route's host, rules and
-  authentication, with the unsealed credential;
+* `decide_dispatch_trace`, `dispatch_trace`: a dispatch decision means the
+  request presented exactly one surrogate, it authenticated and then
+  decrypted — together, it opened (`open_ok_trace`) — for this peer, the
+  route is the first route of the token's authenticated provider, the policy
+  permitted the operation in between, and the bytes are the extracted
+  encoder's output for that route's host, rules and authentication, with the
+  unsealed credential;
+* `dispatch_permitted`: the policy answered `true` for the opened claims and
+  the request's operation; `decide_unpermitted`: when it answers `false` the
+  decision is the fixed `denied` refusal, whatever `unseal` would do;
 * `serve_dispatch_exact`: the bytes handed to `exchange` are
   `UpstreamPrefix ++ HeaderPrefix ++ credential ++ CRLF ++ UpstreamSuffix`;
 * `serve_rejected_never_sends`: a missing, malformed or refused surrogate gets
@@ -61,16 +69,17 @@ inductive Decision where
 def Decision.ofCore : stateless_proxy.Decision → Decision
   | .Unauthorized r => .unauthorized r
   | .Refused code => .refused code
-  | .Dispatch index wire opened => .dispatch index wire opened
+  | .Dispatch d => .dispatch d.route d.wire d.opened
 
 /-- The extracted pure decision `stateless_proxy::decide`. -/
-def decide_request {V : Type} (ops : stateless.SurrogateOpener V) (opener : V)
+def decide_request {V P : Type} (ops : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P)
+    (opener : V) (policy : P)
     (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance)
     (peer : Slice U8) (now : I64) : Result Decision := do
-  let c ← stateless_proxy.decide ops opener request routes a peer now
+  let c ← stateless_proxy.decide ops pol opener policy request routes a peer now
   Result.ok (Decision.ofCore c)
 
-variable {V O : Type}
+variable {V O P : Type}
 
 /-- What happens after a dispatch decision, for one origin adapter. -/
 def Dispatched (inst : Origin O) (io : O) (request : proxy_http.Request) (limit : Usize)
@@ -96,11 +105,12 @@ def Dispatched (inst : Origin O) (io : O) (request : proxy_http.Request) (limit 
     `refused`, returned that fixed refusal without touching the origin; for
     `dispatch`, recorded admission and, only if it was acknowledged,
     exchanged exactly the decided bytes with the decided route. -/
-theorem serve_follows_decision (ops : stateless.SurrogateOpener V) (inst : Origin O) (opener : V) (io : O)
+theorem serve_follows_decision (ops : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P) (inst : Origin O)
+    (opener : V) (policy : P) (io : O)
     (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance) (peer : Slice U8)
     (now : I64) (limit : Usize) (served : proxy_controller.Served) (after : O)
-    (h : serve ops inst opener io request routes a peer now limit = Result.ok (served, after)) :
-    ∃ d, decide_request ops opener request routes a peer now = Result.ok d ∧
+    (h : serve ops pol inst opener policy io request routes a peer now limit = Result.ok (served, after)) :
+    ∃ d, decide_request ops pol opener policy request routes a peer now = Result.ok d ∧
       match d with
       | .unauthorized r => unauthorized_served = Result.ok served ∧
           inst.rejected io (r.getD .Malformed) = Result.ok after
@@ -108,7 +118,7 @@ theorem serve_follows_decision (ops : stateless.SurrogateOpener V) (inst : Origi
       | .dispatch index wire opened => Dispatched inst io request limit index wire opened served after := by
   unfold serve at h
   obtain ⟨c, hc, h⟩ := bind_ok_inv h
-  have hd : decide_request ops opener request routes a peer now = Result.ok (Decision.ofCore c) := by
+  have hd : decide_request ops pol opener policy request routes a peer now = Result.ok (Decision.ofCore c) := by
     simp [decide_request, hc]
   refine ⟨Decision.ofCore c, hd, ?_⟩
   cases c with
@@ -126,7 +136,7 @@ theorem serve_follows_decision (ops : stateless.SurrogateOpener V) (inst : Origi
     obtain ⟨e1, e2⟩ := h
     subst e1 e2
     exact ⟨hs, rfl⟩
-  | Dispatch index wire opened =>
+  | Dispatch dsp =>
     obtain ⟨⟨acked, io1⟩, hadm, h⟩ := bind_ok_inv h
     cases acked with
     | false =>
@@ -179,17 +189,17 @@ theorem serve_follows_decision (ops : stateless.SurrogateOpener V) (inst : Origi
     states, sharing nothing — given the same opener (key set), request,
     routes, acceptance policy, peer and clock follow one and the same
     decision. -/
-theorem replicas_decide_alike {O1 O2 : Type} (ops : stateless.SurrogateOpener V) (opener : V)
+theorem replicas_decide_alike {O1 O2 : Type} (ops : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P) (opener : V) (policy : P)
     (inst1 : Origin O1) (io1 : O1) (inst2 : Origin O2) (io2 : O2)
     (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance) (peer : Slice U8)
     (now : I64) (limit : Usize) (s1 s2 : proxy_controller.Served) (a1 : O1) (a2 : O2)
-    (h1 : serve ops inst1 opener io1 request routes a peer now limit = Result.ok (s1, a1))
-    (h2 : serve ops inst2 opener io2 request routes a peer now limit = Result.ok (s2, a2)) :
-    ∃ d, decide_request ops opener request routes a peer now = Result.ok d ∧
+    (h1 : serve ops pol inst1 opener policy io1 request routes a peer now limit = Result.ok (s1, a1))
+    (h2 : serve ops pol inst2 opener policy io2 request routes a peer now limit = Result.ok (s2, a2)) :
+    ∃ d, decide_request ops pol opener policy request routes a peer now = Result.ok d ∧
       (∀ code, d = .refused code → s1 = s2) ∧
       (∀ r, d = .unauthorized r → s1 = s2) := by
-  obtain ⟨d1, hd1, m1⟩ := serve_follows_decision ops inst1 opener io1 request routes a peer now limit s1 a1 h1
-  obtain ⟨d2, hd2, m2⟩ := serve_follows_decision ops inst2 opener io2 request routes a peer now limit s2 a2 h2
+  obtain ⟨d1, hd1, m1⟩ := serve_follows_decision ops pol inst1 opener policy io1 request routes a peer now limit s1 a1 h1
+  obtain ⟨d2, hd2, m2⟩ := serve_follows_decision ops pol inst2 opener policy io2 request routes a peer now limit s2 a2 h2
   rw [hd1] at hd2
   simp only [Result.ok.injEq] at hd2
   subst hd2
@@ -232,13 +242,14 @@ def outcome (request : proxy_http.Request) (limit : Usize) (d : Decision) (acked
 /-- **The reply is the decision plus the adapter's answers.** Every run of
     `serve` returns `outcome` of the pure decision and of what its origin
     adapter answered; nothing else about the adapter's state reaches it. -/
-theorem serve_outcome (ops : stateless.SurrogateOpener V) (inst : Origin O) (opener : V) (io : O)
+theorem serve_outcome (ops : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P) (inst : Origin O)
+    (opener : V) (policy : P) (io : O)
     (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance) (peer : Slice U8)
     (now : I64) (limit : Usize) (served : proxy_controller.Served) (after : O)
-    (h : serve ops inst opener io request routes a peer now limit = Result.ok (served, after)) :
-    ∃ d, decide_request ops opener request routes a peer now = Result.ok d ∧
+    (h : serve ops pol inst opener policy io request routes a peer now limit = Result.ok (served, after)) :
+    ∃ d, decide_request ops pol opener policy request routes a peer now = Result.ok d ∧
       ∃ acked answer done, outcome request limit d acked answer done = Result.ok served := by
-  obtain ⟨d, hd, m⟩ := serve_follows_decision ops inst opener io request routes a peer now limit served after h
+  obtain ⟨d, hd, m⟩ := serve_follows_decision ops pol inst opener policy io request routes a peer now limit served after h
   refine ⟨d, hd, ?_⟩
   cases d with
   | unauthorized r => exact ⟨true, .Err .InternalError, true, m.1⟩
@@ -267,17 +278,17 @@ theorem serve_outcome (ops : stateless.SurrogateOpener V) (inst : Origin O) (ope
     each reply is `outcome` of that decision and its own adapter's answers.
     Their replies can differ only because their upstream exchanges, or their
     admission and completion records, answered differently. -/
-theorem replicas_differ_only_by_answers {O1 O2 : Type} (ops : stateless.SurrogateOpener V) (opener : V)
+theorem replicas_differ_only_by_answers {O1 O2 : Type} (ops : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P) (opener : V) (policy : P)
     (inst1 : Origin O1) (io1 : O1) (inst2 : Origin O2) (io2 : O2)
     (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance) (peer : Slice U8)
     (now : I64) (limit : Usize) (s1 s2 : proxy_controller.Served) (a1 : O1) (a2 : O2)
-    (h1 : serve ops inst1 opener io1 request routes a peer now limit = Result.ok (s1, a1))
-    (h2 : serve ops inst2 opener io2 request routes a peer now limit = Result.ok (s2, a2)) :
-    ∃ d, decide_request ops opener request routes a peer now = Result.ok d ∧
+    (h1 : serve ops pol inst1 opener policy io1 request routes a peer now limit = Result.ok (s1, a1))
+    (h2 : serve ops pol inst2 opener policy io2 request routes a peer now limit = Result.ok (s2, a2)) :
+    ∃ d, decide_request ops pol opener policy request routes a peer now = Result.ok d ∧
       (∃ acked answer done, outcome request limit d acked answer done = Result.ok s1) ∧
       (∃ acked answer done, outcome request limit d acked answer done = Result.ok s2) := by
-  obtain ⟨d1, hd1, o1⟩ := serve_outcome ops inst1 opener io1 request routes a peer now limit s1 a1 h1
-  obtain ⟨d2, hd2, o2⟩ := serve_outcome ops inst2 opener io2 request routes a peer now limit s2 a2 h2
+  obtain ⟨d1, hd1, o1⟩ := serve_outcome ops pol inst1 opener policy io1 request routes a peer now limit s1 a1 h1
+  obtain ⟨d2, hd2, o2⟩ := serve_outcome ops pol inst2 opener policy io2 request routes a peer now limit s2 a2 h2
   rw [hd1] at hd2
   simp only [Result.ok.injEq] at hd2
   subst hd2
@@ -321,15 +332,86 @@ theorem route_of_loop_contract (routes : Slice Route) (provider : Slice U8) (ind
 
 /-! ## What a dispatch decision means -/
 
+/-- **The trace of a dispatch decision.** The request carried exactly one
+    surrogate; `authenticate` verified it and admitted its claims for this
+    peer, now; the route is in range and serves the authenticated provider;
+    the operation policy permitted the request's operation for those claims;
+    only then did `decrypt` unseal the credential; and the bytes are the
+    extracted encoder's accepted output for that route with that credential. -/
+theorem decide_dispatch_trace (ops : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P)
+    (opener : V) (policy : P) (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance)
+    (peer : Slice U8) (now : I64) {dsp : stateless_proxy.Dispatch}
+    (h : stateless_proxy.decide ops pol opener policy request routes a peer now = Result.ok (.Dispatch dsp)) :
+    ∃ token v op, surrogate_of (alloc.vec.Vec.deref request.fields) = Result.ok (some token) ∧
+      stateless.authenticate ops opener (alloc.vec.Vec.deref token) a peer now = Result.ok (.Ok v) ∧
+      stateless_policy.operation_of request = Result.ok op ∧
+      pol.permits policy v.claims op = Result.ok true ∧
+      stateless.decrypt ops opener v = Result.ok (.Ok dsp.opened) ∧
+      ∃ (inside : dsp.route.val < routes.length),
+        (routes[dsp.route.val]'inside).provider.val = v.claims.provider.val ∧
+        proxy_http.encode_upstream (alloc.vec.Vec.new U8) request
+          (alloc.vec.Vec.deref (routes[dsp.route.val]'inside).host)
+          (alloc.vec.Vec.deref (routes[dsp.route.val]'inside).rules)
+          (alloc.vec.Vec.deref dsp.opened.credential) (routes[dsp.route.val]'inside).authentication =
+          Result.ok (.Ok (), dsp.wire) := by
+  unfold stateless_proxy.decide at h
+  obtain ⟨o, ho, h⟩ := bind_ok_inv h
+  cases o with
+  | none => simp at h
+  | some token =>
+    dsimp only at h
+    obtain ⟨r, hauth, h⟩ := bind_ok_inv h
+    cases r with
+    | Err e => simp at h
+    | Ok v =>
+      dsimp only at h
+      obtain ⟨i, hi, h⟩ := bind_ok_inv h
+      split at h
+      · simp at h
+      · rename_i inside
+        have in' : i.val < routes.length := by scalar_tac
+        obtain ⟨op, hop, h⟩ := bind_ok_inv h
+        obtain ⟨b, hb, h⟩ := bind_ok_inv h
+        split at h
+        · rename_i yes
+          obtain ⟨r1, hdec, h⟩ := bind_ok_inv h
+          cases r1 with
+          | Err e => simp at h
+          | Ok o2 =>
+            dsimp only at h
+            have get : Slice.index_usize routes i = Result.ok (routes[i.val]'in') := by
+              simp [Slice.index_usize, in']
+            rw [get] at h
+            simp only [bind_ok] at h
+            obtain ⟨⟨r2, w⟩, henc, h⟩ := bind_ok_inv h
+            cases r2 with
+            | Err refusal =>
+              obtain ⟨code, _, h⟩ := bind_ok_inv h
+              simp at h
+            | Ok u =>
+              have same : stateless_proxy.Decision.Dispatch { route := i, wire := w, opened := o2 } =
+                  .Dispatch dsp := by simpa using h
+              cases same
+              have route := route_of_loop_contract routes (alloc.vec.Vec.deref v.claims.provider) 0#usize
+              simp only [route_of] at hi
+              rw [hi] at route
+              simp only [WP.spec_ok] at route
+              refine ⟨token, v, op, ho, hauth, hop, by rw [hb, yes], hdec, in',
+                by simpa [alloc.vec.Vec.deref] using route in', ?_⟩
+              cases u
+              exact henc
+        · simp at h
+
 /-- **Dispatch is authorized.** A dispatch decision means: the request
     carried exactly one surrogate; it opened for this peer, now, under this
     acceptance policy; the route is in range and serves the token's
     authenticated provider; and the decided bytes are the extracted encoder's
     accepted output for that route with the unsealed credential. -/
-theorem dispatch_trace (ops : stateless.SurrogateOpener V) (opener : V) (request : proxy_http.Request)
+theorem dispatch_trace (ops : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P) (opener : V)
+    (policy : P) (request : proxy_http.Request)
     (routes : Slice Route) (a : stateless.Acceptance) (peer : Slice U8) (now : I64)
     {index : Usize} {wire : alloc.vec.Vec U8} {opened : stateless.Opened}
-    (h : decide_request ops opener request routes a peer now = Result.ok (.dispatch index wire opened)) :
+    (h : decide_request ops pol opener policy request routes a peer now = Result.ok (.dispatch index wire opened)) :
     ∃ token, surrogate_of (alloc.vec.Vec.deref request.fields) = Result.ok (some token) ∧
       stateless.«open» ops opener (alloc.vec.Vec.deref token) a peer now = Result.ok (.Ok opened) ∧
       ∃ (inside : index.val < routes.length),
@@ -340,46 +422,66 @@ theorem dispatch_trace (ops : stateless.SurrogateOpener V) (opener : V) (request
           Result.ok (.Ok (), wire) := by
   unfold decide_request at h
   obtain ⟨c, hc, h⟩ := bind_ok_inv h
-  have hcd : c = .Dispatch index wire opened := by
-    cases c <;> simp [Decision.ofCore] at h ⊢
-    exact h
-  subst hcd
-  unfold stateless_proxy.decide at hc
-  have h := hc
-  obtain ⟨o, ho, h⟩ := bind_ok_inv h
-  cases o with
-  | none => simp at h
-  | some token =>
-    dsimp only at h
-    obtain ⟨r, hopen, h⟩ := bind_ok_inv h
-    cases r with
-    | Err e => simp at h
-    | Ok o2 =>
-      dsimp only at h
-      obtain ⟨i, hi, h⟩ := bind_ok_inv h
-      split at h
-      · simp at h
-      · rename_i inside
-        have in' : i.val < routes.length := by scalar_tac
-        have get : Slice.index_usize routes i = Result.ok (routes[i.val]'in') := by
-          simp [Slice.index_usize, in']
-        rw [get] at h
-        simp only [bind_ok] at h
-        obtain ⟨⟨r1, w⟩, henc, h⟩ := bind_ok_inv h
-        cases r1 with
-        | Err refusal =>
-          obtain ⟨code, _, h⟩ := bind_ok_inv h
-          simp at h
-        | Ok u =>
-          have same : stateless_proxy.Decision.Dispatch i w o2 = .Dispatch index wire opened := by simpa using h
-          cases same
-          have route := route_of_loop_contract routes (alloc.vec.Vec.deref opened.claims.provider) 0#usize
-          simp only [route_of] at hi
-          rw [hi] at route
-          simp only [WP.spec_ok] at route
-          refine ⟨token, ho, hopen, in', by simpa [alloc.vec.Vec.deref] using route in', ?_⟩
-          cases u
-          exact henc
+  cases c with
+  | Unauthorized r => simp [Decision.ofCore] at h
+  | Refused code => simp [Decision.ofCore] at h
+  | Dispatch dsp =>
+    simp only [Decision.ofCore, Result.ok.injEq, Decision.dispatch.injEq] at h
+    obtain ⟨e1, e2, e3⟩ := h
+    subst e1 e2 e3
+    obtain ⟨token, v, op, ho, hauth, _, _, hdec, inside, prov, henc⟩ :=
+      decide_dispatch_trace ops pol opener policy request routes a peer now hc
+    obtain ⟨_, same, _⟩ := stateless.Proofs.decrypt_ok_trace ops opener v dsp.opened hdec
+    exact ⟨token, ho, stateless.Proofs.open_of_halves ops opener _ a peer now v dsp.opened hauth hdec, inside,
+      by rw [same]; exact prov, henc⟩
+
+/-- **Dispatch is permitted by the operation policy.** For a dispatch
+    decision, the policy was asked about this request's operation and the
+    opened surrogate's claims, and answered `true`. -/
+theorem dispatch_permitted (ops : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P)
+    (opener : V) (policy : P) (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance)
+    (peer : Slice U8) (now : I64) {index : Usize} {wire : alloc.vec.Vec U8} {opened : stateless.Opened}
+    (h : decide_request ops pol opener policy request routes a peer now = Result.ok (.dispatch index wire opened)) :
+    ∃ op, stateless_policy.operation_of request = Result.ok op ∧
+      pol.permits policy opened.claims op = Result.ok true := by
+  unfold decide_request at h
+  obtain ⟨c, hc, h⟩ := bind_ok_inv h
+  cases c with
+  | Unauthorized r => simp [Decision.ofCore] at h
+  | Refused code => simp [Decision.ofCore] at h
+  | Dispatch dsp =>
+    simp only [Decision.ofCore, Result.ok.injEq, Decision.dispatch.injEq] at h
+    obtain ⟨e1, e2, e3⟩ := h
+    subst e1 e2 e3
+    obtain ⟨_, v, op, _, _, hop, hperm, hdec, _⟩ := decide_dispatch_trace ops pol opener policy request routes a peer now hc
+    obtain ⟨_, same, _⟩ := stateless.Proofs.decrypt_ok_trace ops opener v dsp.opened hdec
+    exact ⟨op, hop, by rw [same]; exact hperm⟩
+
+/-- **A refused operation is refused before decryption.** If the surrogate
+    authenticates, its provider has a route, and the policy refuses the
+    operation, the decision is the fixed `denied` refusal — whatever the
+    `unseal` adapter would do, so the credential is never decrypted. -/
+theorem decide_unpermitted (ops : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P)
+    (opener : V) (policy : P) (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance)
+    (peer : Slice U8) (now : I64) (token : alloc.vec.Vec U8) (v : stateless.Verified)
+    (op : stateless_policy.Operation)
+    (ho : surrogate_of (alloc.vec.Vec.deref request.fields) = Result.ok (some token))
+    (hauth : stateless.authenticate ops opener (alloc.vec.Vec.deref token) a peer now = Result.ok (.Ok v))
+    (routed : ∃ i, route_of routes (alloc.vec.Vec.deref v.claims.provider) = Result.ok i ∧ i.val < routes.length)
+    (hop : stateless_policy.operation_of request = Result.ok op)
+    (refused : pol.permits policy v.claims op = Result.ok false)
+    (other : V → stateless.Verified → Result (core.result.Result (alloc.vec.Vec U8) stateless.Rejection)) :
+    decide_request ops pol opener policy request routes a peer now = Result.ok (.refused .Denied) ∧
+    decide_request {ops with «unseal» := other} pol opener policy request routes a peer now =
+      Result.ok (.refused .Denied) := by
+  obtain ⟨i, hi, inside⟩ := routed
+  have hauth' : stateless.authenticate {ops with «unseal» := other} opener (alloc.vec.Vec.deref token) a peer now =
+      Result.ok (.Ok v) := by
+    rw [← hauth]; simp [stateless.authenticate]
+  have notout : ¬ routes.val.length ≤ i.val := by scalar_tac
+  constructor
+  · simp [decide_request, stateless_proxy.decide, ho, hauth, hi, notout, hop, refused, Decision.ofCore]
+  · simp [decide_request, stateless_proxy.decide, ho, hauth', hi, notout, hop, refused, Decision.ofCore]
 
 /-- **Substitution correctness.** When `serve` exchanged bytes with a route,
     those bytes were exactly `UpstreamPrefix ++ HeaderPrefix ++ credential ++
@@ -387,12 +489,13 @@ theorem dispatch_trace (ops : stateless.SurrogateOpener V) (opener : V) (request
     and the credential the opener unsealed from a surrogate admitted for
     this peer; the route serves that surrogate's provider; and the admission
     record was acknowledged first. -/
-theorem serve_dispatch_exact (ops : stateless.SurrogateOpener V) (inst : Origin O) (opener : V) (io : O)
+theorem serve_dispatch_exact (ops : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P) (inst : Origin O)
+    (opener : V) (policy : P) (io : O)
     (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance) (peer : Slice U8)
     (now : I64) (limit : Usize) (served : proxy_controller.Served) (after : O)
-    (h : serve ops inst opener io request routes a peer now limit = Result.ok (served, after))
+    (h : serve ops pol inst opener policy io request routes a peer now limit = Result.ok (served, after))
     (index : Usize) (wire : alloc.vec.Vec U8) (opened : stateless.Opened)
-    (decided : decide_request ops opener request routes a peer now = Result.ok (.dispatch index wire opened))
+    (decided : decide_request ops pol opener policy request routes a peer now = Result.ok (.dispatch index wire opened))
     (room : ∀ (inside : index.val < routes.length),
       (UpstreamPrefix request (alloc.vec.Vec.deref (routes[index.val]'inside).host) ++
         HeaderPrefix (routes[index.val]'inside).authentication ++ opened.credential.val ++ CRLF ++
@@ -407,11 +510,11 @@ theorem serve_dispatch_exact (ops : stateless.SurrogateOpener V) (inst : Origin 
           HeaderPrefix (routes[index.val]'inside).authentication ++ opened.credential.val ++ CRLF ++
           UpstreamSuffix request ∧
         Dispatched inst io request limit index wire opened served after := by
-  obtain ⟨d, hd, m⟩ := serve_follows_decision ops inst opener io request routes a peer now limit served after h
+  obtain ⟨d, hd, m⟩ := serve_follows_decision ops pol inst opener policy io request routes a peer now limit served after h
   rw [decided] at hd
   simp only [Result.ok.injEq] at hd
   subst hd
-  obtain ⟨token, ho, hopen, inside, provider, henc⟩ := dispatch_trace ops opener request routes a peer now decided
+  obtain ⟨token, ho, hopen, inside, provider, henc⟩ := dispatch_trace ops pol opener policy request routes a peer now decided
   obtain ⟨v, hv, adm, same, hun, _⟩ := open_ok_trace ops opener _ a peer now opened hopen
   refine ⟨token, v, ho, hv, adm, same, hun, inside, by rw [← same]; exact provider, ?_, m⟩
   obtain ⟨value, returned, post⟩ := returned_of_spec
@@ -434,16 +537,17 @@ theorem serve_dispatch_exact (ops : stateless.SurrogateOpener V) (inst : Origin 
     refusal — then `serve`, for any origin, never calls `admitted` or
     `exchange`: the origin state after the request is the result of
     `rejected` alone, or untouched. -/
-theorem serve_rejected_never_sends (ops : stateless.SurrogateOpener V) (inst : Origin O) (opener : V) (io : O)
+theorem serve_rejected_never_sends (ops : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P) (inst : Origin O)
+    (opener : V) (policy : P) (io : O)
     (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance) (peer : Slice U8)
     (now : I64) (limit : Usize) (served : proxy_controller.Served) (after : O)
-    (h : serve ops inst opener io request routes a peer now limit = Result.ok (served, after))
+    (h : serve ops pol inst opener policy io request routes a peer now limit = Result.ok (served, after))
     (notDispatched : ∀ index wire opened,
-      decide_request ops opener request routes a peer now ≠ Result.ok (.dispatch index wire opened)) :
+      decide_request ops pol opener policy request routes a peer now ≠ Result.ok (.dispatch index wire opened)) :
     served.stage = .Refused ∧
       ((∃ r, inst.rejected io r = Result.ok after ∧ unauthorized_served = Result.ok served) ∨
        (after = io ∧ served.reply.val = ascii (refusalText served.code))) := by
-  obtain ⟨d, hd, m⟩ := serve_follows_decision ops inst opener io request routes a peer now limit served after h
+  obtain ⟨d, hd, m⟩ := serve_follows_decision ops pol inst opener policy io request routes a peer now limit served after h
   cases d with
   | unauthorized r =>
     obtain ⟨hs, hr⟩ := m
@@ -499,13 +603,14 @@ theorem dispatched_reply {inst : Origin O} {io : O} {request : proxy_http.Reques
     does not occur (`reflection_forms_include_raw`, `guest_response_contract`).
     Other encodings of the credential are covered for the unfolded reflection
     forms only; a provider transformation outside them is not. -/
-theorem serve_guest_reply (ops : stateless.SurrogateOpener V) (inst : Origin O) (opener : V) (io : O)
+theorem serve_guest_reply (ops : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P) (inst : Origin O)
+    (opener : V) (policy : P) (io : O)
     (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance) (peer : Slice U8)
     (now : I64) (limit : Usize) (served : proxy_controller.Served) (after : O)
-    (h : serve ops inst opener io request routes a peer now limit = Result.ok (served, after)) :
+    (h : serve ops pol inst opener policy io request routes a peer now limit = Result.ok (served, after)) :
     unauthorized_served = Result.ok served ∨
     served.reply.val = ascii (refusalText served.code) ∨
-    (∃ index wire opened, decide_request ops opener request routes a peer now =
+    (∃ index wire opened, decide_request ops pol opener policy request routes a peer now =
         Result.ok (.dispatch index wire opened) ∧ served.stage = .Completed ∧
       ∃ forms head response,
         proxy_http.reflection_forms (alloc.vec.Vec.deref opened.credential) = Result.ok forms ∧
@@ -513,7 +618,7 @@ theorem serve_guest_reply (ops : stateless.SurrogateOpener V) (inst : Origin O) 
           request.keep_alive head = Result.ok (.Ok (), served.reply) ∧
         ((ResponseBytes response response.fields.val request.keep_alive false).length ≤ Usize.max →
           ¬ Occurs served.reply.val opened.credential.val)) := by
-  obtain ⟨d, hd, m⟩ := serve_follows_decision ops inst opener io request routes a peer now limit served after h
+  obtain ⟨d, hd, m⟩ := serve_follows_decision ops pol inst opener policy io request routes a peer now limit served after h
   cases d with
   | unauthorized r => exact Or.inl m.1
   | refused code =>

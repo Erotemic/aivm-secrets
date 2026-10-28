@@ -225,10 +225,22 @@ def check(root: Path = ROOT) -> list[str]:
     # The proxy's peer is the TLS handshake's.
     connection = functions(proxy)['connection'][0]
     require('PeerIdentity::from_connection(&stream.conn)' in connection, 'peer not from the handshake')
-    require(re.search(r'stateless_proxy::connection\((?:.|\n)*?peer\.thumbprint\.as_bytes\(\)', connection),
+    # One connection loop per operation policy, each for the handshake peer.
+    loops = re.findall(r'stateless_proxy::connection\((.*?)\n\s*\)', connection, re.S)
+    require(len(loops) == 2 and all('peer.thumbprint.as_bytes()' in call for call in loops),
             'connection not served for the handshake peer')
-    require(count(every, 'stateless_proxy::connection(') == 1, 'a second connection loop')
+    require(count(every, 'stateless_proxy::connection(') == 2, 'a third connection loop')
     checked.append('every proxied request is decided for the TLS handshake peer')
+
+    # The operation policy is one of the core's two extracted policies.
+    require(sorted(call.split(',')[1].strip() for call in loops) == ['&Unrestricted', 'read_only'],
+            'a connection loop under a policy other than the core Unrestricted or ReadOnly')
+    for name, source in shell.items():
+        require(not re.search(r'\bimpl\b[^{]*\bOperationPolicy\b', code_only(source)),
+                f'{name} implements an operation policy')
+    dispatch = re.search(r'pub struct Dispatch \{(.*?)\}', core_proxy, re.S)
+    require(dispatch is not None and 'pub ' not in dispatch.group(1), 'Dispatch fields are public')
+    checked.append('the operation policy is the core Unrestricted or ReadOnly; dispatch data stays in the core')
 
     # Sealing and the mailbox, from exactly their endpoints.
     broker = shell['broker.rs']
@@ -285,8 +297,8 @@ def check(root: Path = ROOT) -> list[str]:
     checked.append('audit records carry claims, routes, statuses and codes only')
 
     # Every decision is the core's.
-    for call in ['stateless::open(', 'stateless_proxy::decide(', 'stateless_proxy::serve(',
-                 'stateless_proxy::connection_step(']:
+    for call in ['stateless::open(', 'stateless::authenticate(', 'stateless::decrypt(', 'stateless_proxy::decide(',
+                 'stateless_proxy::serve(', 'stateless_proxy::connection_step(', '.permits(']:
         for name, source in shell.items():
             require(call not in code_only(source), f'{name} calls {call}')
     checked.append('the shell opens no surrogate and decides no request outside the core loop')

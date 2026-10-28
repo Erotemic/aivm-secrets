@@ -102,7 +102,7 @@ theorem no_providers_no_state {S : Type} {ops : stateless.SurrogateSealer S}
     empty one and no login event happened: the renewals, mints and proxy
     connections of that world were decided from keys, configuration,
     request, peer and clock alone. -/
-theorem strict_no_login_state {M : Type} {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config}
+theorem strict_no_login_state {M : Type} {inst : KeyMaterial M} {Paired : M → M → Prop} {P : Type} {cfg : Config P}
     (none : cfg.login.providers.val = []) {W : World M} (reach : Reachable inst Paired cfg W) :
     stateless_mailbox.empty = Result.ok W.mb ∧ W.logins = [] :=
   no_providers_no_state none (mailbox_reachable reach)

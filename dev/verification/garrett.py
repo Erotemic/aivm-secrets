@@ -42,12 +42,16 @@ STATELESS_PROOFS = {
     "stateless_mailbox.rs": "GarrettStatelessMailbox",
     "stateless_proxy.rs": "GarrettStatelessConnection",
     "stateless_token.rs": "GarrettStatelessProtocol",
+    "stateless_policy.rs": "GarrettStatelessComposition",
 }
 # Mutants whose defect is rejected by a module outside their file's default.
 STATELESS_MUTANT_PROOFS = {
     "stateless state login label not bound": "GarrettStatelessState",
     # The strict profile's theorem: no login provider, no login state.
     "stateless login started for an unconfigured provider": "GarrettStatelessStrict",
+    # The composition theorem and its read-only instantiation.
+    "stateless proxy operation policy not consulted": "GarrettStatelessComposition",
+    "stateless proxy credential decrypted before authorization": "GarrettStatelessComposition",
 }
 THEOREMS = [
     'aivm_secrets_garrett_core.read_transition.Proofs.request_facts_returned_iff',
@@ -1085,6 +1089,7 @@ def inputs() -> list[str]:
         "proofs/GarrettStatelessRoundTrip.lean",
         "proofs/GarrettStatelessWitness.lean",
         "proofs/GarrettStatelessStrict.lean",
+        "proofs/GarrettStatelessComposition.lean",
         "dev/garrett_stateless_vectors.py",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
@@ -2281,6 +2286,7 @@ def mutate(pattern: str | None = None) -> None:
     stateless_proxy = source.with_name("stateless_proxy.rs")
     stateless_mailbox = source.with_name("stateless_mailbox.rs")
     stateless_token = source.with_name("stateless_token.rs")
+    stateless_policy = source.with_name("stateless_policy.rs")
     mutations += [
         (stateless, "stateless certificate binding removed", "if !(certificate == peer) {", "if false {"),
         (stateless, "stateless expired token accepted", "if now >= claims.expires_at {", "if now > claims.expires_at {"),
@@ -2303,7 +2309,7 @@ def mutate(pattern: str | None = None) -> None:
          "    if false {\n        return Err(LoginDenial::Invalid);"),
         (stateless_login, "stateless login delivered to any peer", "if !(certificate == peer) {", "if false {"),
         (stateless_proxy, "stateless proxy wrong provider destination",
-         "let index = route_of(routes, &opened.claims.provider);", "let index: usize = 0;"),
+         "let index = route_of(routes, &verified.claims.provider);", "let index: usize = 0;"),
         (stateless_proxy, "stateless proxy egress without acknowledged admission",
          "if !origin.admitted(&opened.claims, index) {", "if false {"),
         (stateless_proxy, "stateless proxy surrogate forwarded instead of credential",
@@ -2312,7 +2318,34 @@ def mutate(pattern: str | None = None) -> None:
          "let forms = reflection_forms(&opened.credential);", "let forms = reflection_forms(b\"\");"),
         (stateless_proxy, "stateless proxy dispatches despite an encoder refusal",
          "Err(refusal) => Decision::Refused(code_of(&refusal)),",
-         "Err(_refusal) => Decision::Dispatch(index, wire, opened),"),
+         "Err(_refusal) => Decision::Dispatch(Dispatch {\n            route: index,\n            wire,\n            opened,\n        }),"),
+        # Operation authorization (GarrettStatelessComposition): removing or
+        # bypassing the policy, or weakening the read-only policy.
+        (stateless_proxy, "stateless proxy operation policy not consulted",
+         "if !policy.permits(&verified.claims, &operation_of(request)) {", "if false {"),
+        (stateless_proxy, "stateless proxy credential decrypted before authorization",
+         "    if !policy.permits(&verified.claims, &operation_of(request)) {\n"
+         "        return Decision::Refused(Code::Denied);\n    }\n"
+         "    let opened = match stateless::decrypt(opener, verified) {\n"
+         "        Ok(opened) => opened,\n        Err(rejection) => return Decision::Unauthorized(Some(rejection)),\n    };\n",
+         "    let claims = stateless::authenticate(opener, &token, acceptance, peer, now);\n"
+         "    let opened = match stateless::decrypt(opener, verified) {\n"
+         "        Ok(opened) => opened,\n        Err(rejection) => return Decision::Unauthorized(Some(rejection)),\n    };\n"
+         "    let permitted = match claims {\n        Ok(v) => policy.permits(&v.claims, &operation_of(request)),\n"
+         "        Err(_) => false,\n    };\n"
+         "    if !permitted {\n        return Decision::Refused(Code::Denied);\n    }\n"),
+        (stateless_policy, "stateless read-only policy permits a write method",
+         "        read_method(&operation.method)\n", "        true\n"),
+        (stateless_policy, "stateless read-only policy permits a body",
+         "            && operation.body == 0\n", "            && true\n"),
+        (stateless_policy, "stateless read-only policy ignores the destination provider",
+         "    own == provider\n", "    true\n"),
+        (stateless_policy, "stateless read-only policy ignores the resource path",
+         "        && path_matches(&resource.path, &operation.path)\n", "        && true\n"),
+        (stateless_policy, "stateless read-only policy ignores the resource method",
+         "        && method_ok(&resource.method, &operation.method)\n", "        && true\n"),
+        (stateless_policy, "stateless operation path includes the query",
+         "        path: request.target[..end].to_vec(),\n", "        path: request.target.clone(),\n"),
         (stateless_login, "stateless login started for an unconfigured provider",
          "if !stateless::member(&policy.providers, provider) {", "if false {"),
         (stateless_mailbox, "stateless mailbox duplicate login accepted",

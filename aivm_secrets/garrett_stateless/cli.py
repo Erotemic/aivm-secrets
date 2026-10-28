@@ -192,8 +192,8 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 proxy = Proxy.from_file(Path(args.config))
                 running = proxy.serve()
-                _line({'address': running.address, 'profile': 'garrett-stateless-v1', 'role': 'proxy',
-                       'stateless': proxy.config.stateless})
+                _line({'address': running.address, 'operations': proxy.config.operations,
+                       'profile': 'garrett-stateless-v1', 'role': 'proxy', 'stateless': proxy.config.stateless})
             _hold(args)
             running.stop()
         elif args.command == 'mint':

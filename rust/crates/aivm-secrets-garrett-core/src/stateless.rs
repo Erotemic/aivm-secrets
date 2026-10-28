@@ -186,6 +186,49 @@ pub fn open<V: SurrogateOpener>(
     })
 }
 
+/// The first half of [`open`]: verify, then admit for this peer, and stop
+/// before decrypting. The proxy authorizes the operation between this and
+/// [`decrypt`], so a refused operation never has its credential unsealed.
+pub fn authenticate<V: SurrogateOpener>(
+    opener: &V,
+    token: &[u8],
+    acceptance: &Acceptance,
+    peer: &[u8],
+    now: i64,
+) -> Result<Verified, Rejection> {
+    let verified = match opener.verify(token) {
+        Ok(verified) => verified,
+        Err(error) => return Err(error),
+    };
+    match admit(
+        &verified.claims,
+        &verified.key_issuer,
+        acceptance,
+        peer,
+        now,
+    ) {
+        Ok(()) => (),
+        Err(error) => return Err(error),
+    }
+    Ok(verified)
+}
+
+/// The second half of [`open`]: unseal an authenticated surrogate and
+/// check the credential.
+pub fn decrypt<V: SurrogateOpener>(opener: &V, verified: Verified) -> Result<Opened, Rejection> {
+    let credential = match opener.unseal(&verified) {
+        Ok(credential) => credential,
+        Err(error) => return Err(error),
+    };
+    if !http_auth::valid_credential(&credential) {
+        return Err(Rejection::InvalidCredential);
+    }
+    Ok(Opened {
+        claims: verified.claims,
+        credential,
+    })
+}
+
 /// What the broker issues for.
 pub struct IssuePolicy {
     pub issuer: Vec<u8>,

@@ -498,6 +498,72 @@ pub struct RouteConfig {
     pub deny: Vec<DenyRule>,
 }
 
+/// One `read_only` resource: a route's provider, an optional read method
+/// and a path (spec section 11.1).
+#[derive(Clone, Debug)]
+pub struct ResourceConfig {
+    pub provider: String,
+    pub method: String,
+    pub path: String,
+}
+
+/// The proxy's operation policy: Garrett's (any operation the deny rules
+/// leave) or read-only on the listed resources.
+#[derive(Clone, Debug)]
+pub enum Operations {
+    Unrestricted,
+    ReadOnly(Vec<ResourceConfig>),
+}
+
+impl Operations {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Operations::Unrestricted => "unrestricted",
+            Operations::ReadOnly(_) => "read-only",
+        }
+    }
+}
+
+fn read_only_of(f: &Fields, base: &Path, routes: &[RouteConfig]) -> Result<Operations> {
+    let Some(value) = f.present("read_only") else {
+        return Ok(Operations::Unrestricted);
+    };
+    let Value::Array(items) = value else {
+        return Err(config("proxy: read_only must be an array"));
+    };
+    if items.is_empty() || items.len() > 64 {
+        return Err(config("proxy: between 1 and 64 read_only resources"));
+    }
+    let mut resources = Vec::new();
+    for item in items {
+        let r = Fields::new(
+            item,
+            "read_only resource",
+            base,
+            &["path", "provider"],
+            &["method"],
+        )?;
+        let provider = r.string("provider")?;
+        if !routes.iter().any(|route| route.provider == provider) {
+            return Err(config("read_only resource: provider has no route"));
+        }
+        let method = r.optional_string("method")?.unwrap_or_default();
+        if !matches!(method.as_str(), "" | "GET" | "HEAD") {
+            return Err(config("read_only resource: method must be GET or HEAD"));
+        }
+        let path = r.string("path")?;
+        if !path.starts_with('/') {
+            return Err(config("read_only resource: path must start with /"));
+        }
+        resources.push(ResourceConfig {
+            provider,
+            method,
+            path,
+        });
+    }
+    Ok(Operations::ReadOnly(resources))
+}
+
 #[derive(Clone, Debug)]
 pub struct ProxyConfig {
     pub listen: String,
@@ -513,6 +579,7 @@ pub struct ProxyConfig {
     pub routes: Vec<RouteConfig>,
     pub audit: Option<PathBuf>,
     pub stateless: Statelessness,
+    pub operations: Operations,
 }
 
 fn route_of(value: &Value, base: &Path) -> Result<RouteConfig> {
@@ -584,6 +651,7 @@ impl ProxyConfig {
             &[
                 "audit",
                 "max_lifetime",
+                "read_only",
                 "request_limit",
                 "skew",
                 "stateless",
@@ -622,6 +690,7 @@ impl ProxyConfig {
         if audit.is_some() && stateless == Statelessness::Strict {
             return Err(config("proxy: a strict proxy writes no audit file"));
         }
+        let operations = read_only_of(&f, &base, &routes)?;
         Ok(Self {
             listen: f.string("listen")?,
             authority,
@@ -636,6 +705,7 @@ impl ProxyConfig {
             routes,
             audit,
             stateless,
+            operations,
         })
     }
 }
