@@ -341,12 +341,19 @@ fn run(raw: &[String]) -> Result<()> {
         Some("pki") => pki_command(&args),
         Some("broker") => {
             let broker = Arc::new(Broker::from_file(&args.path("--config")?)?);
+            let stateless = broker.config().stateless;
             let running = broker.serve()?;
             line(json::object([
                 ("agent", json::text(&running.agent_address.to_string())),
-                ("browser", json::text(&running.browser_address.to_string())),
+                (
+                    "browser",
+                    running
+                        .browser_address
+                        .map_or(Value::Null, |a| json::text(&a.to_string())),
+                ),
                 ("profile", json::text(garrett_stateless::PROFILE)),
                 ("role", json::text("broker")),
+                ("stateless", json::text(stateless.name())),
             ]));
             hold(&args);
             running.stop();
@@ -354,21 +361,24 @@ fn run(raw: &[String]) -> Result<()> {
         }
         Some("proxy") => {
             let proxy = Arc::new(Proxy::from_file(&args.path("--config")?)?);
+            let stateless = proxy.config().stateless;
             let running = proxy.serve()?;
             line(json::object([
                 ("address", json::text(&running.address.to_string())),
                 ("profile", json::text(garrett_stateless::PROFILE)),
                 ("role", json::text("proxy")),
+                ("stateless", json::text(stateless.name())),
             ]));
             hold(&args);
             running.stop();
             Ok(())
         }
         Some("mint") => {
+            // Minting needs the keys and the issuance policy only: no
+            // listener, OAuth client or client secret.
             let config = BrokerConfig::load(&args.path("--config")?)?;
             let keys = BrokerKeys::load(&config.keys)?;
-            let provider = args.need("--provider")?;
-            let broker = Broker::new(config.clone(), keys, Box::new(broker::HttpsTokenEndpoint))?;
+            let provider = config.provider(args.need("--provider")?)?;
             let credential =
                 zeroize::Zeroizing::new(read_private(&args.path("--credential-file")?, 8192)?);
             let text = std::str::from_utf8(&credential)
@@ -381,7 +391,16 @@ fn run(raw: &[String]) -> Result<()> {
                 .map(|v| v.parse::<i64>())
                 .transpose()
                 .map_err(|_| usage("--lifetime"))?;
-            let issued = broker.mint(provider, text.as_bytes(), der.as_ref(), lifetime)?;
+            let issued = broker::mint_with(
+                &keys,
+                &config.issue_policy(),
+                &provider.name,
+                text.as_bytes(),
+                der.as_ref(),
+                &provider.copy_claims,
+                lifetime.unwrap_or(config.max_lifetime),
+                broker::now_seconds(),
+            )?;
             deliver(&args, &issued)
         }
         Some("inspect") => {

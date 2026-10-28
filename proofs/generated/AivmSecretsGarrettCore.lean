@@ -22402,24 +22402,33 @@ def stateless_proxy.unauthorized_served : Result proxy_controller.Served := do
       status := 0#u16
     }
 
-/-- [aivm_secrets_garrett_core::stateless_proxy::serve]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 152:0-216:1
+/-- [aivm_secrets_garrett_core::stateless_proxy::Decision]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 153:0-160:1
     Visibility: public -/
-def stateless_proxy.serve
-  {V : Type _} {O : Type _} (statelessSurrogateOpenerInst :
-  stateless.SurrogateOpener V) (OriginInst : stateless_proxy.Origin O)
-  (opener : V) (origin : O) (request : proxy_http.Request)
+@[discriminant isize]
+inductive stateless_proxy.Decision where
+| Unauthorized : Option stateless.Rejection → stateless_proxy.Decision
+| Refused : proxy_http.Code → stateless_proxy.Decision
+| Dispatch :
+  Std.Usize →
+  alloc.vec.Vec Std.U8 →
+  stateless.Opened →
+  stateless_proxy.Decision
+
+/-- [aivm_secrets_garrett_core::stateless_proxy::decide]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 167:0-202:1
+    Visibility: public -/
+def stateless_proxy.decide
+  {V : Type _} (statelessSurrogateOpenerInst : stateless.SurrogateOpener V)
+  (opener : V) (request : proxy_http.Request)
   (routes : Slice stateless_proxy.Route) (acceptance : stateless.Acceptance)
-  (peer : Slice Std.U8) (now : Std.I64) (limit : Std.Usize) :
-  Result (proxy_controller.Served × O)
+  (peer : Slice Std.U8) (now : Std.I64) :
+  Result stateless_proxy.Decision
   := do
   let s := alloc.vec.Vec.deref request.fields
   let o ← stateless_proxy.surrogate_of s
   match o with
-  | none =>
-    let origin1 ← OriginInst.rejected origin stateless.Rejection.Malformed
-    let s1 ← stateless_proxy.unauthorized_served
-    ok (s1, origin1)
+  | none => ok (stateless_proxy.Decision.Unauthorized none)
   | some token =>
     let s1 := alloc.vec.Vec.deref token
     let r ←
@@ -22430,11 +22439,7 @@ def stateless_proxy.serve
       let index ← stateless_proxy.route_of routes s2
       let i := Slice.len routes
       if index >= i
-      then
-        let s3 ←
-          proxy_controller.stopped proxy_http.Code.UnknownOrigin
-            proxy_controller.Stage.Refused
-        ok (s3, origin)
+      then ok (stateless_proxy.Decision.Refused proxy_http.Code.UnknownOrigin)
       else
         let route ← Slice.index_usize routes index
         let s3 := alloc.vec.Vec.deref route.host
@@ -22445,51 +22450,73 @@ def stateless_proxy.serve
             s5 route.authentication
         match r1 with
         | core.result.Result.Ok _ =>
-          let (b, origin1) ← OriginInst.admitted origin opened.claims index
-          if b
-          then
-            let s6 := alloc.vec.Vec.deref opened.credential
-            let forms ← proxy_http.reflection_forms s6
-            let (r2, origin2) ←
-              OriginInst.exchange origin1 { route := index, wire }
-            match r2 with
-            | core.result.Result.Ok raw =>
-              let s7 := alloc.vec.Vec.deref raw
-              let s8 := alloc.vec.Vec.deref forms
-              let served ← proxy_controller.release s7 request s8 limit
-              match served.stage with
-              | proxy_controller.Stage.Refused => ok (served, origin2)
-              | proxy_controller.Stage.Failed => ok (served, origin2)
-              | proxy_controller.Stage.Completed =>
-                let (b1, origin3) ←
-                  OriginInst.completed origin2 served.status
-                if b1
-                then ok (served, origin3)
-                else
-                  let s9 ←
-                    proxy_controller.stopped proxy_http.Code.OutcomeUnknown
-                      proxy_controller.Stage.Failed
-                  ok (s9, origin3)
-            | core.result.Result.Err code =>
-              let s7 ←
-                proxy_controller.stopped code proxy_controller.Stage.Failed
-              ok (s7, origin2)
-          else
-            let s6 ←
-              proxy_controller.stopped proxy_http.Code.InternalError
-                proxy_controller.Stage.Refused
-            ok (s6, origin1)
+          ok (stateless_proxy.Decision.Dispatch index wire opened)
         | core.result.Result.Err refusal =>
           let c ← proxy_controller.code_of refusal
-          let s6 ← proxy_controller.stopped c proxy_controller.Stage.Refused
-          ok (s6, origin)
+          ok (stateless_proxy.Decision.Refused c)
     | core.result.Result.Err rejection =>
-      let origin1 ← OriginInst.rejected origin rejection
-      let s2 ← stateless_proxy.unauthorized_served
-      ok (s2, origin1)
+      ok (stateless_proxy.Decision.Unauthorized (some rejection))
+
+/-- [aivm_secrets_garrett_core::stateless_proxy::serve]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 208:0-250:1
+    Visibility: public -/
+def stateless_proxy.serve
+  {V : Type _} {O : Type _} (statelessSurrogateOpenerInst :
+  stateless.SurrogateOpener V) (OriginInst : stateless_proxy.Origin O)
+  (opener : V) (origin : O) (request : proxy_http.Request)
+  (routes : Slice stateless_proxy.Route) (acceptance : stateless.Acceptance)
+  (peer : Slice Std.U8) (now : Std.I64) (limit : Std.Usize) :
+  Result (proxy_controller.Served × O)
+  := do
+  let d ←
+    stateless_proxy.decide statelessSurrogateOpenerInst opener request routes
+      acceptance peer now
+  match d with
+  | stateless_proxy.Decision.Unauthorized rejection =>
+    let origin1 ←
+      match rejection with
+      | none => OriginInst.rejected origin stateless.Rejection.Malformed
+      | some rejection1 => OriginInst.rejected origin rejection1
+    let s ← stateless_proxy.unauthorized_served
+    ok (s, origin1)
+  | stateless_proxy.Decision.Refused code =>
+    let s ← proxy_controller.stopped code proxy_controller.Stage.Refused
+    ok (s, origin)
+  | stateless_proxy.Decision.Dispatch index wire opened =>
+    let (b, origin1) ← OriginInst.admitted origin opened.claims index
+    if b
+    then
+      let s := alloc.vec.Vec.deref opened.credential
+      let forms ← proxy_http.reflection_forms s
+      let (r, origin2) ← OriginInst.exchange origin1 { route := index, wire }
+      match r with
+      | core.result.Result.Ok raw =>
+        let s1 := alloc.vec.Vec.deref raw
+        let s2 := alloc.vec.Vec.deref forms
+        let served ← proxy_controller.release s1 request s2 limit
+        match served.stage with
+        | proxy_controller.Stage.Refused => ok (served, origin2)
+        | proxy_controller.Stage.Failed => ok (served, origin2)
+        | proxy_controller.Stage.Completed =>
+          let (b1, origin3) ← OriginInst.completed origin2 served.status
+          if b1
+          then ok (served, origin3)
+          else
+            let s3 ←
+              proxy_controller.stopped proxy_http.Code.OutcomeUnknown
+                proxy_controller.Stage.Failed
+            ok (s3, origin3)
+      | core.result.Result.Err code =>
+        let s1 ← proxy_controller.stopped code proxy_controller.Stage.Failed
+        ok (s1, origin2)
+    else
+      let s ←
+        proxy_controller.stopped proxy_http.Code.InternalError
+          proxy_controller.Stage.Refused
+      ok (s, origin1)
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::connection_step]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 224:0-294:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 258:0-328:1
     Visibility: public -/
 def stateless_proxy.connection_step
   {V : Type _} {C : Type _} (statelessSurrogateOpenerInst :
@@ -22595,7 +22622,7 @@ def stateless_proxy.connection_step
       else ok ({ buffer := rest, «open» := false }, channel5)
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::connection]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 312:4-323:5
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 346:4-357:5
     Visibility: public -/
 @[rust_loop]
 def stateless_proxy.connection_loop
@@ -22617,7 +22644,7 @@ def stateless_proxy.connection_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::connection]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 299:0-324:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 333:0-358:1
     Visibility: public -/
 @[reducible]
 def stateless_proxy.connection

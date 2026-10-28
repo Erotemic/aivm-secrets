@@ -121,8 +121,8 @@ class HttpsUrl:
 
 
 @dataclass(frozen=True)
-class ProviderConfig:
-    name: str
+class OAuthClient:
+    """The OAuth 2.0 client registration of an ``oauth`` provider (spec section 8)."""
     authorization_url: HttpsUrl
     token_url: HttpsUrl
     client_id: str
@@ -132,17 +132,38 @@ class ProviderConfig:
     token_ca_file: Path | None = None
     client_secret_file: Path | None = None
     issuer: str | None = None
+
+    def requested_scope(self, requested: str | None) -> str:
+        scope = self.default_scope if requested is None else requested
+        if not enc.is_scope(scope) or not all(s in self.scopes for s in scope.split(' ') if s):
+            raise ConfigError('invalid_scope')
+        return scope
+
+
+_OAUTH_REQUIRED = {'authorization_url', 'client_id', 'default_scope', 'scopes', 'token_url'}
+_OAUTH_OPTIONAL = {'client_secret_file', 'issuer', 'token_address', 'token_ca_file'}
+
+
+@dataclass(frozen=True)
+class ProviderConfig:
+    """A provider as the broker sees it. ``oauth`` is ``None`` for a
+    ``provisioned`` provider, whose credentials the operator mints directly
+    (spec section 7.1); issuance, renewal and the proxy do not depend on it."""
+    name: str
+    oauth: OAuthClient | None
     copy_claims: ClaimCopy = field(default_factory=ClaimCopy)
 
     @classmethod
     def load(cls, path: Path) -> 'ProviderConfig':
         value, base = _load(path, PROVIDER_SCHEMA)
-        f = _Fields(value, 'provider', base,
-                    {'authorization_url', 'client_id', 'default_scope', 'name', 'schema', 'scopes', 'token_url'},
-                    {'client_secret_file', 'copy_claims', 'issuer', 'token_address', 'token_ca_file'})
-        scopes = f.strings('scopes')
-        if len(scopes) > 64 or not all(s and ' ' not in s and enc.is_scope(s) for s in scopes):
-            raise ConfigError('provider: invalid scopes')
+        acquisition = value.get('acquisition') if isinstance(value, dict) else None
+        if acquisition not in (None, 'oauth', 'provisioned'):
+            raise ConfigError('provider: acquisition must be oauth or provisioned')
+        provisioned = acquisition == 'provisioned'
+        required, optional = {'name', 'schema'}, {'acquisition', 'copy_claims'}
+        if not provisioned:
+            required, optional = required | _OAUTH_REQUIRED, optional | _OAUTH_OPTIONAL
+        f = _Fields(value, 'provider', base, required, optional)
         copy = f.present('copy_claims')
         if copy is None:
             copy_claims = ClaimCopy('access')
@@ -152,26 +173,45 @@ class ProviderConfig:
             copy_claims = ClaimCopy(f.strings('copy_claims'))
         else:
             raise ConfigError('provider: copy_claims must be null, "all" or a list of names')
+        name = f.checked('name', enc.is_provider)
+        if provisioned:
+            return cls(name=name, oauth=None, copy_claims=copy_claims)
+        scopes = f.strings('scopes')
+        if len(scopes) > 64 or not all(s and ' ' not in s and enc.is_scope(s) for s in scopes):
+            raise ConfigError('provider: invalid scopes')
         issuer = f.optional_string('issuer')
         if issuer is not None and not enc.is_text(issuer):
             raise ConfigError('provider: invalid issuer')
-        provider = cls(
-            name=f.checked('name', enc.is_provider),
+        client = OAuthClient(
             authorization_url=HttpsUrl.parse(f.string('authorization_url')),
             token_url=HttpsUrl.parse(f.string('token_url')),
             client_id=f.checked('client_id', enc.is_text),
             scopes=tuple(scopes), default_scope=f.string('default_scope'),
             token_address=f.optional_string('token_address'), token_ca_file=f.optional_path('token_ca_file'),
-            client_secret_file=f.optional_path('client_secret_file'), issuer=issuer, copy_claims=copy_claims,
+            client_secret_file=f.optional_path('client_secret_file'), issuer=issuer,
         )
-        provider.requested_scope(None)
-        return provider
+        client.requested_scope(None)
+        return cls(name=name, oauth=client, copy_claims=copy_claims)
 
-    def requested_scope(self, requested: str | None) -> str:
-        scope = self.default_scope if requested is None else requested
-        if not enc.is_scope(scope) or not all(s in self.scopes for s in scope.split(' ') if s):
-            raise ConfigError('invalid_scope')
-        return scope
+
+STANDARD = 'standard'
+STRICT = 'strict'
+
+
+def _stateless(f: '_Fields') -> str:
+    """Spec section 9: ``strict`` keeps no mutable state beyond keys and
+    configuration (no OAuth login mailbox, no audit file)."""
+    value = f.optional_string('stateless') or STANDARD
+    if value not in (STANDARD, STRICT):
+        raise ConfigError(f'{f.what}: stateless must be standard or strict')
+    return value
+
+
+@dataclass(frozen=True)
+class BrowserEndpoint:
+    """The browser listener and its public URL, the registered OAuth redirect base."""
+    listen: str
+    public_url: HttpsUrl
 
 
 @dataclass(frozen=True)
@@ -180,8 +220,7 @@ class BrokerConfig:
     audience: str
     replica: str
     agent_listen: str
-    browser_listen: str
-    public_url: HttpsUrl
+    browser: BrowserEndpoint | None
     certificate: Path
     private_key: Path
     agent_ca: Path
@@ -190,31 +229,49 @@ class BrokerConfig:
     max_lifetime: int = 3600
     max_renew: int = 604800
     login_ttl: int = 600
+    stateless: str = STANDARD
 
     @classmethod
     def load(cls, path: Path) -> 'BrokerConfig':
         value, base = _load(path, BROKER_SCHEMA)
         f = _Fields(value, 'broker', base,
-                    {'agent_ca', 'agent_listen', 'audience', 'browser_listen', 'certificate', 'issuer', 'keys',
-                     'private_key', 'providers', 'public_url', 'replica', 'schema'},
-                    {'login_ttl', 'max_lifetime', 'max_renew'})
-        public_url = HttpsUrl.parse(f.string('public_url'))
-        if not public_url.path.endswith('/'):
-            raise ConfigError('broker: public_url must end with /')
+                    {'agent_ca', 'agent_listen', 'audience', 'certificate', 'issuer', 'keys',
+                     'private_key', 'providers', 'replica', 'schema'},
+                    {'browser_listen', 'login_ttl', 'max_lifetime', 'max_renew', 'public_url', 'stateless'})
         providers = tuple(ProviderConfig.load(base / p) for p in f.strings('providers'))
         if not 1 <= len(providers) <= 16:
             raise ConfigError('broker: between 1 and 16 providers')
         if len({p.name for p in providers}) != len(providers):
             raise ConfigError('broker: duplicate provider names')
+        stateless = _stateless(f)
+        oauth = any(p.oauth is not None for p in providers)
+        if oauth and stateless == STRICT:
+            raise ConfigError('broker: a strict broker has no OAuth providers (their logins need the mailbox)')
+        listen, public = f.present('browser_listen'), f.present('public_url')
+        if listen is None and public is None and not oauth:
+            browser = None
+        elif listen is not None and public is not None and oauth:
+            public_url = HttpsUrl.parse(f.string('public_url'))
+            if not public_url.path.endswith('/'):
+                raise ConfigError('broker: public_url must end with /')
+            browser = BrowserEndpoint(f.string('browser_listen'), public_url)
+        else:
+            raise ConfigError('broker: browser_listen and public_url are required with an OAuth provider, '
+                              'and refused without one')
         return cls(
             issuer=f.checked('issuer', enc.is_text), audience=f.checked('audience', enc.is_text),
-            replica=f.checked('replica', enc.is_kid), agent_listen=f.string('agent_listen'),
-            browser_listen=f.string('browser_listen'), public_url=public_url,
+            replica=f.checked('replica', enc.is_kid), agent_listen=f.string('agent_listen'), browser=browser,
             certificate=f.path('certificate'), private_key=f.path('private_key'), agent_ca=f.path('agent_ca'),
             keys=f.path('keys'), providers=providers,
             max_lifetime=f.int('max_lifetime', 3600, 1, 86400), max_renew=f.int('max_renew', 604800, 0, 2592000),
-            login_ttl=f.int('login_ttl', 600, 1, 600),
+            login_ttl=f.int('login_ttl', 600, 1, 600), stateless=stateless,
         )
+
+    def provider(self, name: str) -> ProviderConfig:
+        for provider in self.providers:
+            if provider.name == name:
+                return provider
+        raise ConfigError('unknown_provider')
 
 
 @dataclass(frozen=True)
@@ -242,6 +299,7 @@ class ProxyConfig:
     skew: int = 60
     request_limit: int = 1 << 20
     audit: Path | None = None
+    stateless: str = STANDARD
 
     @classmethod
     def load(cls, path: Path) -> 'ProxyConfig':
@@ -249,7 +307,7 @@ class ProxyConfig:
         f = _Fields(value, 'proxy', base,
                     {'audiences', 'authority', 'certificate', 'client_ca', 'keys', 'listen', 'private_key',
                      'routes', 'schema'},
-                    {'audit', 'max_lifetime', 'request_limit', 'skew'})
+                    {'audit', 'max_lifetime', 'request_limit', 'skew', 'stateless'})
         audiences = f.strings('audiences')
         if not 1 <= len(audiences) <= 16 or not all(enc.is_text(a) for a in audiences):
             raise ConfigError('proxy: invalid audiences')
@@ -264,12 +322,16 @@ class ProxyConfig:
         authority = f.string('authority').lower()
         if not authority or not all(c.isascii() and (c.isalnum() or c in '.-:') for c in authority):
             raise ConfigError('proxy: invalid authority')
+        stateless = _stateless(f)
+        audit = f.optional_path('audit')
+        if audit is not None and stateless == STRICT:
+            raise ConfigError('proxy: a strict proxy writes no audit file')
         return cls(
             listen=f.string('listen'), authority=authority, certificate=f.path('certificate'),
             private_key=f.path('private_key'), client_ca=f.path('client_ca'), keys=f.path('keys'),
             audiences=tuple(audiences), routes=routes, max_lifetime=f.int('max_lifetime', 3600, 1, 86400),
             skew=f.int('skew', 60, 0, 300), request_limit=f.int('request_limit', 1 << 20, 1, 16 << 20),
-            audit=f.optional_path('audit'),
+            audit=audit, stateless=stateless,
         )
 
 

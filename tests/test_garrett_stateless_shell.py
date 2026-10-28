@@ -28,7 +28,7 @@ def copy_sources(tmp_path: Path, guard) -> Path:
 
 def test_current_shell_passes():
     guard = load()
-    assert len(guard.check(ROOT)) == 8
+    assert len(guard.check(ROOT)) == 11
 
 
 @pytest.mark.parametrize('relative, old, new, message', [
@@ -52,6 +52,31 @@ def test_current_shell_passes():
      '("reason", json::text(rejection_name(rejection))),',
      '("reason", json::text(rejection_name(rejection))),\n            ("token", json::text("")),',
      'audit record'),
+    # The shell may not decide a request itself.
+    ('rust/crates/garrett-stateless/src/proxy.rs',
+     '        self.proxy.send_upstream(egress)\n',
+     '        let _ = stateless_proxy::decide(&self.proxy.keys, todo!(), &[], todo!(), b"", 0);\n'
+     '        self.proxy.send_upstream(egress)\n',
+     'stateless_proxy::decide'),
+    # No hidden mutable state, in a struct field or an atomic.
+    ('rust/crates/garrett-stateless/src/proxy.rs',
+     'pub struct Proxy {\n    config: ProxyConfig,',
+     'pub struct Proxy {\n    seen: Mutex<Vec<u8>>,\n    config: ProxyConfig,',
+     'mutable state'),
+    ('rust/crates/garrett-stateless/src/proxy.rs',
+     '        let stop = Arc::new(AtomicBool::new(false));\n',
+     '        let stop = Arc::new(AtomicBool::new(false));\n        let served = Arc::new(AtomicUsize::new(0));\n',
+     'atomic state'),
+    # The mailbox serves OAuth providers only.
+    ('rust/crates/garrett-stateless/src/broker.rs',
+     '                .filter(|p| p.oauth().is_some())\n',
+     '',
+     'login policy'),
+    # No file writes during credential use.
+    ('rust/crates/garrett-stateless/src/broker.rs',
+     'fn poll(&self, peer: &PeerIdentity, login: &str) -> Poll {',
+     'fn poll(&self, peer: &PeerIdentity, login: &str) -> Poll {\n        let _ = std::fs::write("seen", login);',
+     'writes files'),
 ])
 def test_bypass_rejected(tmp_path, relative, old, new, message):
     guard = load()

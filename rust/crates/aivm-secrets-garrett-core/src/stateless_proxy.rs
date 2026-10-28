@@ -147,37 +147,44 @@ pub fn unauthorized_served() -> Served {
     }
 }
 
-/// One request on an authenticated connection, end to end.
-#[allow(clippy::too_many_arguments)]
-pub fn serve<V: SurrogateOpener, O: Origin>(
+/// What one request is authorized to do.
+// Unboxed: Aeneas models `Box` as the identity, so it would buy nothing.
+#[allow(clippy::large_enum_variant)]
+pub enum Decision {
+    /// No usable surrogate (`None`), or why the opener refused it.
+    Unauthorized(Option<Rejection>),
+    /// A fixed refusal before any egress.
+    Refused(Code),
+    /// Send these exact bytes to this route, for this opened surrogate.
+    Dispatch(usize, Vec<u8>, stateless::Opened),
+}
+
+/// The authorization decision for one request, from the keys (through
+/// `opener`), the authenticated peer, the request, the clock and the
+/// static routes and acceptance policy alone. It reads no other state and
+/// performs no effect, so every replica with the same keys and
+/// configuration decides alike.
+pub fn decide<V: SurrogateOpener>(
     opener: &V,
-    origin: &mut O,
     request: &Request,
     routes: &[Route],
     acceptance: &Acceptance,
     peer: &[u8],
     now: i64,
-    limit: usize,
-) -> Served {
+) -> Decision {
     let token = match surrogate_of(&request.fields) {
         Some(token) => token,
-        None => {
-            origin.rejected(&Rejection::Malformed);
-            return unauthorized_served();
-        }
+        None => return Decision::Unauthorized(None),
     };
     let opened = match stateless::open(opener, &token, acceptance, peer, now) {
         Ok(opened) => opened,
-        Err(rejection) => {
-            origin.rejected(&rejection);
-            return unauthorized_served();
-        }
+        Err(rejection) => return Decision::Unauthorized(Some(rejection)),
     };
     // The destination is the authenticated provider's route, never a
     // request value.
     let index = route_of(routes, &opened.claims.provider);
     if index >= routes.len() {
-        return stopped(Code::UnknownOrigin, Stage::Refused);
+        return Decision::Refused(Code::UnknownOrigin);
     }
     let route = &routes[index];
     let mut wire = Vec::new();
@@ -189,9 +196,36 @@ pub fn serve<V: SurrogateOpener, O: Origin>(
         &opened.credential,
         &route.authentication,
     ) {
-        Ok(()) => (),
-        Err(refusal) => return stopped(code_of(&refusal), Stage::Refused),
+        Ok(()) => Decision::Dispatch(index, wire, opened),
+        Err(refusal) => Decision::Refused(code_of(&refusal)),
     }
+}
+
+/// One request on an authenticated connection, end to end: [`decide`], then,
+/// only for a dispatch, the admission record, the one exchange and the
+/// release.
+#[allow(clippy::too_many_arguments)]
+pub fn serve<V: SurrogateOpener, O: Origin>(
+    opener: &V,
+    origin: &mut O,
+    request: &Request,
+    routes: &[Route],
+    acceptance: &Acceptance,
+    peer: &[u8],
+    now: i64,
+    limit: usize,
+) -> Served {
+    let (index, wire, opened) = match decide(opener, request, routes, acceptance, peer, now) {
+        Decision::Unauthorized(rejection) => {
+            match rejection {
+                Some(rejection) => origin.rejected(&rejection),
+                None => origin.rejected(&Rejection::Malformed),
+            }
+            return unauthorized_served();
+        }
+        Decision::Refused(code) => return stopped(code, Stage::Refused),
+        Decision::Dispatch(index, wire, opened) => (index, wire, opened),
+    };
     // Fail closed: no acknowledged admission record, no egress.
     if !origin.admitted(&opened.claims, index) {
         return stopped(Code::InternalError, Stage::Refused);

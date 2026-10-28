@@ -16,7 +16,15 @@ reached only through the extracted interface the proofs quantify over:
   transition from exactly one endpoint;
 * the OAuth access token becomes a `Token` only inside the permitted exchange,
   and a refresh token is never kept;
-* audit records name claims, routes and codes only.
+* audit records name claims, routes and codes only;
+* the shell decides nothing itself: it never calls `stateless::open`,
+  `stateless_proxy::decide` or `serve` directly;
+* its only mutable state beyond keys and configuration is the broker's login
+  mailbox (whose policy names the OAuth providers only, so a strict broker's
+  stays empty, `GarrettStatelessStrict.lean`), the optional proxy audit file
+  handle (refused by a strict configuration), and the stop flags and
+  connection counters of the listeners; and the broker and proxy write no
+  file except that audit file.
 
 It is a source guard over the shell, not a proof and not a call-graph or
 dependency analysis; `docs/verified-garrett-stateless.md` states the trusted
@@ -74,6 +82,26 @@ def code_only(source: str) -> str:
         else:
             out.append(c)
             i += 1
+    return ''.join(out)
+
+
+def without_tests(source: str) -> str:
+    """The source with each `#[cfg(test)]` module blanked: unit tests are not
+    part of the running shell."""
+    code = code_only(source)
+    out = list(source)
+    for match in re.finditer(r'#\[cfg\(test\)\]\s*mod\s+\w+\s*\{', code):
+        depth = 0
+        for j in range(match.end() - 1, len(code)):
+            if code[j] == '{':
+                depth += 1
+            elif code[j] == '}':
+                depth -= 1
+                if depth == 0:
+                    for k in range(match.start(), j + 1):
+                        if out[k] != '\n':
+                            out[k] = ' '
+                    break
     return ''.join(out)
 
 
@@ -158,7 +186,7 @@ def count(source: str, text: str) -> int:
 
 
 def check(root: Path = ROOT) -> list[str]:
-    shell = {p.name: p.read_text() for p in sorted((root / SHELL).glob('*.rs'))}
+    shell = {p.name: without_tests(p.read_text()) for p in sorted((root / SHELL).glob('*.rs'))}
     core = {p.name: p.read_text() for p in sorted((root / CORE).glob('stateless*.rs'))}
     every = '\n'.join(shell.values())
     checked = []
@@ -255,6 +283,43 @@ def check(root: Path = ROOT) -> list[str]:
         require(fields <= {'event', 'peer', 'reason', 'jti', 'method', 'provider', 'route', 'sub', 'status', 'code'},
                 f'audit record field outside the reviewed set: {sorted(fields)}')
     checked.append('audit records carry claims, routes, statuses and codes only')
+
+    # Every decision is the core's.
+    for call in ['stateless::open(', 'stateless_proxy::decide(', 'stateless_proxy::serve(',
+                 'stateless_proxy::connection_step(']:
+        for name, source in shell.items():
+            require(call not in code_only(source), f'{name} calls {call}')
+    checked.append('the shell opens no surrogate and decides no request outside the core loop')
+
+    # Mutable process state: the mailbox, the audit handle, stop flags and
+    # connection counters, and nothing else.
+    for name, source in shell.items():
+        code = code_only(source)
+        for kind in ['RwLock', 'RefCell', 'Cell<', 'OnceLock', 'OnceCell', 'LazyLock', 'thread_local!',
+                     'static mut']:
+            require(kind not in code, f'{name} keeps {kind} state')
+        allowed = {'broker.rs': {'mailbox: Mutex<Mailbox>'}, 'proxy.rs': {'audit: Option<Mutex<std::fs::File>>'}}
+        fields = set(re.findall(r'\b\w+: (?:Option<)?Mutex<[^>]*>>?', code))
+        require(fields <= allowed.get(name, set()), f'{name} holds mutable state {sorted(fields)}')
+        atomics = set(re.findall(r'\b(\w+)(?::| =) Arc(?:<|::new\()Atomic', code))
+        require(atomics <= {'stop', 'active'}, f'{name} holds atomic state {sorted(atomics)}')
+    login = functions(broker)['login_policy'][0]
+    require('.filter(|p| p.oauth().is_some())' in login, 'the login policy names a provider that is not OAuth')
+    checked.append('mutable state is only the OAuth mailbox, the audit handle, stop flags and connection counters')
+
+    # Files: the broker and proxy write only the optional audit file.
+    for name, source in shell.items():
+        code = code_only(source)
+        if name == 'files.rs':
+            continue
+        for call in ['write_private(', 'replace_private(', 'File::create(', 'fs::write(', 'create_dir']:
+            require(call not in code, f'{name} writes files ({call})')
+        opened = owners(source, 'OpenOptions::new()') if 'OpenOptions::new()' in code else set()
+        require(opened <= ({'new'} if name == 'proxy.rs' else set()), f'{name} opens files for writing')
+    new = functions(proxy)['new'][0]
+    require(re.search(r'match &config\.audit \{\s*Some\(path\) => Some\(Mutex::new\(\s*std::fs::OpenOptions::new\(\)'
+                      r'\s*\.append\(true\)', new), 'the proxy opens a file other than the configured audit log')
+    checked.append('the broker and proxy write no file but the optional (non-strict) audit log')
     return checked
 
 

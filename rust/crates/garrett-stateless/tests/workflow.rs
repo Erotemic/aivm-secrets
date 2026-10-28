@@ -4,7 +4,7 @@
 //! API, an independent proxy replica, renewal, and the refusals.
 use garrett_stateless::agent::{Agent, Endpoint};
 use garrett_stateless::broker::{Broker, TokenEndpoint, TokenResponse};
-use garrett_stateless::config::{BrokerConfig, ProviderConfig};
+use garrett_stateless::config::{BrokerConfig, OAuthClient};
 use garrett_stateless::error::{Error, Result};
 use garrett_stateless::http;
 use garrett_stateless::keys::BrokerKeys;
@@ -74,7 +74,7 @@ impl SyntheticOAuth {
 }
 struct TokenStub(Arc<SyntheticOAuth>);
 impl TokenEndpoint for TokenStub {
-    fn exchange(&self, _provider: &ProviderConfig, form: &str) -> Result<TokenResponse> {
+    fn exchange(&self, _provider: &OAuthClient, form: &str) -> Result<TokenResponse> {
         let params = http::parse_query(form).unwrap();
         let get = |k: &str| {
             params
@@ -255,7 +255,7 @@ fn stateless_workflow_end_to_end() {
         Some(&running.agent_address.to_string()),
     )
     .unwrap();
-    let browser = running.browser_address.to_string();
+    let browser = running.browser_address.unwrap().to_string();
 
     let ca_pem = ca.certificate.as_bytes();
     let agent = |c: &pki::Issued| {
@@ -433,4 +433,172 @@ fn stateless_workflow_end_to_end() {
     let renewed = broker2.renew(&peer_c, &issued.token).unwrap();
     assert!(renewed.renew_until <= issued.renew_until);
     assert!(broker2.renew(&peer_d, &issued.token).is_err());
+}
+
+/// Direct provisioning in the strict profile: an API key minted by the
+/// operator, with no OAuth client, browser listener, token endpoint or login
+/// mailbox, and a proxy with no audit file. Renewal still works.
+#[test]
+fn strict_provisioned_workflow() {
+    let dir = Dir::new();
+    let ca = pki::create_ca("test CA", 2).unwrap();
+    let names = vec![
+        "broker.test".to_owned(),
+        "proxy.test".to_owned(),
+        "api.test".to_owned(),
+    ];
+    let server = pki::issue(&ca.certificate, &ca.key, Leaf::Server(&names), 2).unwrap();
+    let agent_c = pki::issue(
+        &ca.certificate,
+        &ca.key,
+        Leaf::Client {
+            name: "agent",
+            uri: None,
+        },
+        2,
+    )
+    .unwrap();
+    dir.write("ca.pem", ca.certificate.as_bytes(), false);
+    dir.write("server.pem", server.certificate.as_bytes(), false);
+    dir.write("server.key", server.key.as_bytes(), true);
+    let keys = BrokerKeys::generate("https://broker.test", "k1").unwrap();
+    dir.write("broker-keys.json", &keys.to_json(), true);
+    dir.write("proxy-keys.json", &keys.export_proxy().to_json(), true);
+    write_json(
+        &dir,
+        "api-key.json",
+        r#"{"schema":"garrett-stateless-v1/provider","name":"api","acquisition":"provisioned"}"#
+            .to_owned(),
+    );
+    write_json(
+        &dir,
+        "oauth.json",
+        r#"{"schema":"garrett-stateless-v1/provider","name":"idp","authorization_url":"https://idp.test/authorize",
+            "token_url":"https://idp.test/token","client_id":"client-1","scopes":["read"],"default_scope":"read"}"#
+            .to_owned(),
+    );
+    // A provisioned provider has no OAuth members.
+    let with_oauth_member = write_json(
+        &dir,
+        "bad-provider.json",
+        r#"{"schema":"garrett-stateless-v1/provider","name":"api","acquisition":"provisioned","client_id":"x"}"#
+            .to_owned(),
+    );
+    assert!(garrett_stateless::config::ProviderConfig::load(&with_oauth_member).is_err());
+    let broker_json = |providers: &str, extra: &str| {
+        format!(
+            r#"{{"schema":"garrett-stateless-v1/broker","issuer":"https://broker.test","audience":"https://proxy.test",
+            "replica":"a","agent_listen":"127.0.0.1:0","certificate":"server.pem","private_key":"server.key",
+            "agent_ca":"ca.pem","keys":"broker-keys.json","providers":[{providers}]{extra}}}"#
+        )
+    };
+    let broker_path = write_json(
+        &dir,
+        "broker.json",
+        broker_json(r#""api-key.json""#, r#","stateless":"strict""#),
+    );
+    // A strict broker refuses an OAuth provider; a browser endpoint needs one.
+    for (name, providers, extra) in [
+        (
+            "strict-oauth.json",
+            r#""api-key.json","oauth.json""#,
+            r#","stateless":"strict","browser_listen":"127.0.0.1:0","public_url":"https://broker.test/""#,
+        ),
+        ("no-browser.json", r#""oauth.json""#, ""),
+        (
+            "stray-browser.json",
+            r#""api-key.json""#,
+            r#","browser_listen":"127.0.0.1:0","public_url":"https://broker.test/""#,
+        ),
+    ] {
+        let path = write_json(&dir, name, broker_json(providers, extra));
+        assert!(BrokerConfig::load(&path).is_err(), "{name}");
+    }
+    let (api_address, seen) = api(&server.certificate, &server.key);
+    let (api_host, api_port) = api_address.rsplit_once(':').unwrap();
+    let proxy_json = |extra: &str| {
+        format!(
+            r#"{{"schema":"garrett-stateless-v1/proxy","listen":"127.0.0.1:0","authority":"proxy.test:8443",
+            "certificate":"server.pem","private_key":"server.key","client_ca":"ca.pem","keys":"proxy-keys.json",
+            "audiences":["https://proxy.test"],"skew":0,"stateless":"strict"{extra},
+            "routes":[{{"provider":"api","host":"api.test","address":"{api_host}","port":{api_port},"ca_file":"ca.pem",
+                       "authentication":"api-key"}}]}}"#
+        )
+    };
+    let audited = write_json(&dir, "audited.json", proxy_json(r#","audit":"audit.log""#));
+    assert!(garrett_stateless::config::ProxyConfig::load(&audited).is_err());
+    let proxy_path = write_json(&dir, "proxy.json", proxy_json(""));
+
+    // The operator mints from the keys and the issuance policy alone.
+    let config = BrokerConfig::load(&broker_path).unwrap();
+    assert!(config.browser.is_none());
+    let der = tls::certificates(agent_c.certificate.as_bytes())
+        .unwrap()
+        .remove(0);
+    let provider = config.provider("api").unwrap();
+    let issued = garrett_stateless::broker::mint_with(
+        &BrokerKeys::load(&config.keys).unwrap(),
+        &config.issue_policy(),
+        &provider.name,
+        b"sk_SYNTHETIC_API_KEY_0123456789",
+        der.as_ref(),
+        &provider.copy_claims,
+        600,
+        garrett_stateless::broker::now_seconds(),
+    )
+    .unwrap();
+    assert!(!issued.token.contains("sk_SYNTHETIC"));
+
+    let ca_pem = ca.certificate.as_bytes();
+    let agent = Agent::new(
+        ca_pem,
+        ClientIdentity::Software {
+            certificate: agent_c.certificate.clone().into_bytes(),
+            key: agent_c.key.as_bytes().to_vec(),
+        },
+    )
+    .unwrap();
+    let proxy = Arc::new(Proxy::from_file(&proxy_path).unwrap())
+        .serve()
+        .unwrap();
+    let proxy_endpoint =
+        Endpoint::parse("https://proxy.test:8443", Some(&proxy.address.to_string())).unwrap();
+    let response = agent
+        .request(
+            &proxy_endpoint,
+            &issued.token,
+            "GET",
+            "/v1/things",
+            &[],
+            b"",
+        )
+        .unwrap();
+    assert_eq!(response.status, 200);
+    assert_eq!(seen.lock().unwrap().len(), 1);
+
+    // The strict broker serves only the agent API: renewal, and no logins.
+    let broker = Arc::new(Broker::from_file(&broker_path).unwrap());
+    let running = broker.serve().unwrap();
+    assert!(running.browser_address.is_none());
+    let broker_endpoint = Endpoint::parse(
+        "https://broker.test:9443",
+        Some(&running.agent_address.to_string()),
+    )
+    .unwrap();
+    assert!(agent.begin_login(&broker_endpoint, "api", None).is_err());
+    let renewed = agent.renew(&broker_endpoint, &issued.token).unwrap();
+    assert!(renewed.renew_until <= issued.renew_until);
+    let again = agent
+        .request(
+            &proxy_endpoint,
+            &renewed.token,
+            "GET",
+            "/v1/things",
+            &[],
+            b"",
+        )
+        .unwrap();
+    assert_eq!(again.status, 200);
+    running.stop();
+    proxy.stop();
 }

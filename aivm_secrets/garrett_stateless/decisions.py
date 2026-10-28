@@ -625,29 +625,58 @@ def release(raw: bytes, request: http1.Request, forms: list, limit: int) -> Serv
     return Served(out, request.keep_alive, 'completed', 'outcome_unknown', response.status)
 
 
-def serve(opener: SurrogateOpener, origin: Origin, request: http1.Request, routes: tuple[Route, ...],
-          acceptance: Acceptance, peer: str, now: int, limit: int) -> Served:
+@dataclass(frozen=True)
+class Decision:
+    """``stateless_proxy::Decision``: ``unauthorized`` (``rejection`` is
+    ``None`` when no surrogate was presented), ``refused`` (``code``) or
+    ``dispatch`` (``route``, the exact ``wire`` bytes and the ``opened``
+    surrogate)."""
+    kind: str
+    rejection: str | None = None
+    code: str | None = None
+    route: int = 0
+    wire: bytes = b''
+    opened: Opened | None = None
+
+    def __repr__(self) -> str:
+        return f'Decision({self.kind!r}, route={self.route})'
+
+
+def decide(opener: SurrogateOpener, request: http1.Request, routes: tuple[Route, ...], acceptance: Acceptance,
+           peer: str, now: int) -> Decision:
+    """The pure authorization decision for one request (``stateless_proxy::decide``):
+    keys (through ``opener``), routes, acceptance policy, peer and clock only."""
     token = surrogate_of(request.fields)
     if token is None:
-        origin.rejected('malformed')
-        return unauthorized()
+        return Decision('unauthorized')
     try:
         opened = open_surrogate(opener, token, acceptance, peer, now)
     except Rejection as rejection:
-        origin.rejected(rejection.code)
-        return unauthorized()
+        return Decision('unauthorized', rejection=rejection.code)
     index = route_of(routes, opened.claims.provider)
     if index >= len(routes):
-        return stopped('unknown_origin', 'refused')
+        return Decision('refused', code='unknown_origin')
     try:
         wire = encode_upstream(request, routes[index], opened.credential)
     except http1.Refused as refused:
-        return stopped(refused.code, 'refused')
+        return Decision('refused', code=refused.code)
+    return Decision('dispatch', route=index, wire=wire, opened=opened)
+
+
+def serve(opener: SurrogateOpener, origin: Origin, request: http1.Request, routes: tuple[Route, ...],
+          acceptance: Acceptance, peer: str, now: int, limit: int) -> Served:
+    decision = decide(opener, request, routes, acceptance, peer, now)
+    if decision.kind == 'unauthorized':
+        origin.rejected(decision.rejection or 'malformed')
+        return unauthorized()
+    if decision.kind == 'refused':
+        return stopped(decision.code, 'refused')
+    opened, index = decision.opened, decision.route
     if not origin.admitted(opened.claims, index):
         return stopped('internal_error', 'refused')
     forms = proxy_policy.reflection_forms(opened.credential)
     try:
-        raw = origin.exchange(index, wire)
+        raw = origin.exchange(index, decision.wire)
     except http1.Refused as refused:
         return stopped(refused.code, 'failed')
     served = release(raw, request, forms, limit)

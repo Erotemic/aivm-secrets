@@ -46,6 +46,8 @@ STATELESS_PROOFS = {
 # Mutants whose defect is rejected by a module outside their file's default.
 STATELESS_MUTANT_PROOFS = {
     "stateless state login label not bound": "GarrettStatelessState",
+    # The strict profile's theorem: no login provider, no login state.
+    "stateless login started for an unconfigured provider": "GarrettStatelessStrict",
 }
 THEOREMS = [
     'aivm_secrets_garrett_core.read_transition.Proofs.request_facts_returned_iff',
@@ -1082,6 +1084,7 @@ def inputs() -> list[str]:
         "proofs/GarrettStatelessProtocol.lean",
         "proofs/GarrettStatelessRoundTrip.lean",
         "proofs/GarrettStatelessWitness.lean",
+        "proofs/GarrettStatelessStrict.lean",
         "dev/garrett_stateless_vectors.py",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
@@ -2307,6 +2310,11 @@ def mutate(pattern: str | None = None) -> None:
          "        &opened.credential,\n        &route.authentication,", "        &token,\n        &route.authentication,"),
         (stateless_proxy, "stateless proxy credential reflection unchecked",
          "let forms = reflection_forms(&opened.credential);", "let forms = reflection_forms(b\"\");"),
+        (stateless_proxy, "stateless proxy dispatches despite an encoder refusal",
+         "Err(refusal) => Decision::Refused(code_of(&refusal)),",
+         "Err(_refusal) => Decision::Dispatch(index, wire, opened),"),
+        (stateless_login, "stateless login started for an unconfigured provider",
+         "if !stateless::member(&policy.providers, provider) {", "if false {"),
         (stateless_mailbox, "stateless mailbox duplicate login accepted",
          "if find(&mailbox.slots, &state.login) < mailbox.slots.len() {", "if false {"),
         (stateless_mailbox, "stateless mailbox serial reused", "        serial: mailbox.next,\n", "        serial: 0,\n"),

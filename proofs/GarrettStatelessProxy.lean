@@ -57,30 +57,18 @@ inductive Decision where
   /-- Send `wire` to route `index` for the opened surrogate. -/
   | dispatch (index : Usize) (wire : alloc.vec.Vec U8) (opened : stateless.Opened)
 
-/-- The prefix of `serve`, composed from the extracted functions. -/
+/-- The extracted decision, with the constructors named for these proofs. -/
+def Decision.ofCore : stateless_proxy.Decision → Decision
+  | .Unauthorized r => .unauthorized r
+  | .Refused code => .refused code
+  | .Dispatch index wire opened => .dispatch index wire opened
+
+/-- The extracted pure decision `stateless_proxy::decide`. -/
 def decide_request {V : Type} (ops : stateless.SurrogateOpener V) (opener : V)
     (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance)
     (peer : Slice U8) (now : I64) : Result Decision := do
-  let o ← surrogate_of (alloc.vec.Vec.deref request.fields)
-  match o with
-  | none => Result.ok (.unauthorized none)
-  | some token =>
-    let r ← stateless.«open» ops opener (alloc.vec.Vec.deref token) a peer now
-    match r with
-    | .Err e => Result.ok (.unauthorized (some e))
-    | .Ok opened =>
-      let index ← route_of routes (alloc.vec.Vec.deref opened.claims.provider)
-      if index ≥ Slice.len routes then Result.ok (.refused .UnknownOrigin)
-      else do
-        let route ← Slice.index_usize routes index
-        let (r1, wire) ← proxy_http.encode_upstream (alloc.vec.Vec.new U8) request
-          (alloc.vec.Vec.deref route.host) (alloc.vec.Vec.deref route.rules)
-          (alloc.vec.Vec.deref opened.credential) route.authentication
-        match r1 with
-        | .Err refusal => do
-          let code ← proxy_controller.code_of refusal
-          Result.ok (.refused code)
-        | .Ok _ => Result.ok (.dispatch index wire opened)
+  let c ← stateless_proxy.decide ops opener request routes a peer now
+  Result.ok (Decision.ofCore c)
 
 variable {V O : Type}
 
@@ -119,100 +107,73 @@ theorem serve_follows_decision (ops : stateless.SurrogateOpener V) (inst : Origi
       | .refused code => proxy_controller.stopped code .Refused = Result.ok served ∧ after = io
       | .dispatch index wire opened => Dispatched inst io request limit index wire opened served after := by
   unfold serve at h
-  obtain ⟨o, ho, h⟩ := bind_ok_inv h
-  cases o with
-  | none =>
+  obtain ⟨c, hc, h⟩ := bind_ok_inv h
+  have hd : decide_request ops opener request routes a peer now = Result.ok (Decision.ofCore c) := by
+    simp [decide_request, hc]
+  refine ⟨Decision.ofCore c, hd, ?_⟩
+  cases c with
+  | Unauthorized r =>
     obtain ⟨io1, hr, h⟩ := bind_ok_inv h
     obtain ⟨s1, hs, h⟩ := bind_ok_inv h
     simp only [Result.ok.injEq, Prod.mk.injEq] at h
     obtain ⟨e1, e2⟩ := h
     subst e1 e2
-    exact ⟨.unauthorized none, by simp [decide_request, ho], hs, hr⟩
-  | some token =>
-    dsimp only at h
-    obtain ⟨r, hopen, h⟩ := bind_ok_inv h
-    cases r with
-    | Err e =>
-      obtain ⟨io1, hr, h⟩ := bind_ok_inv h
-      obtain ⟨s1, hs, h⟩ := bind_ok_inv h
+    refine ⟨hs, ?_⟩
+    cases r <;> exact hr
+  | Refused code =>
+    obtain ⟨s1, hs, h⟩ := bind_ok_inv h
+    simp only [Result.ok.injEq, Prod.mk.injEq] at h
+    obtain ⟨e1, e2⟩ := h
+    subst e1 e2
+    exact ⟨hs, rfl⟩
+  | Dispatch index wire opened =>
+    obtain ⟨⟨acked, io1⟩, hadm, h⟩ := bind_ok_inv h
+    cases acked with
+    | false =>
+      obtain ⟨s6, hs6, h⟩ := bind_ok_inv h
       simp only [Result.ok.injEq, Prod.mk.injEq] at h
       obtain ⟨e1, e2⟩ := h
       subst e1 e2
-      exact ⟨.unauthorized (some e), by simp [decide_request, ho, hopen], hs, hr⟩
-    | Ok opened =>
-      dsimp only at h
-      obtain ⟨index, hindex, h⟩ := bind_ok_inv h
-      split at h
-      · rename_i outside
-        obtain ⟨s3, hs3, h⟩ := bind_ok_inv h
+      exact Or.inl ⟨hadm, hs6⟩
+    | true =>
+      obtain ⟨forms, hforms, h⟩ := bind_ok_inv h
+      obtain ⟨⟨answer, io2⟩, hex, h⟩ := bind_ok_inv h
+      refine Or.inr ⟨io1, forms, answer, io2, hadm, hforms, hex, ?_⟩
+      cases answer with
+      | Ok raw =>
+        obtain ⟨released, rel, h⟩ := bind_ok_inv h
+        refine ⟨released, rel, ?_⟩
+        cases hst : released.stage with
+        | Refused =>
+          rw [hst] at h
+          simp only [Result.ok.injEq, Prod.mk.injEq] at h
+          exact Or.inl ⟨by simp, h.1.symm, h.2.symm⟩
+        | Failed =>
+          rw [hst] at h
+          simp only [Result.ok.injEq, Prod.mk.injEq] at h
+          exact Or.inl ⟨by simp, h.1.symm, h.2.symm⟩
+        | Completed =>
+          rw [hst] at h
+          obtain ⟨⟨acked, io3⟩, comp, h⟩ := bind_ok_inv h
+          cases acked with
+          | true =>
+            have h' : Result.ok (released, io3) = Result.ok (served, after) := h
+            simp only [Result.ok.injEq, Prod.mk.injEq] at h'
+            obtain ⟨e1, e2⟩ := h'
+            subst e2
+            exact Or.inr ⟨rfl, true, comp, Or.inl ⟨rfl, e1.symm⟩⟩
+          | false =>
+            obtain ⟨s9, hs9, h⟩ := bind_ok_inv h
+            simp only [Result.ok.injEq, Prod.mk.injEq] at h
+            obtain ⟨e1, e2⟩ := h
+            subst e1 e2
+            exact Or.inr ⟨rfl, false, comp, Or.inr ⟨rfl, hs9⟩⟩
+      | Err code =>
+        obtain ⟨s7, hs7, h⟩ := bind_ok_inv h
         simp only [Result.ok.injEq, Prod.mk.injEq] at h
         obtain ⟨e1, e2⟩ := h
         subst e1 e2
-        have out' : ¬ (index.val < routes.val.length) := by scalar_tac
-        exact ⟨.refused .UnknownOrigin, by simp [decide_request, ho, hopen, hindex, out'], hs3, rfl⟩
-      · rename_i inside
-        have in' : index.val < routes.val.length := by scalar_tac
-        obtain ⟨route, hroute, h⟩ := bind_ok_inv h
-        obtain ⟨⟨r1, wire⟩, hencode, h⟩ := bind_ok_inv h
-        cases r1 with
-        | Err refusal =>
-          obtain ⟨code, hcode, h⟩ := bind_ok_inv h
-          obtain ⟨s6, hs6, h⟩ := bind_ok_inv h
-          simp only [Result.ok.injEq, Prod.mk.injEq] at h
-          obtain ⟨e1, e2⟩ := h
-          subst e1 e2
-          refine ⟨.refused code, ?_, hs6, rfl⟩
-          simp [decide_request, ho, hopen, hindex, in', hroute, hencode, hcode]
-        | Ok u =>
-          refine ⟨.dispatch index wire opened, ?_, ?_⟩
-          · simp [decide_request, ho, hopen, hindex, in', hroute, hencode]
-          · obtain ⟨⟨acked, io1⟩, hadm, h⟩ := bind_ok_inv h
-            cases acked with
-            | false =>
-              obtain ⟨s6, hs6, h⟩ := bind_ok_inv h
-              simp only [Result.ok.injEq, Prod.mk.injEq] at h
-              obtain ⟨e1, e2⟩ := h
-              subst e1 e2
-              exact Or.inl ⟨hadm, hs6⟩
-            | true =>
-              obtain ⟨forms, hforms, h⟩ := bind_ok_inv h
-              obtain ⟨⟨answer, io2⟩, hex, h⟩ := bind_ok_inv h
-              refine Or.inr ⟨io1, forms, answer, io2, hadm, hforms, hex, ?_⟩
-              cases answer with
-              | Ok raw =>
-                obtain ⟨released, rel, h⟩ := bind_ok_inv h
-                refine ⟨released, rel, ?_⟩
-                cases hst : released.stage with
-                | Refused =>
-                  rw [hst] at h
-                  simp only [Result.ok.injEq, Prod.mk.injEq] at h
-                  exact Or.inl ⟨by simp, h.1.symm, h.2.symm⟩
-                | Failed =>
-                  rw [hst] at h
-                  simp only [Result.ok.injEq, Prod.mk.injEq] at h
-                  exact Or.inl ⟨by simp, h.1.symm, h.2.symm⟩
-                | Completed =>
-                  rw [hst] at h
-                  obtain ⟨⟨acked, io3⟩, comp, h⟩ := bind_ok_inv h
-                  cases acked with
-                  | true =>
-                    have h' : Result.ok (released, io3) = Result.ok (served, after) := h
-                    simp only [Result.ok.injEq, Prod.mk.injEq] at h'
-                    obtain ⟨e1, e2⟩ := h'
-                    subst e2
-                    exact Or.inr ⟨rfl, true, comp, Or.inl ⟨rfl, e1.symm⟩⟩
-                  | false =>
-                    obtain ⟨s9, hs9, h⟩ := bind_ok_inv h
-                    simp only [Result.ok.injEq, Prod.mk.injEq] at h
-                    obtain ⟨e1, e2⟩ := h
-                    subst e1 e2
-                    exact Or.inr ⟨rfl, false, comp, Or.inr ⟨rfl, hs9⟩⟩
-              | Err code =>
-                obtain ⟨s7, hs7, h⟩ := bind_ok_inv h
-                simp only [Result.ok.injEq, Prod.mk.injEq] at h
-                obtain ⟨e1, e2⟩ := h
-                subst e1 e2
-                exact ⟨hs7, rfl⟩
+        exact ⟨hs7, rfl⟩
 
 /-- **Replica equivalence.** Two proxies — any two origin adapters, in any
     states, sharing nothing — given the same opener (key set), request,
@@ -245,6 +206,82 @@ theorem replicas_decide_alike {O1 O2 : Type} (ops : stateless.SurrogateOpener V)
     obtain ⟨x2, _⟩ := m2
     rw [x1] at x2
     simpa using x2
+
+/-- The reply `serve` returns, as a function of the decision and the three
+    answers of its origin adapter: the admission acknowledgement, the
+    exchange's answer and the completion acknowledgement. -/
+def outcome (request : proxy_http.Request) (limit : Usize) (d : Decision) (acked : Bool)
+    (answer : core.result.Result (alloc.vec.Vec U8) proxy_http.Code) (done : Bool) :
+    Result proxy_controller.Served :=
+  match d with
+  | .unauthorized _ => unauthorized_served
+  | .refused code => proxy_controller.stopped code .Refused
+  | .dispatch _ _ opened =>
+    if acked then do
+      let forms ← proxy_http.reflection_forms (alloc.vec.Vec.deref opened.credential)
+      match answer with
+      | .Ok raw => do
+        let released ← proxy_controller.release (alloc.vec.Vec.deref raw) request
+          (alloc.vec.Vec.deref forms) limit
+        match released.stage with
+        | .Completed => if done then Result.ok released else proxy_controller.stopped .OutcomeUnknown .Failed
+        | _ => Result.ok released
+      | .Err code => proxy_controller.stopped code .Failed
+    else proxy_controller.stopped .InternalError .Refused
+
+/-- **The reply is the decision plus the adapter's answers.** Every run of
+    `serve` returns `outcome` of the pure decision and of what its origin
+    adapter answered; nothing else about the adapter's state reaches it. -/
+theorem serve_outcome (ops : stateless.SurrogateOpener V) (inst : Origin O) (opener : V) (io : O)
+    (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance) (peer : Slice U8)
+    (now : I64) (limit : Usize) (served : proxy_controller.Served) (after : O)
+    (h : serve ops inst opener io request routes a peer now limit = Result.ok (served, after)) :
+    ∃ d, decide_request ops opener request routes a peer now = Result.ok d ∧
+      ∃ acked answer done, outcome request limit d acked answer done = Result.ok served := by
+  obtain ⟨d, hd, m⟩ := serve_follows_decision ops inst opener io request routes a peer now limit served after h
+  refine ⟨d, hd, ?_⟩
+  cases d with
+  | unauthorized r => exact ⟨true, .Err .InternalError, true, m.1⟩
+  | refused code => exact ⟨true, .Err .InternalError, true, m.1⟩
+  | dispatch index wire opened =>
+    rcases m with ⟨_, stop⟩ | ⟨io1, forms, answer, io2, _, hforms, _, rest⟩
+    · exact ⟨false, .Err .InternalError, true, by simpa [outcome] using stop⟩
+    · cases answer with
+      | Ok raw =>
+        obtain ⟨released, rel, cases⟩ := rest
+        rcases cases with ⟨stage, same, _⟩ | ⟨stage, acked, _, ⟨_, same⟩ | ⟨_, stop⟩⟩
+        · refine ⟨true, .Ok raw, true, ?_⟩
+          simp only [outcome, ↓reduceIte, hforms, bind_ok, rel]
+          cases hst : released.stage <;> simp_all
+        · refine ⟨true, .Ok raw, true, ?_⟩
+          simp [outcome, hforms, rel, stage, same]
+        · refine ⟨true, .Ok raw, false, ?_⟩
+          simp [outcome, hforms, rel, stage, stop]
+      | Err code =>
+        exact ⟨true, .Err code, true, by simp [outcome, hforms, rest.1]⟩
+
+/-- **Replicas: equal decisions, outcomes that differ only by the network.**
+    Two proxies with the same keys, routes and acceptance policy — any two
+    origin adapters, in any state — make the same decision for the same
+    authenticated request (for a dispatch, the same route and bytes), and
+    each reply is `outcome` of that decision and its own adapter's answers.
+    Their replies can differ only because their upstream exchanges, or their
+    admission and completion records, answered differently. -/
+theorem replicas_differ_only_by_answers {O1 O2 : Type} (ops : stateless.SurrogateOpener V) (opener : V)
+    (inst1 : Origin O1) (io1 : O1) (inst2 : Origin O2) (io2 : O2)
+    (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance) (peer : Slice U8)
+    (now : I64) (limit : Usize) (s1 s2 : proxy_controller.Served) (a1 : O1) (a2 : O2)
+    (h1 : serve ops inst1 opener io1 request routes a peer now limit = Result.ok (s1, a1))
+    (h2 : serve ops inst2 opener io2 request routes a peer now limit = Result.ok (s2, a2)) :
+    ∃ d, decide_request ops opener request routes a peer now = Result.ok d ∧
+      (∃ acked answer done, outcome request limit d acked answer done = Result.ok s1) ∧
+      (∃ acked answer done, outcome request limit d acked answer done = Result.ok s2) := by
+  obtain ⟨d1, hd1, o1⟩ := serve_outcome ops inst1 opener io1 request routes a peer now limit s1 a1 h1
+  obtain ⟨d2, hd2, o2⟩ := serve_outcome ops inst2 opener io2 request routes a peer now limit s2 a2 h2
+  rw [hd1] at hd2
+  simp only [Result.ok.injEq] at hd2
+  subst hd2
+  exact ⟨d1, hd1, o1, o2⟩
 
 /-! ## Route selection -/
 
@@ -302,6 +339,13 @@ theorem dispatch_trace (ops : stateless.SurrogateOpener V) (opener : V) (request
           (alloc.vec.Vec.deref opened.credential) (routes[index.val]'inside).authentication =
           Result.ok (.Ok (), wire) := by
   unfold decide_request at h
+  obtain ⟨c, hc, h⟩ := bind_ok_inv h
+  have hcd : c = .Dispatch index wire opened := by
+    cases c <;> simp [Decision.ofCore] at h ⊢
+    exact h
+  subst hcd
+  unfold stateless_proxy.decide at hc
+  have h := hc
   obtain ⟨o, ho, h⟩ := bind_ok_inv h
   cases o with
   | none => simp at h
@@ -327,7 +371,7 @@ theorem dispatch_trace (ops : stateless.SurrogateOpener V) (opener : V) (request
           obtain ⟨code, _, h⟩ := bind_ok_inv h
           simp at h
         | Ok u =>
-          have same : Decision.dispatch i w o2 = Decision.dispatch index wire opened := by simpa using h
+          have same : stateless_proxy.Decision.Dispatch i w o2 = .Dispatch index wire opened := by simpa using h
           cases same
           have route := route_of_loop_contract routes (alloc.vec.Vec.deref opened.claims.provider) 0#usize
           simp only [route_of] at hi

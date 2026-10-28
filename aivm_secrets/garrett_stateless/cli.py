@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives import serialization
 from . import encoding as enc
 from . import pki
 from .agent import Agent, Endpoint
-from .broker import Broker
+from .broker import Broker, issue_policy, mint_with
 from .config import BrokerConfig
 from .files import read_private, read_public, replace_private, write_private
 from .keys import BrokerKeys
@@ -185,21 +185,27 @@ def main(argv: list[str] | None = None) -> int:
             _pki(args)
         elif args.command in ('broker', 'proxy'):
             if args.command == 'broker':
-                running = Broker.from_file(Path(args.config)).serve()
+                broker = Broker.from_file(Path(args.config))
+                running = broker.serve()
                 _line({'agent': running.agent_address, 'browser': running.browser_address,
-                       'profile': 'garrett-stateless-v1', 'role': 'broker'})
+                       'profile': 'garrett-stateless-v1', 'role': 'broker', 'stateless': broker.config.stateless})
             else:
-                running = Proxy.from_file(Path(args.config)).serve()
-                _line({'address': running.address, 'profile': 'garrett-stateless-v1', 'role': 'proxy'})
+                proxy = Proxy.from_file(Path(args.config))
+                running = proxy.serve()
+                _line({'address': running.address, 'profile': 'garrett-stateless-v1', 'role': 'proxy',
+                       'stateless': proxy.config.stateless})
             _hold(args)
             running.stop()
         elif args.command == 'mint':
-            broker = Broker(BrokerConfig.load(Path(args.config)), BrokerKeys.load(
-                BrokerConfig.load(Path(args.config)).keys))
+            # Minting needs the keys and the issuance policy only: no
+            # listener, OAuth client or client secret.
+            config = BrokerConfig.load(Path(args.config))
+            provider = config.provider(args.provider)
             credential = read_private(Path(args.credential_file), 8192).strip()
             cert = x509.load_pem_x509_certificate(read_public(Path(args.certificate)))
-            _deliver(args, broker.mint(args.provider, credential, cert.public_bytes(serialization.Encoding.DER),
-                                       args.lifetime))
+            _deliver(args, mint_with(BrokerKeys.load(config.keys), issue_policy(config), provider.name, credential,
+                                     cert.public_bytes(serialization.Encoding.DER), provider.copy_claims,
+                                     args.lifetime or config.max_lifetime, int(time.time())))
         elif args.command == 'inspect':
             token = _token(args) if args.token_file else args.token
             if not token:

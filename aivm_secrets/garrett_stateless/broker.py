@@ -18,7 +18,7 @@ from typing import Callable, Protocol
 from . import decisions as d
 from . import encoding as enc
 from . import login, token as tok, tls, wire
-from .config import BrokerConfig, ConfigError, ProviderConfig
+from .config import BrokerConfig, ConfigError, OAuthClient, ProviderConfig
 from .files import read_private
 from .keys import BrokerKeys
 
@@ -37,7 +37,7 @@ class TokenResponse:
 
 
 class TokenEndpoint(Protocol):
-    def exchange(self, provider: ProviderConfig, form: str) -> TokenResponse: ...
+    def exchange(self, provider: OAuthClient, form: str) -> TokenResponse: ...
 
 
 def token_response(status: int, body: bytes) -> TokenResponse:
@@ -66,7 +66,7 @@ def token_response(status: int, body: bytes) -> TokenResponse:
 class HttpsTokenEndpoint:
     """POST the form to the provider's pinned token endpoint."""
 
-    def exchange(self, provider: ProviderConfig, form: str) -> TokenResponse:
+    def exchange(self, provider: OAuthClient, form: str) -> TokenResponse:
         context = tls.upstream_client(provider.token_ca_file)
         url = provider.token_url
         address = provider.token_address or f'{url.host}:{url.port}'
@@ -109,8 +109,8 @@ class Broker:
         self.clock = clock or (lambda: int(time.time()))
         self.mailbox = d.Mailbox()
         self.mailbox_lock = threading.Lock()
-        self._secrets = {p.name: (read_private(p.client_secret_file, 4096).decode('utf-8').strip()
-                                  if p.client_secret_file else None) for p in config.providers}
+        self._secrets = {p.name: (read_private(p.oauth.client_secret_file, 4096).decode('utf-8').strip()
+                                  if p.oauth and p.oauth.client_secret_file else None) for p in config.providers}
 
     @classmethod
     def from_file(cls, path: Path, **kwargs) -> 'Broker':
@@ -123,26 +123,41 @@ class Broker:
                 return provider
         raise wire.ProtocolError('unknown_provider')
 
+    def _oauth_provider(self, name: str) -> tuple[ProviderConfig, OAuthClient]:
+        """A provider whose credentials come from agent-initiated OAuth logins."""
+        provider = self._provider(name)
+        if provider.oauth is None:
+            raise wire.ProtocolError('unknown_provider')
+        return provider, provider.oauth
+
     def _names(self) -> tuple[str, ...]:
         return tuple(p.name for p in self.config.providers)
 
     def issue_policy(self) -> d.IssuePolicy:
-        return d.IssuePolicy(self.config.issuer, self.config.audience, self._names(),
-                             self.config.max_lifetime, self.config.max_renew)
+        return issue_policy(self.config)
 
     def acceptance(self) -> d.Acceptance:
         return d.Acceptance((self.config.audience,), self._names(), self.config.max_lifetime, 60)
 
     def _login_policy(self) -> d.LoginPolicy:
-        return d.LoginPolicy(self.config.replica, self._names(), self.config.login_ttl)
+        """The mailbox's policy names the OAuth providers only, so a broker
+        without one (every strict broker) never holds a login."""
+        return d.LoginPolicy(self.config.replica, tuple(p.name for p in self.config.providers if p.oauth),
+                             self.config.login_ttl)
+
+    def _public_url(self) -> str:
+        if self.config.browser is None:
+            raise wire.ProtocolError('unknown_provider')
+        return self.config.browser.public_url.url()
 
     def redirect_uri(self) -> str:
-        return self.config.public_url.url() + 'callback'
+        return self._public_url() + 'callback'
 
     def begin_login(self, peer: tls.PeerIdentity, provider: str, scope: str | None = None) -> LoginStarted:
-        config = self._provider(provider)
+        _, client = self._oauth_provider(provider)
+        public_url = self._public_url()
         try:
-            scope = config.requested_scope(scope)
+            scope = client.requested_scope(scope)
         except ConfigError:
             raise wire.ProtocolError('invalid_scope') from None
         login_id = enc.random_id()
@@ -154,10 +169,10 @@ class Broker:
             except d.MailboxError as error:
                 raise wire.ProtocolError(error.code) from None
         sealed = login.seal_state(self.keys.state, state)
-        url = self.config.public_url.url() + 'authorize?' + wire.form([('state', sealed)])
+        url = public_url + 'authorize?' + wire.form([('state', sealed)])
         return LoginStarted(login_id, url, login.confirmation(login_id), state.expires_at)
 
-    def _provider_url(self, provider: ProviderConfig, state_text: str, scope: str, verifier: str) -> str:
+    def _provider_url(self, provider: OAuthClient, state_text: str, scope: str, verifier: str) -> str:
         return provider.authorization_url.url() + '?' + wire.form([
             ('response_type', 'code'), ('client_id', provider.client_id), ('redirect_uri', self.redirect_uri()),
             ('scope', scope), ('state', state_text), ('code_challenge', login.pkce_challenge(verifier)),
@@ -175,8 +190,8 @@ class Broker:
                 d.mailbox_pending(self.mailbox, self._login_policy(), state, self.clock())
             except d.MailboxError as error:
                 raise wire.ProtocolError(error.code) from None
-        provider = self._provider(state.provider)
-        url = self._provider_url(provider, state_text, state.scope, state.verifier)
+        _, client = self._oauth_provider(state.provider)
+        url = self._provider_url(client, state_text, state.scope, state.verifier)
         e = html.escape
         page = ('<!doctype html><meta charset=utf-8><title>Authorize agent</title>'
                 '<h1>An agent requests access</h1>'
@@ -201,11 +216,11 @@ class Broker:
             state = login.open_state(self.keys.state, state_text)
         except d.Rejection:
             raise wire.ProtocolError('invalid_state') from None
-        provider = self._provider(state.provider)
+        provider, client = self._oauth_provider(state.provider)
         policy = self._login_policy()
         with self.mailbox_lock:
             try:
-                permit = d.mailbox_accept(self.mailbox, policy, state, provider.issuer, issuer, denied, self.clock())
+                permit = d.mailbox_accept(self.mailbox, policy, state, client.issuer, issuer, denied, self.clock())
             except d.MailboxError as error:
                 raise wire.ProtocolError(error.code) from None
         # The mailbox is unlocked during the network exchange; the answer can
@@ -215,13 +230,13 @@ class Broker:
 
         def token(provider_name: str, code_: str, verifier: str) -> d.Token | None:
             nonlocal failure, scope
-            config = self._provider(provider_name)
-            fields = [('grant_type', 'authorization_code'), ('code', code_), ('redirect_uri', self.redirect_uri()),
-                      ('client_id', config.client_id), ('code_verifier', verifier)]
-            if self._secrets.get(config.name):
-                fields.append(('client_secret', self._secrets[config.name]))
             try:
-                response = self.endpoint.exchange(config, wire.form(fields))
+                config, oauth = self._oauth_provider(provider_name)
+                fields = [('grant_type', 'authorization_code'), ('code', code_), ('redirect_uri', self.redirect_uri()),
+                          ('client_id', oauth.client_id), ('code_verifier', verifier)]
+                if self._secrets.get(config.name):
+                    fields.append(('client_secret', self._secrets[config.name]))
+                response = self.endpoint.exchange(oauth, wire.form(fields))
             except (wire.ProtocolError, OSError, ssl.SSLError) as error:
                 failure = error
                 return None
@@ -349,12 +364,16 @@ class Broker:
         return _page(404, 'not_found')
 
     def serve(self) -> 'RunningBroker':
+        """The agent listener, and the browser listener when an OAuth provider is configured."""
         agent_context = tls.mtls_server(self.config.certificate, self.config.private_key, self.config.agent_ca)
-        browser_context = tls.server(self.config.certificate, self.config.private_key)
         agent = _listen(self.config.agent_listen)
-        browser = _listen(self.config.browser_listen)
+        listeners = [(agent, agent_context, True)]
+        browser = None
+        if self.config.browser is not None:
+            browser = _listen(self.config.browser.listen)
+            listeners.append((browser, tls.server(self.config.certificate, self.config.private_key), False))
         running = RunningBroker(agent, browser)
-        for listener, context, mutual in ((agent, agent_context, True), (browser, browser_context, False)):
+        for listener, context, mutual in listeners:
             thread = threading.Thread(target=_accept_loop, daemon=True,
                                       args=(listener, context, running.stopping, self._handler(mutual)))
             thread.start()
@@ -369,8 +388,18 @@ class Broker:
         return handle
 
 
+def issue_policy(config: BrokerConfig) -> d.IssuePolicy:
+    """What a broker issues for: every configured provider, however its credentials are acquired."""
+    return d.IssuePolicy(config.issuer, config.audience, tuple(p.name for p in config.providers),
+                         config.max_lifetime, config.max_renew)
+
+
 def mint_with(keys: BrokerKeys, policy: d.IssuePolicy, provider: str, credential: bytes, certificate_der: bytes,
               copy: tok.ClaimCopy, lifetime: int, now: int) -> IssuedToken:
+    """Operator issuance from the keys and the issuance policy alone: no
+    listener, OAuth client or client secret."""
+    if keys.active_entry().issuer != policy.issuer:
+        raise ConfigError("the active key is not for the broker's issuer")
     peer = tls.PeerIdentity.from_der(certificate_der)
     info = tok.Informational(upstream=tok.copy_upstream(credential.decode('ascii', 'replace'), copy))
     grant = d.SurrogateGrant(provider, peer.subject, peer.thumbprint, peer.not_after)
@@ -406,7 +435,7 @@ def _listen(address: str) -> socket.socket:
 
 
 class RunningBroker:
-    def __init__(self, agent: socket.socket, browser: socket.socket):
+    def __init__(self, agent: socket.socket, browser: socket.socket | None):
         self.agent, self.browser = agent, browser
         self.stopping = threading.Event()
         self.threads: list[threading.Thread] = []
@@ -417,13 +446,16 @@ class RunningBroker:
         return f'{host}:{port}'
 
     @property
-    def browser_address(self) -> str:
+    def browser_address(self) -> str | None:
+        """``None`` for a broker without an OAuth provider."""
+        if self.browser is None:
+            return None
         host, port = self.browser.getsockname()[:2]
         return f'{host}:{port}'
 
     def stop(self) -> None:
         self.stopping.set()
-        for sock in (self.agent, self.browser):
+        for sock in (self.agent, self.browser) if self.browser is not None else (self.agent,):
             try:
                 sock.close()
             except OSError:

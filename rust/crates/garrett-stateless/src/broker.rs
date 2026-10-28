@@ -4,7 +4,7 @@
 //! and the transient mailbox is the extracted `stateless_mailbox`, changed
 //! only through its transitions. This module supplies randomness, the clock,
 //! sealing, the token request, and serves the two HTTPS listeners.
-use crate::config::{BrokerConfig, ProviderConfig};
+use crate::config::{BrokerConfig, OAuthClient, ProviderConfig};
 use crate::encoding::{is_credential, is_scope, random_id};
 use crate::error::{rejection_name, Error, Result};
 use crate::files::{read_private, read_public};
@@ -43,7 +43,7 @@ pub struct TokenResponse {
 /// The authorization-code exchange. The default is [`HttpsTokenEndpoint`];
 /// tests and alternative providers can supply their own.
 pub trait TokenEndpoint: Send + Sync {
-    fn exchange(&self, provider: &ProviderConfig, form: &str) -> Result<TokenResponse>;
+    fn exchange(&self, client: &OAuthClient, form: &str) -> Result<TokenResponse>;
 }
 
 /// Validate a token endpoint's JSON body.
@@ -97,7 +97,7 @@ impl CodeExchange for ProviderExchange<'_> {
         let attempt = (|| {
             let name =
                 std::str::from_utf8(provider).map_err(|_| Error::Protocol("unknown_provider"))?;
-            let (index, config) = self.broker.provider(name)?;
+            let (index, _, client) = self.broker.oauth_provider(name)?;
             let code =
                 std::str::from_utf8(code).map_err(|_| Error::Protocol("invalid_callback"))?;
             let verifier = Zeroizing::new(
@@ -105,19 +105,19 @@ impl CodeExchange for ProviderExchange<'_> {
                     .map_err(|_| Error::Protocol("internal_error"))?
                     .to_owned(),
             );
-            let redirect = self.broker.redirect_uri();
+            let redirect = self.broker.redirect_uri()?;
             let mut fields = vec![
                 ("grant_type", "authorization_code"),
                 ("code", code),
                 ("redirect_uri", redirect.as_str()),
-                ("client_id", config.client_id.as_str()),
+                ("client_id", client.client_id.as_str()),
                 ("code_verifier", verifier.as_str()),
             ];
             if let Some(secret) = &self.broker.secrets[index] {
                 fields.push(("client_secret", secret.as_str()));
             }
             let form = Zeroizing::new(http::form(&fields));
-            self.broker.endpoint.exchange(config, &form)
+            self.broker.endpoint.exchange(client, &form)
         })();
         match attempt {
             Ok(response) => {
@@ -140,7 +140,7 @@ impl CodeExchange for ProviderExchange<'_> {
 pub struct HttpsTokenEndpoint;
 
 impl TokenEndpoint for HttpsTokenEndpoint {
-    fn exchange(&self, provider: &ProviderConfig, form: &str) -> Result<TokenResponse> {
+    fn exchange(&self, provider: &OAuthClient, form: &str) -> Result<TokenResponse> {
         let ca = match &provider.token_ca_file {
             Some(path) => Some(read_public(path, 1 << 20)?),
             None => None,
@@ -173,7 +173,7 @@ impl TokenEndpoint for HttpsTokenEndpoint {
     }
 }
 
-fn now_seconds() -> i64 {
+pub fn now_seconds() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
@@ -253,15 +253,17 @@ impl Broker {
         }
         let mut secrets = Vec::new();
         for provider in &config.providers {
-            secrets.push(match &provider.client_secret_file {
-                Some(path) => {
-                    let bytes = Zeroizing::new(read_private(path, 4096)?);
-                    let text = std::str::from_utf8(&bytes)
-                        .map_err(|_| Error::Config("client secret".into()))?;
-                    Some(Zeroizing::new(text.trim().to_owned()))
-                }
-                None => None,
-            });
+            secrets.push(
+                match provider.oauth().and_then(|c| c.client_secret_file.as_ref()) {
+                    Some(path) => {
+                        let bytes = Zeroizing::new(read_private(path, 4096)?);
+                        let text = std::str::from_utf8(&bytes)
+                            .map_err(|_| Error::Config("client secret".into()))?;
+                        Some(Zeroizing::new(text.trim().to_owned()))
+                    }
+                    None => None,
+                },
+            );
         }
         Ok(Self {
             config,
@@ -310,22 +312,21 @@ impl Broker {
             .ok_or(Error::Protocol("unknown_provider"))
     }
 
+    /// A provider whose credentials come from agent-initiated OAuth logins.
+    fn oauth_provider(&self, name: &str) -> Result<(usize, &ProviderConfig, &OAuthClient)> {
+        let (index, provider) = self.provider(name)?;
+        let client = provider
+            .oauth()
+            .ok_or(Error::Protocol("unknown_provider"))?;
+        Ok((index, provider, client))
+    }
+
     fn names(&self) -> Vec<Vec<u8>> {
-        self.config
-            .providers
-            .iter()
-            .map(|p| p.name.as_bytes().to_vec())
-            .collect()
+        self.config.provider_names()
     }
 
     pub fn issue_policy(&self) -> IssuePolicy {
-        IssuePolicy {
-            issuer: self.config.issuer.as_bytes().to_vec(),
-            audience: self.config.audience.as_bytes().to_vec(),
-            providers: self.names(),
-            max_lifetime: self.config.max_lifetime,
-            max_renew: self.config.max_renew,
-        }
+        self.config.issue_policy()
     }
 
     /// What renewal accepts: this broker's own audience and providers.
@@ -338,23 +339,40 @@ impl Broker {
         }
     }
 
+    /// The mailbox's policy. It names the OAuth providers only, so a broker
+    /// without one (every strict broker) never holds a login.
     fn login_policy(&self) -> LoginPolicy {
         LoginPolicy {
             replica: self.config.replica.as_bytes().to_vec(),
-            providers: self.names(),
+            providers: self
+                .config
+                .providers
+                .iter()
+                .filter(|p| p.oauth().is_some())
+                .map(|p| p.name.as_bytes().to_vec())
+                .collect(),
             ttl: self.config.login_ttl,
         }
     }
 
-    fn issuer_rule(provider: &ProviderConfig) -> IssuerRule {
+    fn issuer_rule(provider: &OAuthClient) -> IssuerRule {
         match &provider.issuer {
             Some(issuer) => IssuerRule::Exact(issuer.as_bytes().to_vec()),
             None => IssuerRule::Absent,
         }
     }
 
-    pub fn redirect_uri(&self) -> String {
-        format!("{}callback", self.config.public_url.to_url())
+    /// The browser endpoint's public URL; only a broker with an OAuth
+    /// provider has one.
+    fn public_url(&self) -> Result<String> {
+        match &self.config.browser {
+            Some(browser) => Ok(browser.public_url.to_url()),
+            None => Err(Error::Protocol("unknown_provider")),
+        }
+    }
+
+    pub fn redirect_uri(&self) -> Result<String> {
+        Ok(format!("{}callback", self.public_url()?))
     }
 
     /// Spec section 8.1 steps 1-2, for the authenticated `peer`.
@@ -364,8 +382,9 @@ impl Broker {
         provider: &str,
         scope: Option<&str>,
     ) -> Result<LoginStarted> {
-        let (_, config) = self.provider(provider)?;
-        let scope = config.requested_scope(scope)?;
+        let (_, _, client) = self.oauth_provider(provider)?;
+        let scope = client.requested_scope(scope)?;
+        let public_url = self.public_url()?;
         let login = random_id()?;
         let verifier = login::pkce_verifier()?;
         let now = self.now();
@@ -386,7 +405,7 @@ impl Broker {
         Ok(LoginStarted {
             authorization_url: format!(
                 "{}authorize?{}",
-                self.config.public_url.to_url(),
+                public_url,
                 http::form(&[("state", &sealed)])
             ),
             confirmation: login::confirmation(&login),
@@ -398,24 +417,24 @@ impl Broker {
     /// The provider authorization URL for an open state (the interstitial's link).
     fn provider_url(
         &self,
-        provider: &ProviderConfig,
+        provider: &OAuthClient,
         state_text: &str,
         scope: &str,
         verifier: &str,
-    ) -> String {
-        format!(
+    ) -> Result<String> {
+        Ok(format!(
             "{}?{}",
             provider.authorization_url.to_url(),
             http::form(&[
                 ("response_type", "code"),
                 ("client_id", &provider.client_id),
-                ("redirect_uri", &self.redirect_uri()),
+                ("redirect_uri", &self.redirect_uri()?),
                 ("scope", scope),
                 ("state", state_text),
                 ("code_challenge", &login::pkce_challenge(verifier)),
                 ("code_challenge_method", "S256"),
             ])
-        )
+        ))
     }
 
     /// Spec section 8.1 step 3: the interstitial for a pending login.
@@ -427,13 +446,13 @@ impl Broker {
         stateless_mailbox::pending(&*self.locked()?, &self.login_policy(), &state, now)
             .map_err(mailbox_error)?;
         let provider_name = String::from_utf8_lossy(&state.provider).into_owned();
-        let (_, provider) = self.provider(&provider_name)?;
+        let (_, _, client) = self.oauth_provider(&provider_name)?;
         let url = self.provider_url(
-            provider,
+            client,
             state_text,
             &String::from_utf8_lossy(&state.scope),
             &String::from_utf8_lossy(&state.verifier),
-        );
+        )?;
         let page = format!(
             "<!doctype html><meta charset=utf-8><title>Authorize agent</title>\
              <h1>An agent requests access</h1>\
@@ -466,8 +485,8 @@ impl Broker {
         let state = login::open_state(self.keys.state_key(), state_text)
             .map_err(|_| Error::Protocol("invalid_state"))?;
         let provider_name = String::from_utf8_lossy(&state.provider).into_owned();
-        let (_, provider) = self.provider(&provider_name)?;
-        let rule = Self::issuer_rule(provider);
+        let (_, provider, client) = self.oauth_provider(&provider_name)?;
+        let rule = Self::issuer_rule(client);
         let policy = self.login_policy();
         let permit = stateless_mailbox::accept(
             &mut *self.locked()?,
@@ -711,21 +730,25 @@ impl Broker {
         }
     }
 
-    /// Bind both listeners and serve until [`RunningBroker::stop`].
+    /// Bind the agent listener, and the browser listener when an OAuth
+    /// provider is configured, and serve until [`RunningBroker::stop`].
     pub fn serve(self: Arc<Self>) -> Result<RunningBroker> {
         let certificate = read_public(&self.config.certificate, 1 << 20)?;
         let key = Zeroizing::new(read_private(&self.config.private_key, 1 << 20)?);
         let agent_ca = read_public(&self.config.agent_ca, 1 << 20)?;
         let agent_tls = tls::mtls_server(&certificate, &key, &agent_ca)?;
-        let browser_tls = tls::server(&certificate, &key)?;
         let agent = TcpListener::bind(&self.config.agent_listen)?;
-        let browser = TcpListener::bind(&self.config.browser_listen)?;
         let stop = Arc::new(AtomicBool::new(false));
         let agent_address = agent.local_addr()?;
-        let browser_address = browser.local_addr()?;
+        let mut listeners = vec![(agent, agent_tls, true)];
+        let mut browser_address = None;
+        if let Some(endpoint) = &self.config.browser {
+            let browser = TcpListener::bind(&endpoint.listen)?;
+            browser_address = Some(browser.local_addr()?);
+            listeners.push((browser, tls::server(&certificate, &key)?, false));
+        }
         let mut workers = Vec::new();
-        for (listener, config, mutual) in [(agent, agent_tls, true), (browser, browser_tls, false)]
-        {
+        for (listener, config, mutual) in listeners {
             let broker = self.clone();
             let stop = stop.clone();
             workers.push(std::thread::spawn(move || {
@@ -760,6 +783,11 @@ pub fn mint_with(
     lifetime: i64,
     now: i64,
 ) -> Result<IssuedToken> {
+    if keys.active_entry().issuer.as_bytes() != policy.issuer.as_slice() {
+        return Err(Error::Config(
+            "the active key is not for the broker's issuer".into(),
+        ));
+    }
     let peer = PeerIdentity::from_der(certificate_der)?;
     let text =
         std::str::from_utf8(credential).map_err(|_| Error::Rejected("invalid_credential"))?;
@@ -845,7 +873,8 @@ fn token_reply(status: u16, issued: &IssuedToken) -> Vec<u8> {
 /// A served broker; dropping it does not stop it.
 pub struct RunningBroker {
     pub agent_address: SocketAddr,
-    pub browser_address: SocketAddr,
+    /// `None` for a broker without an OAuth provider.
+    pub browser_address: Option<SocketAddr>,
     stop: Arc<AtomicBool>,
     workers: Vec<std::thread::JoinHandle<()>>,
 }
@@ -853,7 +882,7 @@ pub struct RunningBroker {
 impl RunningBroker {
     pub fn stop(self) {
         self.stop.store(true, Ordering::SeqCst);
-        for address in [self.agent_address, self.browser_address] {
+        for address in std::iter::once(self.agent_address).chain(self.browser_address) {
             let _ = TcpStream::connect_timeout(&address, Duration::from_secs(1));
         }
         for worker in self.workers {
