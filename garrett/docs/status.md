@@ -37,9 +37,9 @@ inside `aivm-secrets` and is now self-contained:
 | swtpm test (`GARRETT_REQUIRE_TPM_TESTS=1`) | pass |
 | `verification/extract.py check` | pass; the model has no `axiom` |
 | `lake build` (independent package) | pass |
-| `verification/mutate.py` | running at the extraction commit; see the next commit |
+| `verification/mutate.py` | all 42 mutants rejected, each by its mapped proof module (in the separate-directory copy, 3882 s with `--jobs 8`) |
 | `verification/shell_guard.py check` | pass (12 checks) |
-| Separate-directory check (`verification/standalone.py`) | running at the extraction commit; see the next commit |
+| Separate-directory check (`verification/standalone.py`) | pass at `5ebbc6d`: a copy of this directory alone, with a fresh virtual environment, Cargo target, toolchain bootstrap and Lake build, ran every row above; no source names the origin project outside the allowed history notes |
 
 ## Next, in order
 

@@ -1,7 +1,7 @@
 """Security mutation testing: change one security check in the Rust crate,
 re-extract it, and require the unchanged Lean proofs to reject the result.
 
-    python verification/mutate.py [--filter REGEX]
+    python verification/mutate.py [--filter REGEX] [--jobs N]
 
 Each mutant gets its own copy of ``crates/garrett-stateless-core`` and its
 own Lean output directory; it recompiles the generated module and then the
@@ -18,7 +18,7 @@ import re
 import shutil
 import subprocess
 import tempfile
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import extract
@@ -216,6 +216,7 @@ def subprocess_run(argv, cwd: Path, env: dict) -> subprocess.CompletedProcess:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--filter', help='run only labels matching this regex (not the full campaign)')
+    parser.add_argument('--jobs', type=int, default=min(4, os.cpu_count() or 1), help='mutants checked at once')
     args = parser.parse_args()
     # The proofs are about the committed extraction; it must match the source.
     with tempfile.TemporaryDirectory(prefix='garrett-extract-', dir=ROOT / '.tools') as scratch:
@@ -229,9 +230,15 @@ def main() -> int:
     lean_path = run([toolchain.executable('lake'), 'env', 'printenv', 'LEAN_PATH'], cwd=PROOFS, capture=True,
                     quiet=True).stdout.strip()
     lean_path = os.pathsep.join(str((PROOFS / part).resolve()) for part in lean_path.split(os.pathsep))
-    with ThreadPoolExecutor(max_workers=min(4, os.cpu_count() or 1)) as pool:
-        for line in pool.map(lambda m: check(m, lean_path), selected):
-            print(line, flush=True)
+    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+        futures = [pool.submit(check, m, lean_path) for m in selected]
+        try:
+            for done, future in enumerate(as_completed(futures), 1):
+                print(f'[{done}/{len(selected)}] {future.result()}', flush=True)
+        except BaseException:
+            # Stop at the first failure instead of finishing the queue.
+            pool.shutdown(cancel_futures=True)
+            raise
     print(f'All {len(selected)} selected mutants were rejected.')
     return 0
 
