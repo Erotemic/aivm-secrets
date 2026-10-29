@@ -1572,3 +1572,28 @@ the commit). The standalone copy check and the 42-mutant run were still
 running; their results follow in a later commit. Confidence: high that the
 move preserves the proofs and the wire behaviour (identical proof text,
 byte-identical vectors); medium on CI wiring, which has not run on GitHub.
+
+## 2026-10-29 14:50:35 -0400
+
+Garrett extraction acceptance: the mandatory separate-directory check passed.
+`garrett/verification/standalone.py` copied `garrett/` alone (no build
+outputs) to `/tmp`, then in that copy: cargo build/test with and without
+`tpm` (49 tests each), a fresh venv with `pip install .[tests]`, pytest (109
+passed), `python -m build`, the shell guard, the toolchain bootstrap from the
+pinned archive, `extract.py check`, a cold `lake build` (1821 jobs, 654 s)
+and the full mutation campaign: all 42 mutants rejected, each by its mapped
+proof module (3882 s with 8 jobs on a shared, loaded machine). No source in
+the copy names AIVM outside the allowed history/provenance files.
+
+The first attempt was killed at the maintainer's request while three VMs
+loaded the machine; the earlier run's captured output gave no progress, which
+is why it looked hung. I changed `standalone.py` to log each step to a file,
+print elapsed time and echo the campaign live, and `mutate.py` to report
+mutants as they finish (`[n/42]`), accept `--jobs`, and cancel the queue at
+the first failure. A single in-repo mutant confirmed the new runner before
+the full run. I also stopped a stale waiter of mine whose `pgrep -f` matched
+its own command line and so could never exit.
+
+Not checked here: the GitHub workflow itself has not run. The opt-in axiom
+audit for the Garrett package remains a listed follow-up. Confidence: high
+that `garrett/` builds, tests, extracts and proves alone.

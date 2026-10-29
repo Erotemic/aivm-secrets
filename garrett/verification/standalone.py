@@ -51,12 +51,15 @@ def step(title: str, argv: list, cwd: Path, logs: Path, env: dict | None = None,
         timer = threading.Timer(timeout, process.kill)
         timer.start()
         try:
-            last = ''
+            last, tests = '', 0
             for line in process.stdout:
                 sink.write(line)
                 sink.flush()
                 if line.strip():
                     last = line.strip()
+                # Cargo prints one result per test binary; report their sum.
+                counted = re.match(r'test result: ok\. (\d+) passed', line)
+                tests += int(counted.group(1)) if counted else 0
                 if echo:
                     print(f'   {line.rstrip()}', flush=True)
             code = process.wait()
@@ -66,7 +69,7 @@ def step(title: str, argv: list, cwd: Path, logs: Path, env: dict | None = None,
     if code != 0:
         print(''.join(log.read_text().splitlines(keepends=True)[-80:]))
         raise SystemExit(f'failed after {elapsed:.0f}s (exit {code}): {title}')
-    print(f'   ok in {elapsed:.0f}s: {last[:160]}', flush=True)
+    print(f'   ok in {elapsed:.0f}s: {f"{tests} tests passed" if tests else last[:160]}', flush=True)
 
 
 def origin_mentions(tree: Path) -> list[str]:
