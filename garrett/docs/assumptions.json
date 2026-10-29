@@ -1,0 +1,158 @@
+{
+  "schema": "garrett-stateless-v1/assumptions",
+  "note": "What the proofs and tests do not establish. Each entry names what would break if it were false, the code that owns it, what checks it, and what would remove it. Paths are relative to this project's root.",
+  "assumptions": [
+    {
+      "id": "STATELESS-NATIVE-01",
+      "boundary": "garrett-stateless broker and proxy shells (Rust crate crates/garrett-stateless)",
+      "assumption": "Every decision, codec and transition of garrett-stateless-v1 is extracted Rust (stateless, stateless_login, stateless_mailbox, stateless_proxy including the connection loop, stateless_token including the key set and login state) and composed in proofs/GarrettStatelessProtocol.lean (protocol_safety). Assumed of the native shell, and checked only as source by verification/shell_guard.py: the proxy runs stateless_proxy::connection with the thumbprint of the certificate rustls verified in that handshake; Origin::exchange writes exactly egress_wire of its Egress to the pinned address of that route over TLS verifying its host, once, and returns what it read; Channel::send writes exactly its argument to the client; the broker passes the mutual-TLS peer to begin_login, poll and renew and drives each mailbox transition from one endpoint; audit lines carry claims, routes, statuses and codes only; the shell never calls stateless::open or stateless_proxy::decide itself; its only mutable state is the login mailbox (whose LoginPolicy names the OAuth providers only, which GarrettStatelessStrict.lean needs for a strict broker), the optional audit file handle, and listener stop flags and connection counters; and the broker and proxy write no file except that audit file, which a strict proxy configuration refuses. The mailbox's Permit, Exchanged and the proxy's Egress are linear by Rust ownership (checked by rustc), which the mailbox model's exchange step takes as its held/unspent premises.",
+      "owner": "crates/garrett-stateless/src/proxy.rs",
+      "if_false": "A shell that sent other bytes, used another peer value, or rewrote a mailbox binding would bypass the proved decisions.",
+      "checked_by": [
+        "proofs/GarrettStatelessProxy.lean",
+        "proofs/GarrettStatelessLogin.lean",
+        "crates/garrett-stateless/tests/workflow.rs",
+        "tests/test_garrett_stateless.py",
+        "tests/test_garrett_stateless_interop.py",
+        "proofs/GarrettStatelessProtocol.lean",
+        "proofs/GarrettStatelessConnection.lean",
+        "proofs/GarrettStatelessMailbox.lean",
+        "verification/shell_guard.py",
+        "tests/test_garrett_stateless_shell.py",
+        "proofs/GarrettStatelessStrict.lean",
+        "tests/test_garrett_stateless_strict.py"
+      ],
+      "class": "native-trusted",
+      "justification": "The per-request and login decisions are extracted and proved; the shells move bytes, pass the handshake peer and keep the mailbox.",
+      "removal": "Extract the connection loop glue and the mailbox stage update into core wrappers; add a whole-process syscall witness for the proxy.",
+      "priority": "P2"
+    },
+    {
+      "id": "STATELESS-CRYPTO-01",
+      "boundary": "garrett-stateless-v1 opener and sealer adapters (Ed25519, AES-256-GCM, strict codec)",
+      "assumption": "The KeyMaterial primitives (crates/garrett-stateless/src/token.rs, ring) satisfy the propositions of proofs/GarrettStatelessBoundary.lean that the theorems take as explicit premises: AeadInverse (AES-256-GCM correctness for paired keys), SignVerifies (Ed25519 correctness, positive witnesses only) and, per execution, Unforged (idealized EUF-CMA: an entry verifies only signed parts of tokens this broker issued with a paired key; stated at each renewal and for each proxy key set). The strict JSON/b64url codec, the key-set validation and the claim/AAD binding are no longer assumed: they are extracted and proved (GarrettStatelessCodec/Grammar/Token; the former codec premise of issued_only_opens_for_its_certificate is discharged by issued_codec). No computational proof of ring or the primitives is claimed.",
+      "owner": "crates/garrett-stateless/src/token.rs",
+      "if_false": "A forged signature or a codec that decoded different claims would let an unauthorized surrogate pass admission.",
+      "checked_by": [
+        "tests/test_garrett_stateless_vectors.py",
+        "crates/garrett-stateless/tests/vectors.rs",
+        "tests/vectors/garrett-stateless-v1.jsonl",
+        "proofs/GarrettStatelessBoundary.lean",
+        "proofs/GarrettStatelessToken.lean",
+        "proofs/GarrettStatelessRoundTrip.lean",
+        "crates/garrett-stateless/tests/codec_agreement.rs"
+      ],
+      "class": "external-trusted",
+      "justification": "Signature and AEAD primitives and the compact codec are adapters behind the extracted opener/sealer traits.",
+      "removal": "Pinned versions, shared vectors, independent review; a computational proof is out of scope.",
+      "priority": "P3"
+    },
+    {
+      "id": "STATELESS-TLS-01",
+      "boundary": "garrett-stateless-v1 TLS and X.509 (rustls/webpki; Python ssl/OpenSSL)",
+      "assumption": "The agent listeners require a client certificate chaining to the configured agent CA (TLS 1.3, no resumption) and the peer thumbprint is SHA-256 of the verified leaf DER; provider and token-endpoint connections verify the configured host against the pinned CA or the web PKI roots. Certificate revocation lists are not consulted; only chain validity and the validity period are.",
+      "owner": "crates/garrett-stateless/src/tls.rs",
+      "if_false": "A peer identity not tied to the handshake would let a copied surrogate be accepted; a mis-verified upstream would receive the credential.",
+      "checked_by": [
+        "tests/test_garrett_stateless_interop.py",
+        "crates/garrett-stateless/tests/workflow.rs"
+      ],
+      "class": "external-trusted",
+      "justification": "Client-certificate verification and upstream server authentication are rustls/webpki and OpenSSL.",
+      "removal": "Pin versions; review the verifier configuration; consider CRL/OCSP support as an explicit option.",
+      "priority": "P3"
+    },
+    {
+      "id": "STATELESS-OAUTH-01",
+      "boundary": "OAuth providers used by garrett-stateless-v1",
+      "assumption": "The provider enforces PKCE S256, issues single-use codes bound to client and redirect URI, returns the access token only over its authenticated token endpoint, and (when configured) sends the RFC 9207 iss parameter. The human compares the confirmation code before approving; nothing technical stops a human from approving a login started by someone else's agent.",
+      "owner": "docs/garrett-stateless-v1.md",
+      "if_false": "A provider without PKCE or single-use codes widens code interception; an unchecked confirmation code allows login phishing.",
+      "checked_by": [
+        "examples/synthetic_provider.py",
+        "tests/test_garrett_stateless.py"
+      ],
+      "class": "specification",
+      "justification": "Provider behaviour and human approval are outside the system.",
+      "removal": "Per-provider review before enabling; live provider runs are a separate maintainer validation.",
+      "priority": "P3"
+    },
+    {
+      "id": "STATELESS-DEPLOY-01",
+      "boundary": "garrett-stateless-v1 deployment",
+      "assumption": "Each broker replica has its own registered redirect URI, so a login's callback and polls reach the replica that began it; broker and proxy clocks agree within the configured skew; new key sets reach every proxy before the broker signs with a new kid; retired kids are removed from every proxy to revoke; key files are readable only by the service; agent certificate keys are protected as the chosen mode claims (software keys can be copied; swtpm state can be copied).",
+      "owner": "docs/garrett-stateless-v1.md",
+      "if_false": "Lost logins, early or late expiry, or surrogates surviving an intended revocation.",
+      "checked_by": [
+        "examples/walkthrough.py",
+        "tests/test_garrett_stateless_tpm.py"
+      ],
+      "class": "deployment",
+      "justification": "Replica routing, clocks, key distribution and key custody are operator responsibilities.",
+      "removal": "Deployment guide and a multi-replica acceptance run.",
+      "priority": "P3"
+    },
+    {
+      "id": "STATELESS-CLAIMS-01",
+      "boundary": "Copied provider claims (upstream)",
+      "assumption": "Claims copied under upstream are what the token endpoint returned, not verified provider signatures; no verifier reads them (not modelled in SurrogateClaims). The default policy copies only access-describing claims; an operator who sets copy_claims to \"all\" or a list accepts that personal data may reach the untrusted agent.",
+      "owner": "crates/garrett-stateless/src/token.rs",
+      "if_false": "Personal data exposed to the agent, or an agent misled by provider-asserted claims; authorization is unaffected.",
+      "checked_by": [
+        "tests/test_garrett_stateless.py",
+        "tests/vectors/garrett-stateless-v1.jsonl"
+      ],
+      "class": "specification",
+      "justification": "Copied claims are informational and operator-selected.",
+      "removal": "Keep the default access-only policy; review per provider.",
+      "priority": "P3"
+    },
+    {
+      "id": "STATELESS-PY-01",
+      "boundary": "Python garrett-stateless-v1 implementation",
+      "assumption": "garrett_stateless.core mirrors the extracted Rust crate module for module and the Python codec, keys and login state match the Rust bytes; this is tested (shared vectors, the four-way interop matrix), not proved. Python strings and bytes are not erased after use.",
+      "owner": "src/garrett_stateless/core/",
+      "if_false": "A divergent Python decision would not be covered by the Lean theorems.",
+      "checked_by": [
+        "tests/test_garrett_stateless_vectors.py",
+        "tests/test_garrett_stateless_interop.py"
+      ],
+      "class": "python-reference",
+      "justification": "The Python implementation is a tested mirror of the proved Rust.",
+      "removal": "Keep the shared vectors and interop matrix; prefer the Rust implementation where proofs matter.",
+      "priority": "P3"
+    },
+    {
+      "id": "STATELESS-ACQ-01",
+      "boundary": "garrett-stateless-v1 credential acquisition adapters (provisioned, oauth)",
+      "assumption": "Issuance consumes a provider name, a credential, its expiry and an agent binding, and nothing about the adapter that produced them (spec section 7.1). For a provisioned provider the operator who runs mint is trusted to supply the right credential for the named provider and the right agent certificate; its lifetime is unknown, so only max_renew and the certificate bound ren. For an oauth provider the binding is the mutual-TLS peer that started the login (proved), and the credential and its expiry are what the pinned token endpoint answered (STATELESS-OAUTH-01). A provider-reported scope is an informational claim and never an authorization input. mint accepts any configured provider: for an oauth provider it is a trusted operator override (the operator vouches for a credential the broker did not obtain, and its lifetime is unknown).",
+      "owner": "docs/garrett-stateless-v1.md",
+      "if_false": "A mis-provisioned credential is used for the provider and agent the operator named; the proxy cannot tell.",
+      "checked_by": [
+        "proofs/GarrettStatelessProtocol.lean",
+        "tests/test_garrett_stateless_strict.py",
+        "crates/garrett-stateless/tests/workflow.rs"
+      ],
+      "class": "specification",
+      "justification": "A provisioned credential and its binding are the operator's input; only the OAuth adapter's binding is derived from an authenticated peer.",
+      "removal": "Per-provider review of what each provisioned credential may do; prefer short-lived provider credentials where the provider offers them.",
+      "priority": "P3"
+    },
+    {
+      "id": "STATELESS-OPS-01",
+      "boundary": "garrett-stateless-v1 operation policies (Unrestricted, ReadOnly)",
+      "assumption": "The read-only policy authorizes by the request's method, its target up to any '?', its body length and the surrogate's authenticated provider (spec section 11.1); the proofs (GarrettStatelessComposition) establish exactly that for the extracted decision. That such a request only reads is the provider's semantics: a provider that changes state on GET or HEAD, that honours a method override carried in the query or another forwarded field (the encoder drops the X-HTTP-Method-Override family, not query parameters), or that routes case- or encoding-variant paths to a resource the list does not name, is outside the guarantee. The configured resource list and its route mapping are operator input.",
+      "owner": "docs/garrett-stateless-v1.md",
+      "if_false": "A request the read-only policy permits has a write effect at the provider, or reaches a resource the operator did not mean to allow.",
+      "checked_by": [
+        "proofs/GarrettStatelessComposition.lean",
+        "tests/test_garrett_stateless_operations.py",
+        "crates/garrett-stateless/tests/workflow.rs"
+      ],
+      "class": "specification",
+      "justification": "The proxy proves which method, path, body and provider it lets through; whether that request only reads is the provider's API semantics.",
+      "removal": "Per-provider review of read-only resource lists, including query-borne method overrides and path normalization; provider-specific operation descriptions where an API's semantics are known.",
+      "priority": "P2"
+    }
+  ]
+}

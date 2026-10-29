@@ -1,0 +1,10 @@
+[package]
+name = "garrett-stateless-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The pure garrett-stateless-v1 protocol decisions, extracted to Lean by Aeneas"
+# Publishing needs the maintainer's approval.
+publish = false
+
+[dependencies]

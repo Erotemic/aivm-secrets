@@ -109,30 +109,15 @@ so its output is an ordinary guest request and the read theorems apply to it
 unchanged. Substitution stays
 the weakest profile and never claims authority confinement.
 
-## Phase 7: Garrett's stateless architecture (`garrett-stateless-v1`)
+## Garrett's stateless architecture: extracted (2026-10-29)
 
-A separate profile beside the stateful AIVM profile: standalone Python and
-Rust libraries, a stateless mTLS proxy, an OAuth broker and Lean proofs of the
-extracted Rust decisions. **Implemented 2026-10-26.** Status, evidence and the
-remaining external validations (live provider, hardware TPM, independent
-review, release decision) are in
-[aivm-secrets-garrett-stateless.md](aivm-secrets-garrett-stateless.md).
-
-**Composable isolation (2026-10-27).** The proxy's isolation is now composed
-from separately verified extracted components, with one composition theorem
-(`composed_egress`) instantiated for Garrett's unrestricted proxy and a
-constrained read-only proxy, and acquisition kept outside the core. Status and
-the review items are in
-[aivm-secrets-garrett-composition.md](aivm-secrets-garrett-composition.md).
-Next, in order:
-
-1. Maintainer review of the re-pinned NR-0, read-path, W3, W4 and W5 hashes
-   (`python dev/verification/generated_scope.py diff e9aa9fa` shows what they
-   cover; no agent commit approves them).
-2. Independent review of the `Isolated` statement and `STATELESS-OPS-01`.
-3. Provider-specific read-only resource catalogues (narrows `STATELESS-OPS-01`).
-4. Mailbox-free OAuth acquisition, and further acquisition adapters: later,
-   separate increments.
+`garrett-stateless-v1` (implemented 2026-10-26, composable isolation
+2026-10-27) now lives in [`garrett/`](../../garrett/README.md) as a separate
+project; its status and next steps are in `garrett/docs/status.md`. Moving it
+out restored this project's Rust tree, Python package, generated model and
+every gate pin (NR-0, read-path, W3, W4, W5) to their pre-stateless values
+(`e9aa9fa`), so the stateless re-pins no longer need review. No AIVM work item
+depends on it.
 
 ## Everything else the planning documents list
 

@@ -214,22 +214,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "garrett-stateless"
-version = "0.1.0"
-dependencies = [
- "aivm-secrets-garrett",
- "aivm-secrets-garrett-core",
- "rcgen",
- "ring",
- "rustls",
- "rustls-pemfile",
- "time",
- "webpki-roots",
- "x509-parser",
- "zeroize",
-]
-
-[[package]]
 name = "getrandom"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -777,15 +761,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23f0c9c52aa7cd7d77769a4cfe2a9adb1b331f489a41d912ce14513d5ab995c6"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "webpki-roots"
-version = "1.0.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5f280bbb2b287bc8e7de7e3852945a0ff50d1bbcb5ed42b6c7a568c546df171"
-dependencies = [
- "rustls-pki-types",
 ]
 
 [[package]]

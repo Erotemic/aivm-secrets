@@ -1522,3 +1522,53 @@ guarded, not proved. Python cannot make the dispatch payload private.
 Confidence: high for the extracted-code theorems and the end-to-end tests;
 medium for how well `ReadOnlyAllowed` matches what operators will mean by
 "read-only" at a real provider.
+
+## 2026-10-29 10:45:00 -0400
+
+Extracted `garrett-stateless-v1` into `garrett/`, a self-contained project
+(its own Cargo workspace, Python distribution, Lake package, verification
+tooling, vectors, examples, docs and CI), on the maintainer's request and the
+plan agreed with GPT's review: fork the HTTP code Garrett uses rather than
+share it, one top-level directory, an independent `pyproject.toml`, and an
+independent Lake package now.
+
+Decisions:
+- A scratch extraction showed that a crate depending on the AIVM core gets
+  AIVM's functions as `axiom`s and its types as copies, so Garrett owns its
+  wire code. The core crate takes the six `stateless*.rs` files plus the
+  `proxy_http`, `proxy_controller`, `proxy_connect`, `http_wire`, `http_auth`,
+  `reflection`, `oauth_login` and `credential_use` code they reach, pruned by
+  the compiler's dead-code analysis (`http_request.rs` went entirely). The new
+  generated model has no `axiom` at all.
+- Proofs: the 15 supporting AIVM proof modules were copied and pruned by
+  usage (5,651 → ~1,850 lines; `GarrettRoute` dropped, its five general
+  lemmas moved to `GarrettFoundation` under `garrett_stateless_core.Lemmas`).
+  The 15 stateless proof modules are byte-identical to before apart from the
+  namespace renames. Namespace is the real crate's, `garrett_stateless_core`.
+- Python: `garrett_stateless.core` mirrors the Rust crate module for module
+  (stdlib only, enforced by `tests/test_core_purity.py`); token and login-state
+  crypto moved behind `KeyMaterial`/`StateKey` with caller-supplied nonces,
+  as in Rust. The forked `core/proxy_http.py` reproduces AIVM's HTTP parity
+  vectors byte for byte.
+- The TPM signer was ported into the shell (feature `tpm`); the swtpm test
+  passes. Its writes are exempted in the shell guard with a reason.
+- AIVM: `rust/`, `aivm_secrets/`, `pyproject.toml`, the generated model and
+  every gate pin (NR-0, read-path, W3, W4, W5), the axiom baseline, the
+  ledgers and both proof manifests are restored to `e9aa9fa`; the pending
+  stateless re-pins no longer exist. `generated_scope.py` was removed (its
+  purpose was those re-pins). The restored manifests were already stale at
+  `e9aa9fa` for unrelated files; I did not re-record them.
+
+Left for deliberate follow-ups (garrett/docs/status.md): the refusal body
+still says `"proxy":"aivm-secrets"` and two AIVM-only `Code` variants remain
+(a wire change touching vectors and proofs); GPT's readability items (split
+`stateless_token.rs`, `open` from its halves, shared validators,
+`PROTOCOL.md`, test-only fixed-nonce sealers).
+
+Validation at commit time: AIVM full pytest 2708 passed / 779 skipped; AIVM
+gate tests, W0, W3 and `python -m build` pass; Garrett `lake build` passes;
+Garrett Rust, Python, swtpm, purity and shell-guard checks pass (numbers in
+the commit). The standalone copy check and the 42-mutant run were still
+running; their results follow in a later commit. Confidence: high that the
+move preserves the proofs and the wire behaviour (identical proof text,
+byte-identical vectors); medium on CI wiring, which has not run on GitHub.

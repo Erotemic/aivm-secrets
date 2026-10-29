@@ -251,31 +251,13 @@ def test_only_reviewed_host_adapters_can_open_network_connections():
     # proxy/server.py is the optional credential-substitution profile's own
     # upstream sink (OUT-6, HP-1): pinned origin address and trust anchor
     # only. It is separately enabled and the broker never imports it.
-    # garrett_stateless is the separately enabled garrett-stateless-v1
-    # profile: wire.py dials the configured token endpoint (broker) and the
-    # broker or proxy (agent client); proxy.py dials the pinned address of
-    # the route the authenticated surrogate selects. Neither is loaded by
-    # the broker (checked below).
     assert openers == {'host/egress.py', 'identity/oauth_transport.py',
-                       'identity/coordination.py', 'proxy/server.py',
-                       'garrett_stateless/wire.py', 'garrett_stateless/proxy.py'}
+                       'identity/coordination.py', 'proxy/server.py'}
     # Only the top-level CLI dispatches to the proxy; nothing else loads it.
-    # The stateless profile reuses only the pure HTTP/1.1 and policy modules
-    # of the substitution proxy, and its own ``proxy`` module is internal.
     loaders = {str(path.relative_to(PACKAGE)) for path in ALL
-               if path.parent.name not in ('proxy', 'garrett_stateless')
+               if path.parent.name != 'proxy'
                and any('proxy' in name.split('.') for _, name in imports(path))}
     assert loaders == {'cli.py'}
-    stateless = sorted((PACKAGE / 'garrett_stateless').glob('*.py'))
-    for path in stateless:
-        for level, name in imports(path):
-            if level == 2 and name.split('.')[0] == 'proxy':
-                assert name in ('proxy', 'proxy.http1', 'proxy.policy'), (path.name, name)
-            assert not (level == 2 and name.split('.')[0] in ('kernel', 'host', 'identity', 'transport')), (
-                path.name, name)
-    importers = {str(path.relative_to(PACKAGE)) for path in ALL if path.parent.name != 'garrett_stateless'
-                 and any('garrett_stateless' in name.split('.') for _, name in imports(path))}
-    assert importers == set()
 
 
 def test_only_one_module_runs_a_program_and_never_through_a_shell():

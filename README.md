@@ -17,24 +17,10 @@ The project has two implementations of the same protocol:
 It works on its own or with [AIVM](https://github.com/Erotemic/aivm), which
 can start a broker session for a VM. AIVM never requires this package.
 
-**Garrett's stateless architecture** is a separate profile,
-[`garrett-stateless-v1`](docs/garrett-stateless-v1.md), from Matthew Garrett's
-[*Securing agentic identity*](https://codon.org.uk/~mjg59/blog/p/securing-agentic-identity/).
-An OAuth broker mints a signed surrogate token that carries the provider token
-encrypted and is bound to the agent's client certificate. A stateless mTLS
-proxy swaps the real token in for ordinary API requests. Any number of proxy
-replicas accept the same surrogate without shared state. OAuth is optional: an
-API key the operator provisions needs no OAuth client or browser, and a
-`"stateless": "strict"` deployment keeps nothing but its keys and
-configuration. A proxy can also be configured read-only, so that the same
-surrogate is limited to listed `GET`/`HEAD` resources there. It ships as the
-Python package `aivm_secrets.garrett_stateless` and the Rust crate
-`rust/crates/garrett-stateless`, and the two interoperate. Its Rust decisions,
-codecs and transitions are proved in Lean and composed into one internal
-protocol theorem whose only premises are the external cryptography boundary
-([what is proved](docs/verified-garrett-stateless.md)).
-See the [usage guide](docs/garrett-stateless-usage.md), or run
-`bash scripts/garrett-stateless-demo.sh`.
+**Garrett's stateless architecture** (`garrett-stateless-v1`, from Matthew
+Garrett's [*Securing agentic identity*](https://codon.org.uk/~mjg59/blog/p/securing-agentic-identity/))
+is a separate, self-contained project in [`garrett/`](garrett/README.md), with
+its own Rust crates, Python package and Lean proofs.
 
 ## How a request flows
 
@@ -215,9 +201,7 @@ Tests use synthetic credentials and local HTTPS services only.
 - [Proof tour](docs/assurance/native-read-proof-tour.md) and
   [claim-to-evidence matrix](docs/assurance/claim-evidence-matrix.md)
 - [Assurance by configuration](docs/assurance-profiles.md)
-- `garrett-stateless-v1`: [specification](docs/garrett-stateless-v1.md),
-  [usage](docs/garrett-stateless-usage.md), [proofs](docs/verified-garrett-stateless.md),
-  [status](docs/planning/aivm-secrets-garrett-stateless.md)
+- `garrett-stateless-v1`, a separate project: [`garrett/`](garrett/README.md)
 - [Contributor rules](AGENTS.md)
 
 ## History
