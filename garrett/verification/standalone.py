@@ -1,13 +1,14 @@
 """Check that this tree stands alone: copy it, without build outputs, into an
 empty directory and build, test, extract and prove it there.
 
-    python verification/standalone.py [--keep] [--skip-proofs] [--skip-mutants]
+    python verification/standalone.py [--keep] [--skip-proofs] [--skip-mutants] [--jobs N]
 
 The copy gets its own virtual environment (only this project and its
 dependencies), its own Cargo target and its own Lake build. The toolchain
 bundle is installed from this tree's pinned archive, checked against its
 SHA-256, so nothing is downloaded twice. It also fails if any source file
-names the project this one was extracted from.
+names the project this one was extracted from. Each step's output goes to
+``logs/`` beside the copy; the mutation campaign's progress is also printed.
 """
 from __future__ import annotations
 
@@ -17,6 +18,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,15 +39,34 @@ PENDING_RENAME = {
 }
 
 
-def step(title: str, argv: list, cwd: Path, env: dict | None = None, timeout: int = 7200) -> None:
-    print(f'== {title}', flush=True)
-    result = subprocess.run([str(a) for a in argv], cwd=cwd, env=env, capture_output=True, text=True,
-                            timeout=timeout)
-    if result.returncode != 0:
-        print(result.stdout[-4000:], result.stderr[-4000:], sep='\n')
-        raise SystemExit(f'failed: {title}')
-    tail = (result.stdout.strip().splitlines() or [''])[-1]
-    print(f'   ok: {tail[:160]}', flush=True)
+def step(title: str, argv: list, cwd: Path, logs: Path, env: dict | None = None, timeout: int = 7200,
+         echo: bool = False) -> None:
+    """Run one step, writing its output to a log (and to stdout if `echo`)."""
+    log = logs / (re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-') + '.log')
+    print(f'== {title} (log: {log})', flush=True)
+    started = time.monotonic()
+    with log.open('w') as sink:
+        process = subprocess.Popen([str(a) for a in argv], cwd=cwd, env=env, stdout=subprocess.PIPE,
+                                   stderr=subprocess.STDOUT, text=True)
+        timer = threading.Timer(timeout, process.kill)
+        timer.start()
+        try:
+            last = ''
+            for line in process.stdout:
+                sink.write(line)
+                sink.flush()
+                if line.strip():
+                    last = line.strip()
+                if echo:
+                    print(f'   {line.rstrip()}', flush=True)
+            code = process.wait()
+        finally:
+            timer.cancel()
+    elapsed = time.monotonic() - started
+    if code != 0:
+        print(''.join(log.read_text().splitlines(keepends=True)[-80:]))
+        raise SystemExit(f'failed after {elapsed:.0f}s (exit {code}): {title}')
+    print(f'   ok in {elapsed:.0f}s: {last[:160]}', flush=True)
 
 
 def origin_mentions(tree: Path) -> list[str]:
@@ -66,37 +88,43 @@ def main() -> int:
     parser.add_argument('--keep', action='store_true', help='keep the copy for inspection')
     parser.add_argument('--skip-proofs', action='store_true', help='skip extraction, Lean and mutants')
     parser.add_argument('--skip-mutants', action='store_true', help='skip only the mutation campaign')
+    parser.add_argument('--jobs', type=int, help='mutants checked at once (verification/mutate.py --jobs)')
     args = parser.parse_args()
     scratch = Path(tempfile.mkdtemp(prefix='garrett-standalone-'))
     tree = scratch / 'garrett'
     try:
         shutil.copytree(ROOT, tree, ignore=IGNORED)
-        print(f'copied to {tree}')
+        logs = scratch / 'logs'
+        logs.mkdir()
+        print(f'copied to {tree}', flush=True)
         mentions = origin_mentions(tree)
         if mentions:
             raise SystemExit('the tree still names its origin:\n  ' + '\n  '.join(mentions))
         print('== no source names the origin project')
-        step('cargo build', ['cargo', 'build', '--locked', '--all-targets'], tree)
-        step('cargo test', ['cargo', 'test', '--locked'], tree)
+        step('cargo build', ['cargo', 'build', '--locked', '--all-targets'], tree, logs)
+        step('cargo test', ['cargo', 'test', '--locked'], tree, logs)
         step('cargo test --features tpm', ['cargo', 'test', '--locked', '--features', 'tpm',
-                                           '--target-dir', 'target/tpm'], tree)
+                                           '--target-dir', 'target/tpm'], tree, logs)
         venv = scratch / 'venv'
-        step('virtual environment', [sys.executable, '-m', 'venv', venv], scratch)
+        step('virtual environment', [sys.executable, '-m', 'venv', venv], scratch, logs)
         python = venv / 'bin' / 'python'
-        step('pip install', [python, '-m', 'pip', 'install', '-q', '.[tests]'], tree)
-        step('python -m pytest', [python, '-m', 'pytest', '-q', '-p', 'no:cacheprovider'], tree)
-        step('python -m build', [python, '-m', 'build', '-q', '--outdir', scratch / 'dist'], tree)
-        step('shell guard', [python, 'verification/shell_guard.py', 'check'], tree)
+        step('pip install', [python, '-m', 'pip', 'install', '-q', '.[tests]'], tree, logs)
+        step('python -m pytest', [python, '-m', 'pytest', '-q', '-p', 'no:cacheprovider'], tree, logs)
+        step('python -m build', [python, '-m', 'build', '-q', '--outdir', scratch / 'dist'], tree, logs)
+        step('shell guard', [python, 'verification/shell_guard.py', 'check'], tree, logs)
         if not args.skip_proofs:
             archive = ROOT / '.tools' / 'aeneas-linux-x86_64.tar.gz'
             boot = [python, 'verification/toolchain.py', 'bootstrap']
             if archive.is_file():
                 boot += ['--archive', archive]
-            step('toolchain bootstrap', boot, tree)
-            step('extraction matches the Rust', [python, 'verification/extract.py', 'check'], tree)
-            step('lake build', ['lake', 'build'], tree / 'proofs', timeout=14400)
+            step('toolchain bootstrap', boot, tree, logs)
+            step('extraction matches the Rust', [python, 'verification/extract.py', 'check'], tree, logs)
+            step('lake build', ['lake', 'build'], tree / 'proofs', logs, timeout=14400)
             if not args.skip_mutants:
-                step('mutation campaign', [python, 'verification/mutate.py'], tree, timeout=28800)
+                mutate = [python, 'verification/mutate.py']
+                if args.jobs:
+                    mutate += ['--jobs', args.jobs]
+                step('mutation campaign', mutate, tree, logs, timeout=28800, echo=True)
         print(f'standalone check passed in {tree}')
         return 0
     finally:
