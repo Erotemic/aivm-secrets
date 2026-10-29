@@ -286,6 +286,38 @@ class RouteConfig:
 
 
 @dataclass(frozen=True)
+class ResourceConfig:
+    """One ``read_only`` resource (spec section 11.1)."""
+    provider: str
+    method: str
+    path: str
+
+
+def _read_only(f: '_Fields', base: Path, routes: tuple[RouteConfig, ...]) -> tuple[ResourceConfig, ...] | None:
+    items = f.present('read_only')
+    if items is None:
+        return None
+    if not isinstance(items, list):
+        raise ConfigError('proxy: read_only must be an array')
+    if not 1 <= len(items) <= 64:
+        raise ConfigError('proxy: between 1 and 64 read_only resources')
+    resources = []
+    for item in items:
+        r = _Fields(item, 'read_only resource', base, {'path', 'provider'}, {'method'})
+        provider = r.string('provider')
+        if not any(route.provider == provider for route in routes):
+            raise ConfigError('read_only resource: provider has no route')
+        method = r.optional_string('method') or ''
+        if method not in ('', 'GET', 'HEAD'):
+            raise ConfigError('read_only resource: method must be GET or HEAD')
+        path = r.string('path')
+        if not path.startswith('/'):
+            raise ConfigError('read_only resource: path must start with /')
+        resources.append(ResourceConfig(provider, method, path))
+    return tuple(resources)
+
+
+@dataclass(frozen=True)
 class ProxyConfig:
     listen: str
     authority: str
@@ -300,6 +332,12 @@ class ProxyConfig:
     request_limit: int = 1 << 20
     audit: Path | None = None
     stateless: str = STANDARD
+    # ``None``: Garrett's unrestricted policy; otherwise read-only on these.
+    read_only: tuple[ResourceConfig, ...] | None = None
+
+    @property
+    def operations(self) -> str:
+        return 'unrestricted' if self.read_only is None else 'read-only'
 
     @classmethod
     def load(cls, path: Path) -> 'ProxyConfig':
@@ -307,7 +345,7 @@ class ProxyConfig:
         f = _Fields(value, 'proxy', base,
                     {'audiences', 'authority', 'certificate', 'client_ca', 'keys', 'listen', 'private_key',
                      'routes', 'schema'},
-                    {'audit', 'max_lifetime', 'request_limit', 'skew', 'stateless'})
+                    {'audit', 'max_lifetime', 'read_only', 'request_limit', 'skew', 'stateless'})
         audiences = f.strings('audiences')
         if not 1 <= len(audiences) <= 16 or not all(enc.is_text(a) for a in audiences):
             raise ConfigError('proxy: invalid audiences')
@@ -326,12 +364,13 @@ class ProxyConfig:
         audit = f.optional_path('audit')
         if audit is not None and stateless == STRICT:
             raise ConfigError('proxy: a strict proxy writes no audit file')
+        read_only = _read_only(f, base, routes)
         return cls(
             listen=f.string('listen'), authority=authority, certificate=f.path('certificate'),
             private_key=f.path('private_key'), client_ca=f.path('client_ca'), keys=f.path('keys'),
             audiences=tuple(audiences), routes=routes, max_lifetime=f.int('max_lifetime', 3600, 1, 86400),
             skew=f.int('skew', 60, 0, 300), request_limit=f.int('request_limit', 1 << 20, 1, 16 << 20),
-            audit=audit, stateless=stateless,
+            audit=audit, stateless=stateless, read_only=read_only,
         )
 
 

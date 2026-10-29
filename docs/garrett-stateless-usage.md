@@ -91,6 +91,19 @@ refuse anything that keeps state beyond its keys and configuration: an OAuth
 provider (whose logins need the transient mailbox) and a proxy `audit` file
 (spec section 9). Both print `"stateless": "strict"` in their startup line.
 
+**A read-only proxy.** The same surrogate works through any proxy that shares
+the key set. Add `read_only` to a proxy's configuration to let it forward only
+`GET`/`HEAD` requests without a body, for the listed providers and paths
+(spec section 11.1); anything else gets `403 denied` and nothing is sent:
+
+```json
+"read_only":[{"provider":"api","path":"/user"},{"provider":"api","method":"GET","path":"/repos/octo/demo/"}]
+```
+
+The proxy prints `"operations": "read-only"` (or `"unrestricted"`) in its
+startup line. Whether `GET` only reads is the provider's semantics; review
+each listed path against the provider's API.
+
 Key rotation, and revocation by retiring a key:
 
 ```bash

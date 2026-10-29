@@ -8,7 +8,8 @@
 //! ([`Channel`], [`Origin`]). Everything else is decided here: how the
 //! guest's bytes are framed, which surrogate a request presents, whether it
 //! opens for this connection's peer, which configured route its
-//! authenticated `prv` selects, the exact upstream bytes
+//! authenticated `prv` selects, whether the static operation policy
+//! (`stateless_policy`) permits the request's operation, the exact upstream bytes
 //! (`proxy_http::encode_upstream`) and the released reply
 //! (`proxy_controller::release`).
 //!
@@ -27,6 +28,7 @@ use crate::proxy_http::{
     Request,
 };
 use crate::stateless::{self, Acceptance, Rejection, SurrogateClaims, SurrogateOpener};
+use crate::stateless_policy::{operation_of, OperationPolicy};
 
 /// One configured provider destination.
 pub struct Route {
@@ -147,6 +149,14 @@ pub fn unauthorized_served() -> Served {
     }
 }
 
+/// A decided dispatch: the route, the exact credential-bearing bytes and the
+/// opened surrogate. Its fields are private, so only this module reads them.
+pub struct Dispatch {
+    route: usize,
+    wire: Vec<u8>,
+    opened: stateless::Opened,
+}
+
 /// What one request is authorized to do.
 // Unboxed: Aeneas models `Box` as the identity, so it would buy nothing.
 #[allow(clippy::large_enum_variant)]
@@ -156,16 +166,18 @@ pub enum Decision {
     /// A fixed refusal before any egress.
     Refused(Code),
     /// Send these exact bytes to this route, for this opened surrogate.
-    Dispatch(usize, Vec<u8>, stateless::Opened),
+    Dispatch(Dispatch),
 }
 
 /// The authorization decision for one request, from the keys (through
 /// `opener`), the authenticated peer, the request, the clock and the
-/// static routes and acceptance policy alone. It reads no other state and
-/// performs no effect, so every replica with the same keys and
-/// configuration decides alike.
-pub fn decide<V: SurrogateOpener>(
+/// static routes, operation policy and acceptance policy alone. It reads no
+/// other state and performs no effect, so every replica with the same keys
+/// and configuration decides alike.
+#[allow(clippy::too_many_arguments)]
+pub fn decide<V: SurrogateOpener, P: OperationPolicy>(
     opener: &V,
+    policy: &P,
     request: &Request,
     routes: &[Route],
     acceptance: &Acceptance,
@@ -176,16 +188,25 @@ pub fn decide<V: SurrogateOpener>(
         Some(token) => token,
         None => return Decision::Unauthorized(None),
     };
-    let opened = match stateless::open(opener, &token, acceptance, peer, now) {
-        Ok(opened) => opened,
+    let verified = match stateless::authenticate(opener, &token, acceptance, peer, now) {
+        Ok(verified) => verified,
         Err(rejection) => return Decision::Unauthorized(Some(rejection)),
     };
     // The destination is the authenticated provider's route, never a
     // request value.
-    let index = route_of(routes, &opened.claims.provider);
+    let index = route_of(routes, &verified.claims.provider);
     if index >= routes.len() {
         return Decision::Refused(Code::UnknownOrigin);
     }
+    // The operation policy sees the claims and the operation, never the
+    // credential, which is not decrypted for a refused operation.
+    if !policy.permits(&verified.claims, &operation_of(request)) {
+        return Decision::Refused(Code::Denied);
+    }
+    let opened = match stateless::decrypt(opener, verified) {
+        Ok(opened) => opened,
+        Err(rejection) => return Decision::Unauthorized(Some(rejection)),
+    };
     let route = &routes[index];
     let mut wire = Vec::new();
     match encode_upstream(
@@ -196,7 +217,11 @@ pub fn decide<V: SurrogateOpener>(
         &opened.credential,
         &route.authentication,
     ) {
-        Ok(()) => Decision::Dispatch(index, wire, opened),
+        Ok(()) => Decision::Dispatch(Dispatch {
+            route: index,
+            wire,
+            opened,
+        }),
         Err(refusal) => Decision::Refused(code_of(&refusal)),
     }
 }
@@ -205,8 +230,9 @@ pub fn decide<V: SurrogateOpener>(
 /// only for a dispatch, the admission record, the one exchange and the
 /// release.
 #[allow(clippy::too_many_arguments)]
-pub fn serve<V: SurrogateOpener, O: Origin>(
+pub fn serve<V: SurrogateOpener, P: OperationPolicy, O: Origin>(
     opener: &V,
+    policy: &P,
     origin: &mut O,
     request: &Request,
     routes: &[Route],
@@ -215,7 +241,8 @@ pub fn serve<V: SurrogateOpener, O: Origin>(
     now: i64,
     limit: usize,
 ) -> Served {
-    let (index, wire, opened) = match decide(opener, request, routes, acceptance, peer, now) {
+    let (index, wire, opened) = match decide(opener, policy, request, routes, acceptance, peer, now)
+    {
         Decision::Unauthorized(rejection) => {
             match rejection {
                 Some(rejection) => origin.rejected(&rejection),
@@ -224,7 +251,7 @@ pub fn serve<V: SurrogateOpener, O: Origin>(
             return unauthorized_served();
         }
         Decision::Refused(code) => return stopped(code, Stage::Refused),
-        Decision::Dispatch(index, wire, opened) => (index, wire, opened),
+        Decision::Dispatch(dispatch) => (dispatch.route, dispatch.wire, dispatch.opened),
     };
     // Fail closed: no acknowledged admission record, no egress.
     if !origin.admitted(&opened.claims, index) {
@@ -255,8 +282,9 @@ pub fn serve<V: SurrogateOpener, O: Origin>(
 /// bytes after it.
 // `len` rather than `is_empty`: Aeneas models only the former.
 #[allow(clippy::too_many_arguments, clippy::len_zero)]
-pub fn connection_step<V: SurrogateOpener, C: Channel>(
+pub fn connection_step<V: SurrogateOpener, P: OperationPolicy, C: Channel>(
     opener: &V,
+    policy: &P,
     channel: &mut C,
     buffer: Vec<u8>,
     routes: &[Route],
@@ -305,6 +333,7 @@ pub fn connection_step<V: SurrogateOpener, C: Channel>(
             let now = channel.begin(&parsed.request);
             let served = serve(
                 opener,
+                policy,
                 channel,
                 &parsed.request,
                 routes,
@@ -330,8 +359,9 @@ pub fn connection_step<V: SurrogateOpener, C: Channel>(
 /// A whole authenticated connection, for the `peer` its handshake verified:
 /// steps until one closes it.
 #[allow(clippy::too_many_arguments)]
-pub fn connection<V: SurrogateOpener, C: Channel>(
+pub fn connection<V: SurrogateOpener, P: OperationPolicy, C: Channel>(
     opener: &V,
+    policy: &P,
     channel: &mut C,
     routes: &[Route],
     acceptance: &Acceptance,
@@ -346,6 +376,7 @@ pub fn connection<V: SurrogateOpener, C: Channel>(
     while state.open {
         state = connection_step(
             opener,
+            policy,
             channel,
             state.buffer,
             routes,
@@ -362,6 +393,7 @@ mod tests {
     use super::*;
     use crate::proxy_http::parse_request;
     use crate::stateless::Verified;
+    use crate::stateless_policy::{ReadOnly, Resource, Unrestricted};
 
     const AUTHORITY: &[u8] = b"proxy.test:8443";
 
@@ -444,6 +476,15 @@ mod tests {
     }
 
     fn run(raw: &[u8], peer: &[u8], answer: &[u8]) -> (Served, Recorder) {
+        run_with(&Unrestricted, raw, peer, answer)
+    }
+
+    fn run_with<P: OperationPolicy>(
+        policy: &P,
+        raw: &[u8],
+        peer: &[u8],
+        answer: &[u8],
+    ) -> (Served, Recorder) {
         let request = match parse_request(raw, AUTHORITY, 4096) {
             Ok(Some(parsed)) => parsed.request,
             _ => panic!("parse"),
@@ -454,6 +495,7 @@ mod tests {
         };
         let served = serve(
             &Keys,
+            policy,
             &mut origin,
             &request,
             &routes(),
@@ -577,6 +619,7 @@ mod tests {
         };
         connection(
             &Keys,
+            &Unrestricted,
             &mut guest,
             &routes(),
             &acceptance(),
@@ -603,5 +646,42 @@ mod tests {
         let (served, _) = run(raw, b"PEER", echo);
         assert!(matches!(served.stage, Stage::Failed));
         assert!(!String::from_utf8_lossy(&served.reply).contains("REAL-SECRET"));
+    }
+
+    /// One surrogate through the two policies: the read-only proxy refuses,
+    /// before any admission or egress, what Garrett's proxy forwards.
+    #[test]
+    fn the_read_only_policy_refuses_before_egress() {
+        let read_only = ReadOnly {
+            resources: vec![Resource {
+                provider: b"api".to_vec(),
+                method: Vec::new(),
+                path: b"/user".to_vec(),
+            }],
+        };
+        let allowed =
+            b"GET /user HTTP/1.1\r\nHost: proxy.test:8443\r\nAuthorization: Bearer GOOD\r\n\r\n";
+        for policy_run in [
+            run_with(&Unrestricted, allowed, b"PEER", OK),
+            run_with(&read_only, allowed, b"PEER", OK),
+        ] {
+            assert!(matches!(policy_run.0.stage, Stage::Completed));
+            assert_eq!(policy_run.1.sent.len(), 1);
+        }
+        let changed: [&[u8]; 4] = [
+            b"DELETE /user HTTP/1.1\r\nHost: proxy.test:8443\r\nAuthorization: Bearer GOOD\r\n\r\n",
+            b"GET /admin HTTP/1.1\r\nHost: proxy.test:8443\r\nAuthorization: Bearer GOOD\r\n\r\n",
+            b"POST /user HTTP/1.1\r\nHost: proxy.test:8443\r\nAuthorization: Bearer GOOD\r\nContent-Length: 2\r\n\r\n{}",
+            b"GET /user/x HTTP/1.1\r\nHost: proxy.test:8443\r\nAuthorization: Bearer GOOD\r\n\r\n",
+        ];
+        for raw in changed {
+            let (served, origin) = run_with(&Unrestricted, raw, b"PEER", OK);
+            assert!(matches!(served.stage, Stage::Completed));
+            assert_eq!(origin.sent.len(), 1);
+            let (served, origin) = run_with(&read_only, raw, b"PEER", OK);
+            assert!(matches!(served.stage, Stage::Refused));
+            assert!(matches!(served.code, Code::Denied));
+            assert!(origin.sent.is_empty());
+        }
     }
 }

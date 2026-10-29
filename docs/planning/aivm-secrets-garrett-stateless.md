@@ -30,13 +30,13 @@ the article from our choices), [usage](../garrett-stateless-usage.md),
 
 | Check | Result |
 | --- | --- |
-| `cargo test -p garrett-stateless -p aivm-secrets-garrett-core` | pass (core 108; shell unit, vectors, end-to-end over TLS and the strict provisioned workflow) |
-| `pytest tests/test_garrett_stateless*.py` | 95 pass (including the 4-way interop matrix, the 4-way strict provisioned matrix and the swtpm test, with both Rust builds present) |
-| Full default `lake build` (1920 jobs) | pass; `garrett.py record-sources` re-recorded the manifest |
-| Stateless Rust mutants (`garrett.py mutate --mutation-filter '^stateless '`) | 34 of 34 rejected (2026-10-27, composable-isolation increment) |
+| `cargo test -p garrett-stateless -p aivm-secrets-garrett-core` | pass (core 110; shell unit, vectors, end-to-end over TLS and the strict provisioned workflow with its read-only proxy) |
+| `pytest tests/test_garrett_stateless*.py` | 103 pass (including the 4-way interop matrix, the 4-way strict provisioned matrix, the operation-policy cases and the swtpm test, with both Rust builds present) |
+| Full default `lake build` (1921 jobs) | pass; `garrett.py record-sources` re-recorded the manifest |
+| Stateless Rust mutants (`garrett.py mutate --mutation-filter '^stateless '`) | 42 of 42 rejected (2026-10-27, operation-authorization increment) |
 | Opt-in axiom audit | 2026-10-26 only (1,885 theorems, standard axioms); not re-run for this increment |
 | `protocol_safety` (global internal theorem) | compiles; premises are only the external boundary |
-| Shell guard `stateless_shell.py check` | pass (11 checks) |
+| Shell guard `stateless_shell.py check` | pass (12 checks) |
 | Container demo | pass, `ok: true`, `--network none` |
 | External project depending on the crate (stable 1.98) | builds and runs |
 
@@ -59,6 +59,17 @@ The mutant and audit runs are also recorded in `dev/journals/claude.md`
   `strict_no_login_state` prove a broker whose login policy names no provider
   never holds a login; the shell guard checks the policy names only OAuth
   providers and that no other mutable state or file write exists.
+
+## Composable isolation, second increment (2026-10-27)
+
+- A static operation policy in the extracted core (`stateless_policy`):
+  Garrett's `Unrestricted` and a constrained `ReadOnly` proxy (spec section
+  11.1). `decide` consults it after authenticating and before decrypting.
+- `composed_egress` (`GarrettStatelessComposition`) composes identity,
+  authorization, provider selection, exact encoding and controlled egress
+  for any policy with a `Sound` contract, and is instantiated for both
+  extracted policies. Details, acceptance evidence and the gate re-pin review
+  are in [aivm-secrets-garrett-composition.md](aivm-secrets-garrett-composition.md).
 
 ## Remaining work (none of it blocks local use)
 

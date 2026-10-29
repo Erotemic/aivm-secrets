@@ -331,6 +331,68 @@ theorem open_one_peer {V : Type} (ops : SurrogateOpener V) (opener : V) (token :
   subst h2
   exact adm1.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.symm.trans adm2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2
 
+/-! ## Opening in two halves
+
+The proxy calls `authenticate` (verify, then admit) and `decrypt` (unseal,
+then check the credential) separately, so that it can authorize the operation
+between them. Together they are exactly `open`. -/
+
+/-- An authenticated surrogate: `verify` returned it and `admit` accepted its
+    claims for this peer, now. -/
+theorem authenticate_ok_trace {V : Type} (ops : SurrogateOpener V) (opener : V) (token : Slice U8)
+    (a : Acceptance) (peer : Slice U8) (now : I64) (v : Verified)
+    (h : authenticate ops opener token a peer now = Result.ok (.Ok v)) :
+    ops.verify opener token = Result.ok (.Ok v) ∧
+      admit v.claims (alloc.vec.Vec.deref v.key_issuer) a peer now = Result.ok (.Ok ()) ∧
+      Admitted v.claims (alloc.vec.Vec.deref v.key_issuer) a peer now := by
+  unfold authenticate at h
+  obtain ⟨r, hr, h⟩ := bind_ok_inv h
+  cases r with
+  | Err e => simp at h
+  | Ok w =>
+    dsimp only at h
+    obtain ⟨r1, hr1, h⟩ := bind_ok_inv h
+    cases r1 with
+    | Err e => simp at h
+    | Ok u =>
+      simp only [Result.ok.injEq, core.result.Result.Ok.injEq] at h
+      subst h
+      cases u
+      exact ⟨hr, hr1, (admit_ok_iff _ _ _ _ _ _ hr1).mp rfl⟩
+
+/-- A decrypted surrogate: `unseal` returned exactly its credential, which is
+    valid, and its claims are the authenticated ones. -/
+theorem decrypt_ok_trace {V : Type} (ops : SurrogateOpener V) (opener : V) (v : Verified) (o : Opened)
+    (h : decrypt ops opener v = Result.ok (.Ok o)) :
+    ops.«unseal» opener v = Result.ok (.Ok o.credential) ∧ o.claims = v.claims ∧
+      http_auth.valid_credential (alloc.vec.Vec.deref o.credential) = Result.ok true := by
+  unfold decrypt at h
+  obtain ⟨r, hr, h⟩ := bind_ok_inv h
+  cases r with
+  | Err e => simp at h
+  | Ok c =>
+    dsimp only at h
+    obtain ⟨b, hb, h⟩ := bind_ok_inv h
+    split at h
+    · rename_i yes
+      simp only [Result.ok.injEq, core.result.Result.Ok.injEq] at h
+      subst h
+      exact ⟨hr, rfl, by rw [hb, yes]⟩
+    · simp at h
+
+/-- **The halves compose to `open`.** -/
+theorem open_of_halves {V : Type} (ops : SurrogateOpener V) (opener : V) (token : Slice U8)
+    (a : Acceptance) (peer : Slice U8) (now : I64) (v : Verified) (o : Opened)
+    (ha : authenticate ops opener token a peer now = Result.ok (.Ok v))
+    (hd : decrypt ops opener v = Result.ok (.Ok o)) :
+    «open» ops opener token a peer now = Result.ok (.Ok o) := by
+  obtain ⟨hv, hadm, _⟩ := authenticate_ok_trace ops opener token a peer now v ha
+  obtain ⟨hu, hc, hval⟩ := decrypt_ok_trace ops opener v o hd
+  obtain ⟨claims, credential⟩ := o
+  dsimp only at hc hu hval
+  subst hc
+  simp [«open», hv, hadm, hu, hval]
+
 /-! ## Issuance -/
 
 @[step]

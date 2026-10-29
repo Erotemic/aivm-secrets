@@ -1466,3 +1466,59 @@ no file writes) are a source guard, not a proof; acquisition adapters are
 trusted for the binding they report (provisioned: the operator).
 Confidence: high for the extracted-code theorems; medium for the guard's
 completeness.
+
+## 2026-10-27 22:20:00 -0400
+
+Session: composable Garrett credential isolation, second increment (the
+remainder of the truncated prompt): a static operation policy in the
+extracted core, a reusable composition theorem, and its instantiation for two
+real configurations.
+
+Decisions:
+- The policy is a narrow trait, `OperationPolicy::permits(&self, &claims,
+  &Operation) -> bool`, with exactly two core implementations (`Unrestricted`,
+  `ReadOnly`). A trait rather than an enum so that the Lean composition theorem
+  is genuinely generic over a component with a contract (`Sound`), and both
+  instantiations are the actual extracted trait instances. The shell picks
+  one of the two at startup and runs the monomorphized core loop; it may not
+  implement the trait (guard).
+- `decide` now authenticates (`stateless::authenticate`), routes, authorizes,
+  and only then decrypts (`stateless::decrypt`). `open` is left byte-for-byte
+  unchanged, so its proofs and the "decrypted before admission" mutant still
+  apply to renewal; `open_of_halves` shows the halves compose to `open`, which
+  kept `dispatch_trace`'s statement and every downstream proof unchanged. One
+  behavioural difference in Garrett's proxy: a token whose provider has no
+  route now gets `unknown_origin` before an undecryptable credential would get
+  `401`. Admission already rejects providers outside the acceptance list, which
+  the shell builds from the routes, so the case is unreachable in configured
+  proxies.
+- The policy's refusal is the existing `denied` code (403), the same as a deny
+  rule, so clients see one refusal shape.
+- `Decision::Dispatch` now carries a private-field `Dispatch`; only
+  `stateless_proxy` reads route, bytes and credential.
+- The protocol model's `Config` gained the policy as a type parameter, so
+  `protocol_safety` holds for either policy without new proof.
+- Replica review point: kept `serve_outcome`/`replicas_differ_only_by_answers`
+  and corrected their documentation (three answers, two of them local
+  acknowledgements); added `Answered`, `serve_answered`,
+  `replicas_same_answers_same_reply`, `replica_replies_differ`.
+- `mint` for OAuth providers: documented as a trusted operator override rather
+  than restricted; a restriction cannot bind an operator holding the keys.
+  No separate issuance schema: it would add a format without shrinking the
+  trusted path. A test shows `mint` never opens the configured TLS files.
+- Re-pinned gate hashes: wrote `dev/verification/generated_scope.py` so the
+  maintainer can see that every pre-stateless extracted declaration is
+  unchanged since `e9aa9fa`; approval stays with the maintainer.
+
+Verification: see the composition planning document's table. All 42 stateless
+mutants were rejected (the eight new operation-authorization mutants included;
+the two proxy-policy mutants are caught by `GarrettStatelessProxy`). Full
+`pytest -q`: 2827 passed, 779 skipped (pre-existing optional-backend skips).
+
+Uncertain or left open: "read-only" is the request the proxy lets through,
+not the provider's semantics (`STATELESS-OPS-01`: GET with side effects,
+query-borne method overrides, path variants). The shell's policy selection is
+guarded, not proved. Python cannot make the dispatch payload private.
+Confidence: high for the extracted-code theorems and the end-to-end tests;
+medium for how well `ReadOnlyAllowed` matches what operators will mean by
+"read-only" at a real provider.

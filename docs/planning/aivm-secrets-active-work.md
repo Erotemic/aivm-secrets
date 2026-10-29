@@ -118,6 +118,22 @@ remaining external validations (live provider, hardware TPM, independent
 review, release decision) are in
 [aivm-secrets-garrett-stateless.md](aivm-secrets-garrett-stateless.md).
 
+**Composable isolation (2026-10-27).** The proxy's isolation is now composed
+from separately verified extracted components, with one composition theorem
+(`composed_egress`) instantiated for Garrett's unrestricted proxy and a
+constrained read-only proxy, and acquisition kept outside the core. Status and
+the review items are in
+[aivm-secrets-garrett-composition.md](aivm-secrets-garrett-composition.md).
+Next, in order:
+
+1. Maintainer review of the re-pinned NR-0, read-path, W3, W4 and W5 hashes
+   (`python dev/verification/generated_scope.py diff e9aa9fa` shows what they
+   cover; no agent commit approves them).
+2. Independent review of the `Isolated` statement and `STATELESS-OPS-01`.
+3. Provider-specific read-only resource catalogues (narrows `STATELESS-OPS-01`).
+4. Mailbox-free OAuth acquisition, and further acquisition adapters: later,
+   separate increments.
+
 ## Everything else the planning documents list
 
 A sweep of every document in this directory on 2026-10-24 found the items

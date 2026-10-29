@@ -340,8 +340,9 @@ impl Broker {
     }
 
     /// The mailbox's policy. It names the OAuth providers only, so a broker
-    /// without one (every strict broker) never holds a login.
-    fn login_policy(&self) -> LoginPolicy {
+    /// without one (every strict broker) never holds a login: its
+    /// `providers` is the empty list `GarrettStatelessStrict` assumes.
+    pub fn login_policy(&self) -> LoginPolicy {
         LoginPolicy {
             replica: self.config.replica.as_bytes().to_vec(),
             providers: self

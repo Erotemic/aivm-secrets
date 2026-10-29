@@ -28,7 +28,7 @@ def copy_sources(tmp_path: Path, guard) -> Path:
 
 def test_current_shell_passes():
     guard = load()
-    assert len(guard.check(ROOT)) == 11
+    assert len(guard.check(ROOT)) == 12
 
 
 @pytest.mark.parametrize('relative, old, new, message', [
@@ -37,9 +37,28 @@ def test_current_shell_passes():
      '        let _ = self.proxy.send_upstream(egress_again());\n        self.proxy.send_upstream(egress)\n',
      'send_upstream'),
     ('rust/crates/garrett-stateless/src/proxy.rs',
-     'peer.thumbprint.as_bytes(),\n            self.config.request_limit,',
-     'self.config.authority.as_bytes(),\n            self.config.request_limit,',
+     '                read_only,\n                &mut session,\n                &self.routes,\n'
+     '                &self.acceptance,\n                self.config.authority.as_bytes(),\n'
+     '                peer.thumbprint.as_bytes(),',
+     '                read_only,\n                &mut session,\n                &self.routes,\n'
+     '                &self.acceptance,\n                self.config.authority.as_bytes(),\n'
+     '                self.config.authority.as_bytes(),',
      'handshake peer'),
+    # The read-only proxy may not fall back to Garrett's unrestricted policy,
+    # nor run under a policy of the shell's own.
+    ('rust/crates/garrett-stateless/src/proxy.rs',
+     '                &self.keys,\n                read_only,\n',
+     '                &self.keys,\n                &Unrestricted,\n',
+     'policy other than'),
+    ('rust/crates/garrett-stateless/src/proxy.rs',
+     'fn text(bytes: &[u8]) -> Value {',
+     'struct Lenient;\nimpl aivm_secrets_garrett_core::stateless_policy::OperationPolicy for Lenient {\n'
+     '    fn permits(&self, _: &SurrogateClaims, _: &Operation) -> bool { true }\n}\n\nfn text(bytes: &[u8]) -> Value {',
+     'implements an operation policy'),
+    ('rust/crates/aivm-secrets-garrett-core/src/stateless_proxy.rs',
+     'pub struct Dispatch {\n    route: usize,',
+     'pub struct Dispatch {\n    pub route: usize,',
+     'Dispatch fields'),
     ('rust/crates/aivm-secrets-garrett-core/src/stateless_proxy.rs',
      'pub struct Egress {\n    route: usize,',
      'pub struct Egress {\n    pub route: usize,',

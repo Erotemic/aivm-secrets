@@ -20955,8 +20955,45 @@ def stateless.open
     | core.result.Result.Err error => ok (core.result.Result.Err error)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
+/-- [aivm_secrets_garrett_core::stateless::authenticate]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 192:0-214:1
+    Visibility: public -/
+def stateless.authenticate
+  {V : Type _} (SurrogateOpenerInst : stateless.SurrogateOpener V) (opener : V)
+  (token : Slice Std.U8) (acceptance : stateless.Acceptance)
+  (peer : Slice Std.U8) (now : Std.I64) :
+  Result (core.result.Result stateless.Verified stateless.Rejection)
+  := do
+  let r ← SurrogateOpenerInst.verify opener token
+  match r with
+  | core.result.Result.Ok verified =>
+    let s := alloc.vec.Vec.deref verified.key_issuer
+    let r1 ← stateless.admit verified.claims s acceptance peer now
+    match r1 with
+    | core.result.Result.Ok _ => ok r
+    | core.result.Result.Err error => ok (core.result.Result.Err error)
+  | core.result.Result.Err _ => ok r
+
+/-- [aivm_secrets_garrett_core::stateless::decrypt]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 218:0-230:1
+    Visibility: public -/
+def stateless.decrypt
+  {V : Type _} (SurrogateOpenerInst : stateless.SurrogateOpener V) (opener : V)
+  (verified : stateless.Verified) :
+  Result (core.result.Result stateless.Opened stateless.Rejection)
+  := do
+  let r ← SurrogateOpenerInst.«unseal» opener verified
+  match r with
+  | core.result.Result.Ok credential =>
+    let s := alloc.vec.Vec.deref credential
+    let b ← http_auth.valid_credential s
+    if b
+    then ok (core.result.Result.Ok { claims := verified.claims, credential })
+    else ok (core.result.Result.Err stateless.Rejection.InvalidCredential)
+  | core.result.Result.Err error => ok (core.result.Result.Err error)
+
 /-- [aivm_secrets_garrett_core::stateless::IssuePolicy]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 190:0-196:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 233:0-239:1
     Visibility: public -/
 structure stateless.IssuePolicy where
   issuer : alloc.vec.Vec Std.U8
@@ -20966,7 +21003,7 @@ structure stateless.IssuePolicy where
   max_renew : Std.I64
 
 /-- [aivm_secrets_garrett_core::stateless::Grant]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 201:0-207:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 244:0-250:1
     Visibility: public -/
 structure stateless.Grant where
   provider : alloc.vec.Vec Std.U8
@@ -20976,7 +21013,7 @@ structure stateless.Grant where
   credential_expires : Std.I64
 
 /-- [aivm_secrets_garrett_core::stateless::Window]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 209:0-213:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 252:0-256:1
     Visibility: public -/
 structure stateless.Window where
   issued_at : Std.I64
@@ -20984,7 +21021,7 @@ structure stateless.Window where
   renew_until : Std.I64
 
 /-- [aivm_secrets_garrett_core::stateless::earlier]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 215:0-221:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 258:0-264:1
     Visibility: public -/
 def stateless.earlier (a : Std.I64) (b : Std.I64) : Result Std.I64 := do
   if a <= b
@@ -20992,7 +21029,7 @@ def stateless.earlier (a : Std.I64) (b : Std.I64) : Result Std.I64 := do
   else ok b
 
 /-- [aivm_secrets_garrett_core::stateless::issue_window]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 225:0-255:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 268:0-298:1
     Visibility: public -/
 def stateless.issue_window
   (policy : stateless.IssuePolicy) (grant : stateless.Grant) (now : Std.I64)
@@ -21039,7 +21076,7 @@ def stateless.issue_window
                       { issued_at := now, expires_at, renew_until })
 
 /-- [aivm_secrets_garrett_core::stateless::credential_expiry]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 258:0-273:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 301:0-316:1
     Visibility: public -/
 def stateless.credential_expiry
   (now : Std.I64) (has_expires_in : Bool) (expires_in : Std.I64) :
@@ -21064,7 +21101,7 @@ def stateless.credential_expiry
       else ok (core.result.Result.Ok stateless.MAX_TIME)
 
 /-- [aivm_secrets_garrett_core::stateless::claims_for]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 277:0-304:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 320:0-347:1
     Visibility: public -/
 def stateless.claims_for
   (policy : stateless.IssuePolicy) (grant : stateless.Grant)
@@ -21100,21 +21137,21 @@ def stateless.claims_for
   else ok (core.result.Result.Err stateless.Rejection.UnknownProvider)
 
 /-- Trait declaration: [aivm_secrets_garrett_core::stateless::SurrogateSealer]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 307:0-309:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 350:0-352:1
     Visibility: public -/
 structure stateless.SurrogateSealer (Self : Type _) where
   «seal» : Self → stateless.SurrogateClaims → Slice Std.U8 → Result
     (core.result.Result (alloc.vec.Vec Std.U8) stateless.Rejection)
 
 /-- [aivm_secrets_garrett_core::stateless::Issued]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 311:0-314:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 354:0-357:1
     Visibility: public -/
 structure stateless.Issued where
   claims : stateless.SurrogateClaims
   token : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::stateless::issue]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 318:0-339:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 361:0-382:1
     Visibility: public -/
 def stateless.issue
   {S : Type _} (SurrogateSealerInst : stateless.SurrogateSealer S) (sealer : S)
@@ -21138,7 +21175,7 @@ def stateless.issue
   else ok (core.result.Result.Err stateless.Rejection.InvalidCredential)
 
 /-- [aivm_secrets_garrett_core::stateless::renewal_grant]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 343:0-354:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 386:0-397:1
     Visibility: public -/
 def stateless.renewal_grant
   (claims : stateless.SurrogateClaims) (certificate_expires : Std.I64) :
@@ -21160,7 +21197,7 @@ def stateless.renewal_grant
     }
 
 /-- [aivm_secrets_garrett_core::stateless::renew]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 359:0-385:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless.rs', lines 402:0-428:1
     Visibility: public -/
 def stateless.renew
   {V : Type _} {S : Type _} (SurrogateOpenerInst : stateless.SurrogateOpener V)
@@ -22192,8 +22229,178 @@ def stateless_mailbox.poll
         let v := index_mut_back none
         ok (stateless_mailbox.Polled.Expired, { mailbox with slots := v })
 
+/-- [aivm_secrets_garrett_core::stateless_policy::Operation]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_policy.rs', lines 22:0-27:1
+    Visibility: public -/
+structure stateless_policy.Operation where
+  method : alloc.vec.Vec Std.U8
+  path : alloc.vec.Vec Std.U8
+  body : Std.Usize
+
+/-- [aivm_secrets_garrett_core::stateless_policy::operation_of]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_policy.rs', lines 30:0-37:1
+    Visibility: public -/
+def stateless_policy.operation_of
+  (request : proxy_http.Request) : Result stateless_policy.Operation := do
+  let s := alloc.vec.Vec.deref request.target
+  let «end» ← proxy_http.path_end s
+  let v ← alloc.vec.CloneVec.clone core.clone.CloneU8 request.method
+  let s1 ←
+    alloc.vec.Vec.index (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
+      request.target { «end» }
+  let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 s1
+  let i := alloc.vec.Vec.len request.body
+  ok { method := v, path := v1, body := i }
+
+/-- Trait declaration: [aivm_secrets_garrett_core::stateless_policy::OperationPolicy]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_policy.rs', lines 41:0-43:1
+    Visibility: public -/
+structure stateless_policy.OperationPolicy (Self : Type _) where
+  permits : Self → stateless.SurrogateClaims → stateless_policy.Operation
+    → Result Bool
+
+/-- [aivm_secrets_garrett_core::stateless_policy::Unrestricted]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_policy.rs', lines 46:0-46:24
+    Visibility: public -/
+@[reducible]
+def stateless_policy.Unrestricted := Unit
+
+/-- [aivm_secrets_garrett_core::stateless_policy::{impl aivm_secrets_garrett_core::stateless_policy::OperationPolicy for aivm_secrets_garrett_core::stateless_policy::Unrestricted}::permits]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_policy.rs', lines 49:4-51:5
+    Visibility: public -/
+def
+  stateless_policy.Unrestricted.Insts.Aivm_secrets_garrett_coreStateless_policyOperationPolicy.permits
+  (self : stateless_policy.Unrestricted) (_claims : stateless.SurrogateClaims)
+  (_operation : stateless_policy.Operation) :
+  Result Bool
+  := do
+  ok true
+
+/-- Trait implementation: [aivm_secrets_garrett_core::stateless_policy::{impl aivm_secrets_garrett_core::stateless_policy::OperationPolicy for aivm_secrets_garrett_core::stateless_policy::Unrestricted}]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_policy.rs', lines 48:0-52:1 -/
+@[reducible]
+def
+  stateless_policy.Unrestricted.Insts.Aivm_secrets_garrett_coreStateless_policyOperationPolicy
+  : stateless_policy.OperationPolicy stateless_policy.Unrestricted := {
+  permits :=
+    stateless_policy.Unrestricted.Insts.Aivm_secrets_garrett_coreStateless_policyOperationPolicy.permits
+}
+
+/-- [aivm_secrets_garrett_core::stateless_policy::Resource]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_policy.rs', lines 56:0-60:1
+    Visibility: public -/
+structure stateless_policy.Resource where
+  provider : alloc.vec.Vec Std.U8
+  method : alloc.vec.Vec Std.U8
+  path : alloc.vec.Vec Std.U8
+
+/-- [aivm_secrets_garrett_core::stateless_policy::ReadOnly]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_policy.rs', lines 63:0-65:1
+    Visibility: public -/
+structure stateless_policy.ReadOnly where
+  resources : alloc.vec.Vec stateless_policy.Resource
+
+/-- [aivm_secrets_garrett_core::stateless_policy::read_method]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_policy.rs', lines 68:0-72:1
+    Visibility: public -/
+def stateless_policy.read_method (method : Slice Std.U8) : Result Bool := do
+  let get ←
+    lift (Array.to_slice (Array.make 3#usize [ 71#u8, 69#u8, 84#u8 ]))
+  let head ←
+    lift (Array.to_slice (Array.make 4#usize [ 72#u8, 69#u8, 65#u8, 68#u8 ]))
+  let b ← core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 method get
+  if b
+  then ok true
+  else core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 method head
+
+/-- [aivm_secrets_garrett_core::stateless_policy::resource_allows]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_policy.rs', lines 74:0-79:1
+    Visibility: public -/
+def stateless_policy.resource_allows
+  (resource : stateless_policy.Resource) (provider : Slice Std.U8)
+  (operation : stateless_policy.Operation) :
+  Result Bool
+  := do
+  let own := alloc.vec.Vec.deref resource.provider
+  let b ← core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 own provider
+  if b
+  then
+    let s := alloc.vec.Vec.deref resource.method
+    let s1 := alloc.vec.Vec.deref operation.method
+    let b1 ← proxy_http.method_ok s s1
+    if b1
+    then
+      let s2 := alloc.vec.Vec.deref resource.path
+      let s3 := alloc.vec.Vec.deref operation.path
+      proxy_http.path_matches s2 s3
+    else ok false
+  else ok false
+
+/-- [aivm_secrets_garrett_core::stateless_policy::any_allows]: loop 0:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_policy.rs', lines 83:4-89:1
+    Visibility: public -/
+@[rust_loop]
+def stateless_policy.any_allows_loop
+  (iter : core.slice.iter.Iter stateless_policy.Resource)
+  (provider : Slice Std.U8) (operation : stateless_policy.Operation) :
+  Result Bool
+  := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok false
+  | some resource =>
+    let b ← stateless_policy.resource_allows resource provider operation
+    if b
+    then ok true
+    else stateless_policy.any_allows_loop iter1 provider operation
+partial_fixpoint
+
+/-- [aivm_secrets_garrett_core::stateless_policy::any_allows]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_policy.rs', lines 82:0-89:1
+    Visibility: public -/
+def stateless_policy.any_allows
+  (resources : Slice stateless_policy.Resource) (provider : Slice Std.U8)
+  (operation : stateless_policy.Operation) :
+  Result Bool
+  := do
+  let iter ←
+    SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+      resources
+  stateless_policy.any_allows_loop iter provider operation
+
+/-- [aivm_secrets_garrett_core::stateless_policy::{impl aivm_secrets_garrett_core::stateless_policy::OperationPolicy for aivm_secrets_garrett_core::stateless_policy::ReadOnly}::permits]:
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_policy.rs', lines 92:4-96:5
+    Visibility: public -/
+def
+  stateless_policy.ReadOnly.Insts.Aivm_secrets_garrett_coreStateless_policyOperationPolicy.permits
+  (self : stateless_policy.ReadOnly) (claims : stateless.SurrogateClaims)
+  (operation : stateless_policy.Operation) :
+  Result Bool
+  := do
+  let s := alloc.vec.Vec.deref operation.method
+  let b ← stateless_policy.read_method s
+  if b
+  then
+    if operation.body = 0#usize
+    then
+      let s1 := alloc.vec.Vec.deref self.resources
+      let s2 := alloc.vec.Vec.deref claims.provider
+      stateless_policy.any_allows s1 s2 operation
+    else ok false
+  else ok false
+
+/-- Trait implementation: [aivm_secrets_garrett_core::stateless_policy::{impl aivm_secrets_garrett_core::stateless_policy::OperationPolicy for aivm_secrets_garrett_core::stateless_policy::ReadOnly}]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_policy.rs', lines 91:0-97:1 -/
+@[reducible]
+def
+  stateless_policy.ReadOnly.Insts.Aivm_secrets_garrett_coreStateless_policyOperationPolicy
+  : stateless_policy.OperationPolicy stateless_policy.ReadOnly := {
+  permits :=
+    stateless_policy.ReadOnly.Insts.Aivm_secrets_garrett_coreStateless_policyOperationPolicy.permits
+}
+
 /-- [aivm_secrets_garrett_core::stateless_proxy::Route]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 32:0-38:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 34:0-40:1
     Visibility: public -/
 structure stateless_proxy.Route where
   provider : alloc.vec.Vec Std.U8
@@ -22202,28 +22409,28 @@ structure stateless_proxy.Route where
   authentication : credential_use.Authentication
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::Egress]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 42:0-45:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 44:0-47:1
     Visibility: public -/
 structure stateless_proxy.Egress where
   route : Std.Usize
   wire : alloc.vec.Vec Std.U8
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::egress_route]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 48:0-50:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 50:0-52:1
     Visibility: public -/
 def stateless_proxy.egress_route
   (egress : stateless_proxy.Egress) : Result Std.Usize := do
   ok egress.route
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::egress_wire]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 53:0-55:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 55:0-57:1
     Visibility: public -/
 def stateless_proxy.egress_wire
   (egress : stateless_proxy.Egress) : Result (Slice Std.U8) := do
   ok (alloc.vec.Vec.deref egress.wire)
 
 /-- Trait declaration: [aivm_secrets_garrett_core::stateless_proxy::Origin]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 58:0-70:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 60:0-72:1
     Visibility: public -/
 structure stateless_proxy.Origin (Self : Type _) where
   rejected : Self → stateless.Rejection → Result Self
@@ -22234,7 +22441,7 @@ structure stateless_proxy.Origin (Self : Type _) where
   completed : Self → Std.U16 → Result (Bool × Self)
 
 /-- Trait declaration: [aivm_secrets_garrett_core::stateless_proxy::Channel]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 73:0-89:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 75:0-91:1
     Visibility: public -/
 structure stateless_proxy.Channel (Self : Type _) where
   OriginInst : stateless_proxy.Origin Self
@@ -22247,7 +22454,7 @@ structure stateless_proxy.Channel (Self : Type _) where
   restart : Self → Result Self
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::surrogate_value]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 93:0-99:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 95:0-101:1
     Visibility: public -/
 def stateless_proxy.surrogate_value
   (value : Slice Std.U8) : Result (Option (alloc.vec.Vec Std.U8)) := do
@@ -22266,7 +22473,7 @@ def stateless_proxy.surrogate_value
   else proxy_connect.presented value
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::surrogate_of]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 102:0-111:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 104:0-113:1
     Visibility: public -/
 def stateless_proxy.surrogate_of
   (fields : Slice proxy_http.Field) :
@@ -22298,7 +22505,7 @@ def stateless_proxy.surrogate_of
       stateless_proxy.surrogate_value s2
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::provides]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 113:0-116:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 115:0-118:1
     Visibility: public -/
 def stateless_proxy.provides
   (route : stateless_proxy.Route) (provider : Slice Std.U8) : Result Bool := do
@@ -22306,7 +22513,7 @@ def stateless_proxy.provides
   core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 own provider
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::route_of]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 121:4-123:5
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 123:4-125:5
     Visibility: public -/
 @[rust_loop]
 def stateless_proxy.route_of_loop
@@ -22328,7 +22535,7 @@ def stateless_proxy.route_of_loop
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::route_of]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 119:0-125:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 121:0-127:1
     Visibility: public -/
 @[reducible]
 def stateless_proxy.route_of
@@ -22338,7 +22545,7 @@ def stateless_proxy.route_of
   stateless_proxy.route_of_loop routes provider 0#usize
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::unauthorized]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 128:0-137:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 130:0-139:1
     Visibility: public -/
 def stateless_proxy.unauthorized : Result (alloc.vec.Vec Std.U8) := do
   let s ←
@@ -22389,7 +22596,7 @@ def stateless_proxy.unauthorized : Result (alloc.vec.Vec Std.U8) := do
   alloc.vec.Vec.extend_from_slice core.clone.CloneU8 out2 s3
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::unauthorized_served]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 140:0-148:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 142:0-150:1
     Visibility: public -/
 def stateless_proxy.unauthorized_served : Result proxy_controller.Served := do
   let v ← stateless_proxy.unauthorized
@@ -22402,27 +22609,32 @@ def stateless_proxy.unauthorized_served : Result proxy_controller.Served := do
       status := 0#u16
     }
 
+/-- [aivm_secrets_garrett_core::stateless_proxy::Dispatch]
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 154:0-158:1
+    Visibility: public -/
+structure stateless_proxy.Dispatch where
+  route : Std.Usize
+  wire : alloc.vec.Vec Std.U8
+  opened : stateless.Opened
+
 /-- [aivm_secrets_garrett_core::stateless_proxy::Decision]
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 153:0-160:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 163:0-170:1
     Visibility: public -/
 @[discriminant isize]
 inductive stateless_proxy.Decision where
 | Unauthorized : Option stateless.Rejection → stateless_proxy.Decision
 | Refused : proxy_http.Code → stateless_proxy.Decision
-| Dispatch :
-  Std.Usize →
-  alloc.vec.Vec Std.U8 →
-  stateless.Opened →
-  stateless_proxy.Decision
+| Dispatch : stateless_proxy.Dispatch → stateless_proxy.Decision
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::decide]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 167:0-202:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 178:0-227:1
     Visibility: public -/
 def stateless_proxy.decide
-  {V : Type _} (statelessSurrogateOpenerInst : stateless.SurrogateOpener V)
-  (opener : V) (request : proxy_http.Request)
-  (routes : Slice stateless_proxy.Route) (acceptance : stateless.Acceptance)
-  (peer : Slice Std.U8) (now : Std.I64) :
+  {V : Type _} {P : Type _} (statelessSurrogateOpenerInst :
+  stateless.SurrogateOpener V) (stateless_policyOperationPolicyInst :
+  stateless_policy.OperationPolicy P) (opener : V) (policy : P)
+  (request : proxy_http.Request) (routes : Slice stateless_proxy.Route)
+  (acceptance : stateless.Acceptance) (peer : Slice Std.U8) (now : Std.I64) :
   Result stateless_proxy.Decision
   := do
   let s := alloc.vec.Vec.deref request.fields
@@ -22432,44 +22644,60 @@ def stateless_proxy.decide
   | some token =>
     let s1 := alloc.vec.Vec.deref token
     let r ←
-      stateless.open statelessSurrogateOpenerInst opener s1 acceptance peer now
+      stateless.authenticate statelessSurrogateOpenerInst opener s1 acceptance
+        peer now
     match r with
-    | core.result.Result.Ok opened =>
-      let s2 := alloc.vec.Vec.deref opened.claims.provider
+    | core.result.Result.Ok verified =>
+      let s2 := alloc.vec.Vec.deref verified.claims.provider
       let index ← stateless_proxy.route_of routes s2
       let i := Slice.len routes
       if index >= i
       then ok (stateless_proxy.Decision.Refused proxy_http.Code.UnknownOrigin)
       else
-        let route ← Slice.index_usize routes index
-        let s3 := alloc.vec.Vec.deref route.host
-        let s4 := alloc.vec.Vec.deref route.rules
-        let s5 := alloc.vec.Vec.deref opened.credential
-        let (r1, wire) ←
-          proxy_http.encode_upstream (alloc.vec.Vec.new Std.U8) request s3 s4
-            s5 route.authentication
-        match r1 with
-        | core.result.Result.Ok _ =>
-          ok (stateless_proxy.Decision.Dispatch index wire opened)
-        | core.result.Result.Err refusal =>
-          let c ← proxy_controller.code_of refusal
-          ok (stateless_proxy.Decision.Refused c)
+        let o1 ← stateless_policy.operation_of request
+        let b ←
+          stateless_policyOperationPolicyInst.permits policy verified.claims o1
+        if b
+        then
+          let r1 ←
+            stateless.decrypt statelessSurrogateOpenerInst opener verified
+          match r1 with
+          | core.result.Result.Ok opened =>
+            let route ← Slice.index_usize routes index
+            let s3 := alloc.vec.Vec.deref route.host
+            let s4 := alloc.vec.Vec.deref route.rules
+            let s5 := alloc.vec.Vec.deref opened.credential
+            let (r2, wire) ←
+              proxy_http.encode_upstream (alloc.vec.Vec.new Std.U8) request s3
+                s4 s5 route.authentication
+            match r2 with
+            | core.result.Result.Ok _ =>
+              ok (stateless_proxy.Decision.Dispatch
+                { route := index, wire, opened })
+            | core.result.Result.Err refusal =>
+              let c ← proxy_controller.code_of refusal
+              ok (stateless_proxy.Decision.Refused c)
+          | core.result.Result.Err rejection =>
+            ok (stateless_proxy.Decision.Unauthorized (some rejection))
+        else ok (stateless_proxy.Decision.Refused proxy_http.Code.Denied)
     | core.result.Result.Err rejection =>
       ok (stateless_proxy.Decision.Unauthorized (some rejection))
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::serve]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 208:0-250:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 233:0-277:1
     Visibility: public -/
 def stateless_proxy.serve
-  {V : Type _} {O : Type _} (statelessSurrogateOpenerInst :
-  stateless.SurrogateOpener V) (OriginInst : stateless_proxy.Origin O)
-  (opener : V) (origin : O) (request : proxy_http.Request)
+  {V : Type _} {P : Type _} {O : Type _} (statelessSurrogateOpenerInst :
+  stateless.SurrogateOpener V) (stateless_policyOperationPolicyInst :
+  stateless_policy.OperationPolicy P) (OriginInst : stateless_proxy.Origin O)
+  (opener : V) (policy : P) (origin : O) (request : proxy_http.Request)
   (routes : Slice stateless_proxy.Route) (acceptance : stateless.Acceptance)
   (peer : Slice Std.U8) (now : Std.I64) (limit : Std.Usize) :
   Result (proxy_controller.Served × O)
   := do
   let d ←
-    stateless_proxy.decide statelessSurrogateOpenerInst opener request routes
+    stateless_proxy.decide statelessSurrogateOpenerInst
+      stateless_policyOperationPolicyInst opener policy request routes
       acceptance peer now
   match d with
   | stateless_proxy.Decision.Unauthorized rejection =>
@@ -22482,13 +22710,16 @@ def stateless_proxy.serve
   | stateless_proxy.Decision.Refused code =>
     let s ← proxy_controller.stopped code proxy_controller.Stage.Refused
     ok (s, origin)
-  | stateless_proxy.Decision.Dispatch index wire opened =>
-    let (b, origin1) ← OriginInst.admitted origin opened.claims index
+  | stateless_proxy.Decision.Dispatch dispatch =>
+    let (b, origin1) ←
+      OriginInst.admitted origin dispatch.opened.claims dispatch.route
     if b
     then
-      let s := alloc.vec.Vec.deref opened.credential
+      let s := alloc.vec.Vec.deref dispatch.opened.credential
       let forms ← proxy_http.reflection_forms s
-      let (r, origin2) ← OriginInst.exchange origin1 { route := index, wire }
+      let (r, origin2) ←
+        OriginInst.exchange origin1
+          { route := dispatch.route, wire := dispatch.wire }
       match r with
       | core.result.Result.Ok raw =>
         let s1 := alloc.vec.Vec.deref raw
@@ -22516,12 +22747,13 @@ def stateless_proxy.serve
       ok (s, origin1)
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::connection_step]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 258:0-328:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 285:0-357:1
     Visibility: public -/
 def stateless_proxy.connection_step
-  {V : Type _} {C : Type _} (statelessSurrogateOpenerInst :
-  stateless.SurrogateOpener V) (ChannelInst : stateless_proxy.Channel C)
-  (opener : V) (channel : C) (buffer : alloc.vec.Vec Std.U8)
+  {V : Type _} {P : Type _} {C : Type _} (statelessSurrogateOpenerInst :
+  stateless.SurrogateOpener V) (stateless_policyOperationPolicyInst :
+  stateless_policy.OperationPolicy P) (ChannelInst : stateless_proxy.Channel C)
+  (opener : V) (policy : P) (channel : C) (buffer : alloc.vec.Vec Std.U8)
   (routes : Slice stateless_proxy.Route) (acceptance : stateless.Acceptance)
   (authority : Slice Std.U8) (peer : Slice Std.U8) (limit : Std.Usize) :
   Result (proxy_controller.Tunnel × C)
@@ -22561,8 +22793,8 @@ def stateless_proxy.connection_step
         let (now, channel2) ← ChannelInst.begin channel1 parsed.request
         let (served, channel3) ←
           stateless_proxy.serve statelessSurrogateOpenerInst
-            ChannelInst.OriginInst opener channel2 parsed.request routes
-            acceptance peer now limit
+            stateless_policyOperationPolicyInst ChannelInst.OriginInst opener
+            policy channel2 parsed.request routes acceptance peer now limit
         let channel4 ←
           match served.stage with
           | proxy_controller.Stage.Refused =>
@@ -22605,8 +22837,8 @@ def stateless_proxy.connection_step
       let (now, channel1) ← ChannelInst.begin channel parsed.request
       let (served, channel2) ←
         stateless_proxy.serve statelessSurrogateOpenerInst
-          ChannelInst.OriginInst opener channel1 parsed.request routes
-          acceptance peer now limit
+          stateless_policyOperationPolicyInst ChannelInst.OriginInst opener
+          policy channel1 parsed.request routes acceptance peer now limit
       let channel3 ←
         match served.stage with
         | proxy_controller.Stage.Refused =>
@@ -22622,41 +22854,47 @@ def stateless_proxy.connection_step
       else ok ({ buffer := rest, «open» := false }, channel5)
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::connection]: loop 0:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 346:4-357:5
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 376:4-388:5
     Visibility: public -/
 @[rust_loop]
 def stateless_proxy.connection_loop
-  {V : Type _} {C : Type _} (statelessSurrogateOpenerInst :
-  stateless.SurrogateOpener V) (ChannelInst : stateless_proxy.Channel C)
-  (opener : V) (channel : C) (routes : Slice stateless_proxy.Route)
-  (acceptance : stateless.Acceptance) (authority : Slice Std.U8)
-  (peer : Slice Std.U8) (limit : Std.Usize) (state : proxy_controller.Tunnel) :
+  {V : Type _} {P : Type _} {C : Type _} (statelessSurrogateOpenerInst :
+  stateless.SurrogateOpener V) (stateless_policyOperationPolicyInst :
+  stateless_policy.OperationPolicy P) (ChannelInst : stateless_proxy.Channel C)
+  (opener : V) (policy : P) (channel : C)
+  (routes : Slice stateless_proxy.Route) (acceptance : stateless.Acceptance)
+  (authority : Slice Std.U8) (peer : Slice Std.U8) (limit : Std.Usize)
+  (state : proxy_controller.Tunnel) :
   Result C
   := do
   if state.open
   then
     let (state1, channel1) ←
-      stateless_proxy.connection_step statelessSurrogateOpenerInst ChannelInst
-        opener channel state.buffer routes acceptance authority peer limit
-    stateless_proxy.connection_loop statelessSurrogateOpenerInst ChannelInst
-      opener channel1 routes acceptance authority peer limit state1
+      stateless_proxy.connection_step statelessSurrogateOpenerInst
+        stateless_policyOperationPolicyInst ChannelInst opener policy channel
+        state.buffer routes acceptance authority peer limit
+    stateless_proxy.connection_loop statelessSurrogateOpenerInst
+      stateless_policyOperationPolicyInst ChannelInst opener policy channel1
+      routes acceptance authority peer limit state1
   else ok channel
 partial_fixpoint
 
 /-- [aivm_secrets_garrett_core::stateless_proxy::connection]:
-    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 333:0-358:1
+    Source: 'crates/aivm-secrets-garrett-core/src/stateless_proxy.rs', lines 362:0-389:1
     Visibility: public -/
 @[reducible]
 def stateless_proxy.connection
-  {V : Type _} {C : Type _} (statelessSurrogateOpenerInst :
-  stateless.SurrogateOpener V) (ChannelInst : stateless_proxy.Channel C)
-  (opener : V) (channel : C) (routes : Slice stateless_proxy.Route)
-  (acceptance : stateless.Acceptance) (authority : Slice Std.U8)
-  (peer : Slice Std.U8) (limit : Std.Usize) :
+  {V : Type _} {P : Type _} {C : Type _} (statelessSurrogateOpenerInst :
+  stateless.SurrogateOpener V) (stateless_policyOperationPolicyInst :
+  stateless_policy.OperationPolicy P) (ChannelInst : stateless_proxy.Channel C)
+  (opener : V) (policy : P) (channel : C)
+  (routes : Slice stateless_proxy.Route) (acceptance : stateless.Acceptance)
+  (authority : Slice Std.U8) (peer : Slice Std.U8) (limit : Std.Usize) :
   Result C
   := do
-  stateless_proxy.connection_loop statelessSurrogateOpenerInst ChannelInst
-    opener channel routes acceptance authority peer limit
+  stateless_proxy.connection_loop statelessSurrogateOpenerInst
+    stateless_policyOperationPolicyInst ChannelInst opener policy channel
+    routes acceptance authority peer limit
     { buffer := (alloc.vec.Vec.new Std.U8), «open» := true }
 
 /-- [aivm_secrets_garrett_core::stateless_token::MAX_TOKEN]

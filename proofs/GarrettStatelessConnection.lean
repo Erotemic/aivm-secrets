@@ -94,7 +94,8 @@ theorem returns_admissible {α β : Type} (arg : α) (Q : β → Prop) :
 
 /-! ## Every run of a connection -/
 
-variable {V C : Type} (ops : stateless.SurrogateOpener V) (inst : Channel C) (opener : V)
+variable {V C P : Type} (ops : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P) (inst : Channel C)
+  (opener : V) (policy : P)
   (routes : Slice Route) (a : stateless.Acceptance) (authority peer : Slice U8) (limit : Usize)
 
 /-- The steps a connection took from `state` with the channel at `io`,
@@ -103,27 +104,27 @@ variable {V C : Type} (ops : stateless.SurrogateOpener V) (inst : Channel C) (op
 inductive Runs : C → proxy_controller.Tunnel → C → Prop where
   | closed {io : C} {state : proxy_controller.Tunnel} (shut : state.open = false) : Runs io state io
   | step {io : C} {state next : proxy_controller.Tunnel} {io1 after : C} (running : state.open = true)
-      (stepped : connection_step ops inst opener io state.buffer routes a authority peer limit = Result.ok (next, io1))
+      (stepped : connection_step ops pol inst opener policy io state.buffer routes a authority peer limit = Result.ok (next, io1))
       (rest : Runs io1 next after) : Runs io state after
 
 theorem connection_loop_runs (io : C) (state : proxy_controller.Tunnel) :
-    Returns (connection_loop ops inst opener io routes a authority peer limit state)
-      (fun after => Runs ops inst opener routes a authority peer limit io state after) := by
+    Returns (connection_loop ops pol inst opener policy io routes a authority peer limit state)
+      (fun after => Runs ops pol inst opener policy routes a authority peer limit io state after) := by
   revert io state
-  apply connection_loop.fixpoint_induct ops inst opener routes a authority peer limit
+  apply connection_loop.fixpoint_induct ops pol inst opener policy routes a authority peer limit
     (motive := fun f => ∀ io state, Returns (f io state)
-      (fun after => Runs ops inst opener routes a authority peer limit io state after))
+      (fun after => Runs ops pol inst opener policy routes a authority peer limit io state after))
   · apply Lean.Order.admissible_pi; intro io
     apply Lean.Order.admissible_pi; intro state
     exact Lean.Order.admissible_apply (β := fun _ => proxy_controller.Tunnel → Result C)
       (fun _ (g : proxy_controller.Tunnel → Result C) => Returns (g state)
-        (fun after => Runs ops inst opener routes a authority peer limit io state after)) io
+        (fun after => Runs ops pol inst opener policy routes a authority peer limit io state after)) io
       (returns_admissible state _)
   · intro f ih io state
     simp only
     split
     · rename_i running
-      apply returns_bind (Q₁ := fun r => connection_step ops inst opener io state.buffer routes a authority
+      apply returns_bind (Q₁ := fun r => connection_step ops pol inst opener policy io state.buffer routes a authority
         peer limit = Result.ok r) (returns_of_ok fun v h => h)
       rintro ⟨next, io1⟩ stepped
       simp only [Aeneas.Std.uncurry_apply_pair]
@@ -142,9 +143,9 @@ theorem connection_loop_runs (io : C) (state : proxy_controller.Tunnel) :
     `after` by `connection_step`s, each called with the `peer` the connection
     was started with, from an empty buffer. -/
 theorem connection_runs (io after : C)
-    (h : connection ops inst opener io routes a authority peer limit = Result.ok after) :
-    Runs ops inst opener routes a authority peer limit io { buffer := alloc.vec.Vec.new U8, «open» := true } after :=
-  returns_ok (connection_loop_runs ops inst opener routes a authority peer limit io _) h
+    (h : connection ops pol inst opener policy io routes a authority peer limit = Result.ok after) :
+    Runs ops pol inst opener policy routes a authority peer limit io { buffer := alloc.vec.Vec.new U8, «open» := true } after :=
+  returns_ok (connection_loop_runs ops pol inst opener policy routes a authority peer limit io _) h
 
 /-! ## One step -/
 
@@ -167,7 +168,7 @@ def Stepped (io : C) (buffer : alloc.vec.Vec U8) (out : proxy_controller.Tunnel)
             (bytes.length ≠ 0 ∧ out.buffer.val = buffer.val ++ bytes.val ∧ out.open = true)
   | .Request parsed =>
       ∃ now io1 served io2 io3 io4 sent, inst.begin io parsed.request = Result.ok (now, io1) ∧
-        serve ops inst.OriginInst opener io1 parsed.request routes a peer now limit = Result.ok (served, io2) ∧
+        serve ops pol inst.OriginInst opener policy io1 parsed.request routes a peer now limit = Result.ok (served, io2) ∧
         ((served.stage = .Completed ∧ io3 = io2) ∨
           (served.stage ≠ .Completed ∧ inst.stopped io2 served.code = Result.ok io3)) ∧
         inst.restart io3 = Result.ok io4 ∧
@@ -233,11 +234,11 @@ local macro "stepped_tail" : tactic => `(tactic| (
     it did not complete, and exactly its reply is written, keeping exactly the
     bytes after the request. -/
 theorem connection_step_paths (io : C) (buffer : alloc.vec.Vec U8) (out : proxy_controller.Tunnel) (after : C)
-    (h : connection_step ops inst opener io buffer routes a authority peer limit = Result.ok (out, after)) :
-    (buffer.length = 0 ∧ Stepped ops inst opener routes a authority peer limit io buffer out after) ∨
+    (h : connection_step ops pol inst opener policy io buffer routes a authority peer limit = Result.ok (out, after)) :
+    (buffer.length = 0 ∧ Stepped ops pol inst opener policy routes a authority peer limit io buffer out after) ∨
     (buffer.length ≠ 0 ∧ inst.overdue io = Result.ok (true, after) ∧ out.buffer = buffer ∧ out.open = false) ∨
     (buffer.length ≠ 0 ∧ ∃ io1, inst.overdue io = Result.ok (false, io1) ∧
-      Stepped ops inst opener routes a authority peer limit io1 buffer out after) := by
+      Stepped ops pol inst opener policy routes a authority peer limit io1 buffer out after) := by
   unfold connection_step at h
   dsimp only at h
   split at h
@@ -312,9 +313,9 @@ def ServeLog (d : Decision) (E : List ProxyEvent) : Prop :=
     and bytes, then at most a completion record. -/
 theorem serve_logged (o : Origin C) (io : C) (L : List ProxyEvent) (request : proxy_http.Request) (now : I64)
     (served : proxy_controller.Served) (after : C × List ProxyEvent)
-    (h : serve ops (loggedOrigin o) opener (io, L) request routes a peer now limit = Result.ok (served, after)) :
-    ∃ d E, decide_request ops opener request routes a peer now = Result.ok d ∧ after.2 = L ++ E ∧ ServeLog d E := by
-  obtain ⟨d, hd, m⟩ := serve_follows_decision ops (loggedOrigin o) opener (io, L) request routes a peer now limit
+    (h : serve ops pol (loggedOrigin o) opener policy (io, L) request routes a peer now limit = Result.ok (served, after)) :
+    ∃ d E, decide_request ops pol opener policy request routes a peer now = Result.ok d ∧ after.2 = L ++ E ∧ ServeLog d E := by
+  obtain ⟨d, hd, m⟩ := serve_follows_decision ops pol (loggedOrigin o) opener policy (io, L) request routes a peer now limit
     served after h
   refine ⟨d, ?_⟩
   cases d with
@@ -369,7 +370,7 @@ theorem ok_map_inv {α β : Type} {m : Result α} {f : α → β} {x : β}
 def GuestReply (request : proxy_http.Request) (now : I64) (served : proxy_controller.Served) : Prop :=
   unauthorized_served = Result.ok served ∨
   served.reply.val = proxy_http.Proofs.ascii (proxy_http.Proofs.refusalText served.code) ∨
-  (∃ index wire opened, decide_request ops opener request routes a peer now =
+  (∃ index wire opened, decide_request ops pol opener policy request routes a peer now =
       Result.ok (.dispatch index wire opened) ∧ served.stage = .Completed ∧
     ∃ forms head response,
       proxy_http.reflection_forms (alloc.vec.Vec.deref opened.credential) = Result.ok forms ∧
@@ -385,16 +386,16 @@ def GuestReply (request : proxy_http.Request) (now : I64) (served : proxy_contro
 def StepLog (seg : List ProxyEvent) : Prop :=
   seg = [] ∨
   (∃ code bytes, proxy_http.refusal code = Result.ok bytes ∧ seg = [.refused code, .guestSent bytes.val]) ∨
-  (∃ request now d E served, decide_request ops opener request routes a peer now = Result.ok d ∧
-    ServeLog d E ∧ GuestReply ops opener routes a peer request now served ∧
+  (∃ request now d E served, decide_request ops pol opener policy request routes a peer now = Result.ok d ∧
+    ServeLog d E ∧ GuestReply ops pol opener policy routes a peer request now served ∧
     ((served.stage = .Completed ∧ seg = [.began request] ++ E ++ [.guestSent served.reply.val]) ∨
      (served.stage ≠ .Completed ∧
         seg = [.began request] ++ E ++ [.stopped served.code, .guestSent served.reply.val])))
 
 theorem stepped_logged (ch : Channel C) (io : C) (L : List ProxyEvent) (buffer : alloc.vec.Vec U8)
     (out : proxy_controller.Tunnel) (after : C × List ProxyEvent)
-    (h : Stepped ops (logged ch) opener routes a authority peer limit (io, L) buffer out after) :
-    ∃ seg, after.2 = L ++ seg ∧ StepLog ops opener routes a peer seg := by
+    (h : Stepped ops pol (logged ch) opener policy routes a authority peer limit (io, L) buffer out after) :
+    ∃ seg, after.2 = L ++ seg ∧ StepLog ops pol opener policy routes a peer seg := by
   obtain ⟨framed, _, h⟩ := h
   cases framed with
   | Refuse code =>
@@ -419,11 +420,11 @@ theorem stepped_logged (ch : Channel C) (io : C) (L : List ProxyEvent) (buffer :
     simp only [Prod.mk.injEq] at e1
     obtain ⟨_, e1⟩ := e1
     subst e1
-    have sv' : serve ops (loggedOrigin ch.OriginInst) opener (r1.2, L ++ [ProxyEvent.began parsed.request])
+    have sv' : serve ops pol (loggedOrigin ch.OriginInst) opener policy (r1.2, L ++ [ProxyEvent.began parsed.request])
         parsed.request routes a peer now limit = Result.ok (served, io2) := sv
-    obtain ⟨d, E, hd, log2, slog⟩ := serve_logged ops opener routes a peer limit ch.OriginInst r1.2
+    obtain ⟨d, E, hd, log2, slog⟩ := serve_logged ops pol opener policy routes a peer limit ch.OriginInst r1.2
       (L ++ [.began parsed.request]) parsed.request now served io2 sv'
-    have reply := serve_guest_reply ops (loggedOrigin ch.OriginInst) opener (r1.2, L ++ [.began parsed.request])
+    have reply := serve_guest_reply ops pol (loggedOrigin ch.OriginInst) opener policy (r1.2, L ++ [.began parsed.request])
       parsed.request routes a peer now limit served io2 sv'
     obtain ⟨r4, _, e4⟩ := ok_map_inv rs
     obtain ⟨r6, _, e6⟩ := ok_map_inv sd
@@ -444,11 +445,11 @@ theorem stepped_logged (ch : Channel C) (io : C) (L : List ProxyEvent) (buffer :
 /-- **One logged step** adds exactly one `StepLog` segment. -/
 theorem step_logged (ch : Channel C) (io : C) (L : List ProxyEvent) (buffer : alloc.vec.Vec U8)
     (out : proxy_controller.Tunnel) (after : C × List ProxyEvent)
-    (h : connection_step ops (logged ch) opener (io, L) buffer routes a authority peer limit = Result.ok (out, after)) :
-    ∃ seg, after.2 = L ++ seg ∧ StepLog ops opener routes a peer seg := by
-  rcases connection_step_paths ops (logged ch) opener routes a authority peer limit (io, L) buffer out after h with
+    (h : connection_step ops pol (logged ch) opener policy (io, L) buffer routes a authority peer limit = Result.ok (out, after)) :
+    ∃ seg, after.2 = L ++ seg ∧ StepLog ops pol opener policy routes a peer seg := by
+  rcases connection_step_paths ops pol (logged ch) opener policy routes a authority peer limit (io, L) buffer out after h with
     ⟨_, st⟩ | ⟨_, od, _⟩ | ⟨_, io1, od, st⟩
-  · exact stepped_logged ops opener routes a authority peer limit ch io L buffer out after st
+  · exact stepped_logged ops pol opener policy routes a authority peer limit ch io L buffer out after st
   · obtain ⟨r, _, e⟩ := ok_map_inv od
     simp only [Prod.mk.injEq] at e
     obtain ⟨_, e⟩ := e
@@ -458,16 +459,16 @@ theorem step_logged (ch : Channel C) (io : C) (L : List ProxyEvent) (buffer : al
     simp only [Prod.mk.injEq] at e
     obtain ⟨_, e⟩ := e
     subst e
-    exact stepped_logged ops opener routes a authority peer limit ch r.2 L buffer out after st
+    exact stepped_logged ops pol opener policy routes a authority peer limit ch r.2 L buffer out after st
 
 theorem runs_logged (ch : Channel C) {io after : C × List ProxyEvent} {state : proxy_controller.Tunnel}
-    (run : Runs ops (logged ch) opener routes a authority peer limit io state after) :
+    (run : Runs ops pol (logged ch) opener policy routes a authority peer limit io state after) :
     ∃ segs : List (List ProxyEvent), after.2 = io.2 ++ segs.flatten ∧
-      ∀ seg ∈ segs, StepLog ops opener routes a peer seg := by
+      ∀ seg ∈ segs, StepLog ops pol opener policy routes a peer seg := by
   induction run with
   | closed _ => exact ⟨[], by simp, by simp⟩
   | @step io state next io1 after running stepped rest ih =>
-    obtain ⟨seg, log1, ok1⟩ := step_logged ops opener routes a authority peer limit ch io.1 io.2 state.buffer
+    obtain ⟨seg, log1, ok1⟩ := step_logged ops pol opener policy routes a authority peer limit ch io.1 io.2 state.buffer
       next io1 stepped
     obtain ⟨segs, log2, ok2⟩ := ih
     refine ⟨seg :: segs, by rw [log2, log1]; simp, ?_⟩
@@ -482,17 +483,17 @@ theorem runs_logged (ch : Channel C) {io after : C × List ProxyEvent} {state : 
     and one segment per served request, each decided for this connection's
     `peer`. -/
 theorem connection_logged (ch : Channel C) (io : C) (after : C × List ProxyEvent)
-    (h : connection ops (logged ch) opener (io, []) routes a authority peer limit = Result.ok after) :
-    ∃ segs : List (List ProxyEvent), after.2 = segs.flatten ∧ ∀ seg ∈ segs, StepLog ops opener routes a peer seg := by
-  obtain ⟨segs, log, ok⟩ := runs_logged ops opener routes a authority peer limit ch
-    (connection_runs ops (logged ch) opener routes a authority peer limit _ _ h)
+    (h : connection ops pol (logged ch) opener policy (io, []) routes a authority peer limit = Result.ok after) :
+    ∃ segs : List (List ProxyEvent), after.2 = segs.flatten ∧ ∀ seg ∈ segs, StepLog ops pol opener policy routes a peer seg := by
+  obtain ⟨segs, log, ok⟩ := runs_logged ops pol opener policy routes a authority peer limit ch
+    (connection_runs ops pol (logged ch) opener policy routes a authority peer limit _ _ h)
   exact ⟨segs, by simpa using log, ok⟩
 
 /-- Within one segment, a `sent` event comes only from a dispatch decision,
     right after its acknowledged admission. -/
-theorem seg_sent {seg : List ProxyEvent} (ok : StepLog ops opener routes a peer seg) {r : Usize}
+theorem seg_sent {seg : List ProxyEvent} (ok : StepLog ops pol opener policy routes a peer seg) {r : Usize}
     {w : alloc.vec.Vec U8} (m : ProxyEvent.sent r w ∈ seg) :
-    ∃ request now opened, decide_request ops opener request routes a peer now = Result.ok (.dispatch r w opened) ∧
+    ∃ request now opened, decide_request ops pol opener policy request routes a peer now = Result.ok (.dispatch r w opened) ∧
       ∃ A B, seg = A ++ [.admitted opened.claims r true, .sent r w] ++ B := by
   rcases ok with e | ⟨code, bytes, _, e⟩ | ⟨request, now, d, E, served, hd, slog, _, shape⟩
   · subst e; cases m
@@ -530,7 +531,7 @@ def ProxyEvent.isSent : ProxyEvent → Bool
 
 /-- **No duplicated egress.** A segment — one request — sends at most once:
     there is no retry path. -/
-theorem seg_sends_at_most_once {seg : List ProxyEvent} (ok : StepLog ops opener routes a peer seg) :
+theorem seg_sends_at_most_once {seg : List ProxyEvent} (ok : StepLog ops pol opener policy routes a peer seg) :
     seg.countP ProxyEvent.isSent ≤ 1 := by
   rcases ok with e | ⟨code, bytes, _, e⟩ | ⟨request, now, d, E, served, _, slog, _, shape⟩
   · subst e; simp
@@ -552,9 +553,9 @@ theorem seg_sends_at_most_once {seg : List ProxyEvent} (ok : StepLog ops opener 
     `wire` is the extracted encoder's output with the unsealed credential
     (`dispatch_trace`). -/
 theorem connection_egress_authorized (ch : Channel C) (io : C) (after : C × List ProxyEvent)
-    (h : connection ops (logged ch) opener (io, []) routes a authority peer limit = Result.ok after)
+    (h : connection ops pol (logged ch) opener policy (io, []) routes a authority peer limit = Result.ok after)
     {r : Usize} {w : alloc.vec.Vec U8} (m : ProxyEvent.sent r w ∈ after.2) :
-    ∃ request now opened, decide_request ops opener request routes a peer now = Result.ok (.dispatch r w opened) ∧
+    ∃ request now opened, decide_request ops pol opener policy request routes a peer now = Result.ok (.dispatch r w opened) ∧
       (∃ A B, after.2 = A ++ [.admitted opened.claims r true, .sent r w] ++ B) ∧
       ∃ token, surrogate_of (alloc.vec.Vec.deref request.fields) = Result.ok (some token) ∧
         stateless.«open» ops opener (alloc.vec.Vec.deref token) a peer now = Result.ok (.Ok opened) ∧
@@ -564,13 +565,13 @@ theorem connection_egress_authorized (ch : Channel C) (io : C) (after : C × Lis
             (alloc.vec.Vec.deref (routes[r.val]'inside).host) (alloc.vec.Vec.deref (routes[r.val]'inside).rules)
             (alloc.vec.Vec.deref opened.credential) (routes[r.val]'inside).authentication =
             Result.ok (.Ok (), w) := by
-  obtain ⟨segs, log, ok⟩ := connection_logged ops opener routes a authority peer limit ch io after h
+  obtain ⟨segs, log, ok⟩ := connection_logged ops pol opener policy routes a authority peer limit ch io after h
   rw [log] at m ⊢
   obtain ⟨seg, inSegs, inSeg⟩ := List.mem_flatten.mp m
-  obtain ⟨request, now, opened, hd, A, B, e⟩ := seg_sent ops opener routes a peer (ok seg inSegs) inSeg
+  obtain ⟨request, now, opened, hd, A, B, e⟩ := seg_sent ops pol opener policy routes a peer (ok seg inSegs) inSeg
   obtain ⟨s1, s2, split⟩ := List.append_of_mem inSegs
   refine ⟨request, now, opened, hd, ⟨s1.flatten ++ A, B ++ s2.flatten, ?_⟩,
-    dispatch_trace ops opener request routes a peer now hd⟩
+    dispatch_trace ops pol opener policy request routes a peer now hd⟩
   rw [split, e]
   simp
 
@@ -579,11 +580,11 @@ theorem connection_egress_authorized (ch : Channel C) (io : C) (after : C × Lis
     not a dispatch: every `sent` belongs to a dispatched request (above), and
     each request sends at most once. -/
 theorem connection_sends_once_per_request (ch : Channel C) (io : C) (after : C × List ProxyEvent)
-    (h : connection ops (logged ch) opener (io, []) routes a authority peer limit = Result.ok after) :
+    (h : connection ops pol (logged ch) opener policy (io, []) routes a authority peer limit = Result.ok after) :
     ∃ segs : List (List ProxyEvent), after.2 = segs.flatten ∧
-      ∀ seg ∈ segs, StepLog ops opener routes a peer seg ∧ seg.countP ProxyEvent.isSent ≤ 1 := by
-  obtain ⟨segs, log, ok⟩ := connection_logged ops opener routes a authority peer limit ch io after h
-  exact ⟨segs, log, fun seg m => ⟨ok seg m, seg_sends_at_most_once ops opener routes a peer (ok seg m)⟩⟩
+      ∀ seg ∈ segs, StepLog ops pol opener policy routes a peer seg ∧ seg.countP ProxyEvent.isSent ≤ 1 := by
+  obtain ⟨segs, log, ok⟩ := connection_logged ops pol opener policy routes a authority peer limit ch io after h
+  exact ⟨segs, log, fun seg m => ⟨ok seg m, seg_sends_at_most_once ops pol opener policy routes a peer (ok seg m)⟩⟩
 
 /-- **What the guest receives.** Every byte string a logged connection writes
     to the guest is a fixed framing refusal, or the reply of a request served
@@ -591,11 +592,11 @@ theorem connection_sends_once_per_request (ch : Channel C) (io : C) (after : C �
     `guest_response` release in which the raw credential does not occur
     (`serve_guest_reply`). -/
 theorem connection_guest_bytes (ch : Channel C) (io : C) (after : C × List ProxyEvent)
-    (h : connection ops (logged ch) opener (io, []) routes a authority peer limit = Result.ok after)
+    (h : connection ops pol (logged ch) opener policy (io, []) routes a authority peer limit = Result.ok after)
     {bytes : List U8} (m : ProxyEvent.guestSent bytes ∈ after.2) :
     (∃ code refusal, proxy_http.refusal code = Result.ok refusal ∧ bytes = refusal.val) ∨
-    ∃ request now served, GuestReply ops opener routes a peer request now served ∧ bytes = served.reply.val := by
-  obtain ⟨segs, log, ok⟩ := connection_logged ops opener routes a authority peer limit ch io after h
+    ∃ request now served, GuestReply ops pol opener policy routes a peer request now served ∧ bytes = served.reply.val := by
+  obtain ⟨segs, log, ok⟩ := connection_logged ops pol opener policy routes a authority peer limit ch io after h
   rw [log] at m
   obtain ⟨seg, inSegs, inSeg⟩ := List.mem_flatten.mp m
   rcases ok seg inSegs with e | ⟨code, refusal, hr, e⟩ | ⟨request, now, d, E, served, _, slog, reply, shape⟩

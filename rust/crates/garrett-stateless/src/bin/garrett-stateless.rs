@@ -362,9 +362,11 @@ fn run(raw: &[String]) -> Result<()> {
         Some("proxy") => {
             let proxy = Arc::new(Proxy::from_file(&args.path("--config")?)?);
             let stateless = proxy.config().stateless;
+            let operations = proxy.config().operations.name();
             let running = proxy.serve()?;
             line(json::object([
                 ("address", json::text(&running.address.to_string())),
+                ("operations", json::text(operations)),
                 ("profile", json::text(garrett_stateless::PROFILE)),
                 ("role", json::text("proxy")),
                 ("stateless", json::text(stateless.name())),

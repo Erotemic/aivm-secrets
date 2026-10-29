@@ -529,7 +529,17 @@ fn strict_provisioned_workflow() {
     assert!(garrett_stateless::config::ProxyConfig::load(&audited).is_err());
     let proxy_path = write_json(&dir, "proxy.json", proxy_json(""));
 
-    // The operator mints from the keys and the issuance policy alone.
+    // The operator mints from the keys and the issuance policy alone: the
+    // broker's TLS files are named but never read.
+    let issue_only = write_json(
+        &dir,
+        "issue-only.json",
+        broker_json(r#""api-key.json""#, r#","stateless":"strict""#)
+            .replace("server.pem", "absent.pem")
+            .replace("server.key", "absent.key")
+            .replace("\"ca.pem\"", "\"absent-ca.pem\""),
+    );
+    assert!(BrokerConfig::load(&issue_only).is_ok());
     let config = BrokerConfig::load(&broker_path).unwrap();
     assert!(config.browser.is_none());
     let der = tls::certificates(agent_c.certificate.as_bytes())
@@ -578,6 +588,8 @@ fn strict_provisioned_workflow() {
 
     // The strict broker serves only the agent API: renewal, and no logins.
     let broker = Arc::new(Broker::from_file(&broker_path).unwrap());
+    // The native side of `strict_no_login_state`'s hypothesis.
+    assert!(broker.login_policy().providers.is_empty());
     let running = broker.serve().unwrap();
     assert!(running.browser_address.is_none());
     let broker_endpoint = Endpoint::parse(
@@ -601,4 +613,54 @@ fn strict_provisioned_workflow() {
     assert_eq!(again.status, 200);
     running.stop();
     proxy.stop();
+
+    // The same surrogate through a read-only proxy: the authorized read
+    // succeeds; a changed method, path or body is refused before egress.
+    let read_only_path = write_json(
+        &dir,
+        "read-only.json",
+        proxy_json(r#","read_only":[{"provider":"api","path":"/v1/things"}]"#),
+    );
+    let read_only = Arc::new(Proxy::from_file(&read_only_path).unwrap());
+    assert_eq!(read_only.config().operations.name(), "read-only");
+    let read_only = read_only.serve().unwrap();
+    let read_only_endpoint = Endpoint::parse(
+        "https://proxy.test:8443",
+        Some(&read_only.address.to_string()),
+    )
+    .unwrap();
+    let before = seen.lock().unwrap().len();
+    let read = agent
+        .request(
+            &read_only_endpoint,
+            &issued.token,
+            "GET",
+            "/v1/things",
+            &[],
+            b"",
+        )
+        .unwrap();
+    assert_eq!(read.status, 200);
+    assert_eq!(seen.lock().unwrap().len(), before + 1);
+    for (method, target, body) in [
+        ("POST", "/v1/things", &b"{}"[..]),
+        ("DELETE", "/v1/things", &b""[..]),
+        ("GET", "/v1/other", &b""[..]),
+        ("GET", "/v1/things/1", &b""[..]),
+        ("GET", "/v1/things", &b"x"[..]),
+    ] {
+        let refused = agent
+            .request(
+                &read_only_endpoint,
+                &issued.token,
+                method,
+                target,
+                &[],
+                body,
+            )
+            .unwrap();
+        assert_eq!(refused.status, 403, "{method} {target}");
+        assert_eq!(seen.lock().unwrap().len(), before + 1, "{method} {target}");
+    }
+    read_only.stop();
 }

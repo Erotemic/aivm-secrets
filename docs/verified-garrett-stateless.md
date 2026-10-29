@@ -73,15 +73,81 @@ that set (`kid_configured`, `retired_never_opens`); and **replica
 equivalence** — `decide_request` (`replicas_decide_alike`) and `renew` take no
 replica state, so replicas with the same configuration decide alike.
 
+## Composable isolation (`GarrettStatelessComposition`)
+
+The request path is composed of separately verified extracted components, and
+one theorem composes them for **any** operation policy:
+
+| Component | Extracted Rust | Contract |
+| --- | --- | --- |
+| identity verification | `stateless::authenticate` (verify, then admit) | `authenticate_ok_trace` (`Admitted`) |
+| operation authorization | an `OperationPolicy` instance (`stateless_policy.rs`) | `Sound pol policy Allowed` |
+| provider selection | `stateless_proxy::route_of` | `route_of_loop_contract` |
+| credential release | `stateless::decrypt` | `decrypt_ok_trace`; `open_of_halves` (the two halves are `open`) |
+| exact request encoding | `proxy_http::encode_upstream` | `encode_upstream_contract` |
+| controlled egress | `stateless_proxy::serve`, any `Origin` | `serve_follows_decision` (`Dispatched`) |
+
+`composed_egress`: for any policy component meeting its contract `Allowed`,
+every run of `serve` either makes **no egress** (not a dispatch; `admitted`
+and `exchange` are never called; the reply is the fixed `401` or a fixed
+refusal) or makes **one** egress, after which the surrogate was verified and
+admitted for this TLS peer, the request's `Operation` is `Allowed` for its
+claims, the route serves its provider, the credential is that surrogate's
+unsealed credential, the bytes are the encoder's output (exactly
+`ExactWire` when they fit in memory), and admission was acknowledged before
+the one exchange. The statement is `Isolated`; it is proved once.
+
+It is instantiated, without repeating the proof, for the two policies the
+proxy runs, each an actual extracted trait instance:
+
+* `garrett_egress`: `Unrestricted`, contract `True` (`unrestricted_sound`) —
+  Garrett's proxy, where the surrogate alone authorizes;
+* `read_only_egress`: `ReadOnly p`, contract `ReadOnlyAllowed p`
+  (`read_only_sound`, from `read_only_permits_spec`, `any_allows_spec` over
+  the extracted loop, `resource_allows_spec`, `read_method_eq`, and the
+  existing `method_ok_spec`/`path_matches_spec`).
+  `read_only_dispatch` restates it for the request: a dispatched request is
+  `GET` or `HEAD`, has an empty body, and its path (the target before any
+  `?`, `operation_of_spec`) is allowed by a configured resource for the
+  surrogate's provider. `read_only_refuses`: any other method, or any body, is
+  never dispatched, so nothing is sent.
+
+The policy sees only the claims and the `Operation`, never the credential or
+upstream bytes (its Rust signature). `decide_unpermitted`
+(`GarrettStatelessProxy`): when the policy refuses, the decision is the fixed
+`denied` refusal whatever the `unseal` adapter would do — the credential is
+not decrypted. `dispatch_permitted`: every dispatch was permitted by the
+policy for the opened claims. The dispatch payload (`Dispatch`) has private
+fields, so only `stateless_proxy` reads it.
+
+The shell side is guarded, not proved: `stateless_shell.py` checks that the
+proxy runs the core loop only under `&Unrestricted` or the configured core
+`ReadOnly`, that the shell implements no `OperationPolicy`, and that it never
+calls `permits`, `authenticate` or `decrypt` itself.
+
+**Replicas, answer by answer.** `serve_answered`: a reply is `reply` of the
+pure decision and of `Answered`, exactly what the origin adapter was asked and
+answered — `none` (no dispatch: nothing asked), `unadmitted` (the admission
+record was not acknowledged), or `exchanged answer done` (the provider
+exchange's result and, only for a completed release, the completion
+acknowledgement). `replicas_same_answers_same_reply`: two replicas with the
+same keys, policy, routes and acceptance make the same decision; a refusal
+gives identical replies; equal answers give identical replies.
+`replica_replies_differ`: different replies imply a dispatch whose admission
+acknowledgements, provider exchange results or completion acknowledgements
+differ. All three hold for both policies, since they are proved for any
+policy. `tests/test_garrett_stateless_operations.py` runs the same requests
+against a Python and a Rust replica of each configuration.
+
 ## Statelessness and acquisition (`GarrettStatelessProxy`, `GarrettStatelessStrict`)
 
-**A pure request decision.** `stateless_proxy::decide(opener, request, routes,
-acceptance, peer, now)` is the Rust function every request is decided by; it
-returns `Unauthorized`, `Refused` or `Dispatch(route, bytes, opened)` and
-performs no effect. Its inputs are the keys (through the `KeySet` opener),
-the authenticated peer, the request carrying the surrogate, the clock and the
-static routes and acceptance policy; it has no other input, so no
-history-dependent acceptance is possible. `serve` calls it first and only
+**A pure request decision.** `stateless_proxy::decide(opener, policy, request,
+routes, acceptance, peer, now)` is the Rust function every request is decided
+by; it returns `Unauthorized`, `Refused` or `Dispatch` (route, bytes, opened)
+and performs no effect. Its inputs are the keys (through the `KeySet` opener),
+the static operation policy, the authenticated peer, the request carrying the
+surrogate, the clock and the static routes and acceptance policy; it has no
+other input, so no history-dependent acceptance is possible. `serve` calls it first and only
 then, for a dispatch, records the admission and makes the one exchange.
 `decide_request` is that extracted function (`Decision.ofCore` only renames
 constructors), so `send_origin` above says every provider write in any
@@ -94,9 +160,11 @@ acknowledgement); no other adapter state reaches the reply.
 `replicas_differ_only_by_answers`: two proxies with the same keys and
 configuration, with any two adapters in any state, make the same decision —
 for a dispatch, the same route and bytes — and their replies can differ only
-because those adapter answers differ, for instance because their upstream
-exchanges failed differently. Equal decisions are proved; equal network
-outcomes are not, and cannot be.
+because those adapter answers differ. "Answers" are **three** things, not only
+the provider's reply: the local admission acknowledgement, the provider
+exchange's result, and the local completion acknowledgement. The composition
+section above (`serve_answered`, `replica_replies_differ`) separates them.
+Equal decisions are proved; equal network outcomes are not, and cannot be.
 
 **The strict profile.** The profile's one piece of mutable process state is the
 broker's login mailbox, which only the OAuth acquisition adapter uses. The
@@ -174,6 +242,7 @@ python dev/verification/stateless_shell.py check                                
 | `GarrettStatelessProtocol` | `accepts_sealed`, `informational_no_influence`, `opened_issued`, `lineage`, `login_root`, `send_origin`, `send_root`, `rejection_never_sends`, `kid_configured`, `retired_never_opens`, `issued_secret`, `log_permitted`, `delivered_to_initiator`, `login_once`, `failed_login_quiet`, `prefix_logged`, `connection_prefix`, **`protocol_safety`** | all of the above, composed |
 | `GarrettStatelessWitness` | `issue_then_open`, `issued_codec`, `issued_opens_only_for_its_certificate` | `stateless::issue`, `stateless::open`, the `KeySet`/`TokenSealer` instances |
 | `GarrettStatelessStrict` | `no_providers_no_state`, `strict_no_login_state` | `stateless_mailbox.rs` (all transitions), `stateless_login::begin` |
+| `GarrettStatelessComposition` | `Sound`, `operation_of_spec`, `unrestricted_sound`, `read_method_eq`, `resource_allows_spec`, `any_allows_spec`, `read_only_permits_spec`, `read_only_sound`; **`composed_egress`** (`Isolated`), `garrett_egress`, `read_only_egress`, `read_only_dispatch`, `read_only_refuses`; `serve_answered`, `replicas_same_answers_same_reply`, `replica_replies_differ` | `stateless_policy.rs` (both `OperationPolicy` instances, `operation_of`, `any_allows` and its loop, `resource_allows`, `read_method`); `stateless_proxy::serve` |
 
 The earlier theorems remain and are reused:
 
@@ -185,7 +254,8 @@ The earlier theorems remain and are reused:
 | Issuance | `issue_trace` (`IssuedFor`), `issue_window_spec`, `claims_for_trace`, `issue_invalid_never_seals` | `stateless::issue`, `claims_for`, `issue_window` |
 | One renewal | `renew_trace` | `stateless::renew`, `renewal_grant` |
 | Login binding | `begin_spec`, `begin_trace`, `accept_callback_trace`, `complete_trace`, `deliver_trace`, `deliver_other_peer` | `stateless_login.rs` |
-| `serve` acts on the pure decision | `serve_follows_decision`, `dispatch_trace`, `serve_dispatch_exact`, `serve_rejected_never_sends`, `serve_guest_reply`, `serve_outcome`, `replicas_decide_alike`, `replicas_differ_only_by_answers` | `stateless_proxy::decide`, `stateless_proxy::serve` |
+| `serve` acts on the pure decision | `serve_follows_decision`, `decide_dispatch_trace`, `dispatch_trace`, `dispatch_permitted`, `decide_unpermitted`, `serve_dispatch_exact`, `serve_rejected_never_sends`, `serve_guest_reply`, `serve_outcome`, `replicas_decide_alike`, `replicas_differ_only_by_answers` | `stateless_proxy::decide`, `stateless_proxy::serve` |
+| Opening in two halves | `authenticate_ok_trace`, `decrypt_ok_trace`, `open_of_halves` | `stateless::authenticate`, `stateless::decrypt`, `stateless::open` |
 
 ## Section 5 audit: endpoints and privileged paths
 
@@ -233,11 +303,15 @@ import closure against the mutant. Each must break a proof.
 | token: non-canonical base64 accepted | `GarrettStatelessCodec` |
 | token: associated data omits the header; payload with trailing bytes accepted; signature checked over the payload only; decrypted with the first key; credential allowed in the public payload | `GarrettStatelessToken` |
 | login state: label not bound | `GarrettStatelessState` |
+| proxy: operation policy not consulted; credential decrypted before authorization | `GarrettStatelessComposition` (rejected first by `GarrettStatelessProxy`, in its closure: `decide_dispatch_trace`, `decide_unpermitted`) |
+| read-only policy: permits a write method; permits a body; ignores the destination provider; ignores the resource path; ignores the resource method; operation path includes the query | `GarrettStatelessComposition` |
 
-**Result, 2026-10-27: all 34 stateless mutants are rejected** against the
-tree of the composable-isolation increment, each by a real error in the
-recompiled closure, not a cached object. The 2026-10-26 run rejected the
-first 32. The strict-profile mutant is caught by the existing login proof
+**Result, 2026-10-27: all 42 stateless mutants are rejected** against the
+tree of the operation-authorization increment, each by a real error in the
+recompiled closure, not a cached object. The earlier runs rejected the first
+32 (2026-10-26) and 34 (first composable-isolation increment). The two proxy
+policy mutants are caught by `GarrettStatelessProxy` before
+`GarrettStatelessComposition` is reached. The strict-profile mutant is caught by the existing login proof
 before `GarrettStatelessStrict` is reached, so the run does not show that the
 strict theorem alone would catch it.
 

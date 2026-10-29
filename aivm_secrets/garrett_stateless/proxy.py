@@ -37,6 +37,8 @@ class Proxy:
         self.clock = clock or (lambda: int(time.time()))
         self.routes = tuple(d.Route(r.provider, r.host, r.authentication, r.deny) for r in config.routes)
         self.upstream = tuple((r.address, r.port, r.host, tls.upstream_client(r.ca_file)) for r in config.routes)
+        self.policy: d.OperationPolicy = d.Unrestricted() if config.read_only is None else d.ReadOnly(
+            tuple(d.Resource(r.provider, r.method, r.path) for r in config.read_only))
         self.acceptance = d.Acceptance(config.audiences, tuple(r.provider for r in config.routes),
                                        config.max_lifetime, config.skew)
         self._audit = open(config.audit, 'ab') if config.audit else None
@@ -63,8 +65,8 @@ class Proxy:
             return False
 
     def serve_request(self, request: http1.Request, peer: tls.PeerIdentity) -> d.Served:
-        return d.serve(Opener(self.keys.entries), _Native(self, peer, request.method), request, self.routes,
-                       self.acceptance, peer.thumbprint, self.clock(), self.config.request_limit)
+        return d.serve(Opener(self.keys.entries), self.policy, _Native(self, peer, request.method), request,
+                       self.routes, self.acceptance, peer.thumbprint, self.clock(), self.config.request_limit)
 
     def exchange(self, route: int, wire: bytes) -> bytes:
         address, port, host, context = self.upstream[route]

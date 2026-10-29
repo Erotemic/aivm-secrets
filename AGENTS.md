@@ -50,7 +50,12 @@ mirrors them, and the two implementations must stay byte-compatible with
 `tests/secrets_vectors/garrett-stateless-v1.jsonl`. The composed internal theorem is
 `protocol_safety` (`proofs/GarrettStatelessProtocol.lean`); its only premises
 are the external boundary in `GarrettStatelessBoundary.lean`. Requests are
-decided by the pure `stateless_proxy::decide`. Credential acquisition is a
+decided by the pure `stateless_proxy::decide` under a static operation policy
+(`stateless_policy`: Garrett's `Unrestricted` or the constrained `ReadOnly`,
+a closed choice; spec section 11.1). `composed_egress`
+(`GarrettStatelessComposition.lean`) is the one composition theorem, proved for
+any policy and instantiated for both; extend it rather than duplicating it for
+a new policy. Operation authorization is not statelessness, and vice versa. Credential acquisition is a
 closed choice of two adapters (`provisioned`, `oauth`; spec section 7.1), and
 OAuth is optional: never make the isolation core depend on it. The OAuth login
 mailbox is the profile's only mutable process state; a `"stateless": "strict"`
