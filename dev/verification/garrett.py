@@ -35,24 +35,6 @@ PROFILES = [
     "native-coordinator-authority-v1",
     "native-exact-write-approval-v1",
 ]
-# The proof module that must reject a mutant of each garrett-stateless-v1 source.
-STATELESS_PROOFS = {
-    "stateless.rs": "GarrettStateless",
-    "stateless_login.rs": "GarrettStatelessLogin",
-    "stateless_mailbox.rs": "GarrettStatelessMailbox",
-    "stateless_proxy.rs": "GarrettStatelessConnection",
-    "stateless_token.rs": "GarrettStatelessProtocol",
-    "stateless_policy.rs": "GarrettStatelessComposition",
-}
-# Mutants whose defect is rejected by a module outside their file's default.
-STATELESS_MUTANT_PROOFS = {
-    "stateless state login label not bound": "GarrettStatelessState",
-    # The strict profile's theorem: no login provider, no login state.
-    "stateless login started for an unconfigured provider": "GarrettStatelessStrict",
-    # The composition theorem and its read-only instantiation.
-    "stateless proxy operation policy not consulted": "GarrettStatelessComposition",
-    "stateless proxy credential decrypted before authorization": "GarrettStatelessComposition",
-}
 THEOREMS = [
     'aivm_secrets_garrett_core.read_transition.Proofs.request_facts_returned_iff',
     'aivm_secrets_garrett_core.read_transition.Proofs.finish_request_returned_iff',
@@ -1072,25 +1054,6 @@ def inputs() -> list[str]:
         "tests/secrets_vectors/coordination/authority-v1.jsonl",
         "tests/secrets_vectors/coordination/operator-replies-v1.jsonl",
         "proofs/GarrettProfiles.lean",
-        "proofs/GarrettProxyHttp.lean",
-        "proofs/GarrettProxyResponse.lean",
-        "proofs/GarrettProxyController.lean",
-        "proofs/GarrettStateless.lean",
-        "proofs/GarrettStatelessLogin.lean",
-        "proofs/GarrettStatelessProxy.lean",
-        "proofs/GarrettStatelessMailbox.lean",
-        "proofs/GarrettStatelessConnection.lean",
-        "proofs/GarrettStatelessCodec.lean",
-        "proofs/GarrettStatelessGrammar.lean",
-        "proofs/GarrettStatelessToken.lean",
-        "proofs/GarrettStatelessBoundary.lean",
-        "proofs/GarrettStatelessState.lean",
-        "proofs/GarrettStatelessProtocol.lean",
-        "proofs/GarrettStatelessRoundTrip.lean",
-        "proofs/GarrettStatelessWitness.lean",
-        "proofs/GarrettStatelessStrict.lean",
-        "proofs/GarrettStatelessComposition.lean",
-        "dev/garrett_stateless_vectors.py",
         "tests/limited_exec.py",
         "dev/verification/garrett.py",
         "dev/verification/freshness.py",
@@ -1098,7 +1061,7 @@ def inputs() -> list[str]:
         "tests/test_secrets_identity_mtls.py",
         *TESTS,
     }
-    for name in ["aivm-secrets-garrett", "aivm-secrets-garrett-core", "garrett-stateless"]:
+    for name in ["aivm-secrets-garrett", "aivm-secrets-garrett-core"]:
         directory = ROOT / "rust/crates" / name
         files.add(str((directory / "Cargo.toml").relative_to(ROOT)))
         files.update(str(p.relative_to(ROOT)) for p in directory.rglob("*.rs"))
@@ -2279,117 +2242,6 @@ def mutate(pattern: str | None = None) -> None:
         (rebinding, "rebind inactive target accepted", "    target.active\n", "    true\n"),
         (rebinding, "rebind admission before open bypassed", "if !permitted(", "if false && !permitted("),
     ]
-    # garrett-stateless-v1: each mutant is an actual defect in the Rust the
-    # stateless broker and proxy run; GarrettStateless*.lean must reject it.
-    stateless = source.with_name("stateless.rs")
-    stateless_login = source.with_name("stateless_login.rs")
-    stateless_proxy = source.with_name("stateless_proxy.rs")
-    stateless_mailbox = source.with_name("stateless_mailbox.rs")
-    stateless_token = source.with_name("stateless_token.rs")
-    stateless_policy = source.with_name("stateless_policy.rs")
-    mutations += [
-        (stateless, "stateless certificate binding removed", "if !(certificate == peer) {", "if false {"),
-        (stateless, "stateless expired token accepted", "if now >= claims.expires_at {", "if now > claims.expires_at {"),
-        (stateless, "stateless audience not checked", "if !member(&acceptance.audiences, &claims.audience) {",
-         "if false {"),
-        (stateless, "stateless verifying key issuer not checked", "if !(issuer == key_issuer) {", "if false {"),
-        (stateless, "stateless decrypted before admission",
-         "    match admit(\n        &verified.claims,\n        &verified.key_issuer,\n        acceptance,\n        peer,\n        now,\n    ) {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }\n"
-         "    let credential = match opener.unseal(&verified) {\n        Ok(credential) => credential,\n        Err(error) => return Err(error),\n    };\n",
-         "    let credential = match opener.unseal(&verified) {\n        Ok(credential) => credential,\n        Err(error) => return Err(error),\n    };\n"
-         "    match admit(\n        &verified.claims,\n        &verified.key_issuer,\n        acceptance,\n        peer,\n        now,\n    ) {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }\n"),
-        (stateless, "stateless issuance binds the wrong certificate", "        certificate: grant.certificate,\n",
-         "        certificate: token_id.to_vec(),\n"),
-        (stateless, "stateless renewal extends ren", "        credential_expires: claims.renew_until,\n",
-         "        credential_expires: MAX_TIME,\n"),
-        (stateless_login, "stateless login binds a request value instead of the peer",
-         "        certificate: peer.to_vec(),\n", "        certificate: subject.to_vec(),\n"),
-        (stateless_login, "stateless login callback state not checked",
-         "    if !same_login(policy, entry, state) {\n        return Err(LoginDenial::Invalid);",
-         "    if false {\n        return Err(LoginDenial::Invalid);"),
-        (stateless_login, "stateless login delivered to any peer", "if !(certificate == peer) {", "if false {"),
-        (stateless_proxy, "stateless proxy wrong provider destination",
-         "let index = route_of(routes, &verified.claims.provider);", "let index: usize = 0;"),
-        (stateless_proxy, "stateless proxy egress without acknowledged admission",
-         "if !origin.admitted(&opened.claims, index) {", "if false {"),
-        (stateless_proxy, "stateless proxy surrogate forwarded instead of credential",
-         "        &opened.credential,\n        &route.authentication,", "        &token,\n        &route.authentication,"),
-        (stateless_proxy, "stateless proxy credential reflection unchecked",
-         "let forms = reflection_forms(&opened.credential);", "let forms = reflection_forms(b\"\");"),
-        (stateless_proxy, "stateless proxy dispatches despite an encoder refusal",
-         "Err(refusal) => Decision::Refused(code_of(&refusal)),",
-         "Err(_refusal) => Decision::Dispatch(Dispatch {\n            route: index,\n            wire,\n            opened,\n        }),"),
-        # Operation authorization (GarrettStatelessComposition): removing or
-        # bypassing the policy, or weakening the read-only policy.
-        (stateless_proxy, "stateless proxy operation policy not consulted",
-         "if !policy.permits(&verified.claims, &operation_of(request)) {", "if false {"),
-        (stateless_proxy, "stateless proxy credential decrypted before authorization",
-         "    if !policy.permits(&verified.claims, &operation_of(request)) {\n"
-         "        return Decision::Refused(Code::Denied);\n    }\n"
-         "    let opened = match stateless::decrypt(opener, verified) {\n"
-         "        Ok(opened) => opened,\n        Err(rejection) => return Decision::Unauthorized(Some(rejection)),\n    };\n",
-         "    let claims = stateless::authenticate(opener, &token, acceptance, peer, now);\n"
-         "    let opened = match stateless::decrypt(opener, verified) {\n"
-         "        Ok(opened) => opened,\n        Err(rejection) => return Decision::Unauthorized(Some(rejection)),\n    };\n"
-         "    let permitted = match claims {\n        Ok(v) => policy.permits(&v.claims, &operation_of(request)),\n"
-         "        Err(_) => false,\n    };\n"
-         "    if !permitted {\n        return Decision::Refused(Code::Denied);\n    }\n"),
-        (stateless_policy, "stateless read-only policy permits a write method",
-         "        read_method(&operation.method)\n", "        true\n"),
-        (stateless_policy, "stateless read-only policy permits a body",
-         "            && operation.body == 0\n", "            && true\n"),
-        (stateless_policy, "stateless read-only policy ignores the destination provider",
-         "    own == provider\n", "    true\n"),
-        (stateless_policy, "stateless read-only policy ignores the resource path",
-         "        && path_matches(&resource.path, &operation.path)\n", "        && true\n"),
-        (stateless_policy, "stateless read-only policy ignores the resource method",
-         "        && method_ok(&resource.method, &operation.method)\n", "        && true\n"),
-        (stateless_policy, "stateless operation path includes the query",
-         "        path: request.target[..end].to_vec(),\n", "        path: request.target.clone(),\n"),
-        (stateless_login, "stateless login started for an unconfigured provider",
-         "if !stateless::member(&policy.providers, provider) {", "if false {"),
-        (stateless_mailbox, "stateless mailbox duplicate login accepted",
-         "if find(&mailbox.slots, &state.login) < mailbox.slots.len() {", "if false {"),
-        (stateless_mailbox, "stateless mailbox serial reused", "        serial: mailbox.next,\n", "        serial: 0,\n"),
-        (stateless_mailbox, "stateless mailbox capacity not enforced", "if live(&mailbox.slots) >= MAX_PENDING {",
-         "if false {"),
-        (stateless_mailbox, "stateless mailbox exchange answer reaches another login",
-         "if slot.serial != exchanged.permit.serial {", "if false {"),
-        (stateless_mailbox, "stateless mailbox finish ignores the stage",
-         "            match slot.entry.stage {\n                Stage::Exchanging => (),\n                _ => return Err(MailboxError::Consumed),\n            }\n            let result",
-         "            let result"),
-        (stateless_mailbox, "stateless mailbox poll ignores the peer",
-         "Some(slot) => stateless_login::deliver(&slot.entry, peer, now),",
-         "Some(slot) => stateless_login::deliver(&slot.entry, &slot.entry.certificate, now),"),
-        (stateless_proxy, "stateless proxy connection decides for the authority, not the peer",
-         "                peer,\n                now,\n                limit,\n",
-         "                authority,\n                now,\n                limit,\n"),
-        (stateless_token, "stateless token kid not used to select the key",
-         "while index < entries.len() && !named(&entries[index], kid) {",
-         "while false && !named(&entries[index], kid) {"),
-        (stateless_token, "stateless token duplicate kid accepted in a key set",
-         "&& select(entries, &entry.kid) == index", "&& true"),
-        (stateless_token, "stateless token associated data omits the header",
-         "    append(&mut aad, header);", "    let _ = header;"),
-        (stateless_token, "stateless token payload with trailing bytes accepted",
-         "if i + 1 != bytes.len() {", "if i + 1 > bytes.len() {"),
-        (stateless_token, "stateless token signature checked over the payload only",
-         "if !entry.material.verify(&token[..second], &signature) {",
-         "if !entry.material.verify(&token[first + 1..second], &signature) {"),
-        (stateless_token, "stateless token decrypted with the first key",
-         "    match entries[verified.key]", "    match entries[0]"),
-        (stateless_token, "stateless token credential allowed in the public payload",
-         "if occurs(&header, credential) || occurs(&public, credential) {", "if occurs(&header, credential) {"),
-        (stateless_token, "stateless token header prefix not checked",
-         "if start != HEADER_START || ending != HEADER_END {", "if ending != HEADER_END {"),
-        (stateless_token, "stateless token non-canonical base64 accepted",
-         "    if same != text {", "    if false && same != text {"),
-        (stateless_token, "stateless token provider grammar not checked",
-         "        && is_provider(&claims.provider)\n", "\n"),
-        (stateless_token, "stateless state login label not bound",
-         "let ciphertext = match key.seal(nonce, LOGIN_LABEL, &state_bytes(state)) {",
-         "let ciphertext = match key.seal(nonce, CREDENTIAL_LABEL, &state_bytes(state)) {"),
-    ]
     total = len(mutations)
     if pattern is not None:
         mutations = [mutation for mutation in mutations if re.search(pattern, mutation[1])]
@@ -2574,7 +2426,7 @@ def mutate(pattern: str | None = None) -> None:
                 ]:
                     modules.remove(dependency)
                 modules[1:1] = ["GarrettLogin", "GarrettManifest", "GarrettDisclosure"]
-            if label.startswith(("trace origin ", "request context ", "provider io ", "provider channel ", "provider wire ", "json string ", "json wire ", "stateless ")):
+            if label.startswith(("trace origin ", "request context ", "provider io ", "provider channel ", "provider wire ", "json string ", "json wire ")):
                 # Rebuild the actual local import closure against this mutant;
                 # cached proof objects are never substituted for dependencies.
                 closure: list[str] = []
@@ -2590,7 +2442,7 @@ def mutate(pattern: str | None = None) -> None:
                             visit(imported)
                     closure.append(module)
 
-                visit(STATELESS_MUTANT_PROOFS.get(label, STATELESS_PROOFS.get(source.name, "")) if source.name in STATELESS_PROOFS else "GarrettJsonFrame" if label.startswith("json wire ") else "GarrettJsonString" if label.startswith("json string ") else "GarrettProviderWire" if label.startswith("provider wire ") else "GarrettProviderChannel" if label.startswith("provider channel ") else "GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
+                visit("GarrettJsonFrame" if label.startswith("json wire ") else "GarrettJsonString" if label.startswith("json string ") else "GarrettProviderWire" if label.startswith("provider wire ") else "GarrettProviderChannel" if label.startswith("provider channel ") else "GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
                 modules = closure + [module for module in modules if module not in seen]
             for module in modules:
                 proof = temporary / (module + ".lean")

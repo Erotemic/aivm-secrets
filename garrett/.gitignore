@@ -1,0 +1,8 @@
+/.tools/
+/target/
+/proofs/.lake/
+__pycache__/
+*.egg-info/
+/build/
+/dist/
+*.llbc

@@ -40,29 +40,13 @@ proof, whole-service secrecy, or approval for unattended AIVM agent use. The
 host-only GitHub credential must never enter the guest, Git or ordinary CI.
 Read `docs/aivm-github-live-readonly-acceptance.md` before optional live runs.
 
-**`garrett-stateless-v1` (2026-10-26):** Garrett's stateless architecture is
-a separate profile, never a change to the stateful AIVM profile. Its status and
-the remaining external validations are in
-`docs/planning/aivm-secrets-garrett-stateless.md`. Decisions live in the
-extracted core (`stateless*.rs`; proofs `proofs/GarrettStateless*.lean`;
-mutants labelled `stateless `). The Python `garrett_stateless/decisions.py`
-mirrors them, and the two implementations must stay byte-compatible with
-`tests/secrets_vectors/garrett-stateless-v1.jsonl`. The composed internal theorem is
-`protocol_safety` (`proofs/GarrettStatelessProtocol.lean`); its only premises
-are the external boundary in `GarrettStatelessBoundary.lean`. Requests are
-decided by the pure `stateless_proxy::decide` under a static operation policy
-(`stateless_policy`: Garrett's `Unrestricted` or the constrained `ReadOnly`,
-a closed choice; spec section 11.1). `composed_egress`
-(`GarrettStatelessComposition.lean`) is the one composition theorem, proved for
-any policy and instantiated for both; extend it rather than duplicating it for
-a new policy. Operation authorization is not statelessness, and vice versa. Credential acquisition is a
-closed choice of two adapters (`provisioned`, `oauth`; spec section 7.1), and
-OAuth is optional: never make the isolation core depend on it. The OAuth login
-mailbox is the profile's only mutable process state; a `"stateless": "strict"`
-configuration refuses it and the proxy audit file (`GarrettStatelessStrict.lean`,
-spec section 9). Run
-`python dev/verification/stateless_shell.py check` after changing the
-`garrett-stateless` shell.
+**`garrett/` is a separate project.** Matthew Garrett's stateless
+architecture (`garrett-stateless-v1`) was developed here and extracted on
+2026-10-29 into `garrett/`, a self-contained tree with its own Cargo
+workspace, Python distribution, Lake package, verification tooling, tests and
+`AGENTS.md`. Nothing in `aivm-secrets` imports it, and it imports nothing
+from `aivm-secrets`; keep it that way (it is meant to move to its own
+repository). Work on it from inside `garrett/` under its rules.
 
 **Formalization-first overnight work:** when the operator assigns an extended
 proof campaign, follow `docs/planning/aivm-secrets-overnight-formalization.md`

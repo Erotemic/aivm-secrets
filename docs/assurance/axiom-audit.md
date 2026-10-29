@@ -19,29 +19,6 @@ The allowed set is Lean's three standard axioms (`propext`,
 `Classical.choice`, `Quot.sound`) plus the named axioms Aeneas emits for
 opaque Rust items in the extracted model.
 
-## Result, 2026-10-26 (garrett-stateless-v1 internal protocol)
-
-- 1,885 written theorems in 128 root modules; 388 added by the
-  campaign that composed `protocol_safety` (the mailbox, codec, grammar,
-  token, login-state, round-trip, connection, protocol and witness modules).
-- `outside_allowed` and `model_axiom_use` are both empty: every theorem,
-  including `protocol_safety`, depends only on `propext`, `Classical.choice`
-  and `Quot.sound`. The boundary propositions of
-  `GarrettStatelessBoundary` are premises, not axioms.
-- One theorem was removed: `login_surrogate_bound_to_starting_peer`, whose
-  `StageOnly` premise the mailbox extraction made unnecessary. No theorem
-  changed its axiom set. The baseline was re-recorded after this run.
-
-## Earlier result, 2026-10-26 (garrett-stateless-v1)
-
-- 1,497 written theorems in 117 modules. The 53 additions are the three
-  `GarrettStateless*` modules (48 theorems, plus the step-attribute
-  auxiliaries Lean generates for them).
-- `outside_allowed` and `model_axiom_use` are both empty: every theorem still
-  depends only on `propext`, `Classical.choice` and `Quot.sound`.
-- No theorem was removed or changed its axiom set. The baseline was
-  re-recorded after this run.
-
 ## Result, 2026-10-24
 
 - 1,444 written theorems in 114 modules (rerun after the history models; first run: 1,412 in 112). Lean-generated equation, size and

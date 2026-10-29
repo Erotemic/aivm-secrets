@@ -1,0 +1,37 @@
+# garrett-stateless-v1: the protocol (garrett_stateless.core) and an
+# application around it. Depends on nothing but `cryptography`.
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "garrett-stateless"
+version = "0.1.0"
+readme = "README.md"
+description = "Certificate-bound surrogate credentials and a stateless credential-substituting proxy, after Matthew Garrett's \"Securing agentic identity\""
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{name = "Jon Crall", email = "erotemic@gmail.com"}]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Developers",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+]
+dependencies = ["cryptography>=46.0.0"]
+
+[project.scripts]
+garrett-stateless = "garrett_stateless.cli:main"
+
+[tool.setuptools]
+include-package-data = false
+package-dir = {"" = "src"}
+packages = ["garrett_stateless", "garrett_stateless.core"]
+
+[project.optional-dependencies]
+tests = ["pytest>=7", "build>=1.2", "setuptools>=77", "wheel"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

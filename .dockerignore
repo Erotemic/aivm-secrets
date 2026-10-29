@@ -11,13 +11,6 @@
 !aivm_secrets/**
 !dev/
 !dev/offline_native_guest.py
-!pyproject.toml
-!README.md
-!LICENSE
-!examples/
-!examples/garrett-stateless/
-!examples/garrett-stateless/walkthrough.py
-!examples/garrett-stateless/synthetic_provider.py
 # Do not copy local output, caches, or bytecode even below included roots.
 rust/target/
 **/__pycache__/
