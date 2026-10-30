@@ -177,8 +177,14 @@ Extension points:
   certificate)` uses the tpm2-tools signer.
 
 The decisions themselves are the core functions `stateless::{open, issue,
-renew}`, `stateless_login::*` and `stateless_proxy::serve`. They are the ones
-the Lean theorems are about.
+renew}`, `stateless_login::*` and `stateless_proxy::{decide, serve}`. They are
+the ones the Lean theorems are about. `crates/garrett-stateless/tests/library.rs`
+mints a surrogate and runs `decide` on requests that present it, in one page.
+
+With the core feature `derive` (which this crate enables), the core's
+non-secret value and error types (`Rejection`, `SurrogateClaims`,
+`Acceptance`, `Code`, ...) implement `Debug`, `Clone`, `PartialEq` and `Eq`.
+Types that hold a credential, a token, key material or a request do not.
 
 ## TPM agent keys
 

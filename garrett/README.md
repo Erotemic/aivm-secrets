@@ -25,16 +25,31 @@ read-only operations on configured resources.
 
 **Experimental and unaudited.** Not published to any registry.
 
+## Reading it
+
+Four stops cover the design, the code and the claims:
+
+1. this README: what is implemented and where it stops;
+2. [`PROTOCOL.md`](PROTOCOL.md): one surrogate's life, start to finish, with
+   each step's Rust function and theorem;
+3. `crates/garrett-stateless-core/src/stateless.rs` and `decide` in
+   `stateless_proxy.rs`: the security-critical path, readable without the
+   HTTP parser; `crates/garrett-stateless/tests/library.rs` uses it as a
+   library;
+4. [`proofs/Garrett.lean`](proofs/Garrett.lean): the guarantees, their
+   hypotheses, and what is not established.
+
 ## Layout
 
 | Path | What |
 | --- | --- |
+| `PROTOCOL.md` | a walkthrough of one execution, linked to the Rust and the theorems |
 | `docs/garrett-stateless-v1.md` | the normative specification, including every divergence from the article |
 | `crates/garrett-stateless-core` | the protocol: every decision, codec and state transition, as pure Rust with no dependencies. Aeneas extracts it to Lean |
 | `crates/garrett-stateless` | the application: broker, proxy, agent client and CLI, with `ring`, `rustls` and an optional TPM signer |
 | `src/garrett_stateless/core` | the Python reference of the protocol, module for module as the Rust crate; standard library only |
 | `src/garrett_stateless` | the Python application (same CLI as the Rust one), using `cryptography` |
-| `proofs/` | an independent Lake package: the generated Lean model of the core crate and the theorems about it |
+| `proofs/` | an independent Lake package: the generated Lean model of the core crate and the theorems about it; `Garrett.lean` states the guarantees |
 | `verification/` | the pinned toolchain, extraction, mutation testing and the shell guard |
 | `tests/`, `tests/vectors/` | Python tests and the conformance vectors both implementations are checked against |
 | `examples/` | a synthetic provider, a library example and a container walkthrough |
@@ -61,7 +76,7 @@ python verification/shell_guard.py check      # the application calls the core a
 ```
 
 [`docs/verification.md`](docs/verification.md) states what is proved (the
-composed protocol theorem `protocol_safety`, the isolation theorem
+composed protocol theorem `protocol_safety`, the per-request theorem
 `composed_egress` for both operation policies, and the per-function contracts
 under them), what is only tested, and what is trusted:
 [`docs/assumptions.json`](docs/assumptions.json).

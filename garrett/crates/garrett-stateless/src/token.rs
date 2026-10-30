@@ -122,7 +122,11 @@ pub fn sealer(
     info: &Informational,
 ) -> Result<TokenSealer<RingKey>, Rejection> {
     let nonce = random::<12>().map_err(|_| Rejection::Undecryptable)?;
-    Ok(TokenSealer::new(entry.core(), info.encoded()?, nonce.to_vec()))
+    Ok(TokenSealer::new(
+        entry.core(),
+        info.encoded()?,
+        nonce.to_vec(),
+    ))
 }
 
 /// Deterministic sealing with a given nonce, for the conformance vectors

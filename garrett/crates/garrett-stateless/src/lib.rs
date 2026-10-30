@@ -14,13 +14,14 @@
 //!   request to the provider route the token names;
 //! * an **agent** client ([`agent::Agent`]) for both.
 //!
-//! Neither broker nor proxy keeps persistent state; the proxy keeps no state
-//! at all. Every security decision is made by the Aeneas-extracted
-//! controllers in `garrett-stateless-core` (`stateless`,
-//! `stateless_login`, `stateless_proxy`), which the Lean proofs in
-//! `proofs/GarrettStateless*.lean` are about. This crate provides the
-//! adapters: Ed25519 and AES-256-GCM ([`token`]), key sets ([`keys`]), TLS
-//! ([`tls`]), HTTP and the OAuth token request.
+//! Neither broker nor proxy keeps persistent state; the proxy keeps no
+//! authorization state, and the broker only an in-progress OAuth login.
+//! Every security decision is made by the Aeneas-extracted controllers in
+//! `garrett-stateless-core` (`stateless`, `stateless_login`,
+//! `stateless_proxy`), which the Lean proofs are about (`proofs/Garrett.lean`
+//! states them). `tests/library.rs` shows the library in one page. This
+//! crate provides the adapters: Ed25519 and AES-256-GCM ([`token`]), key
+//! sets ([`keys`]), TLS ([`tls`]), HTTP and the OAuth token request.
 //!
 //! **Security invariants** (each a property of the extracted controller,
 //! under the adapter contracts in the specification):
