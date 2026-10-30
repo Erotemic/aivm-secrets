@@ -20,6 +20,10 @@ open garrett_stateless_core.proxy_http.Base64Proofs (enc enc_injective)
 namespace garrett_stateless_core.stateless_protocol
 
 open garrett_stateless_core.stateless_token
+open garrett_stateless_core.stateless_token.base64 garrett_stateless_core.stateless_token.grammar
+  garrett_stateless_core.stateless_token.json garrett_stateless_core.stateless_token.payload
+  garrett_stateless_core.stateless_token.keys garrett_stateless_core.stateless_token.opening
+  garrett_stateless_core.stateless_token.sealing garrett_stateless_core.stateless_token.login_state
 open garrett_stateless_core.stateless_token.Proofs
 
 /-! ## One token, two directions: what was sealed is what verifies -/
@@ -657,7 +661,7 @@ theorem seg_guest {V P : Type} {ops : stateless.SurrogateOpener V} {pol : statel
     {policy : P} {routes : Slice stateless_proxy.Route}
     {a : stateless.Acceptance} {peer : Slice U8} {seg : List ProxyEvent} (ok : StepLog ops pol opener policy routes a peer seg)
     {bytes : List U8} (inSeg : ProxyEvent.guestSent bytes ∈ seg) :
-    (∃ code refusal, proxy_http.refusal code = Result.ok refusal ∧ bytes = refusal.val) ∨
+    (∃ code refusal, proxy_http.refusal.refusal code = Result.ok refusal ∧ bytes = refusal.val) ∨
     ∃ request now served, GuestReply ops pol opener policy routes a peer request now served ∧ bytes = served.reply.val := by
   rcases ok with e | ⟨code, refusal, hr, e⟩ | ⟨request, now, d, E, served, _, slog, reply, shape⟩
   · subst e; cases inSeg
@@ -705,7 +709,7 @@ theorem send_origin {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Co
         claims.certificate.val = peer.val ∧ Lineage inst cfg W claims credential ∧
         ∃ (inside : r.val < cfg.routes.length),
           (cfg.routes[r.val]'inside).provider.val = claims.provider.val ∧
-          proxy_http.encode_upstream (alloc.vec.Vec.new U8) request
+          proxy_http.upstream.encode_upstream (alloc.vec.Vec.new U8) request
             (alloc.vec.Vec.deref (cfg.routes[r.val]'inside).host)
             (alloc.vec.Vec.deref (cfg.routes[r.val]'inside).rules)
             (alloc.vec.Vec.deref opened.credential) (cfg.routes[r.val]'inside).authentication =
@@ -872,7 +876,7 @@ def Permitted (inst : KeyMaterial M) (cfg : Config P) (W : World M) (keys : KeyS
       ∃ sealer claims credential token src, IssuedIn inst cfg W sealer claims credential token src ∧
         opened.credential.val = credential.val ∧ claims.certificate.val = peer.val
   -- a fixed refusal, or a reply released by `guest_response`
-  | .guestSent bytes => (∃ code refusal, proxy_http.refusal code = Result.ok refusal ∧ bytes = refusal.val) ∨
+  | .guestSent bytes => (∃ code refusal, proxy_http.refusal.refusal code = Result.ok refusal ∧ bytes = refusal.val) ∨
       ∃ request now served, stateless_proxy.Proofs.GuestReply (Opening inst) cfg.policyInst keys cfg.policy cfg.routes cfg.acceptance peer
         request now served ∧ bytes = served.reply.val
   -- codes, statuses and the guest's own request: nothing of a credential

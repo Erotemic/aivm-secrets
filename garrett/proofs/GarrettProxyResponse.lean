@@ -4,7 +4,7 @@ import GarrettReflection
 /-!
 # The proxy's HTTP subset: what the agent may receive
 
-Source: the response side of `crates/garrett-stateless-core/src/proxy_http.rs`
+Source: `crates/garrett-stateless-core/src/proxy_http/response.rs` and `refusal.rs`
 (`guest_response`, `reflects`, `encode_response`), extracted by Aeneas.
 Python reference: `garrett_stateless/core/proxy_http.py` (`guest_response`).
 
@@ -31,6 +31,8 @@ set_option maxHeartbeats 4000000
 set_option maxRecDepth 100000
 
 namespace garrett_stateless_core.proxy_http.Proofs
+open garrett_stateless_core.proxy_http.request garrett_stateless_core.proxy_http.upstream
+  garrett_stateless_core.proxy_http.response garrett_stateless_core.proxy_http.refusal
 
 open garrett_stateless_core.reflection.Proofs (LiteralOccurs MatchesAt contains_contract)
 
@@ -166,7 +168,7 @@ theorem absent_of_contains {haystack needle : Slice U8} {found : Bool}
   simp_all
 
 @[step]
-theorem form_present_spec (data folded unwrappedData : Slice U8) (form : proxy_http.Form) :
+theorem form_present_spec (data folded unwrappedData : Slice U8) (form : proxy_http.response.Form) :
     form_present data folded unwrappedData form ⦃ b => b = false → form.folded = false →
       ¬ Occurs data.val form.bytes.val ∧ ¬ Occurs unwrappedData.val form.bytes.val ⦄ := by
   unfold form_present
@@ -199,14 +201,14 @@ theorem form_present_spec (data folded unwrappedData : Slice U8) (form : proxy_h
 /-- What `reflects` answering `false` excludes for one case-sensitive form:
     it occurs neither in the data nor in the data with line breaks removed
     (so MIME-wrapped base64 is caught). -/
-def Unreflected (data : List U8) (form : proxy_http.Form) : Prop :=
+def Unreflected (data : List U8) (form : proxy_http.response.Form) : Prop :=
   ¬ Occurs data form.bytes.val ∧ ¬ Occurs (data.filter Kept) form.bytes.val
 
-theorem reflects_loop_spec (it : core.slice.iter.Iter proxy_http.Form) (data : Slice U8)
+theorem reflects_loop_spec (it : core.slice.iter.Iter proxy_http.response.Form) (data : Slice U8)
     (folded unwrappedData : alloc.vec.Vec U8) (same : unwrappedData.val = data.val.filter Kept) :
     reflects_loop it data folded unwrappedData ⦃ b => b = false →
       ∀ form ∈ it.slice.val.drop it.i, form.folded = false → Unreflected data.val form ⦄ := by
-  suffices ∀ n (it : core.slice.iter.Iter proxy_http.Form), it.slice.length - it.i = n →
+  suffices ∀ n (it : core.slice.iter.Iter proxy_http.response.Form), it.slice.length - it.i = n →
       reflects_loop it data folded unwrappedData ⦃ b => b = false →
         ∀ form ∈ it.slice.val.drop it.i, form.folded = false → Unreflected data.val form ⦄ from
     this _ it rfl
@@ -247,7 +249,7 @@ theorem reflects_loop_spec (it : core.slice.iter.Iter proxy_http.Form) (data : S
     case-sensitive form occurs anywhere in `data`, nor in `data` with its
     line breaks removed. -/
 @[step]
-theorem reflects_spec (data : Slice U8) (forms : Slice proxy_http.Form) :
+theorem reflects_spec (data : Slice U8) (forms : Slice proxy_http.response.Form) :
     reflects data forms ⦃ b => b = false →
       ∀ form ∈ forms.val, form.folded = false → Unreflected data.val form ⦄ := by
   unfold reflects
@@ -258,23 +260,23 @@ theorem reflects_spec (data : Slice U8) (forms : Slice proxy_http.Form) :
   intro b h no
   simpa using h no
 
-theorem dropped_response_ok (field : proxy_http.Field) : ∃ b, dropped_response field = Result.ok b := by
+theorem dropped_response_ok (field : proxy_http.request.Field) : ∃ b, dropped_response field = Result.ok b := by
   unfold dropped_response
   simp only [lifted_slice, bind_ok, name_is_eq]
   split_ifs <;> simp
 
 @[step]
-theorem dropped_response_spec (field : proxy_http.Field) :
+theorem dropped_response_spec (field : proxy_http.request.Field) :
     dropped_response field ⦃ _ => True ⦄ := by
   obtain ⟨b, h⟩ := dropped_response_ok field
   rw [h]; simp
 
-theorem returned_fields_loop_spec (it : core.slice.iter.Iter proxy_http.Field)
-    (out : alloc.vec.Vec proxy_http.Field)
+theorem returned_fields_loop_spec (it : core.slice.iter.Iter proxy_http.request.Field)
+    (out : alloc.vec.Vec proxy_http.request.Field)
     (room : out.length + (it.slice.length - it.i) ≤ Usize.max) :
     returned_fields_loop it out ⦃ r => ∃ kept, r.val = out.val ++ kept ∧
       kept.Sublist (it.slice.val.drop it.i) ⦄ := by
-  suffices ∀ n (it : core.slice.iter.Iter proxy_http.Field) (out : alloc.vec.Vec proxy_http.Field),
+  suffices ∀ n (it : core.slice.iter.Iter proxy_http.request.Field) (out : alloc.vec.Vec proxy_http.request.Field),
       it.slice.length - it.i = n → out.length + n ≤ Usize.max →
       returned_fields_loop it out ⦃ r => ∃ kept, r.val = out.val ++ kept ∧
         kept.Sublist (it.slice.val.drop it.i) ⦄ from this _ it out rfl room
@@ -299,7 +301,7 @@ theorem returned_fields_loop_spec (it : core.slice.iter.Iter proxy_http.Field)
         exact sub.cons _
       · simp only [bytes_clone_exact, bind_ok]
         have same : ({ «name» := it.slice[it.i].name, value := it.slice[it.i].value } :
-            proxy_http.Field) = it.slice[it.i] := rfl
+            proxy_http.request.Field) = it.slice[it.i] := rfl
         rw [same]
         refine WP.spec_bind (alloc.vec.Vec.push_spec out it.slice[it.i] (by scalar_tac)) ?_
         intro pushed appended
@@ -311,22 +313,22 @@ theorem returned_fields_loop_spec (it : core.slice.iter.Iter proxy_http.Field)
         rw [split_list]
         exact sub.cons_cons _
     · simp only [iter_next_done it inside, bind_ok]
-      change (Result.ok out : Result (alloc.vec.Vec proxy_http.Field)) ⦃ r => ∃ kept,
+      change (Result.ok out : Result (alloc.vec.Vec proxy_http.request.Field)) ⦃ r => ∃ kept,
         r.val = out.val ++ kept ∧ kept.Sublist (it.slice.val.drop it.i) ⦄
       simp only [WP.spec_ok]
       exact ⟨[], by simp, List.nil_sublist _⟩
 
 @[step]
-theorem returned_fields_spec (fields : Slice proxy_http.Field) :
+theorem returned_fields_spec (fields : Slice proxy_http.request.Field) :
     returned_fields fields ⦃ r => r.val.Sublist fields.val ⦄ := by
   unfold returned_fields
   simp only [SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter, bind_ok]
-  refine WP.spec_mono (returned_fields_loop_spec ⟨fields, 0⟩ (alloc.vec.Vec.new proxy_http.Field)
+  refine WP.spec_mono (returned_fields_loop_spec ⟨fields, 0⟩ (alloc.vec.Vec.new proxy_http.request.Field)
     (by simp [alloc.vec.Vec.new, alloc.vec.Vec.length])) ?_
   rintro r ⟨kept, hr, sub⟩
   simpa [alloc.vec.Vec.new, hr] using sub
 
-theorem fields_bytes_sublist {a b : List proxy_http.Field} (sub : a.Sublist b) :
+theorem fields_bytes_sublist {a b : List proxy_http.request.Field} (sub : a.Sublist b) :
     (FieldsBytes a).length ≤ (FieldsBytes b).length := by
   induction sub with
   | slnil => simp
@@ -336,7 +338,7 @@ theorem fields_bytes_sublist {a b : List proxy_http.Field} (sub : a.Sublist b) :
 open garrett_stateless_core.http_wire.Proofs (Digits)
 
 /-- The bytes `encode_response` writes. -/
-def ResponseBytes (response : proxy_http.Response) (fields : List proxy_http.Field)
+def ResponseBytes (response : proxy_http.response.Response) (fields : List proxy_http.request.Field)
     (keep head : Bool) : List U8 :=
   ascii "HTTP/1.1 " ++ Digits response.status.val ++ [32#u8] ++ response.reason.val ++ CRLF ++
     FieldsBytes fields ++ ascii "Content-Length: " ++ Digits response.body.length ++
@@ -358,7 +360,7 @@ theorem close_bytes : ascii "\r\nConnection: close\r\n\r\n" =
      115#u8, 101#u8, 13#u8, 10#u8, 13#u8, 10#u8] := by rfl
 
 /-- The `HEAD` encoding is a prefix of the full one: only the body differs. -/
-theorem response_head_prefix (response : proxy_http.Response) (fields : List proxy_http.Field)
+theorem response_head_prefix (response : proxy_http.response.Response) (fields : List proxy_http.request.Field)
     (keep : Bool) :
     ResponseBytes response fields keep false = ResponseBytes response fields keep true ++
       response.body.val := by
@@ -366,8 +368,8 @@ theorem response_head_prefix (response : proxy_http.Response) (fields : List pro
 
 attribute [local scalar_tac_simps] Array.length_to_slice
 
-theorem encode_response_contract (output : alloc.vec.Vec U8) (response : proxy_http.Response)
-    (fields : Slice proxy_http.Field) (keep head : Bool)
+theorem encode_response_contract (output : alloc.vec.Vec U8) (response : proxy_http.response.Response)
+    (fields : Slice proxy_http.request.Field) (keep head : Bool)
     (room : output.length + (ResponseBytes response fields.val keep false).length ≤ Usize.max) :
     encode_response output response fields keep head ⦃ r =>
       r.val = output.val ++ ResponseBytes response fields.val keep head ⦄ := by
@@ -399,8 +401,8 @@ theorem encode_response_contract (output : alloc.vec.Vec U8) (response : proxy_h
     simp_all [ResponseBytes, CRLF, status_prefix_bytes, length_field_bytes, keep_alive_bytes,
       close_bytes, List.append_assoc]
 
-theorem response_bytes_length_mono (response : proxy_http.Response)
-    {a b : List proxy_http.Field} (keep head : Bool)
+theorem response_bytes_length_mono (response : proxy_http.response.Response)
+    {a b : List proxy_http.request.Field} (keep head : Bool)
     (shorter : (FieldsBytes a).length ≤ (FieldsBytes b).length) :
     (ResponseBytes response a keep head).length ≤ (ResponseBytes response b keep head).length := by
   simp only [ResponseBytes, List.length_append]
@@ -410,8 +412,8 @@ theorem response_bytes_length_mono (response : proxy_http.Response)
     `guest_response` either refuses (`Reflected`) and appends nothing, or
     appends bytes in which no case-sensitive form occurs. For `HEAD` the
     appended bytes are a prefix of the checked ones, so the same holds. -/
-theorem guest_response_contract (output : alloc.vec.Vec U8) (response : proxy_http.Response)
-    (forms : Slice proxy_http.Form) (keep head : Bool)
+theorem guest_response_contract (output : alloc.vec.Vec U8) (response : proxy_http.response.Response)
+    (forms : Slice proxy_http.response.Form) (keep head : Bool)
     (room : output.length + (ResponseBytes response response.fields.val keep false).length ≤
       Usize.max) :
     guest_response output response forms keep head ⦃ r =>
@@ -460,7 +462,7 @@ theorem push_or_keep {α : Type} {c : Prop} [Decidable c] {v w : alloc.vec.Vec �
 
 /-- The search loop only appends forms. -/
 theorem reflection_forms_loop_prefix (secret : Slice U8) :
-    ∀ n (forms out : alloc.vec.Vec proxy_http.Form) (shift : Usize), 3 - shift.val = n →
+    ∀ n (forms out : alloc.vec.Vec proxy_http.response.Form) (shift : Usize), 3 - shift.val = n →
       reflection_forms_loop secret forms shift = Result.ok out → ∃ rest, out.val = forms.val ++ rest := by
   intro n
   induction n using Nat.strong_induction_on with
@@ -490,7 +492,7 @@ theorem reflection_forms_loop_prefix (secret : Slice U8) :
 /-- **The raw credential is always a checked form.** If `reflection_forms`
     returns, its list contains the credential's exact bytes as a
     case-sensitive form, so `guest_response_contract` applies to them. -/
-theorem reflection_forms_include_raw (secret : Slice U8) (forms : alloc.vec.Vec proxy_http.Form)
+theorem reflection_forms_include_raw (secret : Slice U8) (forms : alloc.vec.Vec proxy_http.response.Form)
     (returned : reflection_forms secret = Result.ok forms) :
     ∃ form ∈ forms.val, form.folded = false ∧ form.bytes.val = secret.val := by
   unfold reflection_forms at returned
@@ -518,25 +520,25 @@ theorem reflection_forms_include_raw (secret : Slice U8) (forms : alloc.vec.Vec 
 
 /-! ## Fixed refusals (HP-5(d)) -/
 
-def codeText : proxy_http.Code → String
+def codeText : proxy_http.refusal.Code → String
   | .InvalidRequest => "invalid_request" | .TooLarge => "too_large" | .Denied => "denied"
   | .UnknownOrigin => "unknown_origin" | .Unauthenticated => "unauthenticated"
   | .Revoked => "revoked" | .Reflected => "reflected" | .Unreachable => "unreachable"
   | .OutcomeUnknown => "outcome_unknown" | .CredentialSource => "credential_source"
   | .UnsupportedRequest => "unsupported_request" | .InternalError => "internal_error"
 
-def statusText : proxy_http.Code → String
+def statusText : proxy_http.refusal.Code → String
   | .InvalidRequest => "400 Bad Request" | .TooLarge => "413 Content Too Large"
   | .Unauthenticated => "407 Proxy Authentication Required"
   | .Denied | .UnknownOrigin | .Revoked | .UnsupportedRequest => "403 Forbidden"
   | .Reflected | .Unreachable | .OutcomeUnknown | .CredentialSource | .InternalError =>
       "502 Bad Gateway"
 
-def refusalBody (code : proxy_http.Code) : String :=
+def refusalBody (code : proxy_http.refusal.Code) : String :=
   "{\"error\":{\"code\":\"" ++ codeText code ++ "\"},\"ok\":false,\"proxy\":\"aivm-secrets\"}\n"
 
 /-- The complete refusal text for a code. It mentions nothing but the code. -/
-def refusalText (code : proxy_http.Code) : String :=
+def refusalText (code : proxy_http.refusal.Code) : String :=
   "HTTP/1.1 " ++ statusText code ++ "\r\n" ++
     (match code with
      | .Unauthenticated => "Proxy-Authenticate: Basic realm=\"aivm-secrets\"\r\n"
@@ -557,7 +559,7 @@ theorem digits_two (n : Nat) (lo : 10 ≤ n) (hi : n < 100) :
     the ASCII bytes of `refusalText code`: one of twelve fixed responses that
     depend on nothing but the code, so a refusal carries no request,
     provider or credential bytes. -/
-theorem refusal_exact (code : proxy_http.Code) :
+theorem refusal_exact (code : proxy_http.refusal.Code) :
     refusal code ⦃ out => out.val = ascii (refusalText code) ⦄ := by
   cases code <;>
     simp only [refusal, append_code, append_status, lifted_slice, bind_ok] <;>

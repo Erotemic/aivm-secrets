@@ -4,7 +4,7 @@ import GarrettStatelessToken
 /-!
 # `garrett-stateless-v1`: a sealed surrogate opens (positive witness)
 
-Source: `crates/garrett-stateless-core/src/stateless_token.rs`
+Source: `crates/garrett-stateless-core/src/stateless_token/` (`opening.rs`, `sealing.rs`)
 (`seal_token`, `verify_token`, `unseal_token`). Under the two crypto
 correctness contracts of `GarrettStatelessBoundary` — Ed25519 signatures
 verify, AES-256-GCM opens what it sealed — every token the broker's
@@ -21,6 +21,10 @@ open garrett_stateless_core.proxy_http.Base64Proofs (enc)
 set_option maxHeartbeats 4000000
 
 namespace garrett_stateless_core.stateless_token.Proofs
+open garrett_stateless_core.stateless_token.base64 garrett_stateless_core.stateless_token.grammar
+  garrett_stateless_core.stateless_token.json garrett_stateless_core.stateless_token.payload
+  garrett_stateless_core.stateless_token.keys garrett_stateless_core.stateless_token.opening
+  garrett_stateless_core.stateless_token.sealing garrett_stateless_core.stateless_token.login_state
 
 theorem cred_nonempty {cred : Slice U8} (h : http_auth.valid_credential cred = Result.ok true) :
     0 < cred.val.length := by

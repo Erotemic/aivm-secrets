@@ -788,23 +788,23 @@ inductive proxy_controller.Stage where
 | Failed : proxy_controller.Stage
 | Completed : proxy_controller.Stage
 
-/-- [garrett_stateless_core::proxy_http::Code]
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1266:0-1280:1
+/-- [garrett_stateless_core::proxy_http::refusal::Code]
+    Source: 'crates/garrett-stateless-core/src/proxy_http/refusal.rs', lines 6:0-20:1
     Visibility: public -/
 @[discriminant isize]
-inductive proxy_http.Code where
-| InvalidRequest : proxy_http.Code
-| TooLarge : proxy_http.Code
-| Denied : proxy_http.Code
-| UnknownOrigin : proxy_http.Code
-| Unauthenticated : proxy_http.Code
-| Revoked : proxy_http.Code
-| Reflected : proxy_http.Code
-| Unreachable : proxy_http.Code
-| OutcomeUnknown : proxy_http.Code
-| CredentialSource : proxy_http.Code
-| UnsupportedRequest : proxy_http.Code
-| InternalError : proxy_http.Code
+inductive proxy_http.refusal.Code where
+| InvalidRequest : proxy_http.refusal.Code
+| TooLarge : proxy_http.refusal.Code
+| Denied : proxy_http.refusal.Code
+| UnknownOrigin : proxy_http.refusal.Code
+| Unauthenticated : proxy_http.refusal.Code
+| Revoked : proxy_http.refusal.Code
+| Reflected : proxy_http.refusal.Code
+| Unreachable : proxy_http.refusal.Code
+| OutcomeUnknown : proxy_http.refusal.Code
+| CredentialSource : proxy_http.refusal.Code
+| UnsupportedRequest : proxy_http.refusal.Code
+| InternalError : proxy_http.refusal.Code
 
 /-- [garrett_stateless_core::proxy_controller::Served]
     Source: 'crates/garrett-stateless-core/src/proxy_controller.rs', lines 20:0-30:1
@@ -813,31 +813,31 @@ structure proxy_controller.Served where
   reply : alloc.vec.Vec Std.U8
   keep : Bool
   stage : proxy_controller.Stage
-  code : proxy_http.Code
+  code : proxy_http.refusal.Code
   status : Std.U16
 
-/-- [garrett_stateless_core::proxy_http::Field]
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 30:0-35:1
+/-- [garrett_stateless_core::proxy_http::request::Field]
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 16:0-21:1
     Visibility: public -/
-structure proxy_http.Field where
+structure proxy_http.request.Field where
   «name» : alloc.vec.Vec Std.U8
   value : alloc.vec.Vec Std.U8
 
-/-- [garrett_stateless_core::proxy_http::Request]
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 37:0-43:1
+/-- [garrett_stateless_core::proxy_http::request::Request]
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 23:0-29:1
     Visibility: public -/
-structure proxy_http.Request where
+structure proxy_http.request.Request where
   method : alloc.vec.Vec Std.U8
   target : alloc.vec.Vec Std.U8
-  fields : alloc.vec.Vec proxy_http.Field
+  fields : alloc.vec.Vec proxy_http.request.Field
   body : alloc.vec.Vec Std.U8
   keep_alive : Bool
 
-/-- [garrett_stateless_core::proxy_http::Parsed]
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 46:0-49:1
+/-- [garrett_stateless_core::proxy_http::request::Parsed]
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 32:0-35:1
     Visibility: public -/
-structure proxy_http.Parsed where
-  request : proxy_http.Request
+structure proxy_http.request.Parsed where
+  request : proxy_http.request.Request
   used : Std.Usize
 
 /-- [garrett_stateless_core::proxy_controller::Framed]
@@ -846,11 +846,11 @@ structure proxy_http.Parsed where
 @[discriminant isize]
 inductive proxy_controller.Framed where
 | More : proxy_controller.Framed
-| Refuse : proxy_http.Code → proxy_controller.Framed
-| Request : proxy_http.Parsed → proxy_controller.Framed
+| Refuse : proxy_http.refusal.Code → proxy_controller.Framed
+| Request : proxy_http.request.Parsed → proxy_controller.Framed
 
 /-- [garrett_stateless_core::proxy_http::MAX_HEAD]
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 14:0-14:38
+    Source: 'crates/garrett-stateless-core/src/proxy_http/mod.rs', lines 34:0-34:38
     Visibility: public -/
 @[global_simps, irreducible]
 def proxy_http.MAX_HEAD : Result Std.Usize := 32#usize * 1024#usize
@@ -865,41 +865,41 @@ def proxy_controller.raw_limit
   let i2 ← i + i1
   i2 + 65536#usize
 
-/-- [garrett_stateless_core::proxy_http::Framing]
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 567:0-571:1
+/-- [garrett_stateless_core::proxy_http::request::Framing]
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 546:0-550:1
     Visibility: public -/
 @[discriminant isize]
-inductive proxy_http.Framing where
-| Empty : proxy_http.Framing
-| Length : Std.Usize → proxy_http.Framing
-| Chunked : proxy_http.Framing
+inductive proxy_http.request.Framing where
+| Empty : proxy_http.request.Framing
+| Length : Std.Usize → proxy_http.request.Framing
+| Chunked : proxy_http.request.Framing
 
-/-- [garrett_stateless_core::proxy_http::Refusal]
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 19:0-28:1
+/-- [garrett_stateless_core::proxy_http::request::Refusal]
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 5:0-14:1
     Visibility: public -/
 @[discriminant isize]
-inductive proxy_http.Refusal where
-| InvalidRequest : proxy_http.Refusal
-| TooLarge : proxy_http.Refusal
-| Denied : proxy_http.Refusal
-| InvalidCredential : proxy_http.Refusal
-| UpstreamResponse : proxy_http.Refusal
-| Reflected : proxy_http.Refusal
+inductive proxy_http.request.Refusal where
+| InvalidRequest : proxy_http.request.Refusal
+| TooLarge : proxy_http.request.Refusal
+| Denied : proxy_http.request.Refusal
+| InvalidCredential : proxy_http.request.Refusal
+| UpstreamResponse : proxy_http.request.Refusal
+| Reflected : proxy_http.request.Refusal
 
-/-- [garrett_stateless_core::proxy_http::Chunked]
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 497:0-501:1
+/-- [garrett_stateless_core::proxy_http::request::Chunked]
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 476:0-480:1
     Visibility: public -/
 @[discriminant isize]
-inductive proxy_http.Chunked where
-| Done : alloc.vec.Vec Std.U8 → Std.Usize → proxy_http.Chunked
-| More : proxy_http.Chunked
-| Bad : proxy_http.Refusal → proxy_http.Chunked
+inductive proxy_http.request.Chunked where
+| Done : alloc.vec.Vec Std.U8 → Std.Usize → proxy_http.request.Chunked
+| More : proxy_http.request.Chunked
+| Bad : proxy_http.request.Refusal → proxy_http.request.Chunked
 
-/-- [garrett_stateless_core::proxy_http::crlf_from]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 486:4-488:5
+/-- [garrett_stateless_core::proxy_http::request::crlf_from]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 465:4-467:5
     Visibility: public -/
 @[rust_loop]
-def proxy_http.crlf_from_loop
+def proxy_http.request.crlf_from_loop
   (data : Slice Std.U8) (index : Std.Usize) : Result Std.Usize := do
   let i ← index + 1#usize
   let i1 := Slice.len data
@@ -911,27 +911,28 @@ def proxy_http.crlf_from_loop
       let i3 ← Slice.index_usize data i
       if i3 = 10#u8
       then ok index
-      else proxy_http.crlf_from_loop data i
-    else proxy_http.crlf_from_loop data i
+      else proxy_http.request.crlf_from_loop data i
+    else proxy_http.request.crlf_from_loop data i
   else ok index
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::crlf_from]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 484:0-494:1
+/-- [garrett_stateless_core::proxy_http::request::crlf_from]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 463:0-473:1
     Visibility: public -/
-def proxy_http.crlf_from
+def proxy_http.request.crlf_from
   (data : Slice Std.U8) (start : Std.Usize) : Result Std.Usize := do
-  let index ← proxy_http.crlf_from_loop data start
+  let index ← proxy_http.request.crlf_from_loop data start
   let i ← index + 1#usize
   let i1 := Slice.len data
   if i < i1
   then ok index
   else ok (Slice.len data)
 
-/-- [garrett_stateless_core::proxy_http::hex_digit]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 455:0-465:1
+/-- [garrett_stateless_core::proxy_http::request::hex_digit]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 434:0-444:1
     Visibility: public -/
-def proxy_http.hex_digit (byte : Std.U8) : Result (Option Std.Usize) := do
+def proxy_http.request.hex_digit
+  (byte : Std.U8) : Result (Option Std.Usize) := do
   if byte >= 48#u8
   then
     if byte <= 57#u8
@@ -1002,11 +1003,11 @@ def proxy_http.hex_digit (byte : Std.U8) : Result (Option Std.Usize) := do
         else ok none
       else ok none
 
-/-- [garrett_stateless_core::proxy_http::chunk_size]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 474:4-482:1
+/-- [garrett_stateless_core::proxy_http::request::chunk_size]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 453:4-461:1
     Visibility: public -/
 @[rust_loop]
-def proxy_http.chunk_size_loop
+def proxy_http.request.chunk_size_loop
   (data : Slice Std.U8) («end» : Std.Usize) (total : Std.Usize)
   (index : Std.Usize) :
   Result (Option Std.Usize)
@@ -1014,21 +1015,21 @@ def proxy_http.chunk_size_loop
   if index < «end»
   then
     let i ← Slice.index_usize data index
-    let o ← proxy_http.hex_digit i
+    let o ← proxy_http.request.hex_digit i
     match o with
     | none => ok none
     | some digit =>
       let i1 ← total * 16#usize
       let total1 ← i1 + digit
       let index1 ← index + 1#usize
-      proxy_http.chunk_size_loop data «end» total1 index1
+      proxy_http.request.chunk_size_loop data «end» total1 index1
   else ok (some total)
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::chunk_size]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 468:0-482:1
+/-- [garrett_stateless_core::proxy_http::request::chunk_size]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 447:0-461:1
     Visibility: public -/
-def proxy_http.chunk_size
+def proxy_http.request.chunk_size
   (data : Slice Std.U8) (start : Std.Usize) («end» : Std.Usize) :
   Result (Option Std.Usize)
   := do
@@ -1038,30 +1039,34 @@ def proxy_http.chunk_size
     let i ← «end» - start
     if i > 8#usize
     then ok none
-    else proxy_http.chunk_size_loop data «end» 0#usize start
+    else proxy_http.request.chunk_size_loop data «end» 0#usize start
 
-/-- [garrett_stateless_core::proxy_http::decode_chunked]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 507:4-540:5
+/-- [garrett_stateless_core::proxy_http::request::decode_chunked]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 486:4-519:5
     Visibility: public -/
 @[rust_loop]
-def proxy_http.decode_chunked_loop
+def proxy_http.request.decode_chunked_loop
   (data : Slice Std.U8) (limit : Std.Usize) (body : alloc.vec.Vec Std.U8)
   (position : Std.Usize) :
-  Result proxy_http.Chunked
+  Result proxy_http.request.Chunked
   := do
-  let «end» ← proxy_http.crlf_from data position
+  let «end» ← proxy_http.request.crlf_from data position
   let i := Slice.len data
   if «end» >= i
   then
     let i1 := Slice.len data
     let i2 ← i1 - position
     if i2 > 16#usize
-    then ok (proxy_http.Chunked.Bad proxy_http.Refusal.InvalidRequest)
-    else ok proxy_http.Chunked.More
+    then
+      ok (proxy_http.request.Chunked.Bad
+        proxy_http.request.Refusal.InvalidRequest)
+    else ok proxy_http.request.Chunked.More
   else
-    let o ← proxy_http.chunk_size data position «end»
+    let o ← proxy_http.request.chunk_size data position «end»
     match o with
-    | none => ok (proxy_http.Chunked.Bad proxy_http.Refusal.InvalidRequest)
+    | none =>
+      ok (proxy_http.request.Chunked.Bad
+        proxy_http.request.Refusal.InvalidRequest)
     | some size =>
       let position1 ← «end» + 2#usize
       if size = 0#usize
@@ -1076,31 +1081,40 @@ def proxy_http.decode_chunked_loop
             let i4 ← position1 + 1#usize
             let i5 ← Slice.index_usize data i4
             if i5 = 10#u8
-            then ok (proxy_http.Chunked.Done body i1)
-            else ok (proxy_http.Chunked.Bad proxy_http.Refusal.InvalidRequest)
-          else ok (proxy_http.Chunked.Bad proxy_http.Refusal.InvalidRequest)
-        else ok proxy_http.Chunked.More
+            then ok (proxy_http.request.Chunked.Done body i1)
+            else
+              ok (proxy_http.request.Chunked.Bad
+                proxy_http.request.Refusal.InvalidRequest)
+          else
+            ok (proxy_http.request.Chunked.Bad
+              proxy_http.request.Refusal.InvalidRequest)
+        else ok proxy_http.request.Chunked.More
       else
         let i1 := alloc.vec.Vec.len body
         let i2 ← i1 + size
         if i2 > limit
-        then ok (proxy_http.Chunked.Bad proxy_http.Refusal.TooLarge)
+        then
+          ok (proxy_http.request.Chunked.Bad
+            proxy_http.request.Refusal.TooLarge)
         else
           let i3 := Slice.len data
           let i4 ← position1 + size
           let i5 ← i4 + 2#usize
           if i3 < i5
-          then ok proxy_http.Chunked.More
+          then ok proxy_http.request.Chunked.More
           else
             let i6 ← Slice.index_usize data i4
             if i6 != 13#u8
-            then ok (proxy_http.Chunked.Bad proxy_http.Refusal.InvalidRequest)
+            then
+              ok (proxy_http.request.Chunked.Bad
+                proxy_http.request.Refusal.InvalidRequest)
             else
               let i7 ← i4 + 1#usize
               let i8 ← Slice.index_usize data i7
               if i8 != 10#u8
               then
-                ok (proxy_http.Chunked.Bad proxy_http.Refusal.InvalidRequest)
+                ok (proxy_http.request.Chunked.Bad
+                  proxy_http.request.Refusal.InvalidRequest)
               else
                 let s ←
                   core.slice.index.Slice.index
@@ -1110,32 +1124,34 @@ def proxy_http.decode_chunked_loop
                   alloc.vec.Vec.extend_from_slice core.clone.CloneU8 body s
                 let i9 ← size + 2#usize
                 let position2 ← position1 + i9
-                proxy_http.decode_chunked_loop data limit body1 position2
+                proxy_http.request.decode_chunked_loop data limit body1
+                  position2
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::decode_chunked]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 504:0-541:1
+/-- [garrett_stateless_core::proxy_http::request::decode_chunked]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 483:0-520:1
     Visibility: public -/
 @[reducible]
-def proxy_http.decode_chunked
+def proxy_http.request.decode_chunked
   (data : Slice Std.U8) (start : Std.Usize) (limit : Std.Usize) :
-  Result proxy_http.Chunked
+  Result proxy_http.request.Chunked
   := do
-  proxy_http.decode_chunked_loop data limit (alloc.vec.Vec.new Std.U8) start
+  proxy_http.request.decode_chunked_loop data limit (alloc.vec.Vec.new Std.U8)
+    start
 
-/-- [garrett_stateless_core::proxy_http::body_of]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 610:0-633:1
+/-- [garrett_stateless_core::proxy_http::request::body_of]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 589:0-612:1
     Visibility: public -/
-def proxy_http.body_of
-  (data : Slice Std.U8) (start : Std.Usize) (framed : proxy_http.Framing)
-  (limit : Std.Usize) :
+def proxy_http.request.body_of
+  (data : Slice Std.U8) (start : Std.Usize)
+  (framed : proxy_http.request.Framing) (limit : Std.Usize) :
   Result (core.result.Result (Option ((alloc.vec.Vec Std.U8) × Std.Usize))
-    proxy_http.Refusal)
+    proxy_http.request.Refusal)
   := do
   match framed with
-  | proxy_http.Framing.Empty =>
+  | proxy_http.request.Framing.Empty =>
     ok (core.result.Result.Ok (some (alloc.vec.Vec.new Std.U8, start)))
-  | proxy_http.Framing.Length length =>
+  | proxy_http.request.Framing.Length length =>
     let i := Slice.len data
     let i1 ← i - start
     if i1 < length
@@ -1148,71 +1164,72 @@ def proxy_http.body_of
           { start, «end» := i2 }
       let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 s
       ok (core.result.Result.Ok (some (v, i2)))
-  | proxy_http.Framing.Chunked =>
-    let c ← proxy_http.decode_chunked data start limit
+  | proxy_http.request.Framing.Chunked =>
+    let c ← proxy_http.request.decode_chunked data start limit
     match c with
-    | proxy_http.Chunked.Done body used =>
+    | proxy_http.request.Chunked.Done body used =>
       ok (core.result.Result.Ok (some (body, used)))
-    | proxy_http.Chunked.More => ok (core.result.Result.Ok none)
-    | proxy_http.Chunked.Bad refusal => ok (core.result.Result.Err refusal)
+    | proxy_http.request.Chunked.More => ok (core.result.Result.Ok none)
+    | proxy_http.request.Chunked.Bad refusal =>
+      ok (core.result.Result.Err refusal)
 
-/-- [garrett_stateless_core::proxy_http::blank]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 252:0-254:1
+/-- [garrett_stateless_core::proxy_http::request::blank]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 231:0-233:1
     Visibility: public -/
-def proxy_http.blank (byte : Std.U8) : Result Bool := do
+def proxy_http.request.blank (byte : Std.U8) : Result Bool := do
   if byte = 32#u8
   then ok true
   else ok (byte = 9#u8)
 
-/-- [garrett_stateless_core::proxy_http::visible]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 58:0-60:1
+/-- [garrett_stateless_core::proxy_http::request::visible]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 37:0-39:1
     Visibility: public -/
-def proxy_http.visible (byte : Std.U8) : Result Bool := do
+def proxy_http.request.visible (byte : Std.U8) : Result Bool := do
   if byte >= 33#u8
   then ok (byte <= 126#u8)
   else ok false
 
-/-- [garrett_stateless_core::proxy_http::all_value]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 286:4-293:1
+/-- [garrett_stateless_core::proxy_http::request::all_value]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 265:4-272:1
     Visibility: public -/
 @[rust_loop]
-def proxy_http.all_value_loop
+def proxy_http.request.all_value_loop
   (line : Slice Std.U8) (last : Std.Usize) (check : Std.Usize) :
   Result Bool
   := do
   if check < last
   then
     let i ← Slice.index_usize line check
-    let b ← proxy_http.visible i
+    let b ← proxy_http.request.visible i
     if b
     then
       let check1 ← check + 1#usize
-      proxy_http.all_value_loop line last check1
+      proxy_http.request.all_value_loop line last check1
     else
-      let b1 ← proxy_http.blank i
+      let b1 ← proxy_http.request.blank i
       if b1
       then
         let check1 ← check + 1#usize
-        proxy_http.all_value_loop line last check1
+        proxy_http.request.all_value_loop line last check1
       else ok false
   else ok true
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::all_value]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 284:0-293:1
+/-- [garrett_stateless_core::proxy_http::request::all_value]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 263:0-272:1
     Visibility: public -/
 @[reducible]
-def proxy_http.all_value
+def proxy_http.request.all_value
   (line : Slice Std.U8) (first : Std.Usize) (last : Std.Usize) :
   Result Bool
   := do
-  proxy_http.all_value_loop line last first
+  proxy_http.request.all_value_loop line last first
 
-/-- [garrett_stateless_core::proxy_http::trim_blank_end]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 278:4-280:5
+/-- [garrett_stateless_core::proxy_http::request::trim_blank_end]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 257:4-259:5
     Visibility: public -/
 @[rust_loop]
-def proxy_http.trim_blank_end_loop
+def proxy_http.request.trim_blank_end_loop
   (line : Slice Std.U8) (first : Std.Usize) (last : Std.Usize) :
   Result Std.Usize
   := do
@@ -1220,51 +1237,52 @@ def proxy_http.trim_blank_end_loop
   then
     let i ← last - 1#usize
     let i1 ← Slice.index_usize line i
-    let b ← proxy_http.blank i1
+    let b ← proxy_http.request.blank i1
     if b
-    then proxy_http.trim_blank_end_loop line first i
+    then proxy_http.request.trim_blank_end_loop line first i
     else ok last
   else ok last
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::trim_blank_end]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 276:0-282:1
+/-- [garrett_stateless_core::proxy_http::request::trim_blank_end]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 255:0-261:1
     Visibility: public -/
-def proxy_http.trim_blank_end
+def proxy_http.request.trim_blank_end
   (line : Slice Std.U8) (first : Std.Usize) : Result Std.Usize := do
   let last := Slice.len line
-  proxy_http.trim_blank_end_loop line first last
+  proxy_http.request.trim_blank_end_loop line first last
 
-/-- [garrett_stateless_core::proxy_http::skip_blank]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 270:4-272:5
+/-- [garrett_stateless_core::proxy_http::request::skip_blank]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 249:4-251:5
     Visibility: public -/
 @[rust_loop]
-def proxy_http.skip_blank_loop
+def proxy_http.request.skip_blank_loop
   (line : Slice Std.U8) (first : Std.Usize) : Result Std.Usize := do
   let i := Slice.len line
   if first < i
   then
     let i1 ← Slice.index_usize line first
-    let b ← proxy_http.blank i1
+    let b ← proxy_http.request.blank i1
     if b
-    then let first1 ← first + 1#usize
-         proxy_http.skip_blank_loop line first1
+    then
+      let first1 ← first + 1#usize
+      proxy_http.request.skip_blank_loop line first1
     else ok first
   else ok first
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::skip_blank]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 268:0-274:1
+/-- [garrett_stateless_core::proxy_http::request::skip_blank]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 247:0-253:1
     Visibility: public -/
 @[reducible]
-def proxy_http.skip_blank
+def proxy_http.request.skip_blank
   (line : Slice Std.U8) (start : Std.Usize) : Result Std.Usize := do
-  proxy_http.skip_blank_loop line start
+  proxy_http.request.skip_blank_loop line start
 
-/-- [garrett_stateless_core::proxy_http::token_byte]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 62:0-79:1
+/-- [garrett_stateless_core::proxy_http::request::token_byte]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 41:0-58:1
     Visibility: public -/
-def proxy_http.token_byte (byte : Std.U8) : Result Bool := do
+def proxy_http.request.token_byte (byte : Std.U8) : Result Bool := do
   let b ← http_wire.alphanumeric byte
   if b
   then ok true
@@ -1312,67 +1330,68 @@ def proxy_http.token_byte (byte : Std.U8) : Result Bool := do
                               then ok true
                               else ok (byte = 126#u8)
 
-/-- [garrett_stateless_core::proxy_http::all_token]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 258:4-266:1
+/-- [garrett_stateless_core::proxy_http::request::all_token]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 237:4-245:1
     Visibility: public -/
 @[rust_loop]
-def proxy_http.all_token_loop
+def proxy_http.request.all_token_loop
   (line : Slice Std.U8) («end» : Std.Usize) (index : Std.Usize) :
   Result Bool
   := do
   if index < «end»
   then
     let i ← Slice.index_usize line index
-    let b ← proxy_http.visible i
+    let b ← proxy_http.request.visible i
     if b
     then
-      let b1 ← proxy_http.token_byte i
+      let b1 ← proxy_http.request.token_byte i
       if b1
       then
         let index1 ← index + 1#usize
-        proxy_http.all_token_loop line «end» index1
+        proxy_http.request.all_token_loop line «end» index1
       else ok false
     else ok false
   else ok true
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::all_token]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 256:0-266:1
+/-- [garrett_stateless_core::proxy_http::request::all_token]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 235:0-245:1
     Visibility: public -/
 @[reducible]
-def proxy_http.all_token
+def proxy_http.request.all_token
   (line : Slice Std.U8) («end» : Std.Usize) : Result Bool := do
-  proxy_http.all_token_loop line «end» 0#usize
+  proxy_http.request.all_token_loop line «end» 0#usize
 
-/-- [garrett_stateless_core::proxy_http::colon_at]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 246:4-248:5
+/-- [garrett_stateless_core::proxy_http::request::colon_at]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 225:4-227:5
     Visibility: public -/
 @[rust_loop]
-def proxy_http.colon_at_loop
+def proxy_http.request.colon_at_loop
   (line : Slice Std.U8) (index : Std.Usize) : Result Std.Usize := do
   let i := Slice.len line
   if index < i
   then
     let i1 ← Slice.index_usize line index
     if i1 != 58#u8
-    then let index1 ← index + 1#usize
-         proxy_http.colon_at_loop line index1
+    then
+      let index1 ← index + 1#usize
+      proxy_http.request.colon_at_loop line index1
     else ok index
   else ok index
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::colon_at]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 244:0-250:1
+/-- [garrett_stateless_core::proxy_http::request::colon_at]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 223:0-229:1
     Visibility: public -/
 @[reducible]
-def proxy_http.colon_at (line : Slice Std.U8) : Result Std.Usize := do
-  proxy_http.colon_at_loop line 0#usize
+def proxy_http.request.colon_at (line : Slice Std.U8) : Result Std.Usize := do
+  proxy_http.request.colon_at_loop line 0#usize
 
-/-- [garrett_stateless_core::proxy_http::lowered]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 238:4-240:5
+/-- [garrett_stateless_core::proxy_http::request::lowered]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 217:4-219:5
     Visibility: public -/
 @[rust_loop]
-def proxy_http.lowered_loop
+def proxy_http.request.lowered_loop
   (iter : core.slice.iter.Iter Std.U8) (out : alloc.vec.Vec Std.U8) :
   Result (alloc.vec.Vec Std.U8)
   := do
@@ -1382,34 +1401,34 @@ def proxy_http.lowered_loop
   | some byte =>
     let i ← http_wire.ascii_lower byte
     let out1 ← alloc.vec.Vec.push out i
-    proxy_http.lowered_loop iter1 out1
+    proxy_http.request.lowered_loop iter1 out1
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::lowered]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 236:0-242:1
+/-- [garrett_stateless_core::proxy_http::request::lowered]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 215:0-221:1
     Visibility: public -/
-def proxy_http.lowered
+def proxy_http.request.lowered
   (bytes : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
   let iter ←
     SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
       bytes
-  proxy_http.lowered_loop iter (alloc.vec.Vec.new Std.U8)
+  proxy_http.request.lowered_loop iter (alloc.vec.Vec.new Std.U8)
 
-/-- [garrett_stateless_core::proxy_http::parse_field]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 297:0-314:1
+/-- [garrett_stateless_core::proxy_http::request::parse_field]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 276:0-293:1
     Visibility: public -/
-def proxy_http.parse_field
-  (line : Slice Std.U8) : Result (Option proxy_http.Field) := do
+def proxy_http.request.parse_field
+  (line : Slice Std.U8) : Result (Option proxy_http.request.Field) := do
   let i := Slice.len line
   if i = 0#usize
   then ok none
   else
     let i1 ← Slice.index_usize line 0#usize
-    let b ← proxy_http.blank i1
+    let b ← proxy_http.request.blank i1
     if b
     then ok none
     else
-      let colon ← proxy_http.colon_at line
+      let colon ← proxy_http.request.colon_at line
       if colon = 0#usize
       then ok none
       else
@@ -1417,20 +1436,20 @@ def proxy_http.parse_field
         if colon >= i2
         then ok none
         else
-          let b1 ← proxy_http.all_token line colon
+          let b1 ← proxy_http.request.all_token line colon
           if b1
           then
             let i3 ← colon + 1#usize
-            let first ← proxy_http.skip_blank line i3
-            let last ← proxy_http.trim_blank_end line first
-            let b2 ← proxy_http.all_value line first last
+            let first ← proxy_http.request.skip_blank line i3
+            let last ← proxy_http.request.trim_blank_end line first
+            let b2 ← proxy_http.request.all_value line first last
             if b2
             then
               let s ←
                 core.slice.index.Slice.index
                   (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) line
                   { «end» := colon }
-              let v ← proxy_http.lowered s
+              let v ← proxy_http.request.lowered s
               let s1 ←
                 core.slice.index.Slice.index
                   (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) line
@@ -1440,49 +1459,50 @@ def proxy_http.parse_field
             else ok none
           else ok none
 
-/-- [garrett_stateless_core::proxy_http::line_end]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 230:4-232:5
+/-- [garrett_stateless_core::proxy_http::request::line_end]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 209:4-211:5
     Visibility: public -/
 @[rust_loop]
-def proxy_http.line_end_loop
+def proxy_http.request.line_end_loop
   (head : Slice Std.U8) (index : Std.Usize) : Result Std.Usize := do
   let i := Slice.len head
   if index < i
   then
     let i1 ← Slice.index_usize head index
     if i1 != 13#u8
-    then let index1 ← index + 1#usize
-         proxy_http.line_end_loop head index1
+    then
+      let index1 ← index + 1#usize
+      proxy_http.request.line_end_loop head index1
     else ok index
   else ok index
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::line_end]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 228:0-234:1
+/-- [garrett_stateless_core::proxy_http::request::line_end]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 207:0-213:1
     Visibility: public -/
 @[reducible]
-def proxy_http.line_end
+def proxy_http.request.line_end
   (head : Slice Std.U8) (start : Std.Usize) : Result Std.Usize := do
-  proxy_http.line_end_loop head start
+  proxy_http.request.line_end_loop head start
 
 /-- [garrett_stateless_core::proxy_http::MAX_FIELDS]
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 15:0-15:34
+    Source: 'crates/garrett-stateless-core/src/proxy_http/mod.rs', lines 35:0-35:34
     Visibility: public -/
 @[global_simps, irreducible] def proxy_http.MAX_FIELDS : Std.Usize := 100#usize
 
-/-- [garrett_stateless_core::proxy_http::parse_fields]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 320:4-332:1
+/-- [garrett_stateless_core::proxy_http::request::parse_fields]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 299:4-311:1
     Visibility: public -/
 @[rust_loop]
-def proxy_http.parse_fields_loop
-  (head : Slice Std.U8) (fields : alloc.vec.Vec proxy_http.Field)
+def proxy_http.request.parse_fields_loop
+  (head : Slice Std.U8) (fields : alloc.vec.Vec proxy_http.request.Field)
   (position : Std.Usize) :
-  Result (Option (alloc.vec.Vec proxy_http.Field))
+  Result (Option (alloc.vec.Vec proxy_http.request.Field))
   := do
   let i := Slice.len head
   if position < i
   then
-    let «end» ← proxy_http.line_end head position
+    let «end» ← proxy_http.request.line_end head position
     let i1 := alloc.vec.Vec.len fields
     if i1 >= proxy_http.MAX_FIELDS
     then ok none
@@ -1491,44 +1511,45 @@ def proxy_http.parse_fields_loop
         core.slice.index.Slice.index
           (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) head
           { start := position, «end» }
-      let o ← proxy_http.parse_field s
+      let o ← proxy_http.request.parse_field s
       match o with
       | none => ok none
       | some field =>
         let fields1 ← alloc.vec.Vec.push fields field
         let position1 ← «end» + 2#usize
-        proxy_http.parse_fields_loop head fields1 position1
+        proxy_http.request.parse_fields_loop head fields1 position1
   else ok (some fields)
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::parse_fields]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 317:0-332:1
+/-- [garrett_stateless_core::proxy_http::request::parse_fields]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 296:0-311:1
     Visibility: public -/
 @[reducible]
-def proxy_http.parse_fields
+def proxy_http.request.parse_fields
   (head : Slice Std.U8) (start : Std.Usize) :
-  Result (Option (alloc.vec.Vec proxy_http.Field))
+  Result (Option (alloc.vec.Vec proxy_http.request.Field))
   := do
-  proxy_http.parse_fields_loop head (alloc.vec.Vec.new proxy_http.Field) start
+  proxy_http.request.parse_fields_loop head (alloc.vec.Vec.new
+    proxy_http.request.Field) start
 
-/-- [garrett_stateless_core::proxy_http::request_fields]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 601:0-607:1
+/-- [garrett_stateless_core::proxy_http::request::request_fields]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 580:0-586:1
     Visibility: public -/
-def proxy_http.request_fields
+def proxy_http.request.request_fields
   (head : Slice Std.U8) (first : Std.Usize) :
-  Result (Option (alloc.vec.Vec proxy_http.Field))
+  Result (Option (alloc.vec.Vec proxy_http.request.Field))
   := do
   let i := Slice.len head
   if first >= i
-  then ok (some (alloc.vec.Vec.new proxy_http.Field))
+  then ok (some (alloc.vec.Vec.new proxy_http.request.Field))
   else let i1 ← first + 2#usize
-       proxy_http.parse_fields head i1
+       proxy_http.request.parse_fields head i1
 
-/-- [garrett_stateless_core::proxy_http::decimal]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 446:4-453:1
+/-- [garrett_stateless_core::proxy_http::request::decimal]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 425:4-432:1
     Visibility: public -/
 @[rust_loop]
-def proxy_http.decimal_loop
+def proxy_http.request.decimal_loop
   (iter : core.slice.iter.Iter Std.U8) (total : Std.Usize) :
   Result (Option Std.Usize)
   := do
@@ -1546,13 +1567,14 @@ def proxy_http.decimal_loop
         let i1 ← byte - 48#u8
         let i2 ← lift (UScalar.cast .Usize i1)
         let total1 ← i + i2
-        proxy_http.decimal_loop iter1 total1
+        proxy_http.request.decimal_loop iter1 total1
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::decimal]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 441:0-453:1
+/-- [garrett_stateless_core::proxy_http::request::decimal]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 420:0-432:1
     Visibility: public -/
-def proxy_http.decimal (value : Slice Std.U8) : Result (Option Std.Usize) := do
+def proxy_http.request.decimal
+  (value : Slice Std.U8) : Result (Option Std.Usize) := do
   let i := Slice.len value
   if i = 0#usize
   then ok none
@@ -1564,22 +1586,24 @@ def proxy_http.decimal (value : Slice Std.U8) : Result (Option Std.Usize) := do
       let iter ←
         SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
           value
-      proxy_http.decimal_loop iter 0#usize
+      proxy_http.request.decimal_loop iter 0#usize
 
-/-- [garrett_stateless_core::proxy_http::name_is]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 336:0-338:1
+/-- [garrett_stateless_core::proxy_http::request::name_is]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 315:0-317:1
     Visibility: public -/
-def proxy_http.name_is
-  (field : proxy_http.Field) («name» : Slice Std.U8) : Result Bool := do
+def proxy_http.request.name_is
+  (field : proxy_http.request.Field) («name» : Slice Std.U8) :
+  Result Bool
+  := do
   let s := alloc.vec.Vec.deref field.name
   http_wire.ascii_equal s «name»
 
-/-- [garrett_stateless_core::proxy_http::first_named]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 353:4-355:5
+/-- [garrett_stateless_core::proxy_http::request::first_named]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 332:4-334:5
     Visibility: public -/
 @[rust_loop]
-def proxy_http.first_named_loop
-  (fields : Slice proxy_http.Field) («name» : Slice Std.U8)
+def proxy_http.request.first_named_loop
+  (fields : Slice proxy_http.request.Field) («name» : Slice Std.U8)
   (index : Std.Usize) :
   Result Std.Usize
   := do
@@ -1587,64 +1611,65 @@ def proxy_http.first_named_loop
   if index < i
   then
     let f ← Slice.index_usize fields index
-    let b ← proxy_http.name_is f «name»
+    let b ← proxy_http.request.name_is f «name»
     if b
     then ok index
     else
       let index1 ← index + 1#usize
-      proxy_http.first_named_loop fields «name» index1
+      proxy_http.request.first_named_loop fields «name» index1
   else ok index
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::first_named]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 351:0-357:1
+/-- [garrett_stateless_core::proxy_http::request::first_named]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 330:0-336:1
     Visibility: public -/
 @[reducible]
-def proxy_http.first_named
-  (fields : Slice proxy_http.Field) («name» : Slice Std.U8) :
+def proxy_http.request.first_named
+  (fields : Slice proxy_http.request.Field) («name» : Slice Std.U8) :
   Result Std.Usize
   := do
-  proxy_http.first_named_loop fields «name» 0#usize
+  proxy_http.request.first_named_loop fields «name» 0#usize
 
-/-- [garrett_stateless_core::proxy_http::count_named]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 342:4-346:5
+/-- [garrett_stateless_core::proxy_http::request::count_named]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 321:4-325:5
     Visibility: public -/
 @[rust_loop]
-def proxy_http.count_named_loop
-  (iter : core.slice.iter.Iter proxy_http.Field) («name» : Slice Std.U8)
-  (count : Std.Usize) :
+def proxy_http.request.count_named_loop
+  (iter : core.slice.iter.Iter proxy_http.request.Field)
+  («name» : Slice Std.U8) (count : Std.Usize) :
   Result Std.Usize
   := do
   let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
   match o with
   | none => ok count
   | some field =>
-    let b ← proxy_http.name_is field «name»
+    let b ← proxy_http.request.name_is field «name»
     if b
     then
       let count1 ← count + 1#usize
-      proxy_http.count_named_loop iter1 «name» count1
-    else proxy_http.count_named_loop iter1 «name» count
+      proxy_http.request.count_named_loop iter1 «name» count1
+    else proxy_http.request.count_named_loop iter1 «name» count
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::count_named]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 340:0-348:1
+/-- [garrett_stateless_core::proxy_http::request::count_named]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 319:0-327:1
     Visibility: public -/
-def proxy_http.count_named
-  (fields : Slice proxy_http.Field) («name» : Slice Std.U8) :
+def proxy_http.request.count_named
+  (fields : Slice proxy_http.request.Field) («name» : Slice Std.U8) :
   Result Std.Usize
   := do
   let iter ←
     SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
       fields
-  proxy_http.count_named_loop iter «name» 0#usize
+  proxy_http.request.count_named_loop iter «name» 0#usize
 
-/-- [garrett_stateless_core::proxy_http::framing]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 573:0-597:1
+/-- [garrett_stateless_core::proxy_http::request::framing]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 552:0-576:1
     Visibility: public -/
-def proxy_http.framing
-  (fields : Slice proxy_http.Field) (limit : Std.Usize) :
-  Result (core.result.Result proxy_http.Framing proxy_http.Refusal)
+def proxy_http.request.framing
+  (fields : Slice proxy_http.request.Field) (limit : Std.Usize) :
+  Result (core.result.Result proxy_http.request.Framing
+    proxy_http.request.Refusal)
   := do
   let s ←
     lift (Array.to_slice
@@ -1652,14 +1677,14 @@ def proxy_http.framing
         116#u8, 114#u8, 97#u8, 110#u8, 115#u8, 102#u8, 101#u8, 114#u8, 45#u8,
         101#u8, 110#u8, 99#u8, 111#u8, 100#u8, 105#u8, 110#u8, 103#u8
         ]))
-  let encodings ← proxy_http.count_named fields s
+  let encodings ← proxy_http.request.count_named fields s
   let s1 ←
     lift (Array.to_slice
       (Array.make 14#usize [
         99#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8, 45#u8, 108#u8,
         101#u8, 110#u8, 103#u8, 116#u8, 104#u8
         ]))
-  let lengths ← proxy_http.count_named fields s1
+  let lengths ← proxy_http.request.count_named fields s1
   if encodings > 0#usize
   then
     let s2 ←
@@ -1668,7 +1693,7 @@ def proxy_http.framing
           116#u8, 114#u8, 97#u8, 110#u8, 115#u8, 102#u8, 101#u8, 114#u8, 45#u8,
           101#u8, 110#u8, 99#u8, 111#u8, 100#u8, 105#u8, 110#u8, 103#u8
           ]))
-    let first ← proxy_http.first_named fields s2
+    let first ← proxy_http.request.first_named fields s2
     let f ← Slice.index_usize fields first
     let coding := alloc.vec.Vec.deref f.value
     let chunked ←
@@ -1677,21 +1702,24 @@ def proxy_http.framing
           99#u8, 104#u8, 117#u8, 110#u8, 107#u8, 101#u8, 100#u8
           ]))
     if lengths > 0#usize
-    then ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest)
+    then ok (core.result.Result.Err proxy_http.request.Refusal.InvalidRequest)
     else
       if encodings != 1#usize
-      then ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest)
+      then
+        ok (core.result.Result.Err proxy_http.request.Refusal.InvalidRequest)
       else
         let b ←
           core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 coding chunked
         if b
-        then ok (core.result.Result.Ok proxy_http.Framing.Chunked)
-        else ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest)
+        then ok (core.result.Result.Ok proxy_http.request.Framing.Chunked)
+        else
+          ok (core.result.Result.Err proxy_http.request.Refusal.InvalidRequest)
   else
     if lengths > 0#usize
     then
       if lengths != 1#usize
-      then ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest)
+      then
+        ok (core.result.Result.Err proxy_http.request.Refusal.InvalidRequest)
       else
         let s2 ←
           lift (Array.to_slice
@@ -1699,22 +1727,25 @@ def proxy_http.framing
               99#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8, 45#u8,
               108#u8, 101#u8, 110#u8, 103#u8, 116#u8, 104#u8
               ]))
-        let first ← proxy_http.first_named fields s2
+        let first ← proxy_http.request.first_named fields s2
         let f ← Slice.index_usize fields first
         let s3 := alloc.vec.Vec.deref f.value
-        let o ← proxy_http.decimal s3
+        let o ← proxy_http.request.decimal s3
         match o with
-        | none => ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest)
+        | none =>
+          ok (core.result.Result.Err proxy_http.request.Refusal.InvalidRequest)
         | some length =>
           if length > limit
-          then ok (core.result.Result.Err proxy_http.Refusal.TooLarge)
-          else ok (core.result.Result.Ok (proxy_http.Framing.Length length))
-    else ok (core.result.Result.Ok proxy_http.Framing.Empty)
+          then ok (core.result.Result.Err proxy_http.request.Refusal.TooLarge)
+          else
+            ok (core.result.Result.Ok (proxy_http.request.Framing.Length
+              length))
+    else ok (core.result.Result.Ok proxy_http.request.Framing.Empty)
 
-/-- [garrett_stateless_core::proxy_http::segment_ok]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 149:0-161:1
+/-- [garrett_stateless_core::proxy_http::request::segment_ok]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 128:0-140:1
     Visibility: public -/
-def proxy_http.segment_ok
+def proxy_http.request.segment_ok
   (path : Slice Std.U8) (start : Std.Usize) («end» : Std.Usize) (last : Bool)
   :
   Result Bool
@@ -1741,11 +1772,11 @@ def proxy_http.segment_ok
         ok (¬ b)
       else ok true
 
-/-- [garrett_stateless_core::proxy_http::segments_ok]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 168:4-178:1
+/-- [garrett_stateless_core::proxy_http::request::segments_ok]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 147:4-157:1
     Visibility: public -/
 @[rust_loop]
-def proxy_http.segments_ok_loop
+def proxy_http.request.segments_ok_loop
   (path : Slice Std.U8) (start : Std.Usize) (index : Std.Usize) :
   Result Bool
   := do
@@ -1755,54 +1786,57 @@ def proxy_http.segments_ok_loop
     let i1 ← Slice.index_usize path index
     if i1 = 47#u8
     then
-      let b ← proxy_http.segment_ok path start index false
+      let b ← proxy_http.request.segment_ok path start index false
       if b
       then
         let start1 ← index + 1#usize
-        proxy_http.segments_ok_loop path start1 start1
+        proxy_http.request.segments_ok_loop path start1 start1
       else ok false
     else
       let index1 ← index + 1#usize
-      proxy_http.segments_ok_loop path start index1
-  else let i1 := Slice.len path
-       proxy_http.segment_ok path start i1 true
+      proxy_http.request.segments_ok_loop path start index1
+  else
+    let i1 := Slice.len path
+    proxy_http.request.segment_ok path start i1 true
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::segments_ok]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 164:0-178:1
+/-- [garrett_stateless_core::proxy_http::request::segments_ok]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 143:0-157:1
     Visibility: public -/
 @[reducible]
-def proxy_http.segments_ok (path : Slice Std.U8) : Result Bool := do
-  proxy_http.segments_ok_loop path 1#usize 1#usize
+def proxy_http.request.segments_ok (path : Slice Std.U8) : Result Bool := do
+  proxy_http.request.segments_ok_loop path 1#usize 1#usize
 
-/-- [garrett_stateless_core::proxy_http::path_end]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 142:4-144:5
+/-- [garrett_stateless_core::proxy_http::request::path_end]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 121:4-123:5
     Visibility: public -/
 @[rust_loop]
-def proxy_http.path_end_loop
+def proxy_http.request.path_end_loop
   (target : Slice Std.U8) (index : Std.Usize) : Result Std.Usize := do
   let i := Slice.len target
   if index < i
   then
     let i1 ← Slice.index_usize target index
     if i1 != 63#u8
-    then let index1 ← index + 1#usize
-         proxy_http.path_end_loop target index1
+    then
+      let index1 ← index + 1#usize
+      proxy_http.request.path_end_loop target index1
     else ok index
   else ok index
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::path_end]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 140:0-146:1
+/-- [garrett_stateless_core::proxy_http::request::path_end]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 119:0-125:1
     Visibility: public -/
 @[reducible]
-def proxy_http.path_end (target : Slice Std.U8) : Result Std.Usize := do
-  proxy_http.path_end_loop target 0#usize
+def proxy_http.request.path_end
+  (target : Slice Std.U8) : Result Std.Usize := do
+  proxy_http.request.path_end_loop target 0#usize
 
-/-- [garrett_stateless_core::proxy_http::unreserved]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1057:0-1059:1
+/-- [garrett_stateless_core::proxy_http::response::unreserved]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 193:0-195:1
     Visibility: public -/
-def proxy_http.unreserved (byte : Std.U8) : Result Bool := do
+def proxy_http.response.unreserved (byte : Std.U8) : Result Bool := do
   let b ← http_wire.alphanumeric byte
   if b
   then ok true
@@ -1816,10 +1850,10 @@ def proxy_http.unreserved (byte : Std.U8) : Result Bool := do
            then ok true
            else ok (byte = 126#u8)
 
-/-- [garrett_stateless_core::proxy_http::bad_escape_at]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 103:0-120:1
+/-- [garrett_stateless_core::proxy_http::request::bad_escape_at]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 82:0-99:1
     Visibility: public -/
-def proxy_http.bad_escape_at
+def proxy_http.request.bad_escape_at
   (value : Slice Std.U8) (start : Std.Usize) : Result Bool := do
   let i := Slice.len value
   if start >= i
@@ -1836,20 +1870,20 @@ def proxy_http.bad_escape_at
       else
         let i4 ← start + 1#usize
         let i5 ← Slice.index_usize value i4
-        let o ← proxy_http.hex_digit i5
+        let o ← proxy_http.request.hex_digit i5
         match o with
         | none => ok true
         | some digit =>
           let i6 ← start + 2#usize
           let i7 ← Slice.index_usize value i6
-          let o1 ← proxy_http.hex_digit i7
+          let o1 ← proxy_http.request.hex_digit i7
           match o1 with
           | none => ok true
           | some digit1 =>
             let i8 ← digit * 16#usize
             let i9 ← i8 + digit1
             let byte ← lift (UScalar.cast .U8 i9)
-            let b ← proxy_http.unreserved byte
+            let b ← proxy_http.response.unreserved byte
             if b
             then ok true
             else
@@ -1862,17 +1896,17 @@ def proxy_http.bad_escape_at
                      then ok true
                      else ok (byte = 59#u8)
 
-/-- [garrett_stateless_core::proxy_http::plain_target_bytes]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 125:4-138:1
+/-- [garrett_stateless_core::proxy_http::request::plain_target_bytes]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 104:4-117:1
     Visibility: public -/
 @[rust_loop]
-def proxy_http.plain_target_bytes_loop
+def proxy_http.request.plain_target_bytes_loop
   (target : Slice Std.U8) (index : Std.Usize) : Result Bool := do
   let i := Slice.len target
   if index < i
   then
     let byte ← Slice.index_usize target index
-    let b ← proxy_http.visible byte
+    let b ← proxy_http.request.visible byte
     if b
     then
       if byte = 35#u8
@@ -1884,33 +1918,34 @@ def proxy_http.plain_target_bytes_loop
           if byte = 59#u8
           then ok false
           else
-            let b1 ← proxy_http.bad_escape_at target index
+            let b1 ← proxy_http.request.bad_escape_at target index
             if b1
             then ok false
             else
               let index1 ← index + 1#usize
-              proxy_http.plain_target_bytes_loop target index1
+              proxy_http.request.plain_target_bytes_loop target index1
     else ok false
   else ok true
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::plain_target_bytes]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 123:0-138:1
+/-- [garrett_stateless_core::proxy_http::request::plain_target_bytes]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 102:0-117:1
     Visibility: public -/
 @[reducible]
-def proxy_http.plain_target_bytes (target : Slice Std.U8) : Result Bool := do
-  proxy_http.plain_target_bytes_loop target 0#usize
+def proxy_http.request.plain_target_bytes
+  (target : Slice Std.U8) : Result Bool := do
+  proxy_http.request.plain_target_bytes_loop target 0#usize
 
 /-- [garrett_stateless_core::proxy_http::MAX_TARGET]
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 16:0-16:35
+    Source: 'crates/garrett-stateless-core/src/proxy_http/mod.rs', lines 36:0-36:35
     Visibility: public -/
 @[global_simps, irreducible]
 def proxy_http.MAX_TARGET : Std.Usize := 8192#usize
 
-/-- [garrett_stateless_core::proxy_http::check_target]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 181:0-190:1
+/-- [garrett_stateless_core::proxy_http::request::check_target]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 160:0-169:1
     Visibility: public -/
-def proxy_http.check_target (target : Slice Std.U8) : Result Bool := do
+def proxy_http.request.check_target (target : Slice Std.U8) : Result Bool := do
   let i := Slice.len target
   if i = 0#usize
   then ok false
@@ -1923,21 +1958,21 @@ def proxy_http.check_target (target : Slice Std.U8) : Result Bool := do
       if i2 != 47#u8
       then ok false
       else
-        let b ← proxy_http.plain_target_bytes target
+        let b ← proxy_http.request.plain_target_bytes target
         if b
         then
-          let «end» ← proxy_http.path_end target
+          let «end» ← proxy_http.request.path_end target
           let s ←
             core.slice.index.Slice.index
               (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) target
               { «end» }
-          proxy_http.segments_ok s
+          proxy_http.request.segments_ok s
         else ok false
 
-/-- [garrett_stateless_core::proxy_http::valid_method]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 81:0-96:1
+/-- [garrett_stateless_core::proxy_http::request::valid_method]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 60:0-75:1
     Visibility: public -/
-def proxy_http.valid_method (method : Slice Std.U8) : Result Bool := do
+def proxy_http.request.valid_method (method : Slice Std.U8) : Result Bool := do
   let get ←
     lift (Array.to_slice (Array.make 3#usize [ 71#u8, 69#u8, 84#u8 ]))
   let head ←
@@ -1988,11 +2023,11 @@ def proxy_http.valid_method (method : Slice Std.U8) : Result Bool := do
               core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 method
                 options
 
-/-- [garrett_stateless_core::proxy_http::request_line]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 546:4-548:5
+/-- [garrett_stateless_core::proxy_http::request::request_line]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 525:4-527:5
     Visibility: public -/
 @[rust_loop]
-def proxy_http.request_line_loop0
+def proxy_http.request.request_line_loop0
   (head : Slice Std.U8) («end» : Std.Usize) (first : Std.Usize) :
   Result Std.Usize
   := do
@@ -2002,16 +2037,16 @@ def proxy_http.request_line_loop0
     if i != 32#u8
     then
       let first1 ← first + 1#usize
-      proxy_http.request_line_loop0 head «end» first1
+      proxy_http.request.request_line_loop0 head «end» first1
     else ok first
   else ok first
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::request_line]: loop 1:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 550:4-552:5
+/-- [garrett_stateless_core::proxy_http::request::request_line]: loop 1:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 529:4-531:5
     Visibility: public -/
 @[rust_loop]
-def proxy_http.request_line_loop1
+def proxy_http.request.request_line_loop1
   (head : Slice Std.U8) («end» : Std.Usize) (second : Std.Usize) :
   Result Std.Usize
   := do
@@ -2021,21 +2056,21 @@ def proxy_http.request_line_loop1
     if i != 32#u8
     then
       let second1 ← second + 1#usize
-      proxy_http.request_line_loop1 head «end» second1
+      proxy_http.request.request_line_loop1 head «end» second1
     else ok second
   else ok second
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::request_line]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 544:0-564:1
+/-- [garrett_stateless_core::proxy_http::request::request_line]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 523:0-543:1
     Visibility: public -/
-def proxy_http.request_line
+def proxy_http.request.request_line
   (head : Slice Std.U8) («end» : Std.Usize) :
   Result (Option ((alloc.vec.Vec Std.U8) × (alloc.vec.Vec Std.U8)))
   := do
-  let first ← proxy_http.request_line_loop0 head «end» 0#usize
+  let first ← proxy_http.request.request_line_loop0 head «end» 0#usize
   let second ← first + 1#usize
-  let second1 ← proxy_http.request_line_loop1 head «end» second
+  let second1 ← proxy_http.request.request_line_loop1 head «end» second
   if first >= «end»
   then ok none
   else
@@ -2068,42 +2103,42 @@ def proxy_http.request_line
       if b
       then
         let s2 := alloc.vec.Vec.deref method
-        let b1 ← proxy_http.valid_method s2
+        let b1 ← proxy_http.request.valid_method s2
         if b1
         then
           let s3 := alloc.vec.Vec.deref target
-          let b2 ← proxy_http.check_target s3
+          let b2 ← proxy_http.request.check_target s3
           if b2
           then ok (some (method, target))
           else ok none
         else ok none
       else ok none
 
-/-- [garrett_stateless_core::proxy_http::connection_token]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 389:4-391:5
+/-- [garrett_stateless_core::proxy_http::request::connection_token]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 368:4-370:5
     Visibility: public -/
 @[rust_loop]
-def proxy_http.connection_token_loop0
+def proxy_http.request.connection_token_loop0
   (value : Slice Std.U8) («end» : Std.Usize) (first : Std.Usize) :
   Result Std.Usize
   := do
   if first < «end»
   then
     let i ← Slice.index_usize value first
-    let b ← proxy_http.blank i
+    let b ← proxy_http.request.blank i
     if b
     then
       let first1 ← first + 1#usize
-      proxy_http.connection_token_loop0 value «end» first1
+      proxy_http.request.connection_token_loop0 value «end» first1
     else ok first
   else ok first
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::connection_token]: loop 1:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 393:4-395:5
+/-- [garrett_stateless_core::proxy_http::request::connection_token]: loop 1:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 372:4-374:5
     Visibility: public -/
 @[rust_loop]
-def proxy_http.connection_token_loop1
+def proxy_http.request.connection_token_loop1
   (value : Slice Std.U8) (first : Std.Usize) (last : Std.Usize) :
   Result Std.Usize
   := do
@@ -2111,26 +2146,26 @@ def proxy_http.connection_token_loop1
   then
     let i ← last - 1#usize
     let i1 ← Slice.index_usize value i
-    let b ← proxy_http.blank i1
+    let b ← proxy_http.request.blank i1
     if b
-    then proxy_http.connection_token_loop1 value first i
+    then proxy_http.request.connection_token_loop1 value first i
     else ok last
   else ok last
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::connection_token]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 387:0-407:1
+/-- [garrett_stateless_core::proxy_http::request::connection_token]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 366:0-386:1
     Visibility: public -/
-def proxy_http.connection_token
+def proxy_http.request.connection_token
   (value : Slice Std.U8) (start : Std.Usize) («end» : Std.Usize) :
   Result (Option Bool)
   := do
-  let first ← proxy_http.connection_token_loop0 value «end» start
-  let last ← proxy_http.connection_token_loop1 value first «end»
+  let first ← proxy_http.request.connection_token_loop0 value «end» start
+  let last ← proxy_http.request.connection_token_loop1 value first «end»
   let s ←
     core.slice.index.Slice.index (core.slice.index.SliceIndexRangeUsizeSlice
       Std.U8) value { start := first, «end» := last }
-  let token ← proxy_http.lowered s
+  let token ← proxy_http.request.lowered s
   let bytes := alloc.vec.Vec.deref token
   let close ←
     lift (Array.to_slice
@@ -2150,11 +2185,11 @@ def proxy_http.connection_token
     then ok (some false)
     else ok none
 
-/-- [garrett_stateless_core::proxy_http::connection_value]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 414:4-425:1
+/-- [garrett_stateless_core::proxy_http::request::connection_value]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 393:4-404:1
     Visibility: public -/
 @[rust_loop]
-def proxy_http.connection_value_loop
+def proxy_http.request.connection_value_loop
   (value : Slice Std.U8) (close : Bool) (start : Std.Usize) (index : Std.Usize)
   :
   Result (Option Bool)
@@ -2165,7 +2200,7 @@ def proxy_http.connection_value_loop
     let i1 := Slice.len value
     if index = i1
     then
-      let o ← proxy_http.connection_token value start index
+      let o ← proxy_http.request.connection_token value start index
       match o with
       | none => ok none
       | some token =>
@@ -2173,12 +2208,12 @@ def proxy_http.connection_value_loop
                        then ok true
                        else ok token
         let start1 ← index + 1#usize
-        proxy_http.connection_value_loop value close1 start1 start1
+        proxy_http.request.connection_value_loop value close1 start1 start1
     else
       let i2 ← Slice.index_usize value index
       if i2 = 44#u8
       then
-        let o ← proxy_http.connection_token value start index
+        let o ← proxy_http.request.connection_token value start index
         match o with
         | none => ok none
         | some token =>
@@ -2186,27 +2221,27 @@ def proxy_http.connection_value_loop
                          then ok true
                          else ok token
           let start1 ← index + 1#usize
-          proxy_http.connection_value_loop value close1 start1 start1
+          proxy_http.request.connection_value_loop value close1 start1 start1
       else
         let index1 ← index + 1#usize
-        proxy_http.connection_value_loop value close start index1
+        proxy_http.request.connection_value_loop value close start index1
   else ok (some close)
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::connection_value]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 410:0-425:1
+/-- [garrett_stateless_core::proxy_http::request::connection_value]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 389:0-404:1
     Visibility: public -/
 @[reducible]
-def proxy_http.connection_value
+def proxy_http.request.connection_value
   (value : Slice Std.U8) : Result (Option Bool) := do
-  proxy_http.connection_value_loop value false 0#usize 0#usize
+  proxy_http.request.connection_value_loop value false 0#usize 0#usize
 
-/-- [garrett_stateless_core::proxy_http::keep_alive]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 430:4-439:1
+/-- [garrett_stateless_core::proxy_http::request::keep_alive]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 409:4-418:1
     Visibility: public -/
 @[rust_loop]
-def proxy_http.keep_alive_loop
-  (iter : core.slice.iter.Iter proxy_http.Field) (close : Bool) :
+def proxy_http.request.keep_alive_loop
+  (iter : core.slice.iter.Iter proxy_http.request.Field) (close : Bool) :
   Result (Option Bool)
   := do
   let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
@@ -2219,36 +2254,36 @@ def proxy_http.keep_alive_loop
           99#u8, 111#u8, 110#u8, 110#u8, 101#u8, 99#u8, 116#u8, 105#u8, 111#u8,
           110#u8
           ]))
-    let b ← proxy_http.name_is field s
+    let b ← proxy_http.request.name_is field s
     if b
     then
       let s1 := alloc.vec.Vec.deref field.value
-      let o1 ← proxy_http.connection_value s1
+      let o1 ← proxy_http.request.connection_value s1
       match o1 with
       | none => ok none
       | some token =>
         if close
-        then proxy_http.keep_alive_loop iter1 true
-        else proxy_http.keep_alive_loop iter1 token
-    else proxy_http.keep_alive_loop iter1 close
+        then proxy_http.request.keep_alive_loop iter1 true
+        else proxy_http.request.keep_alive_loop iter1 token
+    else proxy_http.request.keep_alive_loop iter1 close
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::keep_alive]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 428:0-439:1
+/-- [garrett_stateless_core::proxy_http::request::keep_alive]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 407:0-418:1
     Visibility: public -/
-def proxy_http.keep_alive
-  (fields : Slice proxy_http.Field) : Result (Option Bool) := do
+def proxy_http.request.keep_alive
+  (fields : Slice proxy_http.request.Field) : Result (Option Bool) := do
   let iter ←
     SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
       fields
-  proxy_http.keep_alive_loop iter false
+  proxy_http.request.keep_alive_loop iter false
 
-/-- [garrett_stateless_core::proxy_http::host_matches]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 376:0-383:1
+/-- [garrett_stateless_core::proxy_http::request::host_matches]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 355:0-362:1
     Visibility: public -/
-def proxy_http.host_matches
+def proxy_http.request.host_matches
   (value : Slice Std.U8) (host : Slice Std.U8) : Result Bool := do
-  let lower ← proxy_http.lowered value
+  let lower ← proxy_http.request.lowered value
   let with_port ← alloc.slice.Slice.to_vec core.clone.CloneU8 host
   let s ←
     lift (Array.to_slice (Array.make 4#usize [ 58#u8, 52#u8, 52#u8, 51#u8 ]))
@@ -2264,28 +2299,29 @@ def proxy_http.host_matches
     core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 lowered_value
       host_port
 
-/-- [garrett_stateless_core::proxy_http::refused_field]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 359:0-364:1
+/-- [garrett_stateless_core::proxy_http::request::refused_field]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 338:0-343:1
     Visibility: public -/
-def proxy_http.refused_field (field : proxy_http.Field) : Result Bool := do
+def proxy_http.request.refused_field
+  (field : proxy_http.request.Field) : Result Bool := do
   let s ←
     lift (Array.to_slice
       (Array.make 7#usize [
         117#u8, 112#u8, 103#u8, 114#u8, 97#u8, 100#u8, 101#u8
         ]))
-  let b ← proxy_http.name_is field s
+  let b ← proxy_http.request.name_is field s
   if b
   then ok true
   else
     let s1 ←
       lift (Array.to_slice
         (Array.make 6#usize [ 101#u8, 120#u8, 112#u8, 101#u8, 99#u8, 116#u8 ]))
-    let b1 ← proxy_http.name_is field s1
+    let b1 ← proxy_http.request.name_is field s1
     if b1
     then ok true
     else
       let s2 ← lift (Array.to_slice (Array.make 2#usize [ 116#u8, 101#u8 ]))
-      let b2 ← proxy_http.name_is field s2
+      let b2 ← proxy_http.request.name_is field s2
       if b2
       then ok true
       else
@@ -2294,39 +2330,39 @@ def proxy_http.refused_field (field : proxy_http.Field) : Result Bool := do
             (Array.make 7#usize [
               116#u8, 114#u8, 97#u8, 105#u8, 108#u8, 101#u8, 114#u8
               ]))
-        proxy_http.name_is field s3
+        proxy_http.request.name_is field s3
 
-/-- [garrett_stateless_core::proxy_http::any_refused_field]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 367:4-373:1
+/-- [garrett_stateless_core::proxy_http::request::any_refused_field]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 346:4-352:1
     Visibility: public -/
 @[rust_loop]
-def proxy_http.any_refused_field_loop
-  (iter : core.slice.iter.Iter proxy_http.Field) : Result Bool := do
+def proxy_http.request.any_refused_field_loop
+  (iter : core.slice.iter.Iter proxy_http.request.Field) : Result Bool := do
   let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
   match o with
   | none => ok false
   | some field =>
-    let b ← proxy_http.refused_field field
+    let b ← proxy_http.request.refused_field field
     if b
     then ok true
-    else proxy_http.any_refused_field_loop iter1
+    else proxy_http.request.any_refused_field_loop iter1
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::any_refused_field]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 366:0-373:1
+/-- [garrett_stateless_core::proxy_http::request::any_refused_field]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 345:0-352:1
     Visibility: public -/
-def proxy_http.any_refused_field
-  (fields : Slice proxy_http.Field) : Result Bool := do
+def proxy_http.request.any_refused_field
+  (fields : Slice proxy_http.request.Field) : Result Bool := do
   let iter ←
     SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
       fields
-  proxy_http.any_refused_field_loop iter
+  proxy_http.request.any_refused_field_loop iter
 
-/-- [garrett_stateless_core::proxy_http::clean_head]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 211:4-225:1
+/-- [garrett_stateless_core::proxy_http::request::clean_head]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 190:4-204:1
     Visibility: public -/
 @[rust_loop]
-def proxy_http.clean_head_loop
+def proxy_http.request.clean_head_loop
   (head : Slice Std.U8) (index : Std.Usize) : Result Bool := do
   let i := Slice.len head
   if index < i
@@ -2355,8 +2391,8 @@ def proxy_http.clean_head_loop
                 let i5 ← Slice.index_usize head i4
                 if i5 != 13#u8
                 then ok false
-                else proxy_http.clean_head_loop head i1
-            else proxy_http.clean_head_loop head i1
+                else proxy_http.request.clean_head_loop head i1
+            else proxy_http.request.clean_head_loop head i1
       else
         if byte = 10#u8
         then
@@ -2369,25 +2405,25 @@ def proxy_http.clean_head_loop
             then ok false
             else
               let index1 ← index + 1#usize
-              proxy_http.clean_head_loop head index1
+              proxy_http.request.clean_head_loop head index1
         else
           let index1 ← index + 1#usize
-          proxy_http.clean_head_loop head index1
+          proxy_http.request.clean_head_loop head index1
   else ok true
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::clean_head]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 209:0-225:1
+/-- [garrett_stateless_core::proxy_http::request::clean_head]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 188:0-204:1
     Visibility: public -/
 @[reducible]
-def proxy_http.clean_head (head : Slice Std.U8) : Result Bool := do
-  proxy_http.clean_head_loop head 0#usize
+def proxy_http.request.clean_head (head : Slice Std.U8) : Result Bool := do
+  proxy_http.request.clean_head_loop head 0#usize
 
-/-- [garrett_stateless_core::proxy_http::head_end]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 195:4-206:1
+/-- [garrett_stateless_core::proxy_http::request::head_end]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 174:4-185:1
     Visibility: public -/
 @[rust_loop]
-def proxy_http.head_end_loop
+def proxy_http.request.head_end_loop
   (data : Slice Std.U8) (index : Std.Usize) : Result (Option Std.Usize) := do
   let i ← index + 4#usize
   let i1 := Slice.len data
@@ -2408,98 +2444,107 @@ def proxy_http.head_end_loop
           let i8 ← Slice.index_usize data i7
           if i8 = 10#u8
           then ok (some index)
-          else proxy_http.head_end_loop data i3
-        else proxy_http.head_end_loop data i3
-      else proxy_http.head_end_loop data i3
-    else let index1 ← index + 1#usize
-         proxy_http.head_end_loop data index1
+          else proxy_http.request.head_end_loop data i3
+        else proxy_http.request.head_end_loop data i3
+      else proxy_http.request.head_end_loop data i3
+    else
+      let index1 ← index + 1#usize
+      proxy_http.request.head_end_loop data index1
   else ok none
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::head_end]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 193:0-206:1
+/-- [garrett_stateless_core::proxy_http::request::head_end]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 172:0-185:1
     Visibility: public -/
 @[reducible]
-def proxy_http.head_end (data : Slice Std.U8) : Result (Option Std.Usize) := do
-  proxy_http.head_end_loop data 0#usize
+def proxy_http.request.head_end
+  (data : Slice Std.U8) : Result (Option Std.Usize) := do
+  proxy_http.request.head_end_loop data 0#usize
 
-/-- [garrett_stateless_core::proxy_http::parse_request]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 635:0-690:1
+/-- [garrett_stateless_core::proxy_http::request::parse_request]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/request.rs', lines 614:0-669:1
     Visibility: public -/
-def proxy_http.parse_request
+def proxy_http.request.parse_request
   (data : Slice Std.U8) (host : Slice Std.U8) (limit : Std.Usize) :
-  Result (core.result.Result (Option proxy_http.Parsed) proxy_http.Refusal)
+  Result (core.result.Result (Option proxy_http.request.Parsed)
+    proxy_http.request.Refusal)
   := do
-  let o ← proxy_http.head_end data
+  let o ← proxy_http.request.head_end data
   match o with
   | none =>
     let i := Slice.len data
     let i1 ← proxy_http.MAX_HEAD
     if i > i1
-    then ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest)
+    then ok (core.result.Result.Err proxy_http.request.Refusal.InvalidRequest)
     else ok (core.result.Result.Ok none)
   | some «end» =>
     let i ← proxy_http.MAX_HEAD
     if «end» > i
-    then ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest)
+    then ok (core.result.Result.Err proxy_http.request.Refusal.InvalidRequest)
     else
       let head ←
         core.slice.index.Slice.index
           (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) data
           { «end» }
-      let b ← proxy_http.clean_head head
+      let b ← proxy_http.request.clean_head head
       if b
       then
-        let first ← proxy_http.line_end head 0#usize
-        let o1 ← proxy_http.request_line head first
+        let first ← proxy_http.request.line_end head 0#usize
+        let o1 ← proxy_http.request.request_line head first
         match o1 with
-        | none => ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest)
+        | none =>
+          ok (core.result.Result.Err proxy_http.request.Refusal.InvalidRequest)
         | some line =>
           let (method, target) := line
-          let o2 ← proxy_http.request_fields head first
+          let o2 ← proxy_http.request.request_fields head first
           match o2 with
           | none =>
-            ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest)
+            ok (core.result.Result.Err
+              proxy_http.request.Refusal.InvalidRequest)
           | some fields =>
             let s := alloc.vec.Vec.deref fields
-            let b1 ← proxy_http.any_refused_field s
+            let b1 ← proxy_http.request.any_refused_field s
             if b1
-            then ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest)
+            then
+              ok (core.result.Result.Err
+                proxy_http.request.Refusal.InvalidRequest)
             else
               let s1 := alloc.vec.Vec.deref fields
               let s2 ←
                 lift (Array.to_slice
                   (Array.make 4#usize [ 104#u8, 111#u8, 115#u8, 116#u8 ]))
-              let i1 ← proxy_http.count_named s1 s2
+              let i1 ← proxy_http.request.count_named s1 s2
               if i1 != 1#usize
               then
-                ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest)
+                ok (core.result.Result.Err
+                  proxy_http.request.Refusal.InvalidRequest)
               else
                 let s3 := alloc.vec.Vec.deref fields
                 let s4 ←
                   lift (Array.to_slice
                     (Array.make 4#usize [ 104#u8, 111#u8, 115#u8, 116#u8 ]))
-                let i2 ← proxy_http.first_named s3 s4
+                let i2 ← proxy_http.request.first_named s3 s4
                 let f ←
                   alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice
-                    proxy_http.Field) fields i2
+                    proxy_http.request.Field) fields i2
                 let s5 := alloc.vec.Vec.deref f.value
-                let b2 ← proxy_http.host_matches s5 host
+                let b2 ← proxy_http.request.host_matches s5 host
                 if b2
                 then
                   let s6 := alloc.vec.Vec.deref fields
-                  let o3 ← proxy_http.keep_alive s6
+                  let o3 ← proxy_http.request.keep_alive s6
                   match o3 with
                   | none =>
                     ok (core.result.Result.Err
-                      proxy_http.Refusal.InvalidRequest)
+                      proxy_http.request.Refusal.InvalidRequest)
                   | some keep =>
                     let s7 := alloc.vec.Vec.deref fields
-                    let r ← proxy_http.framing s7 limit
+                    let r ← proxy_http.request.framing s7 limit
                     match r with
                     | core.result.Result.Ok framed =>
                       let i3 ← «end» + 4#usize
-                      let r1 ← proxy_http.body_of data i3 framed limit
+                      let r1 ←
+                        proxy_http.request.body_of data i3 framed limit
                       match r1 with
                       | core.result.Result.Ok o4 =>
                         match o4 with
@@ -2523,21 +2568,27 @@ def proxy_http.parse_request
                     | core.result.Result.Err refusal =>
                       ok (core.result.Result.Err refusal)
                 else
-                  ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest)
-      else ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest)
+                  ok (core.result.Result.Err
+                    proxy_http.request.Refusal.InvalidRequest)
+      else
+        ok (core.result.Result.Err proxy_http.request.Refusal.InvalidRequest)
 
 /-- [garrett_stateless_core::proxy_controller::code_of]:
     Source: 'crates/garrett-stateless-core/src/proxy_controller.rs', lines 77:0-86:1
     Visibility: public -/
 def proxy_controller.code_of
-  (refused : proxy_http.Refusal) : Result proxy_http.Code := do
+  (refused : proxy_http.request.Refusal) : Result proxy_http.refusal.Code := do
   match refused with
-  | proxy_http.Refusal.InvalidRequest => ok proxy_http.Code.InvalidRequest
-  | proxy_http.Refusal.TooLarge => ok proxy_http.Code.TooLarge
-  | proxy_http.Refusal.Denied => ok proxy_http.Code.Denied
-  | proxy_http.Refusal.InvalidCredential => ok proxy_http.Code.CredentialSource
-  | proxy_http.Refusal.UpstreamResponse => ok proxy_http.Code.OutcomeUnknown
-  | proxy_http.Refusal.Reflected => ok proxy_http.Code.Reflected
+  | proxy_http.request.Refusal.InvalidRequest =>
+    ok proxy_http.refusal.Code.InvalidRequest
+  | proxy_http.request.Refusal.TooLarge => ok proxy_http.refusal.Code.TooLarge
+  | proxy_http.request.Refusal.Denied => ok proxy_http.refusal.Code.Denied
+  | proxy_http.request.Refusal.InvalidCredential =>
+    ok proxy_http.refusal.Code.CredentialSource
+  | proxy_http.request.Refusal.UpstreamResponse =>
+    ok proxy_http.refusal.Code.OutcomeUnknown
+  | proxy_http.request.Refusal.Reflected =>
+    ok proxy_http.refusal.Code.Reflected
 
 /-- [garrett_stateless_core::proxy_controller::frame]:
     Source: 'crates/garrett-stateless-core/src/proxy_controller.rs', lines 51:0-60:1
@@ -2549,9 +2600,9 @@ def proxy_controller.frame
   let i := Slice.len buffer
   let i1 ← proxy_controller.raw_limit request_limit
   if i > i1
-  then ok (proxy_controller.Framed.Refuse proxy_http.Code.TooLarge)
+  then ok (proxy_controller.Framed.Refuse proxy_http.refusal.Code.TooLarge)
   else
-    let r ← proxy_http.parse_request buffer host request_limit
+    let r ← proxy_http.request.parse_request buffer host request_limit
     match r with
     | core.result.Result.Ok o =>
       match o with
@@ -2586,15 +2637,15 @@ def proxy_controller.remainder
       Std.U8) s
   else ok (alloc.vec.Vec.new Std.U8)
 
-/-- [garrett_stateless_core::proxy_http::append_status]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1299:0-1313:1
+/-- [garrett_stateless_core::proxy_http::refusal::append_status]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/refusal.rs', lines 39:0-53:1
     Visibility: public -/
-def proxy_http.append_status
-  (output : alloc.vec.Vec Std.U8) (code : proxy_http.Code) :
+def proxy_http.refusal.append_status
+  (output : alloc.vec.Vec Std.U8) (code : proxy_http.refusal.Code) :
   Result (alloc.vec.Vec Std.U8)
   := do
   match code with
-  | proxy_http.Code.InvalidRequest =>
+  | proxy_http.refusal.Code.InvalidRequest =>
     let s ←
       lift (Array.to_slice
         (Array.make 15#usize [
@@ -2602,7 +2653,7 @@ def proxy_http.append_status
           101#u8, 113#u8, 117#u8, 101#u8, 115#u8, 116#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.TooLarge =>
+  | proxy_http.refusal.Code.TooLarge =>
     let s ←
       lift (Array.to_slice
         (Array.make 21#usize [
@@ -2611,7 +2662,7 @@ def proxy_http.append_status
           114#u8, 103#u8, 101#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.Denied =>
+  | proxy_http.refusal.Code.Denied =>
     let s ←
       lift (Array.to_slice
         (Array.make 13#usize [
@@ -2619,7 +2670,7 @@ def proxy_http.append_status
           100#u8, 100#u8, 101#u8, 110#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.UnknownOrigin =>
+  | proxy_http.refusal.Code.UnknownOrigin =>
     let s ←
       lift (Array.to_slice
         (Array.make 13#usize [
@@ -2627,7 +2678,7 @@ def proxy_http.append_status
           100#u8, 100#u8, 101#u8, 110#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.Unauthenticated =>
+  | proxy_http.refusal.Code.Unauthenticated =>
     let s ←
       lift (Array.to_slice
         (Array.make 33#usize [
@@ -2637,7 +2688,7 @@ def proxy_http.append_status
           113#u8, 117#u8, 105#u8, 114#u8, 101#u8, 100#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.Revoked =>
+  | proxy_http.refusal.Code.Revoked =>
     let s ←
       lift (Array.to_slice
         (Array.make 13#usize [
@@ -2645,7 +2696,7 @@ def proxy_http.append_status
           100#u8, 100#u8, 101#u8, 110#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.Reflected =>
+  | proxy_http.refusal.Code.Reflected =>
     let s ←
       lift (Array.to_slice
         (Array.make 15#usize [
@@ -2653,7 +2704,7 @@ def proxy_http.append_status
           97#u8, 116#u8, 101#u8, 119#u8, 97#u8, 121#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.Unreachable =>
+  | proxy_http.refusal.Code.Unreachable =>
     let s ←
       lift (Array.to_slice
         (Array.make 15#usize [
@@ -2661,7 +2712,7 @@ def proxy_http.append_status
           97#u8, 116#u8, 101#u8, 119#u8, 97#u8, 121#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.OutcomeUnknown =>
+  | proxy_http.refusal.Code.OutcomeUnknown =>
     let s ←
       lift (Array.to_slice
         (Array.make 15#usize [
@@ -2669,7 +2720,7 @@ def proxy_http.append_status
           97#u8, 116#u8, 101#u8, 119#u8, 97#u8, 121#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.CredentialSource =>
+  | proxy_http.refusal.Code.CredentialSource =>
     let s ←
       lift (Array.to_slice
         (Array.make 15#usize [
@@ -2677,7 +2728,7 @@ def proxy_http.append_status
           97#u8, 116#u8, 101#u8, 119#u8, 97#u8, 121#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.UnsupportedRequest =>
+  | proxy_http.refusal.Code.UnsupportedRequest =>
     let s ←
       lift (Array.to_slice
         (Array.make 13#usize [
@@ -2685,7 +2736,7 @@ def proxy_http.append_status
           100#u8, 100#u8, 101#u8, 110#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.InternalError =>
+  | proxy_http.refusal.Code.InternalError =>
     let s ←
       lift (Array.to_slice
         (Array.make 15#usize [
@@ -2694,15 +2745,15 @@ def proxy_http.append_status
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
 
-/-- [garrett_stateless_core::proxy_http::append_code]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1282:0-1297:1
+/-- [garrett_stateless_core::proxy_http::refusal::append_code]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/refusal.rs', lines 22:0-37:1
     Visibility: public -/
-def proxy_http.append_code
-  (output : alloc.vec.Vec Std.U8) (code : proxy_http.Code) :
+def proxy_http.refusal.append_code
+  (output : alloc.vec.Vec Std.U8) (code : proxy_http.refusal.Code) :
   Result (alloc.vec.Vec Std.U8)
   := do
   match code with
-  | proxy_http.Code.InvalidRequest =>
+  | proxy_http.refusal.Code.InvalidRequest =>
     let s ←
       lift (Array.to_slice
         (Array.make 15#usize [
@@ -2710,19 +2761,19 @@ def proxy_http.append_code
           101#u8, 113#u8, 117#u8, 101#u8, 115#u8, 116#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.TooLarge =>
+  | proxy_http.refusal.Code.TooLarge =>
     let s ←
       lift (Array.to_slice
         (Array.make 9#usize [
           116#u8, 111#u8, 111#u8, 95#u8, 108#u8, 97#u8, 114#u8, 103#u8, 101#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.Denied =>
+  | proxy_http.refusal.Code.Denied =>
     let s ←
       lift (Array.to_slice
         (Array.make 6#usize [ 100#u8, 101#u8, 110#u8, 105#u8, 101#u8, 100#u8 ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.UnknownOrigin =>
+  | proxy_http.refusal.Code.UnknownOrigin =>
     let s ←
       lift (Array.to_slice
         (Array.make 14#usize [
@@ -2730,7 +2781,7 @@ def proxy_http.append_code
           111#u8, 114#u8, 105#u8, 103#u8, 105#u8, 110#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.Unauthenticated =>
+  | proxy_http.refusal.Code.Unauthenticated =>
     let s ←
       lift (Array.to_slice
         (Array.make 15#usize [
@@ -2738,21 +2789,21 @@ def proxy_http.append_code
           116#u8, 105#u8, 99#u8, 97#u8, 116#u8, 101#u8, 100#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.Revoked =>
+  | proxy_http.refusal.Code.Revoked =>
     let s ←
       lift (Array.to_slice
         (Array.make 7#usize [
           114#u8, 101#u8, 118#u8, 111#u8, 107#u8, 101#u8, 100#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.Reflected =>
+  | proxy_http.refusal.Code.Reflected =>
     let s ←
       lift (Array.to_slice
         (Array.make 9#usize [
           114#u8, 101#u8, 102#u8, 108#u8, 101#u8, 99#u8, 116#u8, 101#u8, 100#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.Unreachable =>
+  | proxy_http.refusal.Code.Unreachable =>
     let s ←
       lift (Array.to_slice
         (Array.make 11#usize [
@@ -2760,7 +2811,7 @@ def proxy_http.append_code
           108#u8, 101#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.OutcomeUnknown =>
+  | proxy_http.refusal.Code.OutcomeUnknown =>
     let s ←
       lift (Array.to_slice
         (Array.make 15#usize [
@@ -2768,7 +2819,7 @@ def proxy_http.append_code
           110#u8, 107#u8, 110#u8, 111#u8, 119#u8, 110#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.CredentialSource =>
+  | proxy_http.refusal.Code.CredentialSource =>
     let s ←
       lift (Array.to_slice
         (Array.make 17#usize [
@@ -2776,7 +2827,7 @@ def proxy_http.append_code
           108#u8, 95#u8, 115#u8, 111#u8, 117#u8, 114#u8, 99#u8, 101#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.UnsupportedRequest =>
+  | proxy_http.refusal.Code.UnsupportedRequest =>
     let s ←
       lift (Array.to_slice
         (Array.make 19#usize [
@@ -2785,7 +2836,7 @@ def proxy_http.append_code
           101#u8, 115#u8, 116#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.Code.InternalError =>
+  | proxy_http.refusal.Code.InternalError =>
     let s ←
       lift (Array.to_slice
         (Array.make 14#usize [
@@ -2794,11 +2845,11 @@ def proxy_http.append_code
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
 
-/-- [garrett_stateless_core::proxy_http::refusal]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1316:0-1333:1
+/-- [garrett_stateless_core::proxy_http::refusal::refusal]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/refusal.rs', lines 56:0-73:1
     Visibility: public -/
-def proxy_http.refusal
-  (code : proxy_http.Code) : Result (alloc.vec.Vec Std.U8) := do
+def proxy_http.refusal.refusal
+  (code : proxy_http.refusal.Code) : Result (alloc.vec.Vec Std.U8) := do
   let s ←
     lift (Array.to_slice
       (Array.make 18#usize [
@@ -2808,7 +2859,7 @@ def proxy_http.refusal
   let body ←
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
       Std.U8) s
-  let body1 ← proxy_http.append_code body code
+  let body1 ← proxy_http.refusal.append_code body code
   let s1 ←
     lift (Array.to_slice
       (Array.make 38#usize [
@@ -2827,16 +2878,16 @@ def proxy_http.refusal
   let out ←
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 (alloc.vec.Vec.new
       Std.U8) s2
-  let out1 ← proxy_http.append_status out code
+  let out1 ← proxy_http.refusal.append_status out code
   let s3 ← lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
   let out2 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 out1 s3
   let out3 ←
     match code with
-    | proxy_http.Code.InvalidRequest => ok out2
-    | proxy_http.Code.TooLarge => ok out2
-    | proxy_http.Code.Denied => ok out2
-    | proxy_http.Code.UnknownOrigin => ok out2
-    | proxy_http.Code.Unauthenticated =>
+    | proxy_http.refusal.Code.InvalidRequest => ok out2
+    | proxy_http.refusal.Code.TooLarge => ok out2
+    | proxy_http.refusal.Code.Denied => ok out2
+    | proxy_http.refusal.Code.UnknownOrigin => ok out2
+    | proxy_http.refusal.Code.Unauthenticated =>
       do
       let s4 ←
         lift (Array.to_slice
@@ -2849,13 +2900,13 @@ def proxy_http.refusal
             101#u8, 116#u8, 115#u8, 34#u8, 13#u8, 10#u8
             ]))
       alloc.vec.Vec.extend_from_slice core.clone.CloneU8 out2 s4
-    | proxy_http.Code.Revoked => ok out2
-    | proxy_http.Code.Reflected => ok out2
-    | proxy_http.Code.Unreachable => ok out2
-    | proxy_http.Code.OutcomeUnknown => ok out2
-    | proxy_http.Code.CredentialSource => ok out2
-    | proxy_http.Code.UnsupportedRequest => ok out2
-    | proxy_http.Code.InternalError => ok out2
+    | proxy_http.refusal.Code.Revoked => ok out2
+    | proxy_http.refusal.Code.Reflected => ok out2
+    | proxy_http.refusal.Code.Unreachable => ok out2
+    | proxy_http.refusal.Code.OutcomeUnknown => ok out2
+    | proxy_http.refusal.Code.CredentialSource => ok out2
+    | proxy_http.refusal.Code.UnsupportedRequest => ok out2
+    | proxy_http.refusal.Code.InternalError => ok out2
   let s4 ←
     lift (Array.to_slice
       (Array.make 48#usize [
@@ -2884,10 +2935,10 @@ def proxy_http.refusal
     Source: 'crates/garrett-stateless-core/src/proxy_controller.rs', lines 88:0-97:1
     Visibility: public -/
 def proxy_controller.stopped
-  (code : proxy_http.Code) (stage : proxy_controller.Stage) :
+  (code : proxy_http.refusal.Code) (stage : proxy_controller.Stage) :
   Result proxy_controller.Served
   := do
-  let reply ← proxy_http.refusal code
+  let reply ← proxy_http.refusal.refusal code
   ok { reply, keep := false, stage, code, status := 0#u16 }
 
 /-- [garrett_stateless_core::proxy_controller::is_head]:
@@ -2962,19 +3013,19 @@ def reflection.contains
       let last ← i3 - i4
       reflection.contains_loop value secret last 0#usize
 
-/-- [garrett_stateless_core::proxy_http::Form]
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 877:0-880:1
+/-- [garrett_stateless_core::proxy_http::response::Form]
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 13:0-16:1
     Visibility: public -/
-structure proxy_http.Form where
+structure proxy_http.response.Form where
   bytes : alloc.vec.Vec Std.U8
   folded : Bool
 
-/-- [garrett_stateless_core::proxy_http::form_present]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1222:0-1228:1
+/-- [garrett_stateless_core::proxy_http::response::form_present]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 358:0-364:1
     Visibility: public -/
-def proxy_http.form_present
+def proxy_http.response.form_present
   (data : Slice Std.U8) (folded_data : Slice Std.U8)
-  (unwrapped_data : Slice Std.U8) (form : proxy_http.Form) :
+  (unwrapped_data : Slice Std.U8) (form : proxy_http.response.Form) :
   Result Bool
   := do
   if form.folded
@@ -2990,11 +3041,11 @@ def proxy_http.form_present
       let s1 := alloc.vec.Vec.deref form.bytes
       reflection.contains unwrapped_data s1
 
-/-- [garrett_stateless_core::proxy_http::unwrapped]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1212:4-1216:5
+/-- [garrett_stateless_core::proxy_http::response::unwrapped]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 348:4-352:5
     Visibility: public -/
 @[rust_loop]
-def proxy_http.unwrapped_loop
+def proxy_http.response.unwrapped_loop
   (iter : core.slice.iter.Iter Std.U8) (out : alloc.vec.Vec Std.U8) :
   Result (alloc.vec.Vec Std.U8)
   := do
@@ -3007,27 +3058,27 @@ def proxy_http.unwrapped_loop
       if byte != 10#u8
       then
         let out1 ← alloc.vec.Vec.push out byte
-        proxy_http.unwrapped_loop iter1 out1
-      else proxy_http.unwrapped_loop iter1 out
-    else proxy_http.unwrapped_loop iter1 out
+        proxy_http.response.unwrapped_loop iter1 out1
+      else proxy_http.response.unwrapped_loop iter1 out
+    else proxy_http.response.unwrapped_loop iter1 out
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::unwrapped]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1210:0-1218:1
+/-- [garrett_stateless_core::proxy_http::response::unwrapped]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 346:0-354:1
     Visibility: public -/
-def proxy_http.unwrapped
+def proxy_http.response.unwrapped
   (data : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
   let iter ←
     SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
       data
-  proxy_http.unwrapped_loop iter (alloc.vec.Vec.new Std.U8)
+  proxy_http.response.unwrapped_loop iter (alloc.vec.Vec.new Std.U8)
 
-/-- [garrett_stateless_core::proxy_http::reflects]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1233:4-1239:1
+/-- [garrett_stateless_core::proxy_http::response::reflects]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 369:4-375:1
     Visibility: public -/
 @[rust_loop]
-def proxy_http.reflects_loop
-  (iter : core.slice.iter.Iter proxy_http.Form) (data : Slice Std.U8)
+def proxy_http.response.reflects_loop
+  (iter : core.slice.iter.Iter proxy_http.response.Form) (data : Slice Std.U8)
   (folded_data : alloc.vec.Vec Std.U8) (unwrapped_data : alloc.vec.Vec Std.U8)
   :
   Result Bool
@@ -3038,39 +3089,33 @@ def proxy_http.reflects_loop
   | some form =>
     let s := alloc.vec.Vec.deref folded_data
     let s1 := alloc.vec.Vec.deref unwrapped_data
-    let b ← proxy_http.form_present data s s1 form
+    let b ← proxy_http.response.form_present data s s1 form
     if b
     then ok true
-    else proxy_http.reflects_loop iter1 data folded_data unwrapped_data
+    else
+      proxy_http.response.reflects_loop iter1 data folded_data unwrapped_data
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::reflects]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1230:0-1239:1
+/-- [garrett_stateless_core::proxy_http::response::reflects]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 366:0-375:1
     Visibility: public -/
-def proxy_http.reflects
-  (data : Slice Std.U8) (forms : Slice proxy_http.Form) : Result Bool := do
-  let folded_data ← proxy_http.lowered data
-  let unwrapped_data ← proxy_http.unwrapped data
+def proxy_http.response.reflects
+  (data : Slice Std.U8) (forms : Slice proxy_http.response.Form) :
+  Result Bool
+  := do
+  let folded_data ← proxy_http.request.lowered data
+  let unwrapped_data ← proxy_http.response.unwrapped data
   let iter ←
     SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
       forms
-  proxy_http.reflects_loop iter data folded_data unwrapped_data
+  proxy_http.response.reflects_loop iter data folded_data unwrapped_data
 
-/-- [garrett_stateless_core::proxy_http::Response]
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 868:0-873:1
-    Visibility: public -/
-structure proxy_http.Response where
-  status : Std.U16
-  reason : alloc.vec.Vec Std.U8
-  fields : alloc.vec.Vec proxy_http.Field
-  body : alloc.vec.Vec Std.U8
-
-/-- [garrett_stateless_core::proxy_http::append_fields]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 796:4-801:5
+/-- [garrett_stateless_core::proxy_http::upstream::append_fields]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/upstream.rs', lines 115:4-120:5
     Visibility: public -/
 @[rust_loop]
-def proxy_http.append_fields_loop
-  (iter : core.slice.iter.Iter proxy_http.Field)
+def proxy_http.upstream.append_fields_loop
+  (iter : core.slice.iter.Iter proxy_http.request.Field)
   (output : alloc.vec.Vec Std.U8) :
   Result (alloc.vec.Vec Std.U8)
   := do
@@ -3089,27 +3134,36 @@ def proxy_http.append_fields_loop
     let s3 ← lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
     let output4 ←
       alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output3 s3
-    proxy_http.append_fields_loop iter1 output4
+    proxy_http.upstream.append_fields_loop iter1 output4
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::append_fields]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 795:0-802:1
+/-- [garrett_stateless_core::proxy_http::upstream::append_fields]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/upstream.rs', lines 114:0-121:1
     Visibility: public -/
-def proxy_http.append_fields
-  (output : alloc.vec.Vec Std.U8) (fields : Slice proxy_http.Field) :
+def proxy_http.upstream.append_fields
+  (output : alloc.vec.Vec Std.U8) (fields : Slice proxy_http.request.Field) :
   Result (alloc.vec.Vec Std.U8)
   := do
   let iter ←
     SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
       fields
-  proxy_http.append_fields_loop iter output
+  proxy_http.upstream.append_fields_loop iter output
 
-/-- [garrett_stateless_core::proxy_http::encode_response]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1024:0-1047:1
+/-- [garrett_stateless_core::proxy_http::response::Response]
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 4:0-9:1
     Visibility: public -/
-def proxy_http.encode_response
-  (output : alloc.vec.Vec Std.U8) (response : proxy_http.Response)
-  (fields : Slice proxy_http.Field) (keep_alive : Bool) (head : Bool) :
+structure proxy_http.response.Response where
+  status : Std.U16
+  reason : alloc.vec.Vec Std.U8
+  fields : alloc.vec.Vec proxy_http.request.Field
+  body : alloc.vec.Vec Std.U8
+
+/-- [garrett_stateless_core::proxy_http::response::encode_response]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 160:0-183:1
+    Visibility: public -/
+def proxy_http.response.encode_response
+  (output : alloc.vec.Vec Std.U8) (response : proxy_http.response.Response)
+  (fields : Slice proxy_http.request.Field) (keep_alive : Bool) (head : Bool) :
   Result (alloc.vec.Vec Std.U8)
   := do
   let s ←
@@ -3126,7 +3180,7 @@ def proxy_http.encode_response
   let output4 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output3 s2
   let s3 ← lift (Array.to_slice (Array.make 2#usize [ 13#u8, 10#u8 ]))
   let output5 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output4 s3
-  let output6 ← proxy_http.append_fields output5 fields
+  let output6 ← proxy_http.upstream.append_fields output5 fields
   let s4 ←
     lift (Array.to_slice
       (Array.make 16#usize [
@@ -3165,17 +3219,18 @@ def proxy_http.encode_response
     let s5 := alloc.vec.Vec.deref response.body
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output9 s5
 
-/-- [garrett_stateless_core::proxy_http::dropped_response]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 998:0-1008:1
+/-- [garrett_stateless_core::proxy_http::response::dropped_response]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 134:0-144:1
     Visibility: public -/
-def proxy_http.dropped_response (field : proxy_http.Field) : Result Bool := do
+def proxy_http.response.dropped_response
+  (field : proxy_http.request.Field) : Result Bool := do
   let s ←
     lift (Array.to_slice
       (Array.make 10#usize [
         99#u8, 111#u8, 110#u8, 110#u8, 101#u8, 99#u8, 116#u8, 105#u8, 111#u8,
         110#u8
         ]))
-  let b ← proxy_http.name_is field s
+  let b ← proxy_http.request.name_is field s
   if b
   then ok true
   else
@@ -3185,7 +3240,7 @@ def proxy_http.dropped_response (field : proxy_http.Field) : Result Bool := do
           107#u8, 101#u8, 101#u8, 112#u8, 45#u8, 97#u8, 108#u8, 105#u8, 118#u8,
           101#u8
           ]))
-    let b1 ← proxy_http.name_is field s1
+    let b1 ← proxy_http.request.name_is field s1
     if b1
     then ok true
     else
@@ -3196,7 +3251,7 @@ def proxy_http.dropped_response (field : proxy_http.Field) : Result Bool := do
             45#u8, 101#u8, 110#u8, 99#u8, 111#u8, 100#u8, 105#u8, 110#u8,
             103#u8
             ]))
-      let b2 ← proxy_http.name_is field s2
+      let b2 ← proxy_http.request.name_is field s2
       if b2
       then ok true
       else
@@ -3206,7 +3261,7 @@ def proxy_http.dropped_response (field : proxy_http.Field) : Result Bool := do
               99#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8, 45#u8,
               108#u8, 101#u8, 110#u8, 103#u8, 116#u8, 104#u8
               ]))
-        let b3 ← proxy_http.name_is field s3
+        let b3 ← proxy_http.request.name_is field s3
         if b3
         then ok true
         else
@@ -3217,7 +3272,7 @@ def proxy_http.dropped_response (field : proxy_http.Field) : Result Bool := do
                 116#u8, 104#u8, 101#u8, 110#u8, 116#u8, 105#u8, 99#u8, 97#u8,
                 116#u8, 101#u8
                 ]))
-          let b4 ← proxy_http.name_is field s4
+          let b4 ← proxy_http.request.name_is field s4
           if b4
           then ok true
           else
@@ -3227,7 +3282,7 @@ def proxy_http.dropped_response (field : proxy_http.Field) : Result Bool := do
                   112#u8, 114#u8, 111#u8, 120#u8, 121#u8, 45#u8, 99#u8, 111#u8,
                   110#u8, 110#u8, 101#u8, 99#u8, 116#u8, 105#u8, 111#u8, 110#u8
                   ]))
-            let b5 ← proxy_http.name_is field s5
+            let b5 ← proxy_http.request.name_is field s5
             if b5
             then ok true
             else
@@ -3236,7 +3291,7 @@ def proxy_http.dropped_response (field : proxy_http.Field) : Result Bool := do
                   (Array.make 7#usize [
                     116#u8, 114#u8, 97#u8, 105#u8, 108#u8, 101#u8, 114#u8
                     ]))
-              let b6 ← proxy_http.name_is field s6
+              let b6 ← proxy_http.request.name_is field s6
               if b6
               then ok true
               else
@@ -3245,7 +3300,7 @@ def proxy_http.dropped_response (field : proxy_http.Field) : Result Bool := do
                     (Array.make 7#usize [
                       117#u8, 112#u8, 103#u8, 114#u8, 97#u8, 100#u8, 101#u8
                       ]))
-                let b7 ← proxy_http.name_is field s7
+                let b7 ← proxy_http.request.name_is field s7
                 if b7
                 then ok true
                 else
@@ -3255,76 +3310,77 @@ def proxy_http.dropped_response (field : proxy_http.Field) : Result Bool := do
                         115#u8, 101#u8, 116#u8, 45#u8, 99#u8, 111#u8, 111#u8,
                         107#u8, 105#u8, 101#u8
                         ]))
-                  proxy_http.name_is field s8
+                  proxy_http.request.name_is field s8
 
-/-- [garrett_stateless_core::proxy_http::returned_fields]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1012:4-1019:5
+/-- [garrett_stateless_core::proxy_http::response::returned_fields]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 148:4-155:5
     Visibility: public -/
 @[rust_loop]
-def proxy_http.returned_fields_loop
-  (iter : core.slice.iter.Iter proxy_http.Field)
-  (out : alloc.vec.Vec proxy_http.Field) :
-  Result (alloc.vec.Vec proxy_http.Field)
+def proxy_http.response.returned_fields_loop
+  (iter : core.slice.iter.Iter proxy_http.request.Field)
+  (out : alloc.vec.Vec proxy_http.request.Field) :
+  Result (alloc.vec.Vec proxy_http.request.Field)
   := do
   let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
   match o with
   | none => ok out
   | some field =>
-    let b ← proxy_http.dropped_response field
+    let b ← proxy_http.response.dropped_response field
     if b
-    then proxy_http.returned_fields_loop iter1 out
+    then proxy_http.response.returned_fields_loop iter1 out
     else
       let v ← alloc.vec.CloneVec.clone core.clone.CloneU8 field.name
       let v1 ← alloc.vec.CloneVec.clone core.clone.CloneU8 field.value
       let out1 ←
         alloc.vec.Vec.push out ({ «name» := v, value := v1 } :
-          proxy_http.Field)
-      proxy_http.returned_fields_loop iter1 out1
+          proxy_http.request.Field)
+      proxy_http.response.returned_fields_loop iter1 out1
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::returned_fields]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1010:0-1021:1
+/-- [garrett_stateless_core::proxy_http::response::returned_fields]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 146:0-157:1
     Visibility: public -/
-def proxy_http.returned_fields
-  (fields : Slice proxy_http.Field) :
-  Result (alloc.vec.Vec proxy_http.Field)
+def proxy_http.response.returned_fields
+  (fields : Slice proxy_http.request.Field) :
+  Result (alloc.vec.Vec proxy_http.request.Field)
   := do
   let iter ←
     SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
       fields
-  proxy_http.returned_fields_loop iter (alloc.vec.Vec.new proxy_http.Field)
+  proxy_http.response.returned_fields_loop iter (alloc.vec.Vec.new
+    proxy_http.request.Field)
 
-/-- [garrett_stateless_core::proxy_http::guest_response]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1243:0-1258:1
+/-- [garrett_stateless_core::proxy_http::response::guest_response]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 379:0-394:1
     Visibility: public -/
-def proxy_http.guest_response
-  (output : alloc.vec.Vec Std.U8) (response : proxy_http.Response)
-  (forms : Slice proxy_http.Form) (keep_alive : Bool) (head : Bool) :
-  Result ((core.result.Result Unit proxy_http.Refusal) × (alloc.vec.Vec
-    Std.U8))
+def proxy_http.response.guest_response
+  (output : alloc.vec.Vec Std.U8) (response : proxy_http.response.Response)
+  (forms : Slice proxy_http.response.Form) (keep_alive : Bool) (head : Bool) :
+  Result ((core.result.Result Unit proxy_http.request.Refusal) ×
+    (alloc.vec.Vec Std.U8))
   := do
   let s := alloc.vec.Vec.deref response.fields
-  let fields ← proxy_http.returned_fields s
+  let fields ← proxy_http.response.returned_fields s
   let s1 := alloc.vec.Vec.deref fields
   let full ←
-    proxy_http.encode_response (alloc.vec.Vec.new Std.U8) response s1
+    proxy_http.response.encode_response (alloc.vec.Vec.new Std.U8) response s1
       keep_alive false
   let s2 := alloc.vec.Vec.deref full
-  let b ← proxy_http.reflects s2 forms
+  let b ← proxy_http.response.reflects s2 forms
   if b
-  then ok (core.result.Result.Err proxy_http.Refusal.Reflected, output)
+  then ok (core.result.Result.Err proxy_http.request.Refusal.Reflected, output)
   else
     let s3 := alloc.vec.Vec.deref fields
     let output1 ←
-      proxy_http.encode_response output response s3 keep_alive head
+      proxy_http.response.encode_response output response s3 keep_alive head
     ok (core.result.Result.Ok (), output1)
 
-/-- [garrett_stateless_core::proxy_http::identity_only]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 923:4-930:1
+/-- [garrett_stateless_core::proxy_http::response::identity_only]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 59:4-66:1
     Visibility: public -/
 @[rust_loop]
-def proxy_http.identity_only_loop
-  (iter : core.slice.iter.Iter proxy_http.Field) : Result Bool := do
+def proxy_http.response.identity_only_loop
+  (iter : core.slice.iter.Iter proxy_http.request.Field) : Result Bool := do
   let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
   match o with
   | none => ok true
@@ -3335,7 +3391,7 @@ def proxy_http.identity_only_loop
           99#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8, 45#u8, 101#u8,
           110#u8, 99#u8, 111#u8, 100#u8, 105#u8, 110#u8, 103#u8
           ]))
-    let b ← proxy_http.name_is field s
+    let b ← proxy_http.request.name_is field s
     if b
     then
       let s1 := alloc.vec.Vec.deref field.value
@@ -3346,26 +3402,26 @@ def proxy_http.identity_only_loop
             ]))
       let b1 ← http_wire.ascii_equal s1 s2
       if b1
-      then proxy_http.identity_only_loop iter1
+      then proxy_http.response.identity_only_loop iter1
       else ok false
-    else proxy_http.identity_only_loop iter1
+    else proxy_http.response.identity_only_loop iter1
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::identity_only]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 922:0-930:1
+/-- [garrett_stateless_core::proxy_http::response::identity_only]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 58:0-66:1
     Visibility: public -/
-def proxy_http.identity_only
-  (fields : Slice proxy_http.Field) : Result Bool := do
+def proxy_http.response.identity_only
+  (fields : Slice proxy_http.request.Field) : Result Bool := do
   let iter ←
     SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
       fields
-  proxy_http.identity_only_loop iter
+  proxy_http.response.identity_only_loop iter
 
-/-- [garrett_stateless_core::proxy_http::digit3]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 888:4-897:1
+/-- [garrett_stateless_core::proxy_http::response::digit3]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 24:4-33:1
     Visibility: public -/
 @[rust_loop]
-def proxy_http.digit3_loop
+def proxy_http.response.digit3_loop
   (line : Slice Std.U8) (start : Std.Usize) (total : Std.U16)
   (index : Std.Usize) :
   Result (Option Std.U16)
@@ -3385,25 +3441,25 @@ def proxy_http.digit3_loop
         let i3 ← lift (UScalar.cast .U16 i2)
         let total1 ← i1 + i3
         let index1 ← index + 1#usize
-        proxy_http.digit3_loop line start total1 index1
+        proxy_http.response.digit3_loop line start total1 index1
   else ok (some total)
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::digit3]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 882:0-897:1
+/-- [garrett_stateless_core::proxy_http::response::digit3]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 18:0-33:1
     Visibility: public -/
-def proxy_http.digit3
+def proxy_http.response.digit3
   (line : Slice Std.U8) (start : Std.Usize) : Result (Option Std.U16) := do
   let i ← start + 3#usize
   let i1 := Slice.len line
   if i > i1
   then ok none
-  else proxy_http.digit3_loop line start 0#u16 start
+  else proxy_http.response.digit3_loop line start 0#u16 start
 
-/-- [garrett_stateless_core::proxy_http::status_line]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 900:0-920:1
+/-- [garrett_stateless_core::proxy_http::response::status_line]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 36:0-56:1
     Visibility: public -/
-def proxy_http.status_line
+def proxy_http.response.status_line
   (head : Slice Std.U8) («end» : Std.Usize) :
   Result (Option (Std.U16 × (alloc.vec.Vec Std.U8)))
   := do
@@ -3423,7 +3479,7 @@ def proxy_http.status_line
       core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 s «prefix»
     if b
     then
-      let o ← proxy_http.digit3 head 9#usize
+      let o ← proxy_http.response.digit3 head 9#usize
       match o with
       | none => ok none
       | some status =>
@@ -3440,7 +3496,7 @@ def proxy_http.status_line
                 if «end» > 12#usize
                 then ok 13#usize
                 else ok 12#usize
-              let b1 ← proxy_http.all_value head reason_start «end»
+              let b1 ← proxy_http.request.all_value head reason_start «end»
               if b1
               then
                 let s1 ←
@@ -3455,7 +3511,7 @@ def proxy_http.status_line
               if «end» > 12#usize
               then ok 13#usize
               else ok 12#usize
-            let b1 ← proxy_http.all_value head reason_start «end»
+            let b1 ← proxy_http.request.all_value head reason_start «end»
             if b1
             then
               let s1 ←
@@ -3467,40 +3523,45 @@ def proxy_http.status_line
             else ok none
     else ok none
 
-/-- [garrett_stateless_core::proxy_http::parse_response]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 934:0-995:1
+/-- [garrett_stateless_core::proxy_http::response::parse_response]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 70:0-131:1
     Visibility: public -/
-def proxy_http.parse_response
+def proxy_http.response.parse_response
   (data : Slice Std.U8) (head_request : Bool) (limit : Std.Usize) :
-  Result (core.result.Result proxy_http.Response proxy_http.Refusal)
+  Result (core.result.Result proxy_http.response.Response
+    proxy_http.request.Refusal)
   := do
-  let o ← proxy_http.head_end data
+  let o ← proxy_http.request.head_end data
   match o with
-  | none => ok (core.result.Result.Err proxy_http.Refusal.UpstreamResponse)
+  | none =>
+    ok (core.result.Result.Err proxy_http.request.Refusal.UpstreamResponse)
   | some «end» =>
     let i ← proxy_http.MAX_HEAD
     if «end» > i
-    then ok (core.result.Result.Err proxy_http.Refusal.UpstreamResponse)
+    then
+      ok (core.result.Result.Err proxy_http.request.Refusal.UpstreamResponse)
     else
       let head ←
         core.slice.index.Slice.index
           (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) data
           { «end» }
-      let b ← proxy_http.clean_head head
+      let b ← proxy_http.request.clean_head head
       if b
       then
-        let first ← proxy_http.line_end head 0#usize
-        let o1 ← proxy_http.status_line head first
+        let first ← proxy_http.request.line_end head 0#usize
+        let o1 ← proxy_http.response.status_line head first
         match o1 with
         | none =>
-          ok (core.result.Result.Err proxy_http.Refusal.UpstreamResponse)
+          ok (core.result.Result.Err
+            proxy_http.request.Refusal.UpstreamResponse)
         | some line =>
           let (status, reason) := line
           let i1 := Slice.len head
           if first >= i1
           then
-            let s := alloc.vec.Vec.deref (alloc.vec.Vec.new proxy_http.Field)
-            let b1 ← proxy_http.identity_only s
+            let s :=
+              alloc.vec.Vec.deref (alloc.vec.Vec.new proxy_http.request.Field)
+            let b1 ← proxy_http.response.identity_only s
             if b1
             then
               let start ← «end» + 4#usize
@@ -3510,7 +3571,7 @@ def proxy_http.parse_response
                   {
                     status,
                     reason,
-                    fields := (alloc.vec.Vec.new proxy_http.Field),
+                    fields := (alloc.vec.Vec.new proxy_http.request.Field),
                     body := (alloc.vec.Vec.new Std.U8)
                   })
               else
@@ -3520,7 +3581,7 @@ def proxy_http.parse_response
                     {
                       status,
                       reason,
-                      fields := (alloc.vec.Vec.new proxy_http.Field),
+                      fields := (alloc.vec.Vec.new proxy_http.request.Field),
                       body := (alloc.vec.Vec.new Std.U8)
                     })
                 else
@@ -3530,23 +3591,24 @@ def proxy_http.parse_response
                       {
                         status,
                         reason,
-                        fields := (alloc.vec.Vec.new proxy_http.Field),
+                        fields := (alloc.vec.Vec.new proxy_http.request.Field),
                         body := (alloc.vec.Vec.new Std.U8)
                       })
                   else
                     let s1 :=
-                      alloc.vec.Vec.deref (alloc.vec.Vec.new proxy_http.Field)
-                    let r ← proxy_http.framing s1 limit
+                      alloc.vec.Vec.deref (alloc.vec.Vec.new
+                        proxy_http.request.Field)
+                    let r ← proxy_http.request.framing s1 limit
                     match r with
                     | core.result.Result.Ok f =>
                       match f with
-                      | proxy_http.Framing.Empty =>
+                      | proxy_http.request.Framing.Empty =>
                         let i2 := Slice.len data
                         let i3 ← i2 - start
                         if i3 > limit
                         then
                           ok (core.result.Result.Err
-                            proxy_http.Refusal.TooLarge)
+                            proxy_http.request.Refusal.TooLarge)
                         else
                           let s2 ←
                             core.slice.index.Slice.index
@@ -3558,16 +3620,17 @@ def proxy_http.parse_response
                             {
                               status,
                               reason,
-                              fields := (alloc.vec.Vec.new proxy_http.Field),
+                              fields :=
+                                (alloc.vec.Vec.new proxy_http.request.Field),
                               body
                             })
-                      | proxy_http.Framing.Length length =>
+                      | proxy_http.request.Framing.Length length =>
                         let i2 := Slice.len data
                         let i3 ← i2 - start
                         if i3 < length
                         then
                           ok (core.result.Result.Err
-                            proxy_http.Refusal.UpstreamResponse)
+                            proxy_http.request.Refusal.UpstreamResponse)
                         else
                           let i4 ← start + length
                           let s2 ←
@@ -3580,73 +3643,79 @@ def proxy_http.parse_response
                             {
                               status,
                               reason,
-                              fields := (alloc.vec.Vec.new proxy_http.Field),
+                              fields :=
+                                (alloc.vec.Vec.new proxy_http.request.Field),
                               body
                             })
-                      | proxy_http.Framing.Chunked =>
-                        let c ← proxy_http.decode_chunked data start limit
+                      | proxy_http.request.Framing.Chunked =>
+                        let c ←
+                          proxy_http.request.decode_chunked data start limit
                         match c with
-                        | proxy_http.Chunked.Done body _ =>
+                        | proxy_http.request.Chunked.Done body _ =>
                           ok (core.result.Result.Ok
                             {
                               status,
                               reason,
-                              fields := (alloc.vec.Vec.new proxy_http.Field),
+                              fields :=
+                                (alloc.vec.Vec.new proxy_http.request.Field),
                               body
                             })
-                        | proxy_http.Chunked.More =>
+                        | proxy_http.request.Chunked.More =>
                           ok (core.result.Result.Err
-                            proxy_http.Refusal.UpstreamResponse)
-                        | proxy_http.Chunked.Bad r1 =>
+                            proxy_http.request.Refusal.UpstreamResponse)
+                        | proxy_http.request.Chunked.Bad r1 =>
                           match r1 with
-                          | proxy_http.Refusal.InvalidRequest =>
+                          | proxy_http.request.Refusal.InvalidRequest =>
                             ok (core.result.Result.Err
-                              proxy_http.Refusal.UpstreamResponse)
-                          | proxy_http.Refusal.TooLarge =>
+                              proxy_http.request.Refusal.UpstreamResponse)
+                          | proxy_http.request.Refusal.TooLarge =>
                             ok (core.result.Result.Err
-                              proxy_http.Refusal.TooLarge)
-                          | proxy_http.Refusal.Denied =>
+                              proxy_http.request.Refusal.TooLarge)
+                          | proxy_http.request.Refusal.Denied =>
                             ok (core.result.Result.Err
-                              proxy_http.Refusal.UpstreamResponse)
-                          | proxy_http.Refusal.InvalidCredential =>
+                              proxy_http.request.Refusal.UpstreamResponse)
+                          | proxy_http.request.Refusal.InvalidCredential =>
                             ok (core.result.Result.Err
-                              proxy_http.Refusal.UpstreamResponse)
-                          | proxy_http.Refusal.UpstreamResponse =>
+                              proxy_http.request.Refusal.UpstreamResponse)
+                          | proxy_http.request.Refusal.UpstreamResponse =>
                             ok (core.result.Result.Err
-                              proxy_http.Refusal.UpstreamResponse)
-                          | proxy_http.Refusal.Reflected =>
+                              proxy_http.request.Refusal.UpstreamResponse)
+                          | proxy_http.request.Refusal.Reflected =>
                             ok (core.result.Result.Err
-                              proxy_http.Refusal.UpstreamResponse)
+                              proxy_http.request.Refusal.UpstreamResponse)
                     | core.result.Result.Err r1 =>
                       match r1 with
-                      | proxy_http.Refusal.InvalidRequest =>
+                      | proxy_http.request.Refusal.InvalidRequest =>
                         ok (core.result.Result.Err
-                          proxy_http.Refusal.UpstreamResponse)
-                      | proxy_http.Refusal.TooLarge =>
-                        ok (core.result.Result.Err proxy_http.Refusal.TooLarge)
-                      | proxy_http.Refusal.Denied =>
+                          proxy_http.request.Refusal.UpstreamResponse)
+                      | proxy_http.request.Refusal.TooLarge =>
                         ok (core.result.Result.Err
-                          proxy_http.Refusal.UpstreamResponse)
-                      | proxy_http.Refusal.InvalidCredential =>
+                          proxy_http.request.Refusal.TooLarge)
+                      | proxy_http.request.Refusal.Denied =>
                         ok (core.result.Result.Err
-                          proxy_http.Refusal.UpstreamResponse)
-                      | proxy_http.Refusal.UpstreamResponse =>
+                          proxy_http.request.Refusal.UpstreamResponse)
+                      | proxy_http.request.Refusal.InvalidCredential =>
                         ok (core.result.Result.Err
-                          proxy_http.Refusal.UpstreamResponse)
-                      | proxy_http.Refusal.Reflected =>
+                          proxy_http.request.Refusal.UpstreamResponse)
+                      | proxy_http.request.Refusal.UpstreamResponse =>
                         ok (core.result.Result.Err
-                          proxy_http.Refusal.UpstreamResponse)
+                          proxy_http.request.Refusal.UpstreamResponse)
+                      | proxy_http.request.Refusal.Reflected =>
+                        ok (core.result.Result.Err
+                          proxy_http.request.Refusal.UpstreamResponse)
             else
-              ok (core.result.Result.Err proxy_http.Refusal.UpstreamResponse)
+              ok (core.result.Result.Err
+                proxy_http.request.Refusal.UpstreamResponse)
           else
             let i2 ← first + 2#usize
-            let o2 ← proxy_http.parse_fields head i2
+            let o2 ← proxy_http.request.parse_fields head i2
             match o2 with
             | none =>
-              ok (core.result.Result.Err proxy_http.Refusal.UpstreamResponse)
+              ok (core.result.Result.Err
+                proxy_http.request.Refusal.UpstreamResponse)
             | some fields =>
               let s := alloc.vec.Vec.deref fields
-              let b1 ← proxy_http.identity_only s
+              let b1 ← proxy_http.response.identity_only s
               if b1
               then
                 let start ← «end» + 4#usize
@@ -3681,17 +3750,17 @@ def proxy_http.parse_response
                         })
                     else
                       let s1 := alloc.vec.Vec.deref fields
-                      let r ← proxy_http.framing s1 limit
+                      let r ← proxy_http.request.framing s1 limit
                       match r with
                       | core.result.Result.Ok f =>
                         match f with
-                        | proxy_http.Framing.Empty =>
+                        | proxy_http.request.Framing.Empty =>
                           let i3 := Slice.len data
                           let i4 ← i3 - start
                           if i4 > limit
                           then
                             ok (core.result.Result.Err
-                              proxy_http.Refusal.TooLarge)
+                              proxy_http.request.Refusal.TooLarge)
                           else
                             let s2 ←
                               core.slice.index.Slice.index
@@ -3701,13 +3770,13 @@ def proxy_http.parse_response
                               alloc.slice.Slice.to_vec core.clone.CloneU8 s2
                             ok (core.result.Result.Ok
                               { status, reason, fields, body })
-                        | proxy_http.Framing.Length length =>
+                        | proxy_http.request.Framing.Length length =>
                           let i3 := Slice.len data
                           let i4 ← i3 - start
                           if i4 < length
                           then
                             ok (core.result.Result.Err
-                              proxy_http.Refusal.UpstreamResponse)
+                              proxy_http.request.Refusal.UpstreamResponse)
                           else
                             let i5 ← start + length
                             let s2 ←
@@ -3718,75 +3787,78 @@ def proxy_http.parse_response
                               alloc.slice.Slice.to_vec core.clone.CloneU8 s2
                             ok (core.result.Result.Ok
                               { status, reason, fields, body })
-                        | proxy_http.Framing.Chunked =>
-                          let c ← proxy_http.decode_chunked data start limit
+                        | proxy_http.request.Framing.Chunked =>
+                          let c ←
+                            proxy_http.request.decode_chunked data start limit
                           match c with
-                          | proxy_http.Chunked.Done body _ =>
+                          | proxy_http.request.Chunked.Done body _ =>
                             ok (core.result.Result.Ok
                               { status, reason, fields, body })
-                          | proxy_http.Chunked.More =>
+                          | proxy_http.request.Chunked.More =>
                             ok (core.result.Result.Err
-                              proxy_http.Refusal.UpstreamResponse)
-                          | proxy_http.Chunked.Bad r1 =>
+                              proxy_http.request.Refusal.UpstreamResponse)
+                          | proxy_http.request.Chunked.Bad r1 =>
                             match r1 with
-                            | proxy_http.Refusal.InvalidRequest =>
+                            | proxy_http.request.Refusal.InvalidRequest =>
                               ok (core.result.Result.Err
-                                proxy_http.Refusal.UpstreamResponse)
-                            | proxy_http.Refusal.TooLarge =>
+                                proxy_http.request.Refusal.UpstreamResponse)
+                            | proxy_http.request.Refusal.TooLarge =>
                               ok (core.result.Result.Err
-                                proxy_http.Refusal.TooLarge)
-                            | proxy_http.Refusal.Denied =>
+                                proxy_http.request.Refusal.TooLarge)
+                            | proxy_http.request.Refusal.Denied =>
                               ok (core.result.Result.Err
-                                proxy_http.Refusal.UpstreamResponse)
-                            | proxy_http.Refusal.InvalidCredential =>
+                                proxy_http.request.Refusal.UpstreamResponse)
+                            | proxy_http.request.Refusal.InvalidCredential =>
                               ok (core.result.Result.Err
-                                proxy_http.Refusal.UpstreamResponse)
-                            | proxy_http.Refusal.UpstreamResponse =>
+                                proxy_http.request.Refusal.UpstreamResponse)
+                            | proxy_http.request.Refusal.UpstreamResponse =>
                               ok (core.result.Result.Err
-                                proxy_http.Refusal.UpstreamResponse)
-                            | proxy_http.Refusal.Reflected =>
+                                proxy_http.request.Refusal.UpstreamResponse)
+                            | proxy_http.request.Refusal.Reflected =>
                               ok (core.result.Result.Err
-                                proxy_http.Refusal.UpstreamResponse)
+                                proxy_http.request.Refusal.UpstreamResponse)
                       | core.result.Result.Err r1 =>
                         match r1 with
-                        | proxy_http.Refusal.InvalidRequest =>
+                        | proxy_http.request.Refusal.InvalidRequest =>
                           ok (core.result.Result.Err
-                            proxy_http.Refusal.UpstreamResponse)
-                        | proxy_http.Refusal.TooLarge =>
+                            proxy_http.request.Refusal.UpstreamResponse)
+                        | proxy_http.request.Refusal.TooLarge =>
                           ok (core.result.Result.Err
-                            proxy_http.Refusal.TooLarge)
-                        | proxy_http.Refusal.Denied =>
+                            proxy_http.request.Refusal.TooLarge)
+                        | proxy_http.request.Refusal.Denied =>
                           ok (core.result.Result.Err
-                            proxy_http.Refusal.UpstreamResponse)
-                        | proxy_http.Refusal.InvalidCredential =>
+                            proxy_http.request.Refusal.UpstreamResponse)
+                        | proxy_http.request.Refusal.InvalidCredential =>
                           ok (core.result.Result.Err
-                            proxy_http.Refusal.UpstreamResponse)
-                        | proxy_http.Refusal.UpstreamResponse =>
+                            proxy_http.request.Refusal.UpstreamResponse)
+                        | proxy_http.request.Refusal.UpstreamResponse =>
                           ok (core.result.Result.Err
-                            proxy_http.Refusal.UpstreamResponse)
-                        | proxy_http.Refusal.Reflected =>
+                            proxy_http.request.Refusal.UpstreamResponse)
+                        | proxy_http.request.Refusal.Reflected =>
                           ok (core.result.Result.Err
-                            proxy_http.Refusal.UpstreamResponse)
+                            proxy_http.request.Refusal.UpstreamResponse)
               else
-                ok (core.result.Result.Err proxy_http.Refusal.UpstreamResponse)
-      else ok (core.result.Result.Err proxy_http.Refusal.UpstreamResponse)
+                ok (core.result.Result.Err
+                  proxy_http.request.Refusal.UpstreamResponse)
+      else
+        ok (core.result.Result.Err proxy_http.request.Refusal.UpstreamResponse)
 
 /-- [garrett_stateless_core::proxy_controller::release]:
     Source: 'crates/garrett-stateless-core/src/proxy_controller.rs', lines 105:0-123:1
     Visibility: public -/
 def proxy_controller.release
-  (raw : Slice Std.U8) (request : proxy_http.Request)
-  (forms : Slice proxy_http.Form) (limit : Std.Usize) :
+  (raw : Slice Std.U8) (request : proxy_http.request.Request)
+  (forms : Slice proxy_http.response.Form) (limit : Std.Usize) :
   Result proxy_controller.Served
   := do
   let s := alloc.vec.Vec.deref request.method
   let head ← proxy_controller.is_head s
-  let r ← proxy_http.parse_response raw head limit
+  let r ← proxy_http.response.parse_response raw head limit
   match r with
   | core.result.Result.Ok response =>
     let (r1, out) ←
-      proxy_http.guest_response (alloc.vec.Vec.new Std.U8) response forms
-        request.keep_alive head
+      proxy_http.response.guest_response (alloc.vec.Vec.new Std.U8) response
+        forms request.keep_alive head
     match r1 with
     | core.result.Result.Ok _ =>
       ok
@@ -3794,51 +3866,359 @@ def proxy_controller.release
           reply := out,
           keep := request.keep_alive,
           stage := proxy_controller.Stage.Completed,
-          code := proxy_http.Code.OutcomeUnknown,
+          code := proxy_http.refusal.Code.OutcomeUnknown,
           status := response.status
         }
     | core.result.Result.Err _ =>
-      proxy_controller.stopped proxy_http.Code.Reflected
+      proxy_controller.stopped proxy_http.refusal.Code.Reflected
         proxy_controller.Stage.Failed
   | core.result.Result.Err r1 =>
     match r1 with
-    | proxy_http.Refusal.InvalidRequest =>
-      proxy_controller.stopped proxy_http.Code.OutcomeUnknown
+    | proxy_http.request.Refusal.InvalidRequest =>
+      proxy_controller.stopped proxy_http.refusal.Code.OutcomeUnknown
         proxy_controller.Stage.Failed
-    | proxy_http.Refusal.TooLarge =>
-      proxy_controller.stopped proxy_http.Code.TooLarge
+    | proxy_http.request.Refusal.TooLarge =>
+      proxy_controller.stopped proxy_http.refusal.Code.TooLarge
         proxy_controller.Stage.Failed
-    | proxy_http.Refusal.Denied =>
-      proxy_controller.stopped proxy_http.Code.OutcomeUnknown
+    | proxy_http.request.Refusal.Denied =>
+      proxy_controller.stopped proxy_http.refusal.Code.OutcomeUnknown
         proxy_controller.Stage.Failed
-    | proxy_http.Refusal.InvalidCredential =>
-      proxy_controller.stopped proxy_http.Code.OutcomeUnknown
+    | proxy_http.request.Refusal.InvalidCredential =>
+      proxy_controller.stopped proxy_http.refusal.Code.OutcomeUnknown
         proxy_controller.Stage.Failed
-    | proxy_http.Refusal.UpstreamResponse =>
-      proxy_controller.stopped proxy_http.Code.OutcomeUnknown
+    | proxy_http.request.Refusal.UpstreamResponse =>
+      proxy_controller.stopped proxy_http.refusal.Code.OutcomeUnknown
         proxy_controller.Stage.Failed
-    | proxy_http.Refusal.Reflected =>
-      proxy_controller.stopped proxy_http.Code.OutcomeUnknown
+    | proxy_http.request.Refusal.Reflected =>
+      proxy_controller.stopped proxy_http.refusal.Code.OutcomeUnknown
         proxy_controller.Stage.Failed
 
-/-- [garrett_stateless_core::proxy_http::DenyRule]
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 52:0-56:1
+/-- [garrett_stateless_core::proxy_http::response::hex_lower]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 185:0-191:1
     Visibility: public -/
-structure proxy_http.DenyRule where
+def proxy_http.response.hex_lower (nibble : Std.U8) : Result Std.U8 := do
+  if nibble < 10#u8
+  then 48#u8 + nibble
+  else let i ← nibble - 10#u8
+       97#u8 + i
+
+/-- [garrett_stateless_core::proxy_http::response::percent_lower]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 200:4-208:5
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.response.percent_lower_loop
+  (iter : core.slice.iter.Iter Std.U8) (out : alloc.vec.Vec Std.U8) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok out
+  | some byte =>
+    let b ← proxy_http.response.unreserved byte
+    if b
+    then
+      let i ← http_wire.ascii_lower byte
+      let out1 ← alloc.vec.Vec.push out i
+      proxy_http.response.percent_lower_loop iter1 out1
+    else
+      let out1 ← alloc.vec.Vec.push out 37#u8
+      let i ← byte >>> 4#i32
+      let i1 ← proxy_http.response.hex_lower i
+      let out2 ← alloc.vec.Vec.push out1 i1
+      let i2 ← lift (byte &&& 15#u8)
+      let i3 ← proxy_http.response.hex_lower i2
+      let out3 ← alloc.vec.Vec.push out2 i3
+      proxy_http.response.percent_lower_loop iter1 out3
+partial_fixpoint
+
+/-- [garrett_stateless_core::proxy_http::response::percent_lower]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 198:0-210:1
+    Visibility: public -/
+def proxy_http.response.percent_lower
+  (secret : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
+  let iter ←
+    SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+      secret
+  proxy_http.response.percent_lower_loop iter (alloc.vec.Vec.new Std.U8)
+
+/-- [garrett_stateless_core::proxy_http::response::hex_bytes]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 214:4-217:5
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.response.hex_bytes_loop
+  (iter : core.slice.iter.Iter Std.U8) (out : alloc.vec.Vec Std.U8) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok out
+  | some byte =>
+    let i ← byte >>> 4#i32
+    let i1 ← proxy_http.response.hex_lower i
+    let out1 ← alloc.vec.Vec.push out i1
+    let i2 ← lift (byte &&& 15#u8)
+    let i3 ← proxy_http.response.hex_lower i2
+    let out2 ← alloc.vec.Vec.push out1 i3
+    proxy_http.response.hex_bytes_loop iter1 out2
+partial_fixpoint
+
+/-- [garrett_stateless_core::proxy_http::response::hex_bytes]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 212:0-219:1
+    Visibility: public -/
+def proxy_http.response.hex_bytes
+  (secret : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
+  let iter ←
+    SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+      secret
+  proxy_http.response.hex_bytes_loop iter (alloc.vec.Vec.new Std.U8)
+
+/-- [garrett_stateless_core::proxy_http::response::base64_symbol]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 221:0-239:1
+    Visibility: public -/
+def proxy_http.response.base64_symbol
+  (value : Std.U8) (url : Bool) : Result Std.U8 := do
+  if value < 26#u8
+  then 65#u8 + value
+  else
+    if value < 52#u8
+    then let i ← value - 26#u8
+         97#u8 + i
+    else
+      if value < 62#u8
+      then let i ← value - 52#u8
+           48#u8 + i
+      else
+        if value = 62#u8
+        then if url
+             then ok 45#u8
+             else ok 43#u8
+        else if url
+             then ok 95#u8
+             else ok 47#u8
+
+/-- [garrett_stateless_core::proxy_http::response::sextet]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 242:0-254:1
+    Visibility: public -/
+def proxy_http.response.sextet
+  (bytes : Slice Std.U8) (index : Std.Usize) : Result Std.U8 := do
+  let bit ← index * 6#usize
+  let byte ← bit / 8#usize
+  let offset ← bit % 8#usize
+  let i ← Slice.index_usize bytes byte
+  let high ← lift (UScalar.cast .U16 i)
+  let i1 ← byte + 1#usize
+  let i2 := Slice.len bytes
+  let low ←
+    if i1 < i2
+    then do
+         let i3 ← Slice.index_usize bytes i1
+         ok (UScalar.cast .U16 i3)
+    else ok 0#u16
+  let i3 ← high <<< 8#i32
+  let pair ← lift (i3 ||| low)
+  let i4 ← 10#usize - offset
+  let i5 ← pair >>> i4
+  let i6 ← lift (i5 &&& 63#u16)
+  ok (UScalar.cast .U8 i6)
+
+/-- [garrett_stateless_core::proxy_http::response::encode_unpadded]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 262:4-265:5
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.response.encode_unpadded_loop
+  (bytes : Slice Std.U8) (url : Bool) («end» : Std.Usize)
+  (out : alloc.vec.Vec Std.U8) (index : Std.Usize) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  if index < «end»
+  then
+    let i ← proxy_http.response.sextet bytes index
+    let i1 ← proxy_http.response.base64_symbol i url
+    let out1 ← alloc.vec.Vec.push out i1
+    let index1 ← index + 1#usize
+    proxy_http.response.encode_unpadded_loop bytes url «end» out1 index1
+  else ok out
+partial_fixpoint
+
+/-- [garrett_stateless_core::proxy_http::response::encode_unpadded]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 258:0-267:1
+    Visibility: public -/
+def proxy_http.response.encode_unpadded
+  (bytes : Slice Std.U8) (url : Bool) : Result (alloc.vec.Vec Std.U8) := do
+  let i := Slice.len bytes
+  let i1 ← 8#usize * i
+  let i2 ← i1 + 5#usize
+  let «end» ← i2 / 6#usize
+  proxy_http.response.encode_unpadded_loop bytes url «end» (alloc.vec.Vec.new
+    Std.U8) 0#usize
+
+/-- [garrett_stateless_core::proxy_http::response::aligned_base64]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 274:4-277:5
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.response.aligned_base64_loop0
+  (shift : Std.Usize) (padded : alloc.vec.Vec Std.U8) (zero : Std.Usize) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  if zero < shift
+  then
+    let padded1 ← alloc.vec.Vec.push padded 0#u8
+    let zero1 ← zero + 1#usize
+    proxy_http.response.aligned_base64_loop0 shift padded1 zero1
+  else ok padded
+partial_fixpoint
+
+/-- [garrett_stateless_core::proxy_http::response::aligned_base64]: loop 1:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 283:4-286:5
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.response.aligned_base64_loop1
+  (url : Bool) (padded : alloc.vec.Vec Std.U8) («end» : Std.Usize)
+  (out : alloc.vec.Vec Std.U8) (index : Std.Usize) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  if index < «end»
+  then
+    let s := alloc.vec.Vec.deref padded
+    let i ← proxy_http.response.sextet s index
+    let i1 ← proxy_http.response.base64_symbol i url
+    let out1 ← alloc.vec.Vec.push out i1
+    let index1 ← index + 1#usize
+    proxy_http.response.aligned_base64_loop1 url padded «end» out1 index1
+  else ok out
+partial_fixpoint
+
+/-- [garrett_stateless_core::proxy_http::response::aligned_base64]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 271:0-288:1
+    Visibility: public -/
+def proxy_http.response.aligned_base64
+  (secret : Slice Std.U8) (shift : Std.Usize) (url : Bool) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let padded ←
+    proxy_http.response.aligned_base64_loop0 shift (alloc.vec.Vec.new Std.U8)
+      0#usize
+  let padded1 ←
+    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 padded secret
+  let i ← 8#usize * shift
+  let i1 ← i + 5#usize
+  let start ← i1 / 6#usize
+  let i2 := alloc.vec.Vec.len padded1
+  let i3 ← 8#usize * i2
+  let «end» ← i3 / 6#usize
+  proxy_http.response.aligned_base64_loop1 url padded1 «end»
+    (alloc.vec.Vec.new Std.U8) start
+
+/-- [garrett_stateless_core::proxy_http::response::json_slashes]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 294:4-299:5
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.response.json_slashes_loop
+  (iter : core.slice.iter.Iter Std.U8) (out : alloc.vec.Vec Std.U8) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
+  match o with
+  | none => ok out
+  | some byte =>
+    let out1 ← if byte = 47#u8
+                 then alloc.vec.Vec.push out 92#u8
+                 else ok out
+    let out2 ← alloc.vec.Vec.push out1 byte
+    proxy_http.response.json_slashes_loop iter1 out2
+partial_fixpoint
+
+/-- [garrett_stateless_core::proxy_http::response::json_slashes]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 292:0-301:1
+    Visibility: public -/
+def proxy_http.response.json_slashes
+  (secret : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
+  let iter ←
+    SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
+      secret
+  proxy_http.response.json_slashes_loop iter (alloc.vec.Vec.new Std.U8)
+
+/-- [garrett_stateless_core::proxy_http::response::reflection_forms]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 325:4-341:5
+    Visibility: public -/
+@[rust_loop]
+def proxy_http.response.reflection_forms_loop
+  (secret : Slice Std.U8) (forms : alloc.vec.Vec proxy_http.response.Form)
+  (shift : Std.Usize) :
+  Result (alloc.vec.Vec proxy_http.response.Form)
+  := do
+  if shift < 3#usize
+  then
+    let standard ← proxy_http.response.aligned_base64 secret shift false
+    let i := alloc.vec.Vec.len standard
+    let forms1 ←
+      if i >= 8#usize
+      then
+        alloc.vec.Vec.push forms ({ bytes := standard, folded := false } :
+          proxy_http.response.Form)
+      else ok forms
+    let url ← proxy_http.response.aligned_base64 secret shift true
+    let i1 := alloc.vec.Vec.len url
+    let forms2 ←
+      if i1 >= 8#usize
+      then
+        alloc.vec.Vec.push forms1 ({ bytes := url, folded := false } :
+          proxy_http.response.Form)
+      else ok forms1
+    let shift1 ← shift + 1#usize
+    proxy_http.response.reflection_forms_loop secret forms2 shift1
+  else ok forms
+partial_fixpoint
+
+/-- [garrett_stateless_core::proxy_http::response::reflection_forms]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/response.rs', lines 303:0-343:1
+    Visibility: public -/
+def proxy_http.response.reflection_forms
+  (secret : Slice Std.U8) :
+  Result (alloc.vec.Vec proxy_http.response.Form)
+  := do
+  let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 secret
+  let forms ←
+    alloc.vec.Vec.push (alloc.vec.Vec.new proxy_http.response.Form)
+      ({ bytes := v, folded := false } : proxy_http.response.Form)
+  let escaped ← proxy_http.response.json_slashes secret
+  let i := alloc.vec.Vec.len escaped
+  let i1 := Slice.len secret
+  let forms1 ←
+    if i != i1
+    then
+      alloc.vec.Vec.push forms ({ bytes := escaped, folded := false } :
+        proxy_http.response.Form)
+    else ok forms
+  let v1 ← proxy_http.response.percent_lower secret
+  let forms2 ←
+    alloc.vec.Vec.push forms1 ({ bytes := v1, folded := true } :
+      proxy_http.response.Form)
+  let v2 ← proxy_http.response.hex_bytes secret
+  let forms3 ←
+    alloc.vec.Vec.push forms2 ({ bytes := v2, folded := true } :
+      proxy_http.response.Form)
+  proxy_http.response.reflection_forms_loop secret forms3 0#usize
+
+/-- [garrett_stateless_core::proxy_http::upstream::DenyRule]
+    Source: 'crates/garrett-stateless-core/src/proxy_http/upstream.rs', lines 5:0-9:1
+    Visibility: public -/
+structure proxy_http.upstream.DenyRule where
   method : alloc.vec.Vec Std.U8
   path : alloc.vec.Vec Std.U8
 
-/-- [garrett_stateless_core::proxy_http::dropped]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 696:0-716:1
+/-- [garrett_stateless_core::proxy_http::upstream::dropped]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/upstream.rs', lines 15:0-35:1
     Visibility: public -/
-def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
+def proxy_http.upstream.dropped
+  (field : proxy_http.request.Field) : Result Bool := do
   let s ←
     lift (Array.to_slice
       (Array.make 13#usize [
         97#u8, 117#u8, 116#u8, 104#u8, 111#u8, 114#u8, 105#u8, 122#u8, 97#u8,
         116#u8, 105#u8, 111#u8, 110#u8
         ]))
-  let b ← proxy_http.name_is field s
+  let b ← proxy_http.request.name_is field s
   if b
   then ok true
   else
@@ -3847,7 +4227,7 @@ def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
         (Array.make 9#usize [
           120#u8, 45#u8, 97#u8, 112#u8, 105#u8, 45#u8, 107#u8, 101#u8, 121#u8
           ]))
-    let b1 ← proxy_http.name_is field s1
+    let b1 ← proxy_http.request.name_is field s1
     if b1
     then ok true
     else
@@ -3858,7 +4238,7 @@ def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
             116#u8, 104#u8, 111#u8, 114#u8, 105#u8, 122#u8, 97#u8, 116#u8,
             105#u8, 111#u8, 110#u8
             ]))
-      let b2 ← proxy_http.name_is field s2
+      let b2 ← proxy_http.request.name_is field s2
       if b2
       then ok true
       else
@@ -3868,7 +4248,7 @@ def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
               112#u8, 114#u8, 111#u8, 120#u8, 121#u8, 45#u8, 99#u8, 111#u8,
               110#u8, 110#u8, 101#u8, 99#u8, 116#u8, 105#u8, 111#u8, 110#u8
               ]))
-        let b3 ← proxy_http.name_is field s3
+        let b3 ← proxy_http.request.name_is field s3
         if b3
         then ok true
         else
@@ -3878,7 +4258,7 @@ def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
                 99#u8, 111#u8, 110#u8, 110#u8, 101#u8, 99#u8, 116#u8, 105#u8,
                 111#u8, 110#u8
                 ]))
-          let b4 ← proxy_http.name_is field s4
+          let b4 ← proxy_http.request.name_is field s4
           if b4
           then ok true
           else
@@ -3888,7 +4268,7 @@ def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
                   107#u8, 101#u8, 101#u8, 112#u8, 45#u8, 97#u8, 108#u8, 105#u8,
                   118#u8, 101#u8
                   ]))
-            let b5 ← proxy_http.name_is field s5
+            let b5 ← proxy_http.request.name_is field s5
             if b5
             then ok true
             else
@@ -3899,7 +4279,7 @@ def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
                     114#u8, 45#u8, 101#u8, 110#u8, 99#u8, 111#u8, 100#u8,
                     105#u8, 110#u8, 103#u8
                     ]))
-              let b6 ← proxy_http.name_is field s6
+              let b6 ← proxy_http.request.name_is field s6
               if b6
               then ok true
               else
@@ -3909,14 +4289,14 @@ def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
                       99#u8, 111#u8, 110#u8, 116#u8, 101#u8, 110#u8, 116#u8,
                       45#u8, 108#u8, 101#u8, 110#u8, 103#u8, 116#u8, 104#u8
                       ]))
-                let b7 ← proxy_http.name_is field s7
+                let b7 ← proxy_http.request.name_is field s7
                 if b7
                 then ok true
                 else
                   let s8 ←
                     lift (Array.to_slice
                       (Array.make 2#usize [ 116#u8, 101#u8 ]))
-                  let b8 ← proxy_http.name_is field s8
+                  let b8 ← proxy_http.request.name_is field s8
                   if b8
                   then ok true
                   else
@@ -3925,7 +4305,7 @@ def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
                         (Array.make 7#usize [
                           116#u8, 114#u8, 97#u8, 105#u8, 108#u8, 101#u8, 114#u8
                           ]))
-                    let b9 ← proxy_http.name_is field s9
+                    let b9 ← proxy_http.request.name_is field s9
                     if b9
                     then ok true
                     else
@@ -3935,7 +4315,7 @@ def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
                             117#u8, 112#u8, 103#u8, 114#u8, 97#u8, 100#u8,
                             101#u8
                             ]))
-                      let b10 ← proxy_http.name_is field s10
+                      let b10 ← proxy_http.request.name_is field s10
                       if b10
                       then ok true
                       else
@@ -3944,7 +4324,7 @@ def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
                             (Array.make 4#usize [
                               104#u8, 111#u8, 115#u8, 116#u8
                               ]))
-                        let b11 ← proxy_http.name_is field s11
+                        let b11 ← proxy_http.request.name_is field s11
                         if b11
                         then ok true
                         else
@@ -3955,7 +4335,7 @@ def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
                                 45#u8, 101#u8, 110#u8, 99#u8, 111#u8, 100#u8,
                                 105#u8, 110#u8, 103#u8
                                 ]))
-                          let b12 ← proxy_http.name_is field s12
+                          let b12 ← proxy_http.request.name_is field s12
                           if b12
                           then ok true
                           else
@@ -3964,7 +4344,7 @@ def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
                                 (Array.make 6#usize [
                                   99#u8, 111#u8, 111#u8, 107#u8, 105#u8, 101#u8
                                   ]))
-                            let b13 ← proxy_http.name_is field s13
+                            let b13 ← proxy_http.request.name_is field s13
                             if b13
                             then ok true
                             else
@@ -3977,7 +4357,7 @@ def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
                                     118#u8, 101#u8, 114#u8, 114#u8, 105#u8,
                                     100#u8, 101#u8
                                     ]))
-                              let b14 ← proxy_http.name_is field s14
+                              let b14 ← proxy_http.request.name_is field s14
                               if b14
                               then ok true
                               else
@@ -3989,7 +4369,8 @@ def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
                                       118#u8, 101#u8, 114#u8, 114#u8, 105#u8,
                                       100#u8, 101#u8
                                       ]))
-                                let b15 ← proxy_http.name_is field s15
+                                let b15 ←
+                                  proxy_http.request.name_is field s15
                                 if b15
                                 then ok true
                                 else
@@ -4000,7 +4381,8 @@ def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
                                         112#u8, 45#u8, 109#u8, 101#u8, 116#u8,
                                         104#u8, 111#u8, 100#u8
                                         ]))
-                                  let b16 ← proxy_http.name_is field s16
+                                  let b16 ←
+                                    proxy_http.request.name_is field s16
                                   if b16
                                   then ok true
                                   else
@@ -4009,7 +4391,8 @@ def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
                                         (Array.make 5#usize [
                                           114#u8, 97#u8, 110#u8, 103#u8, 101#u8
                                           ]))
-                                    let b17 ← proxy_http.name_is field s17
+                                    let b17 ←
+                                      proxy_http.request.name_is field s17
                                     if b17
                                     then ok true
                                     else
@@ -4019,59 +4402,60 @@ def proxy_http.dropped (field : proxy_http.Field) : Result Bool := do
                                             105#u8, 102#u8, 45#u8, 114#u8,
                                             97#u8, 110#u8, 103#u8, 101#u8
                                             ]))
-                                      proxy_http.name_is field s18
+                                      proxy_http.request.name_is field s18
 
-/-- [garrett_stateless_core::proxy_http::forwarded]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 720:4-727:5
+/-- [garrett_stateless_core::proxy_http::upstream::forwarded]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/upstream.rs', lines 39:4-46:5
     Visibility: public -/
 @[rust_loop]
-def proxy_http.forwarded_loop
-  (iter : core.slice.iter.Iter proxy_http.Field)
-  (out : alloc.vec.Vec proxy_http.Field) :
-  Result (alloc.vec.Vec proxy_http.Field)
+def proxy_http.upstream.forwarded_loop
+  (iter : core.slice.iter.Iter proxy_http.request.Field)
+  (out : alloc.vec.Vec proxy_http.request.Field) :
+  Result (alloc.vec.Vec proxy_http.request.Field)
   := do
   let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
   match o with
   | none => ok out
   | some field =>
-    let b ← proxy_http.dropped field
+    let b ← proxy_http.upstream.dropped field
     if b
-    then proxy_http.forwarded_loop iter1 out
+    then proxy_http.upstream.forwarded_loop iter1 out
     else
       let v ← alloc.vec.CloneVec.clone core.clone.CloneU8 field.name
       let v1 ← alloc.vec.CloneVec.clone core.clone.CloneU8 field.value
       let out1 ←
         alloc.vec.Vec.push out ({ «name» := v, value := v1 } :
-          proxy_http.Field)
-      proxy_http.forwarded_loop iter1 out1
+          proxy_http.request.Field)
+      proxy_http.upstream.forwarded_loop iter1 out1
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::forwarded]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 718:0-729:1
+/-- [garrett_stateless_core::proxy_http::upstream::forwarded]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/upstream.rs', lines 37:0-48:1
     Visibility: public -/
-def proxy_http.forwarded
-  (fields : Slice proxy_http.Field) :
-  Result (alloc.vec.Vec proxy_http.Field)
+def proxy_http.upstream.forwarded
+  (fields : Slice proxy_http.request.Field) :
+  Result (alloc.vec.Vec proxy_http.request.Field)
   := do
   let iter ←
     SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
       fields
-  proxy_http.forwarded_loop iter (alloc.vec.Vec.new proxy_http.Field)
+  proxy_http.upstream.forwarded_loop iter (alloc.vec.Vec.new
+    proxy_http.request.Field)
 
-/-- [garrett_stateless_core::proxy_http::method_ok]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 737:0-739:1
+/-- [garrett_stateless_core::proxy_http::upstream::method_ok]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/upstream.rs', lines 56:0-58:1
     Visibility: public -/
-def proxy_http.method_ok
+def proxy_http.upstream.method_ok
   (rule_method : Slice Std.U8) (method : Slice Std.U8) : Result Bool := do
   let i := Slice.len rule_method
   if i = 0#usize
   then ok true
   else core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 rule_method method
 
-/-- [garrett_stateless_core::proxy_http::plus_slash]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 742:0-747:1
+/-- [garrett_stateless_core::proxy_http::upstream::plus_slash]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/upstream.rs', lines 61:0-66:1
     Visibility: public -/
-def proxy_http.plus_slash
+def proxy_http.upstream.plus_slash
   («prefix» : Slice Std.U8) (path : Slice Std.U8) : Result Bool := do
   let i := Slice.len path
   let i1 := Slice.len «prefix»
@@ -4096,10 +4480,11 @@ def proxy_http.plus_slash
     else ok false
   else ok false
 
-/-- [garrett_stateless_core::proxy_http::ends_with_slash]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 750:0-752:1
+/-- [garrett_stateless_core::proxy_http::upstream::ends_with_slash]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/upstream.rs', lines 69:0-71:1
     Visibility: public -/
-def proxy_http.ends_with_slash (rule_path : Slice Std.U8) : Result Bool := do
+def proxy_http.upstream.ends_with_slash
+  (rule_path : Slice Std.U8) : Result Bool := do
   let i := Slice.len rule_path
   if i > 0#usize
   then
@@ -4109,24 +4494,24 @@ def proxy_http.ends_with_slash (rule_path : Slice Std.U8) : Result Bool := do
     ok (i3 = 47#u8)
   else ok false
 
-/-- [garrett_stateless_core::proxy_http::path_matches]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 756:0-762:1
+/-- [garrett_stateless_core::proxy_http::upstream::path_matches]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/upstream.rs', lines 75:0-81:1
     Visibility: public -/
-def proxy_http.path_matches
+def proxy_http.upstream.path_matches
   (rule_path : Slice Std.U8) (path : Slice Std.U8) : Result Bool := do
   let b ←
     core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 path rule_path
   if b
   then ok true
   else
-    let b1 ← proxy_http.plus_slash rule_path path
+    let b1 ← proxy_http.upstream.plus_slash rule_path path
     if b1
     then ok true
     else
-      let b2 ← proxy_http.ends_with_slash rule_path
+      let b2 ← proxy_http.upstream.ends_with_slash rule_path
       if b2
       then
-        let b3 ← proxy_http.plus_slash path rule_path
+        let b3 ← proxy_http.upstream.plus_slash path rule_path
         if b3
         then ok true
         else
@@ -4143,100 +4528,104 @@ def proxy_http.path_matches
           else ok false
       else ok false
 
-/-- [garrett_stateless_core::proxy_http::rule_matches]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 764:0-766:1
+/-- [garrett_stateless_core::proxy_http::upstream::rule_matches]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/upstream.rs', lines 83:0-85:1
     Visibility: public -/
-def proxy_http.rule_matches
-  (rule : proxy_http.DenyRule) (method : Slice Std.U8) (path : Slice Std.U8) :
+def proxy_http.upstream.rule_matches
+  (rule : proxy_http.upstream.DenyRule) (method : Slice Std.U8)
+  (path : Slice Std.U8) :
   Result Bool
   := do
   let s := alloc.vec.Vec.deref rule.method
-  let b ← proxy_http.method_ok s method
+  let b ← proxy_http.upstream.method_ok s method
   if b
-  then let s1 := alloc.vec.Vec.deref rule.path
-       proxy_http.path_matches s1 path
+  then
+    let s1 := alloc.vec.Vec.deref rule.path
+    proxy_http.upstream.path_matches s1 path
   else ok false
 
-/-- [garrett_stateless_core::proxy_http::denied]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 769:4-775:1
+/-- [garrett_stateless_core::proxy_http::upstream::denied]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/upstream.rs', lines 88:4-94:1
     Visibility: public -/
 @[rust_loop]
-def proxy_http.denied_loop
-  (iter : core.slice.iter.Iter proxy_http.DenyRule) (method : Slice Std.U8)
-  (path : Slice Std.U8) :
+def proxy_http.upstream.denied_loop
+  (iter : core.slice.iter.Iter proxy_http.upstream.DenyRule)
+  (method : Slice Std.U8) (path : Slice Std.U8) :
   Result Bool
   := do
   let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
   match o with
   | none => ok false
   | some rule =>
-    let b ← proxy_http.rule_matches rule method path
+    let b ← proxy_http.upstream.rule_matches rule method path
     if b
     then ok true
-    else proxy_http.denied_loop iter1 method path
+    else proxy_http.upstream.denied_loop iter1 method path
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::denied]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 768:0-775:1
+/-- [garrett_stateless_core::proxy_http::upstream::denied]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/upstream.rs', lines 87:0-94:1
     Visibility: public -/
-def proxy_http.denied
-  (rules : Slice proxy_http.DenyRule) (method : Slice Std.U8)
+def proxy_http.upstream.denied
+  (rules : Slice proxy_http.upstream.DenyRule) (method : Slice Std.U8)
   (path : Slice Std.U8) :
   Result Bool
   := do
   let iter ←
     SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
       rules
-  proxy_http.denied_loop iter method path
+  proxy_http.upstream.denied_loop iter method path
 
-/-- [garrett_stateless_core::proxy_http::clean_field]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 780:0-784:1
+/-- [garrett_stateless_core::proxy_http::upstream::clean_field]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/upstream.rs', lines 99:0-103:1
     Visibility: public -/
-def proxy_http.clean_field (field : proxy_http.Field) : Result Bool := do
+def proxy_http.upstream.clean_field
+  (field : proxy_http.request.Field) : Result Bool := do
   let i := alloc.vec.Vec.len field.name
   if i != 0#usize
   then
     let s := alloc.vec.Vec.deref field.name
     let i1 := alloc.vec.Vec.len field.name
-    let b ← proxy_http.all_token s i1
+    let b ← proxy_http.request.all_token s i1
     if b
     then
       let s1 := alloc.vec.Vec.deref field.value
       let i2 := alloc.vec.Vec.len field.value
-      proxy_http.all_value s1 0#usize i2
+      proxy_http.request.all_value s1 0#usize i2
     else ok false
   else ok false
 
-/-- [garrett_stateless_core::proxy_http::clean_fields]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 787:4-793:1
+/-- [garrett_stateless_core::proxy_http::upstream::clean_fields]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/upstream.rs', lines 106:4-112:1
     Visibility: public -/
 @[rust_loop]
-def proxy_http.clean_fields_loop
-  (iter : core.slice.iter.Iter proxy_http.Field) : Result Bool := do
+def proxy_http.upstream.clean_fields_loop
+  (iter : core.slice.iter.Iter proxy_http.request.Field) : Result Bool := do
   let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
   match o with
   | none => ok true
   | some field =>
-    let b ← proxy_http.clean_field field
+    let b ← proxy_http.upstream.clean_field field
     if b
-    then proxy_http.clean_fields_loop iter1
+    then proxy_http.upstream.clean_fields_loop iter1
     else ok false
 partial_fixpoint
 
-/-- [garrett_stateless_core::proxy_http::clean_fields]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 786:0-793:1
+/-- [garrett_stateless_core::proxy_http::upstream::clean_fields]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/upstream.rs', lines 105:0-112:1
     Visibility: public -/
-def proxy_http.clean_fields
-  (fields : Slice proxy_http.Field) : Result Bool := do
+def proxy_http.upstream.clean_fields
+  (fields : Slice proxy_http.request.Field) : Result Bool := do
   let iter ←
     SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
       fields
-  proxy_http.clean_fields_loop iter
+  proxy_http.upstream.clean_fields_loop iter
 
-/-- [garrett_stateless_core::proxy_http::needs_length]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 804:0-810:1
+/-- [garrett_stateless_core::proxy_http::upstream::needs_length]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/upstream.rs', lines 123:0-129:1
     Visibility: public -/
-def proxy_http.needs_length (request : proxy_http.Request) : Result Bool := do
+def proxy_http.upstream.needs_length
+  (request : proxy_http.request.Request) : Result Bool := do
   let post ←
     lift (Array.to_slice (Array.make 4#usize [ 80#u8, 79#u8, 83#u8, 84#u8 ]))
   let put ←
@@ -4259,39 +4648,40 @@ def proxy_http.needs_length (request : proxy_http.Request) : Result Bool := do
       then ok true
       else core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 method patch
 
-/-- [garrett_stateless_core::proxy_http::encode_upstream]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 817:0-861:1
+/-- [garrett_stateless_core::proxy_http::upstream::encode_upstream]:
+    Source: 'crates/garrett-stateless-core/src/proxy_http/upstream.rs', lines 136:0-180:1
     Visibility: public -/
-def proxy_http.encode_upstream
-  (output : alloc.vec.Vec Std.U8) (request : proxy_http.Request)
-  (host : Slice Std.U8) (rules : Slice proxy_http.DenyRule)
+def proxy_http.upstream.encode_upstream
+  (output : alloc.vec.Vec Std.U8) (request : proxy_http.request.Request)
+  (host : Slice Std.U8) (rules : Slice proxy_http.upstream.DenyRule)
   (secret : Slice Std.U8) (authentication : credential_use.Authentication) :
-  Result ((core.result.Result Unit proxy_http.Refusal) × (alloc.vec.Vec
-    Std.U8))
+  Result ((core.result.Result Unit proxy_http.request.Refusal) ×
+    (alloc.vec.Vec Std.U8))
   := do
   let s := alloc.vec.Vec.deref request.method
-  let b ← proxy_http.valid_method s
+  let b ← proxy_http.request.valid_method s
   if b
   then
     let s1 := alloc.vec.Vec.deref request.target
-    let b1 ← proxy_http.check_target s1
+    let b1 ← proxy_http.request.check_target s1
     if b1
     then
       let s2 := alloc.vec.Vec.deref request.fields
-      let fields ← proxy_http.forwarded s2
+      let fields ← proxy_http.upstream.forwarded s2
       let s3 := alloc.vec.Vec.deref fields
-      let b2 ← proxy_http.clean_fields s3
+      let b2 ← proxy_http.upstream.clean_fields s3
       if b2
       then
         let s4 := alloc.vec.Vec.deref request.target
-        let «end» ← proxy_http.path_end s4
+        let «end» ← proxy_http.request.path_end s4
         let s5 := alloc.vec.Vec.deref request.method
         let s6 ←
           alloc.vec.Vec.index (core.slice.index.SliceIndexRangeToUsizeSlice
             Std.U8) request.target { «end» }
-        let b3 ← proxy_http.denied rules s5 s6
+        let b3 ← proxy_http.upstream.denied rules s5 s6
         if b3
-        then ok (core.result.Result.Err proxy_http.Refusal.Denied, output)
+        then
+          ok (core.result.Result.Err proxy_http.request.Refusal.Denied, output)
         else
           let b4 ← http_auth.valid_credential secret
           if b4
@@ -4321,7 +4711,7 @@ def proxy_http.encode_upstream
             let output6 ←
               alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output5 s11
             let s12 := alloc.vec.Vec.deref fields
-            let output7 ← proxy_http.append_fields output6 s12
+            let output7 ← proxy_http.upstream.append_fields output6 s12
             let (r, output8) ←
               http_auth.append_header output7 secret authentication
             match r with
@@ -4339,7 +4729,7 @@ def proxy_http.encode_upstream
                     ]))
               let output9 ←
                 alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output8 s13
-              let b5 ← proxy_http.needs_length request
+              let b5 ← proxy_http.upstream.needs_length request
               let output10 ←
                 if b5
                 then
@@ -4370,319 +4760,20 @@ def proxy_http.encode_upstream
                 alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output11 s15
               ok (core.result.Result.Ok (), output12)
             | core.result.Result.Err _ =>
-              ok (core.result.Result.Err proxy_http.Refusal.InvalidCredential,
-                output8)
+              ok (core.result.Result.Err
+                proxy_http.request.Refusal.InvalidCredential, output8)
           else
-            ok (core.result.Result.Err proxy_http.Refusal.InvalidCredential,
-              output)
+            ok (core.result.Result.Err
+              proxy_http.request.Refusal.InvalidCredential, output)
       else
-        ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest, output)
-    else ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest, output)
-  else ok (core.result.Result.Err proxy_http.Refusal.InvalidRequest, output)
-
-/-- [garrett_stateless_core::proxy_http::hex_lower]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1049:0-1055:1
-    Visibility: public -/
-def proxy_http.hex_lower (nibble : Std.U8) : Result Std.U8 := do
-  if nibble < 10#u8
-  then 48#u8 + nibble
-  else let i ← nibble - 10#u8
-       97#u8 + i
-
-/-- [garrett_stateless_core::proxy_http::percent_lower]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1064:4-1072:5
-    Visibility: public -/
-@[rust_loop]
-def proxy_http.percent_lower_loop
-  (iter : core.slice.iter.Iter Std.U8) (out : alloc.vec.Vec Std.U8) :
-  Result (alloc.vec.Vec Std.U8)
-  := do
-  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
-  match o with
-  | none => ok out
-  | some byte =>
-    let b ← proxy_http.unreserved byte
-    if b
-    then
-      let i ← http_wire.ascii_lower byte
-      let out1 ← alloc.vec.Vec.push out i
-      proxy_http.percent_lower_loop iter1 out1
+        ok (core.result.Result.Err proxy_http.request.Refusal.InvalidRequest,
+          output)
     else
-      let out1 ← alloc.vec.Vec.push out 37#u8
-      let i ← byte >>> 4#i32
-      let i1 ← proxy_http.hex_lower i
-      let out2 ← alloc.vec.Vec.push out1 i1
-      let i2 ← lift (byte &&& 15#u8)
-      let i3 ← proxy_http.hex_lower i2
-      let out3 ← alloc.vec.Vec.push out2 i3
-      proxy_http.percent_lower_loop iter1 out3
-partial_fixpoint
-
-/-- [garrett_stateless_core::proxy_http::percent_lower]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1062:0-1074:1
-    Visibility: public -/
-def proxy_http.percent_lower
-  (secret : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
-  let iter ←
-    SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
-      secret
-  proxy_http.percent_lower_loop iter (alloc.vec.Vec.new Std.U8)
-
-/-- [garrett_stateless_core::proxy_http::hex_bytes]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1078:4-1081:5
-    Visibility: public -/
-@[rust_loop]
-def proxy_http.hex_bytes_loop
-  (iter : core.slice.iter.Iter Std.U8) (out : alloc.vec.Vec Std.U8) :
-  Result (alloc.vec.Vec Std.U8)
-  := do
-  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
-  match o with
-  | none => ok out
-  | some byte =>
-    let i ← byte >>> 4#i32
-    let i1 ← proxy_http.hex_lower i
-    let out1 ← alloc.vec.Vec.push out i1
-    let i2 ← lift (byte &&& 15#u8)
-    let i3 ← proxy_http.hex_lower i2
-    let out2 ← alloc.vec.Vec.push out1 i3
-    proxy_http.hex_bytes_loop iter1 out2
-partial_fixpoint
-
-/-- [garrett_stateless_core::proxy_http::hex_bytes]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1076:0-1083:1
-    Visibility: public -/
-def proxy_http.hex_bytes
-  (secret : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
-  let iter ←
-    SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
-      secret
-  proxy_http.hex_bytes_loop iter (alloc.vec.Vec.new Std.U8)
-
-/-- [garrett_stateless_core::proxy_http::base64_symbol]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1085:0-1103:1
-    Visibility: public -/
-def proxy_http.base64_symbol
-  (value : Std.U8) (url : Bool) : Result Std.U8 := do
-  if value < 26#u8
-  then 65#u8 + value
+      ok (core.result.Result.Err proxy_http.request.Refusal.InvalidRequest,
+        output)
   else
-    if value < 52#u8
-    then let i ← value - 26#u8
-         97#u8 + i
-    else
-      if value < 62#u8
-      then let i ← value - 52#u8
-           48#u8 + i
-      else
-        if value = 62#u8
-        then if url
-             then ok 45#u8
-             else ok 43#u8
-        else if url
-             then ok 95#u8
-             else ok 47#u8
-
-/-- [garrett_stateless_core::proxy_http::sextet]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1106:0-1118:1
-    Visibility: public -/
-def proxy_http.sextet
-  (bytes : Slice Std.U8) (index : Std.Usize) : Result Std.U8 := do
-  let bit ← index * 6#usize
-  let byte ← bit / 8#usize
-  let offset ← bit % 8#usize
-  let i ← Slice.index_usize bytes byte
-  let high ← lift (UScalar.cast .U16 i)
-  let i1 ← byte + 1#usize
-  let i2 := Slice.len bytes
-  let low ←
-    if i1 < i2
-    then do
-         let i3 ← Slice.index_usize bytes i1
-         ok (UScalar.cast .U16 i3)
-    else ok 0#u16
-  let i3 ← high <<< 8#i32
-  let pair ← lift (i3 ||| low)
-  let i4 ← 10#usize - offset
-  let i5 ← pair >>> i4
-  let i6 ← lift (i5 &&& 63#u16)
-  ok (UScalar.cast .U8 i6)
-
-/-- [garrett_stateless_core::proxy_http::encode_unpadded]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1126:4-1129:5
-    Visibility: public -/
-@[rust_loop]
-def proxy_http.encode_unpadded_loop
-  (bytes : Slice Std.U8) (url : Bool) («end» : Std.Usize)
-  (out : alloc.vec.Vec Std.U8) (index : Std.Usize) :
-  Result (alloc.vec.Vec Std.U8)
-  := do
-  if index < «end»
-  then
-    let i ← proxy_http.sextet bytes index
-    let i1 ← proxy_http.base64_symbol i url
-    let out1 ← alloc.vec.Vec.push out i1
-    let index1 ← index + 1#usize
-    proxy_http.encode_unpadded_loop bytes url «end» out1 index1
-  else ok out
-partial_fixpoint
-
-/-- [garrett_stateless_core::proxy_http::encode_unpadded]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1122:0-1131:1
-    Visibility: public -/
-def proxy_http.encode_unpadded
-  (bytes : Slice Std.U8) (url : Bool) : Result (alloc.vec.Vec Std.U8) := do
-  let i := Slice.len bytes
-  let i1 ← 8#usize * i
-  let i2 ← i1 + 5#usize
-  let «end» ← i2 / 6#usize
-  proxy_http.encode_unpadded_loop bytes url «end» (alloc.vec.Vec.new Std.U8)
-    0#usize
-
-/-- [garrett_stateless_core::proxy_http::aligned_base64]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1138:4-1141:5
-    Visibility: public -/
-@[rust_loop]
-def proxy_http.aligned_base64_loop0
-  (shift : Std.Usize) (padded : alloc.vec.Vec Std.U8) (zero : Std.Usize) :
-  Result (alloc.vec.Vec Std.U8)
-  := do
-  if zero < shift
-  then
-    let padded1 ← alloc.vec.Vec.push padded 0#u8
-    let zero1 ← zero + 1#usize
-    proxy_http.aligned_base64_loop0 shift padded1 zero1
-  else ok padded
-partial_fixpoint
-
-/-- [garrett_stateless_core::proxy_http::aligned_base64]: loop 1:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1147:4-1150:5
-    Visibility: public -/
-@[rust_loop]
-def proxy_http.aligned_base64_loop1
-  (url : Bool) (padded : alloc.vec.Vec Std.U8) («end» : Std.Usize)
-  (out : alloc.vec.Vec Std.U8) (index : Std.Usize) :
-  Result (alloc.vec.Vec Std.U8)
-  := do
-  if index < «end»
-  then
-    let s := alloc.vec.Vec.deref padded
-    let i ← proxy_http.sextet s index
-    let i1 ← proxy_http.base64_symbol i url
-    let out1 ← alloc.vec.Vec.push out i1
-    let index1 ← index + 1#usize
-    proxy_http.aligned_base64_loop1 url padded «end» out1 index1
-  else ok out
-partial_fixpoint
-
-/-- [garrett_stateless_core::proxy_http::aligned_base64]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1135:0-1152:1
-    Visibility: public -/
-def proxy_http.aligned_base64
-  (secret : Slice Std.U8) (shift : Std.Usize) (url : Bool) :
-  Result (alloc.vec.Vec Std.U8)
-  := do
-  let padded ←
-    proxy_http.aligned_base64_loop0 shift (alloc.vec.Vec.new Std.U8) 0#usize
-  let padded1 ←
-    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 padded secret
-  let i ← 8#usize * shift
-  let i1 ← i + 5#usize
-  let start ← i1 / 6#usize
-  let i2 := alloc.vec.Vec.len padded1
-  let i3 ← 8#usize * i2
-  let «end» ← i3 / 6#usize
-  proxy_http.aligned_base64_loop1 url padded1 «end» (alloc.vec.Vec.new
-    Std.U8) start
-
-/-- [garrett_stateless_core::proxy_http::json_slashes]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1158:4-1163:5
-    Visibility: public -/
-@[rust_loop]
-def proxy_http.json_slashes_loop
-  (iter : core.slice.iter.Iter Std.U8) (out : alloc.vec.Vec Std.U8) :
-  Result (alloc.vec.Vec Std.U8)
-  := do
-  let (o, iter1) ← core.slice.iter.IteratorSliceIter.next iter
-  match o with
-  | none => ok out
-  | some byte =>
-    let out1 ← if byte = 47#u8
-                 then alloc.vec.Vec.push out 92#u8
-                 else ok out
-    let out2 ← alloc.vec.Vec.push out1 byte
-    proxy_http.json_slashes_loop iter1 out2
-partial_fixpoint
-
-/-- [garrett_stateless_core::proxy_http::json_slashes]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1156:0-1165:1
-    Visibility: public -/
-def proxy_http.json_slashes
-  (secret : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
-  let iter ←
-    SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter
-      secret
-  proxy_http.json_slashes_loop iter (alloc.vec.Vec.new Std.U8)
-
-/-- [garrett_stateless_core::proxy_http::reflection_forms]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1189:4-1205:5
-    Visibility: public -/
-@[rust_loop]
-def proxy_http.reflection_forms_loop
-  (secret : Slice Std.U8) (forms : alloc.vec.Vec proxy_http.Form)
-  (shift : Std.Usize) :
-  Result (alloc.vec.Vec proxy_http.Form)
-  := do
-  if shift < 3#usize
-  then
-    let standard ← proxy_http.aligned_base64 secret shift false
-    let i := alloc.vec.Vec.len standard
-    let forms1 ←
-      if i >= 8#usize
-      then
-        alloc.vec.Vec.push forms ({ bytes := standard, folded := false } :
-          proxy_http.Form)
-      else ok forms
-    let url ← proxy_http.aligned_base64 secret shift true
-    let i1 := alloc.vec.Vec.len url
-    let forms2 ←
-      if i1 >= 8#usize
-      then
-        alloc.vec.Vec.push forms1 ({ bytes := url, folded := false } :
-          proxy_http.Form)
-      else ok forms1
-    let shift1 ← shift + 1#usize
-    proxy_http.reflection_forms_loop secret forms2 shift1
-  else ok forms
-partial_fixpoint
-
-/-- [garrett_stateless_core::proxy_http::reflection_forms]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http.rs', lines 1167:0-1207:1
-    Visibility: public -/
-def proxy_http.reflection_forms
-  (secret : Slice Std.U8) : Result (alloc.vec.Vec proxy_http.Form) := do
-  let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 secret
-  let forms ←
-    alloc.vec.Vec.push (alloc.vec.Vec.new proxy_http.Form)
-      ({ bytes := v, folded := false } : proxy_http.Form)
-  let escaped ← proxy_http.json_slashes secret
-  let i := alloc.vec.Vec.len escaped
-  let i1 := Slice.len secret
-  let forms1 ←
-    if i != i1
-    then
-      alloc.vec.Vec.push forms ({ bytes := escaped, folded := false } :
-        proxy_http.Form)
-    else ok forms
-  let v1 ← proxy_http.percent_lower secret
-  let forms2 ←
-    alloc.vec.Vec.push forms1 ({ bytes := v1, folded := true } :
-      proxy_http.Form)
-  let v2 ← proxy_http.hex_bytes secret
-  let forms3 ←
-    alloc.vec.Vec.push forms2 ({ bytes := v2, folded := true } :
-      proxy_http.Form)
-  proxy_http.reflection_forms_loop secret forms3 0#usize
+    ok (core.result.Result.Err proxy_http.request.Refusal.InvalidRequest,
+      output)
 
 /-- [garrett_stateless_core::stateless::MAX_TIME]
     Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 14:0-14:43
@@ -6207,9 +6298,11 @@ structure stateless_policy.Operation where
     Source: 'crates/garrett-stateless-core/src/stateless_policy.rs', lines 31:0-38:1
     Visibility: public -/
 def stateless_policy.operation_of
-  (request : proxy_http.Request) : Result stateless_policy.Operation := do
+  (request : proxy_http.request.Request) :
+  Result stateless_policy.Operation
+  := do
   let s := alloc.vec.Vec.deref request.target
-  let «end» ← proxy_http.path_end s
+  let «end» ← proxy_http.request.path_end s
   let v ← alloc.vec.CloneVec.clone core.clone.CloneU8 request.method
   let s1 ←
     alloc.vec.Vec.index (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8)
@@ -6293,12 +6386,12 @@ def stateless_policy.resource_allows
   then
     let s := alloc.vec.Vec.deref resource.method
     let s1 := alloc.vec.Vec.deref operation.method
-    let b1 ← proxy_http.method_ok s s1
+    let b1 ← proxy_http.upstream.method_ok s s1
     if b1
     then
       let s2 := alloc.vec.Vec.deref resource.path
       let s3 := alloc.vec.Vec.deref operation.path
-      proxy_http.path_matches s2 s3
+      proxy_http.upstream.path_matches s2 s3
     else ok false
   else ok false
 
@@ -6371,7 +6464,7 @@ def
 structure stateless_proxy.Route where
   provider : alloc.vec.Vec Std.U8
   host : alloc.vec.Vec Std.U8
-  rules : alloc.vec.Vec proxy_http.DenyRule
+  rules : alloc.vec.Vec proxy_http.upstream.DenyRule
   authentication : credential_use.Authentication
 
 /-- [garrett_stateless_core::stateless_proxy::Egress]
@@ -6403,7 +6496,7 @@ structure stateless_proxy.Origin (Self : Type _) where
   admitted : Self → stateless.SurrogateClaims → Std.Usize → Result (Bool
     × Self)
   exchange : Self → stateless_proxy.Egress → Result ((core.result.Result
-    (alloc.vec.Vec Std.U8) proxy_http.Code) × Self)
+    (alloc.vec.Vec Std.U8) proxy_http.refusal.Code) × Self)
   completed : Self → Std.U16 → Result (Bool × Self)
 
 /-- Trait declaration: [garrett_stateless_core::stateless_proxy::Channel]
@@ -6414,9 +6507,9 @@ structure stateless_proxy.Channel (Self : Type _) where
   overdue : Self → Result (Bool × Self)
   read : Self → Result ((Option (alloc.vec.Vec Std.U8)) × Self)
   send : Self → Slice Std.U8 → Result (Bool × Self)
-  refused : Self → proxy_http.Code → Result Self
-  stopped : Self → proxy_http.Code → Result Self
-  begin : Self → proxy_http.Request → Result (Std.I64 × Self)
+  refused : Self → proxy_http.refusal.Code → Result Self
+  stopped : Self → proxy_http.refusal.Code → Result Self
+  begin : Self → proxy_http.request.Request → Result (Std.I64 × Self)
   restart : Self → Result Self
 
 /-- [garrett_stateless_core::stateless_proxy::surrogate_value]:
@@ -6442,7 +6535,7 @@ def stateless_proxy.surrogate_value
     Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 104:0-113:1
     Visibility: public -/
 def stateless_proxy.surrogate_of
-  (fields : Slice proxy_http.Field) :
+  (fields : Slice proxy_http.request.Field) :
   Result (Option (alloc.vec.Vec Std.U8))
   := do
   let s ←
@@ -6451,7 +6544,7 @@ def stateless_proxy.surrogate_of
         97#u8, 117#u8, 116#u8, 104#u8, 111#u8, 114#u8, 105#u8, 122#u8, 97#u8,
         116#u8, 105#u8, 111#u8, 110#u8
         ]))
-  let i ← proxy_http.count_named fields s
+  let i ← proxy_http.request.count_named fields s
   if i != 1#usize
   then ok none
   else
@@ -6461,7 +6554,7 @@ def stateless_proxy.surrogate_of
           97#u8, 117#u8, 116#u8, 104#u8, 111#u8, 114#u8, 105#u8, 122#u8, 97#u8,
           116#u8, 105#u8, 111#u8, 110#u8
           ]))
-    let index ← proxy_http.first_named fields s1
+    let index ← proxy_http.request.first_named fields s1
     let i1 := Slice.len fields
     if index >= i1
     then ok none
@@ -6571,7 +6664,7 @@ def stateless_proxy.unauthorized_served : Result proxy_controller.Served := do
       reply := v,
       keep := false,
       stage := proxy_controller.Stage.Refused,
-      code := proxy_http.Code.Unauthenticated,
+      code := proxy_http.refusal.Code.Unauthenticated,
       status := 0#u16
     }
 
@@ -6589,7 +6682,7 @@ structure stateless_proxy.Dispatch where
 @[discriminant isize]
 inductive stateless_proxy.Decision where
 | Unauthorized : Option stateless.Rejection → stateless_proxy.Decision
-| Refused : proxy_http.Code → stateless_proxy.Decision
+| Refused : proxy_http.refusal.Code → stateless_proxy.Decision
 | Dispatch : stateless_proxy.Dispatch → stateless_proxy.Decision
 
 /-- [garrett_stateless_core::stateless_proxy::decide]:
@@ -6599,7 +6692,7 @@ def stateless_proxy.decide
   {V : Type _} {P : Type _} (statelessSurrogateOpenerInst :
   stateless.SurrogateOpener V) (stateless_policyOperationPolicyInst :
   stateless_policy.OperationPolicy P) (opener : V) (policy : P)
-  (request : proxy_http.Request) (routes : Slice stateless_proxy.Route)
+  (request : proxy_http.request.Request) (routes : Slice stateless_proxy.Route)
   (acceptance : stateless.Acceptance) (peer : Slice Std.U8) (now : Std.I64) :
   Result stateless_proxy.Decision
   := do
@@ -6618,7 +6711,9 @@ def stateless_proxy.decide
       let index ← stateless_proxy.route_of routes s2
       let i := Slice.len routes
       if index >= i
-      then ok (stateless_proxy.Decision.Refused proxy_http.Code.UnknownOrigin)
+      then
+        ok (stateless_proxy.Decision.Refused
+          proxy_http.refusal.Code.UnknownOrigin)
       else
         let o1 ← stateless_policy.operation_of request
         let b ←
@@ -6634,8 +6729,8 @@ def stateless_proxy.decide
             let s4 := alloc.vec.Vec.deref route.rules
             let s5 := alloc.vec.Vec.deref opened.credential
             let (r2, wire) ←
-              proxy_http.encode_upstream (alloc.vec.Vec.new Std.U8) request s3
-                s4 s5 route.authentication
+              proxy_http.upstream.encode_upstream (alloc.vec.Vec.new Std.U8)
+                request s3 s4 s5 route.authentication
             match r2 with
             | core.result.Result.Ok _ =>
               ok (stateless_proxy.Decision.Dispatch
@@ -6645,7 +6740,8 @@ def stateless_proxy.decide
               ok (stateless_proxy.Decision.Refused c)
           | core.result.Result.Err rejection =>
             ok (stateless_proxy.Decision.Unauthorized (some rejection))
-        else ok (stateless_proxy.Decision.Refused proxy_http.Code.Denied)
+        else
+          ok (stateless_proxy.Decision.Refused proxy_http.refusal.Code.Denied)
     | core.result.Result.Err rejection =>
       ok (stateless_proxy.Decision.Unauthorized (some rejection))
 
@@ -6656,7 +6752,7 @@ def stateless_proxy.serve
   {V : Type _} {P : Type _} {O : Type _} (statelessSurrogateOpenerInst :
   stateless.SurrogateOpener V) (stateless_policyOperationPolicyInst :
   stateless_policy.OperationPolicy P) (OriginInst : stateless_proxy.Origin O)
-  (opener : V) (policy : P) (origin : O) (request : proxy_http.Request)
+  (opener : V) (policy : P) (origin : O) (request : proxy_http.request.Request)
   (routes : Slice stateless_proxy.Route) (acceptance : stateless.Acceptance)
   (peer : Slice Std.U8) (now : Std.I64) (limit : Std.Usize) :
   Result (proxy_controller.Served × O)
@@ -6682,7 +6778,7 @@ def stateless_proxy.serve
     if b
     then
       let s := alloc.vec.Vec.deref dispatch.opened.credential
-      let forms ← proxy_http.reflection_forms s
+      let forms ← proxy_http.response.reflection_forms s
       let (r, origin2) ←
         OriginInst.exchange origin1
           { route := dispatch.route, wire := dispatch.wire }
@@ -6700,7 +6796,7 @@ def stateless_proxy.serve
           then ok (served, origin3)
           else
             let s3 ←
-              proxy_controller.stopped proxy_http.Code.OutcomeUnknown
+              proxy_controller.stopped proxy_http.refusal.Code.OutcomeUnknown
                 proxy_controller.Stage.Failed
             ok (s3, origin3)
       | core.result.Result.Err code =>
@@ -6708,7 +6804,7 @@ def stateless_proxy.serve
         ok (s1, origin2)
     else
       let s ←
-        proxy_controller.stopped proxy_http.Code.InternalError
+        proxy_controller.stopped proxy_http.refusal.Code.InternalError
           proxy_controller.Stage.Refused
       ok (s, origin1)
 
@@ -6749,7 +6845,7 @@ def stateless_proxy.connection_step
             ok ({ buffer := buffer1, «open» := true }, channel2)
       | proxy_controller.Framed.Refuse code =>
         let channel2 ← ChannelInst.refused channel1 code
-        let v ← proxy_http.refusal code
+        let v ← proxy_http.refusal.refusal code
         let s1 := alloc.vec.Vec.deref v
         let (_, channel3) ← ChannelInst.send channel2 s1
         ok ({ buffer, «open» := false }, channel3)
@@ -6793,7 +6889,7 @@ def stateless_proxy.connection_step
           ok ({ buffer := buffer1, «open» := true }, channel1)
     | proxy_controller.Framed.Refuse code =>
       let channel1 ← ChannelInst.refused channel code
-      let v ← proxy_http.refusal code
+      let v ← proxy_http.refusal.refusal code
       let s1 := alloc.vec.Vec.deref v
       let (_, channel2) ← ChannelInst.send channel1 s1
       ok ({ buffer, «open» := false }, channel2)
@@ -6863,120 +6959,18 @@ def stateless_proxy.connection
     routes acceptance authority peer limit
     { buffer := (alloc.vec.Vec.new Std.U8), «open» := true }
 
-/-- [garrett_stateless_core::stateless_token::MAX_TOKEN]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 27:0-27:35
+/-- [garrett_stateless_core::stateless_token::base64::b64url]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/base64.rs', lines 15:0-17:1
     Visibility: public -/
-@[global_simps, irreducible]
-def stateless_token.MAX_TOKEN : Std.Usize := 16384#usize
-
-/-- [garrett_stateless_core::stateless_token::MAX_INTEGER]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 29:0-29:46
-    Visibility: public -/
-@[global_simps, irreducible]
-def stateless_token.MAX_INTEGER : Std.I64 := 9007199254740991#i64
-
-/-- [garrett_stateless_core::stateless_token::MAX_KEYS]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 30:0-30:30
-    Visibility: public -/
-@[global_simps, irreducible]
-def stateless_token.MAX_KEYS : Std.Usize := 8#usize
-
-/-- [garrett_stateless_core::stateless_token::MAX_DEPTH]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 32:0-32:32
-    Visibility: public -/
-@[global_simps, irreducible]
-def stateless_token.MAX_DEPTH : Std.Usize := 16#usize
-
-/-- [garrett_stateless_core::stateless_token::NONCE]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 33:0-33:28
-    Visibility: public -/
-@[global_simps, irreducible] def stateless_token.NONCE : Std.Usize := 12#usize
-
-/-- [garrett_stateless_core::stateless_token::TAG]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 34:0-34:26
-    Visibility: public -/
-@[global_simps, irreducible] def stateless_token.TAG : Std.Usize := 16#usize
-
-/-- [garrett_stateless_core::stateless_token::SIGNATURE]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 35:0-35:32
-    Visibility: public -/
-@[global_simps, irreducible]
-def stateless_token.SIGNATURE : Std.Usize := 64#usize
-
-/-- [garrett_stateless_core::stateless_token::CREDENTIAL_LABEL]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 37:0-37:73
-    Visibility: public -/
-@[global_simps, irreducible]
-def stateless_token.CREDENTIAL_LABEL : Slice Std.U8 :=
-  Array.to_slice
-    (Array.make 32#usize [
-      103#u8, 97#u8, 114#u8, 114#u8, 101#u8, 116#u8, 116#u8, 45#u8, 115#u8,
-      116#u8, 97#u8, 116#u8, 101#u8, 108#u8, 101#u8, 115#u8, 115#u8, 45#u8,
-      118#u8, 49#u8, 47#u8, 99#u8, 114#u8, 101#u8, 100#u8, 101#u8, 110#u8,
-      116#u8, 105#u8, 97#u8, 108#u8, 0#u8
-      ])
-
-/-- [garrett_stateless_core::stateless_token::HEADER_START]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 38:0-38:65
-    Visibility: public -/
-@[global_simps, irreducible]
-def stateless_token.HEADER_START : Slice Std.U8 :=
-  Array.to_slice
-    (Array.make 22#usize [
-      123#u8, 34#u8, 97#u8, 108#u8, 103#u8, 34#u8, 58#u8, 34#u8, 69#u8, 100#u8,
-      68#u8, 83#u8, 65#u8, 34#u8, 44#u8, 34#u8, 107#u8, 105#u8, 100#u8, 34#u8,
-      58#u8, 34#u8
-      ])
-
-/-- [garrett_stateless_core::stateless_token::HEADER_END]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 39:0-39:74
-    Visibility: public -/
-@[global_simps, irreducible]
-def stateless_token.HEADER_END : Slice Std.U8 :=
-  Array.to_slice
-    (Array.make 35#usize [
-      34#u8, 44#u8, 34#u8, 116#u8, 121#u8, 112#u8, 34#u8, 58#u8, 34#u8, 103#u8,
-      97#u8, 114#u8, 114#u8, 101#u8, 116#u8, 116#u8, 45#u8, 115#u8, 116#u8,
-      97#u8, 116#u8, 101#u8, 108#u8, 101#u8, 115#u8, 115#u8, 45#u8, 118#u8,
-      49#u8, 43#u8, 106#u8, 119#u8, 116#u8, 34#u8, 125#u8
-      ])
-
-/-- Trait declaration: [garrett_stateless_core::stateless_token::KeyMaterial]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 42:0-51:1
-    Visibility: public -/
-structure stateless_token.KeyMaterial (Self : Type _) where
-  verify : Self → Slice Std.U8 → Slice Std.U8 → Result Bool
-  «open» : Self → Slice Std.U8 → Slice Std.U8 → Slice Std.U8 → Result
-    (Option (alloc.vec.Vec Std.U8))
-  sign : Self → Slice Std.U8 → Result (Option (alloc.vec.Vec Std.U8))
-  «seal» : Self → Slice Std.U8 → Slice Std.U8 → Slice Std.U8 → Result
-    (Option (alloc.vec.Vec Std.U8))
-
-/-- [garrett_stateless_core::stateless_token::KeyEntry]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 54:0-58:1
-    Visibility: public -/
-structure stateless_token.KeyEntry (M : Type _) where
-  kid : alloc.vec.Vec Std.U8
-  issuer : alloc.vec.Vec Std.U8
-  material : M
-
-/-- [garrett_stateless_core::stateless_token::KeySet]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 61:0-63:1
-    Visibility: public -/
-structure stateless_token.KeySet (M : Type _) where
-  entries : alloc.vec.Vec (stateless_token.KeyEntry M)
-
-/-- [garrett_stateless_core::stateless_token::b64url]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 67:0-69:1
-    Visibility: public -/
-def stateless_token.b64url
+def stateless_token.base64.b64url
   (bytes : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
-  proxy_http.encode_unpadded bytes true
+  proxy_http.response.encode_unpadded bytes true
 
-/-- [garrett_stateless_core::stateless_token::symbol_value]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 72:0-86:1
+/-- [garrett_stateless_core::stateless_token::base64::symbol_value]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/base64.rs', lines 20:0-34:1
     Visibility: public -/
-def stateless_token.symbol_value (symbol : Std.U8) : Result Std.U32 := do
+def stateless_token.base64.symbol_value
+  (symbol : Std.U8) : Result Std.U32 := do
   if symbol >= 65#u8
   then
     if symbol <= 90#u8
@@ -7079,11 +7073,11 @@ def stateless_token.symbol_value (symbol : Std.U8) : Result Std.U32 := do
              then ok 63#u32
              else ok 64#u32
 
-/-- [garrett_stateless_core::stateless_token::group]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 99:4-111:5
+/-- [garrett_stateless_core::stateless_token::base64::group]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/base64.rs', lines 47:4-59:5
     Visibility: public -/
 @[rust_loop]
-def stateless_token.group_loop
+def stateless_token.base64.group_loop
   (text : Slice Std.U8) (index : Std.Usize) (count : Std.Usize)
   (value : Std.U32) (valid : Bool) (position : Std.Usize) :
   Result (Std.U32 × Bool)
@@ -7096,7 +7090,7 @@ def stateless_token.group_loop
         do
         let i ← index + position
         let i1 ← Slice.index_usize text i
-        stateless_token.symbol_value i1
+        stateless_token.base64.symbol_value i1
       else ok 0#u32
     let (value1, valid1) ←
       if symbol >= 64#u32
@@ -7107,14 +7101,14 @@ def stateless_token.group_loop
         let value2 ← i + symbol
         ok (value2, valid)
     let position1 ← position + 1#usize
-    stateless_token.group_loop text index count value1 valid1 position1
+    stateless_token.base64.group_loop text index count value1 valid1 position1
   else ok (value, valid)
 partial_fixpoint
 
-/-- [garrett_stateless_core::stateless_token::group]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 90:0-116:1
+/-- [garrett_stateless_core::stateless_token::base64::group]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/base64.rs', lines 38:0-64:1
     Visibility: public -/
-def stateless_token.group
+def stateless_token.base64.group
   (text : Slice Std.U8) (index : Std.Usize) :
   Result (Option (Std.U32 × Std.Usize))
   := do
@@ -7126,16 +7120,16 @@ def stateless_token.group
          i2 - index
     else ok 4#usize
   let (value, valid) ←
-    stateless_token.group_loop text index count 0#u32 true 0#usize
+    stateless_token.base64.group_loop text index count 0#u32 true 0#usize
   if valid
   then ok (some (value, count))
   else ok none
 
-/-- [garrett_stateless_core::stateless_token::from_b64url]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 127:4-141:5
+/-- [garrett_stateless_core::stateless_token::base64::from_b64url]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/base64.rs', lines 75:4-89:5
     Visibility: public -/
 @[rust_loop]
-def stateless_token.from_b64url_loop
+def stateless_token.base64.from_b64url_loop
   (text : Slice Std.U8) (out : alloc.vec.Vec Std.U8) (valid : Bool)
   (index : Std.Usize) :
   Result ((alloc.vec.Vec Std.U8) × Bool)
@@ -7145,9 +7139,9 @@ def stateless_token.from_b64url_loop
     let i := Slice.len text
     if index < i
     then
-      let o ← stateless_token.group text index
+      let o ← stateless_token.base64.group text index
       match o with
-      | none => stateless_token.from_b64url_loop text out false index
+      | none => stateless_token.base64.from_b64url_loop text out false index
       | some p =>
         let (value, count) := p
         let i1 ← value / 65536#u32
@@ -7171,15 +7165,15 @@ def stateless_token.from_b64url_loop
             alloc.vec.Vec.push out2 i4
           else ok out2
         let index1 ← index + count
-        stateless_token.from_b64url_loop text out3 valid index1
+        stateless_token.base64.from_b64url_loop text out3 valid index1
     else ok (out, valid)
   else ok (out, valid)
 partial_fixpoint
 
-/-- [garrett_stateless_core::stateless_token::from_b64url]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 120:0-151:1
+/-- [garrett_stateless_core::stateless_token::base64::from_b64url]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/base64.rs', lines 68:0-99:1
     Visibility: public -/
-def stateless_token.from_b64url
+def stateless_token.base64.from_b64url
   (text : Slice Std.U8) : Result (Option (alloc.vec.Vec Std.U8)) := do
   let i := Slice.len text
   let i1 ← i % 4#usize
@@ -7187,12 +7181,12 @@ def stateless_token.from_b64url
   then ok none
   else
     let (out, valid) ←
-      stateless_token.from_b64url_loop text (alloc.vec.Vec.new Std.U8) true
-        0#usize
+      stateless_token.base64.from_b64url_loop text (alloc.vec.Vec.new Std.U8)
+        true 0#usize
     if valid
     then
       let s := alloc.vec.Vec.deref out
-      let encoded ← proxy_http.encode_unpadded s true
+      let encoded ← proxy_http.response.encode_unpadded s true
       let same := alloc.vec.Vec.deref encoded
       let b ←
         core.cmp.impls.PartialEqShared.ne (Slice.Insts.CoreCmpPartialEqSlice
@@ -7202,10 +7196,10 @@ def stateless_token.from_b64url
       else ok (some out)
     else ok none
 
-/-- [garrett_stateless_core::stateless_token::plain]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 156:0-158:1
+/-- [garrett_stateless_core::stateless_token::grammar::plain]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/grammar.rs', lines 16:0-18:1
     Visibility: public -/
-def stateless_token.plain (byte : Std.U8) : Result Bool := do
+def stateless_token.grammar.plain (byte : Std.U8) : Result Bool := do
   if byte >= 33#u8
   then
     if byte <= 126#u8
@@ -7215,10 +7209,10 @@ def stateless_token.plain (byte : Std.U8) : Result Bool := do
     else ok false
   else ok false
 
-/-- [garrett_stateless_core::stateless_token::lower_or_digit]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 160:0-162:1
+/-- [garrett_stateless_core::stateless_token::grammar::lower_or_digit]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/grammar.rs', lines 20:0-22:1
     Visibility: public -/
-def stateless_token.lower_or_digit (byte : Std.U8) : Result Bool := do
+def stateless_token.grammar.lower_or_digit (byte : Std.U8) : Result Bool := do
   if byte >= 97#u8
   then
     if byte <= 122#u8
@@ -7230,39 +7224,40 @@ def stateless_token.lower_or_digit (byte : Std.U8) : Result Bool := do
        then ok (byte <= 57#u8)
        else ok false
 
-/-- [garrett_stateless_core::stateless_token::alphanumeric]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 164:0-166:1
+/-- [garrett_stateless_core::stateless_token::grammar::alphanumeric]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/grammar.rs', lines 24:0-26:1
     Visibility: public -/
-def stateless_token.alphanumeric (byte : Std.U8) : Result Bool := do
+def stateless_token.grammar.alphanumeric (byte : Std.U8) : Result Bool := do
   if byte >= 65#u8
-  then if byte <= 90#u8
-       then ok true
-       else stateless_token.lower_or_digit byte
-  else stateless_token.lower_or_digit byte
+  then
+    if byte <= 90#u8
+    then ok true
+    else stateless_token.grammar.lower_or_digit byte
+  else stateless_token.grammar.lower_or_digit byte
 
-/-- [garrett_stateless_core::stateless_token::is_text]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 174:4-181:1
+/-- [garrett_stateless_core::stateless_token::grammar::is_text]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/grammar.rs', lines 34:4-41:1
     Visibility: public -/
 @[rust_loop]
-def stateless_token.is_text_loop
+def stateless_token.grammar.is_text_loop
   (value : Slice Std.U8) (index : Std.Usize) : Result Bool := do
   let i := Slice.len value
   if index < i
   then
     let i1 ← Slice.index_usize value index
-    let b ← stateless_token.plain i1
+    let b ← stateless_token.grammar.plain i1
     if b
     then
       let index1 ← index + 1#usize
-      stateless_token.is_text_loop value index1
+      stateless_token.grammar.is_text_loop value index1
     else ok false
   else ok true
 partial_fixpoint
 
-/-- [garrett_stateless_core::stateless_token::is_text]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 169:0-181:1
+/-- [garrett_stateless_core::stateless_token::grammar::is_text]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/grammar.rs', lines 29:0-41:1
     Visibility: public -/
-def stateless_token.is_text (value : Slice Std.U8) : Result Bool := do
+def stateless_token.grammar.is_text (value : Slice Std.U8) : Result Bool := do
   let i := Slice.len value
   if i < 1#usize
   then ok false
@@ -7270,23 +7265,23 @@ def stateless_token.is_text (value : Slice Std.U8) : Result Bool := do
     let i1 := Slice.len value
     if i1 > 256#usize
     then ok false
-    else stateless_token.is_text_loop value 0#usize
+    else stateless_token.grammar.is_text_loop value 0#usize
 
-/-- [garrett_stateless_core::stateless_token::is_provider]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 189:4-197:1
+/-- [garrett_stateless_core::stateless_token::grammar::is_provider]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/grammar.rs', lines 49:4-57:1
     Visibility: public -/
 @[rust_loop]
-def stateless_token.is_provider_loop
+def stateless_token.grammar.is_provider_loop
   (value : Slice Std.U8) (index : Std.Usize) : Result Bool := do
   let i := Slice.len value
   if index < i
   then
     let byte ← Slice.index_usize value index
-    let b ← stateless_token.lower_or_digit byte
+    let b ← stateless_token.grammar.lower_or_digit byte
     if b
     then
       let index1 ← index + 1#usize
-      stateless_token.is_provider_loop value index1
+      stateless_token.grammar.is_provider_loop value index1
     else
       if byte != 46#u8
       then
@@ -7296,20 +7291,21 @@ def stateless_token.is_provider_loop
           then ok false
           else
             let index1 ← index + 1#usize
-            stateless_token.is_provider_loop value index1
+            stateless_token.grammar.is_provider_loop value index1
         else
           let index1 ← index + 1#usize
-          stateless_token.is_provider_loop value index1
+          stateless_token.grammar.is_provider_loop value index1
       else
         let index1 ← index + 1#usize
-        stateless_token.is_provider_loop value index1
+        stateless_token.grammar.is_provider_loop value index1
   else ok true
 partial_fixpoint
 
-/-- [garrett_stateless_core::stateless_token::is_provider]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 184:0-197:1
+/-- [garrett_stateless_core::stateless_token::grammar::is_provider]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/grammar.rs', lines 44:0-57:1
     Visibility: public -/
-def stateless_token.is_provider (value : Slice Std.U8) : Result Bool := do
+def stateless_token.grammar.is_provider
+  (value : Slice Std.U8) : Result Bool := do
   let i := Slice.len value
   if i < 1#usize
   then ok false
@@ -7319,26 +7315,26 @@ def stateless_token.is_provider (value : Slice Std.U8) : Result Bool := do
     then ok false
     else
       let i2 ← Slice.index_usize value 0#usize
-      let b ← stateless_token.lower_or_digit i2
+      let b ← stateless_token.grammar.lower_or_digit i2
       if b
-      then stateless_token.is_provider_loop value 0#usize
+      then stateless_token.grammar.is_provider_loop value 0#usize
       else ok false
 
-/-- [garrett_stateless_core::stateless_token::is_kid]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 205:4-213:1
+/-- [garrett_stateless_core::stateless_token::grammar::is_kid]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/grammar.rs', lines 65:4-73:1
     Visibility: public -/
 @[rust_loop]
-def stateless_token.is_kid_loop
+def stateless_token.grammar.is_kid_loop
   (value : Slice Std.U8) (index : Std.Usize) : Result Bool := do
   let i := Slice.len value
   if index < i
   then
     let byte ← Slice.index_usize value index
-    let b ← stateless_token.alphanumeric byte
+    let b ← stateless_token.grammar.alphanumeric byte
     if b
     then
       let index1 ← index + 1#usize
-      stateless_token.is_kid_loop value index1
+      stateless_token.grammar.is_kid_loop value index1
     else
       if byte != 95#u8
       then
@@ -7346,17 +7342,17 @@ def stateless_token.is_kid_loop
         then ok false
         else
           let index1 ← index + 1#usize
-          stateless_token.is_kid_loop value index1
+          stateless_token.grammar.is_kid_loop value index1
       else
         let index1 ← index + 1#usize
-        stateless_token.is_kid_loop value index1
+        stateless_token.grammar.is_kid_loop value index1
   else ok true
 partial_fixpoint
 
-/-- [garrett_stateless_core::stateless_token::is_kid]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 200:0-213:1
+/-- [garrett_stateless_core::stateless_token::grammar::is_kid]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/grammar.rs', lines 60:0-73:1
     Visibility: public -/
-def stateless_token.is_kid (value : Slice Std.U8) : Result Bool := do
+def stateless_token.grammar.is_kid (value : Slice Std.U8) : Result Bool := do
   let i := Slice.len value
   if i < 1#usize
   then ok false
@@ -7366,16 +7362,16 @@ def stateless_token.is_kid (value : Slice Std.U8) : Result Bool := do
     then ok false
     else
       let i2 ← Slice.index_usize value 0#usize
-      let b ← stateless_token.alphanumeric i2
+      let b ← stateless_token.grammar.alphanumeric i2
       if b
-      then stateless_token.is_kid_loop value 0#usize
+      then stateless_token.grammar.is_kid_loop value 0#usize
       else ok false
 
-/-- [garrett_stateless_core::stateless_token::is_id]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 221:4-229:1
+/-- [garrett_stateless_core::stateless_token::grammar::is_id]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/grammar.rs', lines 81:4-89:1
     Visibility: public -/
 @[rust_loop]
-def stateless_token.is_id_loop
+def stateless_token.grammar.is_id_loop
   (value : Slice Std.U8) (index : Std.Usize) : Result Bool := do
   let i := Slice.len value
   if index < i
@@ -7386,14 +7382,14 @@ def stateless_token.is_id_loop
       if byte <= 57#u8
       then
         let index1 ← index + 1#usize
-        stateless_token.is_id_loop value index1
+        stateless_token.grammar.is_id_loop value index1
       else
         if byte >= 97#u8
         then
           if byte <= 102#u8
           then
             let index1 ← index + 1#usize
-            stateless_token.is_id_loop value index1
+            stateless_token.grammar.is_id_loop value index1
           else ok false
         else ok false
     else
@@ -7402,40 +7398,41 @@ def stateless_token.is_id_loop
         if byte <= 102#u8
         then
           let index1 ← index + 1#usize
-          stateless_token.is_id_loop value index1
+          stateless_token.grammar.is_id_loop value index1
         else ok false
       else ok false
   else ok true
 partial_fixpoint
 
-/-- [garrett_stateless_core::stateless_token::is_id]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 216:0-229:1
+/-- [garrett_stateless_core::stateless_token::grammar::is_id]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/grammar.rs', lines 76:0-89:1
     Visibility: public -/
-def stateless_token.is_id (value : Slice Std.U8) : Result Bool := do
+def stateless_token.grammar.is_id (value : Slice Std.U8) : Result Bool := do
   let i := Slice.len value
   if i != 32#usize
   then ok false
-  else stateless_token.is_id_loop value 0#usize
+  else stateless_token.grammar.is_id_loop value 0#usize
 
-/-- [garrett_stateless_core::stateless_token::is_thumbprint]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 232:0-240:1
+/-- [garrett_stateless_core::stateless_token::grammar::is_thumbprint]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/grammar.rs', lines 92:0-100:1
     Visibility: public -/
-def stateless_token.is_thumbprint (value : Slice Std.U8) : Result Bool := do
+def stateless_token.grammar.is_thumbprint
+  (value : Slice Std.U8) : Result Bool := do
   let i := Slice.len value
   if i != 43#usize
   then ok false
   else
-    let o ← stateless_token.from_b64url value
+    let o ← stateless_token.base64.from_b64url value
     match o with
     | none => ok false
     | some bytes => let i1 := alloc.vec.Vec.len bytes
                     ok (i1 = 32#usize)
 
-/-- [garrett_stateless_core::stateless_token::is_scope]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 250:4-264:5
+/-- [garrett_stateless_core::stateless_token::grammar::is_scope]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/grammar.rs', lines 110:4-124:5
     Visibility: public -/
 @[rust_loop]
-def stateless_token.is_scope_loop
+def stateless_token.grammar.is_scope_loop
   (value : Slice Std.U8) (valid : Bool) (after_space : Bool)
   (index : Std.Usize) :
   Result (Bool × Bool)
@@ -7453,26 +7450,26 @@ def stateless_token.is_scope_loop
            ok (b, true)
       else
         do
-        let b ← stateless_token.plain byte
+        let b ← stateless_token.grammar.plain byte
         let b1 ← if b
                    then ok valid
                    else ok false
         ok (b1, false)
     let index1 ← index + 1#usize
-    stateless_token.is_scope_loop value valid1 after_space1 index1
+    stateless_token.grammar.is_scope_loop value valid1 after_space1 index1
   else ok (valid, after_space)
 partial_fixpoint
 
-/-- [garrett_stateless_core::stateless_token::is_scope]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 243:0-266:1
+/-- [garrett_stateless_core::stateless_token::grammar::is_scope]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/grammar.rs', lines 103:0-126:1
     Visibility: public -/
-def stateless_token.is_scope (value : Slice Std.U8) : Result Bool := do
+def stateless_token.grammar.is_scope (value : Slice Std.U8) : Result Bool := do
   let i := Slice.len value
   if i > 1024#usize
   then ok false
   else
     let (valid, after_space) ←
-      stateless_token.is_scope_loop value true true 0#usize
+      stateless_token.grammar.is_scope_loop value true true 0#usize
     if valid
     then
       let i1 := Slice.len value
@@ -7481,21 +7478,21 @@ def stateless_token.is_scope (value : Slice Std.U8) : Result Bool := do
       else ok (¬ after_space)
     else ok false
 
-/-- [garrett_stateless_core::stateless_token::is_verifier]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 274:4-282:1
+/-- [garrett_stateless_core::stateless_token::grammar::is_verifier]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/grammar.rs', lines 134:4-142:1
     Visibility: public -/
 @[rust_loop]
-def stateless_token.is_verifier_loop
+def stateless_token.grammar.is_verifier_loop
   (value : Slice Std.U8) (index : Std.Usize) : Result Bool := do
   let i := Slice.len value
   if index < i
   then
     let byte ← Slice.index_usize value index
-    let b ← stateless_token.alphanumeric byte
+    let b ← stateless_token.grammar.alphanumeric byte
     if b
     then
       let index1 ← index + 1#usize
-      stateless_token.is_verifier_loop value index1
+      stateless_token.grammar.is_verifier_loop value index1
     else
       if byte != 45#u8
       then
@@ -7507,23 +7504,24 @@ def stateless_token.is_verifier_loop
             then ok false
             else
               let index1 ← index + 1#usize
-              stateless_token.is_verifier_loop value index1
+              stateless_token.grammar.is_verifier_loop value index1
           else
             let index1 ← index + 1#usize
-            stateless_token.is_verifier_loop value index1
+            stateless_token.grammar.is_verifier_loop value index1
         else
           let index1 ← index + 1#usize
-          stateless_token.is_verifier_loop value index1
+          stateless_token.grammar.is_verifier_loop value index1
       else
         let index1 ← index + 1#usize
-        stateless_token.is_verifier_loop value index1
+        stateless_token.grammar.is_verifier_loop value index1
   else ok true
 partial_fixpoint
 
-/-- [garrett_stateless_core::stateless_token::is_verifier]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 269:0-282:1
+/-- [garrett_stateless_core::stateless_token::grammar::is_verifier]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/grammar.rs', lines 129:0-142:1
     Visibility: public -/
-def stateless_token.is_verifier (value : Slice Std.U8) : Result Bool := do
+def stateless_token.grammar.is_verifier
+  (value : Slice Std.U8) : Result Bool := do
   let i := Slice.len value
   if i < 43#usize
   then ok false
@@ -7531,12 +7529,12 @@ def stateless_token.is_verifier (value : Slice Std.U8) : Result Bool := do
     let i1 := Slice.len value
     if i1 > 128#usize
     then ok false
-    else stateless_token.is_verifier_loop value 0#usize
+    else stateless_token.grammar.is_verifier_loop value 0#usize
 
-/-- [garrett_stateless_core::stateless_token::hex_value]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 286:0-294:1
+/-- [garrett_stateless_core::stateless_token::json::hex_value]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 15:0-23:1
     Visibility: public -/
-def stateless_token.hex_value (byte : Std.U8) : Result Std.U32 := do
+def stateless_token.json.hex_value (byte : Std.U8) : Result Std.U32 := do
   if byte >= 48#u8
   then
     if byte <= 57#u8
@@ -7563,11 +7561,11 @@ def stateless_token.hex_value (byte : Std.U8) : Result Std.U32 := do
       else ok 16#u32
     else ok 16#u32
 
-/-- [garrett_stateless_core::stateless_token::hex4]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 304:4-312:5
+/-- [garrett_stateless_core::stateless_token::json::hex4]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 33:4-41:5
     Visibility: public -/
 @[rust_loop]
-def stateless_token.hex4_loop
+def stateless_token.json.hex4_loop
   (bytes : Slice Std.U8) («at» : Std.Usize) (value : Std.U32) (valid : Bool)
   (index : Std.Usize) :
   Result (Std.U32 × Bool)
@@ -7576,7 +7574,7 @@ def stateless_token.hex4_loop
   then
     let i ← «at» + index
     let i1 ← Slice.index_usize bytes i
-    let digit ← stateless_token.hex_value i1
+    let digit ← stateless_token.json.hex_value i1
     let (value1, valid1) ←
       if digit >= 16#u32
       then ok (value, false)
@@ -7586,14 +7584,14 @@ def stateless_token.hex4_loop
         let value2 ← i2 + digit
         ok (value2, valid)
     let index1 ← index + 1#usize
-    stateless_token.hex4_loop bytes «at» value1 valid1 index1
+    stateless_token.json.hex4_loop bytes «at» value1 valid1 index1
   else ok (value, valid)
 partial_fixpoint
 
-/-- [garrett_stateless_core::stateless_token::hex4]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 297:0-317:1
+/-- [garrett_stateless_core::stateless_token::json::hex4]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 26:0-46:1
     Visibility: public -/
-def stateless_token.hex4
+def stateless_token.json.hex4
   (bytes : Slice Std.U8) («at» : Std.Usize) : Result (Option Std.U32) := do
   let i ← «at» + 4#usize
   let i1 := Slice.len bytes
@@ -7601,15 +7599,15 @@ def stateless_token.hex4
   then ok none
   else
     let (value, valid) ←
-      stateless_token.hex4_loop bytes «at» 0#u32 true 0#usize
+      stateless_token.json.hex4_loop bytes «at» 0#u32 true 0#usize
     if valid
     then ok (some value)
     else ok none
 
-/-- [garrett_stateless_core::stateless_token::escape]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 321:0-378:1
+/-- [garrett_stateless_core::stateless_token::json::escape]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 50:0-107:1
     Visibility: public -/
-def stateless_token.escape
+def stateless_token.json.escape
   (bytes : Slice Std.U8) («at» : Std.Usize) :
   Result (Option (Std.U32 × Std.Usize))
   := do
@@ -7651,7 +7649,7 @@ def stateless_token.escape
                   then ok none
                   else
                     let i2 ← «at» + 2#usize
-                    let o ← stateless_token.hex4 bytes i2
+                    let o ← stateless_token.json.hex4 bytes i2
                     match o with
                     | none => ok none
                     | some value =>
@@ -7680,7 +7678,8 @@ def stateless_token.escape
                                   then ok none
                                   else
                                     let i9 ← «at» + 8#usize
-                                    let o1 ← stateless_token.hex4 bytes i9
+                                    let o1 ←
+                                      stateless_token.json.hex4 bytes i9
                                     match o1 with
                                     | none => ok none
                                     | some value1 =>
@@ -7769,7 +7768,7 @@ def stateless_token.escape
                                 then ok none
                                 else
                                   let i9 ← «at» + 8#usize
-                                  let o1 ← stateless_token.hex4 bytes i9
+                                  let o1 ← stateless_token.json.hex4 bytes i9
                                   match o1 with
                                   | none => ok none
                                   | some value1 =>
@@ -7838,10 +7837,10 @@ def stateless_token.escape
                                       let i3 ← «at» + 6#usize
                                       ok (some (value, i3))
 
-/-- [garrett_stateless_core::stateless_token::characters]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 382:0-406:1
+/-- [garrett_stateless_core::stateless_token::json::characters]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 111:0-135:1
     Visibility: public -/
-def stateless_token.characters
+def stateless_token.json.characters
   (bytes : Slice Std.U8) (index : Std.Usize) (scalars : alloc.vec.Vec Std.U32)
   :
   Result (Option ((alloc.vec.Vec Std.U32) × Std.Usize))
@@ -7857,13 +7856,13 @@ def stateless_token.characters
     else
       if byte = 92#u8
       then
-        let o ← stateless_token.escape bytes index
+        let o ← stateless_token.json.escape bytes index
         match o with
         | none => ok none
         | some p =>
           let (scalar, next) := p
           let scalars1 ← alloc.vec.Vec.push scalars scalar
-          stateless_token.characters bytes next scalars1
+          stateless_token.json.characters bytes next scalars1
       else
         if byte < 32#u8
         then ok none
@@ -7874,13 +7873,13 @@ def stateless_token.characters
             let i1 ← lift (UScalar.cast .U32 byte)
             let scalars1 ← alloc.vec.Vec.push scalars i1
             let i2 ← index + 1#usize
-            stateless_token.characters bytes i2 scalars1
+            stateless_token.json.characters bytes i2 scalars1
 partial_fixpoint
 
-/-- [garrett_stateless_core::stateless_token::string]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 410:0-415:1
+/-- [garrett_stateless_core::stateless_token::json::string]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 139:0-144:1
     Visibility: public -/
-def stateless_token.string
+def stateless_token.json.string
   (bytes : Slice Std.U8) («at» : Std.Usize) :
   Result (Option ((alloc.vec.Vec Std.U32) × Std.Usize))
   := do
@@ -7893,21 +7892,27 @@ def stateless_token.string
     then ok none
     else
       let i2 ← «at» + 1#usize
-      stateless_token.characters bytes i2 (alloc.vec.Vec.new Std.U32)
+      stateless_token.json.characters bytes i2 (alloc.vec.Vec.new Std.U32)
 
-/-- [garrett_stateless_core::stateless_token::digit]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 417:0-419:1
+/-- [garrett_stateless_core::stateless_token::json::digit]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 146:0-148:1
     Visibility: public -/
-def stateless_token.digit (byte : Std.U8) : Result Bool := do
+def stateless_token.json.digit (byte : Std.U8) : Result Bool := do
   if byte >= 48#u8
   then ok (byte <= 57#u8)
   else ok false
 
-/-- [garrett_stateless_core::stateless_token::digits]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 427:4-435:5
+/-- [garrett_stateless_core::stateless_token::MAX_INTEGER]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 61:0-61:46
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.MAX_INTEGER : Std.I64 := 9007199254740991#i64
+
+/-- [garrett_stateless_core::stateless_token::json::digits]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 156:4-164:5
     Visibility: public -/
 @[rust_loop]
-def stateless_token.digits_loop
+def stateless_token.json.digits_loop
   (bytes : Slice Std.U8) (value : Std.I64) (valid : Bool) («at» : Std.Usize)
   :
   Result (Std.I64 × Std.Usize × Bool)
@@ -7918,7 +7923,7 @@ def stateless_token.digits_loop
     if «at» < i
     then
       let i1 ← Slice.index_usize bytes «at»
-      let b ← stateless_token.digit i1
+      let b ← stateless_token.json.digit i1
       if b
       then
         let i2 ← i1 - 48#u8
@@ -7926,31 +7931,31 @@ def stateless_token.digits_loop
         let i3 ← stateless_token.MAX_INTEGER - next
         let i4 ← i3 / 10#i64
         if value > i4
-        then stateless_token.digits_loop bytes value false «at»
+        then stateless_token.json.digits_loop bytes value false «at»
         else
           let i5 ← value * 10#i64
           let value1 ← i5 + next
           let at1 ← «at» + 1#usize
-          stateless_token.digits_loop bytes value1 valid at1
+          stateless_token.json.digits_loop bytes value1 valid at1
       else ok (value, «at», valid)
     else ok (value, «at», valid)
   else ok (value, «at», valid)
 partial_fixpoint
 
-/-- [garrett_stateless_core::stateless_token::digits]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 423:0-437:1
+/-- [garrett_stateless_core::stateless_token::json::digits]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 152:0-166:1
     Visibility: public -/
 @[reducible]
-def stateless_token.digits
+def stateless_token.json.digits
   (bytes : Slice Std.U8) (index : Std.Usize) :
   Result (Std.I64 × Std.Usize × Bool)
   := do
-  stateless_token.digits_loop bytes 0#i64 true index
+  stateless_token.json.digits_loop bytes 0#i64 true index
 
-/-- [garrett_stateless_core::stateless_token::fraction_at]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 441:0-443:1
+/-- [garrett_stateless_core::stateless_token::json::fraction_at]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 170:0-172:1
     Visibility: public -/
-def stateless_token.fraction_at
+def stateless_token.json.fraction_at
   (bytes : Slice Std.U8) (index : Std.Usize) : Result Bool := do
   let i := Slice.len bytes
   if index < i
@@ -7963,10 +7968,10 @@ def stateless_token.fraction_at
          else ok (i1 = 69#u8)
   else ok false
 
-/-- [garrett_stateless_core::stateless_token::integer]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 447:0-469:1
+/-- [garrett_stateless_core::stateless_token::json::integer]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 176:0-198:1
     Visibility: public -/
-def stateless_token.integer
+def stateless_token.json.integer
   (bytes : Slice Std.U8) («at» : Std.Usize) : Result (Option Std.Usize) := do
   let i := Slice.len bytes
   let index ←
@@ -7983,7 +7988,7 @@ def stateless_token.integer
   then ok none
   else
     let i2 ← Slice.index_usize bytes index
-    let b ← stateless_token.digit i2
+    let b ← stateless_token.json.digit i2
     if b
     then
       if i2 = 48#u8
@@ -7996,35 +8001,35 @@ def stateless_token.integer
           if i3 < i4
           then
             let i5 ← Slice.index_usize bytes i3
-            let b1 ← stateless_token.digit i5
+            let b1 ← stateless_token.json.digit i5
             if b1
             then ok none
             else
-              let b2 ← stateless_token.fraction_at bytes i3
+              let b2 ← stateless_token.json.fraction_at bytes i3
               if b2
               then ok none
               else ok (some i3)
           else
-            let b1 ← stateless_token.fraction_at bytes i3
+            let b1 ← stateless_token.json.fraction_at bytes i3
             if b1
             then ok none
             else ok (some i3)
       else
-        let (_, stop, valid) ← stateless_token.digits bytes index
+        let (_, stop, valid) ← stateless_token.json.digits bytes index
         if valid
         then
-          let b1 ← stateless_token.fraction_at bytes stop
+          let b1 ← stateless_token.json.fraction_at bytes stop
           if b1
           then ok none
           else ok (some stop)
         else ok none
     else ok none
 
-/-- [garrett_stateless_core::stateless_token::before]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 474:4-476:5
+/-- [garrett_stateless_core::stateless_token::json::before]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 203:4-205:5
     Visibility: public -/
 @[rust_loop]
-def stateless_token.before_loop
+def stateless_token.json.before_loop
   (a : Slice Std.U32) (b : Slice Std.U32) (index : Std.Usize) :
   Result Std.Usize
   := do
@@ -8039,18 +8044,18 @@ def stateless_token.before_loop
       if i2 = i3
       then
         let index1 ← index + 1#usize
-        stateless_token.before_loop a b index1
+        stateless_token.json.before_loop a b index1
       else ok index
     else ok index
   else ok index
 partial_fixpoint
 
-/-- [garrett_stateless_core::stateless_token::before]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 472:0-481:1
+/-- [garrett_stateless_core::stateless_token::json::before]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 201:0-210:1
     Visibility: public -/
-def stateless_token.before
+def stateless_token.json.before
   (a : Slice Std.U32) (b : Slice Std.U32) : Result Bool := do
-  let index ← stateless_token.before_loop a b 0#usize
+  let index ← stateless_token.json.before_loop a b 0#usize
   let i := Slice.len a
   if index < i
   then
@@ -8067,10 +8072,16 @@ def stateless_token.before
        let i2 := Slice.len b
        ok (i1 < i2)
 
-/-- [garrett_stateless_core::stateless_token::word]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 514:0-523:1
+/-- [garrett_stateless_core::stateless_token::MAX_DEPTH]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 64:0-64:32
     Visibility: public -/
-def stateless_token.word
+@[global_simps, irreducible]
+def stateless_token.MAX_DEPTH : Std.Usize := 16#usize
+
+/-- [garrett_stateless_core::stateless_token::json::word]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 243:0-252:1
+    Visibility: public -/
+def stateless_token.json.word
   (bytes : Slice Std.U8) («at» : Std.Usize) (literal : Slice Std.U8) :
   Result (Option Std.Usize)
   := do
@@ -8096,10 +8107,10 @@ def stateless_token.word
 
 mutual
 
-/-- [garrett_stateless_core::stateless_token::value]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 484:0-511:1
+/-- [garrett_stateless_core::stateless_token::json::value]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 213:0-240:1
     Visibility: public -/
-def stateless_token.value
+def stateless_token.json.value
   (bytes : Slice Std.U8) («at» : Std.Usize) (level : Std.Usize) :
   Result (Option Std.Usize)
   := do
@@ -8109,14 +8120,14 @@ def stateless_token.value
   else
     let first ← Slice.index_usize bytes «at»
     if first = 123#u8
-    then stateless_token.object bytes «at» level
+    then stateless_token.json.object bytes «at» level
     else
       if first = 91#u8
-      then stateless_token.array bytes «at» level
+      then stateless_token.json.array bytes «at» level
       else
         if first = 34#u8
         then
-          let o ← stateless_token.string bytes «at»
+          let o ← stateless_token.json.string bytes «at»
           match o with
           | none => ok none
           | some p => let (_, next) := p
@@ -8127,7 +8138,7 @@ def stateless_token.value
             let s ←
               lift (Array.to_slice
                 (Array.make 4#usize [ 116#u8, 114#u8, 117#u8, 101#u8 ]))
-            stateless_token.word bytes «at» s
+            stateless_token.json.word bytes «at» s
           else
             if first = 102#u8
             then
@@ -8136,26 +8147,26 @@ def stateless_token.value
                   (Array.make 5#usize [
                     102#u8, 97#u8, 108#u8, 115#u8, 101#u8
                     ]))
-              stateless_token.word bytes «at» s
+              stateless_token.json.word bytes «at» s
             else
               if first = 110#u8
               then
                 let s ←
                   lift (Array.to_slice
                     (Array.make 4#usize [ 110#u8, 117#u8, 108#u8, 108#u8 ]))
-                stateless_token.word bytes «at» s
-              else stateless_token.integer bytes «at»
+                stateless_token.json.word bytes «at» s
+              else stateless_token.json.integer bytes «at»
 partial_fixpoint
 
-/-- [garrett_stateless_core::stateless_token::elements]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 527:0-542:1
+/-- [garrett_stateless_core::stateless_token::json::elements]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 256:0-271:1
     Visibility: public -/
-def stateless_token.elements
+def stateless_token.json.elements
   (bytes : Slice Std.U8) (index : Std.Usize) (level : Std.Usize) :
   Result (Option Std.Usize)
   := do
   let i ← level + 1#usize
-  let o ← stateless_token.value bytes index i
+  let o ← stateless_token.json.value bytes index i
   match o with
   | none => ok none
   | some next =>
@@ -8170,14 +8181,15 @@ def stateless_token.elements
       else
         if i2 != 44#u8
         then ok none
-        else let i3 ← next + 1#usize
-             stateless_token.elements bytes i3 level
+        else
+          let i3 ← next + 1#usize
+          stateless_token.json.elements bytes i3 level
 partial_fixpoint
 
-/-- [garrett_stateless_core::stateless_token::array]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 545:0-553:1
+/-- [garrett_stateless_core::stateless_token::json::array]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 274:0-282:1
     Visibility: public -/
-def stateless_token.array
+def stateless_token.json.array
   (bytes : Slice Std.U8) («at» : Std.Usize) (level : Std.Usize) :
   Result (Option Std.Usize)
   := do
@@ -8192,19 +8204,19 @@ def stateless_token.array
       if i2 = 93#u8
       then let i3 ← «at» + 2#usize
            ok (some i3)
-      else stateless_token.elements bytes i level
-    else stateless_token.elements bytes i level
+      else stateless_token.json.elements bytes i level
+    else stateless_token.json.elements bytes i level
 partial_fixpoint
 
-/-- [garrett_stateless_core::stateless_token::members]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 557:0-588:1
+/-- [garrett_stateless_core::stateless_token::json::members]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 286:0-317:1
     Visibility: public -/
-def stateless_token.members
+def stateless_token.json.members
   (bytes : Slice Std.U8) (index : Std.Usize) (level : Std.Usize) (first : Bool)
   (previous : Slice Std.U32) :
   Result (Option Std.Usize)
   := do
-  let o ← stateless_token.string bytes index
+  let o ← stateless_token.json.string bytes index
   match o with
   | none => ok none
   | some found =>
@@ -8221,7 +8233,7 @@ def stateless_token.members
         else
           let i2 ← next + 1#usize
           let i3 ← level + 1#usize
-          let o1 ← stateless_token.value bytes i2 i3
+          let o1 ← stateless_token.json.value bytes i2 i3
           match o1 with
           | none => ok none
           | some after =>
@@ -8239,10 +8251,10 @@ def stateless_token.members
                 else
                   let i6 ← after + 1#usize
                   let s := alloc.vec.Vec.deref key
-                  stateless_token.members bytes i6 level false s
+                  stateless_token.json.members bytes i6 level false s
     else
       let s := alloc.vec.Vec.deref key
-      let b ← stateless_token.before previous s
+      let b ← stateless_token.json.before previous s
       if b
       then
         let i := Slice.len bytes
@@ -8255,7 +8267,7 @@ def stateless_token.members
           else
             let i2 ← next + 1#usize
             let i3 ← level + 1#usize
-            let o1 ← stateless_token.value bytes i2 i3
+            let o1 ← stateless_token.json.value bytes i2 i3
             match o1 with
             | none => ok none
             | some after =>
@@ -8273,14 +8285,14 @@ def stateless_token.members
                   else
                     let i6 ← after + 1#usize
                     let s1 := alloc.vec.Vec.deref key
-                    stateless_token.members bytes i6 level false s1
+                    stateless_token.json.members bytes i6 level false s1
       else ok none
 partial_fixpoint
 
-/-- [garrett_stateless_core::stateless_token::object]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 591:0-599:1
+/-- [garrett_stateless_core::stateless_token::json::object]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 320:0-328:1
     Visibility: public -/
-def stateless_token.object
+def stateless_token.json.object
   (bytes : Slice Std.U8) («at» : Std.Usize) (level : Std.Usize) :
   Result (Option Std.Usize)
   := do
@@ -8297,18 +8309,19 @@ def stateless_token.object
            ok (some i3)
       else
         let s ← lift (Array.to_slice (Std.Array.empty Std.U32))
-        stateless_token.members bytes i level true s
+        stateless_token.json.members bytes i level true s
     else
       let s ← lift (Array.to_slice (Std.Array.empty Std.U32))
-      stateless_token.members bytes i level true s
+      stateless_token.json.members bytes i level true s
 partial_fixpoint
 
 end
 
-/-- [garrett_stateless_core::stateless_token::upstream_object]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 603:0-611:1
+/-- [garrett_stateless_core::stateless_token::json::upstream_object]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/json.rs', lines 332:0-340:1
     Visibility: public -/
-def stateless_token.upstream_object (bytes : Slice Std.U8) : Result Bool := do
+def stateless_token.json.upstream_object
+  (bytes : Slice Std.U8) : Result Bool := do
   let i := Slice.len bytes
   if i = 0#usize
   then ok false
@@ -8317,92 +8330,300 @@ def stateless_token.upstream_object (bytes : Slice Std.U8) : Result Bool := do
     if i1 != 123#u8
     then ok false
     else
-      let o ← stateless_token.object bytes 0#usize 1#usize
+      let o ← stateless_token.json.object bytes 0#usize 1#usize
       match o with
       | none => ok false
       | some stop => let i2 := Slice.len bytes
                      ok (stop = i2)
 
-/-- [garrett_stateless_core::stateless_token::append]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 615:0-617:1
+/-- Trait declaration: [garrett_stateless_core::stateless_token::keys::KeyMaterial]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/keys.rs', lines 16:0-25:1
     Visibility: public -/
-def stateless_token.append
+structure stateless_token.keys.KeyMaterial (Self : Type _) where
+  verify : Self → Slice Std.U8 → Slice Std.U8 → Result Bool
+  «open» : Self → Slice Std.U8 → Slice Std.U8 → Slice Std.U8 → Result
+    (Option (alloc.vec.Vec Std.U8))
+  sign : Self → Slice Std.U8 → Result (Option (alloc.vec.Vec Std.U8))
+  «seal» : Self → Slice Std.U8 → Slice Std.U8 → Slice Std.U8 → Result
+    (Option (alloc.vec.Vec Std.U8))
+
+/-- [garrett_stateless_core::stateless_token::keys::KeyEntry]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/keys.rs', lines 28:0-32:1
+    Visibility: public -/
+structure stateless_token.keys.KeyEntry (M : Type _) where
+  kid : alloc.vec.Vec Std.U8
+  issuer : alloc.vec.Vec Std.U8
+  material : M
+
+/-- [garrett_stateless_core::stateless_token::keys::KeySet]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/keys.rs', lines 35:0-37:1
+    Visibility: public -/
+structure stateless_token.keys.KeySet (M : Type _) where
+  entries : alloc.vec.Vec (stateless_token.keys.KeyEntry M)
+
+/-- [garrett_stateless_core::stateless_token::keys::named]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/keys.rs', lines 48:0-51:1
+    Visibility: public -/
+def stateless_token.keys.named
+  {M : Type _} (entry : stateless_token.keys.KeyEntry M) (kid : Slice Std.U8) :
+  Result Bool
+  := do
+  let own := alloc.vec.Vec.deref entry.kid
+  core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 own kid
+
+/-- [garrett_stateless_core::stateless_token::keys::select]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/keys.rs', lines 42:4-44:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.keys.select_loop
+  {M : Type _} (entries : Slice (stateless_token.keys.KeyEntry M))
+  (kid : Slice Std.U8) (index : Std.Usize) :
+  Result Std.Usize
+  := do
+  let i := Slice.len entries
+  if index < i
+  then
+    let ke ← Slice.index_usize entries index
+    let b ← stateless_token.keys.named ke kid
+    if b
+    then ok index
+    else
+      let index1 ← index + 1#usize
+      stateless_token.keys.select_loop entries kid index1
+  else ok index
+partial_fixpoint
+
+/-- [garrett_stateless_core::stateless_token::keys::select]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/keys.rs', lines 40:0-46:1
+    Visibility: public -/
+@[reducible]
+def stateless_token.keys.select
+  {M : Type _} (entries : Slice (stateless_token.keys.KeyEntry M))
+  (kid : Slice Std.U8) :
+  Result Std.Usize
+  := do
+  stateless_token.keys.select_loop entries kid 0#usize
+
+/-- [garrett_stateless_core::stateless_token::MAX_KEYS]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 62:0-62:30
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.MAX_KEYS : Std.Usize := 8#usize
+
+/-- [garrett_stateless_core::stateless_token::keys::entry_valid]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/keys.rs', lines 71:0-74:1
+    Visibility: public -/
+def stateless_token.keys.entry_valid
+  {M : Type _} (entries : Slice (stateless_token.keys.KeyEntry M))
+  (index : Std.Usize) :
+  Result Bool
+  := do
+  let entry ← Slice.index_usize entries index
+  let s := alloc.vec.Vec.deref entry.kid
+  let b ← stateless_token.grammar.is_kid s
+  if b
+  then
+    let s1 := alloc.vec.Vec.deref entry.issuer
+    let b1 ← stateless_token.grammar.is_text s1
+    if b1
+    then
+      let s2 := alloc.vec.Vec.deref entry.kid
+      let i ← stateless_token.keys.select entries s2
+      ok (i = index)
+    else ok false
+  else ok false
+
+/-- [garrett_stateless_core::stateless_token::keys::keys_valid]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/keys.rs', lines 61:4-66:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.keys.keys_valid_loop
+  {M : Type _} (entries : Slice (stateless_token.keys.KeyEntry M))
+  (valid : Bool) (index : Std.Usize) :
+  Result Bool
+  := do
+  let i := Slice.len entries
+  if index < i
+  then
+    let b ← stateless_token.keys.entry_valid entries index
+    let valid1 ← if b
+                   then ok valid
+                   else ok false
+    let index1 ← index + 1#usize
+    stateless_token.keys.keys_valid_loop entries valid1 index1
+  else ok valid
+partial_fixpoint
+
+/-- [garrett_stateless_core::stateless_token::keys::keys_valid]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/keys.rs', lines 55:0-68:1
+    Visibility: public -/
+def stateless_token.keys.keys_valid
+  {M : Type _} (entries : Slice (stateless_token.keys.KeyEntry M)) :
+  Result Bool
+  := do
+  let i := Slice.len entries
+  if i < 1#usize
+  then ok false
+  else
+    let i1 := Slice.len entries
+    if i1 > stateless_token.MAX_KEYS
+    then ok false
+    else stateless_token.keys.keys_valid_loop entries true 0#usize
+
+/-- [garrett_stateless_core::stateless_token::keys::KeyError]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/keys.rs', lines 77:0-79:1
+    Visibility: public -/
+@[discriminant isize]
+inductive stateless_token.keys.KeyError where
+| Invalid : stateless_token.keys.KeyError
+
+/-- [garrett_stateless_core::stateless_token::keys::{garrett_stateless_core::stateless_token::keys::KeySet<M>}::new]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/keys.rs', lines 83:4-88:5
+    Visibility: public -/
+def stateless_token.keys.KeySet.new
+  {M : Type _} (entries : alloc.vec.Vec (stateless_token.keys.KeyEntry M)) :
+  Result (core.result.Result (stateless_token.keys.KeySet M)
+    stateless_token.keys.KeyError)
+  := do
+  let s := alloc.vec.Vec.deref entries
+  let b ← stateless_token.keys.keys_valid s
+  if b
+  then ok (core.result.Result.Ok { entries })
+  else ok (core.result.Result.Err stateless_token.keys.KeyError.Invalid)
+
+/-- [garrett_stateless_core::stateless_token::keys::{garrett_stateless_core::stateless_token::keys::KeySet<M>}::entries]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/keys.rs', lines 90:4-92:5
+    Visibility: public -/
+def stateless_token.keys.KeySet.impl.entries
+  {M : Type _} (self : stateless_token.keys.KeySet M) :
+  Result (Slice (stateless_token.keys.KeyEntry M))
+  := do
+  ok (alloc.vec.Vec.deref self.entries)
+
+/-- [garrett_stateless_core::stateless_token::login_state::STATE_PREFIX]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/login_state.rs', lines 15:0-15:40
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.login_state.STATE_PREFIX : Slice Std.U8 :=
+  Array.to_slice (Array.make 4#usize [ 103#u8, 115#u8, 49#u8, 46#u8 ])
+
+/-- [garrett_stateless_core::stateless_token::login_state::MAX_STATE]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/login_state.rs', lines 16:0-16:34
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.login_state.MAX_STATE : Std.Usize := 4096#usize
+
+/-- [garrett_stateless_core::stateless_token::login_state::LOGIN_LABEL]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/login_state.rs', lines 17:0-17:63
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.login_state.LOGIN_LABEL : Slice Std.U8 :=
+  Array.to_slice
+    (Array.make 27#usize [
+      103#u8, 97#u8, 114#u8, 114#u8, 101#u8, 116#u8, 116#u8, 45#u8, 115#u8,
+      116#u8, 97#u8, 116#u8, 101#u8, 108#u8, 101#u8, 115#u8, 115#u8, 45#u8,
+      118#u8, 49#u8, 47#u8, 108#u8, 111#u8, 103#u8, 105#u8, 110#u8, 0#u8
+      ])
+
+/-- Trait declaration: [garrett_stateless_core::stateless_token::login_state::StateKey]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/login_state.rs', lines 20:0-23:1
+    Visibility: public -/
+structure stateless_token.login_state.StateKey (Self : Type _) where
+  «seal» : Self → Slice Std.U8 → Slice Std.U8 → Slice Std.U8 → Result
+    (Option (alloc.vec.Vec Std.U8))
+  «open» : Self → Slice Std.U8 → Slice Std.U8 → Slice Std.U8 → Result
+    (Option (alloc.vec.Vec Std.U8))
+
+/-- [garrett_stateless_core::stateless_token::login_state::state_valid]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/login_state.rs', lines 26:0-40:1
+    Visibility: public -/
+def stateless_token.login_state.state_valid
+  (state : stateless_login.LoginState) : Result Bool := do
+  let s := alloc.vec.Vec.deref state.certificate
+  let b ← stateless_token.grammar.is_thumbprint s
+  if b
+  then
+    let s1 := alloc.vec.Vec.deref state.login
+    let b1 ← stateless_token.grammar.is_id s1
+    if b1
+    then
+      let s2 := alloc.vec.Vec.deref state.provider
+      let b2 ← stateless_token.grammar.is_provider s2
+      if b2
+      then
+        let s3 := alloc.vec.Vec.deref state.replica
+        let b3 ← stateless_token.grammar.is_kid s3
+        if b3
+        then
+          let s4 := alloc.vec.Vec.deref state.scope
+          let b4 ← stateless_token.grammar.is_scope s4
+          if b4
+          then
+            let s5 := alloc.vec.Vec.deref state.subject
+            let b5 ← stateless_token.grammar.is_text s5
+            if b5
+            then
+              let s6 := alloc.vec.Vec.deref state.verifier
+              let b6 ← stateless_token.grammar.is_verifier s6
+              if b6
+              then
+                if state.certificate_expires >= 0#i64
+                then
+                  if state.certificate_expires <= stateless_token.MAX_INTEGER
+                  then
+                    if state.issued_at >= 0#i64
+                    then
+                      if state.issued_at <= stateless_token.MAX_INTEGER
+                      then
+                        if state.expires_at >= 0#i64
+                        then
+                          ok (state.expires_at <= stateless_token.MAX_INTEGER)
+                        else ok false
+                      else ok false
+                    else ok false
+                  else ok false
+                else ok false
+              else ok false
+            else ok false
+          else ok false
+        else ok false
+      else ok false
+    else ok false
+  else ok false
+
+/-- [garrett_stateless_core::stateless_token::payload::append]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/payload.rs', lines 15:0-17:1
+    Visibility: public -/
+def stateless_token.payload.append
   (out : alloc.vec.Vec Std.U8) (bytes : Slice Std.U8) :
   Result (alloc.vec.Vec Std.U8)
   := do
   alloc.vec.Vec.extend_from_slice core.clone.CloneU8 out bytes
 
-/-- [garrett_stateless_core::stateless_token::header_bytes]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 620:0-626:1
+/-- [garrett_stateless_core::stateless_token::payload::append_quoted]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/payload.rs', lines 105:0-109:1
     Visibility: public -/
-def stateless_token.header_bytes
-  (kid : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
-  let out ←
-    stateless_token.append (alloc.vec.Vec.new Std.U8)
-      stateless_token.HEADER_START
-  let out1 ← stateless_token.append out kid
-  stateless_token.append out1 stateless_token.HEADER_END
+def stateless_token.payload.append_quoted
+  (out : alloc.vec.Vec Std.U8) (bytes : Slice Std.U8) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let out1 ← alloc.vec.Vec.push out 34#u8
+  let out2 ← stateless_token.payload.append out1 bytes
+  alloc.vec.Vec.push out2 34#u8
 
-/-- [garrett_stateless_core::stateless_token::header_kid]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 629:0-645:1
+/-- [garrett_stateless_core::stateless_token::payload::append_natural]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/payload.rs', lines 48:0-53:1
     Visibility: public -/
-def stateless_token.header_kid
-  (bytes : Slice Std.U8) : Result (Option (alloc.vec.Vec Std.U8)) := do
-  let i := Slice.len stateless_token.HEADER_START
-  let i1 := Slice.len stateless_token.HEADER_END
-  let fixed ← i + i1
-  let i2 := Slice.len bytes
-  if i2 < fixed
-  then ok none
-  else
-    let i3 := Slice.len bytes
-    let i4 := Slice.len stateless_token.HEADER_END
-    let tail ← i3 - i4
-    let i5 := Slice.len stateless_token.HEADER_START
-    let start ←
-      core.slice.index.Slice.index
-        (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) bytes
-        { «end» := i5 }
-    let ending ←
-      core.slice.index.Slice.index
-        (core.slice.index.SliceIndexRangeFromUsizeSlice Std.U8) bytes
-        { start := tail }
-    let b ←
-      core.cmp.impls.PartialEqShared.ne (Slice.Insts.CoreCmpPartialEqSlice
-        core.cmp.PartialEqU8) start stateless_token.HEADER_START
-    if b
-    then ok none
-    else
-      let b1 ←
-        core.cmp.impls.PartialEqShared.ne (Slice.Insts.CoreCmpPartialEqSlice
-          core.cmp.PartialEqU8) ending stateless_token.HEADER_END
-      if b1
-      then ok none
-      else
-        let i6 := Slice.len stateless_token.HEADER_START
-        let kid ←
-          core.slice.index.Slice.index
-            (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) bytes
-            { start := i6, «end» := tail }
-        let b2 ← stateless_token.is_kid kid
-        if b2
-        then
-          let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 kid
-          ok (some v)
-        else ok none
-
-/-- [garrett_stateless_core::stateless_token::append_natural]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 648:0-653:1
-    Visibility: public -/
-def stateless_token.append_natural
+def stateless_token.payload.append_natural
   (out : alloc.vec.Vec Std.U8) (value : Std.I64) :
   Result (alloc.vec.Vec Std.U8)
   := do
   let out1 ←
     if value >= 10#i64
-    then do
-         let i ← value / 10#i64
-         stateless_token.append_natural out i
+    then
+      do
+      let i ← value / 10#i64
+      stateless_token.payload.append_natural out i
     else ok out
   let i ← value % 10#i64
   let i1 ← lift (IScalar.hcast .U8 i)
@@ -8410,10 +8631,97 @@ def stateless_token.append_natural
   alloc.vec.Vec.push out1 i2
 partial_fixpoint
 
-/-- [garrett_stateless_core::stateless_token::natural]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 656:0-668:1
+/-- [garrett_stateless_core::stateless_token::login_state::state_bytes]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/login_state.rs', lines 43:0-67:1
     Visibility: public -/
-def stateless_token.natural
+def stateless_token.login_state.state_bytes
+  (state : stateless_login.LoginState) : Result (alloc.vec.Vec Std.U8) := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 12#usize [
+        123#u8, 34#u8, 99#u8, 101#u8, 114#u8, 116#u8, 95#u8, 101#u8, 120#u8,
+        112#u8, 34#u8, 58#u8
+        ]))
+  let out ← stateless_token.payload.append (alloc.vec.Vec.new Std.U8) s
+  let out1 ←
+    stateless_token.payload.append_natural out state.certificate_expires
+  let s1 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 99#u8, 110#u8, 102#u8, 34#u8, 58#u8
+        ]))
+  let out2 ← stateless_token.payload.append out1 s1
+  let s2 := alloc.vec.Vec.deref state.certificate
+  let out3 ← stateless_token.payload.append_quoted out2 s2
+  let s3 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 101#u8, 120#u8, 112#u8, 34#u8, 58#u8
+        ]))
+  let out4 ← stateless_token.payload.append out3 s3
+  let out5 ← stateless_token.payload.append_natural out4 state.expires_at
+  let s4 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 105#u8, 97#u8, 116#u8, 34#u8, 58#u8
+        ]))
+  let out6 ← stateless_token.payload.append out5 s4
+  let out7 ← stateless_token.payload.append_natural out6 state.issued_at
+  let s5 ←
+    lift (Array.to_slice
+      (Array.make 9#usize [
+        44#u8, 34#u8, 108#u8, 111#u8, 103#u8, 105#u8, 110#u8, 34#u8, 58#u8
+        ]))
+  let out8 ← stateless_token.payload.append out7 s5
+  let s6 := alloc.vec.Vec.deref state.login
+  let out9 ← stateless_token.payload.append_quoted out8 s6
+  let s7 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 112#u8, 114#u8, 118#u8, 34#u8, 58#u8
+        ]))
+  let out10 ← stateless_token.payload.append out9 s7
+  let s8 := alloc.vec.Vec.deref state.provider
+  let out11 ← stateless_token.payload.append_quoted out10 s8
+  let s9 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 114#u8, 101#u8, 112#u8, 34#u8, 58#u8
+        ]))
+  let out12 ← stateless_token.payload.append out11 s9
+  let s10 := alloc.vec.Vec.deref state.replica
+  let out13 ← stateless_token.payload.append_quoted out12 s10
+  let s11 ←
+    lift (Array.to_slice
+      (Array.make 9#usize [
+        44#u8, 34#u8, 115#u8, 99#u8, 111#u8, 112#u8, 101#u8, 34#u8, 58#u8
+        ]))
+  let out14 ← stateless_token.payload.append out13 s11
+  let s12 := alloc.vec.Vec.deref state.scope
+  let out15 ← stateless_token.payload.append_quoted out14 s12
+  let s13 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 115#u8, 117#u8, 98#u8, 34#u8, 58#u8
+        ]))
+  let out16 ← stateless_token.payload.append out15 s13
+  let s14 := alloc.vec.Vec.deref state.subject
+  let out17 ← stateless_token.payload.append_quoted out16 s14
+  let s15 ←
+    lift (Array.to_slice
+      (Array.make 12#usize [
+        44#u8, 34#u8, 118#u8, 101#u8, 114#u8, 105#u8, 102#u8, 105#u8, 101#u8,
+        114#u8, 34#u8, 58#u8
+        ]))
+  let out18 ← stateless_token.payload.append out17 s15
+  let s16 := alloc.vec.Vec.deref state.verifier
+  let out19 ← stateless_token.payload.append_quoted out18 s16
+  alloc.vec.Vec.push out19 125#u8
+
+/-- [garrett_stateless_core::stateless_token::payload::natural]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/payload.rs', lines 56:0-68:1
+    Visibility: public -/
+def stateless_token.payload.natural
   (bytes : Slice Std.U8) («at» : Std.Usize) :
   Result (Option (Std.I64 × Std.Usize))
   := do
@@ -8422,24 +8730,36 @@ def stateless_token.natural
   then ok none
   else
     let i1 ← Slice.index_usize bytes «at»
-    let b ← stateless_token.digit i1
+    let b ← stateless_token.json.digit i1
     if b
     then
       if i1 = 48#u8
       then let i2 ← «at» + 1#usize
            ok (some (0#i64, i2))
       else
-        let (value, stop, valid) ← stateless_token.digits bytes «at»
+        let (value, stop, valid) ← stateless_token.json.digits bytes «at»
         if valid
         then ok (some (value, stop))
         else ok none
     else ok none
 
-/-- [garrett_stateless_core::stateless_token::plain_string]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 677:4-679:5
+/-- [garrett_stateless_core::stateless_token::payload::number]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/payload.rs', lines 179:0-184:1
+    Visibility: public -/
+def stateless_token.payload.number
+  (bytes : Slice Std.U8) («at» : Std.Usize) (key : Slice Std.U8) :
+  Result (Option (Std.I64 × Std.Usize))
+  := do
+  let o ← stateless_token.json.word bytes «at» key
+  match o with
+  | none => ok none
+  | some next => stateless_token.payload.natural bytes next
+
+/-- [garrett_stateless_core::stateless_token::payload::plain_string]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/payload.rs', lines 77:4-79:5
     Visibility: public -/
 @[rust_loop]
-def stateless_token.plain_string_loop
+def stateless_token.payload.plain_string_loop
   (bytes : Slice Std.U8) (index : Std.Usize) : Result Std.Usize := do
   let i := Slice.len bytes
   if index < i
@@ -8450,16 +8770,16 @@ def stateless_token.plain_string_loop
       if i1 != 92#u8
       then
         let index1 ← index + 1#usize
-        stateless_token.plain_string_loop bytes index1
+        stateless_token.payload.plain_string_loop bytes index1
       else ok index
     else ok index
   else ok index
 partial_fixpoint
 
-/-- [garrett_stateless_core::stateless_token::plain_string]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 672:0-685:1
+/-- [garrett_stateless_core::stateless_token::payload::plain_string]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/payload.rs', lines 72:0-85:1
     Visibility: public -/
-def stateless_token.plain_string
+def stateless_token.payload.plain_string
   (bytes : Slice Std.U8) («at» : Std.Usize) :
   Result (Option ((alloc.vec.Vec Std.U8) × Std.Usize))
   := do
@@ -8472,7 +8792,7 @@ def stateless_token.plain_string
     then ok none
     else
       let index ← «at» + 1#usize
-      let index1 ← stateless_token.plain_string_loop bytes index
+      let index1 ← stateless_token.payload.plain_string_loop bytes index
       let i2 := Slice.len bytes
       if index1 >= i2
       then ok none
@@ -8490,181 +8810,472 @@ def stateless_token.plain_string
           let i5 ← index1 + 1#usize
           ok (some (v, i5))
 
-/-- [garrett_stateless_core::stateless_token::Informational]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 689:0-695:1
+/-- [garrett_stateless_core::stateless_token::payload::field]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/payload.rs', lines 171:0-176:1
     Visibility: public -/
-structure stateless_token.Informational where
+def stateless_token.payload.field
+  (bytes : Slice Std.U8) («at» : Std.Usize) (key : Slice Std.U8) :
+  Result (Option ((alloc.vec.Vec Std.U8) × Std.Usize))
+  := do
+  let o ← stateless_token.json.word bytes «at» key
+  match o with
+  | none => ok none
+  | some next => stateless_token.payload.plain_string bytes next
+
+/-- [garrett_stateless_core::stateless_token::login_state::parse_state]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/login_state.rs', lines 70:0-130:1
+    Visibility: public -/
+def stateless_token.login_state.parse_state
+  (bytes : Slice Std.U8) : Result (Option stateless_login.LoginState) := do
+  let s ←
+    lift (Array.to_slice
+      (Array.make 12#usize [
+        123#u8, 34#u8, 99#u8, 101#u8, 114#u8, 116#u8, 95#u8, 101#u8, 120#u8,
+        112#u8, 34#u8, 58#u8
+        ]))
+  let o ← stateless_token.payload.number bytes 0#usize s
+  match o with
+  | none => ok none
+  | some found =>
+    let (certificate_expires, i) := found
+    let s1 ←
+      lift (Array.to_slice
+        (Array.make 7#usize [
+          44#u8, 34#u8, 99#u8, 110#u8, 102#u8, 34#u8, 58#u8
+          ]))
+    let o1 ← stateless_token.payload.field bytes i s1
+    match o1 with
+    | none => ok none
+    | some found1 =>
+      let (certificate, i1) := found1
+      let s2 ←
+        lift (Array.to_slice
+          (Array.make 7#usize [
+            44#u8, 34#u8, 101#u8, 120#u8, 112#u8, 34#u8, 58#u8
+            ]))
+      let o2 ← stateless_token.payload.number bytes i1 s2
+      match o2 with
+      | none => ok none
+      | some found2 =>
+        let (expires_at, i2) := found2
+        let s3 ←
+          lift (Array.to_slice
+            (Array.make 7#usize [
+              44#u8, 34#u8, 105#u8, 97#u8, 116#u8, 34#u8, 58#u8
+              ]))
+        let o3 ← stateless_token.payload.number bytes i2 s3
+        match o3 with
+        | none => ok none
+        | some found3 =>
+          let (issued_at, i3) := found3
+          let s4 ←
+            lift (Array.to_slice
+              (Array.make 9#usize [
+                44#u8, 34#u8, 108#u8, 111#u8, 103#u8, 105#u8, 110#u8, 34#u8,
+                58#u8
+                ]))
+          let o4 ← stateless_token.payload.field bytes i3 s4
+          match o4 with
+          | none => ok none
+          | some found4 =>
+            let (login, i4) := found4
+            let s5 ←
+              lift (Array.to_slice
+                (Array.make 7#usize [
+                  44#u8, 34#u8, 112#u8, 114#u8, 118#u8, 34#u8, 58#u8
+                  ]))
+            let o5 ← stateless_token.payload.field bytes i4 s5
+            match o5 with
+            | none => ok none
+            | some found5 =>
+              let (provider, i5) := found5
+              let s6 ←
+                lift (Array.to_slice
+                  (Array.make 7#usize [
+                    44#u8, 34#u8, 114#u8, 101#u8, 112#u8, 34#u8, 58#u8
+                    ]))
+              let o6 ← stateless_token.payload.field bytes i5 s6
+              match o6 with
+              | none => ok none
+              | some found6 =>
+                let (replica, i6) := found6
+                let s7 ←
+                  lift (Array.to_slice
+                    (Array.make 9#usize [
+                      44#u8, 34#u8, 115#u8, 99#u8, 111#u8, 112#u8, 101#u8,
+                      34#u8, 58#u8
+                      ]))
+                let o7 ← stateless_token.payload.field bytes i6 s7
+                match o7 with
+                | none => ok none
+                | some found7 =>
+                  let (scope, i7) := found7
+                  let s8 ←
+                    lift (Array.to_slice
+                      (Array.make 7#usize [
+                        44#u8, 34#u8, 115#u8, 117#u8, 98#u8, 34#u8, 58#u8
+                        ]))
+                  let o8 ← stateless_token.payload.field bytes i7 s8
+                  match o8 with
+                  | none => ok none
+                  | some found8 =>
+                    let (subject, i8) := found8
+                    let s9 ←
+                      lift (Array.to_slice
+                        (Array.make 12#usize [
+                          44#u8, 34#u8, 118#u8, 101#u8, 114#u8, 105#u8, 102#u8,
+                          105#u8, 101#u8, 114#u8, 34#u8, 58#u8
+                          ]))
+                    let o9 ← stateless_token.payload.field bytes i8 s9
+                    match o9 with
+                    | none => ok none
+                    | some found9 =>
+                      let (verifier, i9) := found9
+                      let i10 ← i9 + 1#usize
+                      let i11 := Slice.len bytes
+                      if i10 != i11
+                      then ok none
+                      else
+                        let i12 ← Slice.index_usize bytes i9
+                        if i12 != 125#u8
+                        then ok none
+                        else
+                          let b ←
+                            stateless_token.login_state.state_valid
+                              {
+                                login,
+                                provider,
+                                certificate,
+                                subject,
+                                certificate_expires,
+                                replica,
+                                scope,
+                                verifier,
+                                issued_at,
+                                expires_at
+                              }
+                          if b
+                          then
+                            ok (some
+                              {
+                                login,
+                                provider,
+                                certificate,
+                                subject,
+                                certificate_expires,
+                                replica,
+                                scope,
+                                verifier,
+                                issued_at,
+                                expires_at
+                              })
+                          else ok none
+
+/-- [garrett_stateless_core::stateless_token::NONCE]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 65:0-65:28
+    Visibility: public -/
+@[global_simps, irreducible] def stateless_token.NONCE : Std.Usize := 12#usize
+
+/-- [garrett_stateless_core::stateless_token::login_state::seal_state]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/login_state.rs', lines 133:0-151:1
+    Visibility: public -/
+def stateless_token.login_state.seal_state
+  {K : Type _} (StateKeyInst : stateless_token.login_state.StateKey K)
+  (key : K) (state : stateless_login.LoginState) (nonce : Slice Std.U8) :
+  Result (Option (alloc.vec.Vec Std.U8))
+  := do
+  let i := Slice.len nonce
+  if i != stateless_token.NONCE
+  then ok none
+  else
+    let b ← stateless_token.login_state.state_valid state
+    if b
+    then
+      let v ← stateless_token.login_state.state_bytes state
+      let s := alloc.vec.Vec.deref v
+      let o ←
+        StateKeyInst.«seal» key nonce stateless_token.login_state.LOGIN_LABEL
+          s
+      match o with
+      | none => ok none
+      | some ciphertext =>
+        let sealed ←
+          stateless_token.payload.append (alloc.vec.Vec.new Std.U8) nonce
+        let s1 := alloc.vec.Vec.deref ciphertext
+        let sealed1 ← stateless_token.payload.append sealed s1
+        let out ←
+          stateless_token.payload.append (alloc.vec.Vec.new Std.U8)
+            stateless_token.login_state.STATE_PREFIX
+        let s2 := alloc.vec.Vec.deref sealed1
+        let v1 ← stateless_token.base64.b64url s2
+        let s3 := alloc.vec.Vec.deref v1
+        let out1 ← stateless_token.payload.append out s3
+        let i1 := alloc.vec.Vec.len out1
+        if i1 > stateless_token.login_state.MAX_STATE
+        then ok none
+        else ok (some out1)
+    else ok none
+
+/-- [garrett_stateless_core::stateless_token::TAG]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 66:0-66:26
+    Visibility: public -/
+@[global_simps, irreducible] def stateless_token.TAG : Std.Usize := 16#usize
+
+/-- [garrett_stateless_core::stateless_token::login_state::open_state]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/login_state.rs', lines 154:0-177:1
+    Visibility: public -/
+def stateless_token.login_state.open_state
+  {K : Type _} (StateKeyInst : stateless_token.login_state.StateKey K)
+  (key : K) (text : Slice Std.U8) :
+  Result (core.result.Result stateless_login.LoginState stateless.Rejection)
+  := do
+  let i := Slice.len text
+  if i > stateless_token.login_state.MAX_STATE
+  then ok (core.result.Result.Err stateless.Rejection.Malformed)
+  else
+    let i1 := Slice.len text
+    let i2 := Slice.len stateless_token.login_state.STATE_PREFIX
+    if i1 < i2
+    then ok (core.result.Result.Err stateless.Rejection.Malformed)
+    else
+      let i3 := Slice.len stateless_token.login_state.STATE_PREFIX
+      let «prefix» ←
+        core.slice.index.Slice.index
+          (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) text
+          { «end» := i3 }
+      let b ←
+        core.cmp.impls.PartialEqShared.ne (Slice.Insts.CoreCmpPartialEqSlice
+          core.cmp.PartialEqU8) «prefix»
+          stateless_token.login_state.STATE_PREFIX
+      if b
+      then ok (core.result.Result.Err stateless.Rejection.Malformed)
+      else
+        let i4 := Slice.len stateless_token.login_state.STATE_PREFIX
+        let s ←
+          core.slice.index.Slice.index
+            (core.slice.index.SliceIndexRangeFromUsizeSlice Std.U8) text
+            { start := i4 }
+        let o ← stateless_token.base64.from_b64url s
+        match o with
+        | none => ok (core.result.Result.Err stateless.Rejection.Malformed)
+        | some sealed =>
+          let i5 := alloc.vec.Vec.len sealed
+          let i6 ← stateless_token.NONCE + stateless_token.TAG
+          let i7 ← i6 + 1#usize
+          if i5 < i7
+          then ok (core.result.Result.Err stateless.Rejection.Malformed)
+          else
+            let s1 ←
+              alloc.vec.Vec.index (core.slice.index.SliceIndexRangeToUsizeSlice
+                Std.U8) sealed { «end» := stateless_token.NONCE }
+            let s2 ←
+              alloc.vec.Vec.index
+                (core.slice.index.SliceIndexRangeFromUsizeSlice Std.U8) sealed
+                { start := stateless_token.NONCE }
+            let o1 ←
+              StateKeyInst.«open» key s1
+                stateless_token.login_state.LOGIN_LABEL s2
+            match o1 with
+            | none =>
+              ok (core.result.Result.Err stateless.Rejection.Undecryptable)
+            | some plain =>
+              let s3 := alloc.vec.Vec.deref plain
+              let o2 ← stateless_token.login_state.parse_state s3
+              match o2 with
+              | none =>
+                ok (core.result.Result.Err stateless.Rejection.Malformed)
+              | some state => ok (core.result.Result.Ok state)
+
+/-- [garrett_stateless_core::stateless_token::MAX_TOKEN]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 59:0-59:35
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.MAX_TOKEN : Std.Usize := 16384#usize
+
+/-- [garrett_stateless_core::stateless_token::SIGNATURE]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 67:0-67:32
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.SIGNATURE : Std.Usize := 64#usize
+
+/-- [garrett_stateless_core::stateless_token::CREDENTIAL_LABEL]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 69:0-69:73
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.CREDENTIAL_LABEL : Slice Std.U8 :=
+  Array.to_slice
+    (Array.make 32#usize [
+      103#u8, 97#u8, 114#u8, 114#u8, 101#u8, 116#u8, 116#u8, 45#u8, 115#u8,
+      116#u8, 97#u8, 116#u8, 101#u8, 108#u8, 101#u8, 115#u8, 115#u8, 45#u8,
+      118#u8, 49#u8, 47#u8, 99#u8, 114#u8, 101#u8, 100#u8, 101#u8, 110#u8,
+      116#u8, 105#u8, 97#u8, 108#u8, 0#u8
+      ])
+
+/-- [garrett_stateless_core::stateless_token::HEADER_START]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 70:0-70:65
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.HEADER_START : Slice Std.U8 :=
+  Array.to_slice
+    (Array.make 22#usize [
+      123#u8, 34#u8, 97#u8, 108#u8, 103#u8, 34#u8, 58#u8, 34#u8, 69#u8, 100#u8,
+      68#u8, 83#u8, 65#u8, 34#u8, 44#u8, 34#u8, 107#u8, 105#u8, 100#u8, 34#u8,
+      58#u8, 34#u8
+      ])
+
+/-- [garrett_stateless_core::stateless_token::HEADER_END]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 71:0-71:74
+    Visibility: public -/
+@[global_simps, irreducible]
+def stateless_token.HEADER_END : Slice Std.U8 :=
+  Array.to_slice
+    (Array.make 35#usize [
+      34#u8, 44#u8, 34#u8, 116#u8, 121#u8, 112#u8, 34#u8, 58#u8, 34#u8, 103#u8,
+      97#u8, 114#u8, 114#u8, 101#u8, 116#u8, 116#u8, 45#u8, 115#u8, 116#u8,
+      97#u8, 116#u8, 101#u8, 108#u8, 101#u8, 115#u8, 115#u8, 45#u8, 118#u8,
+      49#u8, 43#u8, 106#u8, 119#u8, 116#u8, 34#u8, 125#u8
+      ])
+
+/-- [garrett_stateless_core::stateless_token::opening::ascii]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/opening.rs', lines 18:4-25:1
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.opening.ascii_loop
+  (token : Slice Std.U8) (index : Std.Usize) : Result Bool := do
+  let i := Slice.len token
+  if index < i
+  then
+    let i1 ← Slice.index_usize token index
+    if i1 > 127#u8
+    then ok false
+    else
+      let index1 ← index + 1#usize
+      stateless_token.opening.ascii_loop token index1
+  else ok true
+partial_fixpoint
+
+/-- [garrett_stateless_core::stateless_token::opening::ascii]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/opening.rs', lines 16:0-25:1
+    Visibility: public -/
+@[reducible]
+def stateless_token.opening.ascii (token : Slice Std.U8) : Result Bool := do
+  stateless_token.opening.ascii_loop token 0#usize
+
+/-- [garrett_stateless_core::stateless_token::opening::dot_from]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/opening.rs', lines 30:4-32:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_token.opening.dot_from_loop
+  (token : Slice Std.U8) (index : Std.Usize) : Result Std.Usize := do
+  let i := Slice.len token
+  if index < i
+  then
+    let i1 ← Slice.index_usize token index
+    if i1 != 46#u8
+    then
+      let index1 ← index + 1#usize
+      stateless_token.opening.dot_from_loop token index1
+    else ok index
+  else ok index
+partial_fixpoint
+
+/-- [garrett_stateless_core::stateless_token::opening::dot_from]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/opening.rs', lines 28:0-34:1
+    Visibility: public -/
+@[reducible]
+def stateless_token.opening.dot_from
+  (token : Slice Std.U8) («from» : Std.Usize) : Result Std.Usize := do
+  stateless_token.opening.dot_from_loop token «from»
+
+/-- [garrett_stateless_core::stateless_token::opening::segments]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/opening.rs', lines 37:0-50:1
+    Visibility: public -/
+def stateless_token.opening.segments
+  (token : Slice Std.U8) : Result (Option (Std.Usize × Std.Usize)) := do
+  let i := Slice.len token
+  if i > stateless_token.MAX_TOKEN
+  then ok none
+  else
+    let b ← stateless_token.opening.ascii token
+    if b
+    then
+      let first ← stateless_token.opening.dot_from token 0#usize
+      let i1 := Slice.len token
+      if first >= i1
+      then ok none
+      else
+        let i2 ← first + 1#usize
+        let second ← stateless_token.opening.dot_from token i2
+        let i3 := Slice.len token
+        if second >= i3
+        then ok none
+        else
+          let i4 ← second + 1#usize
+          let i5 ← stateless_token.opening.dot_from token i4
+          let i6 := Slice.len token
+          if i5 < i6
+          then ok none
+          else ok (some (first, second))
+    else ok none
+
+/-- [garrett_stateless_core::stateless_token::payload::associated]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/payload.rs', lines 282:0-289:1
+    Visibility: public -/
+def stateless_token.payload.associated
+  (header : Slice Std.U8) («public» : Slice Std.U8) :
+  Result (alloc.vec.Vec Std.U8)
+  := do
+  let aad ←
+    stateless_token.payload.append (alloc.vec.Vec.new Std.U8)
+      stateless_token.CREDENTIAL_LABEL
+  let aad1 ← stateless_token.payload.append aad header
+  let aad2 ← alloc.vec.Vec.push aad1 0#u8
+  stateless_token.payload.append aad2 «public»
+
+/-- [garrett_stateless_core::stateless_token::payload::Informational]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/payload.rs', lines 89:0-95:1
+    Visibility: public -/
+structure stateless_token.payload.Informational where
   has_scope : Bool
   scope : alloc.vec.Vec Std.U8
   has_upstream : Bool
   upstream : alloc.vec.Vec Std.U8
 
-/-- [garrett_stateless_core::stateless_token::Payload]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 698:0-703:1
+/-- [garrett_stateless_core::stateless_token::payload::Payload]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/payload.rs', lines 98:0-103:1
     Visibility: public -/
-structure stateless_token.Payload where
+structure stateless_token.payload.Payload where
   claims : stateless.SurrogateClaims
   enc : alloc.vec.Vec Std.U8
-  info : stateless_token.Informational
+  info : stateless_token.payload.Informational
 
-/-- [garrett_stateless_core::stateless_token::append_quoted]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 705:0-709:1
+/-- [garrett_stateless_core::stateless_token::payload::payload_valid]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/payload.rs', lines 152:0-168:1
     Visibility: public -/
-def stateless_token.append_quoted
-  (out : alloc.vec.Vec Std.U8) (bytes : Slice Std.U8) :
-  Result (alloc.vec.Vec Std.U8)
-  := do
-  let out1 ← alloc.vec.Vec.push out 34#u8
-  let out2 ← stateless_token.append out1 bytes
-  alloc.vec.Vec.push out2 34#u8
-
-/-- [garrett_stateless_core::stateless_token::payload_bytes]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 713:0-749:1
-    Visibility: public -/
-def stateless_token.payload_bytes
-  (payload : stateless_token.Payload) (with_enc : Bool) :
-  Result (alloc.vec.Vec Std.U8)
-  := do
-  let s ←
-    lift (Array.to_slice
-      (Array.make 7#usize [
-        123#u8, 34#u8, 97#u8, 117#u8, 100#u8, 34#u8, 58#u8
-        ]))
-  let out ← stateless_token.append (alloc.vec.Vec.new Std.U8) s
-  let s1 := alloc.vec.Vec.deref payload.claims.audience
-  let out1 ← stateless_token.append_quoted out s1
-  let s2 ←
-    lift (Array.to_slice
-      (Array.make 19#usize [
-        44#u8, 34#u8, 99#u8, 110#u8, 102#u8, 34#u8, 58#u8, 123#u8, 34#u8,
-        120#u8, 53#u8, 116#u8, 35#u8, 83#u8, 50#u8, 53#u8, 54#u8, 34#u8, 58#u8
-        ]))
-  let out2 ← stateless_token.append out1 s2
-  let s3 := alloc.vec.Vec.deref payload.claims.certificate
-  let out3 ← stateless_token.append_quoted out2 s3
-  let out4 ← alloc.vec.Vec.push out3 125#u8
-  let out5 ←
-    if with_enc
-    then
-      do
-      let s4 ←
-        lift (Array.to_slice
-          (Array.make 7#usize [
-            44#u8, 34#u8, 101#u8, 110#u8, 99#u8, 34#u8, 58#u8
-            ]))
-      let out6 ← stateless_token.append out4 s4
-      let s5 := alloc.vec.Vec.deref payload.enc
-      stateless_token.append_quoted out6 s5
-    else ok out4
-  let s4 ←
-    lift (Array.to_slice
-      (Array.make 7#usize [
-        44#u8, 34#u8, 101#u8, 120#u8, 112#u8, 34#u8, 58#u8
-        ]))
-  let out6 ← stateless_token.append out5 s4
-  let out7 ← stateless_token.append_natural out6 payload.claims.expires_at
-  let s5 ←
-    lift (Array.to_slice
-      (Array.make 7#usize [
-        44#u8, 34#u8, 105#u8, 97#u8, 116#u8, 34#u8, 58#u8
-        ]))
-  let out8 ← stateless_token.append out7 s5
-  let out9 ← stateless_token.append_natural out8 payload.claims.issued_at
-  let s6 ←
-    lift (Array.to_slice
-      (Array.make 7#usize [
-        44#u8, 34#u8, 105#u8, 115#u8, 115#u8, 34#u8, 58#u8
-        ]))
-  let out10 ← stateless_token.append out9 s6
-  let s7 := alloc.vec.Vec.deref payload.claims.issuer
-  let out11 ← stateless_token.append_quoted out10 s7
-  let s8 ←
-    lift (Array.to_slice
-      (Array.make 7#usize [
-        44#u8, 34#u8, 106#u8, 116#u8, 105#u8, 34#u8, 58#u8
-        ]))
-  let out12 ← stateless_token.append out11 s8
-  let s9 := alloc.vec.Vec.deref payload.claims.token_id
-  let out13 ← stateless_token.append_quoted out12 s9
-  let s10 ←
-    lift (Array.to_slice
-      (Array.make 7#usize [
-        44#u8, 34#u8, 112#u8, 114#u8, 118#u8, 34#u8, 58#u8
-        ]))
-  let out14 ← stateless_token.append out13 s10
-  let s11 := alloc.vec.Vec.deref payload.claims.provider
-  let out15 ← stateless_token.append_quoted out14 s11
-  let s12 ←
-    lift (Array.to_slice
-      (Array.make 7#usize [
-        44#u8, 34#u8, 114#u8, 101#u8, 110#u8, 34#u8, 58#u8
-        ]))
-  let out16 ← stateless_token.append out15 s12
-  let out17 ← stateless_token.append_natural out16 payload.claims.renew_until
-  let out18 ←
-    if payload.info.has_scope
-    then
-      do
-      let s13 ←
-        lift (Array.to_slice
-          (Array.make 9#usize [
-            44#u8, 34#u8, 115#u8, 99#u8, 111#u8, 112#u8, 101#u8, 34#u8, 58#u8
-            ]))
-      let out19 ← stateless_token.append out17 s13
-      let s14 := alloc.vec.Vec.deref payload.info.scope
-      stateless_token.append_quoted out19 s14
-    else ok out17
-  let s13 ←
-    lift (Array.to_slice
-      (Array.make 7#usize [
-        44#u8, 34#u8, 115#u8, 117#u8, 98#u8, 34#u8, 58#u8
-        ]))
-  let out19 ← stateless_token.append out18 s13
-  let s14 := alloc.vec.Vec.deref payload.claims.subject
-  let out20 ← stateless_token.append_quoted out19 s14
-  let out21 ←
-    if payload.info.has_upstream
-    then
-      do
-      let s15 ←
-        lift (Array.to_slice
-          (Array.make 12#usize [
-            44#u8, 34#u8, 117#u8, 112#u8, 115#u8, 116#u8, 114#u8, 101#u8,
-            97#u8, 109#u8, 34#u8, 58#u8
-            ]))
-      let out22 ← stateless_token.append out20 s15
-      let s16 := alloc.vec.Vec.deref payload.info.upstream
-      stateless_token.append out22 s16
-    else ok out20
-  alloc.vec.Vec.push out21 125#u8
-
-/-- [garrett_stateless_core::stateless_token::payload_valid]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 752:0-768:1
-    Visibility: public -/
-def stateless_token.payload_valid
-  (payload : stateless_token.Payload) : Result Bool := do
+def stateless_token.payload.payload_valid
+  (payload : stateless_token.payload.Payload) : Result Bool := do
   let s := alloc.vec.Vec.deref payload.claims.issuer
-  let b ← stateless_token.is_text s
+  let b ← stateless_token.grammar.is_text s
   if b
   then
     let s1 := alloc.vec.Vec.deref payload.claims.audience
-    let b1 ← stateless_token.is_text s1
+    let b1 ← stateless_token.grammar.is_text s1
     if b1
     then
       let s2 := alloc.vec.Vec.deref payload.claims.subject
-      let b2 ← stateless_token.is_text s2
+      let b2 ← stateless_token.grammar.is_text s2
       if b2
       then
         let s3 := alloc.vec.Vec.deref payload.claims.token_id
-        let b3 ← stateless_token.is_id s3
+        let b3 ← stateless_token.grammar.is_id s3
         if b3
         then
           let s4 := alloc.vec.Vec.deref payload.claims.provider
-          let b4 ← stateless_token.is_provider s4
+          let b4 ← stateless_token.grammar.is_provider s4
           if b4
           then
             let s5 := alloc.vec.Vec.deref payload.claims.certificate
-            let b5 ← stateless_token.is_thumbprint s5
+            let b5 ← stateless_token.grammar.is_thumbprint s5
             if b5
             then
               if payload.claims.issued_at >= 0#i64
@@ -8683,14 +9294,14 @@ def stateless_token.payload_valid
                           if payload.info.has_scope
                           then
                             let s6 := alloc.vec.Vec.deref payload.info.scope
-                            let b6 ← stateless_token.is_scope s6
+                            let b6 ← stateless_token.grammar.is_scope s6
                             if b6
                             then
                               if payload.info.has_upstream
                               then
                                 let s7 :=
                                   alloc.vec.Vec.deref payload.info.upstream
-                                stateless_token.upstream_object s7
+                                stateless_token.json.upstream_object s7
                               else ok true
                             else ok false
                           else
@@ -8698,7 +9309,7 @@ def stateless_token.payload_valid
                             then
                               let s6 :=
                                 alloc.vec.Vec.deref payload.info.upstream
-                              stateless_token.upstream_object s6
+                              stateless_token.json.upstream_object s6
                             else ok true
                         else ok false
                       else ok false
@@ -8713,41 +9324,19 @@ def stateless_token.payload_valid
     else ok false
   else ok false
 
-/-- [garrett_stateless_core::stateless_token::field]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 771:0-776:1
+/-- [garrett_stateless_core::stateless_token::payload::parse_payload]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/payload.rs', lines 187:0-278:1
     Visibility: public -/
-def stateless_token.field
-  (bytes : Slice Std.U8) («at» : Std.Usize) (key : Slice Std.U8) :
-  Result (Option ((alloc.vec.Vec Std.U8) × Std.Usize))
+def stateless_token.payload.parse_payload
+  (bytes : Slice Std.U8) :
+  Result (Option stateless_token.payload.Payload)
   := do
-  let o ← stateless_token.word bytes «at» key
-  match o with
-  | none => ok none
-  | some next => stateless_token.plain_string bytes next
-
-/-- [garrett_stateless_core::stateless_token::number]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 779:0-784:1
-    Visibility: public -/
-def stateless_token.number
-  (bytes : Slice Std.U8) («at» : Std.Usize) (key : Slice Std.U8) :
-  Result (Option (Std.I64 × Std.Usize))
-  := do
-  let o ← stateless_token.word bytes «at» key
-  match o with
-  | none => ok none
-  | some next => stateless_token.natural bytes next
-
-/-- [garrett_stateless_core::stateless_token::parse_payload]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 787:0-878:1
-    Visibility: public -/
-def stateless_token.parse_payload
-  (bytes : Slice Std.U8) : Result (Option stateless_token.Payload) := do
   let s ←
     lift (Array.to_slice
       (Array.make 7#usize [
         123#u8, 34#u8, 97#u8, 117#u8, 100#u8, 34#u8, 58#u8
         ]))
-  let o ← stateless_token.field bytes 0#usize s
+  let o ← stateless_token.payload.field bytes 0#usize s
   match o with
   | none => ok none
   | some found =>
@@ -8759,13 +9348,13 @@ def stateless_token.parse_payload
           120#u8, 53#u8, 116#u8, 35#u8, 83#u8, 50#u8, 53#u8, 54#u8, 34#u8,
           58#u8
           ]))
-    let o1 ← stateless_token.field bytes i s1
+    let o1 ← stateless_token.payload.field bytes i s1
     match o1 with
     | none => ok none
     | some found1 =>
       let (certificate, i1) := found1
       let s2 ← lift (Array.to_slice (Array.make 1#usize [ 125#u8 ]))
-      let o2 ← stateless_token.word bytes i1 s2
+      let o2 ← stateless_token.json.word bytes i1 s2
       match o2 with
       | none => ok none
       | some next =>
@@ -8774,7 +9363,7 @@ def stateless_token.parse_payload
             (Array.make 7#usize [
               44#u8, 34#u8, 101#u8, 110#u8, 99#u8, 34#u8, 58#u8
               ]))
-        let o3 ← stateless_token.field bytes next s3
+        let o3 ← stateless_token.payload.field bytes next s3
         match o3 with
         | none => ok none
         | some found2 =>
@@ -8784,7 +9373,7 @@ def stateless_token.parse_payload
               (Array.make 7#usize [
                 44#u8, 34#u8, 101#u8, 120#u8, 112#u8, 34#u8, 58#u8
                 ]))
-          let o4 ← stateless_token.number bytes i2 s4
+          let o4 ← stateless_token.payload.number bytes i2 s4
           match o4 with
           | none => ok none
           | some found3 =>
@@ -8794,7 +9383,7 @@ def stateless_token.parse_payload
                 (Array.make 7#usize [
                   44#u8, 34#u8, 105#u8, 97#u8, 116#u8, 34#u8, 58#u8
                   ]))
-            let o5 ← stateless_token.number bytes i3 s5
+            let o5 ← stateless_token.payload.number bytes i3 s5
             match o5 with
             | none => ok none
             | some found4 =>
@@ -8804,7 +9393,7 @@ def stateless_token.parse_payload
                   (Array.make 7#usize [
                     44#u8, 34#u8, 105#u8, 115#u8, 115#u8, 34#u8, 58#u8
                     ]))
-              let o6 ← stateless_token.field bytes i4 s6
+              let o6 ← stateless_token.payload.field bytes i4 s6
               match o6 with
               | none => ok none
               | some found5 =>
@@ -8814,7 +9403,7 @@ def stateless_token.parse_payload
                     (Array.make 7#usize [
                       44#u8, 34#u8, 106#u8, 116#u8, 105#u8, 34#u8, 58#u8
                       ]))
-                let o7 ← stateless_token.field bytes i5 s7
+                let o7 ← stateless_token.payload.field bytes i5 s7
                 match o7 with
                 | none => ok none
                 | some found6 =>
@@ -8824,7 +9413,7 @@ def stateless_token.parse_payload
                       (Array.make 7#usize [
                         44#u8, 34#u8, 112#u8, 114#u8, 118#u8, 34#u8, 58#u8
                         ]))
-                  let o8 ← stateless_token.field bytes i6 s8
+                  let o8 ← stateless_token.payload.field bytes i6 s8
                   match o8 with
                   | none => ok none
                   | some found7 =>
@@ -8834,7 +9423,7 @@ def stateless_token.parse_payload
                         (Array.make 7#usize [
                           44#u8, 34#u8, 114#u8, 101#u8, 110#u8, 34#u8, 58#u8
                           ]))
-                    let o9 ← stateless_token.number bytes i7 s9
+                    let o9 ← stateless_token.payload.number bytes i7 s9
                     match o9 with
                     | none => ok none
                     | some found8 =>
@@ -8845,7 +9434,7 @@ def stateless_token.parse_payload
                             44#u8, 34#u8, 115#u8, 99#u8, 111#u8, 112#u8,
                             101#u8, 34#u8, 58#u8
                             ]))
-                      let o10 ← stateless_token.field bytes i8 s10
+                      let o10 ← stateless_token.payload.field bytes i8 s10
                       let (has_scope, scope, i9) ←
                         match o10 with
                         | none => ok (false, alloc.vec.Vec.new Std.U8, i8)
@@ -8857,7 +9446,7 @@ def stateless_token.parse_payload
                           (Array.make 7#usize [
                             44#u8, 34#u8, 115#u8, 117#u8, 98#u8, 34#u8, 58#u8
                             ]))
-                      let o11 ← stateless_token.field bytes i9 s11
+                      let o11 ← stateless_token.payload.field bytes i9 s11
                       match o11 with
                       | none => ok none
                       | some found9 =>
@@ -8868,7 +9457,7 @@ def stateless_token.parse_payload
                               44#u8, 34#u8, 117#u8, 112#u8, 115#u8, 116#u8,
                               114#u8, 101#u8, 97#u8, 109#u8, 34#u8, 58#u8
                               ]))
-                        let o12 ← stateless_token.word bytes i10 s12
+                        let o12 ← stateless_token.json.word bytes i10 s12
                         match o12 with
                         | none =>
                           let i11 ← i10 + 1#usize
@@ -8883,7 +9472,7 @@ def stateless_token.parse_payload
                             then ok none
                             else
                               let b ←
-                                stateless_token.payload_valid
+                                stateless_token.payload.payload_valid
                                   {
                                     claims :=
                                       {
@@ -8954,7 +9543,7 @@ def stateless_token.parse_payload
                             then ok none
                             else
                               let b ←
-                                stateless_token.payload_valid
+                                stateless_token.payload.payload_valid
                                   {
                                     claims :=
                                       {
@@ -9004,243 +9593,186 @@ def stateless_token.parse_payload
                                   })
                               else ok none
 
-/-- [garrett_stateless_core::stateless_token::associated]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 882:0-889:1
+/-- [garrett_stateless_core::stateless_token::payload::payload_bytes]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/payload.rs', lines 113:0-149:1
     Visibility: public -/
-def stateless_token.associated
-  (header : Slice Std.U8) («public» : Slice Std.U8) :
+def stateless_token.payload.payload_bytes
+  (payload : stateless_token.payload.Payload) (with_enc : Bool) :
   Result (alloc.vec.Vec Std.U8)
   := do
-  let aad ←
-    stateless_token.append (alloc.vec.Vec.new Std.U8)
-      stateless_token.CREDENTIAL_LABEL
-  let aad1 ← stateless_token.append aad header
-  let aad2 ← alloc.vec.Vec.push aad1 0#u8
-  stateless_token.append aad2 «public»
-
-/-- [garrett_stateless_core::stateless_token::named]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 902:0-905:1
-    Visibility: public -/
-def stateless_token.named
-  {M : Type _} (entry : stateless_token.KeyEntry M) (kid : Slice Std.U8) :
-  Result Bool
-  := do
-  let own := alloc.vec.Vec.deref entry.kid
-  core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 own kid
-
-/-- [garrett_stateless_core::stateless_token::select]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 896:4-898:5
-    Visibility: public -/
-@[rust_loop]
-def stateless_token.select_loop
-  {M : Type _} (entries : Slice (stateless_token.KeyEntry M))
-  (kid : Slice Std.U8) (index : Std.Usize) :
-  Result Std.Usize
-  := do
-  let i := Slice.len entries
-  if index < i
-  then
-    let ke ← Slice.index_usize entries index
-    let b ← stateless_token.named ke kid
-    if b
-    then ok index
-    else
-      let index1 ← index + 1#usize
-      stateless_token.select_loop entries kid index1
-  else ok index
-partial_fixpoint
-
-/-- [garrett_stateless_core::stateless_token::select]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 894:0-900:1
-    Visibility: public -/
-@[reducible]
-def stateless_token.select
-  {M : Type _} (entries : Slice (stateless_token.KeyEntry M))
-  (kid : Slice Std.U8) :
-  Result Std.Usize
-  := do
-  stateless_token.select_loop entries kid 0#usize
-
-/-- [garrett_stateless_core::stateless_token::entry_valid]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 925:0-928:1
-    Visibility: public -/
-def stateless_token.entry_valid
-  {M : Type _} (entries : Slice (stateless_token.KeyEntry M))
-  (index : Std.Usize) :
-  Result Bool
-  := do
-  let entry ← Slice.index_usize entries index
-  let s := alloc.vec.Vec.deref entry.kid
-  let b ← stateless_token.is_kid s
-  if b
-  then
-    let s1 := alloc.vec.Vec.deref entry.issuer
-    let b1 ← stateless_token.is_text s1
-    if b1
+  let s ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        123#u8, 34#u8, 97#u8, 117#u8, 100#u8, 34#u8, 58#u8
+        ]))
+  let out ← stateless_token.payload.append (alloc.vec.Vec.new Std.U8) s
+  let s1 := alloc.vec.Vec.deref payload.claims.audience
+  let out1 ← stateless_token.payload.append_quoted out s1
+  let s2 ←
+    lift (Array.to_slice
+      (Array.make 19#usize [
+        44#u8, 34#u8, 99#u8, 110#u8, 102#u8, 34#u8, 58#u8, 123#u8, 34#u8,
+        120#u8, 53#u8, 116#u8, 35#u8, 83#u8, 50#u8, 53#u8, 54#u8, 34#u8, 58#u8
+        ]))
+  let out2 ← stateless_token.payload.append out1 s2
+  let s3 := alloc.vec.Vec.deref payload.claims.certificate
+  let out3 ← stateless_token.payload.append_quoted out2 s3
+  let out4 ← alloc.vec.Vec.push out3 125#u8
+  let out5 ←
+    if with_enc
     then
-      let s2 := alloc.vec.Vec.deref entry.kid
-      let i ← stateless_token.select entries s2
-      ok (i = index)
-    else ok false
-  else ok false
-
-/-- [garrett_stateless_core::stateless_token::keys_valid]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 915:4-920:5
-    Visibility: public -/
-@[rust_loop]
-def stateless_token.keys_valid_loop
-  {M : Type _} (entries : Slice (stateless_token.KeyEntry M)) (valid : Bool)
-  (index : Std.Usize) :
-  Result Bool
-  := do
-  let i := Slice.len entries
-  if index < i
-  then
-    let b ← stateless_token.entry_valid entries index
-    let valid1 ← if b
-                   then ok valid
-                   else ok false
-    let index1 ← index + 1#usize
-    stateless_token.keys_valid_loop entries valid1 index1
-  else ok valid
-partial_fixpoint
-
-/-- [garrett_stateless_core::stateless_token::keys_valid]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 909:0-922:1
-    Visibility: public -/
-def stateless_token.keys_valid
-  {M : Type _} (entries : Slice (stateless_token.KeyEntry M)) :
-  Result Bool
-  := do
-  let i := Slice.len entries
-  if i < 1#usize
-  then ok false
-  else
-    let i1 := Slice.len entries
-    if i1 > stateless_token.MAX_KEYS
-    then ok false
-    else stateless_token.keys_valid_loop entries true 0#usize
-
-/-- [garrett_stateless_core::stateless_token::KeyError]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 931:0-933:1
-    Visibility: public -/
-@[discriminant isize]
-inductive stateless_token.KeyError where
-| Invalid : stateless_token.KeyError
-
-/-- [garrett_stateless_core::stateless_token::{garrett_stateless_core::stateless_token::KeySet<M>}::new]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 937:4-942:5
-    Visibility: public -/
-def stateless_token.KeySet.new
-  {M : Type _} (entries : alloc.vec.Vec (stateless_token.KeyEntry M)) :
-  Result (core.result.Result (stateless_token.KeySet M)
-    stateless_token.KeyError)
-  := do
-  let s := alloc.vec.Vec.deref entries
-  let b ← stateless_token.keys_valid s
-  if b
-  then ok (core.result.Result.Ok { entries })
-  else ok (core.result.Result.Err stateless_token.KeyError.Invalid)
-
-/-- [garrett_stateless_core::stateless_token::{garrett_stateless_core::stateless_token::KeySet<M>}::entries]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 944:4-946:5
-    Visibility: public -/
-def stateless_token.KeySet.impl.entries
-  {M : Type _} (self : stateless_token.KeySet M) :
-  Result (Slice (stateless_token.KeyEntry M))
-  := do
-  ok (alloc.vec.Vec.deref self.entries)
-
-/-- [garrett_stateless_core::stateless_token::ascii]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 954:4-961:1
-    Visibility: public -/
-@[rust_loop]
-def stateless_token.ascii_loop
-  (token : Slice Std.U8) (index : Std.Usize) : Result Bool := do
-  let i := Slice.len token
-  if index < i
-  then
-    let i1 ← Slice.index_usize token index
-    if i1 > 127#u8
-    then ok false
-    else let index1 ← index + 1#usize
-         stateless_token.ascii_loop token index1
-  else ok true
-partial_fixpoint
-
-/-- [garrett_stateless_core::stateless_token::ascii]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 952:0-961:1
-    Visibility: public -/
-@[reducible]
-def stateless_token.ascii (token : Slice Std.U8) : Result Bool := do
-  stateless_token.ascii_loop token 0#usize
-
-/-- [garrett_stateless_core::stateless_token::dot_from]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 966:4-968:5
-    Visibility: public -/
-@[rust_loop]
-def stateless_token.dot_from_loop
-  (token : Slice Std.U8) (index : Std.Usize) : Result Std.Usize := do
-  let i := Slice.len token
-  if index < i
-  then
-    let i1 ← Slice.index_usize token index
-    if i1 != 46#u8
+      do
+      let s4 ←
+        lift (Array.to_slice
+          (Array.make 7#usize [
+            44#u8, 34#u8, 101#u8, 110#u8, 99#u8, 34#u8, 58#u8
+            ]))
+      let out6 ← stateless_token.payload.append out4 s4
+      let s5 := alloc.vec.Vec.deref payload.enc
+      stateless_token.payload.append_quoted out6 s5
+    else ok out4
+  let s4 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 101#u8, 120#u8, 112#u8, 34#u8, 58#u8
+        ]))
+  let out6 ← stateless_token.payload.append out5 s4
+  let out7 ←
+    stateless_token.payload.append_natural out6 payload.claims.expires_at
+  let s5 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 105#u8, 97#u8, 116#u8, 34#u8, 58#u8
+        ]))
+  let out8 ← stateless_token.payload.append out7 s5
+  let out9 ←
+    stateless_token.payload.append_natural out8 payload.claims.issued_at
+  let s6 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 105#u8, 115#u8, 115#u8, 34#u8, 58#u8
+        ]))
+  let out10 ← stateless_token.payload.append out9 s6
+  let s7 := alloc.vec.Vec.deref payload.claims.issuer
+  let out11 ← stateless_token.payload.append_quoted out10 s7
+  let s8 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 106#u8, 116#u8, 105#u8, 34#u8, 58#u8
+        ]))
+  let out12 ← stateless_token.payload.append out11 s8
+  let s9 := alloc.vec.Vec.deref payload.claims.token_id
+  let out13 ← stateless_token.payload.append_quoted out12 s9
+  let s10 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 112#u8, 114#u8, 118#u8, 34#u8, 58#u8
+        ]))
+  let out14 ← stateless_token.payload.append out13 s10
+  let s11 := alloc.vec.Vec.deref payload.claims.provider
+  let out15 ← stateless_token.payload.append_quoted out14 s11
+  let s12 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 114#u8, 101#u8, 110#u8, 34#u8, 58#u8
+        ]))
+  let out16 ← stateless_token.payload.append out15 s12
+  let out17 ←
+    stateless_token.payload.append_natural out16 payload.claims.renew_until
+  let out18 ←
+    if payload.info.has_scope
     then
-      let index1 ← index + 1#usize
-      stateless_token.dot_from_loop token index1
-    else ok index
-  else ok index
-partial_fixpoint
+      do
+      let s13 ←
+        lift (Array.to_slice
+          (Array.make 9#usize [
+            44#u8, 34#u8, 115#u8, 99#u8, 111#u8, 112#u8, 101#u8, 34#u8, 58#u8
+            ]))
+      let out19 ← stateless_token.payload.append out17 s13
+      let s14 := alloc.vec.Vec.deref payload.info.scope
+      stateless_token.payload.append_quoted out19 s14
+    else ok out17
+  let s13 ←
+    lift (Array.to_slice
+      (Array.make 7#usize [
+        44#u8, 34#u8, 115#u8, 117#u8, 98#u8, 34#u8, 58#u8
+        ]))
+  let out19 ← stateless_token.payload.append out18 s13
+  let s14 := alloc.vec.Vec.deref payload.claims.subject
+  let out20 ← stateless_token.payload.append_quoted out19 s14
+  let out21 ←
+    if payload.info.has_upstream
+    then
+      do
+      let s15 ←
+        lift (Array.to_slice
+          (Array.make 12#usize [
+            44#u8, 34#u8, 117#u8, 112#u8, 115#u8, 116#u8, 114#u8, 101#u8,
+            97#u8, 109#u8, 34#u8, 58#u8
+            ]))
+      let out22 ← stateless_token.payload.append out20 s15
+      let s16 := alloc.vec.Vec.deref payload.info.upstream
+      stateless_token.payload.append out22 s16
+    else ok out20
+  alloc.vec.Vec.push out21 125#u8
 
-/-- [garrett_stateless_core::stateless_token::dot_from]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 964:0-970:1
+/-- [garrett_stateless_core::stateless_token::payload::header_kid]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/payload.rs', lines 29:0-45:1
     Visibility: public -/
-@[reducible]
-def stateless_token.dot_from
-  (token : Slice Std.U8) («from» : Std.Usize) : Result Std.Usize := do
-  stateless_token.dot_from_loop token «from»
-
-/-- [garrett_stateless_core::stateless_token::segments]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 973:0-986:1
-    Visibility: public -/
-def stateless_token.segments
-  (token : Slice Std.U8) : Result (Option (Std.Usize × Std.Usize)) := do
-  let i := Slice.len token
-  if i > stateless_token.MAX_TOKEN
+def stateless_token.payload.header_kid
+  (bytes : Slice Std.U8) : Result (Option (alloc.vec.Vec Std.U8)) := do
+  let i := Slice.len stateless_token.HEADER_START
+  let i1 := Slice.len stateless_token.HEADER_END
+  let fixed ← i + i1
+  let i2 := Slice.len bytes
+  if i2 < fixed
   then ok none
   else
-    let b ← stateless_token.ascii token
+    let i3 := Slice.len bytes
+    let i4 := Slice.len stateless_token.HEADER_END
+    let tail ← i3 - i4
+    let i5 := Slice.len stateless_token.HEADER_START
+    let start ←
+      core.slice.index.Slice.index
+        (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) bytes
+        { «end» := i5 }
+    let ending ←
+      core.slice.index.Slice.index
+        (core.slice.index.SliceIndexRangeFromUsizeSlice Std.U8) bytes
+        { start := tail }
+    let b ←
+      core.cmp.impls.PartialEqShared.ne (Slice.Insts.CoreCmpPartialEqSlice
+        core.cmp.PartialEqU8) start stateless_token.HEADER_START
     if b
-    then
-      let first ← stateless_token.dot_from token 0#usize
-      let i1 := Slice.len token
-      if first >= i1
+    then ok none
+    else
+      let b1 ←
+        core.cmp.impls.PartialEqShared.ne (Slice.Insts.CoreCmpPartialEqSlice
+          core.cmp.PartialEqU8) ending stateless_token.HEADER_END
+      if b1
       then ok none
       else
-        let i2 ← first + 1#usize
-        let second ← stateless_token.dot_from token i2
-        let i3 := Slice.len token
-        if second >= i3
-        then ok none
-        else
-          let i4 ← second + 1#usize
-          let i5 ← stateless_token.dot_from token i4
-          let i6 := Slice.len token
-          if i5 < i6
-          then ok none
-          else ok (some (first, second))
-    else ok none
+        let i6 := Slice.len stateless_token.HEADER_START
+        let kid ←
+          core.slice.index.Slice.index
+            (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) bytes
+            { start := i6, «end» := tail }
+        let b2 ← stateless_token.grammar.is_kid kid
+        if b2
+        then
+          let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 kid
+          ok (some v)
+        else ok none
 
-/-- [garrett_stateless_core::stateless_token::verify_token]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 990:0-1047:1
+/-- [garrett_stateless_core::stateless_token::opening::verify_token]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/opening.rs', lines 54:0-111:1
     Visibility: public -/
-def stateless_token.verify_token
-  {M : Type _} (KeyMaterialInst : stateless_token.KeyMaterial M)
-  (entries : Slice (stateless_token.KeyEntry M)) (token : Slice Std.U8) :
+def stateless_token.opening.verify_token
+  {M : Type _} (keysKeyMaterialInst : stateless_token.keys.KeyMaterial M)
+  (entries : Slice (stateless_token.keys.KeyEntry M)) (token : Slice Std.U8) :
   Result (core.result.Result stateless.Verified stateless.Rejection)
   := do
-  let o ← stateless_token.segments token
+  let o ← stateless_token.opening.segments token
   match o with
   | none => ok (core.result.Result.Err stateless.Rejection.Malformed)
   | some found =>
@@ -9249,17 +9781,17 @@ def stateless_token.verify_token
       core.slice.index.Slice.index
         (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) token
         { «end» := first }
-    let o1 ← stateless_token.from_b64url s
+    let o1 ← stateless_token.base64.from_b64url s
     match o1 with
     | none => ok (core.result.Result.Err stateless.Rejection.Malformed)
     | some header =>
       let s1 := alloc.vec.Vec.deref header
-      let o2 ← stateless_token.header_kid s1
+      let o2 ← stateless_token.payload.header_kid s1
       match o2 with
       | none => ok (core.result.Result.Err stateless.Rejection.Malformed)
       | some kid =>
         let s2 := alloc.vec.Vec.deref kid
-        let key ← stateless_token.select entries s2
+        let key ← stateless_token.keys.select entries s2
         let i := Slice.len entries
         if key >= i
         then ok (core.result.Result.Err stateless.Rejection.UnknownKey)
@@ -9270,7 +9802,7 @@ def stateless_token.verify_token
             core.slice.index.Slice.index
               (core.slice.index.SliceIndexRangeFromUsizeSlice Std.U8) token
               { start := i1 }
-          let o3 ← stateless_token.from_b64url s3
+          let o3 ← stateless_token.base64.from_b64url s3
           match o3 with
           | none => ok (core.result.Result.Err stateless.Rejection.Malformed)
           | some signature =>
@@ -9283,7 +9815,7 @@ def stateless_token.verify_token
                   (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) token
                   { «end» := second }
               let s5 := alloc.vec.Vec.deref signature
-              let b ← KeyMaterialInst.verify entry.material s4 s5
+              let b ← keysKeyMaterialInst.verify entry.material s4 s5
               if b
               then
                 let i3 ← first + 1#usize
@@ -9291,19 +9823,19 @@ def stateless_token.verify_token
                   core.slice.index.Slice.index
                     (core.slice.index.SliceIndexRangeUsizeSlice Std.U8) token
                     { start := i3, «end» := second }
-                let o4 ← stateless_token.from_b64url s6
+                let o4 ← stateless_token.base64.from_b64url s6
                 match o4 with
                 | none =>
                   ok (core.result.Result.Err stateless.Rejection.Malformed)
                 | some bytes =>
                   let s7 := alloc.vec.Vec.deref bytes
-                  let o5 ← stateless_token.parse_payload s7
+                  let o5 ← stateless_token.payload.parse_payload s7
                   match o5 with
                   | none =>
                     ok (core.result.Result.Err stateless.Rejection.Malformed)
                   | some payload =>
                     let s8 := alloc.vec.Vec.deref payload.enc
-                    let o6 ← stateless_token.from_b64url s8
+                    let o6 ← stateless_token.base64.from_b64url s8
                     match o6 with
                     | none =>
                       ok (core.result.Result.Err stateless.Rejection.Malformed)
@@ -9317,10 +9849,10 @@ def stateless_token.verify_token
                           stateless.Rejection.Malformed)
                       else
                         let «public» ←
-                          stateless_token.payload_bytes payload false
+                          stateless_token.payload.payload_bytes payload false
                         let s9 := alloc.vec.Vec.deref header
                         let s10 := alloc.vec.Vec.deref «public»
-                        let aad ← stateless_token.associated s9 s10
+                        let aad ← stateless_token.payload.associated s9 s10
                         let issuer := alloc.vec.Vec.deref entry.issuer
                         let v ←
                           alloc.slice.Slice.to_vec core.clone.CloneU8 issuer
@@ -9334,12 +9866,12 @@ def stateless_token.verify_token
                           })
               else ok (core.result.Result.Err stateless.Rejection.BadSignature)
 
-/-- [garrett_stateless_core::stateless_token::unseal_token]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1050:0-1066:1
+/-- [garrett_stateless_core::stateless_token::opening::unseal_token]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/opening.rs', lines 114:0-130:1
     Visibility: public -/
-def stateless_token.unseal_token
-  {M : Type _} (KeyMaterialInst : stateless_token.KeyMaterial M)
-  (entries : Slice (stateless_token.KeyEntry M))
+def stateless_token.opening.unseal_token
+  {M : Type _} (keysKeyMaterialInst : stateless_token.keys.KeyMaterial M)
+  (entries : Slice (stateless_token.keys.KeyEntry M))
   (verified : stateless.Verified) :
   Result (core.result.Result (alloc.vec.Vec Std.U8) stateless.Rejection)
   := do
@@ -9361,54 +9893,66 @@ def stateless_token.unseal_token
           Std.U8) verified.sealed { start := stateless_token.NONCE }
       let ke ← Slice.index_usize entries verified.key
       let s := alloc.vec.Vec.deref verified.aad
-      let o ← KeyMaterialInst.«open» ke.material nonce s sealed
+      let o ← keysKeyMaterialInst.«open» ke.material nonce s sealed
       match o with
       | none => ok (core.result.Result.Err stateless.Rejection.Undecryptable)
       | some plain => ok (core.result.Result.Ok plain)
 
-/-- [garrett_stateless_core::stateless_token::{impl garrett_stateless_core::stateless::SurrogateOpener for garrett_stateless_core::stateless_token::KeySet<M>}::unseal]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1072:4-1074:5
+/-- [garrett_stateless_core::stateless_token::opening::{impl garrett_stateless_core::stateless::SurrogateOpener for garrett_stateless_core::stateless_token::keys::KeySet<M>}::unseal]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/opening.rs', lines 136:4-138:5
     Visibility: public -/
 def
-  stateless_token.KeySet.Insts.Garrett_stateless_coreStatelessSurrogateOpener.unseal
-  {M : Type _} (KeyMaterialInst : stateless_token.KeyMaterial M)
-  (self : stateless_token.KeySet M) (verified : stateless.Verified) :
+  stateless_token.keys.KeySet.Insts.Garrett_stateless_coreStatelessSurrogateOpener.unseal
+  {M : Type _} (keysKeyMaterialInst : stateless_token.keys.KeyMaterial M)
+  (self : stateless_token.keys.KeySet M) (verified : stateless.Verified) :
   Result (core.result.Result (alloc.vec.Vec Std.U8) stateless.Rejection)
   := do
   let s := alloc.vec.Vec.deref self.entries
-  stateless_token.unseal_token KeyMaterialInst s verified
+  stateless_token.opening.unseal_token keysKeyMaterialInst s verified
 
-/-- [garrett_stateless_core::stateless_token::{impl garrett_stateless_core::stateless::SurrogateOpener for garrett_stateless_core::stateless_token::KeySet<M>}::verify]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1069:4-1071:5
+/-- [garrett_stateless_core::stateless_token::opening::{impl garrett_stateless_core::stateless::SurrogateOpener for garrett_stateless_core::stateless_token::keys::KeySet<M>}::verify]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/opening.rs', lines 133:4-135:5
     Visibility: public -/
 def
-  stateless_token.KeySet.Insts.Garrett_stateless_coreStatelessSurrogateOpener.verify
-  {M : Type _} (KeyMaterialInst : stateless_token.KeyMaterial M)
-  (self : stateless_token.KeySet M) (token : Slice Std.U8) :
+  stateless_token.keys.KeySet.Insts.Garrett_stateless_coreStatelessSurrogateOpener.verify
+  {M : Type _} (keysKeyMaterialInst : stateless_token.keys.KeyMaterial M)
+  (self : stateless_token.keys.KeySet M) (token : Slice Std.U8) :
   Result (core.result.Result stateless.Verified stateless.Rejection)
   := do
   let s := alloc.vec.Vec.deref self.entries
-  stateless_token.verify_token KeyMaterialInst s token
+  stateless_token.opening.verify_token keysKeyMaterialInst s token
 
-/-- Trait implementation: [garrett_stateless_core::stateless_token::{impl garrett_stateless_core::stateless::SurrogateOpener for garrett_stateless_core::stateless_token::KeySet<M>}]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1068:0-1075:1 -/
+/-- Trait implementation: [garrett_stateless_core::stateless_token::opening::{impl garrett_stateless_core::stateless::SurrogateOpener for garrett_stateless_core::stateless_token::keys::KeySet<M>}]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/opening.rs', lines 132:0-139:1 -/
 @[reducible]
-def stateless_token.KeySet.Insts.Garrett_stateless_coreStatelessSurrogateOpener
-  {M : Type _} (KeyMaterialInst : stateless_token.KeyMaterial M) :
-  stateless.SurrogateOpener (stateless_token.KeySet M) := {
+def
+  stateless_token.keys.KeySet.Insts.Garrett_stateless_coreStatelessSurrogateOpener
+  {M : Type _} (keysKeyMaterialInst : stateless_token.keys.KeyMaterial M) :
+  stateless.SurrogateOpener (stateless_token.keys.KeySet M) := {
   verify :=
-    stateless_token.KeySet.Insts.Garrett_stateless_coreStatelessSurrogateOpener.verify
-    KeyMaterialInst
+    stateless_token.keys.KeySet.Insts.Garrett_stateless_coreStatelessSurrogateOpener.verify
+    keysKeyMaterialInst
   «unseal» :=
-    stateless_token.KeySet.Insts.Garrett_stateless_coreStatelessSurrogateOpener.unseal
-    KeyMaterialInst
+    stateless_token.keys.KeySet.Insts.Garrett_stateless_coreStatelessSurrogateOpener.unseal
+    keysKeyMaterialInst
 }
 
-/-- [garrett_stateless_core::stateless_token::occurs]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1086:4-1092:5
+/-- [garrett_stateless_core::stateless_token::payload::header_bytes]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/payload.rs', lines 20:0-26:1
+    Visibility: public -/
+def stateless_token.payload.header_bytes
+  (kid : Slice Std.U8) : Result (alloc.vec.Vec Std.U8) := do
+  let out ←
+    stateless_token.payload.append (alloc.vec.Vec.new Std.U8)
+      stateless_token.HEADER_START
+  let out1 ← stateless_token.payload.append out kid
+  stateless_token.payload.append out1 stateless_token.HEADER_END
+
+/-- [garrett_stateless_core::stateless_token::sealing::occurs]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/sealing.rs', lines 22:4-28:5
     Visibility: public -/
 @[rust_loop]
-def stateless_token.occurs_loop
+def stateless_token.sealing.occurs_loop
   (haystack : Slice Std.U8) (needle : Slice Std.U8) (found : Bool)
   (start : Std.Usize) :
   Result Bool
@@ -9433,26 +9977,26 @@ def stateless_token.occurs_loop
                      then ok true
                      else ok found
       let start1 ← start + 1#usize
-      stateless_token.occurs_loop haystack needle found1 start1
+      stateless_token.sealing.occurs_loop haystack needle found1 start1
     else ok found
 partial_fixpoint
 
-/-- [garrett_stateless_core::stateless_token::occurs]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1080:0-1094:1
+/-- [garrett_stateless_core::stateless_token::sealing::occurs]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/sealing.rs', lines 16:0-30:1
     Visibility: public -/
-def stateless_token.occurs
+def stateless_token.sealing.occurs
   (haystack : Slice Std.U8) (needle : Slice Std.U8) : Result Bool := do
   let i := Slice.len needle
   if i = 0#usize
   then ok true
-  else stateless_token.occurs_loop haystack needle false 0#usize
+  else stateless_token.sealing.occurs_loop haystack needle false 0#usize
 
-/-- [garrett_stateless_core::stateless_token::copy_info]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1169:0-1178:1
+/-- [garrett_stateless_core::stateless_token::sealing::copy_info]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/sealing.rs', lines 105:0-114:1
     Visibility: public -/
-def stateless_token.copy_info
-  (info : stateless_token.Informational) :
-  Result stateless_token.Informational
+def stateless_token.sealing.copy_info
+  (info : stateless_token.payload.Informational) :
+  Result stateless_token.payload.Informational
   := do
   let scope := alloc.vec.Vec.deref info.scope
   let upstream := alloc.vec.Vec.deref info.upstream
@@ -9460,10 +10004,10 @@ def stateless_token.copy_info
   let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 upstream
   ok { info with scope := v, upstream := v1 }
 
-/-- [garrett_stateless_core::stateless_token::copy_claims]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1149:0-1167:1
+/-- [garrett_stateless_core::stateless_token::sealing::copy_claims]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/sealing.rs', lines 85:0-103:1
     Visibility: public -/
-def stateless_token.copy_claims
+def stateless_token.sealing.copy_claims
   (claims : stateless.SurrogateClaims) : Result stateless.SurrogateClaims := do
   let issuer := alloc.vec.Vec.deref claims.issuer
   let audience := alloc.vec.Vec.deref claims.audience
@@ -9489,12 +10033,13 @@ def stateless_token.copy_claims
         certificate := v5
     }
 
-/-- [garrett_stateless_core::stateless_token::seal_token]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1098:0-1147:1
+/-- [garrett_stateless_core::stateless_token::sealing::seal_token]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/sealing.rs', lines 34:0-83:1
     Visibility: public -/
-def stateless_token.seal_token
-  {M : Type _} (KeyMaterialInst : stateless_token.KeyMaterial M)
-  (entry : stateless_token.KeyEntry M) (info : stateless_token.Informational)
+def stateless_token.sealing.seal_token
+  {M : Type _} (keysKeyMaterialInst : stateless_token.keys.KeyMaterial M)
+  (entry : stateless_token.keys.KeyEntry M)
+  (info : stateless_token.payload.Informational)
   (claims : stateless.SurrogateClaims) (credential : Slice Std.U8)
   (nonce : Slice Std.U8) :
   Result (core.result.Result (alloc.vec.Vec Std.U8) stateless.Rejection)
@@ -9503,7 +10048,7 @@ def stateless_token.seal_token
   if b
   then
     let s := alloc.vec.Vec.deref entry.kid
-    let b1 ← stateless_token.is_kid s
+    let b1 ← stateless_token.grammar.is_kid s
     if b1
     then
       let i := Slice.len nonce
@@ -9511,56 +10056,57 @@ def stateless_token.seal_token
       then ok (core.result.Result.Err stateless.Rejection.InvalidCredential)
       else
         let s1 := alloc.vec.Vec.deref entry.kid
-        let header ← stateless_token.header_bytes s1
-        let sc ← stateless_token.copy_claims claims
-        let i1 ← stateless_token.copy_info info
+        let header ← stateless_token.payload.header_bytes s1
+        let sc ← stateless_token.sealing.copy_claims claims
+        let i1 ← stateless_token.sealing.copy_info info
         let b2 ←
-          stateless_token.payload_valid
+          stateless_token.payload.payload_valid
             { claims := sc, enc := (alloc.vec.Vec.new Std.U8), info := i1 }
         if b2
         then
           let «public» ←
-            stateless_token.payload_bytes
+            stateless_token.payload.payload_bytes
               { claims := sc, enc := (alloc.vec.Vec.new Std.U8), info := i1 }
               false
           let s2 := alloc.vec.Vec.deref header
-          let b3 ← stateless_token.occurs s2 credential
+          let b3 ← stateless_token.sealing.occurs s2 credential
           if b3
           then ok (core.result.Result.Err stateless.Rejection.Malformed)
           else
             let s3 := alloc.vec.Vec.deref «public»
-            let b4 ← stateless_token.occurs s3 credential
+            let b4 ← stateless_token.sealing.occurs s3 credential
             if b4
             then ok (core.result.Result.Err stateless.Rejection.Malformed)
             else
               let s4 := alloc.vec.Vec.deref header
               let s5 := alloc.vec.Vec.deref «public»
-              let aad ← stateless_token.associated s4 s5
+              let aad ← stateless_token.payload.associated s4 s5
               let s6 := alloc.vec.Vec.deref aad
               let o ←
-                KeyMaterialInst.«seal» entry.material nonce s6 credential
+                keysKeyMaterialInst.«seal» entry.material nonce s6 credential
               match o with
               | none =>
                 ok (core.result.Result.Err stateless.Rejection.Undecryptable)
               | some ciphertext =>
                 let sealed ←
-                  stateless_token.append (alloc.vec.Vec.new Std.U8) nonce
+                  stateless_token.payload.append (alloc.vec.Vec.new Std.U8)
+                    nonce
                 let s7 := alloc.vec.Vec.deref ciphertext
-                let sealed1 ← stateless_token.append sealed s7
+                let sealed1 ← stateless_token.payload.append sealed s7
                 let s8 := alloc.vec.Vec.deref sealed1
-                let v ← stateless_token.b64url s8
+                let v ← stateless_token.base64.b64url s8
                 let s9 := alloc.vec.Vec.deref header
-                let body ← stateless_token.b64url s9
+                let body ← stateless_token.base64.b64url s9
                 let body1 ← alloc.vec.Vec.push body 46#u8
                 let v1 ←
-                  stateless_token.payload_bytes
+                  stateless_token.payload.payload_bytes
                     { claims := sc, enc := v, info := i1 } true
                 let s10 := alloc.vec.Vec.deref v1
-                let v2 ← stateless_token.b64url s10
+                let v2 ← stateless_token.base64.b64url s10
                 let s11 := alloc.vec.Vec.deref v2
-                let body2 ← stateless_token.append body1 s11
+                let body2 ← stateless_token.payload.append body1 s11
                 let s12 := alloc.vec.Vec.deref body2
-                let o1 ← KeyMaterialInst.sign entry.material s12
+                let o1 ← keysKeyMaterialInst.sign entry.material s12
                 match o1 with
                 | none =>
                   ok (core.result.Result.Err stateless.Rejection.UnknownKey)
@@ -9572,9 +10118,9 @@ def stateless_token.seal_token
                   else
                     let body3 ← alloc.vec.Vec.push body2 46#u8
                     let s13 := alloc.vec.Vec.deref signature
-                    let v3 ← stateless_token.b64url s13
+                    let v3 ← stateless_token.base64.b64url s13
                     let s14 := alloc.vec.Vec.deref v3
-                    let body4 ← stateless_token.append body3 s14
+                    let body4 ← stateless_token.payload.append body3 s14
                     let i3 := alloc.vec.Vec.len body4
                     if i3 > stateless_token.MAX_TOKEN
                     then
@@ -9584,56 +10130,59 @@ def stateless_token.seal_token
     else ok (core.result.Result.Err stateless.Rejection.InvalidCredential)
   else ok (core.result.Result.Err stateless.Rejection.InvalidCredential)
 
-/-- [garrett_stateless_core::stateless_token::TokenSealer]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1189:0-1193:1
+/-- [garrett_stateless_core::stateless_token::sealing::TokenSealer]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/sealing.rs', lines 125:0-129:1
     Visibility: public -/
-structure stateless_token.TokenSealer (M : Type _) where
-  entry : stateless_token.KeyEntry M
-  info : stateless_token.Informational
+structure stateless_token.sealing.TokenSealer (M : Type _) where
+  entry : stateless_token.keys.KeyEntry M
+  info : stateless_token.payload.Informational
   nonce : alloc.vec.Vec Std.U8
 
-/-- [garrett_stateless_core::stateless_token::{garrett_stateless_core::stateless_token::TokenSealer<M>}::new]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1197:4-1199:5
+/-- [garrett_stateless_core::stateless_token::sealing::{garrett_stateless_core::stateless_token::sealing::TokenSealer<M>}::new]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/sealing.rs', lines 133:4-135:5
     Visibility: public -/
-def stateless_token.TokenSealer.new
-  {M : Type _} (entry : stateless_token.KeyEntry M)
-  (info : stateless_token.Informational) (nonce : alloc.vec.Vec Std.U8) :
-  Result (stateless_token.TokenSealer M)
+def stateless_token.sealing.TokenSealer.new
+  {M : Type _} (entry : stateless_token.keys.KeyEntry M)
+  (info : stateless_token.payload.Informational) (nonce : alloc.vec.Vec Std.U8)
+  :
+  Result (stateless_token.sealing.TokenSealer M)
   := do
   ok { entry, info, nonce }
 
-/-- [garrett_stateless_core::stateless_token::{impl garrett_stateless_core::stateless::SurrogateSealer for garrett_stateless_core::stateless_token::TokenSealer<M>}::seal]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1203:4-1205:5
+/-- [garrett_stateless_core::stateless_token::sealing::{impl garrett_stateless_core::stateless::SurrogateSealer for garrett_stateless_core::stateless_token::sealing::TokenSealer<M>}::seal]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/sealing.rs', lines 139:4-141:5
     Visibility: public -/
 def
-  stateless_token.TokenSealer.Insts.Garrett_stateless_coreStatelessSurrogateSealer.seal
-  {M : Type _} (KeyMaterialInst : stateless_token.KeyMaterial M)
-  (self : stateless_token.TokenSealer M) (claims : stateless.SurrogateClaims)
-  (credential : Slice Std.U8) :
+  stateless_token.sealing.TokenSealer.Insts.Garrett_stateless_coreStatelessSurrogateSealer.seal
+  {M : Type _} (keysKeyMaterialInst : stateless_token.keys.KeyMaterial M)
+  (self : stateless_token.sealing.TokenSealer M)
+  (claims : stateless.SurrogateClaims) (credential : Slice Std.U8) :
   Result (core.result.Result (alloc.vec.Vec Std.U8) stateless.Rejection)
   := do
   let s := alloc.vec.Vec.deref self.nonce
-  stateless_token.seal_token KeyMaterialInst self.entry self.info claims
-    credential s
+  stateless_token.sealing.seal_token keysKeyMaterialInst self.entry self.info
+    claims credential s
 
-/-- Trait implementation: [garrett_stateless_core::stateless_token::{impl garrett_stateless_core::stateless::SurrogateSealer for garrett_stateless_core::stateless_token::TokenSealer<M>}]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1202:0-1206:1 -/
+/-- Trait implementation: [garrett_stateless_core::stateless_token::sealing::{impl garrett_stateless_core::stateless::SurrogateSealer for garrett_stateless_core::stateless_token::sealing::TokenSealer<M>}]
+    Source: 'crates/garrett-stateless-core/src/stateless_token/sealing.rs', lines 138:0-142:1 -/
 @[reducible]
 def
-  stateless_token.TokenSealer.Insts.Garrett_stateless_coreStatelessSurrogateSealer
-  {M : Type _} (KeyMaterialInst : stateless_token.KeyMaterial M) :
-  stateless.SurrogateSealer (stateless_token.TokenSealer M) := {
+  stateless_token.sealing.TokenSealer.Insts.Garrett_stateless_coreStatelessSurrogateSealer
+  {M : Type _} (keysKeyMaterialInst : stateless_token.keys.KeyMaterial M) :
+  stateless.SurrogateSealer (stateless_token.sealing.TokenSealer M) := {
   «seal» :=
-    stateless_token.TokenSealer.Insts.Garrett_stateless_coreStatelessSurrogateSealer.seal
-    KeyMaterialInst
+    stateless_token.sealing.TokenSealer.Insts.Garrett_stateless_coreStatelessSurrogateSealer.seal
+    keysKeyMaterialInst
 }
 
-/-- [garrett_stateless_core::stateless_token::informational]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1210:0-1223:1
+/-- [garrett_stateless_core::stateless_token::sealing::informational]:
+    Source: 'crates/garrett-stateless-core/src/stateless_token/sealing.rs', lines 146:0-159:1
     Visibility: public -/
-def stateless_token.informational
-  (token : Slice Std.U8) : Result (Option stateless_token.Informational) := do
-  let o ← stateless_token.segments token
+def stateless_token.sealing.informational
+  (token : Slice Std.U8) :
+  Result (Option stateless_token.payload.Informational)
+  := do
+  let o ← stateless_token.opening.segments token
   match o with
   | none => ok none
   | some found =>
@@ -9642,440 +10191,14 @@ def stateless_token.informational
     let s ←
       core.slice.index.Slice.index (core.slice.index.SliceIndexRangeUsizeSlice
         Std.U8) token { start := i, «end» := second }
-    let o1 ← stateless_token.from_b64url s
+    let o1 ← stateless_token.base64.from_b64url s
     match o1 with
     | none => ok none
     | some bytes =>
       let s1 := alloc.vec.Vec.deref bytes
-      let o2 ← stateless_token.parse_payload s1
+      let o2 ← stateless_token.payload.parse_payload s1
       match o2 with
       | none => ok none
       | some payload => ok (some payload.info)
-
-/-- [garrett_stateless_core::stateless_token::STATE_PREFIX]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1227:0-1227:40
-    Visibility: public -/
-@[global_simps, irreducible]
-def stateless_token.STATE_PREFIX : Slice Std.U8 :=
-  Array.to_slice (Array.make 4#usize [ 103#u8, 115#u8, 49#u8, 46#u8 ])
-
-/-- [garrett_stateless_core::stateless_token::MAX_STATE]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1228:0-1228:34
-    Visibility: public -/
-@[global_simps, irreducible]
-def stateless_token.MAX_STATE : Std.Usize := 4096#usize
-
-/-- [garrett_stateless_core::stateless_token::LOGIN_LABEL]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1229:0-1229:63
-    Visibility: public -/
-@[global_simps, irreducible]
-def stateless_token.LOGIN_LABEL : Slice Std.U8 :=
-  Array.to_slice
-    (Array.make 27#usize [
-      103#u8, 97#u8, 114#u8, 114#u8, 101#u8, 116#u8, 116#u8, 45#u8, 115#u8,
-      116#u8, 97#u8, 116#u8, 101#u8, 108#u8, 101#u8, 115#u8, 115#u8, 45#u8,
-      118#u8, 49#u8, 47#u8, 108#u8, 111#u8, 103#u8, 105#u8, 110#u8, 0#u8
-      ])
-
-/-- Trait declaration: [garrett_stateless_core::stateless_token::StateKey]
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1232:0-1235:1
-    Visibility: public -/
-structure stateless_token.StateKey (Self : Type _) where
-  «seal» : Self → Slice Std.U8 → Slice Std.U8 → Slice Std.U8 → Result
-    (Option (alloc.vec.Vec Std.U8))
-  «open» : Self → Slice Std.U8 → Slice Std.U8 → Slice Std.U8 → Result
-    (Option (alloc.vec.Vec Std.U8))
-
-/-- [garrett_stateless_core::stateless_token::state_valid]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1238:0-1252:1
-    Visibility: public -/
-def stateless_token.state_valid
-  (state : stateless_login.LoginState) : Result Bool := do
-  let s := alloc.vec.Vec.deref state.certificate
-  let b ← stateless_token.is_thumbprint s
-  if b
-  then
-    let s1 := alloc.vec.Vec.deref state.login
-    let b1 ← stateless_token.is_id s1
-    if b1
-    then
-      let s2 := alloc.vec.Vec.deref state.provider
-      let b2 ← stateless_token.is_provider s2
-      if b2
-      then
-        let s3 := alloc.vec.Vec.deref state.replica
-        let b3 ← stateless_token.is_kid s3
-        if b3
-        then
-          let s4 := alloc.vec.Vec.deref state.scope
-          let b4 ← stateless_token.is_scope s4
-          if b4
-          then
-            let s5 := alloc.vec.Vec.deref state.subject
-            let b5 ← stateless_token.is_text s5
-            if b5
-            then
-              let s6 := alloc.vec.Vec.deref state.verifier
-              let b6 ← stateless_token.is_verifier s6
-              if b6
-              then
-                if state.certificate_expires >= 0#i64
-                then
-                  if state.certificate_expires <= stateless_token.MAX_INTEGER
-                  then
-                    if state.issued_at >= 0#i64
-                    then
-                      if state.issued_at <= stateless_token.MAX_INTEGER
-                      then
-                        if state.expires_at >= 0#i64
-                        then
-                          ok (state.expires_at <= stateless_token.MAX_INTEGER)
-                        else ok false
-                      else ok false
-                    else ok false
-                  else ok false
-                else ok false
-              else ok false
-            else ok false
-          else ok false
-        else ok false
-      else ok false
-    else ok false
-  else ok false
-
-/-- [garrett_stateless_core::stateless_token::state_bytes]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1255:0-1279:1
-    Visibility: public -/
-def stateless_token.state_bytes
-  (state : stateless_login.LoginState) : Result (alloc.vec.Vec Std.U8) := do
-  let s ←
-    lift (Array.to_slice
-      (Array.make 12#usize [
-        123#u8, 34#u8, 99#u8, 101#u8, 114#u8, 116#u8, 95#u8, 101#u8, 120#u8,
-        112#u8, 34#u8, 58#u8
-        ]))
-  let out ← stateless_token.append (alloc.vec.Vec.new Std.U8) s
-  let out1 ← stateless_token.append_natural out state.certificate_expires
-  let s1 ←
-    lift (Array.to_slice
-      (Array.make 7#usize [
-        44#u8, 34#u8, 99#u8, 110#u8, 102#u8, 34#u8, 58#u8
-        ]))
-  let out2 ← stateless_token.append out1 s1
-  let s2 := alloc.vec.Vec.deref state.certificate
-  let out3 ← stateless_token.append_quoted out2 s2
-  let s3 ←
-    lift (Array.to_slice
-      (Array.make 7#usize [
-        44#u8, 34#u8, 101#u8, 120#u8, 112#u8, 34#u8, 58#u8
-        ]))
-  let out4 ← stateless_token.append out3 s3
-  let out5 ← stateless_token.append_natural out4 state.expires_at
-  let s4 ←
-    lift (Array.to_slice
-      (Array.make 7#usize [
-        44#u8, 34#u8, 105#u8, 97#u8, 116#u8, 34#u8, 58#u8
-        ]))
-  let out6 ← stateless_token.append out5 s4
-  let out7 ← stateless_token.append_natural out6 state.issued_at
-  let s5 ←
-    lift (Array.to_slice
-      (Array.make 9#usize [
-        44#u8, 34#u8, 108#u8, 111#u8, 103#u8, 105#u8, 110#u8, 34#u8, 58#u8
-        ]))
-  let out8 ← stateless_token.append out7 s5
-  let s6 := alloc.vec.Vec.deref state.login
-  let out9 ← stateless_token.append_quoted out8 s6
-  let s7 ←
-    lift (Array.to_slice
-      (Array.make 7#usize [
-        44#u8, 34#u8, 112#u8, 114#u8, 118#u8, 34#u8, 58#u8
-        ]))
-  let out10 ← stateless_token.append out9 s7
-  let s8 := alloc.vec.Vec.deref state.provider
-  let out11 ← stateless_token.append_quoted out10 s8
-  let s9 ←
-    lift (Array.to_slice
-      (Array.make 7#usize [
-        44#u8, 34#u8, 114#u8, 101#u8, 112#u8, 34#u8, 58#u8
-        ]))
-  let out12 ← stateless_token.append out11 s9
-  let s10 := alloc.vec.Vec.deref state.replica
-  let out13 ← stateless_token.append_quoted out12 s10
-  let s11 ←
-    lift (Array.to_slice
-      (Array.make 9#usize [
-        44#u8, 34#u8, 115#u8, 99#u8, 111#u8, 112#u8, 101#u8, 34#u8, 58#u8
-        ]))
-  let out14 ← stateless_token.append out13 s11
-  let s12 := alloc.vec.Vec.deref state.scope
-  let out15 ← stateless_token.append_quoted out14 s12
-  let s13 ←
-    lift (Array.to_slice
-      (Array.make 7#usize [
-        44#u8, 34#u8, 115#u8, 117#u8, 98#u8, 34#u8, 58#u8
-        ]))
-  let out16 ← stateless_token.append out15 s13
-  let s14 := alloc.vec.Vec.deref state.subject
-  let out17 ← stateless_token.append_quoted out16 s14
-  let s15 ←
-    lift (Array.to_slice
-      (Array.make 12#usize [
-        44#u8, 34#u8, 118#u8, 101#u8, 114#u8, 105#u8, 102#u8, 105#u8, 101#u8,
-        114#u8, 34#u8, 58#u8
-        ]))
-  let out18 ← stateless_token.append out17 s15
-  let s16 := alloc.vec.Vec.deref state.verifier
-  let out19 ← stateless_token.append_quoted out18 s16
-  alloc.vec.Vec.push out19 125#u8
-
-/-- [garrett_stateless_core::stateless_token::parse_state]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1282:0-1342:1
-    Visibility: public -/
-def stateless_token.parse_state
-  (bytes : Slice Std.U8) : Result (Option stateless_login.LoginState) := do
-  let s ←
-    lift (Array.to_slice
-      (Array.make 12#usize [
-        123#u8, 34#u8, 99#u8, 101#u8, 114#u8, 116#u8, 95#u8, 101#u8, 120#u8,
-        112#u8, 34#u8, 58#u8
-        ]))
-  let o ← stateless_token.number bytes 0#usize s
-  match o with
-  | none => ok none
-  | some found =>
-    let (certificate_expires, i) := found
-    let s1 ←
-      lift (Array.to_slice
-        (Array.make 7#usize [
-          44#u8, 34#u8, 99#u8, 110#u8, 102#u8, 34#u8, 58#u8
-          ]))
-    let o1 ← stateless_token.field bytes i s1
-    match o1 with
-    | none => ok none
-    | some found1 =>
-      let (certificate, i1) := found1
-      let s2 ←
-        lift (Array.to_slice
-          (Array.make 7#usize [
-            44#u8, 34#u8, 101#u8, 120#u8, 112#u8, 34#u8, 58#u8
-            ]))
-      let o2 ← stateless_token.number bytes i1 s2
-      match o2 with
-      | none => ok none
-      | some found2 =>
-        let (expires_at, i2) := found2
-        let s3 ←
-          lift (Array.to_slice
-            (Array.make 7#usize [
-              44#u8, 34#u8, 105#u8, 97#u8, 116#u8, 34#u8, 58#u8
-              ]))
-        let o3 ← stateless_token.number bytes i2 s3
-        match o3 with
-        | none => ok none
-        | some found3 =>
-          let (issued_at, i3) := found3
-          let s4 ←
-            lift (Array.to_slice
-              (Array.make 9#usize [
-                44#u8, 34#u8, 108#u8, 111#u8, 103#u8, 105#u8, 110#u8, 34#u8,
-                58#u8
-                ]))
-          let o4 ← stateless_token.field bytes i3 s4
-          match o4 with
-          | none => ok none
-          | some found4 =>
-            let (login, i4) := found4
-            let s5 ←
-              lift (Array.to_slice
-                (Array.make 7#usize [
-                  44#u8, 34#u8, 112#u8, 114#u8, 118#u8, 34#u8, 58#u8
-                  ]))
-            let o5 ← stateless_token.field bytes i4 s5
-            match o5 with
-            | none => ok none
-            | some found5 =>
-              let (provider, i5) := found5
-              let s6 ←
-                lift (Array.to_slice
-                  (Array.make 7#usize [
-                    44#u8, 34#u8, 114#u8, 101#u8, 112#u8, 34#u8, 58#u8
-                    ]))
-              let o6 ← stateless_token.field bytes i5 s6
-              match o6 with
-              | none => ok none
-              | some found6 =>
-                let (replica, i6) := found6
-                let s7 ←
-                  lift (Array.to_slice
-                    (Array.make 9#usize [
-                      44#u8, 34#u8, 115#u8, 99#u8, 111#u8, 112#u8, 101#u8,
-                      34#u8, 58#u8
-                      ]))
-                let o7 ← stateless_token.field bytes i6 s7
-                match o7 with
-                | none => ok none
-                | some found7 =>
-                  let (scope, i7) := found7
-                  let s8 ←
-                    lift (Array.to_slice
-                      (Array.make 7#usize [
-                        44#u8, 34#u8, 115#u8, 117#u8, 98#u8, 34#u8, 58#u8
-                        ]))
-                  let o8 ← stateless_token.field bytes i7 s8
-                  match o8 with
-                  | none => ok none
-                  | some found8 =>
-                    let (subject, i8) := found8
-                    let s9 ←
-                      lift (Array.to_slice
-                        (Array.make 12#usize [
-                          44#u8, 34#u8, 118#u8, 101#u8, 114#u8, 105#u8, 102#u8,
-                          105#u8, 101#u8, 114#u8, 34#u8, 58#u8
-                          ]))
-                    let o9 ← stateless_token.field bytes i8 s9
-                    match o9 with
-                    | none => ok none
-                    | some found9 =>
-                      let (verifier, i9) := found9
-                      let i10 ← i9 + 1#usize
-                      let i11 := Slice.len bytes
-                      if i10 != i11
-                      then ok none
-                      else
-                        let i12 ← Slice.index_usize bytes i9
-                        if i12 != 125#u8
-                        then ok none
-                        else
-                          let b ←
-                            stateless_token.state_valid
-                              {
-                                login,
-                                provider,
-                                certificate,
-                                subject,
-                                certificate_expires,
-                                replica,
-                                scope,
-                                verifier,
-                                issued_at,
-                                expires_at
-                              }
-                          if b
-                          then
-                            ok (some
-                              {
-                                login,
-                                provider,
-                                certificate,
-                                subject,
-                                certificate_expires,
-                                replica,
-                                scope,
-                                verifier,
-                                issued_at,
-                                expires_at
-                              })
-                          else ok none
-
-/-- [garrett_stateless_core::stateless_token::seal_state]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1345:0-1363:1
-    Visibility: public -/
-def stateless_token.seal_state
-  {K : Type _} (StateKeyInst : stateless_token.StateKey K) (key : K)
-  (state : stateless_login.LoginState) (nonce : Slice Std.U8) :
-  Result (Option (alloc.vec.Vec Std.U8))
-  := do
-  let i := Slice.len nonce
-  if i != stateless_token.NONCE
-  then ok none
-  else
-    let b ← stateless_token.state_valid state
-    if b
-    then
-      let v ← stateless_token.state_bytes state
-      let s := alloc.vec.Vec.deref v
-      let o ← StateKeyInst.«seal» key nonce stateless_token.LOGIN_LABEL s
-      match o with
-      | none => ok none
-      | some ciphertext =>
-        let sealed ← stateless_token.append (alloc.vec.Vec.new Std.U8) nonce
-        let s1 := alloc.vec.Vec.deref ciphertext
-        let sealed1 ← stateless_token.append sealed s1
-        let out ←
-          stateless_token.append (alloc.vec.Vec.new Std.U8)
-            stateless_token.STATE_PREFIX
-        let s2 := alloc.vec.Vec.deref sealed1
-        let v1 ← stateless_token.b64url s2
-        let s3 := alloc.vec.Vec.deref v1
-        let out1 ← stateless_token.append out s3
-        let i1 := alloc.vec.Vec.len out1
-        if i1 > stateless_token.MAX_STATE
-        then ok none
-        else ok (some out1)
-    else ok none
-
-/-- [garrett_stateless_core::stateless_token::open_state]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token.rs', lines 1366:0-1389:1
-    Visibility: public -/
-def stateless_token.open_state
-  {K : Type _} (StateKeyInst : stateless_token.StateKey K) (key : K)
-  (text : Slice Std.U8) :
-  Result (core.result.Result stateless_login.LoginState stateless.Rejection)
-  := do
-  let i := Slice.len text
-  if i > stateless_token.MAX_STATE
-  then ok (core.result.Result.Err stateless.Rejection.Malformed)
-  else
-    let i1 := Slice.len text
-    let i2 := Slice.len stateless_token.STATE_PREFIX
-    if i1 < i2
-    then ok (core.result.Result.Err stateless.Rejection.Malformed)
-    else
-      let i3 := Slice.len stateless_token.STATE_PREFIX
-      let «prefix» ←
-        core.slice.index.Slice.index
-          (core.slice.index.SliceIndexRangeToUsizeSlice Std.U8) text
-          { «end» := i3 }
-      let b ←
-        core.cmp.impls.PartialEqShared.ne (Slice.Insts.CoreCmpPartialEqSlice
-          core.cmp.PartialEqU8) «prefix» stateless_token.STATE_PREFIX
-      if b
-      then ok (core.result.Result.Err stateless.Rejection.Malformed)
-      else
-        let i4 := Slice.len stateless_token.STATE_PREFIX
-        let s ←
-          core.slice.index.Slice.index
-            (core.slice.index.SliceIndexRangeFromUsizeSlice Std.U8) text
-            { start := i4 }
-        let o ← stateless_token.from_b64url s
-        match o with
-        | none => ok (core.result.Result.Err stateless.Rejection.Malformed)
-        | some sealed =>
-          let i5 := alloc.vec.Vec.len sealed
-          let i6 ← stateless_token.NONCE + stateless_token.TAG
-          let i7 ← i6 + 1#usize
-          if i5 < i7
-          then ok (core.result.Result.Err stateless.Rejection.Malformed)
-          else
-            let s1 ←
-              alloc.vec.Vec.index (core.slice.index.SliceIndexRangeToUsizeSlice
-                Std.U8) sealed { «end» := stateless_token.NONCE }
-            let s2 ←
-              alloc.vec.Vec.index
-                (core.slice.index.SliceIndexRangeFromUsizeSlice Std.U8) sealed
-                { start := stateless_token.NONCE }
-            let o1 ←
-              StateKeyInst.«open» key s1 stateless_token.LOGIN_LABEL s2
-            match o1 with
-            | none =>
-              ok (core.result.Result.Err stateless.Rejection.Undecryptable)
-            | some plain =>
-              let s3 := alloc.vec.Vec.deref plain
-              let o2 ← stateless_token.parse_state s3
-              match o2 with
-              | none =>
-                ok (core.result.Result.Err stateless.Rejection.Malformed)
-              | some state => ok (core.result.Result.Ok state)
 
 end garrett_stateless_core

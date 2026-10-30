@@ -11,8 +11,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CORE = ROOT / 'src' / 'garrett_stateless' / 'core'
 PURE = {'__future__', 'base64', 'binascii', 'dataclasses', 'enum', 'json', 'typing', 'urllib.parse'}
-# The modules mirroring the Rust crate one for one (``proxy_http`` folds in
-# its small leaves; ``encoding`` is the codec part of ``stateless_token``).
+# The modules mirroring the Rust crate's modules. Python keeps each as one
+# file where Rust splits it into files: ``proxy_http`` is Rust's
+# ``proxy_http/{request,upstream,response,refusal}.rs`` plus its small leaves
+# (``http_auth``, ``http_wire``, ``proxy_connect``, ``reflection``);
+# ``encoding`` is ``stateless_token/{base64,grammar,json}.rs`` and
+# ``stateless_token`` the rest of ``stateless_token/``.
 MODULES = {'__init__', 'encoding', 'proxy_http', 'stateless', 'stateless_login', 'stateless_mailbox',
            'stateless_policy', 'stateless_proxy', 'stateless_token'}
 

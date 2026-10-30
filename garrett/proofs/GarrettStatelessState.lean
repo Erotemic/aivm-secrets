@@ -3,7 +3,7 @@ import GarrettStatelessToken
 /-!
 # `garrett-stateless-v1`: the sealed login state
 
-Source: `crates/garrett-stateless-core/src/stateless_token.rs`
+Source: `crates/garrett-stateless-core/src/stateless_token/login_state.rs`
 (`state_bytes`, `parse_state`, `seal_state`, `open_state`), extracted by
 Aeneas. The state key's `seal`/`open` are the external AES-256-GCM
 primitive: arbitrary results here, and one stated inverse premise for the
@@ -17,6 +17,10 @@ open garrett_stateless_core.proxy_http.Base64Proofs (enc)
 set_option maxHeartbeats 4000000
 
 namespace garrett_stateless_core.stateless_token.Proofs
+open garrett_stateless_core.stateless_token.base64 garrett_stateless_core.stateless_token.grammar
+  garrett_stateless_core.stateless_token.json garrett_stateless_core.stateless_token.payload
+  garrett_stateless_core.stateless_token.keys garrett_stateless_core.stateless_token.opening
+  garrett_stateless_core.stateless_token.sealing garrett_stateless_core.stateless_token.login_state
 
 /-! ## The canonical plaintext -/
 

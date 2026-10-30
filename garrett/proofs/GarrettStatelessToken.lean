@@ -3,7 +3,7 @@ import GarrettStatelessGrammar
 /-!
 # `garrett-stateless-v1`: the exact token payload, opening and sealing
 
-Source: `crates/garrett-stateless-core/src/stateless_token.rs`
+Source: `crates/garrett-stateless-core/src/stateless_token/` (`payload.rs`, `opening.rs`, `sealing.rs`)
 (`parse_payload`, `payload_bytes`, `header_kid`, `select`, `verify_token`,
 `unseal_token`, `seal_token`), extracted by Aeneas. Builds on the cursor
 lemmas of `GarrettStatelessCodec`.
@@ -16,6 +16,10 @@ open garrett_stateless_core.proxy_http.Base64Proofs (enc)
 set_option maxHeartbeats 4000000
 
 namespace garrett_stateless_core.stateless_token.Proofs
+open garrett_stateless_core.stateless_token.base64 garrett_stateless_core.stateless_token.grammar
+  garrett_stateless_core.stateless_token.json garrett_stateless_core.stateless_token.payload
+  garrett_stateless_core.stateless_token.keys garrett_stateless_core.stateless_token.opening
+  garrett_stateless_core.stateless_token.sealing garrett_stateless_core.stateless_token.login_state
 
 /-! ## Fields as cursor steps -/
 
@@ -908,7 +912,7 @@ theorem verify_token_sound {M : Type} {inst : KeyMaterial M} {entries : Slice (K
 /-- A successful `b64url` already computed `8 n + 5` without overflow. -/
 theorem b64url_fits {x : Slice U8} {w : alloc.vec.Vec U8} (h : b64url x = Result.ok w) :
     8 * x.val.length + 5 ≤ Usize.max := by
-  unfold b64url proxy_http.encode_unpadded at h
+  unfold b64url proxy_http.response.encode_unpadded at h
   obtain ⟨i1, h1, h⟩ := bind_ok_inv h
   obtain ⟨i2, h2, _⟩ := bind_ok_inv h
   have m := UScalar.mul_equiv 8#usize (Slice.len x)

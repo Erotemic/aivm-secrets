@@ -56,6 +56,10 @@ open Aeneas Aeneas.Std
 open garrett_stateless_core
 open garrett_stateless_core.stateless_protocol
 open garrett_stateless_core.stateless_token
+open garrett_stateless_core.stateless_token.base64 garrett_stateless_core.stateless_token.grammar
+  garrett_stateless_core.stateless_token.json garrett_stateless_core.stateless_token.payload
+  garrett_stateless_core.stateless_token.keys garrett_stateless_core.stateless_token.opening
+  garrett_stateless_core.stateless_token.sealing garrett_stateless_core.stateless_token.login_state
 
 set_option autoImplicit false
 
@@ -191,7 +195,7 @@ open garrett_stateless_core.stateless_proxy garrett_stateless_core.stateless_pro
     authorized, exact, acknowledged egress** — for Garrett's unrestricted
     proxy. -/
 theorem unrestricted_request {V O : Type} (ops : stateless.SurrogateOpener V) (origin : Origin O) (opener : V)
-    (io : O) (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance) (peer : Slice U8)
+    (io : O) (request : proxy_http.request.Request) (routes : Slice Route) (a : stateless.Acceptance) (peer : Slice U8)
     (now : I64) (limit : Usize) (served : proxy_controller.Served) (after : O)
     (h : serve ops UnrestrictedPolicy origin opener () io request routes a peer now limit = Result.ok (served, after)) :
     AuthorizedEgress ops UnrestrictedPolicy origin opener () io (fun _ _ => True) request routes a peer now limit
@@ -204,7 +208,7 @@ open garrett_stateless_core.stateless_proxy garrett_stateless_core.stateless_pro
     `HEAD` with no body, on a configured resource of the surrogate's
     provider (`ReadOnlyAllowed`). -/
 theorem read_only_request {V O : Type} (ops : stateless.SurrogateOpener V) (origin : Origin O) (opener : V)
-    (p : stateless_policy.ReadOnly) (io : O) (request : proxy_http.Request) (routes : Slice Route)
+    (p : stateless_policy.ReadOnly) (io : O) (request : proxy_http.request.Request) (routes : Slice Route)
     (a : stateless.Acceptance) (peer : Slice U8) (now : I64) (limit : Usize) (served : proxy_controller.Served)
     (after : O)
     (h : serve ops ReadOnlyPolicy origin opener p io request routes a peer now limit = Result.ok (served, after)) :

@@ -10,6 +10,7 @@ set_option maxHeartbeats 4000000
 same text, so with this encoder the accepted bytes are the unique preimage of
 the text, whatever the decoding library returned. -/
 namespace garrett_stateless_core.proxy_http.Base64Proofs
+open garrett_stateless_core.proxy_http.response
 
 /-- The symbol for a 6-bit value, as a number. -/
 def symNat (v : Nat) (url : Bool) : Nat :=

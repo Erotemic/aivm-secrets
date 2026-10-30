@@ -13,6 +13,25 @@
 //!   `http_auth`, `reflection`, `credential_use`,
 //!   `oauth_login`: the HTTP/1.1 framing, exact upstream encoding, response
 //!   release and OAuth login primitives those decisions use.
+//!
+//! # The API
+//!
+//! A caller needs these; everything else is `pub` so that the application
+//! shell and the proofs can name it, not as a stable interface.
+//!
+//! | Use | Items |
+//! | --- | --- |
+//! | issue a surrogate | [`stateless::issue`], [`stateless::IssuePolicy`], [`stateless::Grant`], [`stateless_token::TokenSealer::new`] |
+//! | open one | [`stateless::open`] (= [`stateless::authenticate`] then [`stateless::decrypt`]), [`stateless::Acceptance`], [`stateless_token::KeySet::new`] |
+//! | renew one | [`stateless::renew`] |
+//! | decide a proxied request | [`stateless_proxy::decide`]; run a connection with [`stateless_proxy::connection`] |
+//! | restrict operations | [`stateless_policy::Unrestricted`], [`stateless_policy::ReadOnly`] |
+//! | the OAuth login | [`stateless_mailbox`]: `start`, `pending`, `accept`, `exchange`, `finish`, `poll` |
+//! | adapters you implement | [`stateless_token::KeyMaterial`], [`stateless_token::StateKey`], [`stateless_mailbox::CodeExchange`], [`stateless_proxy::Channel`], [`stateless_proxy::Origin`] |
+//!
+//! With the feature `derive`, the non-secret value and error types
+//! implement `Debug`, `Clone`, `PartialEq` and `Eq`; types holding a
+//! credential, token, key or request never do.
 #![forbid(unsafe_code)]
 // Scalar guards keep extraction independent of Range/iterator implementations.
 #![allow(clippy::manual_range_contains)]

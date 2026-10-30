@@ -551,7 +551,7 @@ decision (steps 1-5) and `stateless_proxy::serve` performs it (steps 6-7):
 Every request on a kept-alive connection is admitted independently.
 Methods, request bodies, query strings and status codes pass through within
 the limits of the strict HTTP/1.1 subset of `proxy_http` (its limits are the
-constants at the top of `crates/garrett-stateless-core/src/proxy_http.rs`). Not supported: `Upgrade`,
+constants in `crates/garrett-stateless-core/src/proxy_http/mod.rs`). Not supported: `Upgrade`,
 `Expect`, `Range`, request trailers, HTTP/2, compressed response encodings, and
 upstream responses other than HTTP/1.1 (an `HTTP/1.0` status line is refused
 as `outcome_unknown`).

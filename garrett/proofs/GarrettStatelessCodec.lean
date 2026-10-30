@@ -5,8 +5,8 @@ import GarrettHttpWireDecimal
 /-!
 # `garrett-stateless-v1`: the surrogate codec
 
-Source: `crates/garrett-stateless-core/src/stateless_token.rs`,
-extracted by Aeneas (`stateless_token.*`).
+Source: `crates/garrett-stateless-core/src/stateless_token/` (`base64.rs`,
+`json.rs`, `payload.rs`), extracted by Aeneas (`stateless_token.*`).
 -/
 
 open Aeneas Aeneas.Std
@@ -18,6 +18,10 @@ open garrett_stateless_core.http_wire.Proofs (Digit Digits DecimalValue digit_va
 set_option maxHeartbeats 4000000
 
 namespace garrett_stateless_core.stateless_token.Proofs
+open garrett_stateless_core.stateless_token.base64 garrett_stateless_core.stateless_token.grammar
+  garrett_stateless_core.stateless_token.json garrett_stateless_core.stateless_token.payload
+  garrett_stateless_core.stateless_token.keys garrett_stateless_core.stateless_token.opening
+  garrett_stateless_core.stateless_token.sealing garrett_stateless_core.stateless_token.login_state
 
 /-! ## Strict b64url -/
 

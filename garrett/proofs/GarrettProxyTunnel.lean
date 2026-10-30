@@ -113,7 +113,7 @@ local macro "stepped_tail" : tactic => `(tactic| (
     from the `usize` bound), so `step` keeps exactly the bytes after it and
     nothing is lost or served twice; its body is within the request limit. -/
 theorem step_request_fits {buffer : alloc.vec.Vec U8} {host : Slice U8} {limit : Usize}
-    {parsed : proxy_http.Parsed}
+    {parsed : proxy_http.request.Parsed}
     (small : buffer.length + 16 ^ 8 + 4 ≤ Usize.max) (bounded : limit.val + 16 ^ 8 ≤ Usize.max)
     (h : frame (alloc.vec.Vec.deref buffer) host limit = Result.ok (.Request parsed)) :
     parsed.used.val ≤ buffer.length ∧ parsed.request.body.length ≤ limit.val ∧

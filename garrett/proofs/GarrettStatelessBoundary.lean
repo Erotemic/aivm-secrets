@@ -28,6 +28,10 @@ open Aeneas Aeneas.Std
 namespace garrett_stateless_core.stateless_boundary
 
 open garrett_stateless_core.stateless_token
+open garrett_stateless_core.stateless_token.base64 garrett_stateless_core.stateless_token.grammar
+  garrett_stateless_core.stateless_token.json garrett_stateless_core.stateless_token.payload
+  garrett_stateless_core.stateless_token.keys garrett_stateless_core.stateless_token.opening
+  garrett_stateless_core.stateless_token.sealing garrett_stateless_core.stateless_token.login_state
 
 /-- **Ed25519 correctness.** A signature the signing half produced verifies,
     under the verifying half, over the same bytes. -/

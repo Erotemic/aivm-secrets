@@ -155,7 +155,7 @@ def Stepped (io : C) (buffer : alloc.vec.Vec U8) (out : proxy_controller.Tunnel)
   match framed with
   | .Refuse code =>
       ∃ io1 bytes sent, inst.refused io code = Result.ok io1 ∧
-        proxy_http.refusal code = Result.ok bytes ∧
+        proxy_http.refusal.refusal code = Result.ok bytes ∧
         inst.send io1 (alloc.vec.Vec.deref bytes) = Result.ok (sent, after) ∧
         out.buffer = buffer ∧ out.open = false
   | .More =>
@@ -264,15 +264,15 @@ sequence of native effects the connection loop requested. -/
 /-- One native effect the connection loop requested. -/
 inductive ProxyEvent where
   /-- A parsed request is about to be served. -/
-  | began (request : proxy_http.Request)
+  | began (request : proxy_http.request.Request)
   | rejected (rejection : stateless.Rejection)
   /-- The admission record was requested; `acked` is the native answer. -/
   | admitted (claims : stateless.SurrogateClaims) (route : Usize) (acked : Bool)
   /-- A credential-bearing upstream request was handed to the native sender. -/
   | sent (route : Usize) (wire : alloc.vec.Vec U8)
   | completed (status : U16) (acked : Bool)
-  | refused (code : proxy_http.Code)
-  | stopped (code : proxy_http.Code)
+  | refused (code : proxy_http.refusal.Code)
+  | stopped (code : proxy_http.refusal.Code)
   /-- Bytes written to the guest. -/
   | guestSent (bytes : List U8)
 
@@ -310,7 +310,7 @@ def ServeLog (d : Decision) (E : List ProxyEvent) : Prop :=
     `rejected`; a pre-egress refusal nothing; a dispatch the admission request
     and — only if it was acknowledged — exactly one `sent` of the decided route
     and bytes, then at most a completion record. -/
-theorem serve_logged (o : Origin C) (io : C) (L : List ProxyEvent) (request : proxy_http.Request) (now : I64)
+theorem serve_logged (o : Origin C) (io : C) (L : List ProxyEvent) (request : proxy_http.request.Request) (now : I64)
     (served : proxy_controller.Served) (after : C × List ProxyEvent)
     (h : serve ops pol (loggedOrigin o) opener policy (io, L) request routes a peer now limit = Result.ok (served, after)) :
     ∃ d E, decide_request ops pol opener policy request routes a peer now = Result.ok d ∧ after.2 = L ++ E ∧ ServeLog d E := by
@@ -366,14 +366,14 @@ theorem ok_map_inv {α β : Type} {m : Result α} {f : α → β} {x : β}
   exact ⟨r, hm, (Result.ok_injective e).symm⟩
 
 /-- The guarantee `serve_guest_reply` gives for the reply of one request. -/
-def GuestReply (request : proxy_http.Request) (now : I64) (served : proxy_controller.Served) : Prop :=
+def GuestReply (request : proxy_http.request.Request) (now : I64) (served : proxy_controller.Served) : Prop :=
   unauthorized_served = Result.ok served ∨
   served.reply.val = ascii (proxy_http.Proofs.refusalText served.code) ∨
   (∃ index wire opened, decide_request ops pol opener policy request routes a peer now =
       Result.ok (.dispatch index wire opened) ∧ served.stage = .Completed ∧
     ∃ forms head response,
-      proxy_http.reflection_forms (alloc.vec.Vec.deref opened.credential) = Result.ok forms ∧
-      proxy_http.guest_response (alloc.vec.Vec.new U8) response (alloc.vec.Vec.deref forms)
+      proxy_http.response.reflection_forms (alloc.vec.Vec.deref opened.credential) = Result.ok forms ∧
+      proxy_http.response.guest_response (alloc.vec.Vec.new U8) response (alloc.vec.Vec.deref forms)
         request.keep_alive head = Result.ok (.Ok (), served.reply) ∧
       ((proxy_http.Proofs.ResponseBytes response response.fields.val request.keep_alive false).length ≤
           Usize.max → ¬ proxy_http.Proofs.Occurs served.reply.val opened.credential.val))
@@ -384,7 +384,7 @@ def GuestReply (request : proxy_http.Request) (now : I64) (served : proxy_contro
     exactly when it did not complete, and its reply. -/
 def StepLog (seg : List ProxyEvent) : Prop :=
   seg = [] ∨
-  (∃ code bytes, proxy_http.refusal code = Result.ok bytes ∧ seg = [.refused code, .guestSent bytes.val]) ∨
+  (∃ code bytes, proxy_http.refusal.refusal code = Result.ok bytes ∧ seg = [.refused code, .guestSent bytes.val]) ∨
   (∃ request now d E served, decide_request ops pol opener policy request routes a peer now = Result.ok d ∧
     ServeLog d E ∧ GuestReply ops pol opener policy routes a peer request now served ∧
     ((served.stage = .Completed ∧ seg = [.began request] ++ E ++ [.guestSent served.reply.val]) ∨
@@ -560,7 +560,7 @@ theorem connection_egress_authorized (ch : Channel C) (io : C) (after : C × Lis
         stateless.«open» ops opener (alloc.vec.Vec.deref token) a peer now = Result.ok (.Ok opened) ∧
         ∃ (inside : r.val < routes.length),
           (routes[r.val]'inside).provider.val = opened.claims.provider.val ∧
-          proxy_http.encode_upstream (alloc.vec.Vec.new U8) request
+          proxy_http.upstream.encode_upstream (alloc.vec.Vec.new U8) request
             (alloc.vec.Vec.deref (routes[r.val]'inside).host) (alloc.vec.Vec.deref (routes[r.val]'inside).rules)
             (alloc.vec.Vec.deref opened.credential) (routes[r.val]'inside).authentication =
             Result.ok (.Ok (), w) := by
@@ -593,7 +593,7 @@ theorem connection_sends_once_per_request (ch : Channel C) (io : C) (after : C �
 theorem connection_guest_bytes (ch : Channel C) (io : C) (after : C × List ProxyEvent)
     (h : connection ops pol (logged ch) opener policy (io, []) routes a authority peer limit = Result.ok after)
     {bytes : List U8} (m : ProxyEvent.guestSent bytes ∈ after.2) :
-    (∃ code refusal, proxy_http.refusal code = Result.ok refusal ∧ bytes = refusal.val) ∨
+    (∃ code refusal, proxy_http.refusal.refusal code = Result.ok refusal ∧ bytes = refusal.val) ∨
     ∃ request now served, GuestReply ops pol opener policy routes a peer request now served ∧ bytes = served.reply.val := by
   obtain ⟨segs, log, ok⟩ := connection_logged ops pol opener policy routes a authority peer limit ch io after h
   rw [log] at m

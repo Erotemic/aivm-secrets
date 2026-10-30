@@ -3,7 +3,7 @@ import GarrettStatelessCodec
 /-!
 # `garrett-stateless-v1`: the field grammars, keys, header and segments
 
-Source: `crates/garrett-stateless-core/src/stateless_token.rs`
+Source: `crates/garrett-stateless-core/src/stateless_token/` (`grammar.rs`, `keys.rs`, `payload.rs`, `opening.rs`)
 (`plain`, `is_text`, `is_provider`, `is_kid`, `is_id`, `is_thumbprint`,
 `is_scope`, `is_verifier`, `payload_valid`, `state_valid`, `select`,
 `keys_valid`, `header_bytes`, `header_kid`, `ascii`, `dot_from`, `segments`,
@@ -18,6 +18,10 @@ open garrett_stateless_core.proxy_http.Base64Proofs (symNat sexNat enc encode_un
 set_option maxHeartbeats 4000000
 
 namespace garrett_stateless_core.stateless_token.Proofs
+open garrett_stateless_core.stateless_token.base64 garrett_stateless_core.stateless_token.grammar
+  garrett_stateless_core.stateless_token.json garrett_stateless_core.stateless_token.payload
+  garrett_stateless_core.stateless_token.keys garrett_stateless_core.stateless_token.opening
+  garrett_stateless_core.stateless_token.sealing garrett_stateless_core.stateless_token.login_state
 
 /-! ## Byte classes -/
 
@@ -972,8 +976,8 @@ theorem ascii_loop_eq (v : Slice U8) : ∀ i : Usize, i.val ≤ v.val.length →
     have c : ¬ i < Slice.len v := by scalar_tac
     simp only [c, ↓reduceIte]
 
-theorem ascii_eq (v : Slice U8) : ascii v = Result.ok (decide (∀ x ∈ v.val, AsciiByte x)) := by
-  unfold ascii
+theorem ascii_eq (v : Slice U8) : opening.ascii v = Result.ok (decide (∀ x ∈ v.val, AsciiByte x)) := by
+  unfold opening.ascii
   have := ascii_loop_eq v 0#usize (by simp)
   rw [usize_zero_val, List.drop_zero] at this
   exact this

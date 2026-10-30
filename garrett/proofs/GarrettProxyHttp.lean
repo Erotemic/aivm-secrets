@@ -5,7 +5,7 @@ import GarrettHttpWireHeaders
 /-!
 # The proxy's HTTP subset: where the credential goes
 
-Source: `crates/garrett-stateless-core/src/proxy_http.rs`, extracted
+Source: `crates/garrett-stateless-core/src/proxy_http/upstream.rs`, extracted
 by Aeneas. The Python reference is `garrett_stateless/core/proxy_http.py`.
 
 Proved here, for the extracted upstream encoder `encode_upstream`:
@@ -37,6 +37,8 @@ set_option maxHeartbeats 4000000
 set_option maxRecDepth 100000
 
 namespace garrett_stateless_core.proxy_http.Proofs
+open garrett_stateless_core.proxy_http.request garrett_stateless_core.proxy_http.upstream
+  garrett_stateless_core.proxy_http.response garrett_stateless_core.proxy_http.refusal
 
 open garrett_stateless_core.http_auth.Proofs (HeaderPrefix)
 open garrett_stateless_core.http_wire.Proofs (CaseFold FoldedEqual PrefixTail)
@@ -53,9 +55,9 @@ def fold (bytes : List U8) : List Nat := bytes.map (fun b => CaseFold b.val)
 
 /-- A dropped field: its name equals one of `DroppedNames` ignoring ASCII case,
     so the filter does not depend on the parser lowercasing names. -/
-def Dropped (field : proxy_http.Field) : Prop := fold field.name.val ∈ DroppedNames.map fold
+def Dropped (field : proxy_http.request.Field) : Prop := fold field.name.val ∈ DroppedNames.map fold
 
-instance (field : proxy_http.Field) : Decidable (Dropped field) := by
+instance (field : proxy_http.request.Field) : Decidable (Dropped field) := by
   unfold Dropped; infer_instance
 
 theorem lifted_slice {n : Usize} (bytes : Array U8 n) :
@@ -78,7 +80,7 @@ theorem folded_equal_iff (a b : Slice U8) : FoldedEqual a b ↔ fold a.val = fol
     simpa [fold, List.getElem?_map, List.getElem?_eq_getElem hn,
       List.getElem?_eq_getElem hp] using this
 
-theorem name_is_eq (field : proxy_http.Field) (label : Slice U8) :
+theorem name_is_eq (field : proxy_http.request.Field) (label : Slice U8) :
     name_is field label = Result.ok (decide (fold field.name.val = fold label.val)) := by
   unfold name_is
   rw [garrett_stateless_core.http_wire.Proofs.ascii_equal_exact]
@@ -111,7 +113,7 @@ theorem chain_fold (n : List Nat) (l : List U8) (ls : List (List U8)) (r : Resul
     (if n = fold l then Result.ok true else r) = Result.ok (decide (n ∈ (l :: ls).map fold)) := by
   by_cases h : n = fold l <;> simp [h, rest]
 
-theorem dropped_eq (field : proxy_http.Field) :
+theorem dropped_eq (field : proxy_http.request.Field) :
     dropped field = Result.ok (decide (Dropped field)) := by
   unfold dropped
   simp only [lifted_slice, bind_ok, name_is_eq, array_slice_val, decide_eq_true_eq]
@@ -122,7 +124,7 @@ theorem dropped_eq (field : proxy_http.Field) :
   simp
 
 @[step]
-theorem dropped_spec (field : proxy_http.Field) :
+theorem dropped_spec (field : proxy_http.request.Field) :
     dropped field ⦃ b => b = decide (Dropped field) ⦄ := by
   rw [dropped_eq]; simp
 
@@ -135,7 +137,7 @@ theorem bytes_clone_exact (bytes : alloc.vec.Vec U8) :
   simp only [bind_tc_ok, ← property]
 
 /-- The guest fields that are forwarded, in order. -/
-def Forwarded (fields : List proxy_http.Field) : List proxy_http.Field :=
+def Forwarded (fields : List proxy_http.request.Field) : List proxy_http.request.Field :=
   fields.filter (fun field => !decide (Dropped field))
 
 theorem iter_next_inside {T : Type} (it : core.slice.iter.Iter T) (inside : it.i < it.slice.length) :
@@ -148,11 +150,11 @@ theorem iter_next_done {T : Type} (it : core.slice.iter.Iter T) (done : ¬ it.i 
     core.slice.iter.IteratorSliceIter.next it = Result.ok (none, it) := by
   simp [core.slice.iter.IteratorSliceIter.next, done]
 
-theorem forwarded_loop_contract (it : core.slice.iter.Iter proxy_http.Field)
-    (out : alloc.vec.Vec proxy_http.Field)
+theorem forwarded_loop_contract (it : core.slice.iter.Iter proxy_http.request.Field)
+    (out : alloc.vec.Vec proxy_http.request.Field)
     (room : out.length + (it.slice.length - it.i) ≤ Usize.max) :
     forwarded_loop it out ⦃ r => r.val = out.val ++ Forwarded (it.slice.val.drop it.i) ⦄ := by
-  suffices ∀ n (it : core.slice.iter.Iter proxy_http.Field) (out : alloc.vec.Vec proxy_http.Field),
+  suffices ∀ n (it : core.slice.iter.Iter proxy_http.request.Field) (out : alloc.vec.Vec proxy_http.request.Field),
       it.slice.length - it.i = n → out.length + n ≤ Usize.max →
       forwarded_loop it out ⦃ r => r.val = out.val ++ Forwarded (it.slice.val.drop it.i) ⦄ from
     this _ it out rfl room
@@ -178,7 +180,7 @@ theorem forwarded_loop_contract (it : core.slice.iter.Iter proxy_http.Field)
       · simp only [hb, d, decide_false, Bool.false_eq_true, ↓reduceIte, bytes_clone_exact,
           bind_ok]
         have same : ({ «name» := it.slice[it.i].name, value := it.slice[it.i].value } :
-            proxy_http.Field) = it.slice[it.i] := rfl
+            proxy_http.request.Field) = it.slice[it.i] := rfl
         rw [same]
         refine WP.spec_bind (alloc.vec.Vec.push_spec out it.slice[it.i] (by scalar_tac)) ?_
         intro pushed appended
@@ -193,17 +195,17 @@ theorem forwarded_loop_contract (it : core.slice.iter.Iter proxy_http.Field)
       simp [this, Forwarded]
 
 @[step]
-theorem forwarded_contract (fields : Slice proxy_http.Field) :
+theorem forwarded_contract (fields : Slice proxy_http.request.Field) :
     forwarded fields ⦃ r => r.val = Forwarded fields.val ⦄ := by
   unfold forwarded
   simp only [SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter, bind_ok]
-  apply WP.spec_mono (forwarded_loop_contract ⟨fields, 0⟩ (alloc.vec.Vec.new proxy_http.Field)
+  apply WP.spec_mono (forwarded_loop_contract ⟨fields, 0⟩ (alloc.vec.Vec.new proxy_http.request.Field)
     (by simp [alloc.vec.Vec.new, alloc.vec.Vec.length]))
   intro r h
   simpa [alloc.vec.Vec.new] using h
 
 /-- No forwarded field is a credential field, or any other dropped field. -/
-theorem forwarded_drops (fields : List proxy_http.Field) :
+theorem forwarded_drops (fields : List proxy_http.request.Field) :
     ∀ field ∈ Forwarded fields, ¬ Dropped field := by
   intro field member
   simp only [Forwarded, List.mem_filter, Bool.not_eq_true', decide_eq_false_iff_not] at member
@@ -250,19 +252,19 @@ theorem path_end_spec (target : Slice U8) :
 def CRLF : List U8 := [13#u8, 10#u8]
 
 /-- One forwarded field on the wire. -/
-def FieldBytes (field : proxy_http.Field) : List U8 :=
+def FieldBytes (field : proxy_http.request.Field) : List U8 :=
   field.name.val ++ [58#u8, 32#u8] ++ field.value.val ++ CRLF
 
-def FieldsBytes : List proxy_http.Field → List U8
+def FieldsBytes : List proxy_http.request.Field → List U8
   | [] => []
   | field :: rest => FieldBytes field ++ FieldsBytes rest
 
-theorem append_fields_loop_contract (iter : core.slice.iter.Iter proxy_http.Field)
+theorem append_fields_loop_contract (iter : core.slice.iter.Iter proxy_http.request.Field)
     (output : alloc.vec.Vec U8)
     (room : output.length + (FieldsBytes (iter.slice.val.drop iter.i)).length ≤ Usize.max) :
     append_fields_loop iter output ⦃ out =>
       out.val = output.val ++ FieldsBytes (iter.slice.val.drop iter.i) ⦄ := by
-  suffices ∀ n (it : core.slice.iter.Iter proxy_http.Field), it.slice.length - it.i = n →
+  suffices ∀ n (it : core.slice.iter.Iter proxy_http.request.Field), it.slice.length - it.i = n →
       ∀ (output : alloc.vec.Vec U8),
         output.length + (FieldsBytes (it.slice.val.drop it.i)).length ≤ Usize.max →
         append_fields_loop it output ⦃ out =>
@@ -307,7 +309,7 @@ theorem append_fields_loop_contract (iter : core.slice.iter.Iter proxy_http.Fiel
       simp [this, FieldsBytes]
 
 @[step]
-theorem append_fields_contract (output : alloc.vec.Vec U8) (fields : Slice proxy_http.Field)
+theorem append_fields_contract (output : alloc.vec.Vec U8) (fields : Slice proxy_http.request.Field)
     (room : output.length + (FieldsBytes fields.val).length ≤ Usize.max) :
     append_fields output fields ⦃ out => out.val = output.val ++ FieldsBytes fields.val ⦄ := by
   unfold append_fields
@@ -325,7 +327,7 @@ def PathMatches (rule path : List U8) : Prop :=
   path = rule ∨ path = rule ++ [47#u8] ∨
     ((∃ init, rule = init ++ [47#u8]) ∧ (rule = path ++ [47#u8] ∨ rule <+: path))
 
-def RuleMatches (rule : proxy_http.DenyRule) (method path : List U8) : Prop :=
+def RuleMatches (rule : proxy_http.upstream.DenyRule) (method path : List U8) : Prop :=
   MethodMatches rule.method.val method ∧ PathMatches rule.path.val path
 
 theorem take_eq_prefix {p pre : List U8} :
@@ -482,7 +484,7 @@ theorem path_matches_spec (rule path : Slice U8) :
 
 /-- **What a deny rule matches.** -/
 @[step]
-theorem rule_matches_spec (rule : proxy_http.DenyRule) (method path : Slice U8) :
+theorem rule_matches_spec (rule : proxy_http.upstream.DenyRule) (method path : Slice U8) :
     rule_matches rule method path ⦃ r => r = true ↔ RuleMatches rule method.val path.val ⦄ := by
   unfold rule_matches
   step as ⟨b, hb⟩
@@ -493,13 +495,13 @@ theorem rule_matches_spec (rule : proxy_http.DenyRule) (method path : Slice U8) 
   · simp_all [WP.spec_ok, RuleMatches, vec_deref_val]
 
 /-- The remaining rules from `it.i` on. -/
-def Remaining (it : core.slice.iter.Iter proxy_http.DenyRule) : List proxy_http.DenyRule :=
+def Remaining (it : core.slice.iter.Iter proxy_http.upstream.DenyRule) : List proxy_http.upstream.DenyRule :=
   it.slice.val.drop it.i
 
-theorem denied_loop_spec (it : core.slice.iter.Iter proxy_http.DenyRule) (method path : Slice U8) :
+theorem denied_loop_spec (it : core.slice.iter.Iter proxy_http.upstream.DenyRule) (method path : Slice U8) :
     denied_loop it method path ⦃ r =>
       r = true ↔ ∃ rule ∈ Remaining it, RuleMatches rule method.val path.val ⦄ := by
-  suffices ∀ n (it : core.slice.iter.Iter proxy_http.DenyRule), it.slice.length - it.i = n →
+  suffices ∀ n (it : core.slice.iter.Iter proxy_http.upstream.DenyRule), it.slice.length - it.i = n →
       denied_loop it method path ⦃ r =>
         r = true ↔ ∃ rule ∈ Remaining it, RuleMatches rule method.val path.val ⦄ from this _ it rfl
   intro n
@@ -536,7 +538,7 @@ theorem denied_loop_spec (it : core.slice.iter.Iter proxy_http.DenyRule) (method
 /-- **What the deny list refuses.** `denied` is true exactly when some rule
     in the list matches the method and path (`RuleMatches`). -/
 @[step]
-theorem denied_spec (rules : Slice proxy_http.DenyRule) (method path : Slice U8) :
+theorem denied_spec (rules : Slice proxy_http.upstream.DenyRule) (method path : Slice U8) :
     denied rules method path ⦃ r =>
       r = true ↔ ∃ rule ∈ rules.val, RuleMatches rule method.val path.val ⦄ := by
   unfold denied
@@ -552,13 +554,13 @@ theorem body_methods_bytes : BodyMethods =
     [[80#u8, 79#u8, 83#u8, 84#u8], [80#u8, 85#u8, 84#u8], [80#u8, 65#u8, 84#u8, 67#u8, 72#u8]] := by
   rfl
 
-def NeedsLength (request : proxy_http.Request) : Prop :=
+def NeedsLength (request : proxy_http.request.Request) : Prop :=
   0 < request.body.length ∨ request.method.val ∈ BodyMethods
 
-instance (request : proxy_http.Request) : Decidable (NeedsLength request) := by
+instance (request : proxy_http.request.Request) : Decidable (NeedsLength request) := by
   unfold NeedsLength; infer_instance
 
-theorem needs_length_eq (request : proxy_http.Request) :
+theorem needs_length_eq (request : proxy_http.request.Request) :
     needs_length request = Result.ok (decide (NeedsLength request)) := by
   unfold needs_length
   simp only [NeedsLength, body_methods_bytes, lifted_slice, bind_ok, slice_eq_eq, array_slice_val]
@@ -583,7 +585,7 @@ instance (byte : U8) : Decidable (Visible byte) := by unfold Visible; infer_inst
 def Clean (byte : U8) : Prop := Visible byte ∨ byte.val = 32 ∨ byte.val = 9
 
 /-- A field that is exactly one header line. -/
-def CleanField (field : proxy_http.Field) : Prop :=
+def CleanField (field : proxy_http.request.Field) : Prop :=
   field.name.val ≠ [] ∧ (∀ byte ∈ field.name.val, Visible byte) ∧
     ∀ byte ∈ field.value.val, Clean byte
 
@@ -693,7 +695,7 @@ theorem mem_all {P : U8 → Prop} (bytes : List U8)
   exact all k hk
 
 @[step]
-theorem clean_field_spec (field : proxy_http.Field) :
+theorem clean_field_spec (field : proxy_http.request.Field) :
     clean_field field ⦃ t => t = true → CleanField field ⦄ := by
   unfold clean_field
   dsimp only
@@ -722,9 +724,9 @@ theorem clean_field_spec (field : proxy_http.Field) :
     · simp
   · simp
 
-theorem clean_fields_loop_spec (it : core.slice.iter.Iter proxy_http.Field) :
+theorem clean_fields_loop_spec (it : core.slice.iter.Iter proxy_http.request.Field) :
     clean_fields_loop it ⦃ t => t = true → ∀ field ∈ it.slice.val.drop it.i, CleanField field ⦄ := by
-  suffices ∀ n (it : core.slice.iter.Iter proxy_http.Field), it.slice.length - it.i = n →
+  suffices ∀ n (it : core.slice.iter.Iter proxy_http.request.Field), it.slice.length - it.i = n →
       clean_fields_loop it ⦃ t => t = true → ∀ field ∈ it.slice.val.drop it.i, CleanField field ⦄ from
     this _ it rfl
   intro n
@@ -757,7 +759,7 @@ theorem clean_fields_loop_spec (it : core.slice.iter.Iter proxy_http.Field) :
       cases mem
 
 @[step]
-theorem clean_fields_spec (fields : Slice proxy_http.Field) :
+theorem clean_fields_spec (fields : Slice proxy_http.request.Field) :
     clean_fields fields ⦃ t => t = true → ∀ field ∈ fields.val, CleanField field ⦄ := by
   unfold clean_fields
   simp only [SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter, bind_ok]
@@ -933,12 +935,12 @@ open garrett_stateless_core.http_wire.Proofs (Digits)
 
 /-- Everything written before the credential line: request line, `Host`, and
     the forwarded guest fields. A function of the request and host only. -/
-def UpstreamPrefix (request : proxy_http.Request) (host : Slice U8) : List U8 :=
+def UpstreamPrefix (request : proxy_http.request.Request) (host : Slice U8) : List U8 :=
   request.method.val ++ [32#u8] ++ request.target.val ++ ascii " HTTP/1.1\r\nHost: " ++
     host.val ++ CRLF ++ FieldsBytes (Forwarded request.fields.val)
 
 /-- Everything written after the credential line. A function of the request only. -/
-def UpstreamSuffix (request : proxy_http.Request) : List U8 :=
+def UpstreamSuffix (request : proxy_http.request.Request) : List U8 :=
   ascii "Accept-Encoding: identity\r\nConnection: close\r\n" ++
     (if NeedsLength request then ascii "Content-Length: " ++ Digits request.body.length ++ CRLF
      else []) ++ CRLF ++ request.body.val
@@ -963,7 +965,7 @@ attribute [local scalar_tac_simps] Array.length_to_slice
 attribute [step] garrett_stateless_core.http_wire.Proofs.append_decimal_exact
 
 @[step]
-theorem needs_length_spec (request : proxy_http.Request) :
+theorem needs_length_spec (request : proxy_http.request.Request) :
     needs_length request ⦃ b => b = decide (NeedsLength request) ⦄ := by
   rw [needs_length_eq]; simp
 
@@ -983,8 +985,8 @@ theorem header_prefix_length (authentication : credential_use.Authentication) :
     and since no forwarded name, value or target contains CR or LF, a guest
     cannot add a header line. These checks are the encoder's own, so the
     framing does not depend on the parser. -/
-theorem encode_upstream_contract (output : alloc.vec.Vec U8) (request : proxy_http.Request)
-    (host : Slice U8) (rules : Slice proxy_http.DenyRule) (secret : Slice U8)
+theorem encode_upstream_contract (output : alloc.vec.Vec U8) (request : proxy_http.request.Request)
+    (host : Slice U8) (rules : Slice proxy_http.upstream.DenyRule) (secret : Slice U8)
     (authentication : credential_use.Authentication)
     (room : output.length + (UpstreamPrefix request host ++ HeaderPrefix authentication ++
       secret.val ++ CRLF ++ UpstreamSuffix request).length ≤ Usize.max) :

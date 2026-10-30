@@ -4,7 +4,7 @@ import GarrettProxyHttp
 # HTTPS proxy: what an accepted request occupies
 
 Source: `parse_request` and its helpers in
-`crates/garrett-stateless-core/src/proxy_http.rs`, extracted by
+`crates/garrett-stateless-core/src/proxy_http/request.rs`, extracted by
 Aeneas. The proxy's tunnel loop (`proxy_controller::frame`, then the native
 `buffer.drain(..parsed.used)`) consumes `used` bytes of the guest's buffer.
 
@@ -24,6 +24,8 @@ open garrett_stateless_core.Proofs
 set_option maxHeartbeats 4000000
 
 namespace garrett_stateless_core.proxy_http.Proofs
+open garrett_stateless_core.proxy_http.request garrett_stateless_core.proxy_http.upstream
+  garrett_stateless_core.proxy_http.response garrett_stateless_core.proxy_http.refusal
 
 theorem add_eq {a b c : Usize} (h : a + b = Result.ok c) : c.val = a.val + b.val := by
   have := UScalar.add_equiv a b
