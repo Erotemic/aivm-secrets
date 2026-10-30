@@ -98,7 +98,6 @@ theorem sextet_spec (bytes : Slice U8) (index : Usize)
     ring_nf
     simp
 
-
 /-- The encoding as numbers: the symbol of every group `0 .. ceil(8n/6)`. -/
 def enc (l : List U8) (url : Bool) : List Nat :=
   (List.range ((8 * l.length + 5) / 6)).map (fun i => symNat (sexNat l i) url)

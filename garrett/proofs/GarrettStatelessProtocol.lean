@@ -1,7 +1,7 @@
-import GarrettStatelessMailbox
-import GarrettStatelessConnection
-import GarrettStatelessToken
 import GarrettStatelessBoundary
+import GarrettStatelessConnection
+import GarrettStatelessMailbox
+import GarrettStatelessToken
 
 /-!
 # `garrett-stateless-v1`: the whole protocol, over every execution
@@ -15,7 +15,6 @@ interfaces of `GarrettStatelessBoundary`.
 
 open Aeneas Aeneas.Std
 open garrett_stateless_core.Proofs
-open garrett_stateless_core.proxy_http.Proofs (bind_ok_inv)
 open garrett_stateless_core.proxy_http.Base64Proofs (enc enc_injective)
 
 namespace garrett_stateless_core.stateless_protocol
@@ -92,7 +91,7 @@ theorem payload_list_inj {p q : Payload} (vp : PayloadValid p) (vq : PayloadVali
 theorem slice_index_some {α : Type} {s : Slice α} {i : Usize} {x : α} (h : s.val[i.val]? = some x) :
     Slice.index_usize s i = Result.ok x := by
   obtain ⟨inside, e⟩ := List.getElem?_eq_some_iff.mp h
-  rw [garrett_stateless_core.stateless_mailbox.Proofs.slice_index_eq s i inside, e]
+  rw [slice_index_eq s i inside, e]
 
 /-- `unseal_token` runs to the answer of the selected entry's `open`. -/
 theorem unseal_token_of {M : Type} {inst : KeyMaterial M} {entries : Slice (KeyEntry M)}
@@ -133,11 +132,6 @@ theorem segments_unique {t a b c a' b' c' : List U8} (h : Segments t a b c) (h' 
   obtain ⟨ha, rest⟩ := split_dot na na' e'
   obtain ⟨hb, hc⟩ := split_dot nb nb' rest
   exact ⟨ha, hb, hc⟩
-
-theorem b64_length {l x : List U8} (h : B64 l x) : x.length ≤ l.length := by
-  have := congrArg List.length h
-  rw [List.length_map, enc_length] at this
-  omega
 
 theorem payload_valid_enc {p : Payload} (e : alloc.vec.Vec U8) (h : PayloadValid { p with enc := e }) :
     PayloadValid p := h

@@ -1,5 +1,5 @@
-import GarrettStateless
 import GarrettLogin
+import GarrettStateless
 
 /-!
 # `garrett-stateless-v1`: agent-initiated login, binding and delivery
@@ -32,18 +32,10 @@ derives the end-to-end binding from that.
 
 open Aeneas Aeneas.Std
 open garrett_stateless_core.Proofs
-open garrett_stateless_core.proxy_http.Proofs (bind_ok_inv)
 open garrett_stateless_core.stateless.Proofs
 set_option maxHeartbeats 4000000
 
 namespace garrett_stateless_core.stateless_login.Proofs
-
-theorem vec_deref_mk (v : alloc.vec.Vec U8) : ({ slice := alloc.vec.Vec.deref v } : alloc.vec.Vec U8) = v := by
-  cases v with
-  | mk s =>
-    congr 1
-    rw [Slice.eq_iff]
-    simp [alloc.vec.Vec.deref, alloc.vec.Vec.val]
 
 def BeginSpec (policy : LoginPolicy) (provider peer subject : Slice U8) (certExpires : I64)
     (login verifier scope : Slice U8) (now : I64) (s : LoginState) : Prop :=
@@ -197,6 +189,6 @@ theorem deliver_trace (e : Entry) (peer : Slice U8) (now : I64)
 theorem deliver_other_peer (e : Entry) (peer : Slice U8) (now : I64)
     (different : e.certificate.val ≠ peer.val) :
     deliver e peer now = Result.ok .WrongCertificate := by
-  simp [deliver, proxy_http.Proofs.slice_eq_eq, alloc.vec.Vec.deref, different]
+  simp [deliver, slice_eq_eq, alloc.vec.Vec.deref, different]
 
 end garrett_stateless_core.stateless_login.Proofs

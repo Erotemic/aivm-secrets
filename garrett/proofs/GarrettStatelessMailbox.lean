@@ -9,17 +9,11 @@ extracted by Aeneas (`stateless_mailbox.*`).
 
 open Aeneas Aeneas.Std
 open garrett_stateless_core.Proofs
-open garrett_stateless_core.proxy_http.Proofs (bind_ok_inv slice_eq_eq)
 open garrett_stateless_core.stateless.Proofs
 open garrett_stateless_core.stateless_login.Proofs
 set_option maxHeartbeats 4000000
 
 namespace garrett_stateless_core.stateless_mailbox.Proofs
-
-theorem slice_index_eq {α : Type} (s : Slice α) (i : Usize) (inside : i.val < s.length) :
-    Slice.index_usize s i = Result.ok s.val[i.val] := by
-  obtain ⟨y, hy, same⟩ := returned_of_spec (Slice.index_usize_spec s i inside)
-  rw [hy, same]
 
 /-! ## Pure views of the slot operations -/
 
@@ -71,11 +65,6 @@ theorem set_step {α : Type} (l : List α) (f : α → α) (i : Nat) (hi : i < l
   congr 1
   rw [← List.getElem_cons_drop hi]
   simp only [List.map_cons, List.singleton_append]
-
-theorem usize_succ (i : Usize) (h : i.val + 1 ≤ Usize.max) :
-    ∃ j : Usize, i + 1#usize = Result.ok j ∧ j.val = i.val + 1 := by
-  obtain ⟨c, hc, v⟩ := returned_of_spec (Usize.add_spec (x := i) (y := 1#usize) (by simpa using h))
-  exact ⟨c, hc, by simpa using v⟩
 
 /-- The extracted `prune` empties exactly the slots `kept` drops. -/
 theorem prune_loop_eq (now : I64) :
@@ -303,16 +292,6 @@ def newSlot (st : stateless_login.LoginState) (serial : U64) : Slot :=
 /-- Put `x` in the first empty slot, or after the last. -/
 def place (l : List (Option Slot)) (x : Slot) : List (Option Slot) :=
   if l.findIdx Option.isNone < l.length then l.set (l.findIdx Option.isNone) (some x) else l ++ [some x]
-
-theorem push_ok_val {α : Type} {v w : alloc.vec.Vec α} {x : α}
-    (h : alloc.vec.Vec.push v x = Result.ok w) : w.val = v.val ++ [x] := by
-  unfold alloc.vec.Vec.push at h
-  dsimp only at h
-  split at h
-  · simp only [Result.ok.injEq] at h
-    subst h
-    simp
-  · simp at h
 
 /-- **`start`.** Either nothing but pruning happened and no login began, or
     `begin` accepted the login for `peer`, the pruned mailbox had room and no

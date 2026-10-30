@@ -1,5 +1,4 @@
 import GarrettProxyHttp
-import GarrettHttpWireHeaders
 
 /-!
 # HTTPS proxy: what an accepted request occupies
@@ -21,7 +20,7 @@ header framing does not depend on the parser.
 
 open Aeneas Aeneas.Std
 open garrett_stateless_core.Proofs
-open garrett_stateless_core.Lemmas (bind_ok_inv extend_ok_val index_usize_eq add_one_eq)
+
 set_option maxHeartbeats 4000000
 
 namespace garrett_stateless_core.proxy_http.Proofs
@@ -55,7 +54,6 @@ theorem head_end_some {data : Slice U8} {e : Usize} (small : data.length + 4 ≤
   rw [ho] at h
   simp only [Result.ok.injEq] at h
   exact post e h
-
 
 theorem usize_holds_u32 : 4294967295 ≤ Usize.max := by scalar_tac
 
@@ -138,7 +136,6 @@ theorem crlf_from_loop_spec (data : Slice U8) (index : Usize) (small : data.leng
         intro r ⟨lo, hi⟩; exact ⟨by scalar_tac, hi⟩
     · simp only [WP.spec_ok]; scalar_tac
 
-
 @[step]
 theorem crlf_from_spec (data : Slice U8) (index : Usize) (small : data.length + 4 ≤ Usize.max)
     (inside : index.val ≤ data.length) :
@@ -167,7 +164,6 @@ theorem decode_chunked_loop_spec (data : Slice U8) (limit : Usize)
     step*
     all_goals try rfl
     all_goals scalar_tac
-
 
 /-- A declared `Content-Length` the parser accepts is at most `limit`. -/
 theorem framing_length {fields : Slice Field} {limit n : Usize}
@@ -221,7 +217,6 @@ theorem body_of_spec (data : Slice U8) (start : Usize) (framed : Framing) (limit
       exact post _ _ rfl
     · simp only [WP.spec_ok]; intro body used h; cases h
     · simp only [WP.spec_ok]; intro body used h; cases h
-
 
 theorem body_of_ok {data : Slice U8} {start : Usize} {framed : Framing} {limit : Usize}
     {bytes : alloc.vec.Vec U8} {used : Usize}

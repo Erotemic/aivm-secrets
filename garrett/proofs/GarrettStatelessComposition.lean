@@ -132,11 +132,11 @@ theorem resource_allows_spec (r : Resource) (provider : Slice U8) (op : Operatio
     · rename_i yes
       refine WP.spec_mono (path_matches_spec _ _) ?_
       intro r hr
-      simp_all [ResourceAllows, garrett_stateless_core.http_wire.Proofs.vec_deref_val]
+      simp_all [ResourceAllows, vec_deref_val]
     · rename_i no
-      simp_all [WP.spec_ok, ResourceAllows, garrett_stateless_core.http_wire.Proofs.vec_deref_val]
+      simp_all [WP.spec_ok, ResourceAllows, vec_deref_val]
   · rename_i differ
-    simp_all [WP.spec_ok, ResourceAllows, garrett_stateless_core.http_wire.Proofs.vec_deref_val]
+    simp_all [WP.spec_ok, ResourceAllows, vec_deref_val]
 
 /-- The resources from `it.i` on. -/
 def RemainingResources (it : core.slice.iter.Iter Resource) : List Resource := it.slice.val.drop it.i
@@ -205,7 +205,7 @@ theorem read_only_permits_spec (p : ReadOnly) (claims : stateless.SurrogateClaim
       refine WP.spec_mono (any_allows_spec _ _ op) ?_
       intro r hr
       rw [hr]
-      simp only [ReadOnlyAllowed, garrett_stateless_core.http_wire.Proofs.vec_deref_val]
+      simp only [ReadOnlyAllowed, vec_deref_val]
       have : op.body.val = 0 := by scalar_tac
       simp_all
     · rename_i nonempty
@@ -213,7 +213,7 @@ theorem read_only_permits_spec (p : ReadOnly) (claims : stateless.SurrogateClaim
       have : op.body.val ≠ 0 := by scalar_tac
       simp_all
   · rename_i notread
-    simp_all [WP.spec_ok, ReadOnlyAllowed, garrett_stateless_core.http_wire.Proofs.vec_deref_val]
+    simp_all [WP.spec_ok, ReadOnlyAllowed, vec_deref_val]
 
 /-- The read-only policy meets its contract, for every configuration `p`. -/
 theorem read_only_sound (p : ReadOnly) : Sound ReadOnlyPolicy p (ReadOnlyAllowed p) := by
@@ -223,7 +223,6 @@ theorem read_only_sound (p : ReadOnly) : Sound ReadOnlyPolicy p (ReadOnlyAllowed
   exact hb.mp yes
 
 end garrett_stateless_core.stateless_policy.Proofs
-
 
 namespace garrett_stateless_core.stateless_proxy.Proofs
 

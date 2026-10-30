@@ -1,5 +1,5 @@
-import GarrettStatelessProxy
 import GarrettProxyTunnel
+import GarrettStatelessProxy
 
 /-!
 # `garrett-stateless-v1`: the proxy's authenticated connection loop
@@ -44,8 +44,7 @@ route's pinned address, and that the peer thumbprint is the verified one.
 
 open Aeneas Aeneas.Std
 open garrett_stateless_core.Proofs
-open garrett_stateless_core.proxy_http.Proofs (bind_ok_inv)
-open garrett_stateless_core.proxy_controller.Proofs (ite_ok_inv ok_pair_inv remainder_val)
+open garrett_stateless_core.proxy_controller.Proofs (remainder_val)
 set_option maxHeartbeats 4000000
 
 namespace garrett_stateless_core.stateless_proxy.Proofs
@@ -197,8 +196,8 @@ local macro "stepped_tail" : tactic => `(tactic| (
         obtain ⟨hout, hafter⟩ := ok_pair_inv h
         subst hout hafter
         refine ⟨rd, Or.inr ⟨by scalar_tac, ?_, rfl⟩⟩
-        simpa [garrett_stateless_core.http_wire.Proofs.vec_deref_val] using
-          garrett_stateless_core.Lemmas.extend_ok_val extended
+        simpa [vec_deref_val] using
+          extend_ok_val extended
   | Refuse code =>
     obtain ⟨io2, rf, h⟩ := bind_ok_inv h
     obtain ⟨bytes, rb, h⟩ := bind_ok_inv h
@@ -222,7 +221,7 @@ local macro "stepped_tail" : tactic => `(tactic| (
     · obtain ⟨hout, hafter⟩ := ok_pair_inv h
       subst hout hafter
       exact ⟨now, io2, served, io3, io4, io5, _, bg, sv, stage, rs, sd,
-        by simpa [garrett_stateless_core.http_wire.Proofs.vec_deref_val] using kept, by simp⟩))
+        by simpa [vec_deref_val] using kept, by simp⟩))
 
 /-- **One connection step.** With nothing buffered the deadline is not
     consulted; otherwise an overdue partial request closes the connection and
@@ -369,7 +368,7 @@ theorem ok_map_inv {α β : Type} {m : Result α} {f : α → β} {x : β}
 /-- The guarantee `serve_guest_reply` gives for the reply of one request. -/
 def GuestReply (request : proxy_http.Request) (now : I64) (served : proxy_controller.Served) : Prop :=
   unauthorized_served = Result.ok served ∨
-  served.reply.val = proxy_http.Proofs.ascii (proxy_http.Proofs.refusalText served.code) ∨
+  served.reply.val = ascii (proxy_http.Proofs.refusalText served.code) ∨
   (∃ index wire opened, decide_request ops pol opener policy request routes a peer now =
       Result.ok (.dispatch index wire opened) ∧ served.stage = .Completed ∧
     ∃ forms head response,
@@ -435,12 +434,12 @@ theorem stepped_logged (ch : Channel C) (io : C) (L : List ProxyEvent) (buffer :
     · subst e3
       refine ⟨[.began parsed.request] ++ E ++ [.guestSent served.reply.val], ?_, Or.inr (Or.inr
         ⟨parsed.request, now, d, E, served, hd, slog, reply, Or.inl ⟨done, rfl⟩⟩)⟩
-      simp [log2, garrett_stateless_core.http_wire.Proofs.vec_deref_val]
+      simp [log2, vec_deref_val]
     · obtain ⟨r3, _, e3⟩ := ok_map_inv st
       subst e3
       refine ⟨[.began parsed.request] ++ E ++ [.stopped served.code, .guestSent served.reply.val], ?_,
         Or.inr (Or.inr ⟨parsed.request, now, d, E, served, hd, slog, reply, Or.inr ⟨notDone, rfl⟩⟩)⟩
-      simp [log2, garrett_stateless_core.http_wire.Proofs.vec_deref_val]
+      simp [log2, vec_deref_val]
 
 /-- **One logged step** adds exactly one `StepLog` segment. -/
 theorem step_logged (ch : Channel C) (io : C) (L : List ProxyEvent) (buffer : alloc.vec.Vec U8)

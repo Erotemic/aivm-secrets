@@ -1,5 +1,5 @@
-import GarrettStatelessMailbox
 import GarrettBase64
+import GarrettHttpAuth
 import GarrettHttpWireDecimal
 
 /-!
@@ -11,10 +11,8 @@ extracted by Aeneas (`stateless_token.*`).
 
 open Aeneas Aeneas.Std
 open garrett_stateless_core.Proofs
-open garrett_stateless_core.proxy_http.Proofs (bind_ok_inv slice_eq_eq array_slice_val)
 open garrett_stateless_core.proxy_http.Base64Proofs (symNat sexNat enc encode_unpadded_spec g g_lt
   s0 s1 s2 s3 sexNat_lt symNat_injective)
-open garrett_stateless_core.stateless_mailbox.Proofs (slice_index_eq usize_succ)
 open garrett_stateless_core.http_wire.Proofs (Digit Digits DecimalValue digit_value decimal_value_exact
   decimal_value_append_digit)
 set_option maxHeartbeats 4000000
@@ -710,7 +708,7 @@ theorem slice_range_val {b : Slice U8} {lo hi : Usize} (le : lo.val ≤ hi.val) 
   rw [fv]; simp [List.slice]
 
 theorem to_vec_val (s : Slice U8) : ∃ v, alloc.slice.Slice.to_vec core.clone.CloneU8 s = Result.ok v ∧ v.val = s.val := by
-  exact ⟨⟨s⟩, garrett_stateless_core.stateless.Proofs.to_vec_eq s, rfl⟩
+  exact ⟨⟨s⟩, to_vec_eq s, rfl⟩
 
 /-- **A quoted field, as a cursor step.** What `plain_string` accepts is a
     quote, bytes with no quote or backslash, and a quote. -/
@@ -751,7 +749,7 @@ theorem plain_string_some {b : Slice U8} {pos next : Usize} {v : alloc.vec.Vec U
           have yq : y = 34#u8 := UScalar.eq_of_val_eq (by simpa using closes)
           obtain ⟨found, hf, fv⟩ := slice_range_val (b := b) (lo := start) (hi := j) (by omega) (by omega)
           rw [hf] at h
-          simp only [bind_ok, garrett_stateless_core.stateless.Proofs.to_vec_eq] at h
+          simp only [bind_ok, to_vec_eq] at h
           obtain ⟨n2, hn2, n2v⟩ := usize_succ j (by scalar_tac)
           rw [hn2] at h
           simp only [bind_ok, Result.ok.injEq, Option.some.injEq, Prod.mk.injEq] at h
@@ -841,7 +839,7 @@ theorem plain_string_of {b : Slice U8} {pos : Usize} {f rest : List U8}
     simp only [bind_ok, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, hs, hj, c3]
     rw [slice_index_eq b j (by simp only [Slice.length]; omega), hy, yq]
     simp only [bind_ok, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, hf,
-      garrett_stateless_core.stateless.Proofs.to_vec_eq, hn2]
+      to_vec_eq, hn2]
   · show found.val = f
     rw [fv, sv, tail, jval, show pos.val + 1 + f.length - (pos.val + 1) = f.length by omega,
       List.take_left' rfl]
@@ -1349,8 +1347,7 @@ theorem append_natural_spec' (out : alloc.vec.Vec U8) (v : I64) (lo : 0 ≤ v.va
 /-! ### The payload layout -/
 
 /-- A literal's bytes. -/
-abbrev lit (s : String) : List U8 := garrett_stateless_core.proxy_http.Proofs.ascii s
-
+abbrev lit (s : String) : List U8 := garrett_stateless_core.Proofs.ascii s
 
 /-- The canonical payload of `p`, byte for byte; without `enc` when `withEnc`
     is false. -/
@@ -1382,7 +1379,7 @@ theorem append_ok {out w : alloc.vec.Vec U8} {bytes : Slice U8} (h : append out 
   · simp at h
 
 theorem push_ok {v w : alloc.vec.Vec U8} {x : U8} (h : alloc.vec.Vec.push v x = Result.ok w) :
-    w.val = v.val ++ [x] := garrett_stateless_core.stateless_mailbox.Proofs.push_ok_val h
+    w.val = v.val ++ [x] := push_ok_val h
 
 theorem append_quoted_ok {out w : alloc.vec.Vec U8} {bytes : Slice U8} (h : append_quoted out bytes = Result.ok w) :
     w.val = out.val ++ Q bytes.val := by

@@ -41,8 +41,6 @@ open garrett_stateless_core.Proofs
 
 namespace garrett_stateless_core.proxy_controller.Proofs
 
-open garrett_stateless_core.proxy_http.Proofs (bind_ok_inv)
-
 /-- `remainder` keeps exactly the bytes from `used` on. -/
 theorem remainder_val (buffer : Slice U8) (used : Usize) (rest : alloc.vec.Vec U8)
     (h : remainder buffer used = Result.ok rest) : rest.val = buffer.val.drop used.val := by
@@ -55,7 +53,7 @@ theorem remainder_val (buffer : Slice U8) (used : Usize) (rest : alloc.vec.Vec U
     simp only [core.slice.index.Slice.index, core.slice.index.SliceIndexRangeFromUsizeSlice.index,
       within, ↓reduceIte,
       Result.ok.injEq] at sliced
-    have := garrett_stateless_core.Lemmas.extend_ok_val h
+    have := extend_ok_val h
     rw [this, ← sliced]
     simp [alloc.vec.Vec.new]
   · rename_i past
@@ -63,18 +61,6 @@ theorem remainder_val (buffer : Slice U8) (used : Usize) (rest : alloc.vec.Vec U
     subst h
     have : buffer.val.length ≤ used.val := by scalar_tac
     simp [alloc.vec.Vec.new, List.drop_eq_nil_of_le this]
-
-/-- An `if` that returned: which branch, and what it returned. Applied by
-    unification, so it also sees through the pair bindings Aeneas emits. -/
-theorem ite_ok_inv {α : Type} {c : Prop} [Decidable c] {a b : Result α} {x : α}
-    (h : (if c then a else b) = Result.ok x) : (c ∧ a = Result.ok x) ∨ (¬ c ∧ b = Result.ok x) := by
-  split at h
-  · exact Or.inl ⟨‹_›, h⟩
-  · exact Or.inr ⟨‹_›, h⟩
-
-theorem ok_pair_inv {α β : Type} {a c : α} {b d : β}
-    (h : (Result.ok (a, b) : Result (α × β)) = Result.ok (c, d)) : a = c ∧ b = d :=
-  Prod.mk.inj (Result.ok_injective h)
 
 -- The step after its deadline check, shared by both branches of `step`.
 -- Every inversion is by unification (`bind_ok_inv`, `ite_ok_inv`,
@@ -101,8 +87,8 @@ local macro "stepped_tail" : tactic => `(tactic| (
         obtain ⟨hout, hafter⟩ := ok_pair_inv h
         subst hout hafter
         refine ⟨rd, Or.inr ⟨by scalar_tac, ?_, rfl⟩⟩
-        simpa [garrett_stateless_core.http_wire.Proofs.vec_deref_val] using
-          garrett_stateless_core.Lemmas.extend_ok_val extended
+        simpa [vec_deref_val] using
+          extend_ok_val extended
   | Refuse code =>
     obtain ⟨io2, rf, h⟩ := bind_ok_inv h
     obtain ⟨bytes, rb, h⟩ := bind_ok_inv h
@@ -119,7 +105,7 @@ local macro "stepped_tail" : tactic => `(tactic| (
     cases sent <;>
     · obtain ⟨hout, hafter⟩ := ok_pair_inv h
       subst hout hafter
-      refine ⟨sd, by simpa [garrett_stateless_core.http_wire.Proofs.vec_deref_val] using kept, ?_⟩
+      refine ⟨sd, by simpa [vec_deref_val] using kept, ?_⟩
       simp))
 
 /-- **A served request is a true prefix of the buffer.** When `frame` hands a
@@ -146,7 +132,7 @@ theorem step_request_fits {buffer : alloc.vec.Vec U8} {host : Slice U8} {limit :
         cases shape
         have := garrett_stateless_core.proxy_http.Proofs.parse_request_bounds
           (data := alloc.vec.Vec.deref buffer)
-          (by simpa [garrett_stateless_core.http_wire.Proofs.vec_deref_val] using small) bounded parsed_ok
+          (by simpa [vec_deref_val] using small) bounded parsed_ok
         refine ⟨by simpa using this.1, this.2, ?_⟩
         simp only [List.length_take]
         have : parsed.used.val ≤ buffer.val.length := by simpa using this.1

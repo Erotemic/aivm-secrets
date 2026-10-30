@@ -12,8 +12,6 @@ positive round trip.
 
 open Aeneas Aeneas.Std
 open garrett_stateless_core.Proofs
-open garrett_stateless_core.proxy_http.Proofs (bind_ok_inv slice_eq_eq array_slice_val)
-open garrett_stateless_core.stateless_mailbox.Proofs (slice_index_eq usize_succ)
 open garrett_stateless_core.http_wire.Proofs (Digit Digits DecimalValue digit_value decimal_value_exact)
 open garrett_stateless_core.proxy_http.Base64Proofs (enc)
 set_option maxHeartbeats 4000000
@@ -502,7 +500,7 @@ theorem seal_open_state {K : Type} {inst : StateKey K} {key : K} (aead : StateAe
   have big := usize_big
   have tlen : t.length = (8 * (nonce.val ++ c.val).length + 5) / 6 := by
     have := congrArg List.length b64; simp only [List.length_map, enc_length] at this; exact this
-  have plen : StatePrefix.length = 4 := by simp [StatePrefix, lit, garrett_stateless_core.proxy_http.Proofs.ascii]
+  have plen : StatePrefix.length = 4 := by simp [StatePrefix, lit, garrett_stateless_core.Proofs.ascii]
   have textv : text.val = StatePrefix ++ t := by rw [htext, outv]
   have textLen : text.val.length = 4 + t.length := by rw [textv]; simp [plen]
   have olen' : text.val.length ≤ 4096 := by rw [htext]; exact olen

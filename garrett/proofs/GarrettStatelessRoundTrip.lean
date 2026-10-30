@@ -1,6 +1,5 @@
-import GarrettStatelessToken
 import GarrettStatelessBoundary
-import GarrettHttpAuth
+import GarrettStatelessToken
 
 /-!
 # `garrett-stateless-v1`: a sealed surrogate opens (positive witness)
@@ -18,8 +17,6 @@ authority.
 
 open Aeneas Aeneas.Std
 open garrett_stateless_core.Proofs
-open garrett_stateless_core.proxy_http.Proofs (bind_ok_inv)
-open garrett_stateless_core.stateless_mailbox.Proofs (slice_index_eq usize_succ)
 open garrett_stateless_core.proxy_http.Base64Proofs (enc)
 set_option maxHeartbeats 4000000
 
@@ -112,11 +109,6 @@ theorem norm_valid {c : stateless.SurrogateClaims} {e e' : alloc.vec.Vec U8} {i 
 
 theorem b64_safe {l x : List U8} (h : B64 l x) : ∀ y ∈ l, y.val ≠ 46 ∧ y.val ≤ 127 :=
   fun y my => ⟨(b64_byte_safe (enc_alphabet h y my)).2.2.1, (b64_byte_safe (enc_alphabet h y my)).2.2.2⟩
-
-theorem b64_length {l x : List U8} (h : B64 l x) : x.length ≤ l.length := by
-  have := congrArg List.length h
-  rw [List.length_map, enc_length] at this
-  omega
 
 /-- A slice with the given bytes, when they fit. -/
 theorem slice_of (l : List U8) (fits : l.length ≤ Usize.max) : ∃ x : Slice U8, x.val = l :=
@@ -277,7 +269,7 @@ theorem seal_then_open {M : Type} {inst : KeyMaterial M} {entry e : KeyEntry M} 
   rw [same, hpub]
   simp only [bind_ok]
   obtain rfl : hd = header := vec_ext (by rw [hdv, header_bytes_ok hhdr, deref_val])
-  rw [haad]; simp only [bind_ok, garrett_stateless_core.stateless.Proofs.to_vec_eq]
+  rw [haad]; simp only [bind_ok, to_vec_eq]
   refine ⟨_, rfl, rv, rfl, deref_val _, ?_⟩
   -- unsealing, with the entry that verified
   unfold unseal_token

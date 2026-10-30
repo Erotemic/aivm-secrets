@@ -191,9 +191,9 @@ theorem form_present_spec (data folded unwrappedData : Slice U8) (form : proxy_h
       apply (WP.spec_ok _).mpr
       intro absent _
       have first' : found = false := by simpa using first
-      exact ⟨by simpa [garrett_stateless_core.http_wire.Proofs.vec_deref_val] using
+      exact ⟨by simpa [vec_deref_val] using
           absent_of_contains iff first',
-        by simpa [garrett_stateless_core.http_wire.Proofs.vec_deref_val] using
+        by simpa [vec_deref_val] using
           absent_of_contains iff2 absent⟩
 
 /-- What `reflects` answering `false` excludes for one case-sensitive form:
@@ -233,7 +233,7 @@ theorem reflects_loop_spec (it : core.slice.iter.Iter proxy_http.Form) (data : S
           have := hpresent (by simp_all) plain
           refine ⟨this.1, ?_⟩
           have h2 := this.2
-          simp only [garrett_stateless_core.http_wire.Proofs.vec_deref_val] at h2
+          simp only [vec_deref_val] at h2
           rwa [same] at h2
         · exact hb no form rest plain
     · simp only [iter_next_done it inside, bind_ok]
@@ -420,23 +420,23 @@ theorem guest_response_contract (output : alloc.vec.Vec U8) (response : proxy_ht
       (r.1 ≠ .Ok () ∧ r.2 = output) ⦄ := by
   unfold guest_response
   step as ⟨fields, sub⟩
-  simp only [garrett_stateless_core.http_wire.Proofs.vec_deref_val] at sub
+  simp only [vec_deref_val] at sub
   have fits : (ResponseBytes response fields.val keep false).length ≤
       (ResponseBytes response response.fields.val keep false).length :=
     response_bytes_length_mono response keep false (fields_bytes_sublist sub)
   refine WP.spec_bind (encode_response_contract (alloc.vec.Vec.new U8) response
     (alloc.vec.Vec.deref fields) keep false (by
-      simp only [garrett_stateless_core.http_wire.Proofs.vec_deref_val]
+      simp only [vec_deref_val]
       simp [alloc.vec.Vec.new, alloc.vec.Vec.length]; omega)) ?_
   intro full hfull
   have full_bytes : full.val = ResponseBytes response fields.val keep false := by
-    simpa [alloc.vec.Vec.new, garrett_stateless_core.http_wire.Proofs.vec_deref_val] using hfull
+    simpa [alloc.vec.Vec.new, vec_deref_val] using hfull
   step as ⟨found, hfound⟩
   split
   · simp
   · rename_i absent
     refine WP.spec_bind (encode_response_contract output response (alloc.vec.Vec.deref fields)
-      keep head (by simp only [garrett_stateless_core.http_wire.Proofs.vec_deref_val]; omega)) ?_
+      keep head (by simp only [vec_deref_val]; omega)) ?_
     intro written hwritten
     simp only [WP.spec_ok]
     left
@@ -444,26 +444,12 @@ theorem guest_response_contract (output : alloc.vec.Vec U8) (response : proxy_ht
     intro form mem plain occurs
     have none := (hfound (by simpa using absent) form mem plain).1
     apply none
-    rw [garrett_stateless_core.http_wire.Proofs.vec_deref_val, full_bytes]
-    simp only [garrett_stateless_core.http_wire.Proofs.vec_deref_val] at occurs
+    rw [vec_deref_val, full_bytes]
+    simp only [vec_deref_val] at occurs
     cases head
     · exact occurs
     · rw [response_head_prefix]
       exact occurs_append _ _ _ occurs
-
-theorem bind_ok_inv {A B : Type} {first : Result A} {next : A → Result B} {out : B}
-    (h : (first >>= next) = Result.ok out) : ∃ value, first = Result.ok value ∧ next value = Result.ok out := by
-  cases first using Result.cases <;> simp_all
-
-theorem push_ok_val {α : Type} {v w : alloc.vec.Vec α} {x : α}
-    (h : alloc.vec.Vec.push v x = Result.ok w) : w.val = v.val ++ [x] := by
-  unfold alloc.vec.Vec.push at h
-  dsimp only at h
-  split at h
-  · simp only [Result.ok.injEq] at h
-    subst h
-    simp
-  · simp at h
 
 theorem push_or_keep {α : Type} {c : Prop} [Decidable c] {v w : alloc.vec.Vec α} {x : α}
     (h : (if c then alloc.vec.Vec.push v x else Result.ok v) = Result.ok w) :

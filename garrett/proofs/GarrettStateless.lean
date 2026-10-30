@@ -1,4 +1,4 @@
-import GarrettProxyController
+import GarrettHttpAuth
 
 /-!
 # `garrett-stateless-v1`: surrogate admission, opening, issuance, renewal
@@ -40,7 +40,7 @@ Proved:
 
 open Aeneas Aeneas.Std
 open garrett_stateless_core.Proofs
-open garrett_stateless_core.proxy_http.Proofs (bind_ok_inv slice_eq_eq)
+
 set_option maxHeartbeats 4000000
 
 namespace garrett_stateless_core.stateless.Proofs
@@ -431,14 +431,6 @@ def IssuedFor (p : IssuePolicy) (g : Grant) (tokenId : Slice U8) (now lifetime :
   c.provider = g.provider ∧ c.certificate = g.certificate ∧ c.token_id.val = tokenId.val ∧
   ∃ w, WindowSpec p g now lifetime w ∧ c.issued_at = w.issued_at ∧ c.expires_at = w.expires_at ∧
     c.renew_until = w.renew_until
-
-/-- Copying a byte slice into a vector returns exactly that slice. -/
-theorem to_vec_eq (s : Slice U8) :
-    alloc.slice.Slice.to_vec core.clone.CloneU8 s = Result.ok ⟨s⟩ := by
-  obtain ⟨w, hw, eq⟩ := returned_of_spec (alloc.slice.Slice.to_vec_spec core.clone.CloneU8 s (by intro x _; rfl))
-  rw [hw]
-  cases w
-  simp_all
 
 theorem to_vec_val (s : Slice U8) (v : alloc.vec.Vec U8)
     (h : alloc.slice.Slice.to_vec core.clone.CloneU8 s = Result.ok v) : v.val = s.val := by

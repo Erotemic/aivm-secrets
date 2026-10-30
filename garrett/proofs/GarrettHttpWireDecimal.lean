@@ -1,10 +1,8 @@
 import GarrettStatelessCore
-import GarrettHttpRequest
+import GarrettFoundation
 
 open Aeneas Aeneas.Std
 open garrett_stateless_core.Proofs
-open garrett_stateless_core.http_auth.Proofs
-open garrett_stateless_core.http_request.Proofs
 set_option maxHeartbeats 4000000
 
 namespace garrett_stateless_core.http_wire.Proofs

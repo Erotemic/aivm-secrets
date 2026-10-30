@@ -14,8 +14,6 @@ backslash, so a valid value is always a `Plain` string field.
 
 open Aeneas Aeneas.Std
 open garrett_stateless_core.Proofs
-open garrett_stateless_core.proxy_http.Proofs (bind_ok_inv slice_eq_eq array_slice_val)
-open garrett_stateless_core.stateless_mailbox.Proofs (slice_index_eq usize_succ)
 open garrett_stateless_core.proxy_http.Base64Proofs (symNat sexNat enc encode_unpadded_spec sexNat_lt)
 set_option maxHeartbeats 4000000
 

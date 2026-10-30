@@ -1,3 +1,4 @@
+import GarrettProxyController
 import GarrettStateless
 
 /-!

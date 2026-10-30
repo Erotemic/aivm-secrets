@@ -1,4 +1,5 @@
-import GarrettStatelessGrammar
+import GarrettStatelessCore
+import GarrettFoundation
 
 /-!
 # `garrett-stateless-v1`: the external boundary, as propositions

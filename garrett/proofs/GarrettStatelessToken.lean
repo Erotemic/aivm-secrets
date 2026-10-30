@@ -11,8 +11,6 @@ lemmas of `GarrettStatelessCodec`.
 
 open Aeneas Aeneas.Std
 open garrett_stateless_core.Proofs
-open garrett_stateless_core.proxy_http.Proofs (bind_ok_inv slice_eq_eq array_slice_val)
-open garrett_stateless_core.stateless_mailbox.Proofs (slice_index_eq usize_succ)
 open garrett_stateless_core.http_wire.Proofs (Digit Digits DecimalValue digit_value decimal_value_exact)
 open garrett_stateless_core.proxy_http.Base64Proofs (enc)
 set_option maxHeartbeats 4000000
@@ -281,7 +279,6 @@ theorem parse_payload_sound {b : Slice U8} {p : Payload} (room : b.val.length + 
       rw [hd]
     rw [start, e0, e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, ew, rest]
     cases has_scope <;> simp [PayloadList] <;> rfl
-
 
 /-! The payload as its sequence of members; `Pos p n` is where member `n` starts. -/
 
@@ -928,16 +925,13 @@ theorem b64url_ok' {x : Slice U8} {w : alloc.vec.Vec U8} (h : b64url x = Result.
   obtain ⟨e, pl, safe⟩ := b64url_ok (b64url_fits h) h
   exact ⟨e, pl, safe⟩
 
-theorem vec_deref_mk (v : alloc.vec.Vec U8) : ({ slice := alloc.vec.Vec.deref v } : alloc.vec.Vec U8) = v :=
-  vec_ext (deref_val v)
-
 theorem copy_claims_eq (c : stateless.SurrogateClaims) : copy_claims c = Result.ok c := by
   unfold copy_claims
-  simp only [garrett_stateless_core.stateless.Proofs.to_vec_eq, bind_ok, vec_deref_mk]
+  simp only [to_vec_eq, bind_ok, vec_deref_mk]
 
 theorem copy_info_eq (i : Informational) : copy_info i = Result.ok i := by
   unfold copy_info
-  simp only [garrett_stateless_core.stateless.Proofs.to_vec_eq, bind_ok, vec_deref_mk]
+  simp only [to_vec_eq, bind_ok, vec_deref_mk]
 
 /-- The payload without `enc` does not depend on `enc`. -/
 theorem payload_list_public (c : stateless.SurrogateClaims) (i : Informational) (e e' : alloc.vec.Vec U8) :
@@ -1093,5 +1087,10 @@ theorem seal_token_ok {M : Type} {inst : KeyMaterial M} {entry : KeyEntry M} {in
       unfold MAX_TOKEN at tlen
       simpa [alloc.vec.Vec.len] using tlen
     omega
+
+theorem b64_length {l x : List U8} (h : B64 l x) : x.length ≤ l.length := by
+  have := congrArg List.length h
+  rw [List.length_map, enc_length] at this
+  omega
 
 end garrett_stateless_core.stateless_token.Proofs

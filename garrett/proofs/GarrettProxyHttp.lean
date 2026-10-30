@@ -1,9 +1,5 @@
-import GarrettStatelessCore
-import GarrettFoundation
 import GarrettHttpAuth
-import GarrettHttpRequest
 import GarrettHttpWireDecimal
-import GarrettHttpWireFormatting
 import GarrettHttpWireHeaders
 
 /-!
@@ -43,11 +39,7 @@ set_option maxRecDepth 100000
 namespace garrett_stateless_core.proxy_http.Proofs
 
 open garrett_stateless_core.http_auth.Proofs (HeaderPrefix)
-open garrett_stateless_core.http_request.Proofs (slice_bytes_equal)
 open garrett_stateless_core.http_wire.Proofs (CaseFold FoldedEqual PrefixTail)
-
-/-- ASCII bytes of a literal. -/
-def ascii (s : String) : List U8 := s.toList.map (fun c => ⟨BitVec.ofNat 8 c.toNat⟩)
 
 /-- The guest fields the proxy never forwards. -/
 def DroppedNames : List (List U8) :=
@@ -90,7 +82,7 @@ theorem name_is_eq (field : proxy_http.Field) (label : Slice U8) :
     name_is field label = Result.ok (decide (fold field.name.val = fold label.val)) := by
   unfold name_is
   rw [garrett_stateless_core.http_wire.Proofs.ascii_equal_exact]
-  simp [folded_equal_iff, garrett_stateless_core.http_wire.Proofs.vec_deref_val]
+  simp [folded_equal_iff, vec_deref_val]
 
 /-- The same names as bytes, as the extracted code spells them. -/
 theorem dropped_names_bytes : DroppedNames = [
@@ -113,10 +105,6 @@ theorem dropped_names_bytes : DroppedNames = [
    [120#u8, 45#u8, 104#u8, 116#u8, 116#u8, 112#u8, 45#u8, 109#u8, 101#u8, 116#u8, 104#u8, 111#u8, 100#u8],
    [114#u8, 97#u8, 110#u8, 103#u8, 101#u8],
    [105#u8, 102#u8, 45#u8, 114#u8, 97#u8, 110#u8, 103#u8, 101#u8]] := by rfl
-
-theorem array_slice_val {k : Usize} (l : List U8) (h : l.length = k.val) :
-    (Array.make k l h).to_slice.val = l := by
-  simp [Array.to_slice, Slice.from_val]
 
 theorem chain_fold (n : List Nat) (l : List U8) (ls : List (List U8)) (r : Result Bool)
     (rest : r = Result.ok (decide (n ∈ ls.map fold))) :
@@ -296,7 +284,7 @@ theorem append_fields_loop_contract (iter : core.slice.iter.Iter proxy_http.Fiel
       simp only [FieldBytes, CRLF, List.length_append, List.length_cons, List.length_nil] at space
       have first_room : output.length + (alloc.vec.Vec.deref it.slice[it.i].name).length ≤
           Usize.max := by
-        simp only [garrett_stateless_core.http_wire.Proofs.vec_deref_length]
+        simp only [vec_deref_length]
         scalar_tac
       step
       step
@@ -325,16 +313,6 @@ theorem append_fields_contract (output : alloc.vec.Vec U8) (fields : Slice proxy
   unfold append_fields
   simp only [SharedSlice.Insts.CoreIterTraitsCollectIntoIteratorSharedIter.into_iter, bind_ok]
   exact append_fields_loop_contract ⟨fields, 0⟩ output (by simpa using room)
-
-theorem slice_eq_eq (a b : Slice U8) :
-    core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 a b = Result.ok (decide (a.val = b.val)) := by
-  obtain ⟨out, returned, h⟩ := returned_of_spec (slice_bytes_equal a b)
-  rw [returned]
-  congr 1
-  by_cases e : a.val = b.val
-  · simpa [e] using h
-  · simp only [e, decide_false]
-    cases out <;> simp_all
 
 /-! ### Deny rules: what they match -/
 
@@ -511,8 +489,8 @@ theorem rule_matches_spec (rule : proxy_http.DenyRule) (method path : Slice U8) 
   split
   · refine WP.spec_mono (path_matches_spec _ _) ?_
     intro r hr
-    simp_all [RuleMatches, garrett_stateless_core.http_wire.Proofs.vec_deref_val]
-  · simp_all [WP.spec_ok, RuleMatches, garrett_stateless_core.http_wire.Proofs.vec_deref_val]
+    simp_all [RuleMatches, vec_deref_val]
+  · simp_all [WP.spec_ok, RuleMatches, vec_deref_val]
 
 /-- The remaining rules from `it.i` on. -/
 def Remaining (it : core.slice.iter.Iter proxy_http.DenyRule) : List proxy_http.DenyRule :=
@@ -589,7 +567,7 @@ theorem needs_length_eq (request : proxy_http.Request) :
     simp [this, body]
   · have : ¬ alloc.vec.Vec.len request.body > 0#usize := by scalar_tac
     simp only [this, body, ↓reduceIte, false_or]
-    rw [garrett_stateless_core.http_wire.Proofs.vec_deref_val]
+    rw [vec_deref_val]
     generalize request.method.val = m
     by_cases a : m = [80#u8, 79#u8, 83#u8, 84#u8] <;>
       by_cases b : m = [80#u8, 85#u8, 84#u8] <;>
@@ -1024,10 +1002,10 @@ theorem encode_upstream_contract (output : alloc.vec.Vec U8) (request : proxy_ht
   unfold encode_upstream
   step*
   have target_visible : ∀ byte ∈ request.target.val, Visible byte := by
-    simpa [garrett_stateless_core.http_wire.Proofs.vec_deref_val] using b1_post (by assumption)
+    simpa [vec_deref_val] using b1_post (by assumption)
   have fields_clean : ∀ field ∈ Forwarded request.fields.val, CleanField field := by
     have := b2_post (by assumption)
-    simpa [garrett_stateless_core.http_wire.Proofs.vec_deref_val, fields_post] using this
+    simpa [vec_deref_val, fields_post] using this
   obtain ⟨accepted, checked, equivalent⟩ :=
     returned_of_spec (http_auth.Proofs.valid_credential_contract secret)
   rw [checked]
