@@ -249,12 +249,10 @@ mod tests {
             ("denied", Code::Denied),
             ("unknown_origin", Code::UnknownOrigin),
             ("unauthenticated", Code::Unauthenticated),
-            ("revoked", Code::Revoked),
             ("reflected", Code::Reflected),
             ("unreachable", Code::Unreachable),
             ("outcome_unknown", Code::OutcomeUnknown),
             ("credential_source", Code::CredentialSource),
-            ("unsupported_request", Code::UnsupportedRequest),
         ];
         let mut checked = 0;
         for line in vectors.lines().skip(1) {

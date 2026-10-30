@@ -523,25 +523,25 @@ theorem reflection_forms_include_raw (secret : Slice U8) (forms : alloc.vec.Vec 
 def codeText : proxy_http.refusal.Code → String
   | .InvalidRequest => "invalid_request" | .TooLarge => "too_large" | .Denied => "denied"
   | .UnknownOrigin => "unknown_origin" | .Unauthenticated => "unauthenticated"
-  | .Revoked => "revoked" | .Reflected => "reflected" | .Unreachable => "unreachable"
+  | .Reflected => "reflected" | .Unreachable => "unreachable"
   | .OutcomeUnknown => "outcome_unknown" | .CredentialSource => "credential_source"
-  | .UnsupportedRequest => "unsupported_request" | .InternalError => "internal_error"
+  | .InternalError => "internal_error"
 
 def statusText : proxy_http.refusal.Code → String
   | .InvalidRequest => "400 Bad Request" | .TooLarge => "413 Content Too Large"
   | .Unauthenticated => "407 Proxy Authentication Required"
-  | .Denied | .UnknownOrigin | .Revoked | .UnsupportedRequest => "403 Forbidden"
+  | .Denied | .UnknownOrigin => "403 Forbidden"
   | .Reflected | .Unreachable | .OutcomeUnknown | .CredentialSource | .InternalError =>
       "502 Bad Gateway"
 
 def refusalBody (code : proxy_http.refusal.Code) : String :=
-  "{\"error\":{\"code\":\"" ++ codeText code ++ "\"},\"ok\":false,\"proxy\":\"aivm-secrets\"}\n"
+  "{\"error\":{\"code\":\"" ++ codeText code ++ "\"},\"ok\":false,\"proxy\":\"garrett-stateless\"}\n"
 
 /-- The complete refusal text for a code. It mentions nothing but the code. -/
 def refusalText (code : proxy_http.refusal.Code) : String :=
   "HTTP/1.1 " ++ statusText code ++ "\r\n" ++
     (match code with
-     | .Unauthenticated => "Proxy-Authenticate: Basic realm=\"aivm-secrets\"\r\n"
+     | .Unauthenticated => "Proxy-Authenticate: Basic realm=\"garrett-stateless\"\r\n"
      | _ => "") ++
     "Content-Type: application/json\r\nContent-Length: " ++
     toString (refusalBody code).length ++ "\r\nConnection: close\r\n\r\n" ++ refusalBody code

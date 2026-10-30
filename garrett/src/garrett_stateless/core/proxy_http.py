@@ -355,20 +355,25 @@ def encode_response(
     return bytes(out)
 
 
+# The status of each refusal code (Rust ``proxy_http::refusal::Code``).
+REFUSAL_STATUS = {
+    'invalid_request': b'400 Bad Request', 'too_large': b'413 Content Too Large',
+    'denied': b'403 Forbidden', 'unknown_origin': b'403 Forbidden',
+    'unauthenticated': b'407 Proxy Authentication Required',
+    'reflected': b'502 Bad Gateway', 'unreachable': b'502 Bad Gateway',
+    'outcome_unknown': b'502 Bad Gateway', 'credential_source': b'502 Bad Gateway',
+    'internal_error': b'502 Bad Gateway',
+}
+
+
 def refusal(code: str) -> bytes:
-    """The fixed response for a refused request: no detail, no echo."""
-    if not code.replace('_', '').isalnum() or not code.isascii():
+    """The fixed response for a refused request: no detail, no echo. A code
+    outside ``REFUSAL_STATUS`` is answered as ``internal_error``."""
+    if code not in REFUSAL_STATUS:
         code = 'internal_error'
-    status = {'invalid_request': b'400 Bad Request', 'too_large': b'413 Content Too Large',
-              'denied': b'403 Forbidden', 'unknown_origin': b'403 Forbidden',
-              'unauthenticated': b'407 Proxy Authentication Required',
-              'revoked': b'403 Forbidden', 'reflected': b'502 Bad Gateway',
-              'upstream_response': b'502 Bad Gateway', 'unreachable': b'502 Bad Gateway',
-              'outcome_unknown': b'502 Bad Gateway', 'unsupported_request': b'403 Forbidden',
-              'expired': b'403 Forbidden',
-              'exhausted': b'429 Too Many Requests'}.get(code, b'502 Bad Gateway')
-    body = b'{"error":{"code":"' + code.encode('ascii') + b'"},"ok":false,"proxy":"aivm-secrets"}\n'
-    extra = b'Proxy-Authenticate: Basic realm="aivm-secrets"\r\n' if code == 'unauthenticated' else b''
+    status = REFUSAL_STATUS[code]
+    body = b'{"error":{"code":"' + code.encode('ascii') + b'"},"ok":false,"proxy":"garrett-stateless"}\n'
+    extra = b'Proxy-Authenticate: Basic realm="garrett-stateless"\r\n' if code == 'unauthenticated' else b''
     return (b'HTTP/1.1 ' + status + b'\r\n' + extra + b'Content-Type: application/json\r\n'
             b'Content-Length: ' + str(len(body)).encode() + b'\r\nConnection: close\r\n\r\n' + body)
 

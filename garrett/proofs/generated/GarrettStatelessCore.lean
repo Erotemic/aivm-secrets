@@ -789,7 +789,7 @@ inductive proxy_controller.Stage where
 | Completed : proxy_controller.Stage
 
 /-- [garrett_stateless_core::proxy_http::refusal::Code]
-    Source: 'crates/garrett-stateless-core/src/proxy_http/refusal.rs', lines 6:0-20:1
+    Source: 'crates/garrett-stateless-core/src/proxy_http/refusal.rs', lines 6:0-18:1
     Visibility: public -/
 @[discriminant isize]
 inductive proxy_http.refusal.Code where
@@ -798,12 +798,10 @@ inductive proxy_http.refusal.Code where
 | Denied : proxy_http.refusal.Code
 | UnknownOrigin : proxy_http.refusal.Code
 | Unauthenticated : proxy_http.refusal.Code
-| Revoked : proxy_http.refusal.Code
 | Reflected : proxy_http.refusal.Code
 | Unreachable : proxy_http.refusal.Code
 | OutcomeUnknown : proxy_http.refusal.Code
 | CredentialSource : proxy_http.refusal.Code
-| UnsupportedRequest : proxy_http.refusal.Code
 | InternalError : proxy_http.refusal.Code
 
 /-- [garrett_stateless_core::proxy_controller::Served]
@@ -2638,7 +2636,7 @@ def proxy_controller.remainder
   else ok (alloc.vec.Vec.new Std.U8)
 
 /-- [garrett_stateless_core::proxy_http::refusal::append_status]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http/refusal.rs', lines 39:0-53:1
+    Source: 'crates/garrett-stateless-core/src/proxy_http/refusal.rs', lines 35:0-47:1
     Visibility: public -/
 def proxy_http.refusal.append_status
   (output : alloc.vec.Vec Std.U8) (code : proxy_http.refusal.Code) :
@@ -2688,14 +2686,6 @@ def proxy_http.refusal.append_status
           113#u8, 117#u8, 105#u8, 114#u8, 101#u8, 100#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.refusal.Code.Revoked =>
-    let s ←
-      lift (Array.to_slice
-        (Array.make 13#usize [
-          52#u8, 48#u8, 51#u8, 32#u8, 70#u8, 111#u8, 114#u8, 98#u8, 105#u8,
-          100#u8, 100#u8, 101#u8, 110#u8
-          ]))
-    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
   | proxy_http.refusal.Code.Reflected =>
     let s ←
       lift (Array.to_slice
@@ -2728,14 +2718,6 @@ def proxy_http.refusal.append_status
           97#u8, 116#u8, 101#u8, 119#u8, 97#u8, 121#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.refusal.Code.UnsupportedRequest =>
-    let s ←
-      lift (Array.to_slice
-        (Array.make 13#usize [
-          52#u8, 48#u8, 51#u8, 32#u8, 70#u8, 111#u8, 114#u8, 98#u8, 105#u8,
-          100#u8, 100#u8, 101#u8, 110#u8
-          ]))
-    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
   | proxy_http.refusal.Code.InternalError =>
     let s ←
       lift (Array.to_slice
@@ -2746,7 +2728,7 @@ def proxy_http.refusal.append_status
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
 
 /-- [garrett_stateless_core::proxy_http::refusal::append_code]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http/refusal.rs', lines 22:0-37:1
+    Source: 'crates/garrett-stateless-core/src/proxy_http/refusal.rs', lines 20:0-33:1
     Visibility: public -/
 def proxy_http.refusal.append_code
   (output : alloc.vec.Vec Std.U8) (code : proxy_http.refusal.Code) :
@@ -2789,13 +2771,6 @@ def proxy_http.refusal.append_code
           116#u8, 105#u8, 99#u8, 97#u8, 116#u8, 101#u8, 100#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.refusal.Code.Revoked =>
-    let s ←
-      lift (Array.to_slice
-        (Array.make 7#usize [
-          114#u8, 101#u8, 118#u8, 111#u8, 107#u8, 101#u8, 100#u8
-          ]))
-    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
   | proxy_http.refusal.Code.Reflected =>
     let s ←
       lift (Array.to_slice
@@ -2827,15 +2802,6 @@ def proxy_http.refusal.append_code
           108#u8, 95#u8, 115#u8, 111#u8, 117#u8, 114#u8, 99#u8, 101#u8
           ]))
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
-  | proxy_http.refusal.Code.UnsupportedRequest =>
-    let s ←
-      lift (Array.to_slice
-        (Array.make 19#usize [
-          117#u8, 110#u8, 115#u8, 117#u8, 112#u8, 112#u8, 111#u8, 114#u8,
-          116#u8, 101#u8, 100#u8, 95#u8, 114#u8, 101#u8, 113#u8, 117#u8,
-          101#u8, 115#u8, 116#u8
-          ]))
-    alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
   | proxy_http.refusal.Code.InternalError =>
     let s ←
       lift (Array.to_slice
@@ -2846,7 +2812,7 @@ def proxy_http.refusal.append_code
     alloc.vec.Vec.extend_from_slice core.clone.CloneU8 output s
 
 /-- [garrett_stateless_core::proxy_http::refusal::refusal]:
-    Source: 'crates/garrett-stateless-core/src/proxy_http/refusal.rs', lines 56:0-73:1
+    Source: 'crates/garrett-stateless-core/src/proxy_http/refusal.rs', lines 50:0-67:1
     Visibility: public -/
 def proxy_http.refusal.refusal
   (code : proxy_http.refusal.Code) : Result (alloc.vec.Vec Std.U8) := do
@@ -2862,12 +2828,12 @@ def proxy_http.refusal.refusal
   let body1 ← proxy_http.refusal.append_code body code
   let s1 ←
     lift (Array.to_slice
-      (Array.make 38#usize [
+      (Array.make 43#usize [
         34#u8, 125#u8, 44#u8, 34#u8, 111#u8, 107#u8, 34#u8, 58#u8, 102#u8,
         97#u8, 108#u8, 115#u8, 101#u8, 44#u8, 34#u8, 112#u8, 114#u8, 111#u8,
-        120#u8, 121#u8, 34#u8, 58#u8, 34#u8, 97#u8, 105#u8, 118#u8, 109#u8,
-        45#u8, 115#u8, 101#u8, 99#u8, 114#u8, 101#u8, 116#u8, 115#u8, 34#u8,
-        125#u8, 10#u8
+        120#u8, 121#u8, 34#u8, 58#u8, 34#u8, 103#u8, 97#u8, 114#u8, 114#u8,
+        101#u8, 116#u8, 116#u8, 45#u8, 115#u8, 116#u8, 97#u8, 116#u8, 101#u8,
+        108#u8, 101#u8, 115#u8, 115#u8, 34#u8, 125#u8, 10#u8
         ]))
   let body2 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 body1 s1
   let s2 ←
@@ -2891,21 +2857,20 @@ def proxy_http.refusal.refusal
       do
       let s4 ←
         lift (Array.to_slice
-          (Array.make 48#usize [
+          (Array.make 53#usize [
             80#u8, 114#u8, 111#u8, 120#u8, 121#u8, 45#u8, 65#u8, 117#u8,
             116#u8, 104#u8, 101#u8, 110#u8, 116#u8, 105#u8, 99#u8, 97#u8,
             116#u8, 101#u8, 58#u8, 32#u8, 66#u8, 97#u8, 115#u8, 105#u8, 99#u8,
-            32#u8, 114#u8, 101#u8, 97#u8, 108#u8, 109#u8, 61#u8, 34#u8, 97#u8,
-            105#u8, 118#u8, 109#u8, 45#u8, 115#u8, 101#u8, 99#u8, 114#u8,
-            101#u8, 116#u8, 115#u8, 34#u8, 13#u8, 10#u8
+            32#u8, 114#u8, 101#u8, 97#u8, 108#u8, 109#u8, 61#u8, 34#u8, 103#u8,
+            97#u8, 114#u8, 114#u8, 101#u8, 116#u8, 116#u8, 45#u8, 115#u8,
+            116#u8, 97#u8, 116#u8, 101#u8, 108#u8, 101#u8, 115#u8, 115#u8,
+            34#u8, 13#u8, 10#u8
             ]))
       alloc.vec.Vec.extend_from_slice core.clone.CloneU8 out2 s4
-    | proxy_http.refusal.Code.Revoked => ok out2
     | proxy_http.refusal.Code.Reflected => ok out2
     | proxy_http.refusal.Code.Unreachable => ok out2
     | proxy_http.refusal.Code.OutcomeUnknown => ok out2
     | proxy_http.refusal.Code.CredentialSource => ok out2
-    | proxy_http.refusal.Code.UnsupportedRequest => ok out2
     | proxy_http.refusal.Code.InternalError => ok out2
   let s4 ←
     lift (Array.to_slice

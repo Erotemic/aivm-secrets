@@ -32,11 +32,8 @@ ALLOWED = {'README.md', 'docs/history/composition.md', 'docs/history/stateless-p
            'verification/generate_vectors.py',
            # Provenance of the ported TPM signer.
            'crates/garrett-stateless/src/tpm.rs'}
-# Wire-visible strings scheduled for a deliberate rename (docs/status.md, item 1).
-PENDING_RENAME = {
-    'crates/garrett-stateless-core/src/proxy_http/refusal.rs', 'src/garrett_stateless/core/proxy_http.py',
-    'tests/vectors/proxy-http-refusal-v1.tsv', 'proofs/GarrettProxyResponse.lean',
-}
+# Wire-visible strings scheduled for a deliberate rename (none left).
+PENDING_RENAME: set[str] = set()
 
 
 def step(title: str, argv: list, cwd: Path, logs: Path, env: dict | None = None, timeout: int = 7200,

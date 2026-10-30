@@ -23,8 +23,7 @@ VECTORS = Path(__file__).resolve().parent / 'vectors' / 'proxy-http-v1.tsv'
 RESPONSES = Path(__file__).resolve().parent / 'vectors' / 'proxy-http-response-v1.tsv'
 REFUSALS = Path(__file__).resolve().parent / 'vectors' / 'proxy-http-refusal-v1.tsv'
 REFUSAL_CODES = ('invalid_request', 'too_large', 'denied', 'unknown_origin', 'unauthenticated',
-                 'revoked', 'reflected', 'unreachable', 'outcome_unknown', 'credential_source',
-                 'unsupported_request')
+                 'reflected', 'unreachable', 'outcome_unknown', 'credential_source')
 HOST = b'api.example.org'
 LIMIT = 64
 DENY = (DenyRule(b'POST', b'/v1/tokens'), DenyRule(b'', b'/v1/admin/'))

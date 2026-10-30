@@ -28,49 +28,57 @@ inside `aivm-secrets` and is now self-contained:
 - verification tooling, vectors, examples, the demo and the documentation
   moved here.
 
+**Review of `a407644` (2026-10-29).** Acted on: the Lean imports follow the
+protocol's concepts (generic lemmas in `GarrettFoundation`); `TokenSealer`
+seals once and fixed-nonce sealing is test-only; the agent refuses a reply
+without its limits; `open` is `authenticate` then `decrypt`; the
+application's grammar checks call the core's; `stateless_token.rs` and
+`proxy_http.rs` are split by responsibility; `proofs/Garrett.lean` states the
+guarantees as named propositions and `Isolated` became `AuthorizedEgress`
+with named parts; `PROTOCOL.md` and a compiled library example
+(`crates/garrett-stateless/tests/library.rs`); the claims in the docs are
+classified as proved, assumed, guarded or tested, or not established; the
+refusal responses say `garrett-stateless` and the two codes only the old
+project used are gone (a deliberate wire change: both implementations, the
+refusal vectors and the refusal proofs together).
+
 ## Validation
+
+At the commit that recorded this table (see `git log`):
 
 | Check | Result |
 | --- | --- |
-| `cargo test` (core and application, with `--features tpm`) | 49 pass |
-| `python -m pytest` (including interop, replicas, operations, vectors, purity) | 109 pass (with the swtpm test required) |
-| swtpm test (`GARRETT_REQUIRE_TPM_TESTS=1`) | pass |
+| `cargo test` (core and application; also with `--features tpm`) | 51 pass |
+| `python -m pytest` (including interop, replicas, operations, vectors, purity) | 114 pass (with the swtpm test required) |
 | `verification/extract.py check` | pass; the model has no `axiom` |
-| `lake build` (independent package) | pass |
-| `verification/mutate.py` | all 42 mutants rejected, each by its mapped proof module (in the separate-directory copy, 3882 s with `--jobs 8`) |
+| `lake build` (independent package) | pass (1820 jobs) |
+| `verification/mutate.py` | to be recorded by the next commit (last full run: all 42 rejected, at `5ebbc6d`) |
 | `verification/shell_guard.py check` | pass (12 checks) |
-| Separate-directory check (`verification/standalone.py`) | pass at `5ebbc6d`: a copy of this directory alone, with a fresh virtual environment, Cargo target, toolchain bootstrap and Lake build, ran every row above; no source names the origin project outside the allowed history notes |
+| Separate-directory check (`verification/standalone.py`) | to be recorded by the next commit (last: pass at `5ebbc6d`) |
 
 ## Next, in order
 
-1. **Behaviour that still names the old project.** The fixed refusal response
-   says `"proxy":"aivm-secrets"` and `realm="aivm-secrets"`, and the shared
-   `Code` enum still has two codes only the old project used (`revoked`,
-   `unsupported_request`). Renaming and removing them is a deliberate wire
-   change: update both implementations, the refusal vectors, and the proofs
-   about the refusal table together.
-2. **Readability of the core** (the review that motivated the extraction):
-   split `stateless_token.rs` into its codec, grammar, JSON, payload, key-set,
-   open/seal and sealed-state parts (mapping the proof modules and mutants
-   with it); define `open` as `authenticate` then `decrypt` (`open_of_halves`
-   already proves they agree); have the application's grammar checks
-   (`crates/garrett-stateless/src/encoding.rs`) call the core's; add a short
-   `PROTOCOL.md` that walks through issuance, opening and egress with links
-   to the theorems.
-3. **API tightening.** Make the fixed-nonce sealers (`sealer_with_nonce`,
-   `fixture_seal`) test-only; have the agent reject a broker response without
-   `expires_at`/`renew_until` instead of substituting 0; consider typed
-   identifiers at the public boundary.
-4. **Independent review** of the specification, the trusted shells
-   (`STATELESS-NATIVE-01`), the `Isolated` statement and `STATELESS-OPS-01`.
-   An agent cannot self-certify it.
-5. **Live provider compatibility (maintainer).** One real OAuth provider with
+1. **Typed identifiers at the public boundary.** `SurrogateClaims` and the
+   grant carry issuer, audience, subject, `jti`, provider and thumbprint as
+   interchangeable byte vectors. An ergonomic facade (validated newtypes;
+   untrusted token, verified, admitted and authorized states as types) in
+   the application crate, over the unchanged extracted core, so the proofs
+   keep their simple types.
+2. **Vocabulary.** The code and some proofs say "guest" for the agent's side
+   of the proxy (`guest_response`, `GuestReply`); `PROTOCOL.md` fixes the
+   terms (agent, broker, proxy, provider). Rename identifiers only where a
+   reader gains from it.
+3. **Independent review** of the specification, the trusted shells
+   (`STATELESS-NATIVE-01`), the `AuthorizedEgress` statement,
+   `STATELESS-CRYPTO-01` (now including nonce uniqueness) and
+   `STATELESS-OPS-01`. An agent cannot self-certify it.
+4. **Live provider compatibility (maintainer).** One real OAuth provider with
    PKCE and a read-only call, outside tests and CI.
-6. **Hardware TPM (maintainer).** The swtpm test against a device TPM, with
+5. **Hardware TPM (maintainer).** The swtpm test against a device TPM, with
    provenance verified by the CA.
-7. **Provider-specific read-only catalogues** (narrows `STATELESS-OPS-01`).
-8. **An opt-in axiom audit** for this package (the last one, before the
+6. **Provider-specific read-only catalogues** (narrows `STATELESS-OPS-01`).
+7. **An opt-in axiom audit** for this package (the last one, before the
    extraction, found only Lean's standard axioms; see verification.md).
-9. **Later, separate increments:** OAuth without the mailbox (a protocol
+8. **Later, separate increments:** OAuth without the mailbox (a protocol
    change); further acquisition adapters; a multi-replica broker run; a
    whole-process syscall witness for the proxy; the release decision.
