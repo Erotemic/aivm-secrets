@@ -52,9 +52,9 @@ At the commit that recorded this table (see `git log`):
 | `python -m pytest` (including interop, replicas, operations, vectors, purity) | 114 pass (with the swtpm test required) |
 | `verification/extract.py check` | pass; the model has no `axiom` |
 | `lake build` (independent package) | pass (1820 jobs) |
-| `verification/mutate.py` | to be recorded by the next commit (last full run: all 42 rejected, at `5ebbc6d`) |
+| `verification/mutate.py` | all 42 rejected at `c3f2437`, each by its mapped module (2085 s, `--jobs 8`, in the separate-directory copy) |
 | `verification/shell_guard.py check` | pass (12 checks) |
-| Separate-directory check (`verification/standalone.py`) | to be recorded by the next commit (last: pass at `5ebbc6d`) |
+| Separate-directory check (`verification/standalone.py`) | pass at `c3f2437`: a copy of this directory alone, with a fresh virtual environment, Cargo target, toolchain bootstrap and cold Lake build (282 s), ran every row above; no source names the origin project outside the allowed history and provenance notes |
 
 ## Next, in order
 

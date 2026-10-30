@@ -342,10 +342,14 @@ import closure against the mutant. Each must break a proof.
 | proxy: operation policy not consulted; credential decrypted before authorization | `GarrettStatelessComposition` (rejected first by `GarrettStatelessProxy`, in its closure: `decide_dispatch_trace`, `decide_unpermitted`) |
 | read-only policy: permits a write method; permits a body; ignores the destination provider; ignores the resource path; ignores the resource method; operation path includes the query | `GarrettStatelessComposition` |
 
-**Result, 2026-10-27: all 42 stateless mutants are rejected** against the
-tree of the operation-authorization increment, each by a real error in the
-recompiled closure, not a cached object. The earlier runs rejected the first
-32 (2026-10-26) and 34 (first composable-isolation increment). The two proxy
+**Result, 2026-10-29 (`c3f2437`): all 42 mutants are rejected**, in a copy of
+this directory alone (`verification/standalone.py`), each by a real error in
+the recompiled closure, not a cached object: after the import refactor, the
+`open` change (whose mutant now inlines an `open` that unseals before it
+admits), the module splits (the token mutants now live in
+`stateless_token/*.rs`, each mapped to its first rejecting module) and the
+refusal rename. Earlier runs: 42 (2026-10-27 and, after the extraction,
+2026-10-29 at `5ebbc6d`), 34 and 32. The two proxy
 policy mutants are caught by `GarrettStatelessProxy` before
 `GarrettStatelessComposition` is reached. The strict-profile mutant is caught by the existing login proof
 before `GarrettStatelessStrict` is reached, so the run does not show that the

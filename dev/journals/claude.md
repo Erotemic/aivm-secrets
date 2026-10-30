@@ -1597,3 +1597,56 @@ its own command line and so could never exit.
 Not checked here: the GitHub workflow itself has not run. The opt-in axiom
 audit for the Garrett package remains a listed follow-up. Confidence: high
 that `garrett/` builds, tests, extracts and proves alone.
+
+## 2026-10-29 22:31:50 -0400
+
+Acted on GPT's code-quality review of the Garrett snapshot `a407644`, in
+`garrett/` only, as six commits (`d7995e2` .. `c3f2437`):
+
+- **Lean imports.** I computed which modules each proof module actually uses
+  from the compiled proof terms (a throwaway Lean script over the
+  environment; note `ConstantInfo.value?` hides theorem bodies unless
+  `allowOpaque := true`). The wrong-direction edges were all generic Aeneas
+  facts living in protocol modules, several duplicated two or three times.
+  They now live once in `GarrettFoundation`, in the namespace every module
+  opens; imports were recomputed and transitively reduced.
+  `GarrettStatelessBoundary` went from 17 imported modules (8159 lines) to 1
+  (140); codec 15 to 4; grammar 16 to 5. No statement changed.
+- **Sealing.** `SurrogateSealer::seal` takes `self`, so a `TokenSealer` (one
+  AES-GCM nonce) seals once; Aeneas erases the `&S`/`S` difference, so the
+  model did not change. Fixed-nonce sealing is behind a test-only `fixtures`
+  feature (self dev-dependency). Nonce uniqueness is stated as an assumption
+  (`STATELESS-CRYPTO-01`, the Boundary docstring), not a theorem.
+- **API.** The agent refuses replies without `expires_at`/`renew_until`;
+  `open` is `authenticate` then `decrypt` (new `authenticate_contract`,
+  `decrypt_contract`; the "decrypted before admission" mutant now inlines a
+  bad `open`); the shell's grammar checks call the core's; feature `derive`
+  gives non-secret core types `Debug`/`PartialEq`, off during extraction.
+- **Reader-facing.** `proofs/Garrett.lean` (named guarantees, each a
+  projection of `protocol_safety` or `composed_egress`); `Isolated` became
+  `AuthorizedEgress` with named parts; `PROTOCOL.md`; a compiled library
+  example; docs classify claims as proved / assumed / guarded / not
+  established and soften "disclose no credential", "no state at all" and
+  "performs no effect" to their real scope.
+- **Splits.** `stateless_token.rs` and `proxy_http.rs` became module
+  directories with re-exports (Rust API unchanged; extracted names gain the
+  file). Proofs needed only namespace opens, qualified cross-references and
+  one `ascii` disambiguation. Python kept its files; the mapping is
+  documented.
+- **Wire change.** Refusals say `garrett-stateless`; `Revoked` and
+  `UnsupportedRequest` are gone (both implementations, vectors, proofs).
+
+Validation at `c3f2437`, in a separate copy of `garrett/`: cargo 51 (and 51
+with tpm), pytest 114, build, shell guard, bootstrap, extraction check, cold
+`lake build` (282 s), and all 42 mutants rejected (2085 s).
+
+Mistake: I ran `git stash` for a clippy comparison while a mutation run was
+copying sources from the tree; I killed that run and reran it on the
+committed tree. Rule: never change the working tree's core or proofs while
+`mutate.py` runs in place (the standalone copy is safe).
+
+Not done, and why: typed identifiers at the public boundary (an API design
+the maintainer should choose; queued) and the "guest" vocabulary rename
+(low value against proof churn; queued). The GitHub workflow has still never
+run. Confidence: high in the proofs and tests as run; the
+doc wording changes are judgment calls a reviewer should read.
