@@ -1,104 +1,53 @@
-//! b64url and the grammars of spec section 2.
+//! b64url and the grammars of spec section 2, as `&str` views of the core's
+//! extracted and proved functions (`stateless_token::{b64url, from_b64url,
+//! is_*}` and `http_auth::valid_credential`), so the application and the
+//! core cannot disagree about a grammar.
 use crate::error::{Error, Result};
+use garrett_stateless_core::{http_auth, stateless_token};
 
-const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-
+/// Unpadded url-safe base64.
 pub fn b64url(bytes: &[u8]) -> String {
-    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
-    for chunk in bytes.chunks(3) {
-        let b = [
-            chunk[0],
-            *chunk.get(1).unwrap_or(&0),
-            *chunk.get(2).unwrap_or(&0),
-        ];
-        let n = (u32::from(b[0]) << 16) | (u32::from(b[1]) << 8) | u32::from(b[2]);
-        let count = chunk.len() + 1;
-        for i in 0..count {
-            out.push(ALPHABET[((n >> (18 - 6 * i)) & 63) as usize] as char);
-        }
-    }
-    out
-}
-
-fn sextet(byte: u8) -> Option<u32> {
-    ALPHABET.iter().position(|&a| a == byte).map(|p| p as u32)
+    stateless_token::b64url(bytes).into_iter().map(char::from).collect()
 }
 
 /// Strict decoding: no padding, alphabet only, canonical trailing bits.
 pub fn from_b64url(text: &str) -> Option<Vec<u8>> {
-    if text.len() % 4 == 1 {
-        return None;
-    }
-    let mut out = Vec::with_capacity(text.len() * 3 / 4);
-    for chunk in text.as_bytes().chunks(4) {
-        let mut n = 0u32;
-        for (i, &byte) in chunk.iter().enumerate() {
-            n |= sextet(byte)? << (18 - 6 * i);
-        }
-        let bytes = [(n >> 16) as u8, (n >> 8) as u8, n as u8];
-        out.extend_from_slice(&bytes[..chunk.len() - 1]);
-    }
-    if b64url(&out) != text {
-        return None;
-    }
-    Some(out)
+    stateless_token::from_b64url(text.as_bytes())
 }
 
 /// 1-256 bytes of 0x21-0x7e excluding `"` and `\`.
 pub fn is_text(value: &str) -> bool {
-    (1..=256).contains(&value.len())
-        && value
-            .bytes()
-            .all(|b| (0x21..=0x7e).contains(&b) && b != b'"' && b != b'\\')
+    stateless_token::is_text(value.as_bytes())
 }
 
 /// `[a-z0-9][a-z0-9._-]{0,63}`.
 pub fn is_provider(value: &str) -> bool {
-    let bytes = value.as_bytes();
-    (1..=64).contains(&bytes.len())
-        && (bytes[0].is_ascii_lowercase() || bytes[0].is_ascii_digit())
-        && bytes.iter().all(|&b| {
-            b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'.' | b'_' | b'-')
-        })
+    stateless_token::is_provider(value.as_bytes())
 }
 
 /// `[A-Za-z0-9][A-Za-z0-9_-]{0,31}`.
 pub fn is_kid(value: &str) -> bool {
-    let bytes = value.as_bytes();
-    (1..=32).contains(&bytes.len())
-        && bytes[0].is_ascii_alphanumeric()
-        && bytes
-            .iter()
-            .all(|&b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+    stateless_token::is_kid(value.as_bytes())
 }
 
 /// 32 lowercase hex digits.
 pub fn is_id(value: &str) -> bool {
-    value.len() == 32
-        && value
-            .bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    stateless_token::is_id(value.as_bytes())
 }
 
 /// 43 b64url characters decoding to 32 bytes.
 pub fn is_thumbprint(value: &str) -> bool {
-    value.len() == 43 && from_b64url(value).is_some_and(|b| b.len() == 32)
+    stateless_token::is_thumbprint(value.as_bytes())
 }
 
 /// 1-4096 bytes of 0x21-0x7e.
 pub fn is_credential(value: &[u8]) -> bool {
-    (1..=4096).contains(&value.len()) && value.iter().all(|b| (0x21..=0x7e).contains(b))
+    http_auth::valid_credential(value)
 }
 
 /// 0-1024 bytes: space-separated tokens of 0x21-0x7e excluding `"` and `\`.
 pub fn is_scope(value: &str) -> bool {
-    value.len() <= 1024
-        && (value.is_empty()
-            || value.split(' ').all(|t| {
-                !t.is_empty()
-                    && t.bytes()
-                        .all(|b| (0x21..=0x7e).contains(&b) && b != b'"' && b != b'\\')
-            }))
+    stateless_token::is_scope(value.as_bytes())
 }
 
 pub fn random<const N: usize>() -> Result<[u8; N]> {
