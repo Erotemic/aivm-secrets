@@ -56,18 +56,17 @@ fn refusal(response: &Response) -> Error {
     })
 }
 
+/// A broker's issuance reply: the surrogate and both of its limits. A reply
+/// without either limit is refused rather than read as time 0.
 fn issued(value: &Value) -> Result<IssuedToken> {
-    let token = value
-        .get("token")
-        .and_then(Value::as_str)
-        .ok_or(Error::Protocol("invalid_response"))?;
+    let invalid = || Error::Protocol("invalid_response");
+    let token = value.get("token").and_then(Value::as_str).ok_or_else(invalid)?;
+    let expires_at = value.get("expires_at").and_then(Value::as_int).ok_or_else(invalid)?;
+    let renew_until = value.get("renew_until").and_then(Value::as_int).ok_or_else(invalid)?;
     Ok(IssuedToken {
         token: token.to_owned(),
-        expires_at: value.get("expires_at").and_then(Value::as_int).unwrap_or(0),
-        renew_until: value
-            .get("renew_until")
-            .and_then(Value::as_int)
-            .unwrap_or(0),
+        expires_at,
+        renew_until,
     })
 }
 
@@ -225,5 +224,27 @@ impl Agent {
         let mut all: Vec<(&str, &str)> = vec![("Authorization", &authorization)];
         all.extend_from_slice(headers);
         self.call(proxy, method, target, &all, body)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn reply(text: &str) -> Value {
+        json::parse(text.as_bytes(), 1 << 20, 8).ok().unwrap()
+    }
+
+    #[test]
+    fn an_issuance_reply_needs_both_limits() {
+        let full = issued(&reply(r#"{"expires_at":10,"renew_until":20,"token":"t"}"#)).ok().unwrap();
+        assert_eq!((full.expires_at, full.renew_until), (10, 20));
+        for partial in [
+            r#"{"renew_until":20,"token":"t"}"#,
+            r#"{"expires_at":10,"token":"t"}"#,
+            r#"{"expires_at":"10","renew_until":20,"token":"t"}"#,
+        ] {
+            assert!(matches!(issued(&reply(partial)), Err(Error::Protocol("invalid_response"))));
+        }
     }
 }

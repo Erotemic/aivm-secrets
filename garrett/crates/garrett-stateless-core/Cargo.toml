@@ -7,4 +7,11 @@ description = "The pure garrett-stateless-v1 protocol decisions, extracted to Le
 # Publishing needs the maintainer's approval.
 publish = false
 
+[features]
+# `Debug`, `Clone`, `PartialEq` and `Eq` for the value and error types that
+# carry no secret (never for credentials, tokens, keys or requests). Off by
+# default, so the extracted crate, and therefore the Lean model, is exactly
+# the code without these impls; no core function calls them.
+derive = []
+
 [dependencies]

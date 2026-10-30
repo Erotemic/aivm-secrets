@@ -5,7 +5,9 @@
 //! AES-256-GCM behind its `KeyMaterial`, and builds the informational claims.
 use crate::encoding::{from_b64url, random};
 use crate::json::{self, Value};
-use garrett_stateless_core::stateless::{Rejection, SurrogateClaims};
+use garrett_stateless_core::stateless::Rejection;
+#[cfg(feature = "fixtures")]
+use garrett_stateless_core::stateless::{SurrogateClaims, SurrogateSealer};
 use garrett_stateless_core::stateless_token::{
     self, KeyMaterial, StateKey, TokenSealer, MAX_TOKEN,
 };
@@ -112,32 +114,21 @@ impl Informational {
     }
 }
 
-/// The extracted sealer for one issuance by `entry`, with a fresh nonce.
+/// The extracted sealer for one issuance by `entry`, with a fresh random
+/// nonce. It seals once (`SurrogateSealer::seal` consumes it); this is the
+/// only constructor outside the conformance fixtures.
 pub fn sealer(
     entry: &crate::keys::KeyEntry,
     info: &Informational,
 ) -> Result<TokenSealer<RingKey>, Rejection> {
-    sealer_with_nonce(
-        entry,
-        info,
-        random::<12>().map_err(|_| Rejection::Undecryptable)?,
-    )
+    let nonce = random::<12>().map_err(|_| Rejection::Undecryptable)?;
+    Ok(TokenSealer::new(entry.core(), info.encoded()?, nonce.to_vec()))
 }
 
-/// The same sealer with a given nonce (conformance vectors only).
-pub fn sealer_with_nonce(
-    entry: &crate::keys::KeyEntry,
-    info: &Informational,
-    nonce: [u8; 12],
-) -> Result<TokenSealer<RingKey>, Rejection> {
-    Ok(TokenSealer {
-        entry: entry.core(),
-        info: info.encoded()?,
-        nonce: nonce.to_vec(),
-    })
-}
-
-/// Deterministic sealing for conformance vectors.
+/// Deterministic sealing with a given nonce, for the conformance vectors
+/// only (feature `fixtures`, which the crate's own tests enable). Never use
+/// it to issue: a repeated nonce breaks AES-GCM.
+#[cfg(feature = "fixtures")]
 pub fn fixture_seal(
     entry: &crate::keys::KeyEntry,
     info: &Informational,
@@ -145,14 +136,7 @@ pub fn fixture_seal(
     credential: &[u8],
     nonce: [u8; 12],
 ) -> Result<Vec<u8>, Rejection> {
-    let sealer = sealer_with_nonce(entry, info, nonce)?;
-    stateless_token::seal_token(
-        &sealer.entry,
-        &sealer.info,
-        claims,
-        credential,
-        &sealer.nonce,
-    )
+    TokenSealer::new(entry.core(), info.encoded()?, nonce.to_vec()).seal(claims, credential)
 }
 
 /// Decode a surrogate's header and payload **without verifying** it, for an

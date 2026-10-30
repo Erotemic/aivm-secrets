@@ -121,13 +121,9 @@ def decrypt(opener: SurrogateOpener, verified: Verified) -> Opened:
 
 
 def open_surrogate(opener: SurrogateOpener, token: bytes, acceptance: Acceptance, peer: str, now: int) -> Opened:
-    """Verify, then admit, then (only then) decrypt."""
-    verified = opener.verify(token)
-    admit(verified.claims, verified.key_issuer, acceptance, peer, now)
-    credential = opener.unseal(verified)
-    if not valid_credential(credential):
-        raise Rejection('invalid_credential')
-    return Opened(verified.claims, credential)
+    """Verify, then admit, then (only then) decrypt: ``authenticate``
+    followed by ``decrypt``."""
+    return decrypt(opener, authenticate(opener, token, acceptance, peer, now))
 
 
 @dataclass(frozen=True)

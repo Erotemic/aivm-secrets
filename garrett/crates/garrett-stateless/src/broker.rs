@@ -533,7 +533,7 @@ impl Broker {
         let finished = stateless_mailbox::finish(
             &mut *self.locked()?,
             exchanged,
-            &sealer,
+            sealer,
             &self.issue_policy(),
             token_id.as_bytes(),
             self.now(),
@@ -582,15 +582,12 @@ impl Broker {
     pub fn renew(&self, peer: &PeerIdentity, token: &str) -> Result<IssuedToken> {
         let info = token::informational(token.as_bytes())
             .map_err(|r| Error::Rejected(rejection_name(&r)))?;
-        let sealer = TokenSealer {
-            entry: self.keys.active_entry().core(),
-            info,
-            nonce: crate::encoding::random::<12>()?.to_vec(),
-        };
+        let nonce = crate::encoding::random::<12>()?;
+        let sealer = TokenSealer::new(self.keys.active_entry().core(), info, nonce.to_vec());
         let token_id = random_id()?;
         let issued = stateless::renew(
             &self.verification,
-            &sealer,
+            sealer,
             &self.acceptance(),
             &self.issue_policy(),
             token.as_bytes(),
@@ -809,7 +806,7 @@ pub fn mint_with(
     };
     let token_id = random_id()?;
     let issued = stateless::issue(
-        &sealer,
+        sealer,
         policy,
         grant,
         credential,
@@ -826,16 +823,13 @@ pub fn mint_with(
 
 /// A sealer that refuses every issuance (its nonce is invalid).
 fn refusing_sealer(entry: &crate::keys::KeyEntry) -> TokenSealer<RingKey> {
-    TokenSealer {
-        entry: entry.core(),
-        info: garrett_stateless_core::stateless_token::Informational {
-            has_scope: false,
-            scope: Vec::new(),
-            has_upstream: false,
-            upstream: Vec::new(),
-        },
-        nonce: Vec::new(),
-    }
+    let info = garrett_stateless_core::stateless_token::Informational {
+        has_scope: false,
+        scope: Vec::new(),
+        has_upstream: false,
+        upstream: Vec::new(),
+    };
+    TokenSealer::new(entry.core(), info, Vec::new())
 }
 
 fn escape(text: &str) -> String {

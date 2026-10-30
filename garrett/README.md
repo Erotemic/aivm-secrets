@@ -19,7 +19,8 @@ request and the clock, so any number of replicas with the same keys behave
 alike. The broker's one piece of mutable state is the transient mailbox of
 an in-progress OAuth login; a `"stateless": "strict"` configuration refuses
 OAuth (credentials are minted by an operator instead) and the proxy's audit
-log, leaving no mutable state at all. A proxy can also be limited to
+log, leaving no mutable authorization or login state (only ordinary runtime
+and transport state: sockets, TLS sessions, buffers). A proxy can also be limited to
 read-only operations on configured resources.
 
 **Experimental and unaudited.** Not published to any registry.

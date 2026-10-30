@@ -1,6 +1,7 @@
 //! OAuth callback binding and the one-shot authorization-code lifecycle, used
 //! by `stateless_login`. Byte decoding, clock provenance, PKCE hashing and
 //! HTTPS are adapters.
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub enum Stage {
     Pending,
     Accepted,
@@ -9,11 +10,13 @@ pub enum Stage {
     Complete,
     Uncertain,
 }
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub enum LoginDenial {
     Invalid,
     Expired,
     Consumed,
 }
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub enum IssuerRule {
     Absent,
     Exact(Vec<u8>),

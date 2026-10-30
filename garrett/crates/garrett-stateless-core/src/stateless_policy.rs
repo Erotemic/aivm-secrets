@@ -19,6 +19,7 @@ use crate::proxy_http::{method_ok, path_end, path_matches, Request};
 use crate::stateless::SurrogateClaims;
 
 /// What a policy sees of a request: never its credential-bearing fields.
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub struct Operation {
     pub method: Vec<u8>,
     /// The request target up to any `?`.
@@ -43,6 +44,7 @@ pub trait OperationPolicy {
 }
 
 /// Garrett's proxy: every operation is authorized by the surrogate alone.
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub struct Unrestricted;
 
 impl OperationPolicy for Unrestricted {
@@ -53,6 +55,7 @@ impl OperationPolicy for Unrestricted {
 
 /// One allowed resource: a provider, a method (empty means `GET` or
 /// `HEAD`) and a path, matched like a deny rule's path (`path_matches`).
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub struct Resource {
     pub provider: Vec<u8>,
     pub method: Vec<u8>,
@@ -60,6 +63,7 @@ pub struct Resource {
 }
 
 /// The constrained read-only proxy.
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub struct ReadOnly {
     pub resources: Vec<Resource>,
 }

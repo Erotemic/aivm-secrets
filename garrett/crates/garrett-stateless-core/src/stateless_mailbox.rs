@@ -51,6 +51,7 @@ pub fn empty() -> Mailbox {
 }
 
 /// Why the broker refused a login transition.
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub enum MailboxError {
     /// An extracted controller refused (policy, provider, window, issuance).
     Rejected(Rejection),
@@ -332,7 +333,7 @@ pub fn exchange<E: CodeExchange>(exchanger: &mut E, permit: Permit, code: &[u8])
 /// then [`stateless_login::complete`].
 #[allow(clippy::too_many_arguments)]
 pub fn issued<S: SurrogateSealer>(
-    sealer: &S,
+    sealer: S,
     policy: &IssuePolicy,
     entry: &Entry,
     token: &Token,
@@ -363,7 +364,7 @@ pub fn issued<S: SurrogateSealer>(
 pub fn finish<S: SurrogateSealer>(
     mailbox: &mut Mailbox,
     exchanged: Exchanged,
-    sealer: &S,
+    sealer: S,
     policy: &IssuePolicy,
     token_id: &[u8],
     now: i64,
@@ -467,7 +468,7 @@ mod tests {
 
     struct Seal;
     impl SurrogateSealer for Seal {
-        fn seal(&self, claims: &SurrogateClaims, credential: &[u8]) -> Result<Vec<u8>, Rejection> {
+        fn seal(self, claims: &SurrogateClaims, credential: &[u8]) -> Result<Vec<u8>, Rejection> {
             let mut token = claims.certificate.clone();
             token.push(b':');
             token.extend_from_slice(credential);
@@ -554,7 +555,7 @@ mod tests {
     }
 
     fn finished(mailbox: &mut Mailbox, exchanged: Exchanged, now: i64) -> Result<(), MailboxError> {
-        finish(mailbox, exchanged, &Seal, &issue_policy(), b"j", now, 900)
+        finish(mailbox, exchanged, Seal, &issue_policy(), b"j", now, 900)
     }
 
     #[test]

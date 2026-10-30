@@ -685,6 +685,7 @@ pub fn plain_string(bytes: &[u8], at: usize) -> Option<(Vec<u8>, usize)> {
 }
 
 /// The informational claims, carried but never decision inputs.
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub struct Informational {
     pub has_scope: bool,
     pub scope: Vec<u8>,
@@ -926,6 +927,7 @@ pub fn entry_valid<M>(entries: &[KeyEntry<M>], index: usize) -> bool {
     is_kid(&entry.kid) && is_text(&entry.issuer) && select(entries, &entry.kid) == index
 }
 
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub enum KeyError {
     Invalid,
 }
@@ -1176,15 +1178,29 @@ pub fn copy_info(info: &Informational) -> Informational {
 }
 
 /// The broker's sealer for one issuance: the signing entry, the informational
-/// claims, and a fresh nonce from the native random source.
+/// claims, and the AES-GCM nonce for that one seal.
+///
+/// The core has no randomness, so the caller supplies the nonce, and it must
+/// never have been used with the entry's sealing key before (reusing an
+/// AES-GCM nonce under one key breaks confidentiality and integrity). The
+/// proofs do not establish this; it is the runtime obligation
+/// `STATELESS-CRYPTO-01`. `seal` consumes the sealer, so one nonce seals at
+/// most one surrogate.
 pub struct TokenSealer<M> {
-    pub entry: KeyEntry<M>,
-    pub info: Informational,
-    pub nonce: Vec<u8>,
+    entry: KeyEntry<M>,
+    info: Informational,
+    nonce: Vec<u8>,
+}
+
+impl<M> TokenSealer<M> {
+    /// A sealer for one issuance; `nonce` must be fresh (see above).
+    pub fn new(entry: KeyEntry<M>, info: Informational, nonce: Vec<u8>) -> TokenSealer<M> {
+        TokenSealer { entry, info, nonce }
+    }
 }
 
 impl<M: KeyMaterial> SurrogateSealer for TokenSealer<M> {
-    fn seal(&self, claims: &SurrogateClaims, credential: &[u8]) -> Result<Vec<u8>, Rejection> {
+    fn seal(self, claims: &SurrogateClaims, credential: &[u8]) -> Result<Vec<u8>, Rejection> {
         seal_token(&self.entry, &self.info, claims, credential, &self.nonce)
     }
 }

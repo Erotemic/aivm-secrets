@@ -204,7 +204,7 @@ pub fn grant_of(entry: &Entry, credential_expires: i64) -> Grant {
 /// exchanging can produce a surrogate, and its binding is the entry's.
 #[allow(clippy::too_many_arguments)]
 pub fn complete<S: SurrogateSealer>(
-    sealer: &S,
+    sealer: S,
     policy: &IssuePolicy,
     entry: &Entry,
     credential: &[u8],

@@ -125,14 +125,22 @@ def seal_token(entry: KeyMaterial, info: Informational, claims: SurrogateClaims,
 
 @dataclass
 class TokenSealer:
-    """``stateless.SurrogateSealer`` for one key entry, the informational
-    claims, and a fresh nonce from the application's random source."""
+    """``stateless.SurrogateSealer`` for one issuance: the key entry, the
+    informational claims, and the AES-GCM nonce for that one seal.
+
+    The caller supplies the nonce, which must never have been used with the
+    entry's sealing key (``STATELESS-CRYPTO-01``); a sealer seals at most once,
+    as the Rust ``seal(self)`` consumes it."""
 
     entry: KeyMaterial
     nonce: bytes
     info: Informational = field(default_factory=Informational)
+    used: bool = field(default=False, init=False, repr=False)
 
     def seal(self, claims: SurrogateClaims, credential: bytes) -> bytes:
+        if self.used:
+            raise RuntimeError('a TokenSealer seals once: its nonce is spent')
+        self.used = True
         return seal_token(self.entry, self.info, claims, credential, self.nonce)
 
 

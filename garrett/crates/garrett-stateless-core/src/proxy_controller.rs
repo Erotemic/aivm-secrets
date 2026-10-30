@@ -7,6 +7,7 @@ use crate::proxy_http::{
 };
 
 /// Where a request stopped, for the audit.
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub enum Stage {
     /// Refused before anything was sent upstream.
     Refused,

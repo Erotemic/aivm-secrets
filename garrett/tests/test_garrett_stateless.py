@@ -179,3 +179,29 @@ def test_wrong_peer_is_never_decrypted():
         stateless.open_surrogate(Recording(keys.export_proxy().entries), token, acceptance, other, 150)
     assert unsealed == []
     assert b'real-credential' not in token
+
+
+def test_a_sealer_seals_once():
+    # One nonce, one seal: a second seal with the same sealer would reuse the
+    # AES-GCM nonce under the same key.
+    keys = BrokerKeys.generate('https://broker.test')
+    sealer = TokenSealer(keys.active_entry(), bytes(12))
+    peer = enc.b64url(hashlib.sha256(b'c').digest())
+    claims = stateless.SurrogateClaims('https://broker.test', 'https://proxy.test', 'agent', '0' * 32, 'api', peer,
+                                       100, 200, 300)
+    sealer.seal(claims, b'real-credential')
+    with pytest.raises(RuntimeError, match='seals once'):
+        sealer.seal(claims, b'other-credential')
+
+
+@pytest.mark.parametrize('reply', [
+    {'renew_until': 20, 'token': 't'},
+    {'expires_at': 10, 'token': 't'},
+    {'expires_at': '10', 'renew_until': 20, 'token': 't'},
+    {'expires_at': True, 'renew_until': 20, 'token': 't'},
+])
+def test_an_issuance_reply_needs_both_limits(reply):
+    from garrett_stateless import agent, wire
+    assert agent._issued({'expires_at': 10, 'renew_until': 20, 'token': 't'}).renew_until == 20
+    with pytest.raises(wire.ProtocolError, match='invalid_response'):
+        agent._issued(reply)

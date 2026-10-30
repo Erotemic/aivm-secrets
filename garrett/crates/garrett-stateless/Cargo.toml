@@ -14,9 +14,12 @@ publish = false
 default = []
 # TPM 2.0 client keys through tpm2-tools (src/tpm.rs).
 tpm = ["dep:rustix"]
+# Fixed-nonce sealing for the conformance vectors (`token::fixture_seal`).
+# Only this crate's tests enable it (the dev-dependency below).
+fixtures = []
 
 [dependencies]
-garrett-stateless-core = { path = "../garrett-stateless-core", version = "0.1.0" }
+garrett-stateless-core = { path = "../garrett-stateless-core", version = "0.1.0", features = ["derive"] }
 ring = "0.17"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 rustls-pemfile = "2"
@@ -26,6 +29,9 @@ rcgen = { version = "=0.14.10", default-features = false, features = ["ring", "p
 time = "0.3"
 zeroize = "1"
 rustix = { version = "1", features = ["fs", "process"], optional = true }
+
+[dev-dependencies]
+garrett-stateless = { path = ".", features = ["fixtures"] }
 
 [[bin]]
 name = "garrett-stateless"

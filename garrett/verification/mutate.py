@@ -51,11 +51,21 @@ MUTANTS = [
     ("stateless.rs", "stateless audience not checked", "if !member(&acceptance.audiences, &claims.audience) {",
      "if false {"),
     ("stateless.rs", "stateless verifying key issuer not checked", "if !(issuer == key_issuer) {", "if false {"),
+    # `open` is `authenticate` then `decrypt`; the mutant inlines an `open`
+    # that unseals before it admits.
     ("stateless.rs", "stateless decrypted before admission",
-     "    match admit(\n        &verified.claims,\n        &verified.key_issuer,\n        acceptance,\n        peer,\n        now,\n    ) {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }\n"
-     "    let credential = match opener.unseal(&verified) {\n        Ok(credential) => credential,\n        Err(error) => return Err(error),\n    };\n",
-     "    let credential = match opener.unseal(&verified) {\n        Ok(credential) => credential,\n        Err(error) => return Err(error),\n    };\n"
-     "    match admit(\n        &verified.claims,\n        &verified.key_issuer,\n        acceptance,\n        peer,\n        now,\n    ) {\n        Ok(()) => (),\n        Err(error) => return Err(error),\n    }\n"),
+     "    let verified = match authenticate(opener, token, acceptance, peer, now) {\n"
+     "        Ok(verified) => verified,\n        Err(error) => return Err(error),\n    };\n"
+     "    decrypt(opener, verified)\n",
+     "    let verified = match opener.verify(token) {\n"
+     "        Ok(verified) => verified,\n        Err(error) => return Err(error),\n    };\n"
+     "    let credential = match opener.unseal(&verified) {\n"
+     "        Ok(credential) => credential,\n        Err(error) => return Err(error),\n    };\n"
+     "    match admit(&verified.claims, &verified.key_issuer, acceptance, peer, now) {\n"
+     "        Ok(()) => (),\n        Err(error) => return Err(error),\n    }\n"
+     "    if !http_auth::valid_credential(&credential) {\n"
+     "        return Err(Rejection::InvalidCredential);\n    }\n"
+     "    Ok(Opened { claims: verified.claims, credential })\n"),
     ("stateless.rs", "stateless issuance binds the wrong certificate", "        certificate: grant.certificate,\n",
      "        certificate: token_id.to_vec(),\n"),
     ("stateless.rs", "stateless renewal extends ren", "        credential_expires: claims.renew_until,\n",

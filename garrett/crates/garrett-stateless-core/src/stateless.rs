@@ -21,6 +21,7 @@ pub const MAX_SKEW: i64 = 300;
 
 /// Why a surrogate was not accepted or not issued. Only diagnostics see
 /// the distinction; clients get one fixed refusal.
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub enum Rejection {
     Malformed,
     UnknownKey,
@@ -40,6 +41,7 @@ pub enum Rejection {
 /// The authoritative claims of a surrogate (`iss`, `aud`, `sub`, `jti`,
 /// `prv`, `cnf`, `iat`, `exp`, `ren`). Informational claims (`scope`,
 /// `upstream`) are never decision inputs and are not represented here.
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub struct SurrogateClaims {
     pub issuer: Vec<u8>,
     pub audience: Vec<u8>,
@@ -66,6 +68,7 @@ pub struct Verified {
 }
 
 /// What a proxy (or the broker, for renewal) accepts.
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub struct Acceptance {
     pub audiences: Vec<Vec<u8>>,
     pub providers: Vec<Vec<u8>>,
@@ -150,42 +153,6 @@ pub struct Opened {
     pub credential: Vec<u8>,
 }
 
-/// Verify, then admit, then (only then) decrypt. The production proxy and
-/// the broker's renewal both open surrogates through this function.
-pub fn open<V: SurrogateOpener>(
-    opener: &V,
-    token: &[u8],
-    acceptance: &Acceptance,
-    peer: &[u8],
-    now: i64,
-) -> Result<Opened, Rejection> {
-    let verified = match opener.verify(token) {
-        Ok(verified) => verified,
-        Err(error) => return Err(error),
-    };
-    match admit(
-        &verified.claims,
-        &verified.key_issuer,
-        acceptance,
-        peer,
-        now,
-    ) {
-        Ok(()) => (),
-        Err(error) => return Err(error),
-    }
-    let credential = match opener.unseal(&verified) {
-        Ok(credential) => credential,
-        Err(error) => return Err(error),
-    };
-    if !http_auth::valid_credential(&credential) {
-        return Err(Rejection::InvalidCredential);
-    }
-    Ok(Opened {
-        claims: verified.claims,
-        credential,
-    })
-}
-
 /// The first half of [`open`]: verify, then admit for this peer, and stop
 /// before decrypting. The proxy authorizes the operation between this and
 /// [`decrypt`], so a refused operation never has its credential unsealed.
@@ -214,7 +181,8 @@ pub fn authenticate<V: SurrogateOpener>(
 }
 
 /// The second half of [`open`]: unseal an authenticated surrogate and
-/// check the credential.
+/// check the credential. A [`Verified`] comes from [`authenticate`], so the
+/// credential is decrypted only after admission.
 pub fn decrypt<V: SurrogateOpener>(opener: &V, verified: Verified) -> Result<Opened, Rejection> {
     let credential = match opener.unseal(&verified) {
         Ok(credential) => credential,
@@ -229,7 +197,26 @@ pub fn decrypt<V: SurrogateOpener>(opener: &V, verified: Verified) -> Result<Ope
     })
 }
 
+/// Verify, then admit, then (only then) decrypt: [`authenticate`] followed
+/// by [`decrypt`]. The broker's renewal opens surrogates through this
+/// function; the proxy calls the two halves with its operation policy
+/// between them.
+pub fn open<V: SurrogateOpener>(
+    opener: &V,
+    token: &[u8],
+    acceptance: &Acceptance,
+    peer: &[u8],
+    now: i64,
+) -> Result<Opened, Rejection> {
+    let verified = match authenticate(opener, token, acceptance, peer, now) {
+        Ok(verified) => verified,
+        Err(error) => return Err(error),
+    };
+    decrypt(opener, verified)
+}
+
 /// What the broker issues for.
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub struct IssuePolicy {
     pub issuer: Vec<u8>,
     pub audience: Vec<u8>,
@@ -241,6 +228,7 @@ pub struct IssuePolicy {
 /// One credential to wrap and the agent to bind it to. `certificate` and
 /// `subject` come from the certificate the agent authenticated with;
 /// `credential_expires` is `MAX_TIME` when the provider gave no expiry.
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub struct Grant {
     pub provider: Vec<u8>,
     pub subject: Vec<u8>,
@@ -249,6 +237,7 @@ pub struct Grant {
     pub credential_expires: i64,
 }
 
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub struct Window {
     pub issued_at: i64,
     pub expires_at: i64,
@@ -347,8 +336,12 @@ pub fn claims_for(
 }
 
 /// Signs and seals exactly the given claims around the credential.
+///
+/// `seal` consumes the sealer: an implementation may carry single-use
+/// material (an AES-GCM nonce), and taking `self` means one sealer can seal
+/// at most once.
 pub trait SurrogateSealer {
-    fn seal(&self, claims: &SurrogateClaims, credential: &[u8]) -> Result<Vec<u8>, Rejection>;
+    fn seal(self, claims: &SurrogateClaims, credential: &[u8]) -> Result<Vec<u8>, Rejection>;
 }
 
 pub struct Issued {
@@ -359,7 +352,7 @@ pub struct Issued {
 /// One issuance: a valid credential, the claims of [`claims_for`], then
 /// sealing. Nothing is sealed if any check fails.
 pub fn issue<S: SurrogateSealer>(
-    sealer: &S,
+    sealer: S,
     policy: &IssuePolicy,
     grant: Grant,
     credential: &[u8],
@@ -401,7 +394,7 @@ pub fn renewal_grant(claims: &SurrogateClaims, certificate_expires: i64) -> Gran
 #[allow(clippy::too_many_arguments)]
 pub fn renew<V: SurrogateOpener, S: SurrogateSealer>(
     opener: &V,
-    sealer: &S,
+    sealer: S,
     acceptance: &Acceptance,
     policy: &IssuePolicy,
     token: &[u8],

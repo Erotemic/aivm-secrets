@@ -38,7 +38,14 @@ def SignVerifies {M : Type} (inst : KeyMaterial M) (signer verifier : M) : Prop 
 
 /-- **AES-256-GCM correctness.** What a key seals, the same key opens under
     the same nonce and associated data; the ciphertext is the plaintext and a
-    16-byte tag. -/
+    16-byte tag.
+
+    This is correctness only. Confidentiality and integrity of AES-GCM also
+    need every nonce to be used at most once under a key, and nothing here or
+    in any theorem establishes that: the nonce is an arbitrary input (the
+    core has no randomness). It is a runtime obligation of the application
+    (`STATELESS-CRYPTO-01`): each `TokenSealer` gets a fresh random nonce and
+    `seal` consumes it, and each sealed login state draws its own. -/
 def AeadInverse {M : Type} (inst : KeyMaterial M) (sealer opener : M) : Prop :=
   ∀ (n a pt : Slice U8) (ct : alloc.vec.Vec U8),
     inst.seal sealer n a pt = Result.ok (some ct) →

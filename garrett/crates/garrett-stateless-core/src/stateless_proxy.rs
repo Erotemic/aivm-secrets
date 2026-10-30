@@ -172,7 +172,7 @@ pub enum Decision {
 /// The authorization decision for one request, from the keys (through
 /// `opener`), the authenticated peer, the request, the clock and the
 /// static routes, operation policy and acceptance policy alone. It reads no
-/// other state and performs no effect, so every replica with the same keys
+/// other state and performs no effect of its own, so every replica with the same keys
 /// and configuration decides alike.
 #[allow(clippy::too_many_arguments)]
 pub fn decide<V: SurrogateOpener, P: OperationPolicy>(

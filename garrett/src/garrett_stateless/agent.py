@@ -37,9 +37,14 @@ def _refusal(response: wire.Response) -> wire.ProtocolError:
 
 
 def _issued(value: dict) -> IssuedToken:
+    """A broker's issuance reply: the surrogate and both of its limits. A
+    reply without either limit is refused rather than read as time 0."""
     if not isinstance(value, dict) or not isinstance(value.get('token'), str):
         raise wire.ProtocolError('invalid_response')
-    return IssuedToken(value['token'], value.get('expires_at', 0), value.get('renew_until', 0))
+    limits = [value.get('expires_at'), value.get('renew_until')]
+    if not all(isinstance(v, int) and not isinstance(v, bool) for v in limits):
+        raise wire.ProtocolError('invalid_response')
+    return IssuedToken(value['token'], limits[0], limits[1])
 
 
 class Agent:

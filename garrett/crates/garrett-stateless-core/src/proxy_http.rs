@@ -3,7 +3,7 @@
 //! reflected-credential refusal, and the fixed refusal responses
 //! (`docs/garrett-stateless-v1.md` section 11).
 //!
-//! The Python counterpart is `garrett_stateless.core.http`. Every function is
+//! The Python counterpart is `garrett_stateless.core.proxy_http`. Every function is
 //! pure over bytes. The encoder injects the credential only through
 //! `http_auth::append_header`; every agent field that could carry a
 //! credential or change framing is removed first. ("Guest" below is the
@@ -15,6 +15,7 @@ pub const MAX_HEAD: usize = 32 * 1024;
 pub const MAX_FIELDS: usize = 100;
 pub const MAX_TARGET: usize = 8192;
 
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub enum Refusal {
     InvalidRequest,
     TooLarge,
@@ -47,6 +48,7 @@ pub struct Parsed {
     pub used: usize,
 }
 
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub struct DenyRule {
     /// Empty means any method.
     pub method: Vec<u8>,
@@ -1260,6 +1262,7 @@ pub fn guest_response(
 // ---------------------------------------------------------------------------
 
 /// Every public refusal reason of the proxy.
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub enum Code {
     InvalidRequest,
     TooLarge,

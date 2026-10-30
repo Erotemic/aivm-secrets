@@ -6,7 +6,26 @@ lives in the crate `crates/garrett-stateless-core`; Aeneas extracts it into
 `proofs/generated/GarrettStatelessCore.lean` (namespace
 `garrett_stateless_core`); the theorems are in `proofs/GarrettStateless*.lean`,
 over the supporting HTTP, OAuth and base64 lemmas in the other `proofs/`
-modules. This is experimental, unaudited work.
+modules and the generic Aeneas facts in `proofs/GarrettFoundation.lean`. This
+is experimental, unaudited work.
+
+**Start with [`proofs/Garrett.lean`](../proofs/Garrett.lean).** It states the
+guarantees as a few named propositions (`SendsAreAuthorized`,
+`RefusalsSendNothing`, `DeliveredToInitiator`, `LoginsAtMostOnce`,
+`RenewalPreservesLineage`, `ClaimsHideCredential`, `RecordsPermitted`, and
+`AuthorizedEgress` for one proxy request), with their hypotheses, and derives
+each from the implementation-linked theorems below; it adds no model of its
+own. [`PROTOCOL.md`](../PROTOCOL.md) walks through one execution with links
+to the Rust and to these theorems.
+
+Every claim in this project is one of four kinds:
+
+| Kind | What | Where |
+| --- | --- | --- |
+| proved | properties of the extracted Rust computations and of the modeled executions built from them | the theorems below |
+| assumed | correctness of AES-256-GCM and Ed25519 (and unforgeability), nonce uniqueness, TLS peer identity, randomness, the clock, the adapters' inputs | [`assumptions.json`](assumptions.json), as explicit premises |
+| guarded or tested | the native shells' wiring to the core, interoperability, conformance | `verification/shell_guard.py`, the Rust and Python tests, `tests/vectors/` |
+| not established | whole-process I/O refinement of the binaries, computational security of the primitives, general information-flow noninterference, compatibility with a real provider | — |
 It proves the **internal** protocol, our own code, over every execution. It is
 not a proof of the cryptography, of TLS, of the operating system, of the
 native shells' I/O, or of the toolchain. The specification is
@@ -56,7 +75,7 @@ For every reachable world, the theorem proves:
    over any number of renewals: every issued surrogate has a login or mint
    root with the same certificate, provider and credential and a `ren` no
    later than the root's (`lineage`).
-5. **Outputs disclose no credential.** Every proxy record is one of the
+5. **Every output has a permitted form.** Every proxy record is one of the
    permitted forms (`log_permitted`): the guest's own request; a rejection
    code; the admission of an issued surrogate for this peer, whose claims do
    not contain its credential; exactly the encoder's request (the one
@@ -64,7 +83,10 @@ For every reachable world, the theorem proves:
    refusal or a `guest_response` release in which the raw credential does not
    occur. No issued surrogate shows its credential in its header, public
    payload or claims (`issued_secret`); it leaves the broker only as the
-   plaintext of the AEAD `seal` primitive.
+   plaintext of the AEAD `seal` primitive. This restricts the form of each
+   record and excludes the raw credential (and, in released replies, its
+   listed encodings) from the checked outputs; it is not a general
+   information-flow or noninterference result.
 
 Also proved, outside the summary statement: **informational claims have no
 influence** — two tokens sealed over the same claims by the same entry verify
@@ -75,7 +97,7 @@ that set (`kid_configured`, `retired_never_opens`); and **replica
 equivalence** — `decide_request` (`replicas_decide_alike`) and `renew` take no
 replica state, so replicas with the same configuration decide alike.
 
-## Composable isolation (`GarrettStatelessComposition`)
+## Composable authorized egress (`GarrettStatelessComposition`)
 
 The request path is composed of separately verified extracted components, and
 one theorem composes them for **any** operation policy:
@@ -97,7 +119,12 @@ admitted for this TLS peer, the request's `Operation` is `Allowed` for its
 claims, the route serves its provider, the credential is that surrogate's
 unsealed credential, the bytes are the encoder's output (exactly
 `ExactWire` when they fit in memory), and admission was acknowledged before
-the one exchange. The statement is `Isolated`; it is proved once.
+the one exchange. The statement is `AuthorizedEgress`, proved once: either
+`NoDispatch`, or one dispatch that is `AuthenticatedSurrogate`,
+`AuthorizedOperation`, `ProviderRouteMatches` and `ExactUpstreamRequest` and
+whose egress is `Dispatched`. It constrains the extracted controller; the
+native socket code that performs the exchange is outside it
+(`STATELESS-NATIVE-01`).
 
 It is instantiated, without repeating the proof, for the two policies the
 proxy runs, each an actual extracted trait instance:
@@ -145,8 +172,11 @@ against a Python and a Rust replica of each configuration.
 
 **A pure request decision.** `stateless_proxy::decide(opener, policy, request,
 routes, acceptance, peer, now)` is the Rust function every request is decided
-by; it returns `Unauthorized`, `Refused` or `Dispatch` (route, bytes, opened)
-and performs no effect. Its inputs are the keys (through the `KeySet` opener),
+by; it returns `Unauthorized`, `Refused` or `Dispatch` (route, bytes, opened).
+It performs no effect of its own: the opener and policy are trait
+parameters, and the theorems hold for whatever those implementations return
+(the real `KeySet` and `ReadOnly`/`Unrestricted` are themselves extracted;
+the primitives inside `KeySet` are the assumed boundary). Its inputs are the keys (through the `KeySet` opener),
 the static operation policy, the authenticated peer, the request carrying the
 surrogate, the clock and the static routes and acceptance policy; it has no
 other input, so no history-dependent acceptance is possible. `serve` calls it first and only
@@ -176,7 +206,9 @@ shell builds the mailbox's `LoginPolicy` from the OAuth providers only, and a
 reachable mailbox is the empty one and the login history has no event,
 whatever agents and browsers send. `strict_no_login_state` lifts this to
 every reachable world of the whole protocol model. The proxy has no mutable
-state in the model at all. The other half of the strict profile — no audit
+state in the model at all. "Stateless" here means no mutable authorization or
+login state; the processes still hold ordinary runtime and transport state
+(sockets, TLS sessions, buffers). The other half of the strict profile — no audit
 file, and no other mutable state or file write in the shell — is a source
 guard, not a proof (section 5 below).
 
@@ -198,7 +230,7 @@ provider-reported scope is an informational claim
 
 | Premise | External operation | Form |
 | --- | --- | --- |
-| `aead : ∀ S V, Paired S V → AeadInverse inst S V` | AES-256-GCM `seal`/`open` (`ring`) | correctness: what a key seals, its pair opens under the same nonce and AAD; the ciphertext is the plaintext and a 16-byte tag |
+| `aead : ∀ S V, Paired S V → AeadInverse inst S V` | AES-256-GCM `seal`/`open` (`ring`) | correctness: what a key seals, its pair opens under the same nonce and AAD; the ciphertext is the plaintext and a 16-byte tag. Correctness only: **nonce uniqueness is not proved**; each `TokenSealer` gets a fresh random nonce and `seal` consumes it (`STATELESS-CRYPTO-01`) |
 | `Unforged … keys` at each renewal (a field of the `renew` step) and for each proxy key set | Ed25519 `verify` (`ring`) | the idealized EUF-CMA boundary: in this execution, an entry verifies only signed parts of tokens this broker issued with a key paired to it |
 | `Paired : M → M → Prop` | key management (`keys.rs` rotate/export) | which verification material belongs to which signing key |
 
@@ -235,6 +267,7 @@ python verification/shell_guard.py check      # shell guard
 
 | Lean module | Theorems | Extracted Rust (`crates/garrett-stateless-core/src/`) |
 | --- | --- | --- |
+| `Garrett` | the named guarantees: `sends_are_authorized`, `refusals_send_nothing`, `delivered_to_initiator`, `logins_at_most_once`, `renewal_preserves_lineage`, `claims_hide_credential`, `records_permitted`, `guarantees`, `strict_broker_is_stateless`, `unrestricted_request`, `read_only_request`, `opens_only_for_its_certificate` | everything below, through the theorems it projects |
 | `GarrettStatelessCodec` | `from_b64url_sound`, `from_b64url_complete` (strict url-b64: exactly the canonical encoding), `natural_some`/`natural_of` (canonical decimals ≤ 2^53−1), `plain_string_some`/`_of`, `word_some`/`_of`/`_absent`, `payload_bytes_ok` | `stateless_token.rs`: `from_b64url`, `group`, `symbol_value`, `natural`, `digits`, `plain_string`, `word`, `append*`, `payload_bytes` |
 | `GarrettStatelessGrammar` | exact Boolean characterizations `is_text_eq`, `is_provider_eq`, `is_kid_eq`, `is_id_eq`, `is_thumbprint_true`, `is_scope_true`, `is_verifier_eq`; `payload_valid_true`, `state_valid_true`; `select_spec`, `keys_valid_true`, `select_unique` (key selection is unambiguous); `header_bytes_ok`, `header_kid_spec`, `header_kid_of`; `segments_spec`; `occurs_spec`; `b64url_spec` | `is_*`, `payload_valid`, `state_valid`, `select`, `named`, `keys_valid`, `entry_valid`, `header_bytes`, `header_kid`, `ascii`, `dot_from`, `segments`, `occurs`, `b64url` |
 | `GarrettStatelessToken` | `parse_payload_sound` (accepted bytes are exactly the canonical payload, which is valid), `parse_payload_complete`; `verify_token_ok`, `verify_token_sound` (the exact signed header and payload are what authorization uses; the AAD is exactly label, header, zero, public payload); `unseal_token_ok` (decryption uses the entry the verified `kid` selected); `seal_token_ok` (credential absent from header and public payload; exact AAD; signature over exactly the first two segments); `b64url_fits` | `parse_payload`, `field`, `number`, `verify_token`, `unseal_token`, `seal_token`, `associated`, `copy_claims`, `copy_info` |
@@ -245,7 +278,7 @@ python verification/shell_guard.py check      # shell guard
 | `GarrettStatelessProtocol` | `accepts_sealed`, `informational_no_influence`, `opened_issued`, `lineage`, `login_root`, `send_origin`, `send_root`, `rejection_never_sends`, `kid_configured`, `retired_never_opens`, `issued_secret`, `log_permitted`, `delivered_to_initiator`, `login_once`, `failed_login_quiet`, `prefix_logged`, `connection_prefix`, **`protocol_safety`** | all of the above, composed |
 | `GarrettStatelessWitness` | `issue_then_open`, `issued_codec`, `issued_opens_only_for_its_certificate` | `stateless::issue`, `stateless::open`, the `KeySet`/`TokenSealer` instances |
 | `GarrettStatelessStrict` | `no_providers_no_state`, `strict_no_login_state` | `stateless_mailbox.rs` (all transitions), `stateless_login::begin` |
-| `GarrettStatelessComposition` | `Sound`, `operation_of_spec`, `unrestricted_sound`, `read_method_eq`, `resource_allows_spec`, `any_allows_spec`, `read_only_permits_spec`, `read_only_sound`; **`composed_egress`** (`Isolated`), `garrett_egress`, `read_only_egress`, `read_only_dispatch`, `read_only_refuses`; `serve_answered`, `replicas_same_answers_same_reply`, `replica_replies_differ` | `stateless_policy.rs` (both `OperationPolicy` instances, `operation_of`, `any_allows` and its loop, `resource_allows`, `read_method`); `stateless_proxy::serve` |
+| `GarrettStatelessComposition` | `Sound`, `operation_of_spec`, `unrestricted_sound`, `read_method_eq`, `resource_allows_spec`, `any_allows_spec`, `read_only_permits_spec`, `read_only_sound`; **`composed_egress`** (`AuthorizedEgress`), `garrett_egress`, `read_only_egress`, `read_only_dispatch`, `read_only_refuses`; `serve_answered`, `replicas_same_answers_same_reply`, `replica_replies_differ` | `stateless_policy.rs` (both `OperationPolicy` instances, `operation_of`, `any_allows` and its loop, `resource_allows`, `read_method`); `stateless_proxy::serve` |
 
 The earlier theorems remain and are reused:
 
@@ -258,7 +291,7 @@ The earlier theorems remain and are reused:
 | One renewal | `renew_trace` | `stateless::renew`, `renewal_grant` |
 | Login binding | `begin_spec`, `begin_trace`, `accept_callback_trace`, `complete_trace`, `deliver_trace`, `deliver_other_peer` | `stateless_login.rs` |
 | `serve` acts on the pure decision | `serve_follows_decision`, `decide_dispatch_trace`, `dispatch_trace`, `dispatch_permitted`, `decide_unpermitted`, `serve_dispatch_exact`, `serve_rejected_never_sends`, `serve_guest_reply`, `serve_outcome`, `replicas_decide_alike`, `replicas_differ_only_by_answers` | `stateless_proxy::decide`, `stateless_proxy::serve` |
-| Opening in two halves | `authenticate_ok_trace`, `decrypt_ok_trace`, `open_of_halves` | `stateless::authenticate`, `stateless::decrypt`, `stateless::open` |
+| Opening in two halves (`open` is defined as `authenticate` then `decrypt`) | `authenticate_contract`, `decrypt_contract`, `authenticate_ok_trace`, `decrypt_ok_trace`, `open_of_halves` | `stateless::authenticate`, `stateless::decrypt`, `stateless::open` |
 
 ## Section 5 audit: endpoints and privileged paths
 

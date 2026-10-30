@@ -1,7 +1,7 @@
 import GarrettStatelessProxy
 
 /-!
-# `garrett-stateless-v1`: composable credential isolation
+# `garrett-stateless-v1`: composable authorized egress
 
 Source: `crates/garrett-stateless-core/src/stateless_policy.rs` and
 `stateless_proxy.rs`, extracted by Aeneas.
@@ -237,37 +237,75 @@ def ExactWire (request : proxy_http.Request) (route : Route) (credential : alloc
   UpstreamPrefix request (alloc.vec.Vec.deref route.host) ++ HeaderPrefix route.authentication ++
     credential.val ++ CRLF ++ UpstreamSuffix request
 
+/-- **No egress.** The decision is not a dispatch, the reply is refused, and
+    the origin saw at most the `rejected` diagnostic (its `admitted` and
+    `exchange` were never called). -/
+def NoDispatch (ops : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P)
+    (inst : Origin O) (opener : V) (policy : P) (io : O)
+    (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance) (peer : Slice U8)
+    (now : I64) (served : proxy_controller.Served) (after : O) : Prop :=
+  (∀ index wire opened,
+      decide_request ops pol opener policy request routes a peer now ≠ Result.ok (.dispatch index wire opened)) ∧
+    served.stage = .Refused ∧
+    ((∃ r, inst.rejected io r = Result.ok after ∧ unauthorized_served = Result.ok served) ∨
+     (after = io ∧ served.reply.val = ascii (refusalText served.code)))
+
+/-- **Identity.** The request carried exactly one surrogate; `verify`
+    authenticated it, its claims were `Admitted` for this TLS peer now, and
+    the released credential is `unseal` of that same envelope. -/
+def AuthenticatedSurrogate (ops : stateless.SurrogateOpener V) (opener : V) (request : proxy_http.Request)
+    (a : stateless.Acceptance) (peer : Slice U8) (now : I64) (opened : stateless.Opened) : Prop :=
+  ∃ token v, surrogate_of (alloc.vec.Vec.deref request.fields) = Result.ok (some token) ∧
+    ops.verify opener (alloc.vec.Vec.deref token) = Result.ok (.Ok v) ∧
+    Admitted v.claims (alloc.vec.Vec.deref v.key_issuer) a peer now ∧ opened.claims = v.claims ∧
+    ops.«unseal» opener v = Result.ok (.Ok opened.credential)
+
+/-- **Authorization.** The request's `Operation` is `Allowed` for the
+    authenticated claims. -/
+def AuthorizedOperation (Allowed : stateless.SurrogateClaims → stateless_policy.Operation → Prop)
+    (request : proxy_http.Request) (opened : stateless.Opened) : Prop :=
+  ∃ op, stateless_policy.operation_of request = Result.ok op ∧ Allowed opened.claims op
+
+/-- **Provider selection.** The chosen route serves the authenticated
+    provider, never a request value. -/
+def ProviderRouteMatches (routes : Slice Route) (index : Usize) (opened : stateless.Opened) : Prop :=
+  ∃ (inside : index.val < routes.length), (routes[index.val]'inside).provider.val = opened.claims.provider.val
+
+/-- **Encoding.** The bytes are the extracted encoder's output for that
+    route and credential, and exactly `ExactWire` when they fit in memory. -/
+def ExactUpstreamRequest (request : proxy_http.Request) (routes : Slice Route) (index : Usize)
+    (wire : alloc.vec.Vec U8) (opened : stateless.Opened) : Prop :=
+  ∃ (inside : index.val < routes.length),
+    proxy_http.encode_upstream (alloc.vec.Vec.new U8) request
+      (alloc.vec.Vec.deref (routes[index.val]'inside).host) (alloc.vec.Vec.deref (routes[index.val]'inside).rules)
+      (alloc.vec.Vec.deref opened.credential) (routes[index.val]'inside).authentication =
+      Result.ok (.Ok (), wire) ∧
+    ((ExactWire request (routes[index.val]'inside) opened.credential).length ≤ Usize.max →
+      wire.val = ExactWire request (routes[index.val]'inside) opened.credential)
+
 /-- What `composed_egress` guarantees about one run of `serve` that returned
     `served` with the origin at `after`, for an operation-policy contract
-    `Allowed`. -/
-def Isolated (ops : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P)
+    `Allowed`: either `NoDispatch`, or one dispatch decided by
+    `decide_request` that is `AuthenticatedSurrogate`, `AuthorizedOperation`,
+    `ProviderRouteMatches` and `ExactUpstreamRequest`, and whose egress is
+    `Dispatched` (the admission record acknowledged before the one exchange
+    of exactly those bytes). This constrains the extracted controller; the
+    native socket implementation is outside it (`STATELESS-NATIVE-01`). -/
+def AuthorizedEgress (ops : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P)
     (inst : Origin O) (opener : V) (policy : P) (io : O)
     (Allowed : stateless.SurrogateClaims → stateless_policy.Operation → Prop)
     (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance) (peer : Slice U8)
     (now : I64) (limit : Usize) (served : proxy_controller.Served) (after : O) : Prop :=
-    ((∀ index wire opened,
-        decide_request ops pol opener policy request routes a peer now ≠ Result.ok (.dispatch index wire opened)) ∧
-      served.stage = .Refused ∧
-      ((∃ r, inst.rejected io r = Result.ok after ∧ unauthorized_served = Result.ok served) ∨
-       (after = io ∧ served.reply.val = ascii (refusalText served.code)))) ∨
+  NoDispatch ops pol inst opener policy io request routes a peer now served after ∨
     ∃ index wire opened, decide_request ops pol opener policy request routes a peer now =
         Result.ok (.dispatch index wire opened) ∧
-      (∃ token v, surrogate_of (alloc.vec.Vec.deref request.fields) = Result.ok (some token) ∧
-        ops.verify opener (alloc.vec.Vec.deref token) = Result.ok (.Ok v) ∧
-        Admitted v.claims (alloc.vec.Vec.deref v.key_issuer) a peer now ∧ opened.claims = v.claims ∧
-        ops.«unseal» opener v = Result.ok (.Ok opened.credential)) ∧
-      (∃ op, stateless_policy.operation_of request = Result.ok op ∧ Allowed opened.claims op) ∧
-      (∃ (inside : index.val < routes.length),
-        (routes[index.val]'inside).provider.val = opened.claims.provider.val ∧
-        proxy_http.encode_upstream (alloc.vec.Vec.new U8) request
-          (alloc.vec.Vec.deref (routes[index.val]'inside).host) (alloc.vec.Vec.deref (routes[index.val]'inside).rules)
-          (alloc.vec.Vec.deref opened.credential) (routes[index.val]'inside).authentication =
-          Result.ok (.Ok (), wire) ∧
-        ((ExactWire request (routes[index.val]'inside) opened.credential).length ≤ Usize.max →
-          wire.val = ExactWire request (routes[index.val]'inside) opened.credential)) ∧
+      AuthenticatedSurrogate ops opener request a peer now opened ∧
+      AuthorizedOperation Allowed request opened ∧
+      ProviderRouteMatches routes index opened ∧
+      ExactUpstreamRequest request routes index wire opened ∧
       Dispatched inst io request limit index wire opened served after
 
-/-- **Composable credential isolation.** For any operation-policy component
+/-- **Composable authorized egress.** For any operation-policy component
     meeting its contract `Allowed` (`Sound`), every run of the extracted
     `serve`, for any origin adapter and any key-set opener, is one of:
 
@@ -291,8 +329,9 @@ theorem composed_egress (ops : stateless.SurrogateOpener V) (pol : stateless_pol
     (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance) (peer : Slice U8)
     (now : I64) (limit : Usize) (served : proxy_controller.Served) (after : O)
     (h : serve ops pol inst opener policy io request routes a peer now limit = Result.ok (served, after)) :
-    Isolated ops pol inst opener policy io Allowed request routes a peer now limit served after := by
-  unfold Isolated
+    AuthorizedEgress ops pol inst opener policy io Allowed request routes a peer now limit served after := by
+  unfold AuthorizedEgress NoDispatch AuthenticatedSurrogate AuthorizedOperation ProviderRouteMatches
+    ExactUpstreamRequest
   obtain ⟨d, hd, m⟩ := serve_follows_decision ops pol inst opener policy io request routes a peer now limit
     served after h
   cases d with
@@ -309,7 +348,7 @@ theorem composed_egress (ops : stateless.SurrogateOpener V) (pol : stateless_pol
     exact Or.inl ⟨none, serve_rejected_never_sends ops pol inst opener policy io request routes a peer now limit
       served after h none⟩
   | dispatch index wire opened =>
-    refine Or.inr ⟨index, wire, opened, hd, ?_, ?_, ?_, m⟩
+    refine Or.inr ⟨index, wire, opened, hd, ?_, ?_, ?_, ?_, m⟩
     · obtain ⟨token, ho, hopen, _⟩ := dispatch_trace ops pol opener policy request routes a peer now hd
       obtain ⟨v, hv, adm, same, hun, _⟩ := open_ok_trace ops opener _ a peer now opened hopen
       exact ⟨token, v, ho, hv, adm, same, hun⟩
@@ -317,8 +356,10 @@ theorem composed_egress (ops : stateless.SurrogateOpener V) (pol : stateless_pol
       have contract := sound opened.claims op
       rw [hperm] at contract
       exact ⟨op, hop, (WP.spec_ok _).mp contract rfl⟩
-    · obtain ⟨_, _, _, inside, prov, henc⟩ := dispatch_trace ops pol opener policy request routes a peer now hd
-      refine ⟨inside, prov, henc, fun room => ?_⟩
+    · obtain ⟨_, _, _, inside, prov, _⟩ := dispatch_trace ops pol opener policy request routes a peer now hd
+      exact ⟨inside, prov⟩
+    · obtain ⟨_, _, _, inside, _, henc⟩ := dispatch_trace ops pol opener policy request routes a peer now hd
+      refine ⟨inside, henc, fun room => ?_⟩
       obtain ⟨_, _, _, _, _, _, _, inside', _, bytes, _⟩ := serve_dispatch_exact ops pol inst opener policy io
         request routes a peer now limit served after h index wire opened hd (fun _ => room)
       exact bytes
@@ -333,7 +374,7 @@ theorem garrett_egress (ops : stateless.SurrogateOpener V) (inst : Origin O) (op
     (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance) (peer : Slice U8)
     (now : I64) (limit : Usize) (served : proxy_controller.Served) (after : O)
     (h : serve ops UnrestrictedPolicy inst opener () io request routes a peer now limit = Result.ok (served, after)) :
-    Isolated ops UnrestrictedPolicy inst opener () io (fun _ _ => True) request routes a peer now limit served after :=
+    AuthorizedEgress ops UnrestrictedPolicy inst opener () io (fun _ _ => True) request routes a peer now limit served after :=
   composed_egress ops UnrestrictedPolicy inst opener () io (fun _ _ => True) unrestricted_sound request routes a
     peer now limit served after h
 
@@ -345,7 +386,7 @@ theorem read_only_egress (ops : stateless.SurrogateOpener V) (inst : Origin O) (
     (io : O) (request : proxy_http.Request) (routes : Slice Route) (a : stateless.Acceptance) (peer : Slice U8)
     (now : I64) (limit : Usize) (served : proxy_controller.Served) (after : O)
     (h : serve ops ReadOnlyPolicy inst opener p io request routes a peer now limit = Result.ok (served, after)) :
-    Isolated ops ReadOnlyPolicy inst opener p io (ReadOnlyAllowed p) request routes a peer now limit served after :=
+    AuthorizedEgress ops ReadOnlyPolicy inst opener p io (ReadOnlyAllowed p) request routes a peer now limit served after :=
   composed_egress ops ReadOnlyPolicy inst opener p io (ReadOnlyAllowed p) (read_only_sound p) request routes a
     peer now limit served after h
 

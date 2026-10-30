@@ -63,15 +63,20 @@ theorem issue_then_open {inst : KeyMaterial M} {sealer : TokenSealer M} {keys : 
   obtain ⟨b, hb, bv⟩ := returned_of_spec (http_auth.Proofs.valid_credential_contract (alloc.vec.Vec.deref out))
   have bt : b = true := bv.mpr (by rw [same]; exact valid)
   subst bt
-  unfold stateless.open
-  rw [hv']
-  simp only [bind_ok]
-  rw [hr1]
-  simp only [bind_ok]
-  rw [hu']
-  simp only [bind_ok]
-  rw [hb]
-  simp only [bind_ok, ↓reduceIte]
+  have ha : stateless.authenticate (Opening inst) keys (alloc.vec.Vec.deref issued.token) a peer later =
+      Result.ok (.Ok v) := by
+    unfold stateless.authenticate
+    rw [hv']
+    simp only [bind_ok]
+    rw [hr1]
+    simp only [bind_ok]
+  have hd : stateless.decrypt (Opening inst) keys v = Result.ok (.Ok ⟨v.claims, out⟩) := by
+    unfold stateless.decrypt
+    rw [show (Opening inst).«unseal» keys v = Result.ok (.Ok out) from hu']
+    simp only [bind_ok]
+    rw [hb]
+    simp only [bind_ok, ↓reduceIte]
+  exact stateless.Proofs.open_of_halves _ _ _ _ _ _ v _ ha hd
 
 /-- **The codec premise, discharged.** For the real opener and sealer, a
     verified issued token yields exactly the claims sealed into it — the

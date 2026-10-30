@@ -2,6 +2,7 @@
 //! Validation completes before the caller's zeroizing buffer is modified.
 use crate::credential_use::Authentication;
 
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
 pub enum HeaderDenial {
     InvalidCredential,
 }
