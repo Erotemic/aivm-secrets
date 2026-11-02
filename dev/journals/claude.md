@@ -1650,3 +1650,98 @@ the maintainer should choose; queued) and the "guest" vocabulary rename
 (low value against proof churn; queued). The GitHub workflow has still never
 run. Confidence: high in the proofs and tests as run; the
 doc wording changes are judgment calls a reviewer should read.
+
+## 2026-11-01 22:49:42 -0500
+
+Agent: Claude Opus 5.5 (claude-opus-5-5; exact weights/config variant not
+exposed to me). Task: the pasted "Complete Garrett's Product-Level Formal
+Security Guarantees" brief (it was cut off in section 5.1; I designed the
+confidentiality adversary model myself and say so in the docs). All work in
+`garrett/`, committed locally on `main`, nothing pushed.
+
+What changed, in order of the brief's priorities:
+
+- **Route-to-destination binding (4.1).** The native proxy used to keep the
+  core's `Vec<Route>` and its own `Vec<Upstream>` correlated by position, so a
+  proved route index said nothing about where the bytes went. Now each core
+  `Route` carries a `Destination` (host, address, port, trust anchors), the
+  `Egress` carries the selected route's destination, and the native proxy has
+  no table at all: `open_upstream` builds the TLS session from the destination
+  it is handed. `routes_valid` refuses two routes for one provider, with
+  `routes_valid_spec` / `one_route_per_provider`.
+- **Effect boundary (4.2/4.3).** The provider exchange moved into the core:
+  `exchange` = `Origin::connect(destination)` → only on `true`,
+  `Origin::transmit(egress)` (consumes it) → `collect` over
+  `Origin::receive` within `answer_limit`. The log model gained
+  `connected D ok` and `sent D wire`; `exchange_logged` proves no write
+  after a failed connection (via a generic `collect_loop_preserves`, using
+  `partial_fixpoint` induction with the existing `Returns` WLP).
+  `send_origin`/`protocol_safety` now say every write follows the request's
+  own `began` record, its acknowledged admission and the authenticated
+  connection to the destination of the surrogate's provider route.
+  `Garrett.lean` makes the decision/write distinction explicit:
+  `CompromisedAgentConfinement` is about the log; `provider_writes_confined`
+  lifts it to the network only under the named, trusted `TransportFaithful`
+  contract. I did not try to prove rustls or sockets.
+- **Confidentiality (5).** New `GarrettConfidentiality`: two-run theorems
+  `decide_declassified`, `serve_declassified` (the reply depends on the
+  credential only through the provider's answer and the reflection bit),
+  `encode_upstream_verdict`, `release_declassified`,
+  `seal_token_ciphertext_only`, `issue_ciphertext_only`. The declassification
+  boundary is a new ledger entry, `STATELESS-DISCLOSURE-01`; IND-CPA is added
+  to `STATELESS-CRYPTO-01` as an assumption, not a theorem.
+- **Public interface (2/3).** `Garrett.lean` is organized as Guarantees A–E
+  with named predicates (`IssuedFor`, `PolicyPermits`, `RouteFor`,
+  `ExactRequest`, `AfterAuthenticatedConnection`, `WithinDelegation`,
+  `ConnectionAllowed`, …), a `SecurityGuarantees` structure and
+  `security_guarantees`. Old names stay. Deep `.2.2.2` projections are gone;
+  each guarantee now takes only the hypotheses it needs (e.g. refusals and
+  login uniqueness need no AEAD premise).
+- **C/D/E extras.** `Lineage` now preserves the subject; `BoundedDelegation`
+  (window, audience, provider, binding, root `ren`); `AuthorizedAcquisition`;
+  `connection_needs_no_history` (a connection's behaviour is allowed by the
+  configuration alone, in any world).
+- **Tests (4.4).** Core and Python unit tests (reordered catalogue, impostor
+  and failed connection, failed write, bounded/failed reads, unrouted
+  provider, duplicate catalogue); real-TLS workflow tests (a route address
+  answering with another name's cert or an untrusted CA never decrypts a
+  byte; audit log and replies never carry the credential or surrogate);
+  shell-guard checks and bypass tests for `open_upstream`/`transmit`.
+- **Mutants.** Nine new (destination, Host, failed-connection write,
+  duplicate catalogue, four covert channels, renewal subject). The runner had
+  a latent bug — `dict.get(label, PROOFS_BY_FILE[file])` evaluates the
+  default eagerly — which crashed the first covert run; fixed, and unmapped
+  mutants are now refused up front.
+
+Decisions and tradeoffs:
+
+- I kept `Origin` a trait with three effect callbacks rather than moving TLS
+  into the core: the trusted surface is now two small native functions, which
+  the shell guard pins textually. A deeper refinement would need a syscall
+  witness (queued).
+- `ProxyRepliesDeclassified` conditions on equal *network answers*; that is
+  the honest form — a provider may legitimately reveal the credential. It is
+  per request; a whole-connection two-run theorem is not done (queued).
+- `seal_token_ciphertext_only` is a simulation-style statement (two primitive
+  instances returning the same ciphertext); with one real AEAD its premise is
+  only satisfiable for equal plaintexts, which is exactly why the ciphertext
+  secrecy is stated as the IND-CPA assumption.
+- Process note: I ran mutants from an isolated copy of the committed tree
+  (symlinked `.tools`, own `.lake/build`) so I could keep editing; per the
+  earlier lesson I did not touch the tree a running `mutate.py` reads.
+  A `pkill -f` pattern again matched its own shell; use pids.
+
+Validation at `2e16f5a`, in a separate copy of `garrett/`: cargo 59 (and 59
+with tpm), pytest 120, build, shell guard, bootstrap, extraction check, cold
+`lake build` (303 s), all 51 mutants rejected (3047 s). The encoder
+covert-channel mutant is rejected only by `GarrettConfidentiality`, which is
+evidence the two-run theorems add checking power rather than restating
+existing proofs; the other three covert mutants trip structural trace proofs
+first, so the run does not show the confidentiality theorems alone would
+catch them.
+
+Confidence: high that the new theorems say what their docstrings say (they
+are about the extracted code and compile); medium on whether
+`TransportFaithful` and the declassification boundary are the contracts a
+reviewer will accept — both need independent review, which an agent cannot
+self-certify.
