@@ -30,18 +30,19 @@
     {
       "id": "STATELESS-CRYPTO-01",
       "boundary": "garrett-stateless-v1 opener and sealer adapters (Ed25519, AES-256-GCM, strict codec)",
-      "assumption": "The KeyMaterial primitives (crates/garrett-stateless/src/token.rs, ring) satisfy the propositions of proofs/GarrettStatelessBoundary.lean that the theorems take as explicit premises: AeadInverse (AES-256-GCM correctness for paired keys), SignVerifies (Ed25519 correctness, positive witnesses only) and, per execution, Unforged (idealized EUF-CMA: an entry verifies only signed parts of tokens this broker issued with a paired key; stated at each renewal and for each proxy key set). The strict JSON/b64url codec, the key-set validation and the claim/AAD binding are no longer assumed: they are extracted and proved (GarrettStatelessCodec/Grammar/Token; the former codec premise of issued_only_opens_for_its_certificate is discharged by issued_codec). AeadInverse is correctness only: no theorem establishes nonce uniqueness. The application must give every TokenSealer, and every seal_state call, a 96-bit nonce never used before with that key (a fresh draw from ring's SystemRandom or os.urandom); SurrogateSealer::seal consumes the sealer, so one sealer seals at most once, and fixed-nonce sealing is compiled only for the conformance fixtures (feature fixtures). No computational proof of ring or the primitives is claimed. For confidentiality (proofs/GarrettConfidentiality.lean), AES-256-GCM is further assumed IND-CPA under unique nonces: the theorems prove that a surrogate depends on its credential only through the AEAD ciphertext, and that the ciphertext reveals nothing beyond the credential's length is this assumption, not a theorem.",
+      "assumption": "The KeyMaterial primitives (crates/garrett-stateless/src/token.rs, ring) satisfy the propositions of proofs/GarrettStatelessBoundary.lean that the theorems take as explicit premises: AeadInverse (AES-256-GCM correctness for paired keys), SignVerifies (Ed25519 correctness, positive witnesses only) and, per execution, Unforged (idealized EUF-CMA: an entry verifies only signed parts of tokens this broker issued with a paired key; stated at each renewal and for each proxy key set). The strict JSON/b64url codec, the key-set validation and the claim/AAD binding are no longer assumed: they are extracted and proved (GarrettStatelessCodec/Grammar/Token; the former codec premise of issued_only_opens_for_its_certificate is discharged by issued_codec). AeadInverse is correctness only. Nonces are not proved unique, and are not deterministically unique: (a) single use is enforced by Rust: SurrogateSealer::seal consumes the TokenSealer, so a sealer (one nonce) seals at most once; every surrogate issuance, renewal and seal_state call draws its own nonce; fixed-nonce sealing is compiled only for the conformance fixtures (feature fixtures); (b) the random source is trusted: each nonce is 12 bytes from ring's SystemRandom (getrandom) in Rust or os.urandom in Python, assumed uniform and independent of every other draw; (c) replicas share keys and keep no nonce state, so uniqueness holds only with high probability: among n sealings under one key, a repeat has probability at most n(n-1)/2 · 2^-96 (proofs/GarrettNonce.lean, nonce_collision_bound, a counting bound under (b)); (d) the operator keeps each sealing key below 2^32 sealings across all replicas, the NIST SP 800-38D limit for random 96-bit nonces (repeat probability below 2^-33), by rotating keys (STATELESS-DEPLOY-01); Garrett does not count sealings. Surrogates and login state are sealed under different keys (an entry's seal key and the replica state key), so their nonces never meet under one key. No computational proof of ring or the primitives is claimed. For confidentiality (proofs/GarrettConfidentiality.lean), AES-256-GCM is further assumed IND-CPA under unique nonces: the theorems prove that a surrogate depends on its credential only through the AEAD ciphertext, and that the ciphertext reveals nothing beyond the credential's length is this assumption, not a theorem.",
       "owner": "crates/garrett-stateless/src/token.rs",
       "if_false": "A forged signature or a codec that decoded different claims would let an unauthorized surrogate pass admission. A repeated AES-GCM nonce under one key would expose the XOR of two credentials and allow forging sealed envelopes. A ciphertext that leaked its plaintext would give the agent the credential from its own surrogate.",
       "checked_by": [
-        "tests/test_garrett_stateless_vectors.py",
-        "crates/garrett-stateless/tests/vectors.rs",
-        "tests/vectors/garrett-stateless-v1.jsonl",
-        "proofs/GarrettStatelessBoundary.lean",
-        "proofs/GarrettStatelessToken.lean",
-        "proofs/GarrettStatelessRoundTrip.lean",
         "crates/garrett-stateless/tests/codec_agreement.rs",
-        "proofs/GarrettConfidentiality.lean"
+        "crates/garrett-stateless/tests/vectors.rs",
+        "proofs/GarrettConfidentiality.lean",
+        "proofs/GarrettNonce.lean",
+        "proofs/GarrettStatelessBoundary.lean",
+        "proofs/GarrettStatelessRoundTrip.lean",
+        "proofs/GarrettStatelessToken.lean",
+        "tests/test_garrett_stateless_vectors.py",
+        "tests/vectors/garrett-stateless-v1.jsonl"
       ],
       "class": "external-trusted",
       "justification": "Signature and AEAD primitives and the compact codec are adapters behind the extracted opener/sealer traits.",
@@ -81,7 +82,7 @@
     {
       "id": "STATELESS-DEPLOY-01",
       "boundary": "garrett-stateless-v1 deployment",
-      "assumption": "Each broker replica has its own registered redirect URI, so a login's callback and polls reach the replica that began it; broker and proxy clocks agree within the configured skew; new key sets reach every proxy before the broker signs with a new kid; retired kids are removed from every proxy to revoke; key files are readable only by the service; agent certificate keys are protected as the chosen mode claims (software keys can be copied; swtpm state can be copied).",
+      "assumption": "Each broker replica has its own registered redirect URI, so a login's callback and polls reach the replica that began it; broker and proxy clocks agree within the configured skew; new key sets reach every proxy before the broker signs with a new kid; retired kids are removed from every proxy to revoke; the active sealing key is rotated before it seals 2^32 surrogates across all replicas (STATELESS-CRYPTO-01); key files are readable only by the service; agent certificate keys are protected as the chosen mode claims (software keys can be copied; swtpm state can be copied).",
       "owner": "docs/garrett-stateless-v1.md",
       "if_false": "Lost logins, early or late expiry, or surrogates surviving an intended revocation.",
       "checked_by": [

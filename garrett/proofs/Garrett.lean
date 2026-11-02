@@ -1,4 +1,5 @@
 import GarrettConfidentiality
+import GarrettNonce
 import GarrettStatelessStrict
 import GarrettStatelessWitness
 
@@ -24,6 +25,36 @@ Aeneas extraction of `crates/garrett-stateless-core`
   sends one request to the provider the surrogate names;
 * the **provider** is the upstream API.
 
+## In one paragraph
+
+Garrett does not disclose the provider credential through surrogate claims
+or through the replies and records it constructs itself. Its verified proxy
+hands the credential to its native writer only inside an authorized, exact
+request for the configured destination of the surrogate's provider, and,
+under the trusted transport contract, every application byte it emits to a
+provider belongs to such a request — a prefix of it if the write was
+interrupted. That a surrogate's ciphertext hides the credential is the
+assumed security of AES-256-GCM, and what an authorized provider's answer
+reveals is an explicit disclosure boundary. None of this is unconditional
+credential secrecy.
+
+## Five layers of evidence
+
+Each result belongs to one layer. A claim in a higher layer never follows
+from a lower layer alone.
+
+| layer | about | established by | results |
+| --- | --- | --- | --- |
+| 1. extracted computations | the Rust functions `decide`, `serve`, `exchange`, `issue`, `renew` and the mailbox transitions, for any inputs | Lean theorems about the Aeneas extraction | `unrestricted_request`, `read_only_request`, `one_route_per_provider`, `opens_only_for_its_certificate`, `ProxyRepliesDeclassified`, `SurrogatesRevealOnlyCiphertext`, `replicas_decide_alike` |
+| 2. the protocol and its effect trace | every reachable interleaving of extracted steps; the `log` of effects each connection asked the native shell for | Lean theorems over `Reachable` and the extracted connection loop | `SecurityGuarantees` (`CompromisedAgentConfinement`, `CompletedAfterWholeWrite`, `RefusalsSendNothing`, `ClaimsHideCredential`, `RecordsPermitted`, `BoundedDelegation`, `RenewalPreservesLineage`, `AuthorizedAcquisition`), `ConnectionsDeclassified`, `connection_needs_no_history`, `strict_broker_is_stateless` |
+| 3. native network effects | the application data the proxy process emits to providers | layer 2 and the trusted contract `TransportFaithful`, whose native half is `upstream.rs` (`STATELESS-NATIVE-01`, `STATELESS-TLS-01`) | `ProviderBytesConfined` (`provider_writes_confined`), `completed_requests_emitted_whole` |
+| 4. cryptography | signatures, AEAD correctness and secrecy, nonces | the hypotheses `AeadCorrect` and `Unforged`; IND-CPA, a documented assumption; a counting bound on nonce repeats (`Garrett.Nonce.nonce_collision_bound`) | `STATELESS-CRYPTO-01` |
+| 5. deployment and providers | clocks, key custody and rotation, the TLS stack, the OAuth provider and the human, what a provider does with a request it receives | documented assumptions only | `STATELESS-DEPLOY-01`, `STATELESS-OAUTH-01`, `STATELESS-OPS-01`, `STATELESS-DISCLOSURE-01` |
+
+Each main theorem below says what it **protects**, against which
+**attacker**, from which **source** (extracted functions and theorems), under
+what **trust**, and its **limit**.
+
 ## The model of an execution
 
 `World` records the broker's login mailbox and its history, and every
@@ -46,7 +77,7 @@ for, in order (`ProxyEvent`).
 
 | | guarantee | Lean | status |
 | --- | --- | --- | --- |
-| A | compromised-agent confinement | `CompromisedAgentConfinement`, `provider_writes_confined` | proved for the log; trusted transport contract for the network |
+| A | compromised-agent confinement | `CompromisedAgentConfinement`, `CompletedAfterWholeWrite`, `ProviderBytesConfined` | proved for the log (layer 2); for the network under `TransportFaithful` (layer 3) |
 | B | provider-credential confidentiality | `ClaimsHideCredential`, `RecordsPermitted`, `ProxyRepliesDeclassified`, `ConnectionsDeclassified`, `SurrogatesRevealOnlyCiphertext` | proved up to the declassification boundary; AEAD secrecy trusted |
 | C | bounded, nontransferable delegation | `BoundedDelegation`, `RenewalPreservesLineage`, `opens_only_for_its_certificate` | proved; key custody and the clock trusted |
 | D | authorized credential acquisition | `AuthorizedAcquisition` | proved for the broker; browser, human and OAuth provider trusted |
@@ -54,22 +85,28 @@ for, in order (`ProxyEvent`).
 
 `SecurityGuarantees` collects A, C and D, with `RefusalsSendNothing`,
 `ClaimsHideCredential` and `RecordsPermitted`, for every reachable world
-(`security_guarantees`). B's two-run theorems and E's replica theorems
-compare two executions and are stated separately.
+(`security_guarantees`). It is a structure of named fields, not one
+conjunction: each field keeps its own statement. B's two-run theorems and
+E's replica theorems compare two executions and are stated separately, and
+the network statements of layer 3 take the transport contract as a premise.
 
 ## The trusted base
 
 * `AeadCorrect`: AES-256-GCM decrypts what it encrypted under paired keys
-  (`STATELESS-CRYPTO-01`). Correctness only; nonce uniqueness is a runtime
-  obligation of the application, and AEAD **secrecy** (IND-CPA) is an
-  assumption of B, not a theorem.
+  (`STATELESS-CRYPTO-01`). Correctness only. AEAD **secrecy** (IND-CPA) is
+  an assumption of B, not a theorem, and it needs unique nonces, which are
+  random and so unique only with high probability
+  (`Garrett.Nonce.nonce_collision_bound`); keeping a key's use below the
+  rotation limit is the operator's.
 * `Unforged`: no Ed25519 signature was forged under a proxy's key set (an
   idealized EUF-CMA), stated per key set where the proxy relies on it.
-* `TransportFaithful`: the native transport performs exactly the provider
-  writes the log requests, each on a TLS session whose server proved the
-  destination's name under its trust anchors (`STATELESS-NATIVE-01`,
-  `STATELESS-TLS-01`); the native shells call the core as
-  `verification/shell_guard.py` checks.
+* `TransportFaithful`: the provider sessions with application data
+  correspond, in order, to the logged write attempts; each carries a prefix
+  of the attempted bytes (all of them when the writer reported success) on a
+  TLS session whose server proved the destination's name under its trust
+  anchors (`STATELESS-NATIVE-01`, `STATELESS-TLS-01`). Its native half is
+  `upstream.rs`, whose types allow one write per authenticated session;
+  `verification/shell_guard.py` pins how the shells call the core.
 * The clock passed to the core, and that the TLS layer reports the peer of
   the handshake it verified.
 
@@ -375,6 +412,20 @@ def ConnectionsDeclassified : Prop :=
       stateless_proxy.Proofs.DivergeAtReflection (stateless_proxy.Proofs.agentView f1.2)
         (stateless_proxy.Proofs.agentView f2.2)
 
+/-- **B, over whole connections.**
+
+    * protects: nothing the agent is sent by a connection depends on the
+      credential, beyond the provider's answers and one reflection bit;
+    * attacker: an adaptive agent choosing each request after seeing every
+      earlier reply, on any number of requests;
+    * source: the extracted connection loop, `serve`, `exchange`, `collect`,
+      `release` (`connection_declassified`);
+    * trust: `ChannelsAgree` — the network answers alike whatever
+      credential-bearing bytes were written — is exactly the provider-answer
+      declassification (`STATELESS-DISCLOSURE-01`);
+    * limit: termination-insensitive (both runs return); timing, sizes and
+      other side channels are not modeled; after the first reflection
+      refusal nothing is claimed. -/
 theorem connections_declassified : ConnectionsDeclassified :=
   fun _ _ _ _ _ same _ _ _ agree _ _ r _ _ _ _ _ _ _ h1 h2 =>
     stateless_proxy.Proofs.connection_declassified same agree r h1 h2
@@ -560,7 +611,20 @@ omit aead reach in
 theorem claims_hide_credential : ClaimsHideCredential inst cfg W :=
   fun _ _ _ _ _ issued => (issued_secret issued).2.2
 
-/-- **A.** Every credential-bearing write attempt is authorized. -/
+/-- **A.** Every credential-bearing write attempt is authorized.
+
+    * protects: the credential reaches the native writer only inside the
+      exact request the agent asked for, for the destination of the route
+      of its surrogate's provider, after the operation policy permitted it;
+    * attacker: a malicious agent with its own certificate and surrogates,
+      choosing every request byte, over any number of connections and
+      replicas, interleaved with any logins, mints and renewals;
+    * source: the extracted connection loop and `decide`, `open`,
+      `encode_upstream` (`send_origin`, `dispatch_permitted`,
+      `encoded_exact`);
+    * trust: `AeadCorrect`; `Unforged` for the connection's key set;
+    * limit: about what the controller asked the native writer to do
+      (layer 2), not what reached the network (`provider_writes_confined`). -/
 theorem compromised_agent_confinement : CompromisedAgentConfinement inst Paired cfg W := by
   intro keys peer log m unforged D wire written sent
   obtain ⟨request, now, index, opened, hd, order, sealer, claims, credential, token, src, iss, oc, same, cert, lin,
@@ -576,7 +640,16 @@ theorem compromised_agent_confinement : CompromisedAgentConfinement inst Paired 
     application byte the proxy process emitted to a provider for a connection
     lies in a prefix of an authorized write attempt, on a session to the
     server named by the destination of the route of the surrogate's provider
-    — even when the write failed part-way. -/
+    — even when the write failed part-way.
+
+    * protects: no credential-bearing application data goes to any other
+      server, or in any other request, or beyond the authorized request;
+    * attacker: as for `compromised_agent_confinement`;
+    * source: `compromised_agent_confinement`;
+    * trust: `TransportFaithful` (layer 3), `AeadCorrect`, `Unforged`;
+    * limit: application data (TLS plaintext) only — the TLS records and
+      TCP segments are TLS's and the kernel's; a reported success means the
+      bytes were written and flushed, not that the provider received them. -/
 theorem provider_writes_confined {keys : KeySet M} {peer : Slice U8} {log : List ProxyEvent}
     (m : Act.served keys peer log ∈ W.acts) (unforged : Unforged inst Paired cfg W keys)
     {writes : List ProviderWrite} (faithful : TransportFaithful log writes) :
@@ -603,7 +676,17 @@ theorem completed_requests_emitted_whole {keys : KeySet M} {peer : Slice U8} {lo
   exact ⟨D, wire, ma, ex ▸ mx⟩
 
 /-- **C.** Every credential-bearing write used a surrogate within its
-    delegation. -/
+    delegation.
+
+    * protects: a surrogate is used only by its own certificate, inside its
+      window, for an accepted audience and provider, and never with more
+      than its root issuance granted;
+    * attacker: an agent replaying, renewing or presenting surrogates on
+      other connections, including another agent's;
+    * source: `send_origin`, `open_ok_trace`, `lineage`;
+    * trust: `AeadCorrect`, `Unforged`, the clock;
+    * limit: certificate binding is not key custody — whoever holds the
+      certificate's private key is the agent. -/
 theorem bounded_delegation : BoundedDelegation inst Paired cfg W := by
   intro keys peer log m unforged D wire written sent
   obtain ⟨request, now, index, opened, hd, _, sealer, claims, credential, token, src, iss, oc, same, cert, lin, _⟩ :=
@@ -622,14 +705,29 @@ theorem failed_logins_issue_nothing : FailedLoginsIssueNothing W :=
 theorem credentials_entered_for_the_peer : CredentialsEnteredForThePeer inst Paired cfg W :=
   fun _ _ _ m unforged _ _ _ sent => send_root aead reach m unforged sent
 
-/-- **D.** -/
+/-- **D.** Credentials enter through a door for the agent that uses them.
+
+    * protects: a login's surrogate goes only to the certificate that began
+      it, at most once; a failed exchange or issuance issues nothing; every
+      credential a proxy sends was minted for that certificate or came from
+      a login it started;
+    * attacker: an agent polling, replaying callbacks or racing logins, any
+      OAuth answer, any interleaving;
+    * source: the extracted mailbox transitions (`mailbox_reachable`,
+      `at_most_once`, `failed_never_delivered`), `send_root`;
+    * trust: `AeadCorrect`, `Unforged`; the browser, the human, PKCE secrecy
+      and the provider's token endpoint (`STATELESS-OAUTH-01`); the
+      operator's mint input (`STATELESS-ACQ-01`);
+    * limit: a mint is a trusted door — the operator chooses the
+      certificate. -/
 theorem authorized_acquisition : AuthorizedAcquisition inst Paired cfg W :=
   ⟨delivered_to_initiator reach, logins_at_most_once reach, failed_logins_issue_nothing reach,
     credentials_entered_for_the_peer aead reach⟩
 
 /-- **Garrett's guarantees hold in every reachable world**, under AEAD
     correctness (and, where a proxy relies on signatures, no forgery under its
-    key set). -/
+    key set). Layer 2: about the extracted steps and the effects they
+    request; the network statements of layer 3 are separate. -/
 theorem security_guarantees : SecurityGuarantees inst Paired cfg W where
   confinement := compromised_agent_confinement aead reach
   completed := completed_after_whole_write reach
@@ -715,7 +813,15 @@ def ConnectionAllowed (inst : KeyMaterial M) (cfg : Config P) (keys : KeySet M) 
 
 /-- **E. The proxy needs no history.** Every connection in every reachable
     world is one the configuration allows on its own, and every connection the
-    configuration allows can happen in any world, whatever happened before. -/
+    configuration allows can happen in any world, whatever happened before.
+
+    * protects: authorization does not depend on earlier connections,
+      renewals, mints or logins, so replicas need no shared state;
+    * attacker: any history of other agents' activity;
+    * source: the `Step` relation over extracted transitions;
+    * trust: none beyond the model of a world;
+    * limit: the proxy keeps per-connection state and an optional audit
+      handle; statelessness is about authorization, not the process. -/
 theorem connection_needs_no_history {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config P} :
     (∀ {W : World M}, Reachable inst Paired cfg W → ∀ keys peer log, Act.served keys peer log ∈ W.acts →
       ConnectionAllowed inst cfg keys peer log) ∧

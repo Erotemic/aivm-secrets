@@ -344,7 +344,26 @@ def check(root: Path = ROOT) -> list[str]:
         if name != 'token.rs':
             require('fixture_seal(' not in code_only(source) and 'sealer_with_nonce(' not in code_only(source),
                     f'{name} seals with a fixed nonce')
-    checked.append('sealing only through issue, renew or the mailbox finish, each from one endpoint')
+    # Every production sealer and login-state seal gets a fresh 96-bit nonce
+    # from the system random source, drawn in the same function; only the
+    # feature-gated conformance fixture passes a nonce in.
+    built = {name: owners(source, 'TokenSealer::new(') for name, source in shell.items()
+             if 'TokenSealer::new(' in code_only(source)}
+    require(built == {'broker.rs': {'renew'}, 'token.rs': {'sealer', 'fixture_seal'}},
+            f'a TokenSealer is built outside the reviewed places: {built}')
+    for name, function in [('broker.rs', 'renew'), ('token.rs', 'sealer')]:
+        body = functions(shell[name])[function][0]
+        require(re.search(r'let nonce = (?:crate::encoding::)?random::<12>\(\)', body) and
+                re.search(r'TokenSealer::new\([^;]*nonce\.to_vec\(\)', body, re.S),
+                f'{function} does not seal with a fresh random nonce')
+    fixture = functions(shell['token.rs'])['fixture_seal'][0]
+    require(re.search(r'#\[cfg\(feature = "fixtures"\)\]\s*pub fn fixture_seal', shell['token.rs']),
+            'the fixed-nonce fixture is compiled without the fixtures feature')
+    require(count(shell['login.rs'], 'stateless_token::seal_state(') == 1 and
+            'stateless_token::seal_state(&RingStateKey(state_key), state, &random::<12>()?)' in shell['login.rs'],
+            'login state is not sealed with a fresh random nonce')
+    checked.append('sealing only through issue, renew or the mailbox finish, each from one endpoint, '
+                   'each with a fresh random nonce')
 
     # The broker's agent peer is the mTLS handshake's, and each agent decision uses it.
     require(count(broker, 'PeerIdentity::from_connection(&stream.conn)') == 1, 'broker peer not from the handshake')
@@ -374,7 +393,8 @@ def check(root: Path = ROOT) -> list[str]:
 
     # Every decision is the core's.
     for call in ['stateless::open(', 'stateless::authenticate(', 'stateless::decrypt(', 'stateless_proxy::decide(',
-                 'stateless_proxy::serve(', 'stateless_proxy::connection_step(', '.permits(']:
+                 'stateless_proxy::serve(', 'stateless_proxy::connection_step(', '.permits(', '.unseal(',
+                 'Admitted']:
         for name, source in shell.items():
             require(call not in code_only(source), f'{name} calls {call}')
     checked.append('the shell opens no surrogate and decides no request outside the core loop')

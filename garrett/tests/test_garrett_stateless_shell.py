@@ -167,6 +167,21 @@ def test_current_shell_passes():
      '        let _ = stateless_proxy::decide(&self.proxy.keys, todo!(), &[], todo!(), b"", 0);\n'
      '        match session.transmit(egress) {\n',
      'stateless_proxy::decide'),
+    # The shell may not unseal a surrogate itself, admitted or not.
+    ('crates/garrett-stateless/src/broker.rs',
+     'fn poll(&self, peer: &PeerIdentity, login: &str) -> Poll {',
+     'fn poll(&self, peer: &PeerIdentity, login: &str) -> Poll {\n        let _ = self.verification.unseal(todo!());',
+     'unseal'),
+    # A renewal sealed with a fixed nonce, or a sealer built elsewhere.
+    ('crates/garrett-stateless/src/broker.rs',
+     '        let nonce = crate::encoding::random::<12>()?;\n',
+     '        let nonce = [0u8; 12];\n',
+     'fresh random nonce'),
+    ('crates/garrett-stateless/src/broker.rs',
+     'fn poll(&self, peer: &PeerIdentity, login: &str) -> Poll {',
+     'fn poll(&self, peer: &PeerIdentity, login: &str) -> Poll {\n'
+     '        let _ = TokenSealer::new(todo!(), todo!(), vec![0; 12]);',
+     'outside the reviewed places'),
     # No hidden mutable state, in a struct field or an atomic.
     ('crates/garrett-stateless/src/proxy.rs',
      'pub struct Proxy {\n    config: ProxyConfig,',

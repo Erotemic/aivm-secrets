@@ -76,11 +76,15 @@ python verification/shell_guard.py check      # the application calls the core a
 ```
 
 [`proofs/Garrett.lean`](proofs/Garrett.lean) states five guarantees:
-compromised-agent confinement (every credential-bearing write is an
+compromised-agent confinement (every credential-bearing write attempt is an
 authenticated, authorized, exact request to the configured destination of
-the surrogate's provider), credential confidentiality up to a stated
-declassification boundary, bounded delegation, authorized acquisition and
-stateless authorization. [`docs/verification.md`](docs/verification.md)
+the surrogate's provider, and, under a stated transport contract, every
+byte emitted to a provider belongs to one), credential confidentiality up
+to a stated declassification boundary (per request and over whole
+connections), bounded delegation, authorized acquisition and stateless
+authorization. It sorts every result into five layers: extracted
+computations, the protocol's effect trace, native network effects under the
+transport contract, cryptographic assumptions, and deployment. [`docs/verification.md`](docs/verification.md)
 says, for each, what is proved (on top of the composed protocol theorem
 `protocol_safety` and the per-request theorem `composed_egress`), what is
 only tested, and what is trusted: [`docs/assumptions.json`](docs/assumptions.json).

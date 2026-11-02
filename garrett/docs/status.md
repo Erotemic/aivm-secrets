@@ -3,7 +3,7 @@
 The current state of `garrett-stateless` and what comes next, in order. The
 dated notes from before the extraction are in [`history/`](history).
 
-## State (2026-11-01)
+## State (2026-11-02)
 
 Both implementations are complete for `garrett-stateless-v1`: the OAuth and
 provisioned acquisition adapters, the broker, the stateless proxy with the
@@ -64,6 +64,43 @@ the per-execution ones for every reachable world. Behind them:
   TLS, failed connections and writes, bounded answers, an unrouted provider,
   audit and replies without the credential) and nine new mutants.
 
+**Closing the product boundaries (2026-11-02).**
+
+- **Attempts, emissions and completions are distinct.** The log records
+  `attempted D wire written` (the hand-off to the native writer, with its
+  report); a `ProviderWrite` is the TLS application data a provider session
+  actually carried. `TransportFaithful` now says each session's data is a
+  prefix of an attempt's bytes (all of them if the writer reported
+  success), and `provider_writes_confined` concludes that every emitted byte
+  lies in an authorized request, under partial failure too. A request is
+  completed only after a write reported whole (`seg_completed`,
+  `CompletedAfterWholeWrite`, `completed_requests_emitted_whole`).
+- **A smaller native boundary.** The provider transport is
+  `crates/garrett-stateless/src/upstream.rs`: a session exists only after a
+  TLS handshake authenticated the core's destination, and its types allow
+  one write, with an `Egress` for that destination, after which it can only
+  be read. The guard pins it, with new bypass tests.
+- **Confidentiality over whole connections.** `connection_declassified`
+  (`ConnectionsDeclassified`): two runs of the extracted loop with an
+  adaptive agent and credentials that differ send the agent the same bytes,
+  up to the first reflection refusal, given network answers that do not
+  depend on the credential.
+- **Failed issuance without invalid cryptography.** The mailbox's `finish`
+  takes an optional `Issuance`; without one the login ends `Uncertain` and
+  nothing is sealed. The broker's deliberately invalid sealer is gone.
+- **Verification states as types.** `authenticate` returns `Admitted`
+  (crate-private field); `unseal` and `decrypt` take nothing else. Outside
+  the core neither a forged `Admitted` nor unsealing a `Verified` compiles.
+  Operation authorization between them stays proved control flow.
+- **Nonces.** `STATELESS-CRYPTO-01` separates single use (Rust), the random
+  source (trusted), the probability of a repeat (`GarrettNonce`, at most
+  `n(n−1)/2 · 2^−96`) and the rotation limit (the operator's); the guard
+  checks every production sealer takes a fresh random nonce.
+- **`Garrett.lean`** sorts every result into five layers (extracted
+  computations, the effect trace, native network effects under the
+  transport contract, cryptography, deployment) and documents each main
+  theorem's protected outcome, attacker, source, trust and limit.
+
 ## Validation
 
 At the commit that recorded this table (see `git log`):
@@ -82,32 +119,31 @@ At the commit that recorded this table (see `git log`):
 
 1. **Typed identifiers at the public boundary.** `SurrogateClaims` and the
    grant carry issuer, audience, subject, `jti`, provider and thumbprint as
-   interchangeable byte vectors. An ergonomic facade (validated newtypes;
-   untrusted token, verified, admitted and authorized states as types) in
-   the application crate, over the unchanged extracted core, so the proofs
-   keep their simple types.
+   interchangeable byte vectors. An ergonomic facade of validated newtypes
+   in the application crate, over the unchanged extracted core, so the
+   proofs keep their simple types. (The verified/admitted distinction is
+   already a core type, `Admitted`.)
 2. **Vocabulary.** The code and some proofs say "guest" for the agent's side
    of the proxy (`guest_response`, `GuestReply`); `PROTOCOL.md` fixes the
    terms (agent, broker, proxy, provider). Rename identifiers only where a
    reader gains from it.
-3. **Independent review** of the specification, the five guarantees in
-   `Garrett.lean` (in particular whether `TransportFaithful` is the right
-   native contract and whether the declassification boundary of
-   `STATELESS-DISCLOSURE-01` is acceptable), the trusted shells
-   (`STATELESS-NATIVE-01`), `STATELESS-CRYPTO-01` (now including nonce
-   uniqueness and IND-CPA) and `STATELESS-OPS-01`. An agent cannot
-   self-certify it.
+3. **Independent review** of the specification, the five guarantees and
+   their layers in `Garrett.lean`, in particular: whether `TransportFaithful`
+   (prefix of an attempt per provider session) is the right native contract
+   and `upstream.rs` meets it; whether `ChannelsAgree` and the
+   declassification boundary of `STATELESS-DISCLOSURE-01` are acceptable;
+   the trusted shells (`STATELESS-NATIVE-01`); `STATELESS-CRYPTO-01`
+   (IND-CPA, the random source, the rotation limit) and `STATELESS-OPS-01`.
+   An agent cannot self-certify it.
 4. **Live provider compatibility (maintainer).** One real OAuth provider with
    PKCE and a read-only call, outside tests and CI.
 5. **Hardware TPM (maintainer).** The swtpm test against a device TPM, with
    provenance verified by the CA.
 6. **Provider-specific read-only catalogues** (narrows `STATELESS-OPS-01`).
-7. **An opt-in axiom audit** for this package (the last one, before the
-   extraction, found only Lean's standard axioms; see verification.md).
-8. **Narrow the native contract further.** A whole-connection two-run
-   confidentiality theorem (the per-request one is proved); a syscall-level
-   witness that the proxy's only provider writes are `Origin::transmit`
-   (today a source guard).
-9. **Later, separate increments:** OAuth without the mailbox (a protocol
+7. **Narrow the native contract further.** A syscall-level witness that
+   the proxy's only provider writes are `upstream.rs`'s (today Rust module
+   privacy plus a source guard); the broker's issuance compared over a whole
+   login, as the proxy now is over a whole connection.
+8. **Later, separate increments:** OAuth without the mailbox (a protocol
    change); further acquisition adapters; a multi-replica broker run; the
    release decision.
