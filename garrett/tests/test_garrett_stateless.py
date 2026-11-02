@@ -205,3 +205,70 @@ def test_an_issuance_reply_needs_both_limits(reply):
     assert agent._issued({'expires_at': 10, 'renew_until': 20, 'token': 't'}).renew_until == 20
     with pytest.raises(wire.ProtocolError, match='invalid_response'):
         agent._issued(reply)
+
+
+class _Upstream:
+    """A simulated provider side for the core ``serve``: what was connected to
+    and written, in order."""
+
+    def __init__(self, authenticated: bool = True, written: bool = True):
+        self.authenticated, self.written = authenticated, written
+        self.effects: list = []
+        self.reads = [b'HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi', b'']
+
+    def rejected(self, code):
+        self.effects.append(('rejected', code))
+
+    def admitted(self, claims, route):
+        return True
+
+    def connect(self, destination):
+        self.effects.append(('connect', destination.address))
+        return self.authenticated
+
+    def transmit(self, egress):
+        self.effects.append(('send', egress.destination.address, egress.wire))
+        return self.written
+
+    def receive(self):
+        return self.reads.pop(0) if self.reads else b''
+
+    def completed(self, status):
+        return True
+
+
+def test_the_credential_goes_only_to_the_authenticated_route_destination():
+    from garrett_stateless.core import proxy_http, stateless_policy, stateless_proxy
+    keys = BrokerKeys.generate('https://broker.test')
+    peer = enc.b64url(hashlib.sha256(b'c').digest())
+    claims = stateless.SurrogateClaims('https://broker.test', 'https://proxy.test', 'agent', '0' * 32, 'api', peer,
+                                       100, 200, 300)
+    token = TokenSealer(keys.active_entry(), bytes(12)).seal(claims, b'real-credential')
+    raw = b'GET /user HTTP/1.1\r\nHost: proxy.test\r\nAuthorization: Bearer ' + token + b'\r\n\r\n'
+    request, _ = proxy_http.parse_request(raw, host=b'proxy.test', body_limit=4096)
+    routes = (stateless_proxy.Route('other', stateless_proxy.Destination('other.test', '10.0.0.1'), 'bearer'),
+              stateless_proxy.Route('api', stateless_proxy.Destination('api.test', '10.0.0.2'), 'bearer'))
+    assert stateless_proxy.routes_valid(routes)
+    assert not stateless_proxy.routes_valid(routes + (
+        stateless_proxy.Route('api', stateless_proxy.Destination('evil.test', '10.6.6.6'), 'bearer'),))
+    acceptance = stateless.Acceptance(('https://proxy.test',), ('api', 'other'), 3600, 0)
+
+    def serve(origin, catalogue=routes):
+        return stateless_proxy.serve(KeySet(keys.export_proxy().entries), stateless_policy.Unrestricted(), origin,
+                                     request, catalogue, acceptance, peer, 150, 4096)
+
+    # The destination belongs to the route: reordering moves it with its provider.
+    for catalogue in (routes, routes[::-1]):
+        origin = _Upstream()
+        assert serve(origin, catalogue).stage == 'completed'
+        assert [e[:2] for e in origin.effects] == [('connect', '10.0.0.2'), ('send', '10.0.0.2')]
+        assert b'Host: api.test\r\n' in origin.effects[1][2]
+    # A server that does not authenticate as the destination gets nothing.
+    impostor = _Upstream(authenticated=False)
+    served = serve(impostor)
+    assert (served.stage, served.code) == ('failed', 'unreachable')
+    assert impostor.effects == [('connect', '10.0.0.2')]
+    # A failed write is an unknown outcome, never retried.
+    broken = _Upstream(written=False)
+    assert serve(broken).code == 'outcome_unknown'
+    assert [e[0] for e in broken.effects] == ['connect', 'send']

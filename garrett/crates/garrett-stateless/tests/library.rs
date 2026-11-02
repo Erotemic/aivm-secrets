@@ -11,7 +11,7 @@ use garrett_stateless::{Acceptance, IssuePolicy, Rejection};
 use garrett_stateless_core::credential_use::Authentication;
 use garrett_stateless_core::proxy_http::{parse_request, Request};
 use garrett_stateless_core::stateless_policy::Unrestricted;
-use garrett_stateless_core::stateless_proxy::{decide, Decision, Route};
+use garrett_stateless_core::stateless_proxy::{decide, routes_valid, Decision, Destination, Route};
 
 const ISSUER: &str = "https://broker.example";
 const AUDIENCE: &str = "https://proxy.example";
@@ -81,14 +81,21 @@ fn mint_then_decide() {
         "the surrogate does not show the credential"
     );
 
-    // 2. The proxy's static configuration: one route per provider, and what
-    //    it accepts.
+    // 2. The proxy's static configuration: one route per provider, each
+    //    with the one destination its credential may go to, and what it
+    //    accepts.
     let routes = [Route {
         provider: b"api".to_vec(),
-        host: b"api.example".to_vec(),
+        destination: Destination {
+            host: b"api.example".to_vec(),
+            address: b"api.example".to_vec(),
+            port: 443,
+            trust: Vec::new(),
+        },
         rules: Vec::new(),
         authentication: Authentication::Bearer,
     }];
+    assert!(routes_valid(&routes), "one route per provider");
     let acceptance = Acceptance {
         audiences: vec![AUDIENCE.as_bytes().to_vec()],
         providers: vec![b"api".to_vec()],

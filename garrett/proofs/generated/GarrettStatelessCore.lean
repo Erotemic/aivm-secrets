@@ -6423,49 +6423,153 @@ def
     stateless_policy.ReadOnly.Insts.Garrett_stateless_coreStateless_policyOperationPolicy.permits
 }
 
+/-- [garrett_stateless_core::stateless_proxy::Destination]
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 38:0-48:1
+    Visibility: public -/
+structure stateless_proxy.Destination where
+  host : alloc.vec.Vec Std.U8
+  address : alloc.vec.Vec Std.U8
+  port : Std.U16
+  trust : alloc.vec.Vec Std.U8
+
 /-- [garrett_stateless_core::stateless_proxy::Route]
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 34:0-40:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 53:0-58:1
     Visibility: public -/
 structure stateless_proxy.Route where
   provider : alloc.vec.Vec Std.U8
-  host : alloc.vec.Vec Std.U8
+  destination : stateless_proxy.Destination
   rules : alloc.vec.Vec proxy_http.upstream.DenyRule
   authentication : credential_use.Authentication
 
+/-- [garrett_stateless_core::stateless_proxy::provides]:
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 174:0-177:1
+    Visibility: public -/
+def stateless_proxy.provides
+  (route : stateless_proxy.Route) (provider : Slice Std.U8) : Result Bool := do
+  let own := alloc.vec.Vec.deref route.provider
+  core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 own provider
+
+/-- [garrett_stateless_core::stateless_proxy::route_of]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 182:4-184:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_proxy.route_of_loop
+  (routes : Slice stateless_proxy.Route) (provider : Slice Std.U8)
+  (index : Std.Usize) :
+  Result Std.Usize
+  := do
+  let i := Slice.len routes
+  if index < i
+  then
+    let r ← Slice.index_usize routes index
+    let b ← stateless_proxy.provides r provider
+    if b
+    then ok index
+    else
+      let index1 ← index + 1#usize
+      stateless_proxy.route_of_loop routes provider index1
+  else ok index
+partial_fixpoint
+
+/-- [garrett_stateless_core::stateless_proxy::route_of]:
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 180:0-186:1
+    Visibility: public -/
+@[reducible]
+def stateless_proxy.route_of
+  (routes : Slice stateless_proxy.Route) (provider : Slice Std.U8) :
+  Result Std.Usize
+  := do
+  stateless_proxy.route_of_loop routes provider 0#usize
+
+/-- [garrett_stateless_core::stateless_proxy::routes_valid]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 64:4-71:1
+    Visibility: public -/
+@[rust_loop]
+def stateless_proxy.routes_valid_loop
+  (routes : Slice stateless_proxy.Route) (index : Std.Usize) :
+  Result Bool
+  := do
+  let i := Slice.len routes
+  if index < i
+  then
+    let r ← Slice.index_usize routes index
+    let s := alloc.vec.Vec.deref r.provider
+    let i1 ← stateless_proxy.route_of routes s
+    if i1 != index
+    then ok false
+    else
+      let index1 ← index + 1#usize
+      stateless_proxy.routes_valid_loop routes index1
+  else ok true
+partial_fixpoint
+
+/-- [garrett_stateless_core::stateless_proxy::routes_valid]:
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 62:0-71:1
+    Visibility: public -/
+@[reducible]
+def stateless_proxy.routes_valid
+  (routes : Slice stateless_proxy.Route) : Result Bool := do
+  stateless_proxy.routes_valid_loop routes 0#usize
+
+/-- [garrett_stateless_core::stateless_proxy::copy_destination]:
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 74:0-81:1
+    Visibility: public -/
+def stateless_proxy.copy_destination
+  (destination : stateless_proxy.Destination) :
+  Result stateless_proxy.Destination
+  := do
+  let s := alloc.vec.Vec.deref destination.host
+  let v ← alloc.slice.Slice.to_vec core.clone.CloneU8 s
+  let s1 := alloc.vec.Vec.deref destination.address
+  let v1 ← alloc.slice.Slice.to_vec core.clone.CloneU8 s1
+  let s2 := alloc.vec.Vec.deref destination.trust
+  let v2 ← alloc.slice.Slice.to_vec core.clone.CloneU8 s2
+  ok { destination with host := v, address := v1, trust := v2 }
+
 /-- [garrett_stateless_core::stateless_proxy::Egress]
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 44:0-47:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 86:0-89:1
     Visibility: public -/
 structure stateless_proxy.Egress where
-  route : Std.Usize
+  destination : stateless_proxy.Destination
   wire : alloc.vec.Vec Std.U8
 
-/-- [garrett_stateless_core::stateless_proxy::egress_route]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 50:0-52:1
+/-- [garrett_stateless_core::stateless_proxy::egress_destination]:
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 92:0-94:1
     Visibility: public -/
-def stateless_proxy.egress_route
-  (egress : stateless_proxy.Egress) : Result Std.Usize := do
-  ok egress.route
+def stateless_proxy.egress_destination
+  (egress : stateless_proxy.Egress) : Result stateless_proxy.Destination := do
+  ok egress.destination
 
 /-- [garrett_stateless_core::stateless_proxy::egress_wire]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 55:0-57:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 97:0-99:1
     Visibility: public -/
 def stateless_proxy.egress_wire
   (egress : stateless_proxy.Egress) : Result (Slice Std.U8) := do
   ok (alloc.vec.Vec.deref egress.wire)
 
+/-- [garrett_stateless_core::stateless_proxy::Received]
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 102:0-109:1
+    Visibility: public -/
+@[discriminant isize]
+inductive stateless_proxy.Received where
+| Bytes : alloc.vec.Vec Std.U8 → stateless_proxy.Received
+| End : stateless_proxy.Received
+| Failed : stateless_proxy.Received
+
 /-- Trait declaration: [garrett_stateless_core::stateless_proxy::Origin]
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 60:0-72:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 112:0-131:1
     Visibility: public -/
 structure stateless_proxy.Origin (Self : Type _) where
   rejected : Self → stateless.Rejection → Result Self
   admitted : Self → stateless.SurrogateClaims → Std.Usize → Result (Bool
     × Self)
-  exchange : Self → stateless_proxy.Egress → Result ((core.result.Result
-    (alloc.vec.Vec Std.U8) proxy_http.refusal.Code) × Self)
+  connect : Self → stateless_proxy.Destination → Result (Bool × Self)
+  transmit : Self → stateless_proxy.Egress → Result (Bool × Self)
+  receive : Self → Result (stateless_proxy.Received × Self)
   completed : Self → Std.U16 → Result (Bool × Self)
 
 /-- Trait declaration: [garrett_stateless_core::stateless_proxy::Channel]
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 75:0-91:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 134:0-150:1
     Visibility: public -/
 structure stateless_proxy.Channel (Self : Type _) where
   OriginInst : stateless_proxy.Origin Self
@@ -6478,7 +6582,7 @@ structure stateless_proxy.Channel (Self : Type _) where
   restart : Self → Result Self
 
 /-- [garrett_stateless_core::stateless_proxy::surrogate_value]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 95:0-101:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 154:0-160:1
     Visibility: public -/
 def stateless_proxy.surrogate_value
   (value : Slice Std.U8) : Result (Option (alloc.vec.Vec Std.U8)) := do
@@ -6497,7 +6601,7 @@ def stateless_proxy.surrogate_value
   else proxy_connect.presented value
 
 /-- [garrett_stateless_core::stateless_proxy::surrogate_of]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 104:0-113:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 163:0-172:1
     Visibility: public -/
 def stateless_proxy.surrogate_of
   (fields : Slice proxy_http.request.Field) :
@@ -6528,48 +6632,8 @@ def stateless_proxy.surrogate_of
       let s2 := alloc.vec.Vec.deref f.value
       stateless_proxy.surrogate_value s2
 
-/-- [garrett_stateless_core::stateless_proxy::provides]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 115:0-118:1
-    Visibility: public -/
-def stateless_proxy.provides
-  (route : stateless_proxy.Route) (provider : Slice Std.U8) : Result Bool := do
-  let own := alloc.vec.Vec.deref route.provider
-  core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 own provider
-
-/-- [garrett_stateless_core::stateless_proxy::route_of]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 123:4-125:5
-    Visibility: public -/
-@[rust_loop]
-def stateless_proxy.route_of_loop
-  (routes : Slice stateless_proxy.Route) (provider : Slice Std.U8)
-  (index : Std.Usize) :
-  Result Std.Usize
-  := do
-  let i := Slice.len routes
-  if index < i
-  then
-    let r ← Slice.index_usize routes index
-    let b ← stateless_proxy.provides r provider
-    if b
-    then ok index
-    else
-      let index1 ← index + 1#usize
-      stateless_proxy.route_of_loop routes provider index1
-  else ok index
-partial_fixpoint
-
-/-- [garrett_stateless_core::stateless_proxy::route_of]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 121:0-127:1
-    Visibility: public -/
-@[reducible]
-def stateless_proxy.route_of
-  (routes : Slice stateless_proxy.Route) (provider : Slice Std.U8) :
-  Result Std.Usize
-  := do
-  stateless_proxy.route_of_loop routes provider 0#usize
-
 /-- [garrett_stateless_core::stateless_proxy::unauthorized]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 130:0-139:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 189:0-198:1
     Visibility: public -/
 def stateless_proxy.unauthorized : Result (alloc.vec.Vec Std.U8) := do
   let s ←
@@ -6620,7 +6684,7 @@ def stateless_proxy.unauthorized : Result (alloc.vec.Vec Std.U8) := do
   alloc.vec.Vec.extend_from_slice core.clone.CloneU8 out2 s3
 
 /-- [garrett_stateless_core::stateless_proxy::unauthorized_served]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 142:0-150:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 201:0-209:1
     Visibility: public -/
 def stateless_proxy.unauthorized_served : Result proxy_controller.Served := do
   let v ← stateless_proxy.unauthorized
@@ -6634,7 +6698,7 @@ def stateless_proxy.unauthorized_served : Result proxy_controller.Served := do
     }
 
 /-- [garrett_stateless_core::stateless_proxy::Dispatch]
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 154:0-158:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 213:0-217:1
     Visibility: public -/
 structure stateless_proxy.Dispatch where
   route : Std.Usize
@@ -6642,7 +6706,7 @@ structure stateless_proxy.Dispatch where
   opened : stateless.Opened
 
 /-- [garrett_stateless_core::stateless_proxy::Decision]
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 163:0-170:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 222:0-229:1
     Visibility: public -/
 @[discriminant isize]
 inductive stateless_proxy.Decision where
@@ -6651,7 +6715,7 @@ inductive stateless_proxy.Decision where
 | Dispatch : stateless_proxy.Dispatch → stateless_proxy.Decision
 
 /-- [garrett_stateless_core::stateless_proxy::decide]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 178:0-227:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 237:0-286:1
     Visibility: public -/
 def stateless_proxy.decide
   {V : Type _} {P : Type _} (statelessSurrogateOpenerInst :
@@ -6690,7 +6754,7 @@ def stateless_proxy.decide
           match r1 with
           | core.result.Result.Ok opened =>
             let route ← Slice.index_usize routes index
-            let s3 := alloc.vec.Vec.deref route.host
+            let s3 := alloc.vec.Vec.deref route.destination.host
             let s4 := alloc.vec.Vec.deref route.rules
             let s5 := alloc.vec.Vec.deref opened.credential
             let (r2, wire) ←
@@ -6710,8 +6774,76 @@ def stateless_proxy.decide
     | core.result.Result.Err rejection =>
       ok (stateless_proxy.Decision.Unauthorized (some rejection))
 
+/-- [garrett_stateless_core::stateless_proxy::answer_limit]:
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 289:0-291:1
+    Visibility: public -/
+def stateless_proxy.answer_limit (limit : Std.Usize) : Result Std.Usize := do
+  let i ← proxy_http.MAX_HEAD
+  let i1 ← limit + i
+  i1 + 64#usize
+
+/-- [garrett_stateless_core::stateless_proxy::collect]: loop 0:
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 296:4-307:5
+    Visibility: public -/
+@[rust_loop]
+def stateless_proxy.collect_loop
+  {O : Type _} (OriginInst : stateless_proxy.Origin O) (origin : O)
+  (bound : Std.Usize) (answer : alloc.vec.Vec Std.U8) :
+  Result ((core.result.Result (alloc.vec.Vec Std.U8) proxy_http.refusal.Code)
+    × O)
+  := do
+  let (r, origin1) ← OriginInst.receive origin
+  match r with
+  | stateless_proxy.Received.Bytes bytes =>
+    let s := alloc.vec.Vec.deref bytes
+    let answer1 ← alloc.vec.Vec.extend_from_slice core.clone.CloneU8 answer s
+    let i := alloc.vec.Vec.len answer1
+    if i > bound
+    then ok (core.result.Result.Err proxy_http.refusal.Code.TooLarge, origin1)
+    else stateless_proxy.collect_loop OriginInst origin1 bound answer1
+  | stateless_proxy.Received.End => ok (core.result.Result.Ok answer, origin1)
+  | stateless_proxy.Received.Failed =>
+    ok (core.result.Result.Err proxy_http.refusal.Code.OutcomeUnknown, origin1)
+partial_fixpoint
+
+/-- [garrett_stateless_core::stateless_proxy::collect]:
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 294:0-308:1
+    Visibility: public -/
+@[reducible]
+def stateless_proxy.collect
+  {O : Type _} (OriginInst : stateless_proxy.Origin O) (origin : O)
+  (bound : Std.Usize) :
+  Result ((core.result.Result (alloc.vec.Vec Std.U8) proxy_http.refusal.Code)
+    × O)
+  := do
+  stateless_proxy.collect_loop OriginInst origin bound (alloc.vec.Vec.new
+    Std.U8)
+
+/-- [garrett_stateless_core::stateless_proxy::exchange]:
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 313:0-321:1
+    Visibility: public -/
+def stateless_proxy.exchange
+  {O : Type _} (OriginInst : stateless_proxy.Origin O) (origin : O)
+  (egress : stateless_proxy.Egress) (limit : Std.Usize) :
+  Result ((core.result.Result (alloc.vec.Vec Std.U8) proxy_http.refusal.Code)
+    × O)
+  := do
+  let d ← stateless_proxy.egress_destination egress
+  let (b, origin1) ← OriginInst.connect origin d
+  if b
+  then
+    let (b1, origin2) ← OriginInst.transmit origin1 egress
+    if b1
+    then
+      let i ← stateless_proxy.answer_limit limit
+      stateless_proxy.collect OriginInst origin2 i
+    else
+      ok (core.result.Result.Err proxy_http.refusal.Code.OutcomeUnknown,
+        origin2)
+  else ok (core.result.Result.Err proxy_http.refusal.Code.Unreachable, origin1)
+
 /-- [garrett_stateless_core::stateless_proxy::serve]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 233:0-277:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 327:0-375:1
     Visibility: public -/
 def stateless_proxy.serve
   {V : Type _} {P : Type _} {O : Type _} (statelessSurrogateOpenerInst :
@@ -6744,10 +6876,12 @@ def stateless_proxy.serve
     then
       let s := alloc.vec.Vec.deref dispatch.opened.credential
       let forms ← proxy_http.response.reflection_forms s
-      let (r, origin2) ←
-        OriginInst.exchange origin1
-          { route := dispatch.route, wire := dispatch.wire }
-      match r with
+      let r ← Slice.index_usize routes dispatch.route
+      let d1 ← stateless_proxy.copy_destination r.destination
+      let (r1, origin2) ←
+        stateless_proxy.exchange OriginInst origin1
+          { destination := d1, wire := dispatch.wire } limit
+      match r1 with
       | core.result.Result.Ok raw =>
         let s1 := alloc.vec.Vec.deref raw
         let s2 := alloc.vec.Vec.deref forms
@@ -6774,7 +6908,7 @@ def stateless_proxy.serve
       ok (s, origin1)
 
 /-- [garrett_stateless_core::stateless_proxy::connection_step]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 285:0-357:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 383:0-455:1
     Visibility: public -/
 def stateless_proxy.connection_step
   {V : Type _} {P : Type _} {C : Type _} (statelessSurrogateOpenerInst :
@@ -6881,7 +7015,7 @@ def stateless_proxy.connection_step
       else ok ({ buffer := rest, «open» := false }, channel5)
 
 /-- [garrett_stateless_core::stateless_proxy::connection]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 376:4-388:5
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 474:4-486:5
     Visibility: public -/
 @[rust_loop]
 def stateless_proxy.connection_loop
@@ -6907,7 +7041,7 @@ def stateless_proxy.connection_loop
 partial_fixpoint
 
 /-- [garrett_stateless_core::stateless_proxy::connection]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 362:0-389:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 460:0-487:1
     Visibility: public -/
 @[reducible]
 def stateless_proxy.connection

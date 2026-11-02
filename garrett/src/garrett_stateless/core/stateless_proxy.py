@@ -25,11 +25,37 @@ from .stateless_policy import OperationPolicy, operation_of
 
 
 @dataclass(frozen=True)
-class Route:
-    provider: str
+class Destination:
+    """Where a route's requests go, and who must answer there: the server
+    name (the upstream ``Host`` and the name its TLS certificate must carry),
+    the transport address and port, and the PEM trust anchors (empty for the
+    default roots)."""
     host: str
+    address: str
+    port: int = 443
+    trust: bytes = b''
+
+
+@dataclass(frozen=True)
+class Route:
+    """One configured provider route; the destination is part of it."""
+    provider: str
+    destination: Destination
     authentication: str  # 'bearer' or 'api-key'
     deny: tuple[tuple[str, str], ...] = ()  # (method or '', path)
+
+
+def routes_valid(routes: tuple[Route, ...]) -> bool:
+    """No two routes serve the same provider (``stateless_proxy::routes_valid``)."""
+    return all(route_of(routes, route.provider) == index for index, route in enumerate(routes))
+
+
+@dataclass(frozen=True)
+class Egress:
+    """One credential-bearing upstream request: the destination of the
+    route and the exact bytes. Only :func:`serve` makes one."""
+    destination: Destination
+    wire: bytes
 
 
 @dataclass(frozen=True)
@@ -44,7 +70,9 @@ class Served:
 class Origin(Protocol):
     def rejected(self, code: str) -> None: ...
     def admitted(self, claims: SurrogateClaims, route: int) -> bool: ...
-    def exchange(self, route: int, wire: bytes) -> bytes: ...  # raises Refused(code)
+    def connect(self, destination: Destination) -> bool: ...  # TLS authenticated as destination.host
+    def transmit(self, egress: Egress) -> bool: ...  # the one write, on that connection
+    def receive(self) -> bytes | None: ...  # b'' at the end of the answer; None on failure
     def completed(self, status: int) -> bool: ...
 
 
@@ -112,7 +140,35 @@ def encode_upstream(request: Request, route: Route, credential: bytes) -> bytes:
     """``proxy_http.encode_upstream`` for this route."""
     rules = tuple(proxy_http.DenyRule(m.encode('ascii'), p.encode('ascii')) for m, p in route.deny)
     scheme = 'bearer' if route.authentication == 'bearer' else 'x-api-key'
-    return proxy_http.encode_upstream(request, route.host.encode('ascii'), rules, credential, scheme)
+    return proxy_http.encode_upstream(request, route.destination.host.encode('ascii'), rules, credential, scheme)
+
+
+def answer_limit(limit: int) -> int:
+    return limit + proxy_http.MAX_HEAD + 64
+
+
+def collect(origin: Origin, bound: int) -> bytes:
+    """The provider's answer until it closes, within ``bound`` bytes."""
+    answer = b''
+    while True:
+        chunk = origin.receive()
+        if chunk is None:
+            raise Refused('outcome_unknown')
+        if not chunk:
+            return answer
+        answer += chunk
+        if len(answer) > bound:
+            raise Refused('too_large')
+
+
+def exchange(origin: Origin, egress: Egress, limit: int) -> bytes:
+    """Connect to the egress's destination and, only if the server
+    authenticated as it, send its bytes once and collect the answer."""
+    if not origin.connect(egress.destination):
+        raise Refused('unreachable')
+    if not origin.transmit(egress):
+        raise Refused('outcome_unknown')
+    return collect(origin, answer_limit(limit))
 
 
 def release(raw: bytes, request: Request, forms: list, limit: int) -> Served:
@@ -188,7 +244,7 @@ def serve(opener: SurrogateOpener, policy: OperationPolicy, origin: Origin, requ
         return stopped('internal_error', 'refused')
     forms = proxy_http.reflection_forms(opened.credential)
     try:
-        raw = origin.exchange(index, decision.wire)
+        raw = exchange(origin, Egress(routes[index].destination, decision.wire), limit)
     except Refused as refused:
         return stopped(refused.code, 'failed')
     served = release(raw, request, forms, limit)

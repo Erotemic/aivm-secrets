@@ -34,8 +34,15 @@ class Proxy:
         self.config = config
         self.keys = keys
         self.clock = clock or (lambda: int(time.time()))
-        self.routes = tuple(stateless_proxy.Route(r.provider, r.host, r.authentication, r.deny) for r in config.routes)
-        self.upstream = tuple((r.address, r.port, r.host, tls.upstream_client(r.ca_file)) for r in config.routes)
+        self.routes = tuple(
+            stateless_proxy.Route(r.provider, stateless_proxy.Destination(
+                r.host, r.address, r.port, b'' if r.ca_file is None else Path(r.ca_file).read_bytes()),
+                r.authentication, r.deny)
+            for r in config.routes)
+        if not stateless_proxy.routes_valid(self.routes):
+            raise ValueError('proxy: two routes for one provider')
+        for route in self.routes:
+            tls.upstream_client_pem(route.destination.trust)  # refuse unusable trust anchors now
         self.policy: stateless_policy.OperationPolicy = stateless_policy.Unrestricted() if config.read_only is None else stateless_policy.ReadOnly(
             tuple(stateless_policy.Resource(r.provider, r.method, r.path) for r in config.read_only))
         self.acceptance = stateless.Acceptance(config.audiences, tuple(r.provider for r in config.routes),
@@ -66,38 +73,6 @@ class Proxy:
     def serve_request(self, request: proxy_http.Request, peer: tls.PeerIdentity) -> stateless_proxy.Served:
         return stateless_proxy.serve(KeySet(self.keys.entries), self.policy, _Native(self, peer, request.method), request,
                        self.routes, self.acceptance, peer.thumbprint, self.clock(), self.config.request_limit)
-
-    def exchange(self, route: int, wire: bytes) -> bytes:
-        address, port, host, context = self.upstream[route]
-        started = time.monotonic()
-        try:
-            raw = socket.create_connection((address, port), timeout=IO_TIMEOUT)
-        except OSError:
-            raise proxy_http.Refused('unreachable') from None
-        try:
-            with raw, context.wrap_socket(raw, server_hostname=host) as upstream:
-                try:
-                    upstream.sendall(wire)
-                except OSError:
-                    raise proxy_http.Refused('outcome_unknown') from None
-                data = b''
-                while True:
-                    if time.monotonic() - started > UPSTREAM_DEADLINE:
-                        raise proxy_http.Refused('outcome_unknown')
-                    try:
-                        chunk = upstream.recv(65536)
-                    except ssl.SSLEOFError:
-                        break
-                    except OSError:
-                        raise proxy_http.Refused('outcome_unknown') from None
-                    if not chunk:
-                        break
-                    data += chunk
-                    if len(data) > self.config.request_limit + proxy_http.MAX_HEAD + 64:
-                        raise proxy_http.Refused('too_large')
-                return data
-        except ssl.SSLError:
-            raise proxy_http.Refused('unreachable') from None
 
     def serve(self) -> 'RunningProxy':
         context = tls.mtls_server(self.config.certificate, self.config.private_key, self.config.client_ca)
@@ -168,10 +143,33 @@ class Proxy:
         sock.sendall(proxy_http.refusal(code))
 
 
+class _Upstream:
+    """A TLS connection to a provider whose server authenticated as the
+    destination's host under its trust anchors."""
+
+    def __init__(self, destination: stateless_proxy.Destination):
+        context = tls.upstream_client_pem(destination.trust)
+        raw = socket.create_connection((destination.address, destination.port), timeout=IO_TIMEOUT)
+        try:
+            self.sock = context.wrap_socket(raw, server_hostname=destination.host)
+        except BaseException:
+            raw.close()
+            raise
+        self.destination = destination
+        self.started = time.monotonic()
+
+    def close(self) -> None:
+        try:
+            self.sock.close()
+        except OSError:
+            pass
+
+
 class _Native:
     def __init__(self, proxy: Proxy, peer: tls.PeerIdentity, method: bytes):
         self.proxy, self.peer, self.method = proxy, peer, method.decode('ascii', 'replace')
         self.claims: stateless.SurrogateClaims | None = None
+        self.upstream: _Upstream | None = None
 
     def rejected(self, code: str) -> None:
         self.proxy.record({'event': 'rejected', 'peer': self.peer.thumbprint, 'reason': code})
@@ -181,8 +179,43 @@ class _Native:
         return self.proxy.record({'event': 'admitted', 'jti': claims.token_id, 'method': self.method,
                                   'provider': claims.provider, 'route': route, 'sub': claims.subject})
 
-    def exchange(self, route: int, wire: bytes) -> bytes:
-        return self.proxy.exchange(route, wire)
+    def connect(self, destination: stateless_proxy.Destination) -> bool:
+        try:
+            self.upstream = _Upstream(destination)
+        except (OSError, ssl.SSLError, ValueError):
+            self.upstream = None
+        return self.upstream is not None
+
+    def transmit(self, egress: stateless_proxy.Egress) -> bool:
+        """The one provider write, on the connection ``connect`` opened. No retry."""
+        if self.upstream is None or self.upstream.destination != egress.destination:
+            return False
+        try:
+            self.upstream.sock.sendall(egress.wire)
+            return True
+        except OSError:
+            return False
+
+    def receive(self) -> bytes | None:
+        upstream = self.upstream
+        if upstream is None or time.monotonic() - upstream.started > UPSTREAM_DEADLINE:
+            self._close()
+            return None
+        try:
+            chunk = upstream.sock.recv(65536)
+        except ssl.SSLEOFError:
+            chunk = b''
+        except OSError:
+            self._close()
+            return None
+        if not chunk:
+            self._close()
+        return chunk
+
+    def _close(self) -> None:
+        if self.upstream is not None:
+            self.upstream.close()
+            self.upstream = None
 
     def completed(self, status: int) -> bool:
         claims = self.claims

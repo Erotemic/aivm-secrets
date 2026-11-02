@@ -33,9 +33,32 @@ def test_current_shell_passes():
 
 @pytest.mark.parametrize('relative, old, new, message', [
     ('crates/garrett-stateless/src/proxy.rs',
-     '        self.proxy.send_upstream(egress)\n',
-     '        let _ = self.proxy.send_upstream(egress_again());\n        self.proxy.send_upstream(egress)\n',
-     'send_upstream'),
+     '        let written = upstream.tls.write_all(egress_wire(&egress));\n',
+     '        let _ = upstream.tls.write_all(egress_wire(&egress));\n'
+     '        let written = upstream.tls.write_all(b"again");\n',
+     'more than once'),
+    # The write goes on whatever connection connect opened, so connect must
+    # open it to the destination the core passed, and transmit must check it.
+    ('crates/garrett-stateless/src/proxy.rs',
+     '        self.upstream = open_upstream(destination).ok();\n',
+     '        self.upstream = open_upstream(&self.proxy.routes[0].destination).ok();\n',
+     'does not connect to the destination'),
+    ('crates/garrett-stateless/src/proxy.rs',
+     '        if &upstream.destination != egress_destination(&egress) {\n            return false;\n        }\n',
+     '',
+     'does not check the connection'),
+    ('crates/garrett-stateless/src/proxy.rs',
+     '    let config = upstream_tls(&destination.trust).map_err(|_| ())?;\n',
+     '    let config = upstream_tls(&[]).map_err(|_| ())?;\n',
+     'trust anchors'),
+    ('crates/garrett-stateless/src/proxy.rs',
+     '    let name = ServerName::try_from(host.to_string()).map_err(|_| ())?;\n',
+     '    let name = ServerName::try_from("provider.example".to_string()).map_err(|_| ())?;\n',
+     'TLS name'),
+    ('crates/garrett-stateless/src/proxy.rs',
+     '    read_only: Option<ReadOnly>,\n',
+     '    read_only: Option<ReadOnly>,\n    upstream: Vec<Destination>,\n',
+     'destination table'),
     ('crates/garrett-stateless/src/proxy.rs',
      '                read_only,\n                &mut session,\n                &self.routes,\n'
      '                &self.acceptance,\n                self.config.authority.as_bytes(),\n'
@@ -60,8 +83,8 @@ def test_current_shell_passes():
      'pub struct Dispatch {\n    pub route: usize,',
      'Dispatch fields'),
     ('crates/garrett-stateless-core/src/stateless_proxy.rs',
-     'pub struct Egress {\n    route: usize,',
-     'pub struct Egress {\n    pub route: usize,',
+     'pub struct Egress {\n    destination: Destination,',
+     'pub struct Egress {\n    pub destination: Destination,',
      'Egress fields'),
     ('crates/garrett-stateless/src/broker.rs',
      'fn poll(&self, peer: &PeerIdentity, login: &str) -> Poll {',
@@ -73,9 +96,9 @@ def test_current_shell_passes():
      'audit record'),
     # The shell may not decide a request itself.
     ('crates/garrett-stateless/src/proxy.rs',
-     '        self.proxy.send_upstream(egress)\n',
+     '        let written = upstream.tls.write_all(egress_wire(&egress));\n',
      '        let _ = stateless_proxy::decide(&self.proxy.keys, todo!(), &[], todo!(), b"", 0);\n'
-     '        self.proxy.send_upstream(egress)\n',
+     '        let written = upstream.tls.write_all(egress_wire(&egress));\n',
      'stateless_proxy::decide'),
     # No hidden mutable state, in a struct field or an atomic.
     ('crates/garrett-stateless/src/proxy.rs',

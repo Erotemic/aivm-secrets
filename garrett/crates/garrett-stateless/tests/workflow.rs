@@ -664,3 +664,114 @@ fn strict_provisioned_workflow() {
     }
     read_only.stop();
 }
+
+/// A TLS server that records every application byte it decrypts: what a
+/// route's address would receive if the proxy trusted it.
+fn recording_server(certificate: &str, key: &str) -> (String, Arc<Mutex<Vec<u8>>>) {
+    let config = tls::server(certificate.as_bytes(), key.as_bytes()).unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    let received = Arc::new(Mutex::new(Vec::new()));
+    let log = received.clone();
+    std::thread::spawn(move || {
+        for tcp in listener.incoming().flatten() {
+            let _ = tcp.set_read_timeout(Some(Duration::from_secs(5)));
+            let mut stream = StreamOwned::new(ServerConnection::new(config.clone()).unwrap(), tcp);
+            let mut chunk = [0u8; 4096];
+            while let Ok(n) = std::io::Read::read(&mut stream, &mut chunk) {
+                if n == 0 {
+                    break;
+                }
+                log.lock().unwrap().extend_from_slice(&chunk[..n]);
+            }
+        }
+    });
+    (address, received)
+}
+
+/// The credential goes only to a server that authenticates as the route's
+/// host under the route's trust anchors. A route whose address answers with
+/// another name's certificate, or with the right name from a CA the route does
+/// not trust, gets the TLS handshake and nothing else, and the agent gets a
+/// fixed refusal.
+#[test]
+fn an_impostor_destination_never_receives_the_credential() {
+    let dir = Dir::new();
+    let ca = pki::create_ca("test CA", 2).unwrap();
+    let rogue_ca = pki::create_ca("rogue CA", 2).unwrap();
+    let proxy_names = vec!["proxy.test".to_owned()];
+    let server = pki::issue(&ca.certificate, &ca.key, Leaf::Server(&proxy_names), 2).unwrap();
+    let evil_names = vec!["evil.test".to_owned()];
+    let wrong_name = pki::issue(&ca.certificate, &ca.key, Leaf::Server(&evil_names), 2).unwrap();
+    let api_names = vec!["api.test".to_owned()];
+    let wrong_ca = pki::issue(
+        &rogue_ca.certificate,
+        &rogue_ca.key,
+        Leaf::Server(&api_names),
+        2,
+    )
+    .unwrap();
+    let agent_c = pki::issue(
+        &ca.certificate,
+        &ca.key,
+        Leaf::Client {
+            name: "agent",
+            uri: None,
+        },
+        2,
+    )
+    .unwrap();
+    dir.write("ca.pem", ca.certificate.as_bytes(), false);
+    dir.write("server.pem", server.certificate.as_bytes(), false);
+    dir.write("server.key", server.key.as_bytes(), true);
+    let keys = BrokerKeys::generate("https://broker.test", "k1").unwrap();
+    dir.write("proxy-keys.json", &keys.export_proxy().to_json(), true);
+    let der = tls::certificates(agent_c.certificate.as_bytes())
+        .unwrap()
+        .remove(0);
+    let policy = garrett_stateless::IssuePolicy {
+        issuer: b"https://broker.test".to_vec(),
+        audience: b"https://proxy.test".to_vec(),
+        providers: vec![b"api".to_vec()],
+        max_lifetime: 3600,
+        max_renew: 86400,
+    };
+    let issued = garrett_stateless::broker::mint_with(
+        &keys,
+        &policy,
+        "api",
+        CREDENTIAL.as_bytes(),
+        der.as_ref(),
+        &Default::default(),
+        600,
+        garrett_stateless::broker::now_seconds(),
+    )
+    .unwrap();
+    let agent = Agent::new(
+        ca.certificate.as_bytes(),
+        ClientIdentity::Software {
+            certificate: agent_c.certificate.clone().into_bytes(),
+            key: agent_c.key.as_bytes().to_vec(),
+        },
+    )
+    .unwrap();
+    for (name, impostor) in [("wrong-name", &wrong_name), ("wrong-ca", &wrong_ca)] {
+        let (address, received) = recording_server(&impostor.certificate, &impostor.key);
+        let (host, port) = address.rsplit_once(':').unwrap();
+        let path = proxy_config(&dir, &format!("{name}.json"), host, port);
+        let proxy = Arc::new(Proxy::from_file(&path).unwrap()).serve().unwrap();
+        let endpoint =
+            Endpoint::parse("https://proxy.test:8443", Some(&proxy.address.to_string())).unwrap();
+        let response = agent
+            .request(&endpoint, &issued.token, "GET", "/user", &[], b"")
+            .unwrap();
+        assert_eq!(response.status, 502, "{name}");
+        let body = String::from_utf8_lossy(&response.body);
+        assert!(body.contains("unreachable"), "{name}: {body}");
+        assert!(!body.contains(CREDENTIAL));
+        proxy.stop();
+        std::thread::sleep(Duration::from_millis(100));
+        let bytes = received.lock().unwrap().clone();
+        assert!(bytes.is_empty(), "{name}: the impostor decrypted {bytes:?}");
+    }
+}

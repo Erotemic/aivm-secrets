@@ -4,19 +4,22 @@
 //!
 //! The native shell completes the TLS handshake, then calls [`connection`]
 //! with the peer thumbprint of that handshake and supplies only socket reads
-//! and writes, the clock, diagnostics and the upstream exchange
-//! ([`Channel`], [`Origin`]). Everything else is decided here: how the
-//! guest's bytes are framed, which surrogate a request presents, whether it
-//! opens for this connection's peer, which configured route its
+//! and writes, the clock, diagnostics and the three steps of a provider
+//! exchange ([`Channel`], [`Origin`]). Everything else is decided here: how
+//! the guest's bytes are framed, which surrogate a request presents, whether
+//! it opens for this connection's peer, which configured route its
 //! authenticated `prv` selects, whether the static operation policy
-//! (`stateless_policy`) permits the request's operation, the exact upstream bytes
-//! (`proxy_http::encode_upstream`) and the released reply
-//! (`proxy_controller::release`).
+//! (`stateless_policy`) permits the request's operation, the exact upstream
+//! bytes (`proxy_http::encode_upstream`), the destination they go to (the
+//! route's own [`Destination`]), the order of the exchange ([`exchange`]) and
+//! the released reply (`proxy_controller::release`).
 //!
 //! Credential-bearing egress is closed: the upstream bytes reach the native
 //! shell only inside an [`Egress`], which only [`serve`] can build (its fields
-//! are private) and only after an acknowledged admission, and which
-//! [`Origin::exchange`] consumes.
+//! are private) and only after an acknowledged admission. [`exchange`] shows
+//! the shell the egress's destination to connect to, and hands it the egress
+//! itself, which [`Origin::transmit`] consumes, only if that connection was
+//! authenticated.
 
 use crate::credential_use::Authentication;
 use crate::proxy_connect;
@@ -25,35 +28,84 @@ use crate::proxy_controller::{
 };
 use crate::proxy_http::{
     count_named, encode_upstream, first_named, reflection_forms, refusal, Code, DenyRule, Field,
-    Request,
+    Request, MAX_HEAD,
 };
 use crate::stateless::{self, Acceptance, Rejection, SurrogateClaims, SurrogateOpener};
 use crate::stateless_policy::{operation_of, OperationPolicy};
 
-/// One configured provider destination.
+/// Where a route's requests go, and who must answer there.
+#[cfg_attr(feature = "derive", derive(Debug, Clone, PartialEq, Eq))]
+pub struct Destination {
+    /// The provider's server name: the upstream `Host`, and the name the
+    /// server's TLS certificate must carry.
+    pub host: Vec<u8>,
+    /// The transport address to connect to (a name or an IP literal).
+    pub address: Vec<u8>,
+    pub port: u16,
+    /// The PEM trust anchors the server's certificate must chain to; empty
+    /// for the default web roots.
+    pub trust: Vec<u8>,
+}
+
+/// One configured provider route: the provider, its destination, its deny
+/// rules and how the credential is presented. The destination is part of the
+/// route, so whatever selects the route selects where the credential goes.
 pub struct Route {
     pub provider: Vec<u8>,
-    /// The upstream `Host` (also the name its TLS certificate must carry).
-    pub host: Vec<u8>,
+    pub destination: Destination,
     pub rules: Vec<DenyRule>,
     pub authentication: Authentication,
 }
 
-/// One credential-bearing upstream request: the route and the exact bytes.
-/// Only [`serve`] makes one, after an acknowledged admission.
+/// Whether no two routes serve the same provider, so a provider names one
+/// destination. The proxy refuses a configuration that fails this.
+pub fn routes_valid(routes: &[Route]) -> bool {
+    let mut index = 0;
+    while index < routes.len() {
+        if route_of(routes, &routes[index].provider) != index {
+            return false;
+        }
+        index += 1;
+    }
+    true
+}
+
+/// A copy of a destination.
+pub fn copy_destination(destination: &Destination) -> Destination {
+    Destination {
+        host: destination.host.to_vec(),
+        address: destination.address.to_vec(),
+        port: destination.port,
+        trust: destination.trust.to_vec(),
+    }
+}
+
+/// One credential-bearing upstream request: the destination of the route
+/// and the exact bytes. Only [`serve`] makes one, after an acknowledged
+/// admission.
 pub struct Egress {
-    route: usize,
+    destination: Destination,
     wire: Vec<u8>,
 }
 
-/// The route an egress is for.
-pub fn egress_route(egress: &Egress) -> usize {
-    egress.route
+/// Where an egress goes.
+pub fn egress_destination(egress: &Egress) -> &Destination {
+    &egress.destination
 }
 
 /// The exact bytes an egress sends.
 pub fn egress_wire(egress: &Egress) -> &[u8] {
     &egress.wire
+}
+
+/// One read of the provider's answer.
+pub enum Received {
+    /// More bytes of the answer.
+    Bytes(Vec<u8>),
+    /// The provider closed the connection: the answer is complete.
+    End,
+    /// The read failed or the deadline passed.
+    Failed,
 }
 
 /// What the native shell provides for one request.
@@ -62,10 +114,17 @@ pub trait Origin {
     fn rejected(&mut self, rejection: &Rejection);
     /// Record an admitted request before anything is sent; false refuses.
     fn admitted(&mut self, claims: &SurrogateClaims, route: usize) -> bool;
-    /// Send the egress bytes, once, to the pinned destination of its route
-    /// and return everything it answered before closing, or the refusal
-    /// that applies.
-    fn exchange(&mut self, egress: Egress) -> Result<Vec<u8>, Code>;
+    /// Open a connection to `destination`'s address and port and complete a
+    /// TLS handshake in which the server proves the name `host` under the
+    /// trust anchors `trust`. False if any of that failed, and then nothing
+    /// was sent.
+    fn connect(&mut self, destination: &Destination) -> bool;
+    /// Write the egress's bytes, once, on the connection `connect` just
+    /// opened. False if the write failed: the provider may or may not have
+    /// acted.
+    fn transmit(&mut self, egress: Egress) -> bool;
+    /// The next read of the provider's answer on that connection.
+    fn receive(&mut self) -> Received;
     /// Record a completed request before its reply is released; false
     /// withholds the reply.
     fn completed(&mut self, status: u16) -> bool;
@@ -212,7 +271,7 @@ pub fn decide<V: SurrogateOpener, P: OperationPolicy>(
     match encode_upstream(
         &mut wire,
         request,
-        &route.host,
+        &route.destination.host,
         &route.rules,
         &opened.credential,
         &route.authentication,
@@ -226,9 +285,44 @@ pub fn decide<V: SurrogateOpener, P: OperationPolicy>(
     }
 }
 
+/// The most answer bytes [`exchange`] collects for a request limit.
+pub fn answer_limit(limit: usize) -> usize {
+    limit + MAX_HEAD + 64
+}
+
+/// Collect the provider's answer until it closes, within `bound` bytes.
+pub fn collect<O: Origin>(origin: &mut O, bound: usize) -> Result<Vec<u8>, Code> {
+    let mut answer = Vec::new();
+    loop {
+        match origin.receive() {
+            Received::End => return Ok(answer),
+            Received::Failed => return Err(Code::OutcomeUnknown),
+            Received::Bytes(bytes) => {
+                answer.extend_from_slice(&bytes);
+                if answer.len() > bound {
+                    return Err(Code::TooLarge);
+                }
+            }
+        }
+    }
+}
+
+/// The provider exchange of one egress: connect to its destination, and only
+/// if the server authenticated as that destination, send its bytes once and
+/// collect the answer. No retry.
+pub fn exchange<O: Origin>(origin: &mut O, egress: Egress, limit: usize) -> Result<Vec<u8>, Code> {
+    if !origin.connect(egress_destination(&egress)) {
+        return Err(Code::Unreachable);
+    }
+    if !origin.transmit(egress) {
+        return Err(Code::OutcomeUnknown);
+    }
+    collect(origin, answer_limit(limit))
+}
+
 /// One request on an authenticated connection, end to end: [`decide`], then,
-/// only for a dispatch, the admission record, the one exchange and the
-/// release.
+/// only for a dispatch, the admission record, the one exchange with the
+/// route's destination and the release.
 #[allow(clippy::too_many_arguments)]
 pub fn serve<V: SurrogateOpener, P: OperationPolicy, O: Origin>(
     opener: &V,
@@ -258,7 +352,11 @@ pub fn serve<V: SurrogateOpener, P: OperationPolicy, O: Origin>(
         return stopped(Code::InternalError, Stage::Refused);
     }
     let forms = reflection_forms(&opened.credential);
-    match origin.exchange(Egress { route: index, wire }) {
+    let egress = Egress {
+        destination: copy_destination(&routes[index].destination),
+        wire,
+    };
+    match exchange(origin, egress, limit) {
         Ok(raw) => {
             let served = release(&raw, request, &forms, limit);
             match served.stage {
@@ -426,26 +524,90 @@ mod tests {
         }
     }
 
-    #[derive(Default)]
+    /// A simulated provider connection: what happened, in order.
+    #[derive(Debug, PartialEq)]
+    enum Effect {
+        Connected(Vec<u8>),
+        Sent(Vec<u8>, Vec<u8>),
+    }
+
     struct Recorder {
-        sent: Vec<(usize, Vec<u8>)>,
+        effects: Vec<Effect>,
+        sent: Vec<(Vec<u8>, Vec<u8>)>,
         rejected: usize,
-        answer: Vec<u8>,
+        admit: bool,
+        authenticated: bool,
+        written: bool,
+        reads: Vec<Received>,
+        connected: Option<Vec<u8>>,
+    }
+    impl Default for Recorder {
+        fn default() -> Self {
+            Recorder {
+                effects: Vec::new(),
+                sent: Vec::new(),
+                rejected: 0,
+                admit: true,
+                authenticated: true,
+                written: true,
+                reads: Vec::new(),
+                connected: None,
+            }
+        }
+    }
+    impl Recorder {
+        fn answering(answer: &[u8]) -> Self {
+            Recorder {
+                reads: vec![Received::Bytes(answer.to_vec()), Received::End],
+                ..Default::default()
+            }
+        }
     }
     impl Origin for Recorder {
         fn rejected(&mut self, _rejection: &Rejection) {
             self.rejected += 1;
         }
         fn admitted(&mut self, _claims: &SurrogateClaims, _route: usize) -> bool {
-            true
+            self.admit
         }
-        fn exchange(&mut self, egress: Egress) -> Result<Vec<u8>, Code> {
-            self.sent
-                .push((egress_route(&egress), egress_wire(&egress).to_vec()));
-            Ok(self.answer.clone())
+        fn connect(&mut self, destination: &Destination) -> bool {
+            self.effects
+                .push(Effect::Connected(destination.address.clone()));
+            if self.authenticated {
+                self.connected = Some(destination.host.clone());
+            }
+            self.authenticated
+        }
+        fn transmit(&mut self, egress: Egress) -> bool {
+            let host = egress_destination(&egress).host.clone();
+            assert_eq!(
+                self.connected.as_ref(),
+                Some(&host),
+                "sent before connecting"
+            );
+            self.effects
+                .push(Effect::Sent(host.clone(), egress_wire(&egress).to_vec()));
+            self.sent.push((host, egress_wire(&egress).to_vec()));
+            self.written
+        }
+        fn receive(&mut self) -> Received {
+            if self.reads.is_empty() {
+                Received::End
+            } else {
+                self.reads.remove(0)
+            }
         }
         fn completed(&mut self, _status: u16) -> bool {
             true
+        }
+    }
+
+    fn destination(host: &[u8], address: &[u8]) -> Destination {
+        Destination {
+            host: host.to_vec(),
+            address: address.to_vec(),
+            port: 443,
+            trust: Vec::new(),
         }
     }
 
@@ -453,13 +615,13 @@ mod tests {
         vec![
             Route {
                 provider: b"other".to_vec(),
-                host: b"other.test".to_vec(),
+                destination: destination(b"other.test", b"10.0.0.1"),
                 rules: Vec::new(),
                 authentication: Authentication::ApiKey,
             },
             Route {
                 provider: b"api".to_vec(),
-                host: b"api.test".to_vec(),
+                destination: destination(b"api.test", b"10.0.0.2"),
                 rules: Vec::new(),
                 authentication: Authentication::Bearer,
             },
@@ -485,13 +647,18 @@ mod tests {
         peer: &[u8],
         answer: &[u8],
     ) -> (Served, Recorder) {
+        run_origin(policy, raw, peer, Recorder::answering(answer))
+    }
+
+    fn run_origin<P: OperationPolicy>(
+        policy: &P,
+        raw: &[u8],
+        peer: &[u8],
+        mut origin: Recorder,
+    ) -> (Served, Recorder) {
         let request = match parse_request(raw, AUTHORITY, 4096) {
             Ok(Some(parsed)) => parsed.request,
             _ => panic!("parse"),
-        };
-        let mut origin = Recorder {
-            answer: answer.to_vec(),
-            ..Default::default()
         };
         let served = serve(
             &Keys,
@@ -515,12 +682,132 @@ mod tests {
         let (served, origin) = run(raw, b"PEER", OK);
         assert!(matches!(served.stage, Stage::Completed));
         assert_eq!(origin.sent.len(), 1);
-        let (route, wire) = &origin.sent[0];
-        assert_eq!(*route, 1);
+        let (host, wire) = &origin.sent[0];
+        assert_eq!(host, b"api.test");
         let text = String::from_utf8(wire.clone()).unwrap();
         assert!(text.starts_with("GET /user?x=1 HTTP/1.1\r\nHost: api.test\r\n"));
         assert!(text.contains("Authorization: Bearer REAL-SECRET\r\n"));
         assert!(!text.contains("GOOD"));
+        // The connection went to the authenticated provider's destination,
+        // before the one write, and nowhere else.
+        assert_eq!(
+            origin.effects,
+            vec![
+                Effect::Connected(b"10.0.0.2".to_vec()),
+                Effect::Sent(b"api.test".to_vec(), wire.clone()),
+            ]
+        );
+    }
+
+    /// A destination belongs to its route: reordering the configuration
+    /// moves the destination with the provider, never to another provider.
+    #[test]
+    fn the_destination_moves_with_its_route() {
+        let raw = b"GET / HTTP/1.1\r\nHost: proxy.test:8443\r\nAuthorization: Bearer GOOD\r\n\r\n";
+        let mut reordered = routes();
+        reordered.reverse();
+        let request = match parse_request(raw, AUTHORITY, 4096) {
+            Ok(Some(parsed)) => parsed.request,
+            _ => panic!("parse"),
+        };
+        let mut origin = Recorder::answering(OK);
+        serve(
+            &Keys,
+            &Unrestricted,
+            &mut origin,
+            &request,
+            &reordered,
+            &acceptance(),
+            b"PEER",
+            150,
+            4096,
+        );
+        assert_eq!(origin.effects[0], Effect::Connected(b"10.0.0.2".to_vec()));
+        assert_eq!(origin.sent[0].0, b"api.test");
+    }
+
+    #[test]
+    fn duplicate_providers_are_not_a_valid_catalogue() {
+        assert!(routes_valid(&routes()));
+        assert!(routes_valid(&[]));
+        let mut twice = routes();
+        twice.push(Route {
+            provider: b"api".to_vec(),
+            destination: destination(b"evil.test", b"10.6.6.6"),
+            rules: Vec::new(),
+            authentication: Authentication::Bearer,
+        });
+        assert!(!routes_valid(&twice));
+    }
+
+    /// A server that fails to authenticate as the destination is never sent
+    /// the credential; a failed write is never retried.
+    #[test]
+    fn the_credential_is_written_only_after_authentication_and_once() {
+        let raw = b"GET / HTTP/1.1\r\nHost: proxy.test:8443\r\nAuthorization: Bearer GOOD\r\n\r\n";
+        let impostor = Recorder {
+            authenticated: false,
+            ..Recorder::answering(OK)
+        };
+        let (served, origin) = run_origin(&Unrestricted, raw, b"PEER", impostor);
+        assert!(matches!(served.stage, Stage::Failed));
+        assert!(matches!(served.code, Code::Unreachable));
+        assert!(origin.sent.is_empty());
+        assert!(!String::from_utf8_lossy(&served.reply).contains("REAL-SECRET"));
+
+        let broken = Recorder {
+            written: false,
+            ..Recorder::answering(OK)
+        };
+        let (served, origin) = run_origin(&Unrestricted, raw, b"PEER", broken);
+        assert!(matches!(served.code, Code::OutcomeUnknown));
+        assert_eq!(origin.sent.len(), 1, "no retry after a failed write");
+    }
+
+    /// An unacknowledged admission record stops the request before it
+    /// connects anywhere.
+    #[test]
+    fn unadmitted_requests_never_connect() {
+        let raw = b"GET / HTTP/1.1\r\nHost: proxy.test:8443\r\nAuthorization: Bearer GOOD\r\n\r\n";
+        let refusing = Recorder {
+            admit: false,
+            ..Recorder::answering(OK)
+        };
+        let (served, origin) = run_origin(&Unrestricted, raw, b"PEER", refusing);
+        assert!(matches!(served.stage, Stage::Refused));
+        assert!(origin.effects.is_empty());
+    }
+
+    /// The answer is collected across reads, within the bound, and a failed
+    /// read is an unknown outcome.
+    #[test]
+    fn the_answer_is_bounded_and_failures_are_unknown() {
+        let raw = b"GET / HTTP/1.1\r\nHost: proxy.test:8443\r\nAuthorization: Bearer GOOD\r\n\r\n";
+        let split = Recorder {
+            reads: vec![
+                Received::Bytes(OK[..10].to_vec()),
+                Received::Bytes(OK[10..].to_vec()),
+                Received::End,
+            ],
+            ..Default::default()
+        };
+        let (served, _) = run_origin(&Unrestricted, raw, b"PEER", split);
+        assert!(matches!(served.stage, Stage::Completed));
+        let failing = Recorder {
+            reads: vec![Received::Bytes(OK[..10].to_vec()), Received::Failed],
+            ..Default::default()
+        };
+        let (served, _) = run_origin(&Unrestricted, raw, b"PEER", failing);
+        assert!(matches!(served.code, Code::OutcomeUnknown));
+        let flood = Recorder {
+            reads: vec![
+                Received::Bytes(vec![b'x'; answer_limit(4096)]),
+                Received::Bytes(vec![b'x']),
+            ],
+            ..Default::default()
+        };
+        let (served, _) = run_origin(&Unrestricted, raw, b"PEER", flood);
+        assert!(matches!(served.code, Code::TooLarge));
     }
 
     #[test]
@@ -570,8 +857,14 @@ mod tests {
         fn admitted(&mut self, claims: &SurrogateClaims, route: usize) -> bool {
             self.origin.admitted(claims, route)
         }
-        fn exchange(&mut self, egress: Egress) -> Result<Vec<u8>, Code> {
-            self.origin.exchange(egress)
+        fn connect(&mut self, destination: &Destination) -> bool {
+            self.origin.connect(destination)
+        }
+        fn transmit(&mut self, egress: Egress) -> bool {
+            self.origin.transmit(egress)
+        }
+        fn receive(&mut self) -> Received {
+            self.origin.receive()
         }
         fn completed(&mut self, status: u16) -> bool {
             self.origin.completed(status)
@@ -612,7 +905,10 @@ mod tests {
             reads: vec![input[..20].to_vec(), input[20..].to_vec()],
             written: Vec::new(),
             origin: Recorder {
-                answer: b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi".to_vec(),
+                reads: vec![
+                    Received::Bytes(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nhi".to_vec()),
+                    Received::End,
+                ],
                 ..Default::default()
             },
             stopped: 0,

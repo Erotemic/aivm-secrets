@@ -9,8 +9,10 @@ extracted by Aeneas (`stateless_proxy.serve`). The `garrett-stateless`
 proxy calls `serve` for every request on an authenticated connection with
 the peer thumbprint of that connection's handshake; the native shell
 supplies only `Origin` (a diagnostics callback, the admission record, the
-socket exchange to a route's pinned destination, and the completion
-record) and the key-set opener.
+three steps of a provider exchange — connect to a destination, write an
+egress, read the answer — and the completion record) and the key-set opener.
+Each route carries its own `Destination`, and the extracted `exchange` hands
+the shell exactly the decided route's destination to connect to.
 
 `Decision` / `decide_request` compose the extracted pieces `serve` runs
 before any adapter state matters (`surrogate_of`, `stateless.authenticate`,
@@ -26,7 +28,11 @@ Proved:
 
 * `serve_follows_decision`: every run of `serve`, for any origin adapter,
   either refuses exactly as `decide_request` decided (with no exchange), or
-  dispatches the decided route and bytes, after an acknowledged admission;
+  runs one `exchange` of the decided bytes with the decided route's own
+  destination (`egressTo`), after an acknowledged admission;
+* `routes_valid_spec`: a route catalogue the extracted `routes_valid`
+  accepts serves each provider from one route (`ProvidersDistinct`), so a
+  provider names one destination;
 * `decide_dispatch_trace`, `dispatch_trace`: a dispatch decision means the
   request presented exactly one surrogate, it authenticated and then
   decrypted — together, it opened (`open_ok_trace`) — for this peer, the
@@ -40,7 +46,7 @@ Proved:
 * `serve_dispatch_exact`: the bytes handed to `exchange` are
   `UpstreamPrefix ++ HeaderPrefix ++ credential ++ CRLF ++ UpstreamSuffix`;
 * `serve_rejected_never_sends`: a missing, malformed or refused surrogate gets
-  the fixed `401` and the exchange is never called;
+  the fixed `401` and no exchange is attempted;
 * `serve_guest_reply`: the guest reply is the fixed `401`, a fixed refusal, or
   a `guest_response` release in which the raw credential does not occur;
 * `replicas_decide_alike`: two proxies with the same keys and configuration,
@@ -82,15 +88,27 @@ def decide_request {V P : Type} (ops : stateless.SurrogateOpener V) (pol : state
 
 variable {V O P : Type}
 
-/-- What happens after a dispatch decision, for one origin adapter. -/
-def Dispatched (inst : Origin O) (io : O) (request : proxy_http.request.Request) (limit : Usize)
-    (index : Usize) (wire : alloc.vec.Vec U8) (opened : stateless.Opened)
+theorem copy_destination_eq (d : Destination) : copy_destination d = Result.ok d := by
+  simp only [copy_destination, to_vec_eq, bind_ok, vec_deref_mk]
+
+/-- The egress of a dispatch to route `index`: that route's own destination
+    and the decided bytes. -/
+def egressTo (routes : Slice Route) (index : Usize) (inside : index.val < routes.length)
+    (wire : alloc.vec.Vec U8) : Egress :=
+  { destination := (routes[index.val]'inside).destination, wire := wire }
+
+/-- What happens after a dispatch decision to route `index`, for one origin
+    adapter: the admission record, then, only if it was acknowledged, the one
+    provider exchange (`exchange`) of the decided bytes with **that route's
+    destination**, then the release. -/
+def Dispatched (inst : Origin O) (io : O) (request : proxy_http.request.Request) (routes : Slice Route)
+    (limit : Usize) (index : Usize) (wire : alloc.vec.Vec U8) (opened : stateless.Opened)
     (served : proxy_controller.Served) (after : O) : Prop :=
   (inst.admitted io opened.claims index = Result.ok (false, after) ∧
     proxy_controller.stopped .InternalError .Refused = Result.ok served) ∨
   (∃ io1 forms answer io2, inst.admitted io opened.claims index = Result.ok (true, io1) ∧
     proxy_http.response.reflection_forms (alloc.vec.Vec.deref opened.credential) = Result.ok forms ∧
-    inst.exchange io1 { route := index, wire := wire } = Result.ok (answer, io2) ∧
+    (∃ inside, exchange inst io1 (egressTo routes index inside wire) limit = Result.ok (answer, io2)) ∧
     match answer with
     | .Ok raw => ∃ released, proxy_controller.release (alloc.vec.Vec.deref raw) request
           (alloc.vec.Vec.deref forms) limit = Result.ok released ∧
@@ -105,7 +123,8 @@ def Dispatched (inst : Origin O) (io : O) (request : proxy_http.request.Request)
     `unauthorized`, reported the rejection and returned the fixed `401`; for
     `refused`, returned that fixed refusal without touching the origin; for
     `dispatch`, recorded admission and, only if it was acknowledged,
-    exchanged exactly the decided bytes with the decided route. -/
+    exchanged exactly the decided bytes with the decided route's own
+    destination. -/
 theorem serve_follows_decision (ops : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P) (inst : Origin O)
     (opener : V) (policy : P) (io : O)
     (request : proxy_http.request.Request) (routes : Slice Route) (a : stateless.Acceptance) (peer : Slice U8)
@@ -116,7 +135,7 @@ theorem serve_follows_decision (ops : stateless.SurrogateOpener V) (pol : statel
       | .unauthorized r => unauthorized_served = Result.ok served ∧
           inst.rejected io (r.getD .Malformed) = Result.ok after
       | .refused code => proxy_controller.stopped code .Refused = Result.ok served ∧ after = io
-      | .dispatch index wire opened => Dispatched inst io request limit index wire opened served after := by
+      | .dispatch index wire opened => Dispatched inst io request routes limit index wire opened served after := by
   unfold serve at h
   obtain ⟨c, hc, h⟩ := bind_ok_inv h
   have hd : decide_request ops pol opener policy request routes a peer now = Result.ok (Decision.ofCore c) := by
@@ -148,8 +167,12 @@ theorem serve_follows_decision (ops : stateless.SurrogateOpener V) (pol : statel
       exact Or.inl ⟨hadm, hs6⟩
     | true =>
       obtain ⟨forms, hforms, h⟩ := bind_ok_inv h
+      obtain ⟨route, hroute, h⟩ := bind_ok_inv h
+      obtain ⟨inside, eroute⟩ := slice_index_ok hroute
+      rw [copy_destination_eq] at h
+      simp only [bind_ok] at h
       obtain ⟨⟨answer, io2⟩, hex, h⟩ := bind_ok_inv h
-      refine Or.inr ⟨io1, forms, answer, io2, hadm, hforms, hex, ?_⟩
+      refine Or.inr ⟨io1, forms, answer, io2, hadm, hforms, ⟨inside, by rw [egressTo, ← hex, eroute]; rfl⟩, ?_⟩
       cases answer with
       | Ok raw =>
         obtain ⟨released, rel, h⟩ := bind_ok_inv h
@@ -331,6 +354,120 @@ theorem route_of_loop_contract (routes : Slice Route) (provider : Slice U8) (ind
       intro h
       exact absurd h inside
 
+/-- The first route from `index` on that serves `provider`, or the end. -/
+theorem route_of_loop_first (routes : Slice Route) (provider : Slice U8) (index : Usize)
+    (start : index.val ≤ routes.length) :
+    route_of_loop routes provider index ⦃ out => index.val ≤ out.val ∧ out.val ≤ routes.length ∧
+      (∀ k (hk : k < routes.length), index.val ≤ k → k < out.val → (routes[k]'hk).provider.val ≠ provider.val) ∧
+      ∀ (inside : out.val < routes.length), (routes[out.val]'inside).provider.val = provider.val ⦄ := by
+  suffices ∀ n (index : Usize), index.val ≤ routes.length → routes.length - index.val = n →
+      route_of_loop routes provider index ⦃ out => index.val ≤ out.val ∧ out.val ≤ routes.length ∧
+        (∀ k (hk : k < routes.length), index.val ≤ k → k < out.val → (routes[k]'hk).provider.val ≠ provider.val) ∧
+        ∀ (inside : out.val < routes.length), (routes[out.val]'inside).provider.val = provider.val ⦄
+    from this _ index start rfl
+  intro n
+  induction n using Nat.strong_induction_on with
+  | h n ih =>
+    intro index start measure
+    rw [route_of_loop.eq_def]
+    by_cases inside : index.val < routes.length
+    · have cond : index < Slice.len routes := by scalar_tac
+      simp only [cond, ↓reduceIte]
+      have get : Slice.index_usize routes index = Result.ok (routes[index.val]'inside) := by
+        simp [Slice.index_usize, inside]
+      rw [get]
+      simp only [bind_ok, provides, slice_eq_eq]
+      split
+      · rename_i same
+        apply (WP.spec_ok _).mpr
+        refine ⟨le_refl _, by omega, fun k hk lo hi => by omega, fun _ => ?_⟩
+        simpa [alloc.vec.Vec.deref] using same
+      · rename_i differ
+        obtain ⟨next, hnext, nval⟩ := returned_of_spec (@Usize.add_spec index 1#usize (by scalar_tac))
+        rw [hnext]
+        simp only [bind_ok]
+        refine WP.spec_mono (ih (routes.length - next.val) (by scalar_tac) next (by scalar_tac) rfl) ?_
+        rintro out ⟨lo, hi, before, found⟩
+        refine ⟨by scalar_tac, hi, fun k hk lk kout => ?_, found⟩
+        by_cases ek : k = index.val
+        · subst ek
+          simpa [alloc.vec.Vec.deref] using differ
+        · exact before k hk (by scalar_tac) kout
+    · have cond : ¬ index < Slice.len routes := by scalar_tac
+      simp only [cond, ↓reduceIte]
+      apply (WP.spec_ok _).mpr
+      exact ⟨le_refl _, start, fun k hk lo hi => by omega, fun h => absurd h inside⟩
+
+/-- No two routes serve the same provider. -/
+def ProvidersDistinct (routes : Slice Route) : Prop :=
+  ∀ i j (hi : i < routes.length) (hj : j < routes.length),
+    (routes[i]'hi).provider.val = (routes[j]'hj).provider.val → i = j
+
+theorem route_of_first (routes : Slice Route) (provider : Slice U8) :
+    route_of routes provider ⦃ out => out.val ≤ routes.length ∧
+      (∀ k (hk : k < routes.length), k < out.val → (routes[k]'hk).provider.val ≠ provider.val) ∧
+      ∀ (inside : out.val < routes.length), (routes[out.val]'inside).provider.val = provider.val ⦄ := by
+  refine WP.spec_mono (route_of_loop_first routes provider 0#usize (by simp)) ?_
+  rintro out ⟨_, hi, before, found⟩
+  exact ⟨hi, fun k hk kout => before k hk (by simp) kout, found⟩
+
+theorem routes_valid_loop_spec (routes : Slice Route) (index : Usize) (start : index.val ≤ routes.length)
+    (seen : ∀ i (_hi : i < index.val) (hi' : i < routes.length), ∀ k (hk : k < routes.length), k < i →
+      (routes[k]'hk).provider.val ≠ (routes[i]'hi').provider.val) :
+    routes_valid_loop routes index ⦃ b => b = true → ∀ i (hi : i < routes.length), ∀ k (hk : k < routes.length),
+      k < i → (routes[k]'hk).provider.val ≠ (routes[i]'hi).provider.val ⦄ := by
+  suffices ∀ n (index : Usize), index.val ≤ routes.length → routes.length - index.val = n →
+      (∀ i (hi : i < index.val) (hi' : i < routes.length), ∀ k (hk : k < routes.length), k < i →
+        (routes[k]'hk).provider.val ≠ (routes[i]'hi').provider.val) →
+      routes_valid_loop routes index ⦃ b => b = true → ∀ i (hi : i < routes.length), ∀ k (hk : k < routes.length),
+        k < i → (routes[k]'hk).provider.val ≠ (routes[i]'hi).provider.val ⦄
+    from this _ index start rfl seen
+  intro n
+  induction n using Nat.strong_induction_on with
+  | h n ih =>
+    intro index start measure seen
+    rw [routes_valid_loop.eq_def]
+    by_cases inside : index.val < routes.length
+    · have cond : index < Slice.len routes := by scalar_tac
+      simp only [cond, ↓reduceIte]
+      have get : Slice.index_usize routes index = Result.ok (routes[index.val]'inside) := by
+        simp [Slice.index_usize, inside]
+      rw [get]
+      simp only [bind_ok]
+      apply WP.spec_bind (route_of_first routes _)
+      rintro out ⟨_, before, _⟩
+      split
+      · simp [WP.spec_ok]
+      · rename_i same
+        have eq : out.val = index.val := by simpa using same
+        obtain ⟨next, hnext, nval⟩ := returned_of_spec (@Usize.add_spec index 1#usize (by scalar_tac))
+        rw [hnext]
+        simp only [bind_ok]
+        refine ih (routes.length - next.val) (by scalar_tac) next (by scalar_tac) rfl ?_
+        intro i hi hi' k hk ki
+        by_cases ei : i = index.val
+        · subst ei
+          have := before k hk (by omega)
+          simpa [alloc.vec.Vec.deref] using this
+        · exact seen i (by scalar_tac) hi' k hk ki
+    · have cond : ¬ index < Slice.len routes := by scalar_tac
+      simp only [cond, ↓reduceIte]
+      apply (WP.spec_ok _).mpr
+      intro _ i hi k hk ki
+      exact seen i (by omega) hi k hk ki
+
+/-- **A valid route catalogue names one destination per provider.** If the
+    extracted `routes_valid` accepts the routes, no two serve the same
+    provider. -/
+theorem routes_valid_spec (routes : Slice Route) :
+    routes_valid routes ⦃ b => b = true → ProvidersDistinct routes ⦄ := by
+  refine WP.spec_mono (routes_valid_loop_spec routes 0#usize (by simp) (fun i hi => by simp at hi)) ?_
+  intro b post yes i j hi hj same
+  rcases Nat.lt_trichotomy i j with lt | eq | gt
+  · exact absurd same (post yes j hj i hi lt)
+  · exact eq
+  · exact absurd same.symm (post yes i hi j hj gt)
+
 /-! ## What a dispatch decision means -/
 
 /-- **The trace of a dispatch decision.** The request carried exactly one
@@ -351,7 +488,7 @@ theorem decide_dispatch_trace (ops : stateless.SurrogateOpener V) (pol : statele
       ∃ (inside : dsp.route.val < routes.length),
         (routes[dsp.route.val]'inside).provider.val = v.claims.provider.val ∧
         proxy_http.upstream.encode_upstream (alloc.vec.Vec.new U8) request
-          (alloc.vec.Vec.deref (routes[dsp.route.val]'inside).host)
+          (alloc.vec.Vec.deref (routes[dsp.route.val]'inside).destination.host)
           (alloc.vec.Vec.deref (routes[dsp.route.val]'inside).rules)
           (alloc.vec.Vec.deref dsp.opened.credential) (routes[dsp.route.val]'inside).authentication =
           Result.ok (.Ok (), dsp.wire) := by
@@ -418,7 +555,7 @@ theorem dispatch_trace (ops : stateless.SurrogateOpener V) (pol : stateless_poli
       ∃ (inside : index.val < routes.length),
         (routes[index.val]'inside).provider.val = opened.claims.provider.val ∧
         proxy_http.upstream.encode_upstream (alloc.vec.Vec.new U8) request
-          (alloc.vec.Vec.deref (routes[index.val]'inside).host) (alloc.vec.Vec.deref (routes[index.val]'inside).rules)
+          (alloc.vec.Vec.deref (routes[index.val]'inside).destination.host) (alloc.vec.Vec.deref (routes[index.val]'inside).rules)
           (alloc.vec.Vec.deref opened.credential) (routes[index.val]'inside).authentication =
           Result.ok (.Ok (), wire) := by
   unfold decide_request at h
@@ -498,7 +635,7 @@ theorem serve_dispatch_exact (ops : stateless.SurrogateOpener V) (pol : stateles
     (index : Usize) (wire : alloc.vec.Vec U8) (opened : stateless.Opened)
     (decided : decide_request ops pol opener policy request routes a peer now = Result.ok (.dispatch index wire opened))
     (room : ∀ (inside : index.val < routes.length),
-      (UpstreamPrefix request (alloc.vec.Vec.deref (routes[index.val]'inside).host) ++
+      (UpstreamPrefix request (alloc.vec.Vec.deref (routes[index.val]'inside).destination.host) ++
         HeaderPrefix (routes[index.val]'inside).authentication ++ opened.credential.val ++ CRLF ++
         UpstreamSuffix request).length ≤ Usize.max) :
     ∃ token v, surrogate_of (alloc.vec.Vec.deref request.fields) = Result.ok (some token) ∧
@@ -507,10 +644,10 @@ theorem serve_dispatch_exact (ops : stateless.SurrogateOpener V) (pol : stateles
       ops.«unseal» opener v = Result.ok (.Ok opened.credential) ∧
       ∃ (inside : index.val < routes.length),
         (routes[index.val]'inside).provider.val = v.claims.provider.val ∧
-        wire.val = UpstreamPrefix request (alloc.vec.Vec.deref (routes[index.val]'inside).host) ++
+        wire.val = UpstreamPrefix request (alloc.vec.Vec.deref (routes[index.val]'inside).destination.host) ++
           HeaderPrefix (routes[index.val]'inside).authentication ++ opened.credential.val ++ CRLF ++
           UpstreamSuffix request ∧
-        Dispatched inst io request limit index wire opened served after := by
+        Dispatched inst io request routes limit index wire opened served after := by
   obtain ⟨d, hd, m⟩ := serve_follows_decision ops pol inst opener policy io request routes a peer now limit served after h
   rw [decided] at hd
   simp only [Result.ok.injEq] at hd
@@ -520,7 +657,7 @@ theorem serve_dispatch_exact (ops : stateless.SurrogateOpener V) (pol : stateles
   refine ⟨token, v, ho, hv, adm, same, hun, inside, by rw [← same]; exact provider, ?_, m⟩
   obtain ⟨value, returned, post⟩ := returned_of_spec
     (encode_upstream_contract (alloc.vec.Vec.new U8) request
-      (alloc.vec.Vec.deref (routes[index.val]'inside).host) (alloc.vec.Vec.deref (routes[index.val]'inside).rules)
+      (alloc.vec.Vec.deref (routes[index.val]'inside).destination.host) (alloc.vec.Vec.deref (routes[index.val]'inside).rules)
       (alloc.vec.Vec.deref opened.credential) (routes[index.val]'inside).authentication
       (by rw [show (alloc.vec.Vec.new U8).length = 0 from rfl, Nat.zero_add]
           simpa [alloc.vec.Vec.deref] using room inside))
@@ -568,10 +705,10 @@ theorem serve_rejected_never_sends (ops : stateless.SurrogateOpener V) (pol : st
 
 /-- After a dispatch, the reply is a fixed refusal or a completed release of
     the provider's answer. -/
-theorem dispatched_reply {inst : Origin O} {io : O} {request : proxy_http.request.Request} {limit : Usize}
-    {index : Usize} {wire : alloc.vec.Vec U8} {opened : stateless.Opened}
+theorem dispatched_reply {inst : Origin O} {io : O} {request : proxy_http.request.Request} {routes : Slice Route}
+    {limit : Usize} {index : Usize} {wire : alloc.vec.Vec U8} {opened : stateless.Opened}
     {served : proxy_controller.Served} {after : O}
-    (m : Dispatched inst io request limit index wire opened served after) :
+    (m : Dispatched inst io request routes limit index wire opened served after) :
     served.reply.val = ascii (refusalText served.code) ∨
     ∃ forms raw, proxy_http.response.reflection_forms (alloc.vec.Vec.deref opened.credential) = Result.ok forms ∧
       proxy_controller.release (alloc.vec.Vec.deref raw) request (alloc.vec.Vec.deref forms) limit =

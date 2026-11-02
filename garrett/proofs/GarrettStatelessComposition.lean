@@ -234,7 +234,7 @@ variable {V O P : Type}
 
 /-- The exact credential-bearing bytes of a dispatch on `route`. -/
 def ExactWire (request : proxy_http.request.Request) (route : Route) (credential : alloc.vec.Vec U8) : List U8 :=
-  UpstreamPrefix request (alloc.vec.Vec.deref route.host) ++ HeaderPrefix route.authentication ++
+  UpstreamPrefix request (alloc.vec.Vec.deref route.destination.host) ++ HeaderPrefix route.authentication ++
     credential.val ++ CRLF ++ UpstreamSuffix request
 
 /-- **No egress.** The decision is not a dispatch, the reply is refused, and
@@ -277,7 +277,7 @@ def ExactUpstreamRequest (request : proxy_http.request.Request) (routes : Slice 
     (wire : alloc.vec.Vec U8) (opened : stateless.Opened) : Prop :=
   ∃ (inside : index.val < routes.length),
     proxy_http.upstream.encode_upstream (alloc.vec.Vec.new U8) request
-      (alloc.vec.Vec.deref (routes[index.val]'inside).host) (alloc.vec.Vec.deref (routes[index.val]'inside).rules)
+      (alloc.vec.Vec.deref (routes[index.val]'inside).destination.host) (alloc.vec.Vec.deref (routes[index.val]'inside).rules)
       (alloc.vec.Vec.deref opened.credential) (routes[index.val]'inside).authentication =
       Result.ok (.Ok (), wire) ∧
     ((ExactWire request (routes[index.val]'inside) opened.credential).length ≤ Usize.max →
@@ -303,7 +303,7 @@ def AuthorizedEgress (ops : stateless.SurrogateOpener V) (pol : stateless_policy
       AuthorizedOperation Allowed request opened ∧
       ProviderRouteMatches routes index opened ∧
       ExactUpstreamRequest request routes index wire opened ∧
-      Dispatched inst io request limit index wire opened served after
+      Dispatched inst io request routes limit index wire opened served after
 
 /-- **Composable authorized egress.** For any operation-policy component
     meeting its contract `Allowed` (`Sound`), every run of the extracted
@@ -466,12 +466,13 @@ def reply (request : proxy_http.request.Request) (limit : Usize) : Decision → 
     | .Err code => proxy_controller.stopped code .Failed
 
 /-- `ans` is exactly what `inst`, starting at `io`, answered for `d`. -/
-def AnsweredBy (inst : Origin O) (io : O) (d : Decision) (ans : Answered) (after : O) : Prop :=
+def AnsweredBy (inst : Origin O) (io : O) (routes : Slice Route) (limit : Usize) (d : Decision) (ans : Answered)
+    (after : O) : Prop :=
   match d, ans with
   | .dispatch index _ opened, .unadmitted => inst.admitted io opened.claims index = Result.ok (false, after)
   | .dispatch index wire opened, .exchanged answer done =>
     ∃ io1 io2, inst.admitted io opened.claims index = Result.ok (true, io1) ∧
-      inst.exchange io1 { route := index, wire := wire } = Result.ok (answer, io2) ∧
+      (∃ inside, exchange inst io1 (egressTo routes index inside wire) limit = Result.ok (answer, io2)) ∧
       match done with
       | .none => after = io2
       | some b => ∃ status, inst.completed io2 status = Result.ok (b, after)
@@ -490,7 +491,7 @@ theorem serve_answered (ops : stateless.SurrogateOpener V) (pol : stateless_poli
     (now : I64) (limit : Usize) (served : proxy_controller.Served) (after : O)
     (h : serve ops pol inst opener policy io request routes a peer now limit = Result.ok (served, after)) :
     ∃ d ans, decide_request ops pol opener policy request routes a peer now = Result.ok d ∧
-      (d.isDispatch = false → ans = .none) ∧ (d.isDispatch = true → AnsweredBy inst io d ans after) ∧
+      (d.isDispatch = false → ans = .none) ∧ (d.isDispatch = true → AnsweredBy inst io routes limit d ans after) ∧
       reply request limit d ans = Result.ok served := by
   obtain ⟨d, hd, m⟩ := serve_follows_decision ops pol inst opener policy io request routes a peer now limit
     served after h
@@ -540,7 +541,7 @@ theorem replicas_same_answers_same_reply {O1 O2 : Type} (ops : stateless.Surroga
     (h1 : serve ops pol inst1 opener policy io1 request routes a peer now limit = Result.ok (s1, a1))
     (h2 : serve ops pol inst2 opener policy io2 request routes a peer now limit = Result.ok (s2, a2)) :
     ∃ d ans1 ans2, decide_request ops pol opener policy request routes a peer now = Result.ok d ∧
-      (d.isDispatch = true → AnsweredBy inst1 io1 d ans1 a1 ∧ AnsweredBy inst2 io2 d ans2 a2) ∧
+      (d.isDispatch = true → AnsweredBy inst1 io1 routes limit d ans1 a1 ∧ AnsweredBy inst2 io2 routes limit d ans2 a2) ∧
       (d.isDispatch = false → s1 = s2) ∧
       (ans1 = ans2 → s1 = s2) := by
   obtain ⟨d1, ans1, hd1, none1, by1, r1⟩ := serve_answered ops pol inst1 opener policy io1 request routes a peer
@@ -571,8 +572,8 @@ theorem replica_replies_differ {O1 O2 : Type} (ops : stateless.SurrogateOpener V
     (differ : s1 ≠ s2) :
     ∃ index wire opened ans1 ans2, decide_request ops pol opener policy request routes a peer now =
         Result.ok (.dispatch index wire opened) ∧
-      AnsweredBy inst1 io1 (.dispatch index wire opened) ans1 a1 ∧
-      AnsweredBy inst2 io2 (.dispatch index wire opened) ans2 a2 ∧ ans1 ≠ ans2 := by
+      AnsweredBy inst1 io1 routes limit (.dispatch index wire opened) ans1 a1 ∧
+      AnsweredBy inst2 io2 routes limit (.dispatch index wire opened) ans2 a2 ∧ ans1 ≠ ans2 := by
   obtain ⟨d, ans1, ans2, hd, by12, same_refusal, same_answers⟩ :=
     replicas_same_answers_same_reply ops pol opener policy inst1 io1 inst2 io2 request routes a peer now limit
       s1 s2 a1 a2 h1 h2

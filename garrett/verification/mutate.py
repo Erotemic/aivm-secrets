@@ -92,6 +92,18 @@ MUTANTS = [
     ("stateless_proxy.rs", "stateless proxy dispatches despite an encoder refusal",
      "Err(refusal) => Decision::Refused(code_of(&refusal)),",
      "Err(_refusal) => Decision::Dispatch(Dispatch {\n            route: index,\n            wire,\n            opened,\n        }),"),
+    # The destination: the egress goes to the selected route's own
+    # destination, only after the server authenticated there, and the
+    # catalogue names one destination per provider.
+    ("stateless_proxy.rs", "stateless proxy egress to another route's destination",
+     "destination: copy_destination(&routes[index].destination),",
+     "destination: copy_destination(&routes[0].destination),"),
+    ("stateless_proxy.rs", "stateless proxy Host from another route's destination",
+     "        &route.destination.host,", "        &routes[0].destination.host,"),
+    ("stateless_proxy.rs", "stateless proxy credential written after a failed connection",
+     "if !origin.connect(egress_destination(&egress)) {", "if false {"),
+    ("stateless_proxy.rs", "stateless proxy catalogue accepts two routes for a provider",
+     "if route_of(routes, &routes[index].provider) != index {", "if false {"),
     # Operation authorization (GarrettStatelessComposition): removing or
     # bypassing the policy, or weakening the read-only policy.
     ("stateless_proxy.rs", "stateless proxy operation policy not consulted",

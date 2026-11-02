@@ -61,6 +61,14 @@ def upstream_client(ca_file: Path | None) -> ssl.SSLContext:
     return context
 
 
+def upstream_client_pem(trust: bytes) -> ssl.SSLContext:
+    """A provider API: the PEM trust anchors ``trust``, or the system roots
+    when it is empty."""
+    context = ssl.create_default_context(cadata=trust.decode('ascii') if trust else None)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    return context
+
+
 @dataclass(frozen=True)
 class PeerIdentity:
     thumbprint: str

@@ -196,19 +196,38 @@ def check(root: Path = ROOT) -> list[str]:
         require(not re.search(r'\bunsafe\b', code_only(source)), f'unsafe code in {name}')
     checked.append('no unsafe code in the shell')
 
-    # The proxy's provider write.
+    # The proxy's provider connection and write.
     proxy = shell['proxy.rs']
     require(count(every, 'egress_wire(') == 1, 'egress_wire must be read exactly once in the shell')
-    require(owners(proxy, 'egress_wire(') == {'send_upstream'}, 'egress_wire read outside send_upstream')
-    require('tls.write_all(egress_wire(&egress))' in proxy, 'the provider write is not the egress bytes')
-    require(count(every, 'send_upstream(') == 2, 'send_upstream must be defined once and called once')
-    require(owners(proxy, '.send_upstream(') == {'exchange'}, 'send_upstream called outside Origin::exchange')
-    exchange = functions(proxy)['exchange'][0]
-    require('egress: Egress' in exchange, 'Origin::exchange no longer takes the core Egress')
-    require(not re.search(r'\b(loop|while|for)\b', code_only(exchange)), 'Origin::exchange retries')
-    send = functions(proxy)['send_upstream'][0]
-    require(count(send, 'write_all(') == 1, 'send_upstream writes more than once')
-    checked.append('the proxy writes to a provider once per Egress, only in Origin::exchange')
+    require(owners(proxy, 'egress_wire(') == {'transmit'}, 'egress_wire read outside Origin::transmit')
+    transmit = functions(proxy)['transmit'][0]
+    require('egress: Egress' in transmit, 'Origin::transmit no longer takes the core Egress')
+    require('upstream.tls.write_all(egress_wire(&egress))' in transmit, 'the provider write is not the egress bytes')
+    require(count(transmit, 'write_all(') == 1 and count(every, 'upstream.tls.write') == 1,
+            'the provider connection is written more than once')
+    require('if &upstream.destination != egress_destination(&egress) {' in transmit,
+            'Origin::transmit does not check the connection is to the egress destination')
+    require(not re.search(r'\b(loop|while|for)\b', code_only(transmit)), 'Origin::transmit retries')
+    # The connection is opened only by Origin::connect, to the destination the
+    # core passes, authenticated as its host under its trust anchors.
+    require(count(every, 'open_upstream(') == 2 and owners(proxy, 'open_upstream(') == {'connect', 'open_upstream'},
+            'open_upstream must be defined once and called only from Origin::connect')
+    require('self.upstream = open_upstream(destination).ok();' in functions(proxy)['connect'][0],
+            'Origin::connect does not connect to the destination it was given')
+    opener = functions(proxy)['open_upstream'][0]
+    for text, why in [('(address, destination.port)', 'the destination address and port'),
+                      ('std::str::from_utf8(&destination.address)', 'the destination address'),
+                      ('std::str::from_utf8(&destination.host)', 'the destination host'),
+                      ('ServerName::try_from(host.to_string())', 'the destination host as the TLS name'),
+                      ('upstream_tls(&destination.trust)', 'the destination trust anchors')]:
+        require(text in opener, f'open_upstream does not use {why}')
+    for name, source in shell.items():
+        if name not in ('proxy.rs', 'http.rs'):
+            require('ClientConnection::new(' not in code_only(source), f'{name} opens a TLS client connection')
+    require(owners(proxy, 'ClientConnection::new(') == {'open_upstream'}, 'a provider connection outside open_upstream')
+    require(not re.search(r'(?<![\w])http::', code_only(proxy)), 'the proxy uses the broker HTTP client')
+    require(not re.search(r'\bupstream: Vec<', code_only(proxy)), 'the proxy keeps a destination table')
+    checked.append('the proxy connects only to the egress destination and writes it once, only in Origin::transmit')
 
     # The core alone makes an Egress, from an admitted decision.
     core_proxy = core['stateless_proxy.rs']
@@ -217,7 +236,7 @@ def check(root: Path = ROOT) -> list[str]:
     require('pub ' not in struct.group(1), 'Egress fields are public')
     built = re.findall(r'(?<!struct )\bEgress \{', code_only(core_proxy))
     require(len(built) == 1, 'Egress is built more than once in the core')
-    require(owners(core_proxy, '(Egress {') == {'serve'}, 'Egress built outside serve')
+    require(owners(core_proxy, '= Egress {') == {'serve'}, 'Egress built outside serve')
     for name, source in shell.items():
         require('Egress {' not in code_only(source), f'{name} builds an Egress')
     checked.append('only the core serve makes an Egress; its fields are private')

@@ -76,10 +76,11 @@ variable {M P : Type}
     this connection's peer, and descends from a login or mint. -/
 def SendsAreAuthorized (inst : KeyMaterial M) (Paired : M → M → Prop) (cfg : Config P) (W : World M) : Prop :=
   ∀ keys peer log, Act.served keys peer log ∈ W.acts → Unforged inst Paired cfg W keys →
-    ∀ r w, stateless_proxy.Proofs.ProxyEvent.sent r w ∈ log →
-      ∃ request now opened, stateless_proxy.Proofs.decide_request (Opening inst) cfg.policyInst keys cfg.policy
-          request cfg.routes cfg.acceptance peer now = Result.ok (.dispatch r w opened) ∧
-        (∃ A B, log = A ++ [.admitted opened.claims r true, .sent r w] ++ B) ∧
+    ∀ D w, stateless_proxy.Proofs.ProxyEvent.sent D w ∈ log →
+      ∃ request now index opened, stateless_proxy.Proofs.decide_request (Opening inst) cfg.policyInst keys cfg.policy
+          request cfg.routes cfg.acceptance peer now = Result.ok (.dispatch index w opened) ∧
+        stateless_proxy.Proofs.DestinationOf cfg.routes index D ∧
+        (∃ A B, log = A ++ [.admitted opened.claims index true, .connected D true, .sent D w] ++ B) ∧
         ∃ sealer claims credential token src, IssuedIn inst cfg W sealer claims credential token src ∧
           opened.claims = claims ∧ opened.credential.val = credential.val ∧
           claims.certificate.val = peer.val ∧ Lineage inst cfg W claims credential
@@ -92,7 +93,7 @@ def RefusalsSendNothing (W : World M) : Prop :=
     ∃ segs : List (List stateless_proxy.Proofs.ProxyEvent), log = segs.flatten ∧ ∀ seg ∈ segs,
       seg.countP stateless_proxy.Proofs.ProxyEvent.isSent ≤ 1 ∧
       ∀ rej, stateless_proxy.Proofs.ProxyEvent.rejected rej ∈ seg →
-        ∀ r w, stateless_proxy.Proofs.ProxyEvent.sent r w ∉ seg
+        ∀ D w, stateless_proxy.Proofs.ProxyEvent.sent D w ∉ seg
 
 /-- **3. A login's surrogate goes to the agent that began it.** Every
     delivered surrogate is delivered to, and bound to, the certificate that

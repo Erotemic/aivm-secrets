@@ -51,6 +51,18 @@ theorem slice_index_eq {α : Type} (s : Slice α) (i : Usize) (inside : i.val < 
   obtain ⟨y, hy, same⟩ := returned_of_spec (Slice.index_usize_spec s i inside)
   rw [hy, same]
 
+theorem slice_index_ok {α : Type} {s : Slice α} {i : Usize} {x : α} (h : Slice.index_usize s i = Result.ok x) :
+    ∃ inside : i.val < s.length, x = s.val[i.val] := by
+  by_cases inside : i.val < s.length
+  · rw [slice_index_eq s i inside] at h
+    simp only [Result.ok.injEq] at h
+    exact ⟨inside, h.symm⟩
+  · unfold Slice.index_usize at h
+    split at h
+    · exact absurd h fail_not_ok
+    · rename_i y found
+      exact absurd (by simp_all) inside
+
 theorem array_slice_val {k : Usize} (l : List U8) (h : l.length = k.val) :
     (Array.make k l h).to_slice.val = l := by
   simp [Array.to_slice, Slice.from_val]
