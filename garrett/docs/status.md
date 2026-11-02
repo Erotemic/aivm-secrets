@@ -62,7 +62,7 @@ the per-execution ones for every reachable world. Behind them:
   `STATELESS-DISCLOSURE-01`;
 - new adversarial tests (impostor and untrusted-CA destinations over real
   TLS, failed connections and writes, bounded answers, an unrouted provider,
-  audit and replies without the credential) and eight new mutants.
+  audit and replies without the credential) and nine new mutants.
 
 ## Validation
 
