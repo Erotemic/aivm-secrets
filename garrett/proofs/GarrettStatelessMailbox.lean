@@ -585,23 +585,28 @@ theorem slotAt_none_of_outside {mb : Mailbox} {login : List U8}
 /-- **`finish`.** Either the slots are unchanged and nothing finished, or the
     first slot holding the permit's login has the permit's serial and was
     exchanging; then only that slot changed: to `Complete` holding exactly
-    the surrogate `issued` produced from the exchange's token, or — no
-    token, or issuance refused — to `Uncertain` with no new surrogate. -/
+    the surrogate `issued` produced from the exchange's token with the
+    broker's issuance, or — no token, no issuance, or issuance refused — to
+    `Uncertain` with no new surrogate. Without an issuance nothing is
+    sealed: `issued` is not run. -/
 theorem finish_effect {S : Type} (ops : stateless.SurrogateSealer S) {mb : Mailbox} {x : Exchanged}
-    {sealer : S} {policy : stateless.IssuePolicy} {tokenId : Slice U8} {now lifetime : I64}
+    {issuance : Option (Issuance S)} {policy : stateless.IssuePolicy} {now lifetime : I64}
     {r : core.result.Result Unit MailboxError} {mb' : Mailbox}
-    (h : finish ops mb x sealer policy tokenId now lifetime = Result.ok (r, mb')) :
+    (h : finish ops mb x issuance policy now lifetime = Result.ok (r, mb')) :
     mb'.next = mb.next ∧
     ((mb'.slots.val = mb.slots.val ∧ (∀ u, r ≠ .Ok u) ∧
        ∀ s, slotAt mb x.permit.login.val = some s → ¬ (s.serial = x.permit.serial ∧ s.entry.stage = .Exchanging)) ∨
      ∃ (k : Nat) (hk : k < mb.slots.val.length) (s : Slot), mb.slots.val[k] = some s ∧
        k = mb.slots.val.findIdx (HoldsB x.permit.login.val) ∧ s.serial = x.permit.serial ∧
        s.entry.stage = .Exchanging ∧
-       ((∃ tok iss, x.token = some tok ∧
-           issued ops sealer policy s.entry tok tokenId now lifetime = Result.ok (.Ok iss) ∧ r = .Ok () ∧
+       ((∃ tok i iss, x.token = some tok ∧ issuance = some i ∧
+           issued ops i.sealer policy s.entry tok (alloc.vec.Vec.deref i.token_id) now lifetime =
+             Result.ok (.Ok iss) ∧ r = .Ok () ∧
            mb'.slots.val = mb.slots.val.set k (some (completed s iss))) ∨
-        ((x.token = none ∨ ∃ tok rej, x.token = some tok ∧
-            issued ops sealer policy s.entry tok tokenId now lifetime = Result.ok (.Err rej)) ∧
+        ((x.token = none ∨ (∃ tok, x.token = some tok ∧ issuance = none) ∨ ∃ tok i rej, x.token = some tok ∧
+            issuance = some i ∧
+            issued ops i.sealer policy s.entry tok (alloc.vec.Vec.deref i.token_id) now lifetime =
+              Result.ok (.Err rej)) ∧
           (∀ u, r ≠ .Ok u) ∧
           mb'.slots.val = mb.slots.val.set k (some (withStage s .Uncertain))))) := by
   unfold finish at h
@@ -662,33 +667,57 @@ theorem finish_effect {S : Type} (ops : stateless.SurrogateSealer S) {mb : Mailb
                        exact ⟨n, Or.inl (by simpa using d)⟩)
         -- the exchanging slot
         obtain ⟨res, hres, h⟩ := bind_ok_inv h
+        -- Every refusal ends the slot `Uncertain`.
+        have refused : ∀ {e : MailboxError}, res = .Err e →
+            r ≠ .Ok () ∧ mb'.slots.val = mb.slots.val.set i.val (some (withStage s .Uncertain)) := by
+          intro e he
+          subst he
+          simp only [oauth_login.Proofs.failed_install_is_uncertain, bind_ok, Result.ok.injEq, Prod.mk.injEq] at h
+          obtain ⟨e1, e2⟩ := h
+          subst e1 e2
+          exact ⟨by simp, by simp [withStage]⟩
         cases ht : x.token with
         | none =>
           rw [ht] at hres
           simp only [Result.ok.injEq] at hres
-          subst hres
-          simp only [oauth_login.Proofs.failed_install_is_uncertain, bind_ok, Result.ok.injEq, Prod.mk.injEq] at h
-          obtain ⟨e1, e2⟩ := h
-          subst e1 e2
-          refine ⟨rfl, Or.inr ⟨i.val, inside, s, hs, iv, serialEq, hst, Or.inr ⟨Or.inl rfl, by intro u; simp, ?_⟩⟩⟩
-          simp [withStage]
+          obtain ⟨ne, slots⟩ := refused hres.symm
+          exact ⟨by rw [← hres] at h; simp only [oauth_login.Proofs.failed_install_is_uncertain, bind_ok,
+              Result.ok.injEq, Prod.mk.injEq] at h; rw [← h.2],
+            Or.inr ⟨i.val, inside, s, hs, iv, serialEq, hst, Or.inr ⟨Or.inl rfl, by intro u e; cases u; exact ne e,
+              slots⟩⟩⟩
         | some tok =>
           rw [ht] at hres
           simp only at hres
-          cases res with
-          | Ok iss =>
-            simp only [finish_complete, bind_ok, Result.ok.injEq, Prod.mk.injEq] at h
-            obtain ⟨e1, e2⟩ := h
-            subst e1 e2
-            refine ⟨rfl, Or.inr ⟨i.val, inside, s, hs, iv, serialEq, hst, Or.inl ⟨tok, iss, rfl, hres, rfl, ?_⟩⟩⟩
-            simp [completed]
-          | Err rej =>
-            simp only [oauth_login.Proofs.failed_install_is_uncertain, bind_ok, Result.ok.injEq, Prod.mk.injEq] at h
-            obtain ⟨e1, e2⟩ := h
-            subst e1 e2
-            refine ⟨rfl, Or.inr ⟨i.val, inside, s, hs, iv, serialEq, hst,
-              Or.inr ⟨Or.inr ⟨tok, rej, rfl, hres⟩, by intro u; simp, ?_⟩⟩⟩
-            simp [withStage]
+          cases hi : issuance with
+          | none =>
+            rw [hi] at hres
+            simp only [Result.ok.injEq] at hres
+            obtain ⟨ne, slots⟩ := refused hres.symm
+            exact ⟨by rw [← hres] at h; simp only [oauth_login.Proofs.failed_install_is_uncertain, bind_ok,
+                Result.ok.injEq, Prod.mk.injEq] at h; rw [← h.2],
+              Or.inr ⟨i.val, inside, s, hs, iv, serialEq, hst,
+                Or.inr ⟨Or.inr (Or.inl ⟨tok, rfl, rfl⟩), by intro u e; cases u; exact ne e, slots⟩⟩⟩
+          | some is =>
+            rw [hi] at hres
+            simp only at hres
+            obtain ⟨r0, hr0, hres⟩ := bind_ok_inv hres
+            cases r0 with
+            | Ok iss =>
+              simp only [Result.ok.injEq] at hres
+              subst hres
+              simp only [finish_complete, bind_ok, Result.ok.injEq, Prod.mk.injEq] at h
+              obtain ⟨e1, e2⟩ := h
+              subst e1 e2
+              refine ⟨rfl, Or.inr ⟨i.val, inside, s, hs, iv, serialEq, hst,
+                Or.inl ⟨tok, is, iss, rfl, rfl, hr0, rfl, ?_⟩⟩⟩
+              simp [completed]
+            | Err rej =>
+              simp only [Result.ok.injEq] at hres
+              obtain ⟨ne, slots⟩ := refused hres.symm
+              exact ⟨by rw [← hres] at h; simp only [oauth_login.Proofs.failed_install_is_uncertain, bind_ok,
+                  Result.ok.injEq, Prod.mk.injEq] at h; rw [← h.2],
+                Or.inr ⟨i.val, inside, s, hs, iv, serialEq, hst,
+                  Or.inr ⟨Or.inr (Or.inr ⟨tok, is, rej, rfl, rfl, hr0⟩), by intro u e; cases u; exact ne e, slots⟩⟩⟩
 
 /-- **`poll`.** Either nothing changed and no surrogate was handed over, or
     the first slot holding this login was emptied; a surrogate handed over is
@@ -897,15 +926,21 @@ noncomputable def issuedOf {S : Type} (ops : stateless.SurrogateSealer S) (seale
   if h : ∃ iss, issued ops sealer policy e tok tokenId now lifetime = Result.ok (.Ok iss)
   then some (Classical.choose h) else none
 
+/-- What a finish with `token` and `issuance` issued, if anything. -/
+noncomputable def finishedWith {S : Type} (ops : stateless.SurrogateSealer S) (token : Option Token)
+    (issuance : Option (Issuance S)) (policy : stateless.IssuePolicy) (e : stateless_login.Entry)
+    (now lifetime : I64) : Option stateless.Issued :=
+  match token, issuance with
+  | some tok, some i => issuedOf ops i.sealer policy e tok (alloc.vec.Vec.deref i.token_id) now lifetime
+  | _, _ => none
+
 open Classical in
 noncomputable def finishEvents {S : Type} (ops : stateless.SurrogateSealer S) (mb : Mailbox) (x : Exchanged)
-    (sealer : S) (policy : stateless.IssuePolicy) (tokenId : Slice U8) (now lifetime : I64) : List Event :=
+    (issuance : Option (Issuance S)) (policy : stateless.IssuePolicy) (now lifetime : I64) : List Event :=
   match slotAt mb x.permit.login.val with
   | some s =>
     if s.serial = x.permit.serial ∧ s.entry.stage = .Exchanging then
-      [.finished s.serial (match x.token with
-        | some tok => issuedOf ops sealer policy s.entry tok tokenId now lifetime
-        | none => none)]
+      [.finished s.serial (finishedWith ops x.token issuance policy s.entry now lifetime)]
     else []
   | none => []
 
@@ -941,11 +976,11 @@ inductive Step {S : Type} (ops : stateless.SurrogateSealer S) (policy : stateles
       (unspent : ∀ y, Event.exchanged y ∈ H → y.permit.serial ≠ p.serial)
       (run : stateless_mailbox.exchange inst e p code = Result.ok (x, e')) :
       Step ops policy (mb, H) (mb, H ++ [.exchanged x])
-  | finish {mb : Mailbox} {H : List Event} {x : Exchanged} {sealer : S} {issuePolicy : stateless.IssuePolicy}
-      {tokenId : Slice U8} {now lifetime : I64} {r : core.result.Result Unit MailboxError} {mb' : Mailbox}
-      (held : Event.exchanged x ∈ H)
-      (run : stateless_mailbox.finish ops mb x sealer issuePolicy tokenId now lifetime = Result.ok (r, mb')) :
-      Step ops policy (mb, H) (mb', H ++ finishEvents ops mb x sealer issuePolicy tokenId now lifetime)
+  | finish {mb : Mailbox} {H : List Event} {x : Exchanged} {issuance : Option (Issuance S)}
+      {issuePolicy : stateless.IssuePolicy} {now lifetime : I64} {r : core.result.Result Unit MailboxError}
+      {mb' : Mailbox} (held : Event.exchanged x ∈ H)
+      (run : stateless_mailbox.finish ops mb x issuance issuePolicy now lifetime = Result.ok (r, mb')) :
+      Step ops policy (mb, H) (mb', H ++ finishEvents ops mb x issuance issuePolicy now lifetime)
   | poll {mb : Mailbox} {H : List Event} {peer login : Slice U8} {now : I64} {r : Polled} {mb' : Mailbox}
       (run : stateless_mailbox.poll mb peer login now = Result.ok (r, mb')) :
       Step ops policy (mb, H) (mb', H ++ pollEvents mb peer login r)
@@ -1451,13 +1486,13 @@ theorem issuedOf_none {S : Type} {ops : stateless.SurrogateSealer S} {sealer : S
 
 /-- **`finish` preserves the invariant.** -/
 theorem finish_preserves {S : Type} {ops : stateless.SurrogateSealer S} {policy : stateless_login.LoginPolicy}
-    {mb : Mailbox} {H : List Event} {x : Exchanged} {sealer : S} {issuePolicy : stateless.IssuePolicy}
-    {tokenId : Slice U8} {now lifetime : I64} {r : core.result.Result Unit MailboxError} {mb' : Mailbox}
-    (inv : Inv ops policy (mb, H)) (held : Event.exchanged x ∈ H)
-    (run : stateless_mailbox.finish ops mb x sealer issuePolicy tokenId now lifetime = Result.ok (r, mb')) :
-    Inv ops policy (mb', H ++ finishEvents ops mb x sealer issuePolicy tokenId now lifetime) := by
+    {mb : Mailbox} {H : List Event} {x : Exchanged} {issuance : Option (Issuance S)}
+    {issuePolicy : stateless.IssuePolicy} {now lifetime : I64} {r : core.result.Result Unit MailboxError}
+    {mb' : Mailbox} (inv : Inv ops policy (mb, H)) (held : Event.exchanged x ∈ H)
+    (run : stateless_mailbox.finish ops mb x issuance issuePolicy now lifetime = Result.ok (r, mb')) :
+    Inv ops policy (mb', H ++ finishEvents ops mb x issuance issuePolicy now lifetime) := by
   obtain ⟨next, ⟨slots, _, F⟩ | ⟨k, hk, s, at_k, idx, serialEq, hst, outcome⟩⟩ := finish_effect ops run
-  · have none : finishEvents ops mb x sealer issuePolicy tokenId now lifetime = [] := by
+  · have none : finishEvents ops mb x issuance issuePolicy now lifetime = [] := by
       unfold finishEvents
       cases hs : slotAt mb x.permit.login.val with
       | none => rfl
@@ -1468,10 +1503,8 @@ theorem finish_preserves {S : Type} {ops : stateless.SurrogateSealer S} {policy 
     obtain ⟨⟨st0, started0, se⟩, counts⟩ := inv.slots s sIn
     rw [hst] at counts
     obtain ⟨oneAcc, zf, zd⟩ := counts
-    have events : finishEvents ops mb x sealer issuePolicy tokenId now lifetime =
-        [.finished s.serial (match x.token with
-          | some tok => issuedOf ops sealer issuePolicy s.entry tok tokenId now lifetime
-          | none => none)] := by
+    have events : finishEvents ops mb x issuance issuePolicy now lifetime =
+        [.finished s.serial (finishedWith ops x.token issuance issuePolicy s.entry now lifetime)] := by
       unfold finishEvents
       rw [slotAt_of at_k idx]
       simp only
@@ -1489,9 +1522,9 @@ theorem finish_preserves {S : Type} {ops : stateless.SurrogateSealer S} {policy 
       by_cases same : s.serial = σ
       · subst same; simp [isFin, zf]
       · simp [isFin, same]; omega
-    rcases outcome with ⟨tok, iss, ht, hiss, _, slots⟩ | ⟨failed, _, slots⟩
-    · rw [ht]
-      simp only [issuedOf_some hiss]
+    rcases outcome with ⟨tok, is, iss, ht, hi, hiss, _, slots⟩ | ⟨failed, _, slots⟩
+    · rw [ht, hi]
+      simp only [finishedWith, issuedOf_some hiss]
       refine inv_of_rewrite inv at_k slots next rfl rfl (by simp [Event.serial]) ?_ (onceFin _) ?_
       · refine ⟨⟨st0, List.mem_append_left _ started0, SameEntry_completed se _⟩, ?_⟩
         simp only [completed, cnt_append, cnt_single, isFin, isDel, decide_true, ↓reduceIte, zf, zd]
@@ -1499,16 +1532,15 @@ theorem finish_preserves {S : Type} {ops : stateless.SurrogateSealer S} {policy 
       · intro ev m
         simp only [List.mem_singleton] at m
         subst m
-        obtain ⟨_, cert, prov, subj, valid, sealed⟩ := issued_trace ops sealer hiss
+        obtain ⟨_, cert, prov, subj, valid, sealed⟩ := issued_trace ops is.sealer hiss
         obtain ⟨_, pr, c, sb, _, _, _⟩ := se
         exact ⟨st0, List.mem_append_left _ started0, by rw [cert, c], by rw [prov, pr], by rw [subj, sb],
-          x, tok, List.mem_append_left _ held, serialEq.symm, ht, valid, sealer, sealed⟩
-    · have noneIssued : (match x.token with
-          | some tok => issuedOf ops sealer issuePolicy s.entry tok tokenId now lifetime
-          | none => none) = none := by
-        rcases failed with ht | ⟨tok, rej, ht, hrej⟩
-        · rw [ht]
-        · rw [ht]; exact issuedOf_none hrej
+          x, tok, List.mem_append_left _ held, serialEq.symm, ht, valid, is.sealer, sealed⟩
+    · have noneIssued : finishedWith ops x.token issuance issuePolicy s.entry now lifetime = none := by
+        rcases failed with ht | ⟨tok, ht, hi⟩ | ⟨tok, is, rej, ht, hi, hrej⟩
+        · rw [ht]; rfl
+        · rw [ht, hi]; rfl
+        · rw [ht, hi]; exact issuedOf_none hrej
       rw [noneIssued]
       refine inv_of_rewrite inv at_k slots next rfl rfl (by simp [Event.serial]) ?_ (onceFin _) ?_
       · refine ⟨⟨st0, List.mem_append_left _ started0, SameEntry_withStage se _⟩, ?_⟩

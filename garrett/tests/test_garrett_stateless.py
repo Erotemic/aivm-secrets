@@ -319,3 +319,54 @@ def test_the_native_provider_session_takes_one_write_for_its_destination():
     assert not native.transmit(stateless_proxy.Egress(here, b'GET / HTTP/1.1\r\n\r\n'))
     assert sock.sent == b'GET /' and sock.closed and native.upstream is None
     assert native.receive() is None
+
+
+def test_a_login_the_broker_cannot_issue_for_still_ends(env, monkeypatch):
+    """If the broker cannot draw a surrogate's fresh jti after a successful
+    code exchange, the login ends failed: never left pending, never issued."""
+    from garrett_stateless import broker as broker_module
+
+    def no_randomness() -> str:
+        raise OSError('no randomness')
+
+    broker = Broker.from_file(env.root / 'broker.json')
+    running = broker.serve()
+    endpoint = Endpoint.parse('https://broker.test:9443', running.agent_address)
+    c = _agent(env, 'agent-c')
+    started = c.begin_login(endpoint, 'api')
+    # Randomness fails after the login began, before its surrogate's jti.
+    monkeypatch.setattr(broker_module, '_random_id', no_randomness)
+    done = env.human(started.authorization_url, running.browser_address, expect_confirmation=started.confirmation)
+    assert done.status != 200
+    assert any(e['event'] == 'token_issued' for e in env.provider_log())  # the exchange itself succeeded
+    with pytest.raises(ProtocolError) as failed:
+        c.poll(endpoint, started.login)
+    assert failed.value.code != 'login_pending'
+    with pytest.raises(ProtocolError):
+        c.wait_for_token(endpoint, started.login, 1)
+    running.stop()
+
+
+def test_mailbox_finish_without_an_issuance_ends_the_login():
+    from garrett_stateless.core import stateless_mailbox as mb
+    from garrett_stateless.core.stateless_login import LoginPolicy, Stage
+    sealed = []
+
+    class Sealer:
+        def seal(self, claims, credential):
+            sealed.append(credential)
+            return b'token'
+
+    policy = LoginPolicy('a', ('api',), 600)
+    mailbox = mb.Mailbox()
+    state = mb.mailbox_start(mailbox, policy, 'api', 'PEER', 'agent', 10_000, 'L1', 'V' * 43, 'read', 100)
+    permit = mb.mailbox_accept(mailbox, policy, state, None, None, False, 200)
+    exchanged = mb.mailbox_exchange(lambda provider, code, verifier: mb.Token(b'credential', 600), permit, 'code')
+    with pytest.raises(mb.MailboxError, match='internal_error'):
+        mb.mailbox_finish(mailbox, exchanged, None, None, 203, 900)
+    slot = mailbox.slots[mailbox.find('L1')]
+    assert slot.entry.stage is Stage.UNCERTAIN and slot.token == b'' and sealed == []
+    assert mb.mailbox_poll(mailbox, 'PEER', 'L1', 204)[0] == 'failed'
+    with pytest.raises(mb.MailboxError):
+        mb.mailbox_finish(mailbox, exchanged, mb.Issuance(Sealer(), 'j'), None, 205, 900)
+    assert sealed == []

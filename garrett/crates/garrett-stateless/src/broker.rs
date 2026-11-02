@@ -18,7 +18,7 @@ use garrett_stateless_core::oauth_login::{IssuerRule, LoginDenial};
 use garrett_stateless_core::stateless::{self, Acceptance, Grant, IssuePolicy, MAX_TIME};
 use garrett_stateless_core::stateless_login::LoginPolicy;
 use garrett_stateless_core::stateless_mailbox::{
-    self, CodeExchange, Mailbox, MailboxError, Polled, Token,
+    self, CodeExchange, Issuance, Mailbox, MailboxError, Polled, Token,
 };
 use garrett_stateless_core::stateless_token::{KeySet, TokenSealer};
 use rustls::{ServerConfig, ServerConnection, StreamOwned};
@@ -237,6 +237,7 @@ fn mailbox_error(error: MailboxError) -> Error {
         MailboxError::Consumed => Error::Protocol("login_consumed"),
         MailboxError::Expired => Error::Protocol("login_expired"),
         MailboxError::Denied => Error::Protocol("login_denied"),
+        MailboxError::Unavailable => Error::Protocol("internal_error"),
     }
 }
 
@@ -524,18 +525,22 @@ impl Broker {
             },
             None => Informational::default(),
         };
-        // A sealer that cannot be built (no random nonce, an unencodable
-        // claim) still finishes the login: it refuses to seal.
-        let sealer = token::sealer(self.keys.active_entry(), &info)
-            .unwrap_or_else(|_| refusing_sealer(self.keys.active_entry()));
-        // A failed random draw leaves an invalid `jti`, which fails issuance.
-        let token_id = random_id().unwrap_or_default();
+        // The fresh nonce and `jti` of the surrogate. If either cannot be
+        // drawn (or a claim cannot be encoded), the mailbox still finishes
+        // the login, with no issuance: it ends `Uncertain` and nothing is
+        // sealed.
+        let issuance = match (token::sealer(self.keys.active_entry(), &info), random_id()) {
+            (Ok(sealer), Ok(token_id)) => Some(Issuance {
+                sealer,
+                token_id: token_id.into_bytes(),
+            }),
+            _ => None,
+        };
         let finished = stateless_mailbox::finish(
             &mut *self.locked()?,
             exchanged,
-            sealer,
+            issuance,
             &self.issue_policy(),
-            token_id.as_bytes(),
             self.now(),
             self.config.max_lifetime,
         );
@@ -819,17 +824,6 @@ pub fn mint_with(
         expires_at: issued.claims.expires_at,
         renew_until: issued.claims.renew_until,
     })
-}
-
-/// A sealer that refuses every issuance (its nonce is invalid).
-fn refusing_sealer(entry: &crate::keys::KeyEntry) -> TokenSealer<RingKey> {
-    let info = garrett_stateless_core::stateless_token::Informational {
-        has_scope: false,
-        scope: Vec::new(),
-        has_upstream: false,
-        upstream: Vec::new(),
-    };
-    TokenSealer::new(entry.core(), info, Vec::new())
 }
 
 fn escape(text: &str) -> String {

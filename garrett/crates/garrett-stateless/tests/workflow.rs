@@ -1007,6 +1007,10 @@ fn an_interrupted_provider_write_emits_only_a_prefix_and_is_not_completed() {
         let reply = String::from_utf8_lossy(&response.body);
         assert!(!reply.contains(CREDENTIAL), "{reply}");
         assert_eq!(seen.len(), 1, "one write, no retry (cut at {cut})");
-        assert_eq!(seen[0], authorized[..cut], "a prefix of the authorized request");
+        assert_eq!(
+            seen[0],
+            authorized[..cut],
+            "a prefix of the authorized request"
+        );
     }
 }

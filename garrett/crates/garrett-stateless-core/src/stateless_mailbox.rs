@@ -10,6 +10,9 @@
 //! the token request made with that login's verifier as an [`Exchanged`],
 //! and [`finish`] consumes that. So one accepted callback yields at most one
 //! exchange, and its answer can only reach the login it was made for.
+//! [`finish`] always ends the login: with the surrogate issued, or — no
+//! token, no [`Issuance`] the broker could prepare, or a refused issuance —
+//! `Uncertain` with none.
 // Explicit matches and `mem::replace` keep to what Aeneas models.
 #![allow(
     clippy::single_match,
@@ -64,6 +67,8 @@ pub enum MailboxError {
     Consumed,
     Expired,
     Denied,
+    /// The broker could not prepare an issuance (no fresh randomness).
+    Unavailable,
 }
 
 /// Leave to run the one code exchange of an accepted login. Only [`accept`]
@@ -357,16 +362,23 @@ pub fn issued<S: SurrogateSealer>(
     )
 }
 
+/// What issuing a login's surrogate takes from the broker's randomness: a
+/// sealer for one surrogate, holding a fresh nonce, and the surrogate's
+/// fresh `jti`.
+pub struct Issuance<S> {
+    pub sealer: S,
+    pub token_id: Vec<u8>,
+}
+
 /// Spec section 8.1 step 8: the result of a permitted code exchange. A
-/// failed exchange, or a failed issuance, ends the login `Uncertain` with no
-/// surrogate. Only the slot the permit was made for can change.
-#[allow(clippy::too_many_arguments)]
+/// failed exchange, an exchange the broker could prepare no `issuance` for,
+/// or a refused issuance ends the login `Uncertain` with no surrogate and
+/// nothing sealed. Only the slot the permit was made for can change.
 pub fn finish<S: SurrogateSealer>(
     mailbox: &mut Mailbox,
     exchanged: Exchanged,
-    sealer: S,
+    issuance: Option<Issuance<S>>,
     policy: &IssuePolicy,
-    token_id: &[u8],
     now: i64,
     lifetime: i64,
 ) -> Result<(), MailboxError> {
@@ -385,8 +397,22 @@ pub fn finish<S: SurrogateSealer>(
                 _ => return Err(MailboxError::Consumed),
             }
             let result = match &exchanged.token {
-                Some(token) => issued(sealer, policy, &slot.entry, token, token_id, now, lifetime),
-                None => Err(Rejection::InvalidCredential),
+                Some(token) => match issuance {
+                    Some(issuance) => match issued(
+                        issuance.sealer,
+                        policy,
+                        &slot.entry,
+                        token,
+                        &issuance.token_id,
+                        now,
+                        lifetime,
+                    ) {
+                        Ok(issued) => Ok(issued),
+                        Err(rejection) => Err(MailboxError::Rejected(rejection)),
+                    },
+                    None => Err(MailboxError::Unavailable),
+                },
+                None => Err(MailboxError::Rejected(Rejection::InvalidCredential)),
             };
             match result {
                 Ok(issued) => {
@@ -399,12 +425,12 @@ pub fn finish<S: SurrogateSealer>(
                     slot.renew_until = issued.claims.renew_until;
                     Ok(())
                 }
-                Err(rejection) => {
+                Err(error) => {
                     slot.entry.stage = match oauth_login::finish(&slot.entry.stage, false) {
                         Ok(stage) => stage,
                         Err(_) => Stage::Uncertain,
                     };
-                    Err(MailboxError::Rejected(rejection))
+                    Err(error)
                 }
             }
         }
@@ -555,7 +581,18 @@ mod tests {
     }
 
     fn finished(mailbox: &mut Mailbox, exchanged: Exchanged, now: i64) -> Result<(), MailboxError> {
-        finish(mailbox, exchanged, Seal, &issue_policy(), b"j", now, 900)
+        let issuance = Issuance {
+            sealer: Seal,
+            token_id: b"j".to_vec(),
+        };
+        finish(
+            mailbox,
+            exchanged,
+            Some(issuance),
+            &issue_policy(),
+            now,
+            900,
+        )
     }
 
     #[test]
@@ -604,6 +641,37 @@ mod tests {
             Polled::Failed
         ));
         assert!(accepted(&mut mailbox, &state, 205).is_err());
+    }
+
+    /// A successful exchange the broker cannot prepare an issuance for (no
+    /// fresh nonce or `jti`) still ends the login, without sealing: it is
+    /// never left exchanging, never issues, and cannot be finished again.
+    #[test]
+    fn an_exchange_without_an_issuance_ends_the_login() {
+        let mut mailbox = empty();
+        let mut endpoint = Endpoint { calls: 0 };
+        let state = begun(&mut mailbox, b"L1", b"PEER", b"V", 100);
+        let permit = accepted(&mut mailbox, &state, 200).ok().unwrap();
+        let exchanged = exchange(&mut endpoint, permit, b"code1");
+        assert!(exchanged_token(&exchanged).is_some());
+        let unprepared: Option<Issuance<Seal>> = None;
+        assert!(matches!(
+            finish(
+                &mut mailbox,
+                exchanged,
+                unprepared,
+                &issue_policy(),
+                203,
+                900
+            ),
+            Err(MailboxError::Unavailable)
+        ));
+        assert!(matches!(
+            poll(&mut mailbox, b"PEER", b"L1", 204),
+            Polled::Failed
+        ));
+        assert!(accepted(&mut mailbox, &state, 205).is_err());
+        assert_eq!(endpoint.calls, 1);
     }
 
     #[test]

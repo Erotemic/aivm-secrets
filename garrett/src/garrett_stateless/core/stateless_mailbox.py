@@ -154,19 +154,34 @@ def mailbox_exchange(token: Callable[[str, str, str], Token | None], permit: Per
     return Exchanged(permit, token(permit.provider, code, permit.verifier))
 
 
-def mailbox_finish(mailbox: Mailbox, exchanged: Exchanged, sealer: SurrogateSealer, policy: IssuePolicy,
-                   token_id: str, now: int, lifetime: int) -> None:
+@dataclass(frozen=True)
+class Issuance:
+    """What issuing a login's surrogate takes from the broker's randomness: a
+    sealer for one surrogate, holding a fresh nonce, and its fresh ``jti``."""
+    sealer: SurrogateSealer
+    token_id: str
+
+
+def mailbox_finish(mailbox: Mailbox, exchanged: Exchanged, issuance: Issuance | None, policy: IssuePolicy,
+                   now: int, lifetime: int) -> None:
+    """A failed exchange, an exchange with no ``issuance`` the broker could
+    prepare, or a refused issuance ends the login ``uncertain`` with no
+    surrogate and nothing sealed."""
     index = mailbox.find(exchanged.permit.login)
     if index >= len(mailbox.slots) or mailbox.slots[index].serial != exchanged.permit.serial:
         raise MailboxError('login_unknown')
     slot = mailbox.slots[index]
     if slot.entry.stage is not Stage.EXCHANGING:
         raise MailboxError('login_consumed')
+    if exchanged.token is not None and issuance is None:
+        slot.entry = with_stage(slot.entry, Stage.UNCERTAIN)
+        raise MailboxError('internal_error')
     try:
         if exchanged.token is None:
             raise Rejection('invalid_credential')
         expires = credential_expiry(now, exchanged.token.expires_in)
-        issued = complete(sealer, policy, slot.entry, exchanged.token.credential, expires, token_id, now, lifetime)
+        issued = complete(issuance.sealer, policy, slot.entry, exchanged.token.credential, expires,
+                          issuance.token_id, now, lifetime)
     except Rejection as rejection:
         slot.entry = with_stage(slot.entry, Stage.UNCERTAIN)
         raise MailboxError(rejection.code) from None

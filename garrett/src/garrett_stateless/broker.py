@@ -257,16 +257,22 @@ class Broker:
             return stateless_mailbox.Token(response.access_token.encode('ascii'), response.expires_in)
 
         exchanged = stateless_mailbox.mailbox_exchange(token, permit, code)
-        sealer = None
+        # The surrogate's fresh nonce and jti. If either cannot be drawn, the
+        # mailbox still finishes the login, with no issuance: it ends
+        # uncertain and nothing is sealed.
+        issuance = None
         if exchanged.token is not None:
             info = Informational(scope=(scope if scope is not None else state.scope) or None,
                                      upstream=tok.copy_upstream(exchanged.token.credential.decode('ascii'),
                                                                 provider.copy_claims))
-            sealer = _sealer(self.keys.active_entry(), info)
+            try:
+                issuance = stateless_mailbox.Issuance(_sealer(self.keys.active_entry(), info), _random_id())
+            except (OSError, NotImplementedError, stateless.Rejection):
+                issuance = None
         with self.mailbox_lock:
             try:
-                stateless_mailbox.mailbox_finish(self.mailbox, exchanged, sealer, self.issue_policy(), _random_id(), self.clock(),
-                                 self.config.max_lifetime)
+                stateless_mailbox.mailbox_finish(self.mailbox, exchanged, issuance, self.issue_policy(), self.clock(),
+                                                 self.config.max_lifetime)
             except stateless_mailbox.MailboxError as error:
                 if failure is None:
                     failure = error

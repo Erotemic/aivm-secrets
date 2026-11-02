@@ -53,8 +53,6 @@ MUTANT_PROOFS = {
     'stateless proxy reply reveals a credential bit': 'GarrettConfidentiality',
     'proxy encoder verdict reveals a credential bit': 'GarrettConfidentiality',
     'stateless token carries a credential byte outside the ciphertext': 'GarrettConfidentiality',
-    # Only the whole-connection theorem sees a leak through the loop itself.
-    'stateless proxy connection closes on a credential bit': 'GarrettConfidentiality',
 }
 
 MUTANTS = [
@@ -127,9 +125,9 @@ MUTANTS = [
      "    let route = &routes[index];\n    if opened.credential.len() % 2 == 1 {\n"
      "        return Decision::Refused(Code::Denied);\n    }\n    let mut wire = Vec::new();"),
     # The connection loop re-decides the request and closes the connection on
-    # a credential bit: each reply is unchanged, so only a theorem over the
-    # whole connection (`connection_declassified`) sees the agent's view
-    # change.
+    # a credential bit. Each reply is unchanged, so the per-request theorems
+    # do not see it; `connection_declassified` would, but `connection_step_paths`
+    # rejects it first: it fixes each step's `open` exactly.
     ("stateless_proxy.rs", "stateless proxy connection closes on a credential bit",
      "            let sent = channel.send(&served.reply);\n            Tunnel {\n                buffer: rest,\n"
      "                open: sent && served.keep,\n",
@@ -177,6 +175,11 @@ MUTANTS = [
      "        path: request.target[..end].to_vec(),\n", "        path: request.target.clone(),\n"),
     ("stateless_login.rs", "stateless login started for an unconfigured provider",
      "if !stateless::member(&policy.providers, provider) {", "if false {"),
+    # A login the broker could prepare no issuance for must still end; left
+    # exchanging, it would wait for a finish that never comes.
+    ("stateless_mailbox.rs", "stateless mailbox exchange without an issuance left exchanging",
+     "                    None => Err(MailboxError::Unavailable),",
+     "                    None => return Err(MailboxError::Unavailable),"),
     ("stateless_mailbox.rs", "stateless mailbox duplicate login accepted",
      "if find(&mailbox.slots, &state.login) < mailbox.slots.len() {", "if false {"),
     ("stateless_mailbox.rs", "stateless mailbox serial reused", "        serial: mailbox.next,\n", "        serial: 0,\n"),

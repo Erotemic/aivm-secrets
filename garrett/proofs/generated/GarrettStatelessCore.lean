@@ -5578,19 +5578,19 @@ def stateless_login.deliver
   else ok stateless_login.Delivery.WrongCertificate
 
 /-- [garrett_stateless_core::stateless_mailbox::MAX_PENDING]
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 26:0-26:36
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 29:0-29:36
     Visibility: public -/
 @[global_simps, irreducible]
 def stateless_mailbox.MAX_PENDING : Std.Usize := 1024#usize
 
 /-- [garrett_stateless_core::stateless_mailbox::LAST_SERIAL]
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 28:0-28:50
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 31:0-31:50
     Visibility: public -/
 @[global_simps, irreducible]
 def stateless_mailbox.LAST_SERIAL : Std.U64 := 18446744073709551615#u64
 
 /-- [garrett_stateless_core::stateless_mailbox::Slot]
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 31:0-39:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 34:0-42:1
     Visibility: public -/
 structure stateless_mailbox.Slot where
   entry : stateless_login.Entry
@@ -5600,14 +5600,14 @@ structure stateless_mailbox.Slot where
   renew_until : Std.I64
 
 /-- [garrett_stateless_core::stateless_mailbox::Mailbox]
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 41:0-44:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 44:0-47:1
     Visibility: public -/
 structure stateless_mailbox.Mailbox where
   slots : alloc.vec.Vec (Option stateless_mailbox.Slot)
   next : Std.U64
 
 /-- [garrett_stateless_core::stateless_mailbox::empty]:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 46:0-51:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 49:0-54:1
     Visibility: public -/
 def stateless_mailbox.empty : Result stateless_mailbox.Mailbox := do
   ok
@@ -5617,7 +5617,7 @@ def stateless_mailbox.empty : Result stateless_mailbox.Mailbox := do
     }
 
 /-- [garrett_stateless_core::stateless_mailbox::MailboxError]
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 55:0-67:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 58:0-72:1
     Visibility: public -/
 @[discriminant isize]
 inductive stateless_mailbox.MailboxError where
@@ -5630,9 +5630,10 @@ inductive stateless_mailbox.MailboxError where
 | Consumed : stateless_mailbox.MailboxError
 | Expired : stateless_mailbox.MailboxError
 | Denied : stateless_mailbox.MailboxError
+| Unavailable : stateless_mailbox.MailboxError
 
 /-- [garrett_stateless_core::stateless_mailbox::Permit]
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 71:0-76:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 76:0-81:1
     Visibility: public -/
 structure stateless_mailbox.Permit where
   serial : Std.U64
@@ -5641,7 +5642,7 @@ structure stateless_mailbox.Permit where
   verifier : alloc.vec.Vec Std.U8
 
 /-- [garrett_stateless_core::stateless_mailbox::Token]
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 79:0-83:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 84:0-88:1
     Visibility: public -/
 structure stateless_mailbox.Token where
   credential : alloc.vec.Vec Std.U8
@@ -5649,21 +5650,21 @@ structure stateless_mailbox.Token where
   expires_in : Std.I64
 
 /-- Trait declaration: [garrett_stateless_core::stateless_mailbox::CodeExchange]
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 87:0-89:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 92:0-94:1
     Visibility: public -/
 structure stateless_mailbox.CodeExchange (Self : Type _) where
   token : Self → Slice Std.U8 → Slice Std.U8 → Slice Std.U8 → Result
     ((Option stateless_mailbox.Token) × Self)
 
 /-- [garrett_stateless_core::stateless_mailbox::Exchanged]
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 93:0-96:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 98:0-101:1
     Visibility: public -/
 structure stateless_mailbox.Exchanged where
   permit : stateless_mailbox.Permit
   token : Option stateless_mailbox.Token
 
 /-- [garrett_stateless_core::stateless_mailbox::exchanged_token]:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 99:0-104:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 104:0-109:1
     Visibility: public -/
 def stateless_mailbox.exchanged_token
   (exchanged : stateless_mailbox.Exchanged) :
@@ -5674,7 +5675,7 @@ def stateless_mailbox.exchanged_token
   | some _ => ok exchanged.token
 
 /-- [garrett_stateless_core::stateless_mailbox::kept]:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 108:0-116:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 113:0-121:1
     Visibility: public -/
 def stateless_mailbox.kept
   (slot : Option stateless_mailbox.Slot) (now : Std.I64) : Result Bool := do
@@ -5689,7 +5690,7 @@ def stateless_mailbox.kept
     else ok false
 
 /-- [garrett_stateless_core::stateless_mailbox::prune]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 121:4-126:5
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 126:4-131:5
     Visibility: public -/
 @[rust_loop]
 def stateless_mailbox.prune_loop
@@ -5718,7 +5719,7 @@ def stateless_mailbox.prune_loop
 partial_fixpoint
 
 /-- [garrett_stateless_core::stateless_mailbox::prune]:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 119:0-127:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 124:0-132:1
     Visibility: public -/
 def stateless_mailbox.prune
   (mailbox : stateless_mailbox.Mailbox) (now : Std.I64) :
@@ -5728,7 +5729,7 @@ def stateless_mailbox.prune
   ok { slots := v, next := i }
 
 /-- [garrett_stateless_core::stateless_mailbox::live]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 133:4-139:5
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 138:4-144:5
     Visibility: public -/
 @[rust_loop]
 def stateless_mailbox.live_loop
@@ -5749,7 +5750,7 @@ def stateless_mailbox.live_loop
 partial_fixpoint
 
 /-- [garrett_stateless_core::stateless_mailbox::live]:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 130:0-141:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 135:0-146:1
     Visibility: public -/
 @[reducible]
 def stateless_mailbox.live
@@ -5757,7 +5758,7 @@ def stateless_mailbox.live
   stateless_mailbox.live_loop slots 0#usize 0#usize
 
 /-- [garrett_stateless_core::stateless_mailbox::live_count]:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 143:0-145:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 148:0-150:1
     Visibility: public -/
 def stateless_mailbox.live_count
   (mailbox : stateless_mailbox.Mailbox) : Result Std.Usize := do
@@ -5765,7 +5766,7 @@ def stateless_mailbox.live_count
   stateless_mailbox.live s
 
 /-- [garrett_stateless_core::stateless_mailbox::holds]:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 147:0-155:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 152:0-160:1
     Visibility: public -/
 def stateless_mailbox.holds
   (slot : Option stateless_mailbox.Slot) (login : Slice Std.U8) :
@@ -5778,7 +5779,7 @@ def stateless_mailbox.holds
     core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 own login
 
 /-- [garrett_stateless_core::stateless_mailbox::find]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 160:4-162:5
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 165:4-167:5
     Visibility: public -/
 @[rust_loop]
 def stateless_mailbox.find_loop
@@ -5800,7 +5801,7 @@ def stateless_mailbox.find_loop
 partial_fixpoint
 
 /-- [garrett_stateless_core::stateless_mailbox::find]:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 158:0-164:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 163:0-169:1
     Visibility: public -/
 @[reducible]
 def stateless_mailbox.find
@@ -5810,7 +5811,7 @@ def stateless_mailbox.find
   stateless_mailbox.find_loop slots login 0#usize
 
 /-- [garrett_stateless_core::stateless_mailbox::occupied]:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 166:0-171:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 171:0-176:1
     Visibility: public -/
 def stateless_mailbox.occupied
   (slot : Option stateless_mailbox.Slot) : Result Bool := do
@@ -5819,7 +5820,7 @@ def stateless_mailbox.occupied
   | some _ => ok true
 
 /-- [garrett_stateless_core::stateless_mailbox::vacancy]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 176:4-178:5
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 181:4-183:5
     Visibility: public -/
 @[rust_loop]
 def stateless_mailbox.vacancy_loop
@@ -5840,7 +5841,7 @@ def stateless_mailbox.vacancy_loop
 partial_fixpoint
 
 /-- [garrett_stateless_core::stateless_mailbox::vacancy]:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 174:0-180:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 179:0-185:1
     Visibility: public -/
 @[reducible]
 def stateless_mailbox.vacancy
@@ -5848,7 +5849,7 @@ def stateless_mailbox.vacancy
   stateless_mailbox.vacancy_loop slots 0#usize
 
 /-- [garrett_stateless_core::stateless_mailbox::start]:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 186:0-237:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 191:0-242:1
     Visibility: public -/
 def stateless_mailbox.start
   (mailbox : stateless_mailbox.Mailbox) (policy : stateless_login.LoginPolicy)
@@ -5921,7 +5922,7 @@ def stateless_mailbox.start
       rejection), mailbox)
 
 /-- [garrett_stateless_core::stateless_mailbox::pending]:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 241:0-267:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 246:0-272:1
     Visibility: public -/
 def stateless_mailbox.pending
   (mailbox : stateless_mailbox.Mailbox) (policy : stateless_login.LoginPolicy)
@@ -5964,7 +5965,7 @@ def stateless_mailbox.pending
       else ok (core.result.Result.Err stateless_mailbox.MailboxError.Consumed)
 
 /-- [garrett_stateless_core::stateless_mailbox::accept]:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 273:0-323:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 278:0-328:1
     Visibility: public -/
 def stateless_mailbox.accept
   (mailbox : stateless_mailbox.Mailbox) (policy : stateless_login.LoginPolicy)
@@ -6035,7 +6036,7 @@ def stateless_mailbox.accept
           denial), { mailbox with slots := v })
 
 /-- [garrett_stateless_core::stateless_mailbox::exchange]:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 327:0-330:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 332:0-335:1
     Visibility: public -/
 def stateless_mailbox.exchange
   {E : Type _} (CodeExchangeInst : stateless_mailbox.CodeExchange E)
@@ -6048,7 +6049,7 @@ def stateless_mailbox.exchange
   ok ({ permit, token }, exchanger1)
 
 /-- [garrett_stateless_core::stateless_mailbox::issued]:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 335:0-358:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 340:0-363:1
     Visibility: public -/
 def stateless_mailbox.issued
   {S : Type _} (statelessSurrogateSealerInst : stateless.SurrogateSealer S)
@@ -6066,15 +6067,22 @@ def stateless_mailbox.issued
       expires token_id now lifetime
   | core.result.Result.Err rejection => ok (core.result.Result.Err rejection)
 
+/-- [garrett_stateless_core::stateless_mailbox::Issuance]
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 368:0-371:1
+    Visibility: public -/
+structure stateless_mailbox.Issuance (S : Type _) where
+  sealer : S
+  token_id : alloc.vec.Vec Std.U8
+
 /-- [garrett_stateless_core::stateless_mailbox::finish]:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 364:0-412:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 377:0-438:1
     Visibility: public -/
 def stateless_mailbox.finish
   {S : Type _} (statelessSurrogateSealerInst : stateless.SurrogateSealer S)
   (mailbox : stateless_mailbox.Mailbox)
-  (exchanged : stateless_mailbox.Exchanged) (sealer : S)
-  (policy : stateless.IssuePolicy) (token_id : Slice Std.U8) (now : Std.I64)
-  (lifetime : Std.I64) :
+  (exchanged : stateless_mailbox.Exchanged)
+  (issuance : Option (stateless_mailbox.Issuance S))
+  (policy : stateless.IssuePolicy) (now : Std.I64) (lifetime : Std.I64) :
   Result ((core.result.Result Unit stateless_mailbox.MailboxError) ×
     stateless_mailbox.Mailbox)
   := do
@@ -6118,10 +6126,26 @@ def stateless_mailbox.finish
           let result ←
             match exchanged.token with
             | none =>
-              ok (core.result.Result.Err stateless.Rejection.InvalidCredential)
+              ok (core.result.Result.Err
+                (stateless_mailbox.MailboxError.Rejected
+                stateless.Rejection.InvalidCredential))
             | some token =>
-              stateless_mailbox.issued statelessSurrogateSealerInst sealer
-                policy slot.entry token token_id now lifetime
+              match issuance with
+              | none =>
+                ok (core.result.Result.Err
+                  stateless_mailbox.MailboxError.Unavailable)
+              | some issuance1 =>
+                do
+                let s2 := alloc.vec.Vec.deref issuance1.token_id
+                let r ←
+                  stateless_mailbox.issued statelessSurrogateSealerInst
+                    issuance1.sealer policy slot.entry token s2 now lifetime
+                match r with
+                | core.result.Result.Ok issued =>
+                  ok (core.result.Result.Ok issued)
+                | core.result.Result.Err rejection =>
+                  ok (core.result.Result.Err
+                    (stateless_mailbox.MailboxError.Rejected rejection))
           match result with
           | core.result.Result.Ok issued =>
             let r ← oauth_login.finish oauth_login.Stage.Exchanging true
@@ -6152,16 +6176,14 @@ def stateless_mailbox.finish
                       renew_until := issued.claims.renew_until
                   })
               ok (core.result.Result.Ok (), { mailbox with slots := v })
-          | core.result.Result.Err rejection =>
+          | core.result.Result.Err error =>
             let r ← oauth_login.finish oauth_login.Stage.Exchanging false
             match r with
             | core.result.Result.Ok stage =>
               let v :=
                 index_mut_back (some
                   { slot with entry := { slot.entry with stage } })
-              ok (core.result.Result.Err
-                (stateless_mailbox.MailboxError.Rejected rejection),
-                { mailbox with slots := v })
+              ok (core.result.Result.Err error, { mailbox with slots := v })
             | core.result.Result.Err _ =>
               let v :=
                 index_mut_back (some
@@ -6172,9 +6194,7 @@ def stateless_mailbox.finish
                         { slot.entry with stage := oauth_login.Stage.Uncertain
                         }
                   })
-              ok (core.result.Result.Err
-                (stateless_mailbox.MailboxError.Rejected rejection),
-                { mailbox with slots := v })
+              ok (core.result.Result.Err error, { mailbox with slots := v })
         | oauth_login.Stage.Complete =>
           let v := index_mut_back o
           ok (core.result.Result.Err stateless_mailbox.MailboxError.Consumed,
@@ -6185,7 +6205,7 @@ def stateless_mailbox.finish
             { mailbox with slots := v })
 
 /-- [garrett_stateless_core::stateless_mailbox::Polled]
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 415:0-427:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 441:0-453:1
     Visibility: public -/
 @[discriminant isize]
 inductive stateless_mailbox.Polled where
@@ -6202,7 +6222,7 @@ inductive stateless_mailbox.Polled where
 | Expired : stateless_mailbox.Polled
 
 /-- [garrett_stateless_core::stateless_mailbox::poll]:
-    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 432:0-462:1
+    Source: 'crates/garrett-stateless-core/src/stateless_mailbox.rs', lines 458:0-488:1
     Visibility: public -/
 def stateless_mailbox.poll
   (mailbox : stateless_mailbox.Mailbox) (peer : Slice Std.U8)
