@@ -871,3 +871,142 @@ fn the_audit_log_and_replies_never_carry_the_credential() {
         assert!(!output.contains(&issued.token), "{output}");
     }
 }
+
+/// A provider that records the application bytes of each request, then
+/// either answers (`cut` is `None`) or, after exactly `cut` bytes, drops the
+/// connection mid-request.
+fn cutting_server(
+    certificate: &str,
+    key: &str,
+    cut: Option<usize>,
+) -> (String, Arc<Mutex<Vec<Vec<u8>>>>) {
+    let config = tls::server(certificate.as_bytes(), key.as_bytes()).unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let log = requests.clone();
+    std::thread::spawn(move || {
+        for tcp in listener.incoming().flatten() {
+            let _ = tcp.set_read_timeout(Some(Duration::from_secs(5)));
+            let mut stream = StreamOwned::new(ServerConnection::new(config.clone()).unwrap(), tcp);
+            let mut bytes = Vec::new();
+            let mut chunk = [0u8; 4096];
+            loop {
+                let want = match cut {
+                    Some(cut) => cut - bytes.len(),
+                    None => complete_request(&bytes).map_or(chunk.len(), |n| n - bytes.len()),
+                };
+                if want == 0 {
+                    break;
+                }
+                match std::io::Read::read(&mut stream, &mut chunk[..want.min(4096)]) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => bytes.extend_from_slice(&chunk[..n]),
+                }
+            }
+            log.lock().unwrap().push(bytes);
+            if cut.is_none() {
+                let _ = stream.write_all(&http::response(200, "application/json", &[], b"{}"));
+                stream.conn.send_close_notify();
+                let _ = stream.conn.complete_io(&mut stream.sock);
+            }
+        }
+    });
+    (address, requests)
+}
+
+/// The length of the HTTP/1.1 request at the start of `bytes` (head and
+/// `Content-Length` body), once its head has arrived.
+fn complete_request(bytes: &[u8]) -> Option<usize> {
+    let end = bytes.windows(4).position(|w| w == b"\r\n\r\n")? + 4;
+    let head = String::from_utf8_lossy(&bytes[..end]).to_ascii_lowercase();
+    let length = head
+        .lines()
+        .find_map(|line| line.strip_prefix("content-length:"))
+        .map_or(0, |value| value.trim().parse::<usize>().unwrap());
+    Some(end + length)
+}
+
+/// A provider write interrupted part-way is never reported as a completed
+/// request, and what the provider received is a prefix of the one
+/// authorized request: no other bytes, and no retry.
+#[test]
+fn an_interrupted_provider_write_emits_only_a_prefix_and_is_not_completed() {
+    let dir = Dir::new();
+    let ca = pki::create_ca("test CA", 2).unwrap();
+    let names = vec!["proxy.test".to_owned(), "api.test".to_owned()];
+    let server = pki::issue(&ca.certificate, &ca.key, Leaf::Server(&names), 2).unwrap();
+    let agent_c = pki::issue(
+        &ca.certificate,
+        &ca.key,
+        Leaf::Client {
+            name: "agent",
+            uri: None,
+        },
+        2,
+    )
+    .unwrap();
+    dir.write("ca.pem", ca.certificate.as_bytes(), false);
+    dir.write("server.pem", server.certificate.as_bytes(), false);
+    dir.write("server.key", server.key.as_bytes(), true);
+    let keys = BrokerKeys::generate("https://broker.test", "k1").unwrap();
+    dir.write("proxy-keys.json", &keys.export_proxy().to_json(), true);
+    let der = tls::certificates(agent_c.certificate.as_bytes())
+        .unwrap()
+        .remove(0);
+    let policy = garrett_stateless::IssuePolicy {
+        issuer: b"https://broker.test".to_vec(),
+        audience: b"https://proxy.test".to_vec(),
+        providers: vec![b"api".to_vec()],
+        max_lifetime: 3600,
+        max_renew: 86400,
+    };
+    let issued = garrett_stateless::broker::mint_with(
+        &keys,
+        &policy,
+        "api",
+        CREDENTIAL.as_bytes(),
+        der.as_ref(),
+        &Default::default(),
+        600,
+        garrett_stateless::broker::now_seconds(),
+    )
+    .unwrap();
+    let agent = Agent::new(
+        ca.certificate.as_bytes(),
+        ClientIdentity::Software {
+            certificate: agent_c.certificate.clone().into_bytes(),
+            key: agent_c.key.as_bytes().to_vec(),
+        },
+    )
+    .unwrap();
+    let body = vec![b'x'; 256 * 1024];
+    let send = |cut: Option<usize>, name: &str| {
+        let (address, requests) = cutting_server(&server.certificate, &server.key, cut);
+        let (host, port) = address.rsplit_once(':').unwrap();
+        let path = proxy_config(&dir, name, host, port);
+        let proxy = Arc::new(Proxy::from_file(&path).unwrap()).serve().unwrap();
+        let endpoint =
+            Endpoint::parse("https://proxy.test:8443", Some(&proxy.address.to_string())).unwrap();
+        let response = agent
+            .request(&endpoint, &issued.token, "POST", "/upload", &[], &body)
+            .unwrap();
+        proxy.stop();
+        std::thread::sleep(Duration::from_millis(100));
+        let seen = requests.lock().unwrap().clone();
+        (response, seen)
+    };
+    let (whole, seen) = send(None, "whole.json");
+    assert_eq!(whole.status, 200);
+    assert_eq!(seen.len(), 1);
+    let authorized = seen[0].clone();
+    assert!(String::from_utf8_lossy(&authorized).contains(CREDENTIAL));
+    for cut in [16, authorized.len() / 2, authorized.len() - 1] {
+        let (response, seen) = send(Some(cut), &format!("cut-{cut}.json"));
+        assert_eq!(response.status, 502, "cut at {cut}");
+        let reply = String::from_utf8_lossy(&response.body);
+        assert!(!reply.contains(CREDENTIAL), "{reply}");
+        assert_eq!(seen.len(), 1, "one write, no retry (cut at {cut})");
+        assert_eq!(seen[0], authorized[..cut], "a prefix of the authorized request");
+    }
+}

@@ -6442,7 +6442,7 @@ structure stateless_proxy.Route where
   authentication : credential_use.Authentication
 
 /-- [garrett_stateless_core::stateless_proxy::provides]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 174:0-177:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 175:0-178:1
     Visibility: public -/
 def stateless_proxy.provides
   (route : stateless_proxy.Route) (provider : Slice Std.U8) : Result Bool := do
@@ -6450,7 +6450,7 @@ def stateless_proxy.provides
   core.slice.cmp.PartialEqSlice.eq core.cmp.PartialEqU8 own provider
 
 /-- [garrett_stateless_core::stateless_proxy::route_of]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 182:4-184:5
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 183:4-185:5
     Visibility: public -/
 @[rust_loop]
 def stateless_proxy.route_of_loop
@@ -6472,7 +6472,7 @@ def stateless_proxy.route_of_loop
 partial_fixpoint
 
 /-- [garrett_stateless_core::stateless_proxy::route_of]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 180:0-186:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 181:0-187:1
     Visibility: public -/
 @[reducible]
 def stateless_proxy.route_of
@@ -6557,7 +6557,7 @@ inductive stateless_proxy.Received where
 | Failed : stateless_proxy.Received
 
 /-- Trait declaration: [garrett_stateless_core::stateless_proxy::Origin]
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 112:0-131:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 112:0-132:1
     Visibility: public -/
 structure stateless_proxy.Origin (Self : Type _) where
   rejected : Self → stateless.Rejection → Result Self
@@ -6569,7 +6569,7 @@ structure stateless_proxy.Origin (Self : Type _) where
   completed : Self → Std.U16 → Result (Bool × Self)
 
 /-- Trait declaration: [garrett_stateless_core::stateless_proxy::Channel]
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 134:0-150:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 135:0-151:1
     Visibility: public -/
 structure stateless_proxy.Channel (Self : Type _) where
   OriginInst : stateless_proxy.Origin Self
@@ -6582,7 +6582,7 @@ structure stateless_proxy.Channel (Self : Type _) where
   restart : Self → Result Self
 
 /-- [garrett_stateless_core::stateless_proxy::surrogate_value]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 154:0-160:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 155:0-161:1
     Visibility: public -/
 def stateless_proxy.surrogate_value
   (value : Slice Std.U8) : Result (Option (alloc.vec.Vec Std.U8)) := do
@@ -6601,7 +6601,7 @@ def stateless_proxy.surrogate_value
   else proxy_connect.presented value
 
 /-- [garrett_stateless_core::stateless_proxy::surrogate_of]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 163:0-172:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 164:0-173:1
     Visibility: public -/
 def stateless_proxy.surrogate_of
   (fields : Slice proxy_http.request.Field) :
@@ -6633,7 +6633,7 @@ def stateless_proxy.surrogate_of
       stateless_proxy.surrogate_value s2
 
 /-- [garrett_stateless_core::stateless_proxy::unauthorized]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 189:0-198:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 190:0-199:1
     Visibility: public -/
 def stateless_proxy.unauthorized : Result (alloc.vec.Vec Std.U8) := do
   let s ←
@@ -6684,7 +6684,7 @@ def stateless_proxy.unauthorized : Result (alloc.vec.Vec Std.U8) := do
   alloc.vec.Vec.extend_from_slice core.clone.CloneU8 out2 s3
 
 /-- [garrett_stateless_core::stateless_proxy::unauthorized_served]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 201:0-209:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 202:0-210:1
     Visibility: public -/
 def stateless_proxy.unauthorized_served : Result proxy_controller.Served := do
   let v ← stateless_proxy.unauthorized
@@ -6698,7 +6698,7 @@ def stateless_proxy.unauthorized_served : Result proxy_controller.Served := do
     }
 
 /-- [garrett_stateless_core::stateless_proxy::Dispatch]
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 213:0-217:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 214:0-218:1
     Visibility: public -/
 structure stateless_proxy.Dispatch where
   route : Std.Usize
@@ -6706,7 +6706,7 @@ structure stateless_proxy.Dispatch where
   opened : stateless.Opened
 
 /-- [garrett_stateless_core::stateless_proxy::Decision]
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 222:0-229:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 223:0-230:1
     Visibility: public -/
 @[discriminant isize]
 inductive stateless_proxy.Decision where
@@ -6715,7 +6715,7 @@ inductive stateless_proxy.Decision where
 | Dispatch : stateless_proxy.Dispatch → stateless_proxy.Decision
 
 /-- [garrett_stateless_core::stateless_proxy::decide]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 237:0-286:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 238:0-287:1
     Visibility: public -/
 def stateless_proxy.decide
   {V : Type _} {P : Type _} (statelessSurrogateOpenerInst :
@@ -6775,7 +6775,7 @@ def stateless_proxy.decide
       ok (stateless_proxy.Decision.Unauthorized (some rejection))
 
 /-- [garrett_stateless_core::stateless_proxy::answer_limit]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 289:0-291:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 290:0-292:1
     Visibility: public -/
 def stateless_proxy.answer_limit (limit : Std.Usize) : Result Std.Usize := do
   let i ← proxy_http.MAX_HEAD
@@ -6783,7 +6783,7 @@ def stateless_proxy.answer_limit (limit : Std.Usize) : Result Std.Usize := do
   i1 + 64#usize
 
 /-- [garrett_stateless_core::stateless_proxy::collect]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 296:4-307:5
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 297:4-308:5
     Visibility: public -/
 @[rust_loop]
 def stateless_proxy.collect_loop
@@ -6807,7 +6807,7 @@ def stateless_proxy.collect_loop
 partial_fixpoint
 
 /-- [garrett_stateless_core::stateless_proxy::collect]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 294:0-308:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 295:0-309:1
     Visibility: public -/
 @[reducible]
 def stateless_proxy.collect
@@ -6820,7 +6820,7 @@ def stateless_proxy.collect
     Std.U8)
 
 /-- [garrett_stateless_core::stateless_proxy::exchange]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 313:0-321:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 314:0-322:1
     Visibility: public -/
 def stateless_proxy.exchange
   {O : Type _} (OriginInst : stateless_proxy.Origin O) (origin : O)
@@ -6843,7 +6843,7 @@ def stateless_proxy.exchange
   else ok (core.result.Result.Err proxy_http.refusal.Code.Unreachable, origin1)
 
 /-- [garrett_stateless_core::stateless_proxy::serve]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 327:0-375:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 328:0-376:1
     Visibility: public -/
 def stateless_proxy.serve
   {V : Type _} {P : Type _} {O : Type _} (statelessSurrogateOpenerInst :
@@ -6908,7 +6908,7 @@ def stateless_proxy.serve
       ok (s, origin1)
 
 /-- [garrett_stateless_core::stateless_proxy::connection_step]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 383:0-455:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 384:0-456:1
     Visibility: public -/
 def stateless_proxy.connection_step
   {V : Type _} {P : Type _} {C : Type _} (statelessSurrogateOpenerInst :
@@ -7015,7 +7015,7 @@ def stateless_proxy.connection_step
       else ok ({ buffer := rest, «open» := false }, channel5)
 
 /-- [garrett_stateless_core::stateless_proxy::connection]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 474:4-486:5
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 475:4-487:5
     Visibility: public -/
 @[rust_loop]
 def stateless_proxy.connection_loop
@@ -7041,7 +7041,7 @@ def stateless_proxy.connection_loop
 partial_fixpoint
 
 /-- [garrett_stateless_core::stateless_proxy::connection]:
-    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 460:0-487:1
+    Source: 'crates/garrett-stateless-core/src/stateless_proxy.rs', lines 461:0-488:1
     Visibility: public -/
 @[reducible]
 def stateless_proxy.connection

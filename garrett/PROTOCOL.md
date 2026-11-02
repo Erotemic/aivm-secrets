@@ -191,8 +191,9 @@ every pair of runs.
   (`STATELESS-CRYPTO-01`).
 * **TLS and the shells**: that the handshake's peer thumbprint is the one
   passed to the core, that `Origin::connect` reports only sessions that
-  authenticated the destination and `Origin::transmit` writes exactly the
-  egress on it (the hypothesis `TransportFaithful`), and that the native
+  authenticated the destination and `Origin::transmit` writes, as TLS
+  application data on it, a prefix of the egress bytes and all of them when
+  it reports success (the hypothesis `TransportFaithful`), and that the native
   shells call the core as `verification/shell_guard.py` checks; this is a
   source guard, not a proof (`STATELESS-NATIVE-01`, `STATELESS-TLS-01`).
 * **Secrecy of the ciphertext** (IND-CPA), timing and other side channels,

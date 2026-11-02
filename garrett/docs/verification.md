@@ -35,7 +35,7 @@ where a proxy relies on signatures, `Unforged`.
 
 | | Guarantee (human statement) | Lean | Proved | Trusted | Tested only |
 | --- | --- | --- | --- | --- | --- |
-| A | Even a malicious agent cannot make Garrett transmit a credential except in an authenticated, authorized, exact request to the configured destination of the provider its surrogate names. | `CompromisedAgentConfinement` (`CredentialWriteAuthorized`: `IssuedFor`, `PolicyPermits`, `RouteFor`, `ExactRequest`, `AfterAuthenticatedConnection`); `provider_writes_confined`; `one_route_per_provider`; `read_only_writes` | every credential-bearing record of every connection, in every execution; the route-to-destination binding (each `Route` carries its `Destination`); one route per provider (`routes_valid_spec`); no write after a failed connection (`exchange_logged`) | `TransportFaithful`: the native `connect`/`transmit` perform exactly the logged writes on a TLS session that authenticated the destination (`STATELESS-NATIVE-01`, `STATELESS-TLS-01`); `Unforged` | the native proxy against an impostor destination (`workflow.rs`), the shell guard's pinning of `open_upstream` and `transmit` |
+| A | Even a malicious agent cannot make Garrett emit a credential-bearing byte to a provider except as part of an authenticated, authorized, exact request to the configured destination of the provider its surrogate names — an interrupted write emits only a prefix of that request. | `CompromisedAgentConfinement` (`CredentialWriteAuthorized`: `IssuedFor`, `PolicyPermits`, `RouteFor`, `ExactRequest`, `AfterAuthenticatedConnection`); `ProviderBytesConfined` (`provider_writes_confined`); `CompletedAfterWholeWrite`, `completed_requests_emitted_whole`; `one_route_per_provider`; `read_only_writes` | every write attempt of every connection, in every execution; the route-to-destination binding (each `Route` carries its `Destination`); one route per provider (`routes_valid_spec`); no write after a failed connection, no answer read and no completion after a failed write (`exchange_logged`, `seg_completed`) | `TransportFaithful`: the application data on each provider session is a prefix of the attempted bytes, all of them if the writer reported success, on a TLS session that authenticated the destination; the native half is `upstream.rs` (`STATELESS-NATIVE-01`, `STATELESS-TLS-01`); `Unforged` | the native proxy against an impostor destination and a provider that drops the connection mid-request (`workflow.rs`); the shell guard's pinning of `upstream.rs` |
 | B | The agent cannot recover the credential from its surrogate, from the proxy's replies or from the broker's outputs, beyond what is declassified on purpose. | `ClaimsHideCredential`, `RecordsPermitted`, `ProxyRepliesDeclassified`, `SurrogatesRevealOnlyCiphertext` (`GarrettConfidentiality`) | two-run theorems: the decision and the reply depend on the credential only through the provider's answer and one reflection bit; a surrogate only through its AEAD ciphertext | AES-256-GCM IND-CPA with unique nonces (`STATELESS-CRYPTO-01`); the declassification boundary (`STATELESS-DISCLOSURE-01`) | — |
 | C | A surrogate grants only its binding, provider and window, and renewal cannot widen what the root issuance granted. | `BoundedDelegation` (`WithinDelegation`), `RenewalPreservesLineage`, `opens_only_for_its_certificate` | for every credential-bearing write: bound to the connection's certificate, accepted audience and provider, inside its window, `exp ≤ ren ≤` the root's `ren`, same provider, binding, subject and credential as its root | the clock; custody of the agent's private key (`STATELESS-DEPLOY-01`); what `Unrestricted` permits is everything on the route | — |
 | D | OAuth credentials are bound to the agent that began the login, issued at most once per exchange, and delivered only to it; operator mint is a separate, trusted door. | `AuthorizedAcquisition` (`DeliveredToInitiator`, `LoginsAtMostOnce`, `FailedLoginsIssueNothing`, `CredentialsEnteredForThePeer`) | the mailbox over every interleaving; every credential a proxy sends was minted for that certificate or came from a login that certificate started | the browser, the human's approval, PKCE secrecy and the provider's token endpoint (`STATELESS-OAUTH-01`); the operator's mint input (`STATELESS-ACQ-01`) | the Rust and Python login workflows |
@@ -43,13 +43,19 @@ where a proxy relies on signatures, `Unforged`.
 
 The distinctions the guarantees keep:
 
-* **A decision is not a write.** `composed_egress` and `decide_request` are
-  about the extracted controller. `CompromisedAgentConfinement` is about the
-  connection's log of native effects, which the extracted connection loop
-  requests. That those requests are the process's only provider writes, each
-  on a TLS session that authenticated the destination, is the explicit
-  hypothesis `TransportFaithful` of `provider_writes_confined`, not a
-  theorem.
+* **A decision is not a write attempt, and an attempt is not a
+  transmission.** `composed_egress` and `decide_request` are about the
+  extracted controller's decision. `CompromisedAgentConfinement` is about the
+  connection's log of native effects the extracted connection loop requests:
+  an `attempted D wire written` record is the hand-off of an authorized
+  request to the native writer, with the writer's report. What reached the
+  network is a third notion, `ProviderWrite`: the application data (TLS
+  plaintext, not the encrypted TCP bytes) emitted on one provider session.
+  The explicit hypothesis `TransportFaithful` relates the two — each
+  session's data is a prefix of an attempt's bytes, all of them if the writer
+  reported success — and `provider_writes_confined` concludes that every
+  emitted byte lies in an authorized request. It does not claim a failed
+  write emitted nothing, nor that a reported success reached the provider.
 * **`Unrestricted` is not least privilege.** Under Garrett's proxy the
   surrogate alone authorizes every operation on its provider's route (minus
   the deny rules); `ReadOnly` restricts the method, body and path
@@ -89,8 +95,8 @@ state with anything, so running each atomically loses no interleaving.
 
 For every reachable world, the theorem proves:
 
-1. **Every credential-bearing provider write has an authorized origin.** Each
-   `sent D w` record follows, in the same connection, the `began` record of
+1. **Every credential-bearing provider write attempt has an authorized
+   origin.** Each `attempted D w written` record follows, in the same connection, the `began` record of
    the request the connection framed, the acknowledged admission of the same
    claims and route, and the authenticated connection to `D`; it was decided
    by `decide_request`, which is the extracted pure `stateless_proxy::decide`,
@@ -103,8 +109,8 @@ For every reachable world, the theorem proves:
    precisely, it is an operator-minted credential for that certificate, or
    the token returned by the code exchange of a login started by a client
    holding exactly the sending connection's certificate (`send_root`).
-2. **A rejection creates no send, and no request sends twice**
-   (`rejection_never_sends`).
+2. **A rejection attempts no write, and no request attempts two**, also
+   after a failed write (`rejection_never_sends`).
 3. **Every delivered surrogate belongs to its initiator**: it goes only to the
    certificate that began its login, is bound to it, and is the one issued
    for that login. **No login is exchanged, issued or delivered twice**, and
@@ -352,7 +358,7 @@ python verification/shell_guard.py check      # shell guard
 | `GarrettStatelessState` | `state_bytes_ok`, `parse_state_sound`, `parse_state_complete`, `seal_state_ok`, `open_state_ok`, `seal_open_state` | `state_bytes`, `parse_state`, `seal_state`, `open_state` |
 | `GarrettStatelessRoundTrip` | `seal_then_open` | `seal_token`, `verify_token`, `unseal_token` |
 | `GarrettStatelessMailbox` | `reachable_inv`; `slot_from_start`, `accepted_matches_start`, `at_most_once`, `issued_for_starting_peer`, `delivered_to_starting_peer`, `failed_never_delivered`, `delivered_is_gone` | `stateless_mailbox.rs`: `start`, `pending`, `accept`, `exchange`, `finish`, `poll` and their loops |
-| `GarrettStatelessConnection` | `connection_runs`, `collect_loop_preserves`, `exchange_logged`, `serveLog_events`, `step_logged`, `connection_logged`, `seg_sent`, `seg_connected`, `connection_egress_authorized`, `connection_sends_once_per_request`, `connection_guest_bytes` | `stateless_proxy.rs`: `connection`, `connection_step`, `serve`, `exchange`, `collect` |
+| `GarrettStatelessConnection` | `connection_runs`, `collect_loop_preserves`, `exchange_logged`, `serveLog_events`, `step_logged`, `connection_logged`, `seg_attempted`, `seg_connected`, `seg_completed`, `connection_egress_authorized`, `connection_attempts_once_per_request`, `connection_guest_bytes` | `stateless_proxy.rs`: `connection`, `connection_step`, `serve`, `exchange`, `collect` |
 | `GarrettStatelessProtocol` | `accepts_sealed`, `informational_no_influence`, `opened_issued`, `lineage`, `login_root`, `send_origin`, `send_root`, `rejection_never_sends`, `kid_configured`, `retired_never_opens`, `issued_secret`, `log_permitted`, `delivered_to_initiator`, `login_once`, `failed_login_quiet`, `prefix_logged`, `connection_prefix`, **`protocol_safety`** | all of the above, composed |
 | `GarrettStatelessWitness` | `issue_then_open`, `issued_codec`, `issued_opens_only_for_its_certificate` | `stateless::issue`, `stateless::open`, the `KeySet`/`TokenSealer` instances |
 | `GarrettStatelessStrict` | `no_providers_no_state`, `strict_no_login_state` | `stateless_mailbox.rs` (all transitions), `stateless_login::begin` |
@@ -400,7 +406,7 @@ configuration refuses. This is a source guard, not a proof.
 | `GET /v1/logins/{id}` (agent mTLS) | `poll` | the surrogate, once, to the starting certificate | wrong peer refused; **attempted vs completed delivery**: the slot is removed when `poll` returns it (`delivered_is_gone`), so a reply lost in transit is not resent; the agent starts a new login |
 | `POST /v1/renewals` (agent mTLS) | `stateless::renew` | a new surrogate, same binding/provider/credential, `ren` not later | any refusal is 401; a retried renewal issues another surrogate within the same limit (`lineage`) |
 | `mint` (operator) | `stateless::issue` | a surrogate for the operator's certificate and credential, from the keys and issuance policy alone (no listener, OAuth client or client secret) | refusal before any seal (`issue_invalid_never_seals`); an active key for another issuer is refused |
-| proxy (agent mTLS) | `stateless_proxy::connection` | exactly one `sent` per admitted request, after `connected D true` | **attempted vs completed**: `connected D false` (the server did not authenticate as `D`) sends nothing and is `unreachable`; `sent` is the hand-off to `Origin::transmit`; `completed` records a provider answer; a native write or read failure is `OutcomeUnknown` and is never retried; an answer past `answer_limit` is `too_large` |
+| proxy (agent mTLS) | `stateless_proxy::connection` | exactly one write attempt per admitted request, after `connected D true` | **attempted vs emitted vs completed**: `connected D false` (the server did not authenticate as `D`) attempts nothing and is `unreachable`; `attempted D w written` is the hand-off to `Origin::transmit` with its report; a failed write (which may have emitted any prefix of `w`) is `OutcomeUnknown`, its answer is not read, it is never completed (`seg_completed`) and never retried; `completed` records an answer to a write reported whole; an answer past `answer_limit` is `too_large` |
 | key rotation, retirement, export | `KeySet::new` (`keys_valid_true`) | a valid set: 1–8 entries, unique `kid`s | an invalid set is refused; retirement removes a `kid` from proxies (`retired_never_opens`) |
 
 ## Implementation linkage: mutation evidence
@@ -458,12 +464,16 @@ The assumption ledger entries are `STATELESS-NATIVE-01`, `STATELESS-CRYPTO-01`,
   round trip; login safety does not depend on it, because the mailbox accepts
   only a callback that matches its own pending entry.
 - **Native shells.** The shell must do what `shell_guard.py` checks: pass
-  the handshake peer; answer `connect` with `true` only for a TLS session to
-  the destination it was given in which the server proved its host under its
-  trust anchors; write exactly `egress_wire` on that session in `transmit`;
-  and write only `served.reply` to the guest. In `Garrett.lean` this is the
-  explicit hypothesis `TransportFaithful`. That the native code meets it, and
-  that a provider-side effect follows, are not proved.
+  the handshake peer; reach providers only through `upstream.rs`, whose
+  private types allow a session only after a TLS handshake to the
+  destination it was given in which the server proved its host under its
+  trust anchors, and one write on it, of exactly `egress_wire` of an egress
+  for that destination; and write only `served.reply` to the guest. In
+  `Garrett.lean` this is the explicit hypothesis `TransportFaithful`: the
+  application data on each provider session is a prefix of the attempted
+  bytes, all of them if the writer reported success. That `write_all` and
+  `flush` behave so, and that a provider-side effect follows, are not
+  proved.
 - **TLS and X.509.** The peer thumbprint must be that of the certificate the
   TLS stack verified; CRLs are not consulted.
 - **Rust ownership.** `Permit`, `Exchanged` and `Egress` have private fields

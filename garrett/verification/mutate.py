@@ -109,6 +109,13 @@ MUTANTS = [
      "        &route.destination.host,", "        &routes[0].destination.host,"),
     ("stateless_proxy.rs", "stateless proxy credential written after a failed connection",
      "if !origin.connect(egress_destination(&egress)) {", "if false {"),
+    # A write the native writer did not report whole may have emitted any
+    # prefix of the request: its outcome is unknown, never a completed
+    # provider operation. (A retry cannot even be written: `transmit`
+    # consumes the egress.)
+    ("stateless_proxy.rs", "stateless proxy failed write treated as delivered",
+     "    if !origin.transmit(egress) {\n        return Err(Code::OutcomeUnknown);\n    }\n",
+     "    let _ = origin.transmit(egress);\n"),
     ("stateless_proxy.rs", "stateless proxy catalogue accepts two routes for a provider",
      "if route_of(routes, &routes[index].provider) != index {", "if false {"),
     # The credential may influence what the agent sees only through what is

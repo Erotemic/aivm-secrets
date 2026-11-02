@@ -145,7 +145,8 @@ class Proxy:
 
 class _Upstream:
     """A TLS connection to a provider whose server authenticated as the
-    destination's host under its trust anchors."""
+    destination's host under its trust anchors. It takes one write: after it,
+    the session can only be read."""
 
     def __init__(self, destination: stateless_proxy.Destination):
         context = tls.upstream_client_pem(destination.trust)
@@ -157,6 +158,7 @@ class _Upstream:
             raise
         self.destination = destination
         self.started = time.monotonic()
+        self.written = False
 
     def close(self) -> None:
         try:
@@ -187,18 +189,23 @@ class _Native:
         return self.upstream is not None
 
     def transmit(self, egress: stateless_proxy.Egress) -> bool:
-        """The one provider write, on the connection ``connect`` opened. No retry."""
-        if self.upstream is None or self.upstream.destination != egress.destination:
+        """The one provider write, on the session ``connect`` opened to the
+        egress's destination, which it uses up. A failed write may have sent
+        any prefix of the bytes; the session is closed. No retry."""
+        upstream = self.upstream
+        if upstream is None or upstream.written or upstream.destination != egress.destination:
             return False
+        upstream.written = True
         try:
-            self.upstream.sock.sendall(egress.wire)
+            upstream.sock.sendall(egress.wire)
             return True
         except OSError:
+            self._close()
             return False
 
     def receive(self) -> bytes | None:
         upstream = self.upstream
-        if upstream is None or time.monotonic() - upstream.started > UPSTREAM_DEADLINE:
+        if upstream is None or not upstream.written or time.monotonic() - upstream.started > UPSTREAM_DEADLINE:
             self._close()
             return None
         try:

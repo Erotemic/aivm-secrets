@@ -56,6 +56,7 @@ pub mod tls;
 pub mod token;
 #[cfg(feature = "tpm")]
 pub mod tpm;
+mod upstream;
 
 pub use error::{Error, Result};
 pub use garrett_stateless_core::stateless::{Acceptance, IssuePolicy, Rejection, SurrogateClaims};

@@ -8,8 +8,12 @@ shell's source, each place where a credential, a signing or sealing key, a
 provider connection or an audit record is handled, and checks that each one is
 reached only through the extracted interface the proofs quantify over:
 
-* the proxy's one provider write sends `egress_wire` of an `Egress`, which only
-  the core's `serve` makes, and only `Origin::exchange` calls it;
+* the proxy reaches a provider only through `upstream.rs`, whose private
+  types allow one TLS session per `Origin::connect`, authenticated as the
+  destination the core passed, and one write on it: `egress_wire` of an
+  `Egress` for that destination, which only the core's `serve` makes;
+* the proxy never handles a credential: it writes to the agent only the bytes
+  the core hands `Channel::send`, and opens nothing with a key;
 * the proxy serves every request for the peer of its TLS handshake;
 * the broker seals only through `seal_token`, behind `stateless::issue`,
   `stateless::renew` or the mailbox's `finish`, and drives each mailbox
@@ -196,38 +200,91 @@ def check(root: Path = ROOT) -> list[str]:
         require(not re.search(r'\bunsafe\b', code_only(source)), f'unsafe code in {name}')
     checked.append('no unsafe code in the shell')
 
-    # The proxy's provider connection and write.
+    # The proxy's provider transport is upstream.rs, and only the proxy uses it.
     proxy = shell['proxy.rs']
+    upstream = shell['upstream.rs']
+    for name, source in shell.items():
+        if name not in ('proxy.rs', 'upstream.rs', 'lib.rs'):
+            require(not re.search(r'\bupstream::', code_only(source)) and 'Authenticated' not in code_only(source),
+                    f'{name} uses the provider transport')
+    # Its session types keep their fields private: no other code can reach the
+    # socket, and the destination of a session is the one it was opened for.
+    for struct in ['Authenticated', 'Answering']:
+        body = re.search(r'pub\(crate\) struct ' + struct + r' \{(.*?)\}', code_only(upstream), re.S)
+        require(body is not None, f'upstream.rs no longer defines {struct}')
+        require('pub' not in body.group(1), f'{struct} exposes a field')
+    for struct, builder in [('Authenticated', 'open'), ('Answering', 'transmit')]:
+        built = len(re.findall(r'(?<!struct )(?<!impl )\b' + struct + r' \{', code_only(upstream)))
+        require(built == 1 and owners(upstream, 'Some(' + struct + ' {') == {builder},
+                f'a provider session ({struct}) is built outside {builder}')
+    # One write per session: only `transmit`, which consumes the authenticated
+    # session, writes, and it writes exactly the egress bytes, once, after
+    # checking the egress is for this session's destination.
     require(count(every, 'egress_wire(') == 1, 'egress_wire must be read exactly once in the shell')
-    require(owners(proxy, 'egress_wire(') == {'transmit'}, 'egress_wire read outside Origin::transmit')
-    transmit = functions(proxy)['transmit'][0]
-    require('egress: Egress' in transmit, 'Origin::transmit no longer takes the core Egress')
-    require('upstream.tls.write_all(egress_wire(&egress))' in transmit, 'the provider write is not the egress bytes')
-    require(count(transmit, 'write_all(') == 1 and count(every, 'upstream.tls.write') == 1,
-            'the provider connection is written more than once')
-    require('if &upstream.destination != egress_destination(&egress) {' in transmit,
-            'Origin::transmit does not check the connection is to the egress destination')
-    require(not re.search(r'\b(loop|while|for)\b', code_only(transmit)), 'Origin::transmit retries')
-    # The connection is opened only by Origin::connect, to the destination the
-    # core passes, authenticated as its host under its trust anchors.
-    require(count(every, 'open_upstream(') == 2 and owners(proxy, 'open_upstream(') == {'connect', 'open_upstream'},
-            'open_upstream must be defined once and called only from Origin::connect')
-    require('self.upstream = open_upstream(destination).ok();' in functions(proxy)['connect'][0],
-            'Origin::connect does not connect to the destination it was given')
-    opener = functions(proxy)['open_upstream'][0]
+    require(owners(upstream, 'egress_wire(') == {'transmit'}, 'egress_wire read outside Authenticated::transmit')
+    transmit = functions(upstream)['transmit'][0]
+    require('fn transmit(self, egress: Egress) -> Option<Answering>' in transmit,
+            'Authenticated::transmit no longer consumes the session and a core Egress')
+    require('tls.write_all(egress_wire(&egress))' in transmit, 'the provider write is not the egress bytes')
+    for call in ['write_all(', '.write(', 'flush(']:
+        require(count(upstream, call) == (0 if call == '.write(' else 1),
+                f'the provider session is written other than by one write_all and flush ({call})')
+    check_first = 'if &self.destination != egress_destination(&egress) {'
+    require(check_first in transmit and transmit.index(check_first) < transmit.index('write_all('),
+            'Authenticated::transmit does not check the egress is for its destination before writing')
+    require(not re.search(r'\b(loop|while|for)\b', code_only(transmit)), 'Authenticated::transmit retries')
+    require('fn transmit(&mut self' not in code_only(upstream) and 'fn write' not in code_only(upstream),
+            'a provider session can be written through a borrowed handle')
+    # The session is authenticated as the destination the core passed: its
+    # address and port, its host as the TLS name, its trust anchors.
+    opener = functions(upstream)['open'][0]
     for text, why in [('(address, destination.port)', 'the destination address and port'),
                       ('std::str::from_utf8(&destination.address)', 'the destination address'),
                       ('std::str::from_utf8(&destination.host)', 'the destination host'),
                       ('ServerName::try_from(host.to_string())', 'the destination host as the TLS name'),
-                      ('upstream_tls(&destination.trust)', 'the destination trust anchors')]:
-        require(text in opener, f'open_upstream does not use {why}')
+                      ('client(&destination.trust)', 'the destination trust anchors'),
+                      ('destination: destination.clone()', 'the destination it authenticated')]:
+        require(text in opener, f'Authenticated::open does not use {why}')
+    client = functions(upstream)['client'][0]
+    require('tls::upstream_client(' in client and owners(shell['tls.rs'], '.with_root_certificates(store)') ==
+            {'upstream_client'}, 'the provider TLS client does not verify against the destination trust anchors')
     for name, source in shell.items():
-        if name not in ('proxy.rs', 'http.rs'):
+        require(not re.search(r'\bdangerous\b|ServerCertVerifier|danger::', code_only(source)),
+                f'{name} replaces the TLS certificate verification')
+        if name not in ('upstream.rs', 'http.rs'):
             require('ClientConnection::new(' not in code_only(source), f'{name} opens a TLS client connection')
-    require(owners(proxy, 'ClientConnection::new(') == {'open_upstream'}, 'a provider connection outside open_upstream')
+    require(owners(upstream, 'ClientConnection::new(') == {'open'}, 'a provider connection outside open')
+    # The proxy opens a session only in Origin::connect, to the destination
+    # the core passed, and writes only through it in Origin::transmit.
+    require(owners(proxy, 'Authenticated::open(') == {'connect'} and
+            'Authenticated::open(destination)' in functions(proxy)['connect'][0],
+            'Origin::connect does not open the destination it was given')
+    require(owners(proxy, 'session.transmit(egress)') == {'transmit'}, 'the provider write is not Origin::transmit')
+    # Its only other outgoing TCP connection wakes its own listener to stop.
+    require(owners(proxy, 'TcpStream::connect') == {'stop'} and
+            'TcpStream::connect_timeout(&self.address,' in functions(proxy)['stop'][0],
+            'the proxy opens a TCP connection other than to its own listener')
     require(not re.search(r'(?<![\w])http::', code_only(proxy)), 'the proxy uses the broker HTTP client')
-    require(not re.search(r'\bupstream: Vec<', code_only(proxy)), 'the proxy keeps a destination table')
-    checked.append('the proxy connects only to the egress destination and writes it once, only in Origin::transmit')
+    require(not re.search(r'\bupstream: Vec<|Vec<Destination>|Vec<Authenticated>', code_only(proxy)),
+            'the proxy keeps a destination table')
+    checked.append('the proxy reaches a provider only through upstream.rs: one session per connect, authenticated as '
+                   'the core\'s destination, written once with that destination\'s Egress')
+
+    # The proxy never handles the credential: it writes to the agent only the
+    # bytes the core passes to Channel::send, and opens nothing with a key.
+    send = functions(proxy)['send'][0]
+    require('self.stream\n            .write_all(bytes)' in send or 'self.stream.write_all(bytes)' in send,
+            'Channel::send does not write exactly the core reply')
+    require(owners(proxy, 'write_all(') == {'send', 'record'} and count(send, 'write_all(') == 1 and
+            '.write(' not in code_only(proxy), 'the proxy writes to the agent outside Channel::send')
+    record = functions(proxy)['record'][0]
+    require(count(record, 'write_all(&line)') == count(record, 'write_all('),
+            'an audit record writes something other than its canonical line')
+    for name in ('proxy.rs', 'upstream.rs'):
+        code = code_only(shell[name])
+        for word in ['credential', 'unseal', 'Opened', 'KeyMaterial', 'reflection_forms', 'sealed']:
+            require(not re.search(r'\b' + word + r'\b', code), f'{name} handles a credential ({word})')
+    checked.append('the proxy writes to the agent only the core reply and never handles a credential')
 
     # The core alone makes an Egress, from an admitted decision.
     core_proxy = core['stateless_proxy.rs']

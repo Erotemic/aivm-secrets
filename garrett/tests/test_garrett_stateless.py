@@ -268,7 +268,54 @@ def test_the_credential_goes_only_to_the_authenticated_route_destination():
     served = serve(impostor)
     assert (served.stage, served.code) == ('failed', 'unreachable')
     assert impostor.effects == [('connect', '10.0.0.2')]
-    # A failed write is an unknown outcome, never retried.
+    # A failed write is an unknown outcome, never retried, its answer never
+    # read, and never completed.
     broken = _Upstream(written=False)
-    assert serve(broken).code == 'outcome_unknown'
+    served = serve(broken)
+    assert (served.stage, served.code) == ('failed', 'outcome_unknown')
     assert [e[0] for e in broken.effects] == ['connect', 'send']
+    assert len(broken.reads) == 2
+    assert b'real-credential' not in served.reply
+
+
+class _Socket:
+    """A provider TLS socket that records writes; ``fail_after`` bytes into a
+    write it raises, having sent that prefix."""
+
+    def __init__(self, fail_after: int | None = None):
+        self.sent, self.fail_after, self.closed = b'', fail_after, False
+
+    def sendall(self, data: bytes) -> None:
+        if self.fail_after is not None:
+            self.sent += data[:self.fail_after]
+            raise ConnectionResetError
+        self.sent += data
+
+    def close(self) -> None:
+        self.closed = True
+
+
+def test_the_native_provider_session_takes_one_write_for_its_destination():
+    from garrett_stateless import proxy
+    from garrett_stateless.core import stateless_proxy
+    here, there = stateless_proxy.Destination('api.test', '10.0.0.2'), stateless_proxy.Destination('x.test', '10.0.0.9')
+
+    def session(sock):
+        upstream = proxy._Upstream.__new__(proxy._Upstream)
+        upstream.sock, upstream.destination, upstream.started, upstream.written = sock, here, 0.0, False
+        native = proxy._Native.__new__(proxy._Native)
+        native.upstream = upstream
+        return native
+
+    sock = _Socket()
+    native = session(sock)
+    assert not native.transmit(stateless_proxy.Egress(there, b'for another destination'))
+    assert native.transmit(stateless_proxy.Egress(here, b'GET / HTTP/1.1\r\n\r\n'))
+    assert not native.transmit(stateless_proxy.Egress(here, b'again'))
+    assert sock.sent == b'GET / HTTP/1.1\r\n\r\n'
+    # A failed write sent a prefix, and leaves no session to read or write.
+    sock = _Socket(fail_after=5)
+    native = session(sock)
+    assert not native.transmit(stateless_proxy.Egress(here, b'GET / HTTP/1.1\r\n\r\n'))
+    assert sock.sent == b'GET /' and sock.closed and native.upstream is None
+    assert native.receive() is None

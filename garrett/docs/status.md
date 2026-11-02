@@ -52,8 +52,8 @@ the per-execution ones for every reachable world. Behind them:
   connects to exactly the selected route's destination and writes only after
   the shell reports an authenticated session; the native proxy keeps no
   destination table, and `routes_valid` refuses two routes for one provider;
-- the connection log records `connected D ok` and `sent D wire`; every write
-  follows the authenticated connection to the destination of the
+- the connection log records `connected D ok` and `attempted D wire written`;
+  every write attempt follows the authenticated connection to the destination of the
   surrogate's provider route (`send_origin`, `protocol_safety`);
 - the network-level statement rests on one explicit trusted contract,
   `TransportFaithful`;

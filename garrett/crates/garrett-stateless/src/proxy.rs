@@ -13,8 +13,9 @@
 //! trust anchors), then, only if that succeeded, to write the egress once
 //! (`Origin::transmit`), then reads the answer (`Origin::receive`). The
 //! destination comes from the route the core selected, so there is no table
-//! here to get out of step with the core's routes. The only code that writes
-//! to a provider is `transmit`, which needs an `Egress`, which only the
+//! here to get out of step with the core's routes. The provider session is
+//! the `upstream` module's: it can be opened only to a destination and
+//! written only once, with an `Egress` for that destination, which only the
 //! extracted controller can make.
 use crate::broker::Clock;
 use crate::config::{Authentication as RouteAuthentication, Operations, ProxyConfig};
@@ -24,26 +25,24 @@ use crate::json::{self, Value};
 use crate::keys::ProxyKeys;
 use crate::tls::{self, PeerIdentity};
 use crate::token::RingKey;
+use crate::upstream::{self, Answering, Authenticated};
 use garrett_stateless_core::credential_use::Authentication;
 use garrett_stateless_core::proxy_http::{self as core_http, Code, DenyRule, Request};
 use garrett_stateless_core::stateless::{Acceptance, Rejection, SurrogateClaims};
 use garrett_stateless_core::stateless_policy::{ReadOnly, Resource, Unrestricted};
 use garrett_stateless_core::stateless_proxy::{
-    self, egress_destination, egress_wire, routes_valid, Channel, Destination, Egress, Origin,
-    Received, Route,
+    self, routes_valid, Channel, Destination, Egress, Origin, Received, Route,
 };
 use garrett_stateless_core::stateless_token::KeySet;
-use rustls::pki_types::ServerName;
-use rustls::{ClientConfig, ClientConnection, ServerConfig, ServerConnection, StreamOwned};
+use rustls::{ServerConfig, ServerConnection, StreamOwned};
 use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use zeroize::Zeroizing;
 
 const IO_TIMEOUT: Duration = Duration::from_secs(15);
-const UPSTREAM_DEADLINE: Duration = Duration::from_secs(45);
 const REQUEST_DEADLINE: Duration = Duration::from_secs(120);
 const MAX_CONNECTIONS: usize = 64;
 
@@ -75,7 +74,7 @@ impl Proxy {
                 None => Vec::new(),
             };
             // Refuse unusable trust anchors now rather than per request.
-            upstream_tls(&trust)?;
+            upstream::client(&trust)?;
             routes.push(Route {
                 provider: route.provider.as_bytes().to_vec(),
                 destination: Destination {
@@ -243,7 +242,7 @@ impl Proxy {
             chunk: vec![0; 65536],
             method: String::new(),
             claims: None,
-            upstream: None,
+            provider: Provider::Idle,
         };
         // The configured policy is one of the core's two extracted ones.
         match &self.read_only {
@@ -274,49 +273,14 @@ impl Proxy {
     }
 }
 
-/// The TLS client for a destination's trust anchors (PEM), or the default
-/// web roots when it names none.
-fn upstream_tls(trust: &[u8]) -> Result<Arc<ClientConfig>> {
-    if trust.is_empty() {
-        tls::upstream_client(None)
-    } else {
-        tls::upstream_client(Some(trust))
-    }
-}
-
-/// A TLS connection to a provider whose server authenticated as the host
-/// of `destination`.
-struct Upstream {
-    destination: Destination,
-    tls: StreamOwned<ClientConnection, TcpStream>,
-    started: Instant,
-}
-
-/// Connect to `destination` and complete a TLS handshake in which the server
-/// proves `destination.host` under `destination.trust`.
-fn open_upstream(destination: &Destination) -> std::result::Result<Upstream, ()> {
-    let address = std::str::from_utf8(&destination.address).map_err(|_| ())?;
-    let host = std::str::from_utf8(&destination.host).map_err(|_| ())?;
-    let socket_address = (address, destination.port)
-        .to_socket_addrs()
-        .ok()
-        .and_then(|mut a| a.next())
-        .ok_or(())?;
-    let socket = TcpStream::connect_timeout(&socket_address, IO_TIMEOUT).map_err(|_| ())?;
-    socket.set_read_timeout(Some(IO_TIMEOUT)).map_err(|_| ())?;
-    socket.set_write_timeout(Some(IO_TIMEOUT)).map_err(|_| ())?;
-    let name = ServerName::try_from(host.to_string()).map_err(|_| ())?;
-    let config = upstream_tls(&destination.trust).map_err(|_| ())?;
-    let connection = ClientConnection::new(config, name).map_err(|_| ())?;
-    let mut tls = StreamOwned::new(connection, socket);
-    while tls.conn.is_handshaking() {
-        tls.conn.complete_io(&mut tls.sock).map_err(|_| ())?;
-    }
-    Ok(Upstream {
-        destination: destination.clone(),
-        tls,
-        started: Instant::now(),
-    })
+/// Where the provider session of the request being served stands.
+enum Provider {
+    /// None open (or the last one ended).
+    Idle,
+    /// Authenticated as the destination, nothing written.
+    Connected(Authenticated),
+    /// Written once; only its answer can be read.
+    Answering(Answering),
 }
 
 fn text(bytes: &[u8]) -> Value {
@@ -332,8 +296,8 @@ struct Session<'a> {
     chunk: Vec<u8>,
     method: String,
     claims: Option<(String, String)>,
-    /// The provider connection of the request being served, if any.
-    upstream: Option<Upstream>,
+    /// The provider session of the request being served.
+    provider: Provider,
 }
 
 impl Origin for Session<'_> {
@@ -359,45 +323,36 @@ impl Origin for Session<'_> {
         ]))
     }
     fn connect(&mut self, destination: &Destination) -> bool {
-        self.upstream = open_upstream(destination).ok();
-        self.upstream.is_some()
+        self.provider = match Authenticated::open(destination) {
+            Some(session) => Provider::Connected(session),
+            None => Provider::Idle,
+        };
+        matches!(self.provider, Provider::Connected(_))
     }
-    /// The one provider write: the egress bytes, once, on the connection
-    /// `connect` opened to that egress's destination. No retry.
+    /// The one provider write: the egress, on the session `connect` opened,
+    /// which consumes it. No retry.
     fn transmit(&mut self, egress: Egress) -> bool {
-        let Some(upstream) = self.upstream.as_mut() else {
+        let Provider::Connected(session) = std::mem::replace(&mut self.provider, Provider::Idle)
+        else {
             return false;
         };
-        if &upstream.destination != egress_destination(&egress) {
-            return false;
+        match session.transmit(egress) {
+            Some(answering) => {
+                self.provider = Provider::Answering(answering);
+                true
+            }
+            None => false,
         }
-        let written = upstream.tls.write_all(egress_wire(&egress));
-        drop(egress);
-        written.and_then(|()| upstream.tls.flush()).is_ok()
     }
     fn receive(&mut self) -> Received {
-        let Some(upstream) = self.upstream.as_mut() else {
+        let Provider::Answering(session) = &mut self.provider else {
             return Received::Failed;
         };
-        if upstream.started.elapsed() > UPSTREAM_DEADLINE {
-            self.upstream = None;
-            return Received::Failed;
+        let received = session.receive(&mut self.chunk);
+        if !matches!(received, Received::Bytes(_)) {
+            self.provider = Provider::Idle;
         }
-        match upstream.tls.read(&mut self.chunk) {
-            Ok(0) => {
-                self.upstream = None;
-                Received::End
-            }
-            Ok(n) => Received::Bytes(self.chunk[..n].to_vec()),
-            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
-                self.upstream = None;
-                Received::End
-            }
-            Err(_) => {
-                self.upstream = None;
-                Received::Failed
-            }
-        }
+        received
     }
     fn completed(&mut self, status: u16) -> bool {
         let (jti, provider) = self.claims.take().unwrap_or_default();
@@ -445,7 +400,7 @@ impl Channel for Session<'_> {
     fn begin(&mut self, request: &Request) -> i64 {
         self.method = String::from_utf8_lossy(&request.method).into_owned();
         self.claims = None;
-        self.upstream = None;
+        self.provider = Provider::Idle;
         (self.proxy.clock)()
     }
     fn restart(&mut self) {

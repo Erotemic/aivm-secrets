@@ -28,16 +28,19 @@ Proved here, for **any** opener and **any** channel, in any state:
   per-step segments (`StepLog`);
 * `exchange_logged`: one provider exchange asks the shell to connect to
   exactly the egress's destination and hands it the egress bytes only if the
-  shell reported that the server authenticated there; reading the answer
-  records nothing (`collect_loop_preserves`);
-* `connection_egress_authorized`: every `sent D wire` follows the
-  acknowledged admission of the same request and the authenticated
+  shell reported that the server authenticated there; a failed write ends the
+  exchange as an unknown outcome; reading the answer records nothing
+  (`collect_loop_preserves`);
+* `connection_egress_authorized`: every `attempted D wire written` follows
+  the acknowledged admission of the same request and the authenticated
   connection to `D`, and that request's decision was a dispatch of exactly
   those bytes to the route whose destination is `D`, for a surrogate opened
   for this peer (`dispatch_trace`); `seg_connected`: every connection request
   is to the destination of a dispatched request's route;
-  `seg_sends_at_most_once`, `connection_sends_once_per_request`: at most one
-  send per request, none for a request without a dispatch;
+  `seg_attempts_at_most_once`, `connection_attempts_once_per_request`: at
+  most one write attempt per request, none for a request without a dispatch;
+  `seg_completed`: a request is recorded as completed only after a write the
+  shell reported whole;
 * `connection_guest_bytes`: the guest receives only fixed refusals, the fixed
   `401`, or `guest_response` releases in which the raw credential does not
   occur.
@@ -45,12 +48,16 @@ Proved here, for **any** opener and **any** channel, in any state:
 Partial correctness is stated with `Returns`, a liberal precondition in which
 a failed callback satisfies every postcondition: these theorems say what holds
 whenever the connection returns, whatever the callbacks return or fail with.
-Still trusted (native boundary, `STATELESS-NATIVE-01`): that the channel's
-callbacks perform the effect they name — in particular that `connect`
-answers `true` only for a TLS session in which the server proved the
-destination's host under its trust anchors, and that `transmit` writes the
-egress bytes once on that session — and that the peer thumbprint is the
-verified one.
+An `attempted` record is the controller handing an egress to the native
+writer, with the writer's report; it is not a network transmission. What
+reached the network is a separate notion, related to these records by the
+trusted transport contract (`Garrett.TransportFaithful`): the application
+data emitted on that session is a prefix of the attempted bytes, all of them
+if the writer reported success. Still trusted (native boundary,
+`STATELESS-NATIVE-01`): that contract — in particular that `connect` answers
+`true` only for a TLS session in which the server proved the destination's
+host under its trust anchors — and that the peer thumbprint is the verified
+one.
 -/
 
 open Aeneas Aeneas.Std
@@ -318,9 +325,11 @@ inductive ProxyEvent where
       to authenticate as its host under its trust anchors; `ok` is the
       native answer. -/
   | connected (destination : Destination) (ok : Bool)
-  /-- Credential-bearing bytes were handed to the native writer, for the
-      connection to `destination`. -/
-  | sent (destination : Destination) (wire : alloc.vec.Vec U8)
+  /-- Credential-bearing bytes were handed to the native writer, once, for
+      the connection to `destination`; `written` is its report (`true`: the
+      whole request was written and flushed). An attempt, not a network
+      transmission: a failed write may have emitted any prefix of `wire`. -/
+  | attempted (destination : Destination) (wire : alloc.vec.Vec U8) (written : Bool)
   | completed (status : U16) (acked : Bool)
   | refused (code : proxy_http.refusal.Code)
   | stopped (code : proxy_http.refusal.Code)
@@ -334,7 +343,7 @@ def loggedOrigin (o : Origin C) : Origin (C × List ProxyEvent) where
   connect s destination := Std.bind (o.connect s.1 destination) fun r =>
     Result.ok (r.1, (r.2, s.2 ++ [.connected destination r.1]))
   transmit s egress := Std.bind (o.transmit s.1 egress) fun r =>
-    Result.ok (r.1, (r.2, s.2 ++ [.sent egress.destination egress.wire]))
+    Result.ok (r.1, (r.2, s.2 ++ [.attempted egress.destination egress.wire r.1]))
   receive s := Std.bind (o.receive s.1) fun r => Result.ok (r.1, (r.2, s.2))
   completed s status := Std.bind (o.completed s.1 status) fun r =>
     Result.ok (r.1, (r.2, s.2 ++ [.completed status r.1]))
@@ -360,12 +369,16 @@ theorem receive_quiet (o : Origin C) (X : List ProxyEvent) (s : C × List ProxyE
 /-- **The log of one provider exchange.** The shell was asked to connect to
     exactly the egress's destination; only if it answered that the server
     authenticated there were the egress bytes handed to its writer, once, for
-    that destination; reading the answer records nothing more. -/
+    that destination; a write the writer did not report whole ends the
+    exchange as an unknown outcome, with no answer read; reading the answer
+    records nothing more. -/
 theorem exchange_logged (o : Origin C) (io : C) (L : List ProxyEvent) (e : Egress) (limit : Usize)
     (answer : core.result.Result (alloc.vec.Vec U8) proxy_http.refusal.Code) (after : C × List ProxyEvent)
     (h : exchange (loggedOrigin o) (io, L) e limit = Result.ok (answer, after)) :
     (after.2 = L ++ [.connected e.destination false] ∧ answer = .Err .Unreachable) ∨
-    after.2 = L ++ [.connected e.destination true, .sent e.destination e.wire] := by
+    (after.2 = L ++ [.connected e.destination true, .attempted e.destination e.wire false] ∧
+      answer = .Err .OutcomeUnknown) ∨
+    after.2 = L ++ [.connected e.destination true, .attempted e.destination e.wire true] := by
   unfold exchange at h
   simp only [egress_destination, bind_ok] at h
   obtain ⟨⟨b, s1⟩, hc, h⟩ := bind_ok_inv h
@@ -384,22 +397,24 @@ theorem exchange_logged (o : Origin C) (io : C) (L : List ProxyEvent) (e : Egres
     obtain ⟨⟨b1, s2⟩, ht, h⟩ := bind_ok_inv h
     obtain ⟨r1, _, et⟩ := bind_ok_inv ht
     simp only [Result.ok.injEq, Prod.mk.injEq] at et
-    obtain ⟨_, es2⟩ := et
+    obtain ⟨eb1, es2⟩ := et
     subst es2
     refine Or.inr ?_
     cases b1 with
     | false =>
       simp only [Aeneas.Std.uncurry_apply_pair, Bool.false_eq_true, ↓reduceIte, Result.ok.injEq,
         Prod.mk.injEq] at h
+      refine Or.inl ⟨?_, h.1.symm⟩
       rw [← h.2]
-      simp [eb]
+      simp [eb, eb1]
     | true =>
+      refine Or.inr ?_
       simp only [Aeneas.Std.uncurry_apply_pair, ↓reduceIte] at h
       obtain ⟨bound, _, h⟩ := bind_ok_inv h
       have quiet := returns_ok (collect_loop_preserves (loggedOrigin o) bound (fun s => s.2 = _)
         (receive_quiet o _) _ _) h rfl
       rw [quiet]
-      simp [eb]
+      simp [eb, eb1]
 
 /-- The destination of route `index`. -/
 def DestinationOf (index : Usize) (D : Destination) : Prop :=
@@ -414,8 +429,9 @@ def ServeLog (d : Decision) (E : List ProxyEvent) : Prop :=
       E = [.admitted opened.claims index false] ∨
       ∃ D, DestinationOf routes index D ∧
         (E = [.admitted opened.claims index true, .connected D false] ∨
-         E = [.admitted opened.claims index true, .connected D true, .sent D wire] ∨
-         ∃ status acked, E = [.admitted opened.claims index true, .connected D true, .sent D wire,
+         E = [.admitted opened.claims index true, .connected D true, .attempted D wire false] ∨
+         E = [.admitted opened.claims index true, .connected D true, .attempted D wire true] ∨
+         ∃ status acked, E = [.admitted opened.claims index true, .connected D true, .attempted D wire true,
            .completed status acked])
 
 /-- **The log of one request.** For any wrapped origin, a `serve` call
@@ -423,8 +439,9 @@ def ServeLog (d : Decision) (E : List ProxyEvent) : Prop :=
     `rejected`; a pre-egress refusal nothing; a dispatch the admission request
     and — only if it was acknowledged — one connection request to **the
     decided route's own destination**, and, only if the shell answered that
-    the server authenticated there, exactly one `sent` of the decided bytes
-    to that destination, then at most a completion record. -/
+    the server authenticated there, exactly one write attempt of the decided
+    bytes to that destination, then, only if the writer reported the whole
+    request written, at most a completion record. -/
 theorem serve_logged (o : Origin C) (io : C) (L : List ProxyEvent) (request : proxy_http.request.Request) (now : I64)
     (served : proxy_controller.Served) (after : C × List ProxyEvent)
     (h : serve ops pol (loggedOrigin o) opener policy (io, L) request routes a peer now limit = Result.ok (served, after)) :
@@ -457,27 +474,31 @@ theorem serve_logged (o : Origin C) (io : C) (L : List ProxyEvent) (request : pr
       subst e2
       obtain ⟨inside, ex⟩ := ex
       have dest : DestinationOf routes index (egressTo routes index inside wire).destination := ⟨inside, rfl⟩
-      rcases exchange_logged o r.2 _ _ limit answer io2 ex with ⟨log2, unreachable⟩ | log2
+      rcases exchange_logged o r.2 _ _ limit answer io2 ex with ⟨log2, unreachable⟩ | ⟨log2, unknown⟩ | log2
       · subst unreachable
         obtain ⟨_, e⟩ := rest
         subst e
         exact ⟨_, hd, by rw [log2]; simp [e1], Or.inr ⟨_, dest, Or.inl rfl⟩⟩
+      · subst unknown
+        obtain ⟨_, e⟩ := rest
+        subst e
+        exact ⟨_, hd, by rw [log2]; simp [e1, egressTo], Or.inr ⟨_, dest, Or.inr (Or.inl rfl)⟩⟩
       · cases answer with
         | Err code =>
           obtain ⟨_, e⟩ := rest
           subst e
-          exact ⟨_, hd, by rw [log2]; simp [e1, egressTo], Or.inr ⟨_, dest, Or.inr (Or.inl rfl)⟩⟩
+          exact ⟨_, hd, by rw [log2]; simp [e1, egressTo], Or.inr ⟨_, dest, Or.inr (Or.inr (Or.inl rfl))⟩⟩
         | Ok raw =>
           obtain ⟨released, _, cases⟩ := rest
           rcases cases with ⟨_, _, e⟩ | ⟨_, acked, comp, _⟩
           · subst e
-            exact ⟨_, hd, by rw [log2]; simp [e1, egressTo], Or.inr ⟨_, dest, Or.inr (Or.inl rfl)⟩⟩
+            exact ⟨_, hd, by rw [log2]; simp [e1, egressTo], Or.inr ⟨_, dest, Or.inr (Or.inr (Or.inl rfl))⟩⟩
           · obtain ⟨r'', _, e''⟩ := bind_ok_inv comp
             simp only [Result.ok.injEq, Prod.mk.injEq] at e''
             obtain ⟨_, e2''⟩ := e''
             subst e2''
             exact ⟨_, hd, by rw [log2]; simp [e1, egressTo],
-              Or.inr ⟨_, dest, Or.inr (Or.inr ⟨released.status, r''.1, rfl⟩)⟩⟩
+              Or.inr ⟨_, dest, Or.inr (Or.inr (Or.inr ⟨released.status, r''.1, rfl⟩))⟩⟩
 
 theorem ok_map_inv {α β : Type} {m : Result α} {f : α → β} {x : β}
     (h : Std.bind m (fun r => Result.ok (f r)) = Result.ok x) : ∃ r, m = Result.ok r ∧ x = f r := by
@@ -608,19 +629,21 @@ theorem connection_logged (ch : Channel C) (io : C) (after : C × List ProxyEven
   exact ⟨segs, by simpa using log, ok⟩
 
 /-- **What each event of one request's log can be.** An admission, a
-connection or a send comes only from a dispatch decision: the admission for
-its route and claims, the connection to that route's own destination, and the
-send of exactly its bytes to that destination, right after the acknowledged
-admission and the authenticated connection. -/
+connection or a write attempt comes only from a dispatch decision: the
+admission for its route and claims, the connection to that route's own
+destination, and the attempt of exactly its bytes to that destination, right
+after the acknowledged admission and the authenticated connection. A
+completion record comes only after an attempt the writer reported whole. -/
 theorem serveLog_events {d : Decision} {E : List ProxyEvent} (slog : ServeLog routes d E) {ev : ProxyEvent}
     (m : ev ∈ E) :
     match ev with
     | .rejected _ => ∃ r, d = .unauthorized r
     | .admitted claims index _ => ∃ wire opened, d = .dispatch index wire opened ∧ claims = opened.claims
     | .connected D _ => ∃ index wire opened, d = .dispatch index wire opened ∧ DestinationOf routes index D
-    | .sent D w => ∃ index opened, d = .dispatch index w opened ∧ DestinationOf routes index D ∧
-        ∃ B, E = [.admitted opened.claims index true, .connected D true, .sent D w] ++ B
-    | .completed _ _ => ∃ index wire opened, d = .dispatch index wire opened
+    | .attempted D w written => ∃ index opened, d = .dispatch index w opened ∧ DestinationOf routes index D ∧
+        ∃ B, E = [.admitted opened.claims index true, .connected D true, .attempted D w written] ++ B
+    | .completed status acked => ∃ index wire opened D, d = .dispatch index wire opened ∧ DestinationOf routes index D ∧
+        E = [.admitted opened.claims index true, .connected D true, .attempted D wire true, .completed status acked]
     | _ => False := by
   cases d with
   | unauthorized r =>
@@ -630,29 +653,30 @@ theorem serveLog_events {d : Decision} {E : List ProxyEvent} (slog : ServeLog ro
     exact ⟨r, rfl⟩
   | refused code => rw [slog] at m; cases m
   | dispatch index wire opened =>
-    rcases slog with e | ⟨D, dest, e | e | ⟨status, acked, e⟩⟩ <;> subst e <;>
+    rcases slog with e | ⟨D, dest, e | e | e | ⟨status, acked, e⟩⟩ <;> subst e <;>
       simp only [List.mem_cons, List.not_mem_nil, or_false] at m <;>
       rcases m with rfl | rfl | rfl | rfl <;>
       first
       | exact ⟨wire, opened, rfl, rfl⟩
       | exact ⟨index, wire, opened, rfl, dest⟩
-      | exact ⟨index, wire, opened, rfl⟩
       | exact ⟨index, opened, rfl, dest, [], rfl⟩
       | exact ⟨index, opened, rfl, dest, [.completed status acked], rfl⟩
+      | exact ⟨index, wire, opened, D, rfl, dest, rfl⟩
 
-/-- Within one segment, a `sent` event comes only from a dispatch decision
+/-- Within one segment, a write attempt comes only from a dispatch decision
     for the request the segment began with, right after its acknowledged
     admission and the authenticated connection to the destination of the
     decided route. -/
-theorem seg_sent {seg : List ProxyEvent} (ok : StepLog ops pol opener policy routes a peer seg) {D : Destination}
-    {w : alloc.vec.Vec U8} (m : ProxyEvent.sent D w ∈ seg) :
+theorem seg_attempted {seg : List ProxyEvent} (ok : StepLog ops pol opener policy routes a peer seg) {D : Destination}
+    {w : alloc.vec.Vec U8} {written : Bool} (m : ProxyEvent.attempted D w written ∈ seg) :
     ∃ request now index opened, decide_request ops pol opener policy request routes a peer now =
         Result.ok (.dispatch index w opened) ∧ DestinationOf routes index D ∧
-      ∃ B, seg = [.began request, .admitted opened.claims index true, .connected D true, .sent D w] ++ B := by
+      ∃ B, seg = [.began request, .admitted opened.claims index true, .connected D true, .attempted D w written] ++
+        B := by
   rcases ok with e | ⟨code, bytes, _, e⟩ | ⟨request, now, d, E, served, hd, slog, _, shape⟩
   · subst e; cases m
   · subst e; simp at m
-  · have inE : ProxyEvent.sent D w ∈ E := by
+  · have inE : ProxyEvent.attempted D w written ∈ E := by
       rcases shape with ⟨_, e⟩ | ⟨_, e⟩ <;> subst e <;> simpa using m
     obtain ⟨index, opened, ed, dest, B, eE⟩ := serveLog_events routes slog inE
     subst ed
@@ -660,6 +684,28 @@ theorem seg_sent {seg : List ProxyEvent} (ok : StepLog ops pol opener policy rou
     rcases shape with ⟨_, e⟩ | ⟨_, e⟩ <;> subst e <;> rw [eE]
     · exact ⟨B ++ [.guestSent served.reply.val], by simp⟩
     · exact ⟨B ++ [.stopped served.code, .guestSent served.reply.val], by simp⟩
+
+/-- **Completed only after a whole write.** Within one segment, a
+    completion record follows the authenticated connection and a write
+    attempt of the dispatched bytes that the writer reported whole: a failed
+    or partial write is never recorded as a completed provider operation. -/
+theorem seg_completed {seg : List ProxyEvent} (ok : StepLog ops pol opener policy routes a peer seg) {status : U16}
+    {acked : Bool} (m : ProxyEvent.completed status acked ∈ seg) :
+    ∃ request now index wire opened D, decide_request ops pol opener policy request routes a peer now =
+        Result.ok (.dispatch index wire opened) ∧ DestinationOf routes index D ∧
+      ∃ B, seg = [.began request, .admitted opened.claims index true, .connected D true, .attempted D wire true,
+        .completed status acked] ++ B := by
+  rcases ok with e | ⟨code, bytes, _, e⟩ | ⟨request, now, d, E, served, hd, slog, _, shape⟩
+  · subst e; cases m
+  · subst e; simp at m
+  · have inE : ProxyEvent.completed status acked ∈ E := by
+      rcases shape with ⟨_, e⟩ | ⟨_, e⟩ <;> subst e <;> simpa using m
+    obtain ⟨index, wire, opened, D, ed, dest, eE⟩ := serveLog_events routes slog inE
+    subst ed
+    refine ⟨request, now, index, wire, opened, D, hd, dest, ?_⟩
+    rcases shape with ⟨_, e⟩ | ⟨_, e⟩ <;> subst e <;> rw [eE]
+    · exact ⟨[.guestSent served.reply.val], by simp⟩
+    · exact ⟨[.stopped served.code, .guestSent served.reply.val], by simp⟩
 
 /-- Within one segment, a connection request comes only from a dispatch
     decision, and is to the destination of the decided route. -/
@@ -676,28 +722,29 @@ theorem seg_connected {seg : List ProxyEvent} (ok : StepLog ops pol opener polic
     subst ed
     exact ⟨request, now, index, wire, opened, hd, dest⟩
 
-/-- Whether an event hands credential-bearing bytes to the native sender. -/
-def ProxyEvent.isSent : ProxyEvent → Bool
-  | .sent _ _ => true
+/-- Whether an event hands credential-bearing bytes to the native writer. -/
+def ProxyEvent.isAttempt : ProxyEvent → Bool
+  | .attempted _ _ _ => true
   | _ => false
 
-/-- **No duplicated egress.** A segment — one request — sends at most once:
-    there is no retry path. -/
-theorem seg_sends_at_most_once {seg : List ProxyEvent} (ok : StepLog ops pol opener policy routes a peer seg) :
-    seg.countP ProxyEvent.isSent ≤ 1 := by
+/-- **No duplicated egress.** A segment — one request — attempts at most one
+    write: there is no retry path, after a failed write either. -/
+theorem seg_attempts_at_most_once {seg : List ProxyEvent} (ok : StepLog ops pol opener policy routes a peer seg) :
+    seg.countP ProxyEvent.isAttempt ≤ 1 := by
   rcases ok with e | ⟨code, bytes, _, e⟩ | ⟨request, now, d, E, served, _, slog, _, shape⟩
   · subst e; simp
-  · subst e; simp [ProxyEvent.isSent]
-  · have hE : E.countP ProxyEvent.isSent ≤ 1 := by
+  · subst e; simp [ProxyEvent.isAttempt]
+  · have hE : E.countP ProxyEvent.isAttempt ≤ 1 := by
       cases d with
-      | unauthorized _ => rw [slog]; simp [ProxyEvent.isSent]
+      | unauthorized _ => rw [slog]; simp [ProxyEvent.isAttempt]
       | refused _ => rw [slog]; simp
       | dispatch index wire opened =>
-        rcases slog with e | ⟨_, _, e | e | ⟨_, _, e⟩⟩ <;> subst e <;> simp [List.countP_cons, ProxyEvent.isSent]
-    rcases shape with ⟨_, e⟩ | ⟨_, e⟩ <;> subst e <;> simp [List.countP_append, ProxyEvent.isSent] <;> omega
+        rcases slog with e | ⟨_, _, e | e | e | ⟨_, _, e⟩⟩ <;> subst e <;>
+          simp [List.countP_cons, ProxyEvent.isAttempt]
+    rcases shape with ⟨_, e⟩ | ⟨_, e⟩ <;> subst e <;> simp [List.countP_append, ProxyEvent.isAttempt] <;> omega
 
 /-- **Every credential-bearing egress of a connection is authorized.** If a
-    logged connection returns, every `sent D wire` in its log immediately
+    logged connection returns, every `attempted D wire written` in its log immediately
     follows the request's `began` record, the acknowledged `admitted` record
     and the authenticated connection to `D`, and that request's pre-egress decision
     was a dispatch of exactly `wire` to the route whose destination is `D`:
@@ -707,11 +754,11 @@ theorem seg_sends_at_most_once {seg : List ProxyEvent} (ok : StepLog ops pol ope
     (`dispatch_trace`). -/
 theorem connection_egress_authorized (ch : Channel C) (io : C) (after : C × List ProxyEvent)
     (h : connection ops pol (logged ch) opener policy (io, []) routes a authority peer limit = Result.ok after)
-    {D : Destination} {w : alloc.vec.Vec U8} (m : ProxyEvent.sent D w ∈ after.2) :
+    {D : Destination} {w : alloc.vec.Vec U8} {written : Bool} (m : ProxyEvent.attempted D w written ∈ after.2) :
     ∃ request now index opened, decide_request ops pol opener policy request routes a peer now =
         Result.ok (.dispatch index w opened) ∧
-      (∃ A B, after.2 = A ++ [.began request, .admitted opened.claims index true, .connected D true, .sent D w] ++
-        B) ∧
+      (∃ A B, after.2 = A ++ [.began request, .admitted opened.claims index true, .connected D true,
+        .attempted D w written] ++ B) ∧
       ∃ token, surrogate_of (alloc.vec.Vec.deref request.fields) = Result.ok (some token) ∧
         stateless.«open» ops opener (alloc.vec.Vec.deref token) a peer now = Result.ok (.Ok opened) ∧
         ∃ (inside : index.val < routes.length),
@@ -726,7 +773,7 @@ theorem connection_egress_authorized (ch : Channel C) (io : C) (after : C × Lis
   rw [log] at m ⊢
   obtain ⟨seg, inSegs, inSeg⟩ := List.mem_flatten.mp m
   obtain ⟨request, now, index, opened, hd, ⟨inside', dest⟩, B, e⟩ :=
-    seg_sent ops pol opener policy routes a peer (ok seg inSegs) inSeg
+    seg_attempted ops pol opener policy routes a peer (ok seg inSegs) inSeg
   obtain ⟨s1, s2, split⟩ := List.append_of_mem inSegs
   obtain ⟨token, ho, hopen, inside, prov, henc⟩ := dispatch_trace ops pol opener policy request routes a peer now hd
   refine ⟨request, now, index, opened, hd, ⟨s1.flatten, B ++ s2.flatten, ?_⟩,
@@ -735,15 +782,15 @@ theorem connection_egress_authorized (ch : Channel C) (io : C) (after : C × Lis
   simp
 
 /-- **Requests without a dispatch decision never reach the provider.** A
-    connection's log has no `sent` event for any request whose decision was
-    not a dispatch: every `sent` belongs to a dispatched request (above), and
-    each request sends at most once. -/
-theorem connection_sends_once_per_request (ch : Channel C) (io : C) (after : C × List ProxyEvent)
+    connection's log has no write attempt for any request whose decision was
+    not a dispatch: every attempt belongs to a dispatched request (above), and
+    each request attempts at most one write. -/
+theorem connection_attempts_once_per_request (ch : Channel C) (io : C) (after : C × List ProxyEvent)
     (h : connection ops pol (logged ch) opener policy (io, []) routes a authority peer limit = Result.ok after) :
     ∃ segs : List (List ProxyEvent), after.2 = segs.flatten ∧
-      ∀ seg ∈ segs, StepLog ops pol opener policy routes a peer seg ∧ seg.countP ProxyEvent.isSent ≤ 1 := by
+      ∀ seg ∈ segs, StepLog ops pol opener policy routes a peer seg ∧ seg.countP ProxyEvent.isAttempt ≤ 1 := by
   obtain ⟨segs, log, ok⟩ := connection_logged ops pol opener policy routes a authority peer limit ch io after h
-  exact ⟨segs, log, fun seg m => ⟨ok seg m, seg_sends_at_most_once ops pol opener policy routes a peer (ok seg m)⟩⟩
+  exact ⟨segs, log, fun seg m => ⟨ok seg m, seg_attempts_at_most_once ops pol opener policy routes a peer (ok seg m)⟩⟩
 
 /-- **What the guest receives.** Every byte string a logged connection writes
     to the guest is a fixed framing refusal, or the reply of a request served
@@ -771,7 +818,7 @@ theorem connection_guest_bytes (ch : Channel C) (io : C) (after : C × List Prox
       | unauthorized _ => rw [slog] at mb; simp at mb
       | refused _ => rw [slog] at mb; simp at mb
       | dispatch index wire opened =>
-        rcases slog with e | ⟨_, _, e | e | ⟨_, _, e⟩⟩ <;> subst e <;> simp at mb
+        rcases slog with e | ⟨_, _, e | e | e | ⟨_, _, e⟩⟩ <;> subst e <;> simp at mb
     rcases shape with ⟨_, e⟩ | ⟨_, e⟩ <;> subst e <;>
       simp only [List.mem_append, List.mem_cons, List.not_mem_nil, or_false, reduceCtorEq, false_or,
         ProxyEvent.guestSent.injEq] at inSeg <;>

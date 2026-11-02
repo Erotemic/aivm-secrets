@@ -105,9 +105,12 @@ variable {M P : Type}
 abbrev AeadCorrect (inst : KeyMaterial M) (Paired : M → M → Prop) : Prop :=
   ∀ S V, Paired S V → stateless_boundary.AeadInverse inst S V
 
-/-- One credential-bearing write to a provider as the network sees it: the
-    server name its TLS certificate proved, the trust anchors it chained to,
-    the address and port, and the bytes. -/
+/-- The application data the proxy process emitted on one provider TLS
+    session, as the network sees it: the server name the session's
+    certificate proved, the trust anchors it chained to, the address and
+    port, and the **plaintext** written into the session — application data,
+    before TLS record protection. The encrypted bytes on the TCP connection
+    are TLS's business (`STATELESS-TLS-01`), not modeled. -/
 structure ProviderWrite where
   host : List U8
   trust : List U8
@@ -115,42 +118,83 @@ structure ProviderWrite where
   port : U16
   bytes : List U8
 
-/-- The write a `sent D w` record stands for. -/
-def ProviderWrite.of (D : stateless_proxy.Destination) (w : alloc.vec.Vec U8) : ProviderWrite :=
-  ⟨D.host.val, D.trust.val, D.address.val, D.port, w.val⟩
+/-- Application data `bytes` emitted on a session to `D`. -/
+def ProviderWrite.on (D : stateless_proxy.Destination) (bytes : List U8) : ProviderWrite :=
+  ⟨D.host.val, D.trust.val, D.address.val, D.port, bytes⟩
 
-/-- The provider writes a connection's log requests, in order. -/
-def providerWrites : List ProxyEvent → List ProviderWrite
+/-- The write attempts a connection's log records, in order: the
+    destination, the bytes handed to the native writer, and its report. -/
+def attempts : List ProxyEvent → List (stateless_proxy.Destination × alloc.vec.Vec U8 × Bool)
   | [] => []
-  | .sent D w :: rest => ProviderWrite.of D w :: providerWrites rest
-  | _ :: rest => providerWrites rest
+  | .attempted D w written :: rest => (D, w, written) :: attempts rest
+  | _ :: rest => attempts rest
+
+/-- What one attempt may have emitted: on a session to its destination, a
+    **prefix** of the attempted bytes — any prefix, including none, since a
+    failed write can stop anywhere — and all of them if the writer reported
+    the whole request written. -/
+def Emitted : stateless_proxy.Destination × alloc.vec.Vec U8 × Bool → ProviderWrite → Prop
+  | (D, w, written), x => ∃ bytes, x = ProviderWrite.on D bytes ∧ bytes <+: w.val ∧ (written = true → bytes = w.val)
 
 /-- **The native transport contract** (trusted, not proved:
-    `STATELESS-NATIVE-01`, `STATELESS-TLS-01`). The provider writes the proxy
-    process makes for one connection are exactly those its log requests, in
-    order: `Origin::connect` answers `true` only for a TLS session in which the
-    server proved the destination's host under its trust anchors, and
-    `Origin::transmit` writes the egress bytes once on that session. This is
-    the only place where a statement about the network rests on native code;
-    `verification/shell_guard.py` pins its two functions in the source. -/
+    `STATELESS-NATIVE-01`, `STATELESS-TLS-01`). The provider sessions on which
+    the proxy process emitted application data for one connection correspond,
+    in order, to the write attempts its log records, and each emitted what
+    `Emitted` allows: `Origin::connect` answers `true` only for a TLS session
+    in which the server proved the destination's host under its trust
+    anchors; `Origin::transmit` writes, as application data on that session
+    and nowhere else, a prefix of the egress bytes, all of them when it
+    reports success; and nothing else emits application data to a provider.
+    It does not say a failed write emitted nothing, nor that a reported
+    success reached the provider. The native half is one module,
+    `crates/garrett-stateless/src/upstream.rs`, whose types allow one write
+    per authenticated session; `verification/shell_guard.py` pins it. -/
 def TransportFaithful (log : List ProxyEvent) (writes : List ProviderWrite) : Prop :=
-  writes = providerWrites log
+  List.Forall₂ Emitted (attempts log) writes
 
-theorem mem_providerWrites {log : List ProxyEvent} {x : ProviderWrite} (m : x ∈ providerWrites log) :
-    ∃ D w, ProxyEvent.sent D w ∈ log ∧ x = ProviderWrite.of D w := by
+theorem mem_attempts {log : List ProxyEvent} {D : stateless_proxy.Destination} {w : alloc.vec.Vec U8}
+    {written : Bool} (m : (D, w, written) ∈ attempts log) : ProxyEvent.attempted D w written ∈ log := by
   induction log with
   | nil => cases m
   | cons ev rest ih =>
     cases ev with
-    | sent D w =>
-      simp only [providerWrites, List.mem_cons] at m
-      rcases m with e | m
-      · exact ⟨D, w, List.mem_cons_self, e⟩
-      · obtain ⟨D', w', m', e⟩ := ih m
-        exact ⟨D', w', List.mem_cons_of_mem _ m', e⟩
-    | _ =>
-      obtain ⟨D', w', m', e⟩ := ih m
-      exact ⟨D', w', List.mem_cons_of_mem _ m', e⟩
+    | attempted D' w' written' =>
+      simp only [attempts, List.mem_cons, Prod.mk.injEq] at m
+      rcases m with ⟨e1, e2, e3⟩ | m
+      · subst e1 e2 e3; exact List.mem_cons_self
+      · exact List.mem_cons_of_mem _ (ih m)
+    | _ => exact List.mem_cons_of_mem _ (ih m)
+
+theorem attempts_of_mem {log : List ProxyEvent} {D : stateless_proxy.Destination} {w : alloc.vec.Vec U8}
+    {written : Bool} (m : ProxyEvent.attempted D w written ∈ log) : (D, w, written) ∈ attempts log := by
+  induction log with
+  | nil => cases m
+  | cons ev rest ih =>
+    rcases List.mem_cons.mp m with e | later
+    · subst e; exact List.mem_cons_self
+    · cases ev with
+      | attempted D' w' b' => exact List.mem_cons_of_mem _ (ih later)
+      | _ => exact ih later
+
+theorem forall₂_mem_right {α β : Type} {R : α → β → Prop} {l1 : List α} {l2 : List β} (h : List.Forall₂ R l1 l2)
+    {x : β} (m : x ∈ l2) : ∃ y ∈ l1, R y x := by
+  induction h with
+  | nil => cases m
+  | cons r _ ih =>
+    rcases List.mem_cons.mp m with e | m
+    · subst e; exact ⟨_, List.mem_cons_self, r⟩
+    · obtain ⟨y, my, ry⟩ := ih m
+      exact ⟨y, List.mem_cons_of_mem _ my, ry⟩
+
+theorem forall₂_mem_left {α β : Type} {R : α → β → Prop} {l1 : List α} {l2 : List β} (h : List.Forall₂ R l1 l2)
+    {y : α} (m : y ∈ l1) : ∃ x ∈ l2, R y x := by
+  induction h with
+  | nil => cases m
+  | cons r _ ih =>
+    rcases List.mem_cons.mp m with e | m
+    · subst e; exact ⟨_, List.mem_cons_self, r⟩
+    · obtain ⟨x, mx, rx⟩ := ih m
+      exact ⟨x, List.mem_cons_of_mem _ mx, rx⟩
 
 /-! ## A. Compromised-agent confinement
 
@@ -194,40 +238,63 @@ def ExactRequest (request : proxy_http.request.Request) (route : stateless_proxy
   ((ExactWire request route credential).length ≤ Usize.max → wire.val = ExactWire request route credential)
 
 /-- **In order, for the request the connection received.** The write
-    follows, in the connection's log, the record of the request the
+    attempt follows, in the connection's log, the record of the request the
     connection framed from the agent's bytes, the acknowledged admission
     record and the authenticated connection to the same destination. -/
 def AfterAuthenticatedConnection (log : List ProxyEvent) (request : proxy_http.request.Request)
     (claims : stateless.SurrogateClaims) (index : Usize) (D : stateless_proxy.Destination)
-    (wire : alloc.vec.Vec U8) : Prop :=
-  ∃ A B, log = A ++ [.began request, .admitted claims index true, .connected D true, .sent D wire] ++ B
+    (wire : alloc.vec.Vec U8) (written : Bool) : Prop :=
+  ∃ A B, log = A ++ [.began request, .admitted claims index true, .connected D true, .attempted D wire written] ++ B
 
-/-- **An authorized credential write.** The write of `wire` to `D` on a
-    connection authenticated as `peer` was decided as a dispatch by the
-    extracted `decide_request` for a request that connection received; it
-    follows that request's record, the acknowledged admission and the
-    authenticated connection to `D`; the surrogate was issued for `peer`; the operation policy permitted
-    the operation; `D` is the destination of the route serving the
-    surrogate's provider; and `wire` is exactly the agent's request carrying
-    exactly the issued credential. -/
+/-- **An authorized credential write attempt.** Handing `wire` for `D` to
+    the native writer, on a connection authenticated as `peer`, was decided
+    as a dispatch by the extracted `decide_request` for a request that
+    connection received; it follows that request's record, the acknowledged
+    admission and the authenticated connection to `D`; the surrogate was
+    issued for `peer`; the operation policy permitted the operation; `D` is
+    the destination of the route serving the surrogate's provider; and `wire`
+    is exactly the agent's request carrying exactly the issued credential. -/
 def CredentialWriteAuthorized (inst : KeyMaterial M) (cfg : Config P) (W : World M) (keys : KeySet M)
-    (peer : Slice U8) (log : List ProxyEvent) (D : stateless_proxy.Destination) (wire : alloc.vec.Vec U8) : Prop :=
+    (peer : Slice U8) (log : List ProxyEvent) (D : stateless_proxy.Destination) (wire : alloc.vec.Vec U8)
+    (written : Bool) : Prop :=
   ∃ request now index route opened,
     decide_request (Opening inst) cfg.policyInst keys cfg.policy request cfg.routes cfg.acceptance peer now =
       Result.ok (.dispatch index wire opened) ∧
-    AfterAuthenticatedConnection log request opened.claims index D wire ∧
+    AfterAuthenticatedConnection log request opened.claims index D wire written ∧
     IssuedFor inst cfg W peer opened.claims opened.credential ∧
     PolicyPermits cfg request opened.claims ∧
     RouteFor cfg.routes opened.claims.provider.val index route ∧ route.destination = D ∧
     ExactRequest request route opened.credential wire
 
-/-- **A. Compromised-agent confinement.** On every proxy connection, under a
-    key set without forgery, every credential-bearing write is authorized
-    (`CredentialWriteAuthorized`). -/
+/-- **A. Compromised-agent confinement** (the controller's part). On every
+    proxy connection, under a key set without forgery, every write attempt is
+    authorized (`CredentialWriteAuthorized`). This is about what the
+    extracted controller asks the native writer to do; `ProviderBytesConfined`
+    is the network-level statement. -/
 def CompromisedAgentConfinement (inst : KeyMaterial M) (Paired : M → M → Prop) (cfg : Config P) (W : World M) :
     Prop :=
   ∀ keys peer log, Act.served keys peer log ∈ W.acts → Unforged inst Paired cfg W keys →
-    ∀ D wire, ProxyEvent.sent D wire ∈ log → CredentialWriteAuthorized inst cfg W keys peer log D wire
+    ∀ D wire written, ProxyEvent.attempted D wire written ∈ log →
+      CredentialWriteAuthorized inst cfg W keys peer log D wire written
+
+/-- **A, on the network.** Every application byte a proxy connection emitted
+    to a provider belongs to an authorized request for that provider: each
+    provider session's application data is a prefix of an authorized write
+    attempt's bytes, on a session to that attempt's destination — all of the
+    request when the writer reported success, never more and never other
+    bytes. -/
+def ProviderBytesConfined (inst : KeyMaterial M) (cfg : Config P) (W : World M) (keys : KeySet M)
+    (peer : Slice U8) (log : List ProxyEvent) (writes : List ProviderWrite) : Prop :=
+  ∀ x ∈ writes, ∃ D wire written, x = ProviderWrite.on D x.bytes ∧ x.bytes <+: wire.val ∧
+    (written = true → x.bytes = wire.val) ∧ CredentialWriteAuthorized inst cfg W keys peer log D wire written
+
+/-- **Completed only after a whole write.** A request is recorded as a
+    completed provider operation only right after a write attempt that the
+    native writer reported whole; a failed or partial write ends as an
+    unknown outcome. -/
+def CompletedAfterWholeWrite (W : World M) : Prop :=
+  ∀ keys peer log, Act.served keys peer log ∈ W.acts → ∀ status acked, ProxyEvent.completed status acked ∈ log →
+    ∃ A B D wire, log = A ++ [.attempted D wire true, .completed status acked] ++ B
 
 /-! ## B. Provider-credential confidentiality
 
@@ -315,11 +382,11 @@ def WithinDelegation (inst : KeyMaterial M) (cfg : Config P) (W : World M) (peer
   claims.expires_at.val ≤ claims.renew_until.val ∧
   ∃ issued, credential.val = issued.val ∧ Lineage inst cfg W claims issued
 
-/-- **C. Bounded delegation.** Every credential-bearing write used a
+/-- **C. Bounded delegation.** Every credential-bearing write attempt used a
     surrogate within its delegation. -/
 def BoundedDelegation (inst : KeyMaterial M) (Paired : M → M → Prop) (cfg : Config P) (W : World M) : Prop :=
   ∀ keys peer log, Act.served keys peer log ∈ W.acts → Unforged inst Paired cfg W keys →
-    ∀ D wire, ProxyEvent.sent D wire ∈ log →
+    ∀ D wire written, ProxyEvent.attempted D wire written ∈ log →
       ∃ request now index opened,
         decide_request (Opening inst) cfg.policyInst keys cfg.policy request cfg.routes cfg.acceptance peer now =
           Result.ok (.dispatch index wire opened) ∧
@@ -368,7 +435,7 @@ def FailedLoginsIssueNothing (W : World M) : Prop :=
 def CredentialsEnteredForThePeer (inst : KeyMaterial M) (Paired : M → M → Prop) (cfg : Config P) (W : World M) :
     Prop :=
   ∀ keys peer log, Act.served keys peer log ∈ W.acts → Unforged inst Paired cfg W keys →
-    ∀ D wire, ProxyEvent.sent D wire ∈ log →
+    ∀ D wire written, ProxyEvent.attempted D wire written ∈ log →
       ∃ opened : stateless.Opened, (∃ request now index, decide_request (Opening inst) cfg.policyInst keys cfg.policy
           request cfg.routes cfg.acceptance peer now = Result.ok (.dispatch index wire opened)) ∧
         ((∃ sealer0 claims0 credential0 token0, IssuedIn inst cfg W sealer0 claims0 credential0 token0 .mint ∧
@@ -384,26 +451,26 @@ def AuthorizedAcquisition (inst : KeyMaterial M) (Paired : M → M → Prop) (cf
 
 /-! ## Refusals -/
 
-/-- **A refused request sends nothing, and no request sends twice.** Every
+/-- **A refused request writes nothing, and no request writes twice.** Every
     connection's record splits into one segment per request; a segment has at
-    most one send, and none if the request was rejected. -/
+    most one write attempt, and none if the request was rejected. -/
 def RefusalsSendNothing (W : World M) : Prop :=
   ∀ keys peer log, Act.served keys peer log ∈ W.acts →
     ∃ segs : List (List ProxyEvent), log = segs.flatten ∧ ∀ seg ∈ segs,
-      seg.countP ProxyEvent.isSent ≤ 1 ∧
-      ∀ rej, ProxyEvent.rejected rej ∈ seg → ∀ D w, ProxyEvent.sent D w ∉ seg
+      seg.countP ProxyEvent.isAttempt ≤ 1 ∧
+      ∀ rej, ProxyEvent.rejected rej ∈ seg → ∀ D w written, ProxyEvent.attempted D w written ∉ seg
 
-/-- **Every provider send is authorized** (`protocol_safety`'s first part,
-    unchanged): `CompromisedAgentConfinement` without the policy and the
+/-- **Every provider write attempt is authorized** (`protocol_safety`'s
+    first part): `CompromisedAgentConfinement` without the policy and the
     exact-bytes clauses. -/
 def SendsAreAuthorized (inst : KeyMaterial M) (Paired : M → M → Prop) (cfg : Config P) (W : World M) : Prop :=
   ∀ keys peer log, Act.served keys peer log ∈ W.acts → Unforged inst Paired cfg W keys →
-    ∀ D w, ProxyEvent.sent D w ∈ log →
+    ∀ D w written, ProxyEvent.attempted D w written ∈ log →
       ∃ request now index opened, decide_request (Opening inst) cfg.policyInst keys cfg.policy
           request cfg.routes cfg.acceptance peer now = Result.ok (.dispatch index w opened) ∧
         stateless_proxy.Proofs.DestinationOf cfg.routes index D ∧
-        (∃ A B, log = A ++ [.began request, .admitted opened.claims index true, .connected D true, .sent D w] ++
-          B) ∧
+        (∃ A B, log = A ++ [.began request, .admitted opened.claims index true, .connected D true,
+          .attempted D w written] ++ B) ∧
         ∃ sealer claims credential token src, IssuedIn inst cfg W sealer claims credential token src ∧
           opened.claims = claims ∧ opened.credential.val = credential.val ∧
           claims.certificate.val = peer.val ∧ Lineage inst cfg W claims credential
@@ -415,6 +482,7 @@ structure SecurityGuarantees (inst : KeyMaterial M) (Paired : M → M → Prop) 
     Prop where
   /-- A. -/
   confinement : CompromisedAgentConfinement inst Paired cfg W
+  completed : CompletedAfterWholeWrite W
   refusals : RefusalsSendNothing W
   /-- B, per execution. -/
   claimsHide : ClaimsHideCredential inst cfg W
@@ -432,6 +500,18 @@ include aead reach
 
 theorem sends_are_authorized : SendsAreAuthorized inst Paired cfg W :=
   fun keys peer log m unforged => ((protocol_safety aead reach).1 keys peer log m unforged).1
+
+omit aead in
+theorem completed_after_whole_write : CompletedAfterWholeWrite W := by
+  intro keys peer log m status acked mc
+  obtain ⟨_, segs, log, ok⟩ := served_segs reach m
+  rw [log] at mc ⊢
+  obtain ⟨seg, inSegs, inSeg⟩ := List.mem_flatten.mp mc
+  obtain ⟨request, now, index, wire, opened, D, _, _, B, e⟩ := stateless_proxy.Proofs.seg_completed (Opening inst)
+    cfg.policyInst keys cfg.policy cfg.routes cfg.acceptance peer (ok seg inSegs) inSeg
+  obtain ⟨s1, s2, split⟩ := List.append_of_mem inSegs
+  exact ⟨s1.flatten ++ [.began request, .admitted opened.claims index true, .connected D true], B ++ s2.flatten,
+    D, wire, by rw [split, e]; simp⟩
 
 theorem records_permitted : RecordsPermitted inst Paired cfg W :=
   fun _ _ _ m unforged => log_permitted aead reach m unforged
@@ -455,9 +535,9 @@ omit aead reach in
 theorem claims_hide_credential : ClaimsHideCredential inst cfg W :=
   fun _ _ _ _ _ issued => (issued_secret issued).2.2
 
-/-- **A.** Every credential-bearing write is authorized. -/
+/-- **A.** Every credential-bearing write attempt is authorized. -/
 theorem compromised_agent_confinement : CompromisedAgentConfinement inst Paired cfg W := by
-  intro keys peer log m unforged D wire sent
+  intro keys peer log m unforged D wire written sent
   obtain ⟨request, now, index, opened, hd, order, sealer, claims, credential, token, src, iss, oc, same, cert, lin,
     inside, prov, dest, enc⟩ := send_origin aead reach m unforged sent
   obtain ⟨op, hop, hperm⟩ :=
@@ -468,22 +548,38 @@ theorem compromised_agent_confinement : CompromisedAgentConfinement inst Paired 
     stateless_proxy.Proofs.encoded_exact enc⟩
 
 /-- **A, on the network.** Under the native transport contract, every
-    credential-bearing write the proxy process makes for a connection is an
-    authorized write to the server named by the destination of the route of
-    the surrogate's provider. -/
+    application byte the proxy process emitted to a provider for a connection
+    lies in a prefix of an authorized write attempt, on a session to the
+    server named by the destination of the route of the surrogate's provider
+    — even when the write failed part-way. -/
 theorem provider_writes_confined {keys : KeySet M} {peer : Slice U8} {log : List ProxyEvent}
     (m : Act.served keys peer log ∈ W.acts) (unforged : Unforged inst Paired cfg W keys)
     {writes : List ProviderWrite} (faithful : TransportFaithful log writes) :
-    ∀ x ∈ writes, ∃ D wire, x = ProviderWrite.of D wire ∧ CredentialWriteAuthorized inst cfg W keys peer log D wire := by
+    ProviderBytesConfined inst cfg W keys peer log writes := by
   intro x mx
-  rw [faithful] at mx
-  obtain ⟨D, wire, sent, e⟩ := mem_providerWrites mx
-  exact ⟨D, wire, e, compromised_agent_confinement aead reach keys peer log m unforged D wire sent⟩
+  obtain ⟨⟨D, wire, written⟩, ma, bytes, e, pre, whole⟩ := forall₂_mem_right faithful mx
+  subst e
+  exact ⟨D, wire, written, rfl, pre, whole,
+    compromised_agent_confinement aead reach keys peer log m unforged D wire written (mem_attempts ma)⟩
+
+/-- **A, for completed requests.** Under the native transport contract, a
+    request recorded as completed emitted its whole authorized request on a
+    session to its destination. -/
+theorem completed_requests_emitted_whole {keys : KeySet M} {peer : Slice U8} {log : List ProxyEvent}
+    (m : Act.served keys peer log ∈ W.acts) {writes : List ProviderWrite} (faithful : TransportFaithful log writes)
+    {status : U16} {acked : Bool} (mc : ProxyEvent.completed status acked ∈ log) :
+    ∃ D wire, ProxyEvent.attempted D wire true ∈ log ∧ ProviderWrite.on D wire.val ∈ writes := by
+  obtain ⟨A, B, D, wire, e⟩ := completed_after_whole_write reach keys peer log m status acked mc
+  have ma : ProxyEvent.attempted D wire true ∈ log := by rw [e]; simp
+  have mt := attempts_of_mem ma
+  obtain ⟨x, mx, bytes, ex, _, whole⟩ := forall₂_mem_left faithful mt
+  rw [whole rfl] at ex
+  exact ⟨D, wire, ma, ex ▸ mx⟩
 
 /-- **C.** Every credential-bearing write used a surrogate within its
     delegation. -/
 theorem bounded_delegation : BoundedDelegation inst Paired cfg W := by
-  intro keys peer log m unforged D wire sent
+  intro keys peer log m unforged D wire written sent
   obtain ⟨request, now, index, opened, hd, _, sealer, claims, credential, token, src, iss, oc, same, cert, lin, _⟩ :=
     send_origin aead reach m unforged sent
   obtain ⟨_, _, hopen, _⟩ := stateless_proxy.Proofs.dispatch_trace (Opening inst) cfg.policyInst keys cfg.policy request
@@ -498,7 +594,7 @@ theorem failed_logins_issue_nothing : FailedLoginsIssueNothing W :=
   fun _ failed => failed_login_quiet reach failed
 
 theorem credentials_entered_for_the_peer : CredentialsEnteredForThePeer inst Paired cfg W :=
-  fun _ _ _ m unforged _ _ sent => send_root aead reach m unforged sent
+  fun _ _ _ m unforged _ _ _ sent => send_root aead reach m unforged sent
 
 /-- **D.** -/
 theorem authorized_acquisition : AuthorizedAcquisition inst Paired cfg W :=
@@ -510,6 +606,7 @@ theorem authorized_acquisition : AuthorizedAcquisition inst Paired cfg W :=
     key set). -/
 theorem security_guarantees : SecurityGuarantees inst Paired cfg W where
   confinement := compromised_agent_confinement aead reach
+  completed := completed_after_whole_write reach
   refusals := refusals_send_nothing reach
   claimsHide := claims_hide_credential
   records := records_permitted aead reach
@@ -557,8 +654,8 @@ open garrett_stateless_core.stateless_policy.Proofs in
     is the provider's API semantics. -/
 theorem read_only_writes {inst : KeyMaterial M} {cfg : Config stateless_policy.ReadOnly}
     (readOnly : cfg.policyInst = ReadOnlyPolicy) {W : World M} {keys : KeySet M} {peer : Slice U8}
-    {log : List ProxyEvent} {D : stateless_proxy.Destination} {wire : alloc.vec.Vec U8}
-    (authorized : CredentialWriteAuthorized inst cfg W keys peer log D wire) :
+    {log : List ProxyEvent} {D : stateless_proxy.Destination} {wire : alloc.vec.Vec U8} {written : Bool}
+    (authorized : CredentialWriteAuthorized inst cfg W keys peer log D wire written) :
     ∃ (request : proxy_http.request.Request) (opened : stateless.Opened), PolicyPermits cfg request opened.claims ∧
       ReadMethod request.method.val ∧
       request.body.length = 0 := by

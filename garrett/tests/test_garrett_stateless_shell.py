@@ -28,33 +28,100 @@ def copy_sources(tmp_path: Path, guard) -> Path:
 
 def test_current_shell_passes():
     guard = load()
-    assert len(guard.check(ROOT)) == 12
+    assert len(guard.check(ROOT)) == 13
 
 
 @pytest.mark.parametrize('relative, old, new, message', [
+    # A second write on a provider session, or a write of other bytes.
+    ('crates/garrett-stateless/src/upstream.rs',
+     '        let written = tls.write_all(egress_wire(&egress));\n',
+     '        let _ = tls.write_all(egress_wire(&egress));\n'
+     '        let written = tls.write_all(b"again");\n',
+     'one write_all'),
+    ('crates/garrett-stateless/src/upstream.rs',
+     '    pub(crate) fn receive(&mut self, chunk: &mut [u8]) -> Received {\n',
+     '    pub(crate) fn resend(&mut self, bytes: &[u8]) {\n        let _ = self.tls.flush();\n'
+     '        let _ = std::io::Write::write(&mut self.tls, bytes);\n    }\n'
+     '    pub(crate) fn receive(&mut self, chunk: &mut [u8]) -> Received {\n',
+     'other than by one write_all'),
+    # Credential-bearing bytes read out of an Egress anywhere but the one write.
     ('crates/garrett-stateless/src/proxy.rs',
-     '        let written = upstream.tls.write_all(egress_wire(&egress));\n',
-     '        let _ = upstream.tls.write_all(egress_wire(&egress));\n'
-     '        let written = upstream.tls.write_all(b"again");\n',
-     'more than once'),
-    # The write goes on whatever connection connect opened, so connect must
-    # open it to the destination the core passed, and transmit must check it.
-    ('crates/garrett-stateless/src/proxy.rs',
-     '        self.upstream = open_upstream(destination).ok();\n',
-     '        self.upstream = open_upstream(&self.proxy.routes[0].destination).ok();\n',
-     'does not connect to the destination'),
-    ('crates/garrett-stateless/src/proxy.rs',
-     '        if &upstream.destination != egress_destination(&egress) {\n            return false;\n        }\n',
+     '        match session.transmit(egress) {\n',
+     '        let _copy = garrett_stateless_core::stateless_proxy::egress_wire(&egress).to_vec();\n'
+     '        match session.transmit(egress) {\n',
+     'egress_wire must be read exactly once'),
+    # Writing through a borrowed session, which could then be written again.
+    ('crates/garrett-stateless/src/upstream.rs',
+     '    pub(crate) fn transmit(self, egress: Egress) -> Option<Answering> {\n',
+     '    pub(crate) fn transmit(mut self, egress: Egress) -> Option<Answering> {\n',
+     'no longer consumes the session'),
+    # A session for one destination used for another destination's egress.
+    ('crates/garrett-stateless/src/upstream.rs',
+     '        if &self.destination != egress_destination(&egress) {\n            return None;\n        }\n',
      '',
-     'does not check the connection'),
+     'does not check the egress is for its destination'),
+    # The session must be opened to the destination the core passed, and
+    # authenticated as its host under its trust anchors.
     ('crates/garrett-stateless/src/proxy.rs',
-     '    let config = upstream_tls(&destination.trust).map_err(|_| ())?;\n',
-     '    let config = upstream_tls(&[]).map_err(|_| ())?;\n',
+     '        self.provider = match Authenticated::open(destination) {\n',
+     '        self.provider = match Authenticated::open(&self.proxy.routes[0].destination) {\n',
+     'does not open the destination'),
+    ('crates/garrett-stateless/src/upstream.rs',
+     '        let config = client(&destination.trust).ok()?;\n',
+     '        let config = client(&[]).ok()?;\n',
      'trust anchors'),
-    ('crates/garrett-stateless/src/proxy.rs',
-     '    let name = ServerName::try_from(host.to_string()).map_err(|_| ())?;\n',
-     '    let name = ServerName::try_from("provider.example".to_string()).map_err(|_| ())?;\n',
+    ('crates/garrett-stateless/src/upstream.rs',
+     '        let name = ServerName::try_from(host.to_string()).ok()?;\n',
+     '        let name = ServerName::try_from("provider.example".to_string()).ok()?;\n',
      'TLS name'),
+    ('crates/garrett-stateless/src/upstream.rs',
+     '            destination: destination.clone(),\n',
+     '            destination: Destination { host: Vec::new(), ..destination.clone() },\n',
+     'the destination it authenticated'),
+    ('crates/garrett-stateless/src/tls.rs',
+     '        .with_root_certificates(store)\n',
+     '        .dangerous()\n        .with_custom_certificate_verifier(Arc::new(AcceptAll))\n',
+     'verif'),
+    ('crates/garrett-stateless/src/proxy.rs',
+     'fn text(bytes: &[u8]) -> Value {',
+     'fn direct(c: Arc<rustls::ClientConfig>) {\n    let _ = rustls::ClientConnection::new(c, "a.test".try_into().unwrap());\n}\n\n'
+     'fn text(bytes: &[u8]) -> Value {',
+     'opens a TLS client connection'),
+    ('crates/garrett-stateless/src/proxy.rs',
+     'fn text(bytes: &[u8]) -> Value {',
+     'fn direct() {\n    let _ = TcpStream::connect("10.0.0.1:443");\n}\n\nfn text(bytes: &[u8]) -> Value {',
+     'TCP connection'),
+    # The session types keep the socket private and are built in one place.
+    ('crates/garrett-stateless/src/upstream.rs',
+     'pub(crate) struct Answering {\n    tls:',
+     'pub(crate) struct Answering {\n    pub(crate) tls:',
+     'exposes a field'),
+    ('crates/garrett-stateless/src/upstream.rs',
+     '    pub(crate) fn receive(&mut self, chunk: &mut [u8]) -> Received {\n',
+     '    pub(crate) fn reopen(self) -> Option<Authenticated> {\n'
+     '        Some(Authenticated { destination: todo!(), tls: self.tls, started: self.started })\n    }\n'
+     '    pub(crate) fn receive(&mut self, chunk: &mut [u8]) -> Received {\n',
+     'built outside open'),
+    ('crates/garrett-stateless/src/broker.rs',
+     'fn poll(&self, peer: &PeerIdentity, login: &str) -> Poll {',
+     'fn poll(&self, peer: &PeerIdentity, login: &str) -> Poll {\n        let _ = crate::upstream::client(&[]);',
+     'uses the provider transport'),
+    # Only the core makes an Egress.
+    ('crates/garrett-stateless/src/proxy.rs',
+     '        match session.transmit(egress) {\n',
+     '        let egress = Egress { destination: todo!(), wire: Vec::new() };\n'
+     '        match session.transmit(egress) {\n',
+     'builds an Egress'),
+    # The agent receives only the core's reply; the proxy holds no credential.
+    ('crates/garrett-stateless/src/proxy.rs',
+     '    fn restart(&mut self) {\n',
+     '    fn restart(&mut self) {\n        let _ = self.stream.write_all(b"extra");\n',
+     'writes to the agent outside Channel::send'),
+    ('crates/garrett-stateless/src/proxy.rs',
+     '        let received = session.receive(&mut self.chunk);\n',
+     '        let received = session.receive(&mut self.chunk);\n'
+     '        let _ = garrett_stateless_core::stateless::Opened::credential;\n',
+     'handles a credential'),
     ('crates/garrett-stateless/src/proxy.rs',
      '    read_only: Option<ReadOnly>,\n',
      '    read_only: Option<ReadOnly>,\n    upstream: Vec<Destination>,\n',
@@ -96,9 +163,9 @@ def test_current_shell_passes():
      'audit record'),
     # The shell may not decide a request itself.
     ('crates/garrett-stateless/src/proxy.rs',
-     '        let written = upstream.tls.write_all(egress_wire(&egress));\n',
+     '        match session.transmit(egress) {\n',
      '        let _ = stateless_proxy::decide(&self.proxy.keys, todo!(), &[], todo!(), b"", 0);\n'
-     '        let written = upstream.tls.write_all(egress_wire(&egress));\n',
+     '        match session.transmit(egress) {\n',
      'stateless_proxy::decide'),
     # No hidden mutable state, in a struct field or an atomic.
     ('crates/garrett-stateless/src/proxy.rs',

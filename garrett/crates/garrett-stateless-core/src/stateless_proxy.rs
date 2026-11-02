@@ -120,8 +120,9 @@ pub trait Origin {
     /// was sent.
     fn connect(&mut self, destination: &Destination) -> bool;
     /// Write the egress's bytes, once, on the connection `connect` just
-    /// opened. False if the write failed: the provider may or may not have
-    /// acted.
+    /// opened. True if all of them were written; false if the write failed,
+    /// in which case any prefix of them may have been sent and the provider
+    /// may or may not have acted.
     fn transmit(&mut self, egress: Egress) -> bool;
     /// The next read of the provider's answer on that connection.
     fn receive(&mut self) -> Received;
@@ -540,6 +541,7 @@ mod tests {
         written: bool,
         reads: Vec<Received>,
         connected: Option<Vec<u8>>,
+        completions: usize,
     }
     impl Default for Recorder {
         fn default() -> Self {
@@ -552,6 +554,7 @@ mod tests {
                 written: true,
                 reads: Vec::new(),
                 connected: None,
+                completions: 0,
             }
         }
     }
@@ -598,6 +601,7 @@ mod tests {
             }
         }
         fn completed(&mut self, _status: u16) -> bool {
+            self.completions += 1;
             true
         }
     }
@@ -782,13 +786,19 @@ mod tests {
         assert!(origin.sent.is_empty());
         assert!(!String::from_utf8_lossy(&served.reply).contains("REAL-SECRET"));
 
+        // A write that failed part-way: the provider may hold any prefix of
+        // the request, so its answer is not read and nothing is completed.
         let broken = Recorder {
             written: false,
             ..Recorder::answering(OK)
         };
         let (served, origin) = run_origin(&Unrestricted, raw, b"PEER", broken);
+        assert!(matches!(served.stage, Stage::Failed));
         assert!(matches!(served.code, Code::OutcomeUnknown));
         assert_eq!(origin.sent.len(), 1, "no retry after a failed write");
+        assert_eq!(origin.reads.len(), 2, "no answer is read after a failed write");
+        assert_eq!(origin.completions, 0, "a failed write is never completed");
+        assert!(!String::from_utf8_lossy(&served.reply).contains("REAL-SECRET"));
     }
 
     /// An unacknowledged admission record stops the request before it
