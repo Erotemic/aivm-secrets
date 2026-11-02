@@ -691,10 +691,11 @@ end guest
 
 /-- **Every credential-bearing provider write has an authorized origin.** In
     any execution, each `sent D w` record of any proxy connection is
-    preceded, in that connection's log, by the acknowledged admission of the
-    same claims and the authenticated connection to `D`; it was decided by
-    `decide_request` for that connection's TLS peer on a surrogate taken from
-    the request; `D` is the destination of the route that serves the
+    preceded, in that connection's log, by the `began` record of the request
+    the connection framed, the acknowledged admission of the same claims and
+    the authenticated connection to `D`; it was decided by `decide_request`,
+    for that request and that connection's TLS peer, on a surrogate taken
+    from the request; `D` is the destination of the route that serves the
     surrogate's provider; and, if no signature under the connection's key set
     was forged and AEAD is correct for paired keys, that surrogate is one this
     broker issued — bound to exactly this peer's certificate — and the bytes
@@ -709,7 +710,7 @@ theorem send_origin {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Co
     (sent : stateless_proxy.Proofs.ProxyEvent.sent D w ∈ log) :
     ∃ request now index opened, stateless_proxy.Proofs.decide_request (Opening inst) cfg.policyInst keys cfg.policy
         request cfg.routes cfg.acceptance peer now = Result.ok (.dispatch index w opened) ∧
-      (∃ A B, log = A ++ [.admitted opened.claims index true, .connected D true, .sent D w] ++ B) ∧
+      (∃ A B, log = A ++ [.began request, .admitted opened.claims index true, .connected D true, .sent D w] ++ B) ∧
       ∃ sealer claims credential token src, IssuedIn inst cfg W sealer claims credential token src ∧
         opened.claims = claims ∧ opened.credential.val = credential.val ∧
         claims.certificate.val = peer.val ∧ Lineage inst cfg W claims credential ∧
@@ -724,11 +725,12 @@ theorem send_origin {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Co
   obtain ⟨configured, segs, log, ok⟩ := served_segs reach m
   rw [log] at sent ⊢
   obtain ⟨seg, inSegs, inSeg⟩ := List.mem_flatten.mp sent
-  obtain ⟨request, now, index, opened, hd, ⟨_, dest⟩, A, B, e⟩ := stateless_proxy.Proofs.seg_sent (Opening inst)
+  obtain ⟨request, now, index, opened, hd, ⟨_, dest⟩, B, e⟩ := stateless_proxy.Proofs.seg_sent (Opening inst)
     cfg.policyInst keys cfg.policy cfg.routes cfg.acceptance peer (ok seg inSegs) inSeg
-  have order : ∃ A B, segs.flatten = A ++ [.admitted opened.claims index true, .connected D true, .sent D w] ++ B := by
+  have order : ∃ A B, segs.flatten =
+      A ++ [.began request, .admitted opened.claims index true, .connected D true, .sent D w] ++ B := by
     obtain ⟨s1, s2, split⟩ := List.append_of_mem inSegs
-    exact ⟨s1.flatten ++ A, B ++ s2.flatten, by rw [split, e]; simp⟩
+    exact ⟨s1.flatten, B ++ s2.flatten, by rw [split, e]; simp⟩
   obtain ⟨token, _, ho, inside, prov, wire⟩ := stateless_proxy.Proofs.dispatch_trace (Opening inst) cfg.policyInst keys
     cfg.policy request cfg.routes cfg.acceptance peer now hd
   obtain ⟨sealer, claims, credential, tok, src, iss, oc, ok, _⟩ := opened_issued configured unforged aead ho
@@ -1027,7 +1029,8 @@ theorem protocol_safety {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg 
         ∃ request now index opened, stateless_proxy.Proofs.decide_request (Opening inst) cfg.policyInst keys cfg.policy
             request cfg.routes cfg.acceptance peer now = Result.ok (.dispatch index w opened) ∧
           stateless_proxy.Proofs.DestinationOf cfg.routes index D ∧
-          (∃ A B, log = A ++ [.admitted opened.claims index true, .connected D true, .sent D w] ++ B) ∧
+          (∃ A B, log = A ++ [.began request, .admitted opened.claims index true, .connected D true, .sent D w] ++
+            B) ∧
           ∃ sealer claims credential token src, IssuedIn inst cfg W sealer claims credential token src ∧
             opened.claims = claims ∧ opened.credential.val = credential.val ∧
             claims.certificate.val = peer.val ∧ Lineage inst cfg W claims credential) ∧

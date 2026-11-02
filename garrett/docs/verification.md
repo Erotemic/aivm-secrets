@@ -90,10 +90,11 @@ state with anything, so running each atomically loses no interleaving.
 For every reachable world, the theorem proves:
 
 1. **Every credential-bearing provider write has an authorized origin.** Each
-   `sent D w` record follows, in the same connection, the acknowledged
-   admission of the same claims and route and the authenticated connection to
-   `D`; it was decided by `decide_request`, which is the extracted pure
-   `stateless_proxy::decide`, for the connection's own TLS peer; `D` is the
+   `sent D w` record follows, in the same connection, the `began` record of
+   the request the connection framed, the acknowledged admission of the same
+   claims and route, and the authenticated connection to `D`; it was decided
+   by `decide_request`, which is the extracted pure `stateless_proxy::decide`,
+   for that request and the connection's own TLS peer; `D` is the
    destination of the route serving the surrogate's provider; the surrogate
    is one this broker issued, bound to exactly that peer's certificate; the
    bytes are exactly the encoder's request carrying exactly the issued

@@ -619,7 +619,7 @@ theorem serveLog_events {d : Decision} {E : List ProxyEvent} (slog : ServeLog ro
     | .admitted claims index _ => ∃ wire opened, d = .dispatch index wire opened ∧ claims = opened.claims
     | .connected D _ => ∃ index wire opened, d = .dispatch index wire opened ∧ DestinationOf routes index D
     | .sent D w => ∃ index opened, d = .dispatch index w opened ∧ DestinationOf routes index D ∧
-        ∃ A B, E = A ++ [.admitted opened.claims index true, .connected D true, .sent D w] ++ B
+        ∃ B, E = [.admitted opened.claims index true, .connected D true, .sent D w] ++ B
     | .completed _ _ => ∃ index wire opened, d = .dispatch index wire opened
     | _ => False := by
   cases d with
@@ -637,28 +637,29 @@ theorem serveLog_events {d : Decision} {E : List ProxyEvent} (slog : ServeLog ro
       | exact ⟨wire, opened, rfl, rfl⟩
       | exact ⟨index, wire, opened, rfl, dest⟩
       | exact ⟨index, wire, opened, rfl⟩
-      | exact ⟨index, opened, rfl, dest, [], [], rfl⟩
-      | exact ⟨index, opened, rfl, dest, [], [.completed status acked], rfl⟩
+      | exact ⟨index, opened, rfl, dest, [], rfl⟩
+      | exact ⟨index, opened, rfl, dest, [.completed status acked], rfl⟩
 
-/-- Within one segment, a `sent` event comes only from a dispatch decision,
-    right after its acknowledged admission and the authenticated connection
-    to the destination of the decided route. -/
+/-- Within one segment, a `sent` event comes only from a dispatch decision
+    for the request the segment began with, right after its acknowledged
+    admission and the authenticated connection to the destination of the
+    decided route. -/
 theorem seg_sent {seg : List ProxyEvent} (ok : StepLog ops pol opener policy routes a peer seg) {D : Destination}
     {w : alloc.vec.Vec U8} (m : ProxyEvent.sent D w ∈ seg) :
     ∃ request now index opened, decide_request ops pol opener policy request routes a peer now =
         Result.ok (.dispatch index w opened) ∧ DestinationOf routes index D ∧
-      ∃ A B, seg = A ++ [.admitted opened.claims index true, .connected D true, .sent D w] ++ B := by
+      ∃ B, seg = [.began request, .admitted opened.claims index true, .connected D true, .sent D w] ++ B := by
   rcases ok with e | ⟨code, bytes, _, e⟩ | ⟨request, now, d, E, served, hd, slog, _, shape⟩
   · subst e; cases m
   · subst e; simp at m
   · have inE : ProxyEvent.sent D w ∈ E := by
       rcases shape with ⟨_, e⟩ | ⟨_, e⟩ <;> subst e <;> simpa using m
-    obtain ⟨index, opened, ed, dest, A, B, eE⟩ := serveLog_events routes slog inE
+    obtain ⟨index, opened, ed, dest, B, eE⟩ := serveLog_events routes slog inE
     subst ed
     refine ⟨request, now, index, opened, hd, dest, ?_⟩
     rcases shape with ⟨_, e⟩ | ⟨_, e⟩ <;> subst e <;> rw [eE]
-    · exact ⟨[.began request] ++ A, B ++ [.guestSent served.reply.val], by simp⟩
-    · exact ⟨[.began request] ++ A, B ++ [.stopped served.code, .guestSent served.reply.val], by simp⟩
+    · exact ⟨B ++ [.guestSent served.reply.val], by simp⟩
+    · exact ⟨B ++ [.stopped served.code, .guestSent served.reply.val], by simp⟩
 
 /-- Within one segment, a connection request comes only from a dispatch
     decision, and is to the destination of the decided route. -/
@@ -697,8 +698,8 @@ theorem seg_sends_at_most_once {seg : List ProxyEvent} (ok : StepLog ops pol ope
 
 /-- **Every credential-bearing egress of a connection is authorized.** If a
     logged connection returns, every `sent D wire` in its log immediately
-    follows the acknowledged `admitted` record of that same request and the
-    authenticated connection to `D`, and that request's pre-egress decision
+    follows the request's `began` record, the acknowledged `admitted` record
+    and the authenticated connection to `D`, and that request's pre-egress decision
     was a dispatch of exactly `wire` to the route whose destination is `D`:
     the request carried exactly one surrogate, it opened for **this
     connection's `peer`**, the route serves its authenticated provider, and
@@ -709,7 +710,8 @@ theorem connection_egress_authorized (ch : Channel C) (io : C) (after : C × Lis
     {D : Destination} {w : alloc.vec.Vec U8} (m : ProxyEvent.sent D w ∈ after.2) :
     ∃ request now index opened, decide_request ops pol opener policy request routes a peer now =
         Result.ok (.dispatch index w opened) ∧
-      (∃ A B, after.2 = A ++ [.admitted opened.claims index true, .connected D true, .sent D w] ++ B) ∧
+      (∃ A B, after.2 = A ++ [.began request, .admitted opened.claims index true, .connected D true, .sent D w] ++
+        B) ∧
       ∃ token, surrogate_of (alloc.vec.Vec.deref request.fields) = Result.ok (some token) ∧
         stateless.«open» ops opener (alloc.vec.Vec.deref token) a peer now = Result.ok (.Ok opened) ∧
         ∃ (inside : index.val < routes.length),
@@ -723,11 +725,11 @@ theorem connection_egress_authorized (ch : Channel C) (io : C) (after : C × Lis
   obtain ⟨segs, log, ok⟩ := connection_logged ops pol opener policy routes a authority peer limit ch io after h
   rw [log] at m ⊢
   obtain ⟨seg, inSegs, inSeg⟩ := List.mem_flatten.mp m
-  obtain ⟨request, now, index, opened, hd, ⟨inside', dest⟩, A, B, e⟩ :=
+  obtain ⟨request, now, index, opened, hd, ⟨inside', dest⟩, B, e⟩ :=
     seg_sent ops pol opener policy routes a peer (ok seg inSegs) inSeg
   obtain ⟨s1, s2, split⟩ := List.append_of_mem inSegs
   obtain ⟨token, ho, hopen, inside, prov, henc⟩ := dispatch_trace ops pol opener policy request routes a peer now hd
-  refine ⟨request, now, index, opened, hd, ⟨s1.flatten ++ A, B ++ s2.flatten, ?_⟩,
+  refine ⟨request, now, index, opened, hd, ⟨s1.flatten, B ++ s2.flatten, ?_⟩,
     token, ho, hopen, inside, prov, dest, henc⟩
   rw [split, e]
   simp

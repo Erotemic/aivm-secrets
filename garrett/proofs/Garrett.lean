@@ -193,18 +193,20 @@ def ExactRequest (request : proxy_http.request.Request) (route : stateless_proxy
     Result.ok (.Ok (), wire) ∧
   ((ExactWire request route credential).length ≤ Usize.max → wire.val = ExactWire request route credential)
 
-/-- **In order.** The write follows, in the connection's log, the
-    acknowledged admission record of the same request and the authenticated
-    connection to the same destination. -/
-def AfterAuthenticatedConnection (log : List ProxyEvent) (claims : stateless.SurrogateClaims) (index : Usize)
-    (D : stateless_proxy.Destination) (wire : alloc.vec.Vec U8) : Prop :=
-  ∃ A B, log = A ++ [.admitted claims index true, .connected D true, .sent D wire] ++ B
+/-- **In order, for the request the connection received.** The write
+    follows, in the connection's log, the record of the request the
+    connection framed from the agent's bytes, the acknowledged admission
+    record and the authenticated connection to the same destination. -/
+def AfterAuthenticatedConnection (log : List ProxyEvent) (request : proxy_http.request.Request)
+    (claims : stateless.SurrogateClaims) (index : Usize) (D : stateless_proxy.Destination)
+    (wire : alloc.vec.Vec U8) : Prop :=
+  ∃ A B, log = A ++ [.began request, .admitted claims index true, .connected D true, .sent D wire] ++ B
 
 /-- **An authorized credential write.** The write of `wire` to `D` on a
     connection authenticated as `peer` was decided as a dispatch by the
-    extracted `decide_request` for a request that connection carried; it
-    follows the acknowledged admission and the authenticated connection to
-    `D`; the surrogate was issued for `peer`; the operation policy permitted
+    extracted `decide_request` for a request that connection received; it
+    follows that request's record, the acknowledged admission and the
+    authenticated connection to `D`; the surrogate was issued for `peer`; the operation policy permitted
     the operation; `D` is the destination of the route serving the
     surrogate's provider; and `wire` is exactly the agent's request carrying
     exactly the issued credential. -/
@@ -213,7 +215,7 @@ def CredentialWriteAuthorized (inst : KeyMaterial M) (cfg : Config P) (W : World
   ∃ request now index route opened,
     decide_request (Opening inst) cfg.policyInst keys cfg.policy request cfg.routes cfg.acceptance peer now =
       Result.ok (.dispatch index wire opened) ∧
-    AfterAuthenticatedConnection log opened.claims index D wire ∧
+    AfterAuthenticatedConnection log request opened.claims index D wire ∧
     IssuedFor inst cfg W peer opened.claims opened.credential ∧
     PolicyPermits cfg request opened.claims ∧
     RouteFor cfg.routes opened.claims.provider.val index route ∧ route.destination = D ∧
@@ -400,7 +402,8 @@ def SendsAreAuthorized (inst : KeyMaterial M) (Paired : M → M → Prop) (cfg :
       ∃ request now index opened, decide_request (Opening inst) cfg.policyInst keys cfg.policy
           request cfg.routes cfg.acceptance peer now = Result.ok (.dispatch index w opened) ∧
         stateless_proxy.Proofs.DestinationOf cfg.routes index D ∧
-        (∃ A B, log = A ++ [.admitted opened.claims index true, .connected D true, .sent D w] ++ B) ∧
+        (∃ A B, log = A ++ [.began request, .admitted opened.claims index true, .connected D true, .sent D w] ++
+          B) ∧
         ∃ sealer claims credential token src, IssuedIn inst cfg W sealer claims credential token src ∧
           opened.claims = claims ∧ opened.credential.val = credential.val ∧
           claims.certificate.val = peer.val ∧ Lineage inst cfg W claims credential
