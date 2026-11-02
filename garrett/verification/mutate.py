@@ -92,7 +92,7 @@ MUTANTS = [
      "    if false {\n        return Err(LoginDenial::Invalid);"),
     ("stateless_login.rs", "stateless login delivered to any peer", "if !(certificate == peer) {", "if false {"),
     ("stateless_proxy.rs", "stateless proxy wrong provider destination",
-     "let index = route_of(routes, &verified.claims.provider);", "let index: usize = 0;"),
+     "let index = route_of(routes, &admitted.verified.claims.provider);", "let index: usize = 0;"),
     ("stateless_proxy.rs", "stateless proxy egress without acknowledged admission",
      "if !origin.admitted(&opened.claims, index) {", "if false {"),
     ("stateless_proxy.rs", "stateless proxy surrogate forwarded instead of credential",
@@ -152,16 +152,16 @@ MUTANTS = [
     # Operation authorization (GarrettStatelessComposition): removing or
     # bypassing the policy, or weakening the read-only policy.
     ("stateless_proxy.rs", "stateless proxy operation policy not consulted",
-     "if !policy.permits(&verified.claims, &operation_of(request)) {", "if false {"),
+     "if !policy.permits(&admitted.verified.claims, &operation_of(request)) {", "if false {"),
     ("stateless_proxy.rs", "stateless proxy credential decrypted before authorization",
-     "    if !policy.permits(&verified.claims, &operation_of(request)) {\n"
+     "    if !policy.permits(&admitted.verified.claims, &operation_of(request)) {\n"
      "        return Decision::Refused(Code::Denied);\n    }\n"
-     "    let opened = match stateless::decrypt(opener, verified) {\n"
+     "    let opened = match stateless::decrypt(opener, admitted) {\n"
      "        Ok(opened) => opened,\n        Err(rejection) => return Decision::Unauthorized(Some(rejection)),\n    };\n",
      "    let claims = stateless::authenticate(opener, &token, acceptance, peer, now);\n"
-     "    let opened = match stateless::decrypt(opener, verified) {\n"
+     "    let opened = match stateless::decrypt(opener, admitted) {\n"
      "        Ok(opened) => opened,\n        Err(rejection) => return Decision::Unauthorized(Some(rejection)),\n    };\n"
-     "    let permitted = match claims {\n        Ok(v) => policy.permits(&v.claims, &operation_of(request)),\n"
+     "    let permitted = match claims {\n        Ok(v) => policy.permits(&v.verified.claims, &operation_of(request)),\n"
      "        Err(_) => false,\n    };\n"
      "    if !permitted {\n        return Decision::Refused(Code::Denied);\n    }\n"),
     ("stateless_policy.rs", "stateless read-only policy permits a write method",
@@ -295,6 +295,10 @@ def main() -> int:
     parser.add_argument('--filter', help='run only labels matching this regex (not the full campaign)')
     parser.add_argument('--jobs', type=int, default=min(4, os.cpu_count() or 1), help='mutants checked at once')
     args = parser.parse_args()
+    # Every defect must still apply to the source, before any work starts.
+    stale = [m[1] for m in MUTANTS if (CORE / 'src' / m[0]).read_text().count(m[2]) != 1]
+    if stale:
+        raise SystemExit(f'mutations that no longer match once: {stale}')
     # The proofs are about the committed extraction; it must match the source.
     with tempfile.TemporaryDirectory(prefix='garrett-extract-', dir=ROOT / '.tools') as scratch:
         if extract.extract(Path(scratch), quiet=True).read_bytes() != (PROOFS / 'generated' / extract.MODULE).read_bytes():
