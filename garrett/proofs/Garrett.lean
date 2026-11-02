@@ -302,7 +302,7 @@ custody: whoever holds the agent's private key is, to Garrett, the agent. -/
     was presented on a connection authenticated as its own certificate; this
     proxy accepts its audience and provider; `now` is inside its validity
     window, which ends no later than its renewal limit; and it descends from
-    a login or an operator mint with the same binding, provider and
+    a login or an operator mint with the same binding, provider, subject and
     credential and a renewal limit no earlier than its own. -/
 def WithinDelegation (inst : KeyMaterial M) (cfg : Config P) (W : World M) (peer : Slice U8) (now : I64)
     (claims : stateless.SurrogateClaims) (credential : alloc.vec.Vec U8) : Prop :=
@@ -324,8 +324,8 @@ def BoundedDelegation (inst : KeyMaterial M) (Paired : M → M → Prop) (cfg : 
         WithinDelegation inst cfg W peer now opened.claims opened.credential
 
 /-- **Renewal never widens a surrogate.** Every issued surrogate descends
-    from a login or mint with the same binding, provider and credential, and
-    a renewal limit no later. -/
+    from a login or mint with the same binding, provider, subject and
+    credential, and a renewal limit no later. -/
 def RenewalPreservesLineage (inst : KeyMaterial M) (cfg : Config P) (W : World M) : Prop :=
   ∀ sealer claims credential token src, IssuedIn inst cfg W sealer claims credential token src →
     Lineage inst cfg W claims credential

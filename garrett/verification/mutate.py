@@ -61,6 +61,8 @@ MUTANTS = [
     ("stateless.rs", "stateless audience not checked", "if !member(&acceptance.audiences, &claims.audience) {",
      "if false {"),
     ("stateless.rs", "stateless verifying key issuer not checked", "if !(issuer == key_issuer) {", "if false {"),
+    ("stateless.rs", "stateless renewal changes the subject", "        subject: subject.to_vec(),",
+     "        subject: provider.to_vec(),"),
     # `open` is `authenticate` then `decrypt`; the mutant inlines an `open`
     # that unseals before it admits.
     ("stateless.rs", "stateless decrypted before admission",

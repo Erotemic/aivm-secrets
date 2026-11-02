@@ -71,7 +71,7 @@ library APIs.
 python verification/toolchain.py bootstrap   # pinned Aeneas release, Rust nightly, Lean; Mathlib cache
 python verification/extract.py check          # proofs/generated is exactly what the tools produce
 (cd proofs && lake build)                     # every theorem
-python verification/mutate.py                 # 50 security mutants, each rejected by a proof
+python verification/mutate.py                 # 51 security mutants, each rejected by a proof
 python verification/shell_guard.py check      # the application calls the core as the proofs assume
 ```
 

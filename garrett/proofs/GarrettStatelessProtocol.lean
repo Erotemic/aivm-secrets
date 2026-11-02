@@ -528,12 +528,14 @@ theorem issued_mono {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Co
     exact ⟨grant, tid, now, lifetime, grow.2 _ m, rest⟩
 
 /-- `token` descends from a root issuance (a login's end or an operator mint)
-    with the same binding, provider and credential, and a `ren` no later. -/
+    with the same binding, provider, subject and credential, and a `ren` no
+    later. -/
 def Lineage (inst : KeyMaterial M) (cfg : Config P) (W : World M) (claims : stateless.SurrogateClaims)
     (credential : Slice U8) : Prop :=
   ∃ sealer0 claims0 credential0 token0 src0, IssuedIn inst cfg W sealer0 claims0 credential0 token0 src0 ∧
     (src0 = .mint ∨ ∃ σ, src0 = .login σ) ∧
     claims.certificate.val = claims0.certificate.val ∧ claims.provider.val = claims0.provider.val ∧
+    claims.subject.val = claims0.subject.val ∧
     claims.renew_until.val ≤ claims0.renew_until.val ∧ credential.val = credential0.val
 
 theorem lineage_mono {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config P} {W W' : World M}
@@ -546,12 +548,13 @@ theorem root_lineage {inst : KeyMaterial M} {cfg : Config P} {W : World M} {seal
     {claims : stateless.SurrogateClaims} {credential : Slice U8} {token : alloc.vec.Vec U8} {src : Source}
     (h : IssuedIn inst cfg W sealer claims credential token src) (root : src = .mint ∨ ∃ σ, src = .login σ) :
     Lineage inst cfg W claims credential :=
-  ⟨sealer, claims, credential, token, src, h, root, rfl, rfl, le_refl _, rfl⟩
+  ⟨sealer, claims, credential, token, src, h, root, rfl, rfl, rfl, le_refl _, rfl⟩
 
 /-- **Renewal never extends a surrogate's life or changes what it is.** In
     every execution in which no signature is forged at a renewal, every
     surrogate the broker ever issued descends from a login or an operator
-    mint: same certificate binding, same provider, same credential, and an
+    mint: same certificate binding, same provider, same subject, same
+    credential, and an
     absolute limit (`ren`) no later than the root's — over any number of
     renewals. -/
 theorem lineage {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config P}
@@ -594,18 +597,19 @@ theorem lineage {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Config
         · simp only [List.mem_singleton, Act.renewed.injEq] at m'
           obtain ⟨ek, es, et, ep, ece, etid, enow, elt, eiss⟩ := m'
           subst ek es et ep ece etid enow elt
-          obtain ⟨opened', ho', cert1, _, prov1, _, ren1, _, _⟩ :=
+          obtain ⟨opened', ho', cert1, _, prov1, subj1, ren1, _, _⟩ :=
             stateless.Proofs.renew_trace (Opening inst) (Sealing inst) keys sealer run
           rw [ho] at ho'
           simp only [Result.ok.injEq, core.result.Result.Ok.injEq] at ho'
           subst ho'
           subst eiss
-          simp only at cert1 prov1 ren1
+          simp only at cert1 prov1 subj1 ren1
           obtain ⟨s1, c1, k1, t1, src1, iss1, ocl, ocr, _⟩ := opened_issued configured unforged aead ho
-          obtain ⟨s0, c0, k0, t0, src0, iss0, root, cert0, prov0, ren0, cred0⟩ := ih iss1
-          refine ⟨s0, c0, k0, t0, src0, issued_mono (.renew configured unforged run) iss0, root, ?_, ?_, ?_, ?_⟩
+          obtain ⟨s0, c0, k0, t0, src0, iss0, root, cert0, prov0, subj0, ren0, cred0⟩ := ih iss1
+          refine ⟨s0, c0, k0, t0, src0, issued_mono (.renew configured unforged run) iss0, root, ?_, ?_, ?_, ?_, ?_⟩
           · rw [cert1, ocl, cert0]
           · rw [prov1, ocl, prov0]
+          · rw [subj1, ocl, subj0]
           · rw [ocl] at ren1; omega
           · rw [← oc, deref_val, ocr, cred0]
 
@@ -983,7 +987,7 @@ theorem send_root {inst : KeyMaterial M} {Paired : M → M → Prop} {cfg : Conf
           opened.credential.val = tok.credential.val)) := by
   obtain ⟨request, now, index, opened, hd, _, sealer, claims, credential, token, src, iss, _, ok, cert, lin, _⟩ :=
     send_origin aead reach m unforged sent
-  obtain ⟨s0, c0, k0, t0, src0, iss0, root, cert0, _, _, cred0⟩ := lin
+  obtain ⟨s0, c0, k0, t0, src0, iss0, root, cert0, _, _, _, cred0⟩ := lin
   refine ⟨opened, ⟨request, now, index, hd⟩, ?_⟩
   rcases root with e | ⟨σ, e⟩ <;> subst e
   · exact Or.inl ⟨s0, c0, k0, t0, iss0, by rw [← cert0, cert], by rw [ok, cred0]⟩
