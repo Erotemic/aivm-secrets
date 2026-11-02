@@ -24,7 +24,7 @@
 //! | issue a surrogate | [`stateless::issue`], [`stateless::IssuePolicy`], [`stateless::Grant`], [`stateless_token::TokenSealer::new`] |
 //! | open one | [`stateless::open`] (= [`stateless::authenticate`] then [`stateless::decrypt`]), [`stateless::Acceptance`], [`stateless_token::KeySet::new`] |
 //! | renew one | [`stateless::renew`] |
-//! | decide a proxied request | [`stateless_proxy::decide`]; run a connection with [`stateless_proxy::connection`] |
+//! | decide a proxied request | [`stateless_proxy::decide`]; run a connection with [`stateless_proxy::connection`] over routes ([`stateless_proxy::Route`], each with its [`stateless_proxy::Destination`]) that pass [`stateless_proxy::routes_valid`] |
 //! | restrict operations | [`stateless_policy::Unrestricted`], [`stateless_policy::ReadOnly`] |
 //! | the OAuth login | [`stateless_mailbox`]: `start`, `pending`, `accept`, `exchange`, `finish`, `poll` |
 //! | adapters you implement | [`stateless_token::KeyMaterial`], [`stateless_token::StateKey`], [`stateless_mailbox::CodeExchange`], [`stateless_proxy::Channel`], [`stateless_proxy::Origin`] |

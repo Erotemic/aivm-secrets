@@ -542,7 +542,11 @@ decision (steps 1-5) and `stateless_proxy::serve` performs it (steps 6-7):
    - add `Connection: close` and `Accept-Encoding: identity`.
    Deny rules refuse with `403`.
 6. Exchange over TLS with the route's pinned `address:port`, verifying the
-   route `host` against `ca_file` (or system roots).
+   route `host` against `ca_file` (or system roots). The request is written
+   only after the server has authenticated as the route `host`, once: a
+   failed connection or handshake sends nothing (`502`, `unreachable`); a
+   failed write or read is `502`, `outcome_unknown`, and is never retried.
+   A proxy configuration with two routes for one `provider` is refused.
 7. Release the response with the existing `proxy_http::guest_response`.
    A response whose bytes contain the credential in any of the checked
    encodings is refused (`502`, `reflected`). Hop-by-hop fields and

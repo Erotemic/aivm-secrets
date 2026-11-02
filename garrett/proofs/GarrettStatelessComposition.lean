@@ -237,6 +237,29 @@ def ExactWire (request : proxy_http.request.Request) (route : Route) (credential
   UpstreamPrefix request (alloc.vec.Vec.deref route.destination.host) ++ HeaderPrefix route.authentication ++
     credential.val ++ CRLF ++ UpstreamSuffix request
 
+/-- **An accepted encoding is the exact request.** When the extracted
+    encoder accepts a request for a route and credential, its bytes are
+    exactly `ExactWire` whenever that fits in memory. -/
+theorem encoded_exact {request : proxy_http.request.Request} {route : Route} {credential wire : alloc.vec.Vec U8}
+    (h : proxy_http.upstream.encode_upstream (alloc.vec.Vec.new U8) request
+      (alloc.vec.Vec.deref route.destination.host) (alloc.vec.Vec.deref route.rules)
+      (alloc.vec.Vec.deref credential) route.authentication = Result.ok (.Ok (), wire))
+    (room : (ExactWire request route credential).length ≤ Usize.max) :
+    wire.val = ExactWire request route credential := by
+  obtain ⟨value, returned, post⟩ := returned_of_spec
+    (encode_upstream_contract (alloc.vec.Vec.new U8) request
+      (alloc.vec.Vec.deref route.destination.host) (alloc.vec.Vec.deref route.rules)
+      (alloc.vec.Vec.deref credential) route.authentication
+      (by rw [show (alloc.vec.Vec.new U8).length = 0 from rfl, Nat.zero_add]
+          simpa [ExactWire, alloc.vec.Vec.deref] using room))
+  rw [h] at returned
+  simp only [Result.ok.injEq] at returned
+  subst returned
+  rcases post with ⟨_, _, _, _, bytes⟩ | ⟨refused, _⟩
+  · rw [bytes]
+    simp [alloc.vec.Vec.new, ExactWire]
+  · exact absurd rfl refused
+
 /-- **No egress.** The decision is not a dispatch, the reply is refused, and
     the origin saw at most the `rejected` diagnostic (its `admitted` and
     `exchange` were never called). -/

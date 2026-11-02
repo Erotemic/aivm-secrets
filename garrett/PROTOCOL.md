@@ -4,8 +4,8 @@ This walks through one surrogate's life, start to finish. Each step names
 the Rust function that decides it, all in
 [`crates/garrett-stateless-core/src/`](crates/garrett-stateless-core/src), and
 the theorem that proves it. The theorems are about the Aeneas extraction of
-that same Rust; [`proofs/Garrett.lean`](proofs/Garrett.lean) collects the
-guarantees. The normative wire format is
+that same Rust; [`proofs/Garrett.lean`](proofs/Garrett.lean) states the five
+guarantees they add up to ([below](#the-five-guarantees)). The normative wire format is
 [`docs/garrett-stateless-v1.md`](docs/garrett-stateless-v1.md). What is
 trusted rather than proved is in
 [`docs/assumptions.json`](docs/assumptions.json), and the
@@ -94,7 +94,7 @@ pub fn decide(opener, policy, request, routes, acceptance, peer, now) -> Decisio
         return Decision::Refused(Code::Denied);              // refused before any decryption
     }
     let opened = stateless::decrypt(opener, verified)?;      // only now unseal the credential
-    encode_upstream(&mut wire, request, &route.host, &route.rules,
+    encode_upstream(&mut wire, request, &route.destination.host, &route.rules,
                     &opened.credential, &route.authentication)?;  // the exact upstream bytes
     Decision::Dispatch(Dispatch { route: index, wire, opened })
 }
@@ -111,7 +111,7 @@ component:
 | authorization | any `OperationPolicy`: `Unrestricted` (Garrett's proxy) or `ReadOnly` | `Sound`; `unrestricted_sound`, `read_only_sound` |
 | credential release | `stateless::decrypt` = `unseal_token`, then `valid_credential` | `decrypt_contract`, `decrypt_ok_trace`, `unseal_token_ok` |
 | exact encoding | `proxy_http::encode_upstream` | `encode_upstream_contract` (exactly `ExactWire` when it fits in memory: the agent's request with every credential-bearing or framing field removed, and one authentication header carrying the credential) |
-| egress | `serve`, with any `Origin` adapter | `serve_follows_decision`: the admission record is acknowledged, then exactly one `Origin::exchange` of exactly those bytes |
+| egress | `serve`, then `exchange`, with any `Origin` adapter | `serve_follows_decision`: the admission record is acknowledged, then one `exchange` of exactly those bytes with **the route's own `Destination`**; `exchange_logged`: the shell is asked to connect to that destination, and is handed the bytes only if it reports that the server authenticated there |
 
 `composed_egress` composes them, once, for any operation policy:
 every run of `serve` is `NoDispatch` (nothing sent; a fixed refusal) or one
@@ -121,20 +121,29 @@ dispatch that is `AuthenticatedSurrogate`, `AuthorizedOperation`,
 The policy never sees the credential, and a refused operation is never
 decrypted (`decide_unpermitted`).
 
-Credential-bearing egress is closed in the types: the bytes reach the shell
-only inside an `Egress`, which only `serve` can build and only
-`Origin::exchange` consumes.
+Each configured `Route` carries its `Destination` (server name, address,
+port, trust anchors), so the route the signed provider selects is also where
+the credential goes; the proxy refuses a catalogue with two routes for one
+provider (`routes_valid`, `one_route_per_provider`). Credential-bearing
+egress is closed in the types: the bytes reach the shell only inside an
+`Egress`, which only `serve` can build and only `Origin::transmit` consumes,
+and only after `Origin::connect` reported a TLS session that authenticated
+the egress's destination. A failed connection sends nothing; a failed write
+is an unknown outcome and is never retried.
 
 ## 4. The response
 
-The provider's answer comes back through `Origin::exchange`;
+The provider's answer comes back through `Origin::receive`, collected by
+`exchange` within `answer_limit`;
 `proxy_controller::release` re-frames it with `proxy_http::guest_response`,
 which drops hop-by-hop fields and `Set-Cookie` and **refuses** (`502`) a
 response in which the credential occurs in any of the checked encodings
 (`reflection_forms`: raw, JSON-escaped, percent-encoded, hex, and standard and URL-safe base64 at each alignment). Every record the
 proxy produces has one of a few permitted forms (`log_permitted`,
-`RecordsPermitted`); this restricts each output's form and is not a general
-information-flow result.
+`RecordsPermitted`). Beyond the form of each output, `serve_declassified`
+says what the reply can depend on: run twice with two different credentials
+and the same provider answers, the agent gets the same reply, unless the
+answer reflected one credential and not the other.
 
 Over a whole execution: every provider send has an authorized,
 issued-surrogate origin bound to the connection's own peer
@@ -160,6 +169,20 @@ differ only through what their adapters answered, the admission
 acknowledgement, the provider's answer and the completion acknowledgement
 (`replica_replies_differ`).
 
+## The five guarantees
+
+[`proofs/Garrett.lean`](proofs/Garrett.lean) states them; each holds in
+every reachable world (`security_guarantees`) or, for the comparisons, for
+every pair of runs.
+
+| | Guarantee | Lean |
+| --- | --- | --- |
+| A | a malicious agent cannot make the proxy send a credential except in an authenticated, authorized, exact request to the configured destination of its surrogate's provider | `CompromisedAgentConfinement`; on the network, under the transport contract, `provider_writes_confined` |
+| B | the agent learns about a credential only what is declassified: no claim shows it, a reply depends on it only through the provider's answer and one reflection bit, a surrogate only through its ciphertext | `ClaimsHideCredential`, `RecordsPermitted`, `ProxyRepliesDeclassified`, `SurrogatesRevealOnlyCiphertext` |
+| C | a surrogate grants only its binding, provider and window, never more than its root issuance | `BoundedDelegation`, `RenewalPreservesLineage`, `opens_only_for_its_certificate` |
+| D | an OAuth credential reaches only the agent that began the login, at most once; operator mint is a separate, trusted door | `AuthorizedAcquisition` |
+| E | the proxy decides from the request, keys, policies and clock alone; replicas decide alike | `connection_needs_no_history`, `replicas_decide_alike`, `strict_broker_is_stateless` |
+
 ## What this does not show
 
 * **Trusted primitives**: Ed25519 and AES-256-GCM correctness, Ed25519
@@ -167,11 +190,16 @@ acknowledgement, the provider's answer and the completion acknowledgement
   drawing each nonce at random and sealing once per sealer
   (`STATELESS-CRYPTO-01`).
 * **TLS and the shells**: that the handshake's peer thumbprint is the one
-  passed to the core, and that the native shells call the core as
-  `verification/shell_guard.py` checks; this is a source guard, not a proof
-  (`STATELESS-NATIVE-01`, `STATELESS-TLS-01`).
+  passed to the core, that `Origin::connect` reports only sessions that
+  authenticated the destination and `Origin::transmit` writes exactly the
+  egress on it (the hypothesis `TransportFaithful`), and that the native
+  shells call the core as `verification/shell_guard.py` checks; this is a
+  source guard, not a proof (`STATELESS-NATIVE-01`, `STATELESS-TLS-01`).
+* **Secrecy of the ciphertext** (IND-CPA), timing and other side channels,
+  and anything a provider's answers reveal (`STATELESS-DISCLOSURE-01`).
 * **Not established**: whole-process I/O refinement, computational security,
-  noninterference, and compatibility with any real provider.
+  that `GET`/`HEAD` cannot mutate a provider, protection of the agent's key,
+  and compatibility with any real provider.
 
 [`docs/verification.md`](docs/verification.md) has the full theorem map, the
 premises and the mutation evidence: Rust defects that the proofs reject.

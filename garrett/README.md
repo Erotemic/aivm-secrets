@@ -71,15 +71,19 @@ library APIs.
 python verification/toolchain.py bootstrap   # pinned Aeneas release, Rust nightly, Lean; Mathlib cache
 python verification/extract.py check          # proofs/generated is exactly what the tools produce
 (cd proofs && lake build)                     # every theorem
-python verification/mutate.py                 # 42 security mutants, each rejected by a proof
+python verification/mutate.py                 # 50 security mutants, each rejected by a proof
 python verification/shell_guard.py check      # the application calls the core as the proofs assume
 ```
 
-[`docs/verification.md`](docs/verification.md) states what is proved (the
-composed protocol theorem `protocol_safety`, the per-request theorem
-`composed_egress` for both operation policies, and the per-function contracts
-under them), what is only tested, and what is trusted:
-[`docs/assumptions.json`](docs/assumptions.json).
+[`proofs/Garrett.lean`](proofs/Garrett.lean) states five guarantees:
+compromised-agent confinement (every credential-bearing write is an
+authenticated, authorized, exact request to the configured destination of
+the surrogate's provider), credential confidentiality up to a stated
+declassification boundary, bounded delegation, authorized acquisition and
+stateless authorization. [`docs/verification.md`](docs/verification.md)
+says, for each, what is proved (on top of the composed protocol theorem
+`protocol_safety` and the per-request theorem `composed_egress`), what is
+only tested, and what is trusted: [`docs/assumptions.json`](docs/assumptions.json).
 
 ## Origin
 
