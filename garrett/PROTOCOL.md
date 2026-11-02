@@ -143,7 +143,10 @@ proxy produces has one of a few permitted forms (`log_permitted`,
 `RecordsPermitted`). Beyond the form of each output, `serve_declassified`
 says what the reply can depend on: run twice with two different credentials
 and the same provider answers, the agent gets the same reply, unless the
-answer reflected one credential and not the other.
+answer reflected one credential and not the other. `connection_declassified`
+says the same of a whole connection with an adaptive agent: everything the
+agent is sent is the same, up to the first reply at which one run refused a
+reflected answer.
 
 Over a whole execution: every provider send has an authorized,
 issued-surrogate origin bound to the connection's own peer

@@ -47,7 +47,7 @@ for, in order (`ProxyEvent`).
 | | guarantee | Lean | status |
 | --- | --- | --- | --- |
 | A | compromised-agent confinement | `CompromisedAgentConfinement`, `provider_writes_confined` | proved for the log; trusted transport contract for the network |
-| B | provider-credential confidentiality | `ClaimsHideCredential`, `RecordsPermitted`, `ProxyRepliesDeclassified`, `SurrogatesRevealOnlyCiphertext` | proved up to the declassification boundary; AEAD secrecy trusted |
+| B | provider-credential confidentiality | `ClaimsHideCredential`, `RecordsPermitted`, `ProxyRepliesDeclassified`, `ConnectionsDeclassified`, `SurrogatesRevealOnlyCiphertext` | proved up to the declassification boundary; AEAD secrecy trusted |
 | C | bounded, nontransferable delegation | `BoundedDelegation`, `RenewalPreservesLineage`, `opens_only_for_its_certificate` | proved; key custody and the clock trusted |
 | D | authorized credential acquisition | `AuthorizedAcquisition` | proved for the broker; browser, human and OAuth provider trusted |
 | E | stateless authorization | `ConnectionAllowed`, `connection_needs_no_history`, `replicas_decide_alike`, `replica_replies_differ`, `strict_broker_is_stateless` | proved |
@@ -354,6 +354,31 @@ def SurrogatesRevealOnlyCiphertext : Prop :=
     stateless.issue (Sealing inst1) sealer policy grant c1 tid now lifetime = Result.ok (.Ok i1) →
     stateless.issue (Sealing inst2) sealer policy grant c2 tid now lifetime = Result.ok (.Ok i2) → i1 = i2
 
+/-- **A whole connection is declassified.** Two runs of the extracted
+    connection loop with openers that differ only in the valid credential
+    they unseal, on channels that answer alike from related states — the
+    same agent bytes, deadlines and clock, adaptively, and the same network
+    answers whatever credential-bearing bytes were written — send the agent
+    the same byte strings, or the same up to one reply at which one run sent
+    the fixed reflection refusal. -/
+def ConnectionsDeclassified : Prop :=
+  ∀ {V P C1 C2 : Type} (ops1 ops2 : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P)
+    (opener : V) (policy : P), stateless_proxy.Proofs.SameButCredential ops1 ops2 opener →
+    ∀ (R : C1 → C2 → Prop) (ch1 : stateless_proxy.Channel C1) (ch2 : stateless_proxy.Channel C2),
+    stateless_proxy.Proofs.ChannelsAgree R ch1 ch2 → ∀ io1 io2, R io1 io2 →
+    ∀ routes a authority peer limit f1 f2,
+    stateless_proxy.connection ops1 pol (stateless_proxy.Proofs.logged ch1) opener policy (io1, []) routes a authority
+      peer limit = Result.ok f1 →
+    stateless_proxy.connection ops2 pol (stateless_proxy.Proofs.logged ch2) opener policy (io2, []) routes a authority
+      peer limit = Result.ok f2 →
+    (stateless_proxy.Proofs.agentView f1.2 = stateless_proxy.Proofs.agentView f2.2 ∧ R f1.1 f2.1) ∨
+      stateless_proxy.Proofs.DivergeAtReflection (stateless_proxy.Proofs.agentView f1.2)
+        (stateless_proxy.Proofs.agentView f2.2)
+
+theorem connections_declassified : ConnectionsDeclassified :=
+  fun _ _ _ _ _ same _ _ _ agree _ _ r _ _ _ _ _ _ _ h1 h2 =>
+    stateless_proxy.Proofs.connection_declassified same agree r h1 h2
+
 theorem proxy_replies_declassified : ProxyRepliesDeclassified :=
   fun ops1 ops2 _ _ _ same inst1 io1 inst2 io2 _ _ _ _ _ _ _ _ _ _ h1 h2 =>
     stateless_proxy.Proofs.serve_declassified (ops1 := ops1) (ops2 := ops2) same inst1 io1 inst2 io2 h1 h2
@@ -562,6 +587,7 @@ theorem provider_writes_confined {keys : KeySet M} {peer : Slice U8} {log : List
   exact ⟨D, wire, written, rfl, pre, whole,
     compromised_agent_confinement aead reach keys peer log m unforged D wire written (mem_attempts ma)⟩
 
+omit aead in
 /-- **A, for completed requests.** Under the native transport contract, a
     request recorded as completed emitted its whole authorized request on a
     session to its destination. -/

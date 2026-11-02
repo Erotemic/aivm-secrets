@@ -22,7 +22,7 @@ Every claim in this project is one of four kinds:
 | proved | properties of the extracted Rust computations and of the modeled executions built from them | the theorems below |
 | assumed | correctness of AES-256-GCM and Ed25519 (and unforgeability), AEAD secrecy (IND-CPA) and nonce uniqueness, the native transport contract, TLS peer identity, randomness, the clock, the adapters' inputs | [`assumptions.json`](assumptions.json), as explicit premises |
 | guarded or tested | the native shells' wiring to the core, interoperability, conformance | `verification/shell_guard.py`, the Rust and Python tests, `tests/vectors/` |
-| not established | whole-process I/O refinement of the binaries, computational security of the primitives, noninterference beyond the stated declassification boundary (timing, sizes, side channels, a whole connection), compatibility with a real provider | — |
+| not established | whole-process I/O refinement of the binaries, computational security of the primitives, noninterference beyond the stated declassification boundary (timing, sizes, side channels), compatibility with a real provider | — |
 
 ## The five guarantees
 
@@ -238,6 +238,7 @@ two executions that differ only in the protected credential.
 | `encode_upstream_verdict` | the encoder accepts or refuses two valid credentials alike (its refusals come from checks made before the credential is read, or from its validity) |
 | `release_declassified`, `guest_response_forms` | releasing one provider answer against two credentials' reflection forms gives the same reply, unless one is the fixed reflection refusal |
 | `reply_declassified`, `serve_declassified` | with the same network answers, the agent receives the same reply, unless the provider's answer reflected one credential and not the other |
+| `connection_declassified` (`ConnectionsDeclassified`) | two runs of the extracted connection loop, for every request on it and an adaptive agent, on channels that answer alike from related states (`ChannelsAgree`: the agent's bytes, deadlines and clock, and the network's answers whatever credential-bearing bytes were written): the agent is sent the same byte strings, or the same up to one reply at which one run sent the fixed reflection refusal (`DivergeAtReflection`); `channels_agree_self` shows the hypothesis is satisfiable |
 | `seal_token_ciphertext_only`, `issue_ciphertext_only` | two issuances that both succeed, under primitives that sign alike and return the same AEAD ciphertext for the two credentials, give the same surrogate |
 
 Declassified on purpose (`STATELESS-DISCLOSURE-01`): the bytes sent to the
@@ -247,9 +248,11 @@ the credential in a checked encoding; at issuance, whether the credential is
 valid and whether it occurs in the header or public claims; and the
 ciphertext, which hides the credential only under the IND-CPA assumption
 (`STATELESS-CRYPTO-01`) and reveals its length. Not covered: timing, sizes on
-the network, side channels, the native shells (`STATELESS-NATIVE-01`), and a
-whole-connection two-run theorem (the connection loop adds only framing
-refusals, which do not involve the opener).
+the network, side channels, the native shells (`STATELESS-NATIVE-01`), runs
+that do not both return (termination-insensitive), and the broker's
+issuance over a whole login. The whole-connection theorem compares runs
+only while their replies agree: after a reflection refusal the agent knows
+that bit, and nothing is claimed about the runs that follow.
 
 ## Statelessness and acquisition (`GarrettStatelessProxy`, `GarrettStatelessStrict`)
 
@@ -351,7 +354,7 @@ python verification/shell_guard.py check      # shell guard
 | Lean module | Theorems | Extracted Rust (`crates/garrett-stateless-core/src/`) |
 | --- | --- | --- |
 | `Garrett` | the five guarantees: `compromised_agent_confinement`, `provider_writes_confined`, `one_route_per_provider`, `read_only_writes` (A); `claims_hide_credential`, `records_permitted`, `proxy_replies_declassified`, `surrogates_reveal_only_ciphertext` (B); `bounded_delegation`, `renewal_preserves_lineage`, `opens_only_for_its_certificate` (C); `authorized_acquisition`, `delivered_to_initiator`, `logins_at_most_once`, `failed_logins_issue_nothing`, `credentials_entered_for_the_peer` (D); `connection_needs_no_history`, `replicas_decide_alike`, `strict_broker_is_stateless` (E); `security_guarantees`; and, as before, `sends_are_authorized`, `refusals_send_nothing`, `guarantees`, `unrestricted_request`, `read_only_request` | everything below, through the theorems it projects |
-| `GarrettConfidentiality` | `guest_response_forms`, `release_declassified`, `append_header_valid`, `encode_upstream_verdict`, `decide_declassified`, `reply_declassified`, `serve_declassified`, `seal_token_ciphertext_only`, `issue_ciphertext_only` | `proxy_http::response::guest_response`, `proxy_controller::release`, `proxy_http::encode_upstream`, `http_auth::append_header`, `stateless_proxy::{decide, serve}`, `stateless_token::seal_token`, `stateless::issue` |
+| `GarrettConfidentiality` | `guest_response_forms`, `release_declassified`, `append_header_valid`, `encode_upstream_verdict`, `decide_declassified`, `reply_declassified`, `serve_declassified`, `exchange_agree`, `serve_agree`, `step_agree`, `connection_declassified`, `channels_agree_self`, `seal_token_ciphertext_only`, `issue_ciphertext_only` | `proxy_http::response::guest_response`, `proxy_controller::release`, `proxy_http::encode_upstream`, `http_auth::append_header`, `stateless_proxy::{decide, serve, exchange, collect, connection_step, connection}`, `stateless_token::seal_token`, `stateless::issue` |
 | `GarrettStatelessCodec` | `from_b64url_sound`, `from_b64url_complete` (strict url-b64: exactly the canonical encoding), `natural_some`/`natural_of` (canonical decimals ≤ 2^53−1), `plain_string_some`/`_of`, `word_some`/`_of`/`_absent`, `payload_bytes_ok` | `stateless_token/` (`base64.rs`, `payload.rs`): `from_b64url`, `group`, `symbol_value`, `natural`, `digits`, `plain_string`, `word`, `append*`, `payload_bytes` |
 | `GarrettStatelessGrammar` | exact Boolean characterizations `is_text_eq`, `is_provider_eq`, `is_kid_eq`, `is_id_eq`, `is_thumbprint_true`, `is_scope_true`, `is_verifier_eq`; `payload_valid_true`, `state_valid_true`; `select_spec`, `keys_valid_true`, `select_unique` (key selection is unambiguous); `header_bytes_ok`, `header_kid_spec`, `header_kid_of`; `segments_spec`; `occurs_spec`; `b64url_spec` | `is_*`, `payload_valid`, `state_valid`, `select`, `named`, `keys_valid`, `entry_valid`, `header_bytes`, `header_kid`, `ascii`, `dot_from`, `segments`, `occurs`, `b64url` |
 | `GarrettStatelessToken` | `parse_payload_sound` (accepted bytes are exactly the canonical payload, which is valid), `parse_payload_complete`; `verify_token_ok`, `verify_token_sound` (the exact signed header and payload are what authorization uses; the AAD is exactly label, header, zero, public payload); `unseal_token_ok` (decryption uses the entry the verified `kid` selected); `seal_token_ok` (credential absent from header and public payload; exact AAD; signature over exactly the first two segments); `b64url_fits` | `parse_payload`, `field`, `number`, `verify_token`, `unseal_token`, `seal_token`, `associated`, `copy_claims`, `copy_info` |

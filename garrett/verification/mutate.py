@@ -53,6 +53,8 @@ MUTANT_PROOFS = {
     'stateless proxy reply reveals a credential bit': 'GarrettConfidentiality',
     'proxy encoder verdict reveals a credential bit': 'GarrettConfidentiality',
     'stateless token carries a credential byte outside the ciphertext': 'GarrettConfidentiality',
+    # Only the whole-connection theorem sees a leak through the loop itself.
+    'stateless proxy connection closes on a credential bit': 'GarrettConfidentiality',
 }
 
 MUTANTS = [
@@ -124,6 +126,18 @@ MUTANTS = [
      "    let route = &routes[index];\n    let mut wire = Vec::new();",
      "    let route = &routes[index];\n    if opened.credential.len() % 2 == 1 {\n"
      "        return Decision::Refused(Code::Denied);\n    }\n    let mut wire = Vec::new();"),
+    # The connection loop re-decides the request and closes the connection on
+    # a credential bit: each reply is unchanged, so only a theorem over the
+    # whole connection (`connection_declassified`) sees the agent's view
+    # change.
+    ("stateless_proxy.rs", "stateless proxy connection closes on a credential bit",
+     "            let sent = channel.send(&served.reply);\n            Tunnel {\n                buffer: rest,\n"
+     "                open: sent && served.keep,\n",
+     "            let sent = channel.send(&served.reply);\n"
+     "            let leak = match decide(opener, policy, &parsed.request, routes, acceptance, peer, now) {\n"
+     "                Decision::Dispatch(dispatch) => dispatch.opened.credential.len() % 2 == 1,\n"
+     "                _ => false,\n            };\n"
+     "            Tunnel {\n                buffer: rest,\n                open: sent && served.keep && !leak,\n"),
     ("stateless_proxy.rs", "stateless proxy reply reveals a credential bit",
      "        Err(code) => stopped(code, Stage::Failed),",
      "        Err(code) => {\n            if opened.credential.len() % 2 == 1 {\n"
