@@ -3,7 +3,7 @@
 The current state of `garrett-stateless` and what comes next, in order. The
 dated notes from before the extraction are in [`history/`](history).
 
-## State (2026-10-29)
+## State (2026-11-01)
 
 Both implementations are complete for `garrett-stateless-v1`: the OAuth and
 provisioned acquisition adapters, the broker, the stateless proxy with the
@@ -42,19 +42,41 @@ refusal responses say `garrett-stateless` and the two codes only the old
 project used are gone (a deliberate wire change: both implementations, the
 refusal vectors and the refusal proofs together).
 
+**Product-level guarantees (2026-11-01).** `proofs/Garrett.lean` now states
+five guarantees — compromised-agent confinement, credential confidentiality,
+bounded delegation, authorized acquisition and stateless authorization — as
+named propositions over the extracted code, and `security_guarantees` proves
+the per-execution ones for every reachable world. Behind them:
+
+- each proxy `Route` carries its `Destination`; the extracted `exchange`
+  connects to exactly the selected route's destination and writes only after
+  the shell reports an authenticated session; the native proxy keeps no
+  destination table, and `routes_valid` refuses two routes for one provider;
+- the connection log records `connected D ok` and `sent D wire`; every write
+  follows the authenticated connection to the destination of the
+  surrogate's provider route (`send_origin`, `protocol_safety`);
+- the network-level statement rests on one explicit trusted contract,
+  `TransportFaithful`;
+- `GarrettConfidentiality`: two-run theorems for the proxy's decision and
+  reply and for issuance, with the declassification boundary in
+  `STATELESS-DISCLOSURE-01`;
+- new adversarial tests (impostor and untrusted-CA destinations over real
+  TLS, failed connections and writes, bounded answers, an unrouted provider,
+  audit and replies without the credential) and eight new mutants.
+
 ## Validation
 
 At the commit that recorded this table (see `git log`):
 
 | Check | Result |
 | --- | --- |
-| `cargo test` (core and application; also with `--features tpm`) | 51 pass |
-| `python -m pytest` (including interop, replicas, operations, vectors, purity) | 114 pass (with the swtpm test required) |
+| `cargo test` (core and application; also with `--features tpm`) | 59 pass |
+| `python -m pytest` (including interop, replicas, operations, vectors, purity) | 120 pass |
 | `verification/extract.py check` | pass; the model has no `axiom` |
-| `lake build` (independent package) | pass (1820 jobs) |
-| `verification/mutate.py` | all 42 rejected at `c3f2437`, each by its mapped module (2085 s, `--jobs 8`, in the separate-directory copy) |
+| `lake build` (independent package) | pass (1821 jobs; cold, 303 s) |
+| `verification/mutate.py` | all 51 rejected at `2e16f5a` (3047 s, `--jobs 10`, in the separate-directory copy): `GarrettStatelessProxy` 12, `GarrettStateless` 8, `GarrettStatelessComposition` 6, `GarrettStatelessMailbox` 6, `GarrettStatelessToken` 6, `GarrettStatelessGrammar` 4, `GarrettStatelessLogin` 4, `GarrettStatelessConnection` 2, `GarrettStatelessCodec` 1, `GarrettStatelessState` 1, `GarrettConfidentiality` 1 |
 | `verification/shell_guard.py check` | pass (12 checks) |
-| Separate-directory check (`verification/standalone.py`) | pass at `c3f2437`: a copy of this directory alone, with a fresh virtual environment, Cargo target, toolchain bootstrap and cold Lake build (282 s), ran every row above; no source names the origin project outside the allowed history and provenance notes |
+| Separate-directory check (`verification/standalone.py`) | pass at `2e16f5a`: a copy of this directory alone, with a fresh virtual environment, Cargo target, toolchain bootstrap and cold Lake build, ran every row above; no source names the origin project outside the allowed history and provenance notes |
 
 ## Next, in order
 
@@ -68,10 +90,13 @@ At the commit that recorded this table (see `git log`):
    of the proxy (`guest_response`, `GuestReply`); `PROTOCOL.md` fixes the
    terms (agent, broker, proxy, provider). Rename identifiers only where a
    reader gains from it.
-3. **Independent review** of the specification, the trusted shells
-   (`STATELESS-NATIVE-01`), the `AuthorizedEgress` statement,
-   `STATELESS-CRYPTO-01` (now including nonce uniqueness) and
-   `STATELESS-OPS-01`. An agent cannot self-certify it.
+3. **Independent review** of the specification, the five guarantees in
+   `Garrett.lean` (in particular whether `TransportFaithful` is the right
+   native contract and whether the declassification boundary of
+   `STATELESS-DISCLOSURE-01` is acceptable), the trusted shells
+   (`STATELESS-NATIVE-01`), `STATELESS-CRYPTO-01` (now including nonce
+   uniqueness and IND-CPA) and `STATELESS-OPS-01`. An agent cannot
+   self-certify it.
 4. **Live provider compatibility (maintainer).** One real OAuth provider with
    PKCE and a read-only call, outside tests and CI.
 5. **Hardware TPM (maintainer).** The swtpm test against a device TPM, with
@@ -79,6 +104,10 @@ At the commit that recorded this table (see `git log`):
 6. **Provider-specific read-only catalogues** (narrows `STATELESS-OPS-01`).
 7. **An opt-in axiom audit** for this package (the last one, before the
    extraction, found only Lean's standard axioms; see verification.md).
-8. **Later, separate increments:** OAuth without the mailbox (a protocol
-   change); further acquisition adapters; a multi-replica broker run; a
-   whole-process syscall witness for the proxy; the release decision.
+8. **Narrow the native contract further.** A whole-connection two-run
+   confidentiality theorem (the per-request one is proved); a syscall-level
+   witness that the proxy's only provider writes are `Origin::transmit`
+   (today a source guard).
+9. **Later, separate increments:** OAuth without the mailbox (a protocol
+   change); further acquisition adapters; a multi-replica broker run; the
+   release decision.

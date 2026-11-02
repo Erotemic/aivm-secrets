@@ -426,14 +426,18 @@ import closure against the mutant. Each must break a proof.
 | proxy: operation policy not consulted; credential decrypted before authorization | `GarrettStatelessComposition` (rejected first by `GarrettStatelessProxy`, in its closure: `decide_dispatch_trace`, `decide_unpermitted`) |
 | read-only policy: permits a write method; permits a body; ignores the destination provider; ignores the resource path; ignores the resource method; operation path includes the query | `GarrettStatelessComposition` |
 
-**Result, 2026-10-29 (`c3f2437`): all 42 mutants are rejected**, in a copy of
-this directory alone (`verification/standalone.py`), each by a real error in
-the recompiled closure, not a cached object: after the import refactor, the
-`open` change (whose mutant now inlines an `open` that unseals before it
-admits), the module splits (the token mutants now live in
-`stateless_token/*.rs`, each mapped to its first rejecting module) and the
-refusal rename. Earlier runs: 42 (2026-10-27 and, after the extraction,
-2026-10-29 at `5ebbc6d`), 34 and 32. The two proxy
+**Result, 2026-11-01 (`2e16f5a`): all 51 mutants are rejected**, in a copy
+of this directory alone (`verification/standalone.py`), each by a real error
+in the recompiled closure, not a cached object. The nine new ones: the three
+destination mutants and the duplicate-catalogue mutant by
+`GarrettStatelessProxy`, the write-after-failed-connection mutant by
+`GarrettStatelessConnection`, the subject mutant by `GarrettStateless`, and
+of the four covert channels, the decision and reply bits by
+`GarrettStatelessProxy` (their extra branch breaks the trace proofs first),
+the token byte by `GarrettStatelessToken`, and the encoder bit **only** by
+`GarrettConfidentiality` (`encode_upstream_verdict`): the encoder's own
+contract allows any refusal, so no other proof notices it. Earlier runs: 42
+(`c3f2437`, `5ebbc6d`, 2026-10-27), 34 and 32. The two proxy
 policy mutants are caught by `GarrettStatelessProxy` before
 `GarrettStatelessComposition` is reached. The strict-profile mutant is caught by the existing login proof
 before `GarrettStatelessStrict` is reached, so the run does not show that the
