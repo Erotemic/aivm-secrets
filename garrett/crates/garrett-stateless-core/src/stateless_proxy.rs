@@ -248,22 +248,22 @@ pub fn decide<V: SurrogateOpener, P: OperationPolicy>(
         Some(token) => token,
         None => return Decision::Unauthorized(None),
     };
-    let verified = match stateless::authenticate(opener, &token, acceptance, peer, now) {
-        Ok(verified) => verified,
+    let admitted = match stateless::authenticate(opener, &token, acceptance, peer, now) {
+        Ok(admitted) => admitted,
         Err(rejection) => return Decision::Unauthorized(Some(rejection)),
     };
     // The destination is the authenticated provider's route, never a
     // request value.
-    let index = route_of(routes, &verified.claims.provider);
+    let index = route_of(routes, &admitted.verified.claims.provider);
     if index >= routes.len() {
         return Decision::Refused(Code::UnknownOrigin);
     }
     // The operation policy sees the claims and the operation, never the
     // credential, which is not decrypted for a refused operation.
-    if !policy.permits(&verified.claims, &operation_of(request)) {
+    if !policy.permits(&admitted.verified.claims, &operation_of(request)) {
         return Decision::Refused(Code::Denied);
     }
-    let opened = match stateless::decrypt(opener, verified) {
+    let opened = match stateless::decrypt(opener, admitted) {
         Ok(opened) => opened,
         Err(rejection) => return Decision::Unauthorized(Some(rejection)),
     };
@@ -491,7 +491,7 @@ pub fn connection<V: SurrogateOpener, P: OperationPolicy, C: Channel>(
 mod tests {
     use super::*;
     use crate::proxy_http::parse_request;
-    use crate::stateless::Verified;
+    use crate::stateless::{Admitted, Verified};
     use crate::stateless_policy::{ReadOnly, Resource, Unrestricted};
 
     const AUTHORITY: &[u8] = b"proxy.test:8443";
@@ -520,7 +520,7 @@ mod tests {
                 sealed: Vec::new(),
             })
         }
-        fn unseal(&self, _verified: &Verified) -> Result<Vec<u8>, Rejection> {
+        fn unseal(&self, _admitted: &Admitted) -> Result<Vec<u8>, Rejection> {
             Ok(b"REAL-SECRET".to_vec())
         }
     }
@@ -796,7 +796,11 @@ mod tests {
         assert!(matches!(served.stage, Stage::Failed));
         assert!(matches!(served.code, Code::OutcomeUnknown));
         assert_eq!(origin.sent.len(), 1, "no retry after a failed write");
-        assert_eq!(origin.reads.len(), 2, "no answer is read after a failed write");
+        assert_eq!(
+            origin.reads.len(),
+            2,
+            "no answer is read after a failed write"
+        );
         assert_eq!(origin.completions, 0, "a failed write is never completed");
         assert!(!String::from_utf8_lossy(&served.reply).contains("REAL-SECRET"));
     }

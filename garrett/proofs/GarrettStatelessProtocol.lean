@@ -325,8 +325,8 @@ theorem sealing_seal (inst : KeyMaterial M) (s : TokenSealer M) (c : stateless.S
 theorem opening_verify (inst : KeyMaterial M) (ks : KeySet M) (t : Slice U8) :
     (Opening inst).verify ks t = verify_token inst (alloc.vec.Vec.deref ks.entries) t := rfl
 
-theorem opening_unseal (inst : KeyMaterial M) (ks : KeySet M) (v : stateless.Verified) :
-    (Opening inst).unseal ks v = unseal_token inst (alloc.vec.Vec.deref ks.entries) v := rfl
+theorem opening_unseal (inst : KeyMaterial M) (ks : KeySet M) (v : stateless.Admitted) :
+    (Opening inst).unseal ks v = unseal_token inst (alloc.vec.Vec.deref ks.entries) v.verified := rfl
 
 /-- The public configuration of one deployment. Replicas share it. -/
 structure Config (P : Type) where

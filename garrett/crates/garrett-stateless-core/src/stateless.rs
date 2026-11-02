@@ -57,8 +57,9 @@ pub struct SurrogateClaims {
 
 /// A token whose header and signature the opener has verified under one
 /// configured key. `key_issuer` is the issuer configured for that key;
-/// `key`, `aad` and `sealed` are opaque to this module and returned to
-/// `unseal`.
+/// `key`, `aad` and `sealed` are opaque to this module. A checked signature
+/// is all it says: it has not been admitted for any peer, and it cannot be
+/// unsealed ([`Admitted`]).
 pub struct Verified {
     pub key: usize,
     pub key_issuer: Vec<u8>,
@@ -141,11 +142,40 @@ pub fn admit(
     Ok(())
 }
 
+/// A verified token that [`authenticate`] admitted: its claims passed
+/// [`admit`] for one connection's peer at one time under one acceptance
+/// policy. Only `authenticate` makes one (its field is visible to this crate
+/// alone), and only an `Admitted` can be unsealed or decrypted. Code outside
+/// this crate can neither make one nor unseal a merely verified token:
+///
+/// ```compile_fail,E0451
+/// use garrett_stateless_core::stateless::{Admitted, Verified};
+/// fn forge(verified: Verified) -> Admitted {
+///     Admitted { verified }
+/// }
+/// ```
+///
+/// ```compile_fail,E0308
+/// use garrett_stateless_core::stateless::{SurrogateOpener, Verified};
+/// fn bypass<V: SurrogateOpener>(opener: &V, verified: &Verified) {
+///     let _ = opener.unseal(verified);
+/// }
+/// ```
+pub struct Admitted {
+    pub(crate) verified: Verified,
+}
+
+/// The claims of an admitted surrogate.
+pub fn admitted_claims(admitted: &Admitted) -> &SurrogateClaims {
+    &admitted.verified.claims
+}
+
 /// The key-set adapter: `verify` authenticates the header and signature
-/// and decodes the claims; `unseal` opens `enc` with the same key.
+/// and decodes the claims; `unseal` opens `enc` of an admitted surrogate
+/// with the key that verified it.
 pub trait SurrogateOpener {
     fn verify(&self, token: &[u8]) -> Result<Verified, Rejection>;
-    fn unseal(&self, verified: &Verified) -> Result<Vec<u8>, Rejection>;
+    fn unseal(&self, admitted: &Admitted) -> Result<Vec<u8>, Rejection>;
 }
 
 pub struct Opened {
@@ -162,7 +192,7 @@ pub fn authenticate<V: SurrogateOpener>(
     acceptance: &Acceptance,
     peer: &[u8],
     now: i64,
-) -> Result<Verified, Rejection> {
+) -> Result<Admitted, Rejection> {
     let verified = match opener.verify(token) {
         Ok(verified) => verified,
         Err(error) => return Err(error),
@@ -177,14 +207,14 @@ pub fn authenticate<V: SurrogateOpener>(
         Ok(()) => (),
         Err(error) => return Err(error),
     }
-    Ok(verified)
+    Ok(Admitted { verified })
 }
 
 /// The second half of [`open`]: unseal an authenticated surrogate and
 /// check the credential. A [`Verified`] comes from [`authenticate`], so the
 /// credential is decrypted only after admission.
-pub fn decrypt<V: SurrogateOpener>(opener: &V, verified: Verified) -> Result<Opened, Rejection> {
-    let credential = match opener.unseal(&verified) {
+pub fn decrypt<V: SurrogateOpener>(opener: &V, admitted: Admitted) -> Result<Opened, Rejection> {
+    let credential = match opener.unseal(&admitted) {
         Ok(credential) => credential,
         Err(error) => return Err(error),
     };
@@ -192,7 +222,7 @@ pub fn decrypt<V: SurrogateOpener>(opener: &V, verified: Verified) -> Result<Ope
         return Err(Rejection::InvalidCredential);
     }
     Ok(Opened {
-        claims: verified.claims,
+        claims: admitted.verified.claims,
         credential,
     })
 }
@@ -208,11 +238,11 @@ pub fn open<V: SurrogateOpener>(
     peer: &[u8],
     now: i64,
 ) -> Result<Opened, Rejection> {
-    let verified = match authenticate(opener, token, acceptance, peer, now) {
-        Ok(verified) => verified,
+    let admitted = match authenticate(opener, token, acceptance, peer, now) {
+        Ok(admitted) => admitted,
         Err(error) => return Err(error),
     };
-    decrypt(opener, verified)
+    decrypt(opener, admitted)
 }
 
 /// What the broker issues for.
@@ -461,7 +491,7 @@ mod tests {
                 sealed: Vec::new(),
             })
         }
-        fn unseal(&self, _verified: &Verified) -> Result<Vec<u8>, Rejection> {
+        fn unseal(&self, _admitted: &Admitted) -> Result<Vec<u8>, Rejection> {
             self.unsealed.set(true);
             Ok(b"real-credential".to_vec())
         }

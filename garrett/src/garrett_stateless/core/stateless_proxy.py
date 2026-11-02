@@ -212,16 +212,16 @@ def decide(opener: SurrogateOpener, policy: OperationPolicy, request: Request, r
     if token is None:
         return Decision('unauthorized')
     try:
-        verified = authenticate(opener, token, acceptance, peer, now)
+        admitted = authenticate(opener, token, acceptance, peer, now)
     except Rejection as rejection:
         return Decision('unauthorized', rejection=rejection.code)
-    index = route_of(routes, verified.claims.provider)
+    index = route_of(routes, admitted.claims.provider)
     if index >= len(routes):
         return Decision('refused', code='unknown_origin')
-    if not policy.permits(verified.claims, operation_of(request)):
+    if not policy.permits(admitted.claims, operation_of(request)):
         return Decision('refused', code='denied')
     try:
-        opened = decrypt(opener, verified)
+        opened = decrypt(opener, admitted)
     except Rejection as rejection:
         return Decision('unauthorized', rejection=rejection.code)
     try:

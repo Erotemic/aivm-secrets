@@ -275,13 +275,13 @@ def NoDispatch (ops : stateless.SurrogateOpener V) (pol : stateless_policy.Opera
 
 /-- **Identity.** The request carried exactly one surrogate; `verify`
     authenticated it, its claims were `Admitted` for this TLS peer now, and
-    the released credential is `unseal` of that same envelope. -/
+    the released credential is `unseal` of that same envelope, admitted. -/
 def AuthenticatedSurrogate (ops : stateless.SurrogateOpener V) (opener : V) (request : proxy_http.request.Request)
     (a : stateless.Acceptance) (peer : Slice U8) (now : I64) (opened : stateless.Opened) : Prop :=
   ∃ token v, surrogate_of (alloc.vec.Vec.deref request.fields) = Result.ok (some token) ∧
     ops.verify opener (alloc.vec.Vec.deref token) = Result.ok (.Ok v) ∧
     Admitted v.claims (alloc.vec.Vec.deref v.key_issuer) a peer now ∧ opened.claims = v.claims ∧
-    ops.«unseal» opener v = Result.ok (.Ok opened.credential)
+    ops.«unseal» opener { verified := v } = Result.ok (.Ok opened.credential)
 
 /-- **Authorization.** The request's `Operation` is `Allowed` for the
     authenticated claims. -/

@@ -55,9 +55,21 @@ class Acceptance:
     skew: int = 60
 
 
+@dataclass(frozen=True)
+class Admitted:
+    """A verified token that ``authenticate`` admitted for one peer at one
+    time. Only ``authenticate`` makes one, and only an ``Admitted`` is
+    unsealed or decrypted (the Rust type keeps its field private)."""
+    verified: Verified
+
+    @property
+    def claims(self) -> SurrogateClaims:
+        return self.verified.claims
+
+
 class SurrogateOpener(Protocol):
     def verify(self, token: bytes) -> Verified: ...
-    def unseal(self, verified: Verified) -> bytes: ...
+    def unseal(self, admitted: Admitted) -> bytes: ...
 
 
 class SurrogateSealer(Protocol):
@@ -105,19 +117,19 @@ def admit(claims: SurrogateClaims, key_issuer: str, acceptance: Acceptance, peer
         raise Rejection('wrong_certificate')
 
 
-def authenticate(opener: SurrogateOpener, token: bytes, acceptance: Acceptance, peer: str, now: int) -> Verified:
+def authenticate(opener: SurrogateOpener, token: bytes, acceptance: Acceptance, peer: str, now: int) -> Admitted:
     """The first half of ``open``: verify, then admit, without decrypting."""
     verified = opener.verify(token)
     admit(verified.claims, verified.key_issuer, acceptance, peer, now)
-    return verified
+    return Admitted(verified)
 
 
-def decrypt(opener: SurrogateOpener, verified: Verified) -> Opened:
+def decrypt(opener: SurrogateOpener, admitted: Admitted) -> Opened:
     """The second half of ``open``: unseal and check the credential."""
-    credential = opener.unseal(verified)
+    credential = opener.unseal(admitted)
     if not valid_credential(credential):
         raise Rejection('invalid_credential')
-    return Opened(verified.claims, credential)
+    return Opened(admitted.claims, credential)
 
 
 def open_surrogate(opener: SurrogateOpener, token: bytes, acceptance: Acceptance, peer: str, now: int) -> Opened:

@@ -64,20 +64,23 @@ MUTANTS = [
     ("stateless.rs", "stateless renewal changes the subject", "        subject: subject.to_vec(),",
      "        subject: provider.to_vec(),"),
     # `open` is `authenticate` then `decrypt`; the mutant inlines an `open`
-    # that unseals before it admits.
+    # that unseals before it admits. Outside this crate the bypass does not
+    # compile (`Admitted` has a crate-private field); inside, only the proofs
+    # stand in the way.
     ("stateless.rs", "stateless decrypted before admission",
-     "    let verified = match authenticate(opener, token, acceptance, peer, now) {\n"
-     "        Ok(verified) => verified,\n        Err(error) => return Err(error),\n    };\n"
-     "    decrypt(opener, verified)\n",
+     "    let admitted = match authenticate(opener, token, acceptance, peer, now) {\n"
+     "        Ok(admitted) => admitted,\n        Err(error) => return Err(error),\n    };\n"
+     "    decrypt(opener, admitted)\n",
      "    let verified = match opener.verify(token) {\n"
      "        Ok(verified) => verified,\n        Err(error) => return Err(error),\n    };\n"
-     "    let credential = match opener.unseal(&verified) {\n"
+     "    let admitted = Admitted { verified };\n"
+     "    let credential = match opener.unseal(&admitted) {\n"
      "        Ok(credential) => credential,\n        Err(error) => return Err(error),\n    };\n"
-     "    match admit(&verified.claims, &verified.key_issuer, acceptance, peer, now) {\n"
+     "    match admit(&admitted.verified.claims, &admitted.verified.key_issuer, acceptance, peer, now) {\n"
      "        Ok(()) => (),\n        Err(error) => return Err(error),\n    }\n"
      "    if !http_auth::valid_credential(&credential) {\n"
      "        return Err(Rejection::InvalidCredential);\n    }\n"
-     "    Ok(Opened { claims: verified.claims, credential })\n"),
+     "    Ok(Opened { claims: admitted.verified.claims, credential })\n"),
     ("stateless.rs", "stateless issuance binds the wrong certificate", "        certificate: grant.certificate,\n",
      "        certificate: token_id.to_vec(),\n"),
     ("stateless.rs", "stateless renewal extends ren", "        credential_expires: claims.renew_until,\n",

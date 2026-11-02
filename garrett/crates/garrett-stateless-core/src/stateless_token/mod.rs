@@ -35,7 +35,9 @@
 
 use crate::http_auth;
 use crate::proxy_http::encode_unpadded;
-use crate::stateless::{Rejection, SurrogateClaims, SurrogateOpener, SurrogateSealer, Verified};
+use crate::stateless::{
+    Admitted, Rejection, SurrogateClaims, SurrogateOpener, SurrogateSealer, Verified,
+};
 use crate::stateless_login::LoginState;
 
 mod base64;

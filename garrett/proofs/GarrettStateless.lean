@@ -192,7 +192,11 @@ theorem admit_ok_iff (c : SurrogateClaims) (k : Slice U8) (a : Acceptance) (peer
 
 `open` is `authenticate` (verify, then admit) followed by `decrypt` (unseal,
 then check the credential). The proxy calls the two halves itself, with its
-operation policy between them; the broker's renewal calls `open`. -/
+operation policy between them; the broker's renewal calls `open`.
+`authenticate` returns a `stateless.Admitted` wrapping the verified envelope;
+in Rust its field is crate-private, so only `authenticate` makes one, and
+`unseal` and `decrypt` take nothing else. The theorems below speak of the
+verified envelope inside it. -/
 
 /-- **What an authenticated surrogate is.** For any opener adapter: an `Ok`
     result came from an envelope the adapter authenticated for this token,
@@ -204,7 +208,8 @@ theorem authenticate_contract {V : Type} (ops : SurrogateOpener V) (opener : V) 
       match out with | .Ok v => Authentic token v | .Err _ => True ⦄) :
     authenticate ops opener token a peer now ⦃ out =>
       match out with
-      | .Ok v => Authentic token v ∧ Admitted v.claims (alloc.vec.Vec.deref v.key_issuer) a peer now
+      | .Ok v => Authentic token v.verified ∧
+          Admitted v.verified.claims (alloc.vec.Vec.deref v.verified.key_issuer) a peer now
       | .Err _ => True ⦄ := by
   unfold authenticate
   apply WP.spec_bind verify_contract
@@ -224,13 +229,13 @@ theorem authenticate_contract {V : Type} (ops : SurrogateOpener V) (opener : V) 
 
 /-- **What a decrypted surrogate is.** The credential is the adapter's
     unsealing of that envelope and is valid; the claims are unchanged. -/
-theorem decrypt_contract {V : Type} (ops : SurrogateOpener V) (opener : V) (v : Verified)
+theorem decrypt_contract {V : Type} (ops : SurrogateOpener V) (opener : V) (v : stateless.Admitted)
     (Unsealed : Verified → alloc.vec.Vec U8 → Prop)
     (unseal_contract : ops.«unseal» opener v ⦃ out =>
-      match out with | .Ok c => Unsealed v c | .Err _ => True ⦄) :
+      match out with | .Ok c => Unsealed v.verified c | .Err _ => True ⦄) :
     decrypt ops opener v ⦃ out =>
       match out with
-      | .Ok opened => opened.claims = v.claims ∧ Unsealed v opened.credential ∧
+      | .Ok opened => opened.claims = v.verified.claims ∧ Unsealed v.verified opened.credential ∧
           http_auth.Proofs.ValidCredential (alloc.vec.Vec.deref opened.credential)
       | .Err _ => True ⦄ := by
   unfold decrypt
@@ -258,8 +263,8 @@ theorem open_contract {V : Type} (ops : SurrogateOpener V) (opener : V) (token :
     (Authentic : Slice U8 → Verified → Prop) (Unsealed : Verified → alloc.vec.Vec U8 → Prop)
     (verify_contract : ops.verify opener token ⦃ out =>
       match out with | .Ok v => Authentic token v | .Err _ => True ⦄)
-    (unseal_contract : ∀ v, ops.«unseal» opener v ⦃ out =>
-      match out with | .Ok c => Unsealed v c | .Err _ => True ⦄) :
+    (unseal_contract : ∀ v : stateless.Admitted, ops.«unseal» opener v ⦃ out =>
+      match out with | .Ok c => Unsealed v.verified c | .Err _ => True ⦄) :
     «open» ops opener token a peer now ⦃ out =>
       match out with
       | .Ok opened => ∃ v, Authentic token v ∧
@@ -278,16 +283,16 @@ theorem open_contract {V : Type} (ops : SurrogateOpener V) (opener : V) (token :
     intro out h
     cases out with
     | Err e => trivial
-    | Ok opened => exact ⟨v, authenticated.1, authenticated.2, h.1, h.2.1, h.2.2⟩
+    | Ok opened => exact ⟨v.verified, authenticated.1, authenticated.2, h.1, h.2.1, h.2.2⟩
 
 /-- An authenticated surrogate: `verify` returned it and `admit` accepted its
     claims for this peer, now. -/
 theorem authenticate_ok_trace {V : Type} (ops : SurrogateOpener V) (opener : V) (token : Slice U8)
-    (a : Acceptance) (peer : Slice U8) (now : I64) (v : Verified)
+    (a : Acceptance) (peer : Slice U8) (now : I64) (v : stateless.Admitted)
     (h : authenticate ops opener token a peer now = Result.ok (.Ok v)) :
-    ops.verify opener token = Result.ok (.Ok v) ∧
-      admit v.claims (alloc.vec.Vec.deref v.key_issuer) a peer now = Result.ok (.Ok ()) ∧
-      Admitted v.claims (alloc.vec.Vec.deref v.key_issuer) a peer now := by
+    ops.verify opener token = Result.ok (.Ok v.verified) ∧
+      admit v.verified.claims (alloc.vec.Vec.deref v.verified.key_issuer) a peer now = Result.ok (.Ok ()) ∧
+      Admitted v.verified.claims (alloc.vec.Vec.deref v.verified.key_issuer) a peer now := by
   unfold authenticate at h
   obtain ⟨r, hr, h⟩ := bind_ok_inv h
   cases r with
@@ -305,9 +310,9 @@ theorem authenticate_ok_trace {V : Type} (ops : SurrogateOpener V) (opener : V) 
 
 /-- A decrypted surrogate: `unseal` returned exactly its credential, which is
     valid, and its claims are the authenticated ones. -/
-theorem decrypt_ok_trace {V : Type} (ops : SurrogateOpener V) (opener : V) (v : Verified) (o : Opened)
+theorem decrypt_ok_trace {V : Type} (ops : SurrogateOpener V) (opener : V) (v : stateless.Admitted) (o : Opened)
     (h : decrypt ops opener v = Result.ok (.Ok o)) :
-    ops.«unseal» opener v = Result.ok (.Ok o.credential) ∧ o.claims = v.claims ∧
+    ops.«unseal» opener v = Result.ok (.Ok o.credential) ∧ o.claims = v.verified.claims ∧
       http_auth.valid_credential (alloc.vec.Vec.deref o.credential) = Result.ok true := by
   unfold decrypt at h
   obtain ⟨r, hr, h⟩ := bind_ok_inv h
@@ -325,7 +330,7 @@ theorem decrypt_ok_trace {V : Type} (ops : SurrogateOpener V) (opener : V) (v : 
 
 /-- **The halves compose to `open`.** -/
 theorem open_of_halves {V : Type} (ops : SurrogateOpener V) (opener : V) (token : Slice U8)
-    (a : Acceptance) (peer : Slice U8) (now : I64) (v : Verified) (o : Opened)
+    (a : Acceptance) (peer : Slice U8) (now : I64) (v : stateless.Admitted) (o : Opened)
     (ha : authenticate ops opener token a peer now = Result.ok (.Ok v))
     (hd : decrypt ops opener v = Result.ok (.Ok o)) :
     «open» ops opener token a peer now = Result.ok (.Ok o) := by
@@ -338,7 +343,7 @@ theorem open_unadmitted_never_unseals {V : Type} (ops : SurrogateOpener V) (open
     (token : Slice U8) (a : Acceptance) (peer : Slice U8) (now : I64) (v : Verified)
     (verified : ops.verify opener token = Result.ok (.Ok v))
     (refused : ¬ Admitted v.claims (alloc.vec.Vec.deref v.key_issuer) a peer now)
-    (other : V → Verified → Result (core.result.Result (alloc.vec.Vec U8) Rejection)) :
+    (other : V → stateless.Admitted → Result (core.result.Result (alloc.vec.Vec U8) Rejection)) :
     (∃ e, «open» ops opener token a peer now = Result.ok (.Err e)) ∧
     «open» ops opener token a peer now = «open» {ops with «unseal» := other} opener token a peer now := by
   obtain ⟨r1, returned, iff⟩ := returned_of_spec (admit_spec v.claims (alloc.vec.Vec.deref v.key_issuer) a peer now)
@@ -365,7 +370,7 @@ theorem open_ok_trace {V : Type} (ops : SurrogateOpener V) (opener : V) (token :
     (h : «open» ops opener token a peer now = Result.ok (.Ok opened)) :
     ∃ v, ops.verify opener token = Result.ok (.Ok v) ∧
       Admitted v.claims (alloc.vec.Vec.deref v.key_issuer) a peer now ∧
-      opened.claims = v.claims ∧ ops.«unseal» opener v = Result.ok (.Ok opened.credential) ∧
+      opened.claims = v.claims ∧ ops.«unseal» opener { verified := v } = Result.ok (.Ok opened.credential) ∧
       http_auth.Proofs.ValidCredential (alloc.vec.Vec.deref opened.credential) := by
   unfold «open» at h
   obtain ⟨r, hr, h⟩ := bind_ok_inv h
@@ -380,7 +385,7 @@ theorem open_ok_trace {V : Type} (ops : SurrogateOpener V) (opener : V) (token :
     rw [hb] at hval
     simp only [Result.ok.injEq] at hval
     subst hval
-    exact ⟨v, hv, adm, hc, hu, valid.mp rfl⟩
+    exact ⟨v.verified, hv, adm, hc, hu, valid.mp rfl⟩
 
 /-- **Binding.** An opened surrogate's `cnf` is the peer, byte for byte, and
     the clock is inside its window. -/

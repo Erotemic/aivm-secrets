@@ -170,9 +170,9 @@ def test_wrong_peer_is_never_decrypted():
     unsealed = []
 
     class Recording(KeySet):
-        def unseal(self, verified):
-            unsealed.append(verified)
-            return super().unseal(verified)
+        def unseal(self, admitted):
+            unsealed.append(admitted)
+            return super().unseal(admitted)
 
     acceptance = stateless.Acceptance(('https://proxy.test',), ('api',), 3600, 0)
     with pytest.raises(Rejection, match='wrong_certificate'):

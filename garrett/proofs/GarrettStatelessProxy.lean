@@ -483,10 +483,10 @@ theorem decide_dispatch_trace (ops : stateless.SurrogateOpener V) (pol : statele
     ∃ token v op, surrogate_of (alloc.vec.Vec.deref request.fields) = Result.ok (some token) ∧
       stateless.authenticate ops opener (alloc.vec.Vec.deref token) a peer now = Result.ok (.Ok v) ∧
       stateless_policy.operation_of request = Result.ok op ∧
-      pol.permits policy v.claims op = Result.ok true ∧
+      pol.permits policy v.verified.claims op = Result.ok true ∧
       stateless.decrypt ops opener v = Result.ok (.Ok dsp.opened) ∧
       ∃ (inside : dsp.route.val < routes.length),
-        (routes[dsp.route.val]'inside).provider.val = v.claims.provider.val ∧
+        (routes[dsp.route.val]'inside).provider.val = v.verified.claims.provider.val ∧
         proxy_http.upstream.encode_upstream (alloc.vec.Vec.new U8) request
           (alloc.vec.Vec.deref (routes[dsp.route.val]'inside).destination.host)
           (alloc.vec.Vec.deref (routes[dsp.route.val]'inside).rules)
@@ -530,7 +530,7 @@ theorem decide_dispatch_trace (ops : stateless.SurrogateOpener V) (pol : statele
               have same : stateless_proxy.Decision.Dispatch { route := i, wire := w, opened := o2 } =
                   .Dispatch dsp := by simpa using h
               cases same
-              have route := route_of_loop_contract routes (alloc.vec.Vec.deref v.claims.provider) 0#usize
+              have route := route_of_loop_contract routes (alloc.vec.Vec.deref v.verified.claims.provider) 0#usize
               simp only [route_of] at hi
               rw [hi] at route
               simp only [WP.spec_ok] at route
@@ -601,14 +601,15 @@ theorem dispatch_permitted (ops : stateless.SurrogateOpener V) (pol : stateless_
     `unseal` adapter would do, so the credential is never decrypted. -/
 theorem decide_unpermitted (ops : stateless.SurrogateOpener V) (pol : stateless_policy.OperationPolicy P)
     (opener : V) (policy : P) (request : proxy_http.request.Request) (routes : Slice Route) (a : stateless.Acceptance)
-    (peer : Slice U8) (now : I64) (token : alloc.vec.Vec U8) (v : stateless.Verified)
+    (peer : Slice U8) (now : I64) (token : alloc.vec.Vec U8) (v : stateless.Admitted)
     (op : stateless_policy.Operation)
     (ho : surrogate_of (alloc.vec.Vec.deref request.fields) = Result.ok (some token))
     (hauth : stateless.authenticate ops opener (alloc.vec.Vec.deref token) a peer now = Result.ok (.Ok v))
-    (routed : ∃ i, route_of routes (alloc.vec.Vec.deref v.claims.provider) = Result.ok i ∧ i.val < routes.length)
+    (routed : ∃ i, route_of routes (alloc.vec.Vec.deref v.verified.claims.provider) = Result.ok i ∧
+      i.val < routes.length)
     (hop : stateless_policy.operation_of request = Result.ok op)
-    (refused : pol.permits policy v.claims op = Result.ok false)
-    (other : V → stateless.Verified → Result (core.result.Result (alloc.vec.Vec U8) stateless.Rejection)) :
+    (refused : pol.permits policy v.verified.claims op = Result.ok false)
+    (other : V → stateless.Admitted → Result (core.result.Result (alloc.vec.Vec U8) stateless.Rejection)) :
     decide_request ops pol opener policy request routes a peer now = Result.ok (.refused .Denied) ∧
     decide_request {ops with «unseal» := other} pol opener policy request routes a peer now =
       Result.ok (.refused .Denied) := by
@@ -641,7 +642,7 @@ theorem serve_dispatch_exact (ops : stateless.SurrogateOpener V) (pol : stateles
     ∃ token v, surrogate_of (alloc.vec.Vec.deref request.fields) = Result.ok (some token) ∧
       ops.verify opener (alloc.vec.Vec.deref token) = Result.ok (.Ok v) ∧
       Admitted v.claims (alloc.vec.Vec.deref v.key_issuer) a peer now ∧ opened.claims = v.claims ∧
-      ops.«unseal» opener v = Result.ok (.Ok opened.credential) ∧
+      ops.«unseal» opener { verified := v } = Result.ok (.Ok opened.credential) ∧
       ∃ (inside : index.val < routes.length),
         (routes[index.val]'inside).provider.val = v.claims.provider.val ∧
         wire.val = UpstreamPrefix request (alloc.vec.Vec.deref (routes[index.val]'inside).destination.host) ++

@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol, Sequence
 
 from . import encoding as enc
-from .stateless import Rejection, SurrogateClaims, Verified
+from .stateless import Admitted, Rejection, SurrogateClaims, Verified
 from .stateless_login import LoginState
 
 TYP = 'garrett-stateless-v1+jwt'
@@ -231,7 +231,8 @@ class KeySet:
             raise Rejection('malformed')
         return Verified(index, entry.issuer, claims, associated(header_bytes, enc.canonical(payload)), sealed)
 
-    def unseal(self, verified: Verified) -> bytes:
+    def unseal(self, admitted: Admitted) -> bytes:
+        verified = admitted.verified
         if not 0 <= verified.key < len(self.keys):
             raise Rejection('unknown_key')
         plain = self.keys[verified.key].open(verified.sealed[:NONCE], verified.aad, verified.sealed[NONCE:])

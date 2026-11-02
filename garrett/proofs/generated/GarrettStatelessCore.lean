@@ -4795,7 +4795,7 @@ structure stateless.SurrogateClaims where
   renew_until : Std.I64
 
 /-- [garrett_stateless_core::stateless::Verified]
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 62:0-68:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 63:0-69:1
     Visibility: public -/
 structure stateless.Verified where
   key : Std.Usize
@@ -4805,7 +4805,7 @@ structure stateless.Verified where
   sealed : alloc.vec.Vec Std.U8
 
 /-- [garrett_stateless_core::stateless::Acceptance]
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 72:0-77:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 73:0-78:1
     Visibility: public -/
 structure stateless.Acceptance where
   audiences : alloc.vec.Vec (alloc.vec.Vec Std.U8)
@@ -4814,7 +4814,7 @@ structure stateless.Acceptance where
   skew : Std.I64
 
 /-- [garrett_stateless_core::stateless::member]: loop 0:
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 80:4-87:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 81:4-88:1
     Visibility: public -/
 @[rust_loop]
 def stateless.member_loop
@@ -4833,7 +4833,7 @@ def stateless.member_loop
 partial_fixpoint
 
 /-- [garrett_stateless_core::stateless::member]:
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 79:0-87:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 80:0-88:1
     Visibility: public -/
 def stateless.member
   (set : Slice (alloc.vec.Vec Std.U8)) (value : Slice Std.U8) :
@@ -4844,7 +4844,7 @@ def stateless.member
   stateless.member_loop iter value
 
 /-- [garrett_stateless_core::stateless::acceptance_valid]:
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 89:0-94:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 90:0-95:1
     Visibility: public -/
 def stateless.acceptance_valid
   (acceptance : stateless.Acceptance) : Result Bool := do
@@ -4859,7 +4859,7 @@ def stateless.acceptance_valid
   else ok false
 
 /-- [garrett_stateless_core::stateless::lifetime_valid]:
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 97:0-104:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 98:0-105:1
     Visibility: public -/
 def stateless.lifetime_valid
   (claims : stateless.SurrogateClaims) (max_lifetime : Std.I64) :
@@ -4885,7 +4885,7 @@ def stateless.lifetime_valid
   else ok false
 
 /-- [garrett_stateless_core::stateless::admit]:
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 108:0-142:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 109:0-143:1
     Visibility: public -/
 def stateless.admit
   (claims : stateless.SurrogateClaims) (key_issuer : Slice Std.U8)
@@ -4945,30 +4945,43 @@ def stateless.admit
         else ok (core.result.Result.Err stateless.Rejection.WrongIssuer)
   else ok (core.result.Result.Err stateless.Rejection.BadPolicy)
 
+/-- [garrett_stateless_core::stateless::Admitted]
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 164:0-166:1
+    Visibility: public -/
+structure stateless.Admitted where
+  verified : stateless.Verified
+
+/-- [garrett_stateless_core::stateless::admitted_claims]:
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 169:0-171:1
+    Visibility: public -/
+def stateless.admitted_claims
+  (admitted : stateless.Admitted) : Result stateless.SurrogateClaims := do
+  ok admitted.verified.claims
+
 /-- Trait declaration: [garrett_stateless_core::stateless::SurrogateOpener]
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 146:0-149:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 176:0-179:1
     Visibility: public -/
 structure stateless.SurrogateOpener (Self : Type _) where
   verify : Self → Slice Std.U8 → Result (core.result.Result
     stateless.Verified stateless.Rejection)
-  «unseal» : Self → stateless.Verified → Result (core.result.Result
+  «unseal» : Self → stateless.Admitted → Result (core.result.Result
     (alloc.vec.Vec Std.U8) stateless.Rejection)
 
 /-- [garrett_stateless_core::stateless::Opened]
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 151:0-154:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 181:0-184:1
     Visibility: public -/
 structure stateless.Opened where
   claims : stateless.SurrogateClaims
   credential : alloc.vec.Vec Std.U8
 
 /-- [garrett_stateless_core::stateless::authenticate]:
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 159:0-181:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 189:0-211:1
     Visibility: public -/
 def stateless.authenticate
   {V : Type _} (SurrogateOpenerInst : stateless.SurrogateOpener V) (opener : V)
   (token : Slice Std.U8) (acceptance : stateless.Acceptance)
   (peer : Slice Std.U8) (now : Std.I64) :
-  Result (core.result.Result stateless.Verified stateless.Rejection)
+  Result (core.result.Result stateless.Admitted stateless.Rejection)
   := do
   let r ← SurrogateOpenerInst.verify opener token
   match r with
@@ -4976,30 +4989,32 @@ def stateless.authenticate
     let s := alloc.vec.Vec.deref verified.key_issuer
     let r1 ← stateless.admit verified.claims s acceptance peer now
     match r1 with
-    | core.result.Result.Ok _ => ok r
+    | core.result.Result.Ok _ => ok (core.result.Result.Ok { verified })
     | core.result.Result.Err error => ok (core.result.Result.Err error)
-  | core.result.Result.Err _ => ok r
+  | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [garrett_stateless_core::stateless::decrypt]:
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 186:0-198:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 216:0-228:1
     Visibility: public -/
 def stateless.decrypt
   {V : Type _} (SurrogateOpenerInst : stateless.SurrogateOpener V) (opener : V)
-  (verified : stateless.Verified) :
+  (admitted : stateless.Admitted) :
   Result (core.result.Result stateless.Opened stateless.Rejection)
   := do
-  let r ← SurrogateOpenerInst.«unseal» opener verified
+  let r ← SurrogateOpenerInst.«unseal» opener admitted
   match r with
   | core.result.Result.Ok credential =>
     let s := alloc.vec.Vec.deref credential
     let b ← http_auth.valid_credential s
     if b
-    then ok (core.result.Result.Ok { claims := verified.claims, credential })
+    then
+      ok (core.result.Result.Ok
+        { claims := admitted.verified.claims, credential })
     else ok (core.result.Result.Err stateless.Rejection.InvalidCredential)
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [garrett_stateless_core::stateless::open]:
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 204:0-216:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 234:0-246:1
     Visibility: public -/
 def stateless.open
   {V : Type _} (SurrogateOpenerInst : stateless.SurrogateOpener V) (opener : V)
@@ -5010,12 +5025,12 @@ def stateless.open
   let r ←
     stateless.authenticate SurrogateOpenerInst opener token acceptance peer now
   match r with
-  | core.result.Result.Ok verified =>
-    stateless.decrypt SurrogateOpenerInst opener verified
+  | core.result.Result.Ok admitted =>
+    stateless.decrypt SurrogateOpenerInst opener admitted
   | core.result.Result.Err error => ok (core.result.Result.Err error)
 
 /-- [garrett_stateless_core::stateless::IssuePolicy]
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 220:0-226:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 250:0-256:1
     Visibility: public -/
 structure stateless.IssuePolicy where
   issuer : alloc.vec.Vec Std.U8
@@ -5025,7 +5040,7 @@ structure stateless.IssuePolicy where
   max_renew : Std.I64
 
 /-- [garrett_stateless_core::stateless::Grant]
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 232:0-238:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 262:0-268:1
     Visibility: public -/
 structure stateless.Grant where
   provider : alloc.vec.Vec Std.U8
@@ -5035,7 +5050,7 @@ structure stateless.Grant where
   credential_expires : Std.I64
 
 /-- [garrett_stateless_core::stateless::Window]
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 241:0-245:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 271:0-275:1
     Visibility: public -/
 structure stateless.Window where
   issued_at : Std.I64
@@ -5043,7 +5058,7 @@ structure stateless.Window where
   renew_until : Std.I64
 
 /-- [garrett_stateless_core::stateless::earlier]:
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 247:0-253:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 277:0-283:1
     Visibility: public -/
 def stateless.earlier (a : Std.I64) (b : Std.I64) : Result Std.I64 := do
   if a <= b
@@ -5051,7 +5066,7 @@ def stateless.earlier (a : Std.I64) (b : Std.I64) : Result Std.I64 := do
   else ok b
 
 /-- [garrett_stateless_core::stateless::issue_window]:
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 257:0-287:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 287:0-317:1
     Visibility: public -/
 def stateless.issue_window
   (policy : stateless.IssuePolicy) (grant : stateless.Grant) (now : Std.I64)
@@ -5098,7 +5113,7 @@ def stateless.issue_window
                       { issued_at := now, expires_at, renew_until })
 
 /-- [garrett_stateless_core::stateless::credential_expiry]:
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 290:0-305:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 320:0-335:1
     Visibility: public -/
 def stateless.credential_expiry
   (now : Std.I64) (has_expires_in : Bool) (expires_in : Std.I64) :
@@ -5123,7 +5138,7 @@ def stateless.credential_expiry
       else ok (core.result.Result.Ok stateless.MAX_TIME)
 
 /-- [garrett_stateless_core::stateless::claims_for]:
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 309:0-336:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 339:0-366:1
     Visibility: public -/
 def stateless.claims_for
   (policy : stateless.IssuePolicy) (grant : stateless.Grant)
@@ -5159,21 +5174,21 @@ def stateless.claims_for
   else ok (core.result.Result.Err stateless.Rejection.UnknownProvider)
 
 /-- Trait declaration: [garrett_stateless_core::stateless::SurrogateSealer]
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 343:0-345:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 373:0-375:1
     Visibility: public -/
 structure stateless.SurrogateSealer (Self : Type _) where
   «seal» : Self → stateless.SurrogateClaims → Slice Std.U8 → Result
     (core.result.Result (alloc.vec.Vec Std.U8) stateless.Rejection)
 
 /-- [garrett_stateless_core::stateless::Issued]
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 347:0-350:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 377:0-380:1
     Visibility: public -/
 structure stateless.Issued where
   claims : stateless.SurrogateClaims
   token : alloc.vec.Vec Std.U8
 
 /-- [garrett_stateless_core::stateless::issue]:
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 354:0-375:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 384:0-405:1
     Visibility: public -/
 def stateless.issue
   {S : Type _} (SurrogateSealerInst : stateless.SurrogateSealer S) (sealer : S)
@@ -5197,7 +5212,7 @@ def stateless.issue
   else ok (core.result.Result.Err stateless.Rejection.InvalidCredential)
 
 /-- [garrett_stateless_core::stateless::renewal_grant]:
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 379:0-390:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 409:0-420:1
     Visibility: public -/
 def stateless.renewal_grant
   (claims : stateless.SurrogateClaims) (certificate_expires : Std.I64) :
@@ -5219,7 +5234,7 @@ def stateless.renewal_grant
     }
 
 /-- [garrett_stateless_core::stateless::renew]:
-    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 395:0-421:1
+    Source: 'crates/garrett-stateless-core/src/stateless.rs', lines 425:0-451:1
     Visibility: public -/
 def stateless.renew
   {V : Type _} {S : Type _} (SurrogateOpenerInst : stateless.SurrogateOpener V)
@@ -6755,8 +6770,8 @@ def stateless_proxy.decide
       stateless.authenticate statelessSurrogateOpenerInst opener s1 acceptance
         peer now
     match r with
-    | core.result.Result.Ok verified =>
-      let s2 := alloc.vec.Vec.deref verified.claims.provider
+    | core.result.Result.Ok admitted =>
+      let s2 := alloc.vec.Vec.deref admitted.verified.claims.provider
       let index ← stateless_proxy.route_of routes s2
       let i := Slice.len routes
       if index >= i
@@ -6766,11 +6781,12 @@ def stateless_proxy.decide
       else
         let o1 ← stateless_policy.operation_of request
         let b ←
-          stateless_policyOperationPolicyInst.permits policy verified.claims o1
+          stateless_policyOperationPolicyInst.permits policy
+            admitted.verified.claims o1
         if b
         then
           let r1 ←
-            stateless.decrypt statelessSurrogateOpenerInst opener verified
+            stateless.decrypt statelessSurrogateOpenerInst opener admitted
           match r1 with
           | core.result.Result.Ok opened =>
             let route ← Slice.index_usize routes index
@@ -8022,7 +8038,7 @@ def stateless_token.json.digit (byte : Std.U8) : Result Bool := do
   else ok false
 
 /-- [garrett_stateless_core::stateless_token::MAX_INTEGER]
-    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 61:0-61:46
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 63:0-63:46
     Visibility: public -/
 @[global_simps, irreducible]
 def stateless_token.MAX_INTEGER : Std.I64 := 9007199254740991#i64
@@ -8192,7 +8208,7 @@ def stateless_token.json.before
        ok (i1 < i2)
 
 /-- [garrett_stateless_core::stateless_token::MAX_DEPTH]
-    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 64:0-64:32
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 66:0-66:32
     Visibility: public -/
 @[global_simps, irreducible]
 def stateless_token.MAX_DEPTH : Std.Usize := 16#usize
@@ -8524,7 +8540,7 @@ def stateless_token.keys.select
   stateless_token.keys.select_loop entries kid 0#usize
 
 /-- [garrett_stateless_core::stateless_token::MAX_KEYS]
-    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 62:0-62:30
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 64:0-64:30
     Visibility: public -/
 @[global_simps, irreducible]
 def stateless_token.MAX_KEYS : Std.Usize := 8#usize
@@ -9091,7 +9107,7 @@ def stateless_token.login_state.parse_state
                           else ok none
 
 /-- [garrett_stateless_core::stateless_token::NONCE]
-    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 65:0-65:28
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 67:0-67:28
     Visibility: public -/
 @[global_simps, irreducible] def stateless_token.NONCE : Std.Usize := 12#usize
 
@@ -9136,7 +9152,7 @@ def stateless_token.login_state.seal_state
     else ok none
 
 /-- [garrett_stateless_core::stateless_token::TAG]
-    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 66:0-66:26
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 68:0-68:26
     Visibility: public -/
 @[global_simps, irreducible] def stateless_token.TAG : Std.Usize := 16#usize
 
@@ -9206,19 +9222,19 @@ def stateless_token.login_state.open_state
               | some state => ok (core.result.Result.Ok state)
 
 /-- [garrett_stateless_core::stateless_token::MAX_TOKEN]
-    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 59:0-59:35
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 61:0-61:35
     Visibility: public -/
 @[global_simps, irreducible]
 def stateless_token.MAX_TOKEN : Std.Usize := 16384#usize
 
 /-- [garrett_stateless_core::stateless_token::SIGNATURE]
-    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 67:0-67:32
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 69:0-69:32
     Visibility: public -/
 @[global_simps, irreducible]
 def stateless_token.SIGNATURE : Std.Usize := 64#usize
 
 /-- [garrett_stateless_core::stateless_token::CREDENTIAL_LABEL]
-    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 69:0-69:73
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 71:0-71:73
     Visibility: public -/
 @[global_simps, irreducible]
 def stateless_token.CREDENTIAL_LABEL : Slice Std.U8 :=
@@ -9231,7 +9247,7 @@ def stateless_token.CREDENTIAL_LABEL : Slice Std.U8 :=
       ])
 
 /-- [garrett_stateless_core::stateless_token::HEADER_START]
-    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 70:0-70:65
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 72:0-72:65
     Visibility: public -/
 @[global_simps, irreducible]
 def stateless_token.HEADER_START : Slice Std.U8 :=
@@ -9243,7 +9259,7 @@ def stateless_token.HEADER_START : Slice Std.U8 :=
       ])
 
 /-- [garrett_stateless_core::stateless_token::HEADER_END]
-    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 71:0-71:74
+    Source: 'crates/garrett-stateless-core/src/stateless_token/mod.rs', lines 73:0-73:74
     Visibility: public -/
 @[global_simps, irreducible]
 def stateless_token.HEADER_END : Slice Std.U8 :=
@@ -9986,8 +10002,7 @@ def stateless_token.opening.verify_token
               else ok (core.result.Result.Err stateless.Rejection.BadSignature)
 
 /-- [garrett_stateless_core::stateless_token::opening::unseal_token]:
-    Source: 'crates/garrett-stateless-core/src/stateless_token/opening.rs', lines 114:0-130:1
-    Visibility: public -/
+    Source: 'crates/garrett-stateless-core/src/stateless_token/opening.rs', lines 114:0-130:1 -/
 def stateless_token.opening.unseal_token
   {M : Type _} (keysKeyMaterialInst : stateless_token.keys.KeyMaterial M)
   (entries : Slice (stateless_token.keys.KeyEntry M))
@@ -10023,11 +10038,11 @@ def stateless_token.opening.unseal_token
 def
   stateless_token.keys.KeySet.Insts.Garrett_stateless_coreStatelessSurrogateOpener.unseal
   {M : Type _} (keysKeyMaterialInst : stateless_token.keys.KeyMaterial M)
-  (self : stateless_token.keys.KeySet M) (verified : stateless.Verified) :
+  (self : stateless_token.keys.KeySet M) (admitted : stateless.Admitted) :
   Result (core.result.Result (alloc.vec.Vec Std.U8) stateless.Rejection)
   := do
   let s := alloc.vec.Vec.deref self.entries
-  stateless_token.opening.unseal_token keysKeyMaterialInst s verified
+  stateless_token.opening.unseal_token keysKeyMaterialInst s admitted.verified
 
 /-- [garrett_stateless_core::stateless_token::opening::{impl garrett_stateless_core::stateless::SurrogateOpener for garrett_stateless_core::stateless_token::keys::KeySet<M>}::verify]:
     Source: 'crates/garrett-stateless-core/src/stateless_token/opening.rs', lines 133:4-135:5

@@ -56,7 +56,7 @@ theorem issue_then_open {inst : KeyMaterial M} {sealer : TokenSealer M} {keys : 
   refine ⟨⟨v.claims, out⟩, ?_, vclaims, outv⟩
   have hv' : (Opening inst).verify keys (alloc.vec.Vec.deref issued.token) = Result.ok (.Ok v) := by
     rw [opening_verify]; exact hv
-  have hu' : KeySet.Insts.Garrett_stateless_coreStatelessSurrogateOpener.unseal inst keys v =
+  have hu' : KeySet.Insts.Garrett_stateless_coreStatelessSurrogateOpener.unseal inst keys { verified := v } =
       Result.ok (.Ok out) := hout
   obtain ⟨r1, hr1, _⟩ := returned_of_spec (stateless.Proofs.admit_spec v.claims (alloc.vec.Vec.deref v.key_issuer)
     a peer later)
@@ -68,19 +68,19 @@ theorem issue_then_open {inst : KeyMaterial M} {sealer : TokenSealer M} {keys : 
   have bt : b = true := bv.mpr (by rw [same]; exact valid)
   subst bt
   have ha : stateless.authenticate (Opening inst) keys (alloc.vec.Vec.deref issued.token) a peer later =
-      Result.ok (.Ok v) := by
+      Result.ok (.Ok { verified := v }) := by
     unfold stateless.authenticate
     rw [hv']
     simp only [bind_ok]
     rw [hr1]
     simp only [bind_ok]
-  have hd : stateless.decrypt (Opening inst) keys v = Result.ok (.Ok ⟨v.claims, out⟩) := by
+  have hd : stateless.decrypt (Opening inst) keys { verified := v } = Result.ok (.Ok ⟨v.claims, out⟩) := by
     unfold stateless.decrypt
-    rw [show (Opening inst).«unseal» keys v = Result.ok (.Ok out) from hu']
+    rw [show (Opening inst).«unseal» keys { verified := v } = Result.ok (.Ok out) from hu']
     simp only [bind_ok]
     rw [hb]
     simp only [bind_ok, ↓reduceIte]
-  exact stateless.Proofs.open_of_halves _ _ _ _ _ _ v _ ha hd
+  exact stateless.Proofs.open_of_halves _ _ _ _ _ _ { verified := v } _ ha hd
 
 /-- **The codec premise, discharged.** For the real opener and sealer, a
     verified issued token yields exactly the claims sealed into it — the

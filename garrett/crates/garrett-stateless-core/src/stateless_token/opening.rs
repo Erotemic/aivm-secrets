@@ -111,7 +111,7 @@ pub fn verify_token<M: KeyMaterial>(
 }
 
 /// Open `enc` with the key that verified the token.
-pub fn unseal_token<M: KeyMaterial>(
+fn unseal_token<M: KeyMaterial>(
     entries: &[KeyEntry<M>],
     verified: &Verified,
 ) -> Result<Vec<u8>, Rejection> {
@@ -133,7 +133,7 @@ impl<M: KeyMaterial> SurrogateOpener for KeySet<M> {
     fn verify(&self, token: &[u8]) -> Result<Verified, Rejection> {
         verify_token(&self.entries, token)
     }
-    fn unseal(&self, verified: &Verified) -> Result<Vec<u8>, Rejection> {
-        unseal_token(&self.entries, verified)
+    fn unseal(&self, admitted: &Admitted) -> Result<Vec<u8>, Rejection> {
+        unseal_token(&self.entries, &admitted.verified)
     }
 }

@@ -86,14 +86,14 @@ protocol:
 ```rust
 pub fn decide(opener, policy, request, routes, acceptance, peer, now) -> Decision {
     let token = surrogate_of(&request.fields)?;              // exactly one surrogate, or Unauthorized
-    let verified = stateless::authenticate(opener, &token,   // verify the signature and header,
+    let admitted = stateless::authenticate(opener, &token,   // verify the signature and header,
                                            acceptance, peer, now)?;  // then admit the claims for THIS peer
-    let index = route_of(routes, &verified.claims.provider); // the route of the signed provider,
-                                                             // never a request value
-    if !policy.permits(&verified.claims, &operation_of(request)) {
+    let index = route_of(routes, &admitted.verified.claims.provider); // the route of the signed
+                                                             // provider, never a request value
+    if !policy.permits(&admitted.verified.claims, &operation_of(request)) {
         return Decision::Refused(Code::Denied);              // refused before any decryption
     }
-    let opened = stateless::decrypt(opener, verified)?;      // only now unseal the credential
+    let opened = stateless::decrypt(opener, admitted)?;      // only now unseal the credential
     encode_upstream(&mut wire, request, &route.destination.host, &route.rules,
                     &opened.credential, &route.authentication)?;  // the exact upstream bytes
     Decision::Dispatch(Dispatch { route: index, wire, opened })
@@ -101,8 +101,16 @@ pub fn decide(opener, policy, request, routes, acceptance, peer, now) -> Decisio
 ```
 
 (Simplified: the real function matches every `Result` explicitly, which keeps
-the extracted model's control flow small.) Each line is a separately proved
-component:
+the extracted model's control flow small.) The states a surrogate passes
+through are types where Rust can enforce them: the token bytes; a
+`Verified` (signature checked, nothing more); an `Admitted`, which only
+`authenticate` makes (its field is private to the core crate) and which is
+the only thing `SurrogateOpener::unseal` and `decrypt` accept; and the
+`Opened` credential. Operation authorization is not a type: that `permits`
+runs between `authenticate` and `decrypt` is the control flow of `decide`,
+proved by `decide_unpermitted` and `dispatch_permitted` (the broker's
+renewal opens surrogates with no operation to authorize). Each line is a
+separately proved component:
 
 | Step | Rust | Contract |
 | --- | --- | --- |
