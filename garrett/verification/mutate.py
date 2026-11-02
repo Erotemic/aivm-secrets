@@ -239,7 +239,7 @@ def check(mutant: tuple[str, str, str, str], lean_path: str) -> str:
         built = subprocess_run([*lean, '-o', generated.with_suffix('.olean'), generated], temporary, env)
         if built.returncode != 0:
             raise SystemExit(f'the mutated extraction does not compile: {label}\n{built.stdout}')
-        for module in closure(MUTANT_PROOFS.get(label, PROOFS_BY_FILE[file])):
+        for module in closure(MUTANT_PROOFS[label] if label in MUTANT_PROOFS else PROOFS_BY_FILE[file]):
             proof = temporary / f'{module}.lean'
             shutil.copy2(PROOFS / proof.name, proof)
             result = subprocess_run([*lean, '-DmaxErrors=1', '-o', temporary / f'{module}.olean', proof],
@@ -271,6 +271,9 @@ def main() -> int:
         if extract.extract(Path(scratch), quiet=True).read_bytes() != (PROOFS / 'generated' / extract.MODULE).read_bytes():
             raise SystemExit('proofs/generated is stale: run verification/extract.py write first')
     run([toolchain.executable('lake'), 'build'], cwd=PROOFS)
+    unmapped = [m[1] for m in MUTANTS if m[1] not in MUTANT_PROOFS and m[0] not in PROOFS_BY_FILE]
+    if unmapped:
+        raise SystemExit(f'mutants with no proof module: {unmapped}')
     selected = [m for m in MUTANTS if args.filter is None or re.search(args.filter, m[1])]
     if not selected:
         raise SystemExit('no mutants match the filter')

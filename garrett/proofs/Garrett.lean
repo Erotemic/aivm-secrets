@@ -431,22 +431,26 @@ theorem sends_are_authorized : SendsAreAuthorized inst Paired cfg W :=
   fun keys peer log m unforged => ((protocol_safety aead reach).1 keys peer log m unforged).1
 
 theorem records_permitted : RecordsPermitted inst Paired cfg W :=
-  fun keys peer log m unforged => ((protocol_safety aead reach).1 keys peer log m unforged).2
+  fun _ _ _ m unforged => log_permitted aead reach m unforged
 
+omit aead in
 theorem refusals_send_nothing : RefusalsSendNothing W :=
-  (protocol_safety aead reach).2.1
+  fun _ _ _ m => rejection_never_sends reach m
 
+omit aead in
 theorem delivered_to_initiator : DeliveredToInitiator inst cfg W :=
-  (protocol_safety aead reach).2.2.1
+  fun _ _ _ del => stateless_protocol.delivered_to_initiator reach del
 
+omit aead in
 theorem logins_at_most_once : LoginsAtMostOnce W :=
-  (protocol_safety aead reach).2.2.2.1
+  fun σ => login_once reach σ
 
 theorem renewal_preserves_lineage : RenewalPreservesLineage inst cfg W :=
-  fun sealer claims credential token src h => ((protocol_safety aead reach).2.2.2.2 sealer claims credential token src h).1
+  fun _ _ _ _ _ issued => lineage aead reach issued
 
+omit aead reach in
 theorem claims_hide_credential : ClaimsHideCredential inst cfg W :=
-  fun sealer claims credential token src h => ((protocol_safety aead reach).2.2.2.2 sealer claims credential token src h).2
+  fun _ _ _ _ _ issued => (issued_secret issued).2.2
 
 /-- **A.** Every credential-bearing write is authorized. -/
 theorem compromised_agent_confinement : CompromisedAgentConfinement inst Paired cfg W := by
@@ -495,7 +499,7 @@ theorem credentials_entered_for_the_peer : CredentialsEnteredForThePeer inst Pai
 
 /-- **D.** -/
 theorem authorized_acquisition : AuthorizedAcquisition inst Paired cfg W :=
-  ⟨delivered_to_initiator aead reach, logins_at_most_once aead reach, failed_logins_issue_nothing reach,
+  ⟨delivered_to_initiator reach, logins_at_most_once reach, failed_logins_issue_nothing reach,
     credentials_entered_for_the_peer aead reach⟩
 
 /-- **Garrett's guarantees hold in every reachable world**, under AEAD
@@ -503,8 +507,8 @@ theorem authorized_acquisition : AuthorizedAcquisition inst Paired cfg W :=
     key set). -/
 theorem security_guarantees : SecurityGuarantees inst Paired cfg W where
   confinement := compromised_agent_confinement aead reach
-  refusals := refusals_send_nothing aead reach
-  claimsHide := claims_hide_credential aead reach
+  refusals := refusals_send_nothing reach
+  claimsHide := claims_hide_credential
   records := records_permitted aead reach
   delegation := bounded_delegation aead reach
   renewal := renewal_preserves_lineage aead reach
@@ -516,8 +520,8 @@ theorem guarantees :
     SendsAreAuthorized inst Paired cfg W ∧ RefusalsSendNothing W ∧ DeliveredToInitiator inst cfg W ∧
       LoginsAtMostOnce W ∧ RenewalPreservesLineage inst cfg W ∧ ClaimsHideCredential inst cfg W ∧
       RecordsPermitted inst Paired cfg W :=
-  ⟨sends_are_authorized aead reach, refusals_send_nothing aead reach, delivered_to_initiator aead reach,
-    logins_at_most_once aead reach, renewal_preserves_lineage aead reach, claims_hide_credential aead reach,
+  ⟨sends_are_authorized aead reach, refusals_send_nothing reach, delivered_to_initiator reach,
+    logins_at_most_once reach, renewal_preserves_lineage aead reach, claims_hide_credential,
     records_permitted aead reach⟩
 
 end
