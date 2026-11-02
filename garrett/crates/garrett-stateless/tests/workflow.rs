@@ -775,3 +775,99 @@ fn an_impostor_destination_never_receives_the_credential() {
         assert!(bytes.is_empty(), "{name}: the impostor decrypted {bytes:?}");
     }
 }
+
+/// Neither the audit log nor any reply carries the credential or the
+/// surrogate: not for a served request, not for a reflected answer, not for
+/// a surrogate presented on another agent's connection.
+#[test]
+fn the_audit_log_and_replies_never_carry_the_credential() {
+    let dir = Dir::new();
+    let ca = pki::create_ca("test CA", 2).unwrap();
+    let names = vec!["proxy.test".to_owned(), "api.test".to_owned()];
+    let server = pki::issue(&ca.certificate, &ca.key, Leaf::Server(&names), 2).unwrap();
+    let client = |name| {
+        pki::issue(
+            &ca.certificate,
+            &ca.key,
+            Leaf::Client { name, uri: None },
+            2,
+        )
+        .unwrap()
+    };
+    let (agent_c, thief_c) = (client("agent"), client("thief"));
+    dir.write("ca.pem", ca.certificate.as_bytes(), false);
+    dir.write("server.pem", server.certificate.as_bytes(), false);
+    dir.write("server.key", server.key.as_bytes(), true);
+    let keys = BrokerKeys::generate("https://broker.test", "k1").unwrap();
+    dir.write("proxy-keys.json", &keys.export_proxy().to_json(), true);
+    let (api_address, seen) = api(&server.certificate, &server.key);
+    let (api_host, api_port) = api_address.rsplit_once(':').unwrap();
+    let path = write_json(
+        &dir,
+        "audited.json",
+        format!(
+            r#"{{"schema":"garrett-stateless-v1/proxy","listen":"127.0.0.1:0","authority":"proxy.test:8443",
+            "certificate":"server.pem","private_key":"server.key","client_ca":"ca.pem","keys":"proxy-keys.json",
+            "audiences":["https://proxy.test"],"skew":0,"audit":"audit.log",
+            "routes":[{{"provider":"api","host":"api.test","address":"{api_host}","port":{api_port},"ca_file":"ca.pem",
+                       "authentication":"bearer"}}]}}"#
+        ),
+    );
+    let der = tls::certificates(agent_c.certificate.as_bytes())
+        .unwrap()
+        .remove(0);
+    let policy = garrett_stateless::IssuePolicy {
+        issuer: b"https://broker.test".to_vec(),
+        audience: b"https://proxy.test".to_vec(),
+        providers: vec![b"api".to_vec()],
+        max_lifetime: 3600,
+        max_renew: 86400,
+    };
+    let issued = garrett_stateless::broker::mint_with(
+        &keys,
+        &policy,
+        "api",
+        CREDENTIAL.as_bytes(),
+        der.as_ref(),
+        &Default::default(),
+        600,
+        garrett_stateless::broker::now_seconds(),
+    )
+    .unwrap();
+    let proxy = Arc::new(Proxy::from_file(&path).unwrap()).serve().unwrap();
+    let endpoint =
+        Endpoint::parse("https://proxy.test:8443", Some(&proxy.address.to_string())).unwrap();
+    let agent_for = |c: &pki::Issued| {
+        Agent::new(
+            ca.certificate.as_bytes(),
+            ClientIdentity::Software {
+                certificate: c.certificate.clone().into_bytes(),
+                key: c.key.as_bytes().to_vec(),
+            },
+        )
+        .unwrap()
+    };
+    let (agent, thief) = (agent_for(&agent_c), agent_for(&thief_c));
+    let mut replies = Vec::new();
+    for (who, target, status) in [
+        (&agent, "/user", 200),
+        (&agent, "/echo", 502),
+        (&thief, "/user", 401),
+    ] {
+        let response = who
+            .request(&endpoint, &issued.token, "GET", target, &[], b"")
+            .unwrap();
+        assert_eq!(response.status, status, "{target}");
+        replies.push(String::from_utf8_lossy(&response.body).into_owned());
+    }
+    proxy.stop();
+    // Only the agent's two requests reached the provider.
+    assert_eq!(seen.lock().unwrap().len(), 2);
+    let audit = std::fs::read_to_string(dir.0.join("audit.log")).unwrap();
+    assert!(audit.contains("\"event\":\"admitted\""));
+    assert!(audit.contains("\"event\":\"rejected\""));
+    for output in replies.iter().chain([&audit]) {
+        assert!(!output.contains(CREDENTIAL), "{output}");
+        assert!(!output.contains(&issued.token), "{output}");
+    }
+}

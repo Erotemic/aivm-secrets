@@ -726,6 +726,33 @@ mod tests {
         assert_eq!(origin.sent[0].0, b"api.test");
     }
 
+    /// A surrogate the proxy accepts, for a provider it has no route for, is
+    /// refused before anything is decrypted, admitted or connected.
+    #[test]
+    fn a_provider_without_a_route_is_refused() {
+        let raw = b"GET / HTTP/1.1\r\nHost: proxy.test:8443\r\nAuthorization: Bearer GOOD\r\n\r\n";
+        let request = match parse_request(raw, AUTHORITY, 4096) {
+            Ok(Some(parsed)) => parsed.request,
+            _ => panic!("parse"),
+        };
+        let mut only_other = routes();
+        only_other.truncate(1);
+        let mut origin = Recorder::answering(OK);
+        let served = serve(
+            &Keys,
+            &Unrestricted,
+            &mut origin,
+            &request,
+            &only_other,
+            &acceptance(),
+            b"PEER",
+            150,
+            4096,
+        );
+        assert!(matches!(served.code, Code::UnknownOrigin));
+        assert!(origin.effects.is_empty());
+    }
+
     #[test]
     fn duplicate_providers_are_not_a_valid_catalogue() {
         assert!(routes_valid(&routes()));
