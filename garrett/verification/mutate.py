@@ -48,6 +48,11 @@ MUTANT_PROOFS = {
     # The composition theorem and its read-only instantiation.
     'stateless proxy operation policy not consulted': 'GarrettStatelessComposition',
     'stateless proxy credential decrypted before authorization': 'GarrettStatelessComposition',
+    # Covert channels for the credential: the two-run theorems.
+    'stateless proxy decision reveals a credential bit': 'GarrettConfidentiality',
+    'stateless proxy reply reveals a credential bit': 'GarrettConfidentiality',
+    'proxy encoder verdict reveals a credential bit': 'GarrettConfidentiality',
+    'stateless token carries a credential byte outside the ciphertext': 'GarrettConfidentiality',
 }
 
 MUTANTS = [
@@ -104,6 +109,22 @@ MUTANTS = [
      "if !origin.connect(egress_destination(&egress)) {", "if false {"),
     ("stateless_proxy.rs", "stateless proxy catalogue accepts two routes for a provider",
      "if route_of(routes, &routes[index].provider) != index {", "if false {"),
+    # The credential may influence what the agent sees only through what is
+    # declassified (GarrettConfidentiality).
+    ("stateless_proxy.rs", "stateless proxy decision reveals a credential bit",
+     "    let route = &routes[index];\n    let mut wire = Vec::new();",
+     "    let route = &routes[index];\n    if opened.credential.len() % 2 == 1 {\n"
+     "        return Decision::Refused(Code::Denied);\n    }\n    let mut wire = Vec::new();"),
+    ("stateless_proxy.rs", "stateless proxy reply reveals a credential bit",
+     "        Err(code) => stopped(code, Stage::Failed),",
+     "        Err(code) => {\n            if opened.credential.len() % 2 == 1 {\n"
+     "                return stopped(Code::Denied, Stage::Failed);\n            }\n"
+     "            stopped(code, Stage::Failed)\n        }"),
+    ("proxy_http/upstream.rs", "proxy encoder verdict reveals a credential bit",
+     "    if !http_auth::valid_credential(secret) {",
+     "    if !http_auth::valid_credential(secret) || secret.len() % 2 == 1 {"),
+    ("stateless_token/sealing.rs", "stateless token carries a credential byte outside the ciphertext",
+     "    append(&mut sealed, nonce);", "    append(&mut sealed, nonce);\n    sealed.push(credential[0]);"),
     # Operation authorization (GarrettStatelessComposition): removing or
     # bypassing the policy, or weakening the read-only policy.
     ("stateless_proxy.rs", "stateless proxy operation policy not consulted",
