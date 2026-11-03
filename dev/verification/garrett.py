@@ -1060,6 +1060,37 @@ def inputs() -> list[str]:
         "tests/secrets_helpers.py",
         "tests/test_secrets_identity_mtls.py",
         *TESTS,
+        # Proof modules over the pinned core added after 2026-10-21 (Freshness
+        # and GarrettNoninterference are pinned by their own scripts).
+        "proofs/GarrettDispatchErasure.lean",
+        "proofs/GarrettPublicError.lean",
+        "proofs/GarrettNativeSendLog.lean",
+        "proofs/GarrettChannelWork.lean",
+        "proofs/GarrettNR4ManifestRelease.lean",
+        "proofs/GarrettNR4AdaptiveRelease.lean",
+        "proofs/GarrettNR4ExchangeAdaptive.lean",
+        "proofs/GarrettNR4RequestAdaptive.lean",
+        "proofs/GarrettNR4FrameAdaptive.lean",
+        "proofs/GarrettProxyHttp.lean",
+        "proofs/GarrettProxyResponse.lean",
+        "proofs/GarrettProxyController.lean",
+        "proofs/GarrettRoute.lean",
+        "proofs/GarrettControl.lean",
+        "proofs/GarrettRouteMatch.lean",
+        "proofs/GarrettProxyConnect.lean",
+        "proofs/GarrettPublicFieldNameContract.lean",
+        "proofs/GarrettProxyParse.lean",
+        "proofs/GarrettApprovalStore.lean",
+        "proofs/GarrettProxyTunnel.lean",
+        "proofs/GarrettSessionAudit.lean",
+        "proofs/GarrettProxyAudit.lean",
+        "proofs/GarrettWriteGate.lean",
+        "proofs/GarrettProductionReadFrame.lean",
+        "proofs/GarrettProductionAssurance.lean",
+        "proofs/GarrettBase64.lean",
+        "proofs/GarrettRouteUnique.lean",
+        "proofs/GarrettServiceHistory.lean",
+        "proofs/GarrettLoginHistory.lean",
     }
     for name in ["aivm-secrets-garrett", "aivm-secrets-garrett-core"]:
         directory = ROOT / "rust/crates" / name
@@ -1275,6 +1306,7 @@ def assurance_coordinates() -> dict:
             "Physical TPM provenance, EK activation, PCR/firmware policy and anti-rollback deployment",
             "Provider non-disclosure, host compromise, snapshot rollback and side channels",
             "Complete Rust policy/credential administration, client aliases, command resolvers, delegation/budgets, full approval host/audit/trace refinement, TPM material provisioning and concrete storage/concurrent-history refinement",
+            "The native garrett-proxy binary (proxy_main.rs): it reads its own credential file and opens its own provider TLS connection outside custody/provider_stream.rs; its extracted request, response and audit decisions are proved separately and it makes no authority-confinement claim (PROXY-AUTHORITY-01)",
         ],
     }
 

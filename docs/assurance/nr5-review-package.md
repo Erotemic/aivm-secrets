@@ -133,11 +133,12 @@ native guards have bypass tests in `tests/test_secrets_w3_effect_boundary.py`.
 On 2026-11-02 the two `send log` mutants (a send repeated after the gate,
 an attempt marked without a send) were both rejected, first by
 `GarrettDispatch`, whose exact callback characterization the send-log
-proofs build on. The full campaign was not rerun. Note that
-`dev/verification/garrett.py check` currently fails because
-`proofs/garrett-manifest.json` has been stale since before this package (69
-changed and 53 missing hashes); `garrett.mutate()` runs without it, and the
-manifest should be re-recorded after review.
+proofs build on. The full campaign was not rerun. `proofs/garrett-manifest.json` was
+re-recorded on 2026-11-02 after an independent agent review of the changes
+since its last accurate record (`e741383`): fresh extraction equal to the
+committed model, every Lean module built, and 29 newer proof modules added
+to its coverage. `garrett.py check` still stops at its final `cargo fmt
+--check`, because 17 Rust files have drifted from rustfmt since 2026-10-21.
 
 ## 8. Known limits
 
