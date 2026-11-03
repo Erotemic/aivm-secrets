@@ -107,13 +107,13 @@ At the commit that recorded this table (see `git log`):
 
 | Check | Result |
 | --- | --- |
-| `cargo test` (core and application; also with `--features tpm`) | 59 pass |
-| `python -m pytest` (including interop, replicas, operations, vectors, purity) | 120 pass |
+| `cargo test` (core and application; also with `--features tpm`) | 63 pass (with two `compile_fail` doctests) |
+| `python -m pytest` (including interop, replicas, operations, vectors, purity) | 139 pass |
 | `verification/extract.py check` | pass; the model has no `axiom` |
-| `lake build` (independent package) | pass (1821 jobs; cold, 303 s) |
-| `verification/mutate.py` | all 51 rejected at `2e16f5a` (3047 s, `--jobs 10`, in the separate-directory copy): `GarrettStatelessProxy` 12, `GarrettStateless` 8, `GarrettStatelessComposition` 6, `GarrettStatelessMailbox` 6, `GarrettStatelessToken` 6, `GarrettStatelessGrammar` 4, `GarrettStatelessLogin` 4, `GarrettStatelessConnection` 2, `GarrettStatelessCodec` 1, `GarrettStatelessState` 1, `GarrettConfidentiality` 1 |
-| `verification/shell_guard.py check` | pass (12 checks) |
-| Separate-directory check (`verification/standalone.py`) | pass at `2e16f5a`: a copy of this directory alone, with a fresh virtual environment, Cargo target, toolchain bootstrap and cold Lake build, ran every row above; no source names the origin project outside the allowed history and provenance notes |
+| `lake build` (independent package) | pass (1822 jobs; cold, 354 s) |
+| `verification/mutate.py` | all 54 rejected at `d307b86` (3953 s, `--jobs 10`, in the separate-directory copy): `GarrettStatelessProxy` 12, `GarrettStateless` 8, `GarrettStatelessMailbox` 7, `GarrettStatelessComposition` 6, `GarrettStatelessToken` 6, `GarrettStatelessConnection` 4, `GarrettStatelessGrammar` 4, `GarrettStatelessLogin` 4, `GarrettStatelessCodec` 1, `GarrettStatelessState` 1, `GarrettConfidentiality` 1 |
+| `verification/shell_guard.py check` | pass (13 checks; 38 bypass tests) |
+| Separate-directory check (`verification/standalone.py`) | pass at `d307b86`: a copy of this directory alone, with a fresh virtual environment, Cargo target, toolchain bootstrap and cold Lake build, ran every row above; no source names the origin project outside the allowed history and provenance notes |
 
 ## Next, in order
 

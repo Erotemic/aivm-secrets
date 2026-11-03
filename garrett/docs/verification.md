@@ -427,9 +427,9 @@ import closure against the mutant. Each must break a proof.
 | --- | --- |
 | certificate binding removed; expired token accepted; audience not checked; verifying key issuer not checked; decrypted before admission; issuance binds the wrong certificate; renewal extends `ren`; renewal changes the subject | `GarrettStateless` |
 | login binds a request value instead of the peer; callback state not checked; delivered to any peer | `GarrettStatelessLogin` |
-| mailbox: duplicate login accepted; serial reused; capacity not enforced; exchange answer reaches another login; finish ignores the stage; poll ignores the peer | `GarrettStatelessMailbox` |
+| mailbox: duplicate login accepted; serial reused; capacity not enforced; exchange answer reaches another login; finish ignores the stage; poll ignores the peer; an exchange without an issuance left exchanging | `GarrettStatelessMailbox` |
 | proxy: wrong provider destination; egress without acknowledged admission; surrogate forwarded instead of credential; credential reflection unchecked; dispatches despite an encoder refusal; egress to another route's destination; `Host` from another route's destination; catalogue accepts two routes for a provider | `GarrettStatelessProxy` (within the `GarrettStatelessConnection` closure) |
-| proxy: credential written after a failed connection | `GarrettStatelessConnection` (`exchange_logged`) |
+| proxy: credential written after a failed connection; a failed write treated as delivered; the connection closes on a credential bit | `GarrettStatelessConnection` (`exchange_logged`; `connection_step_paths`, which fixes each step's `open` exactly, rejects the closing bit before `connection_declassified` is reached) |
 | covert channels: the decision, the reply or the encoder's verdict reveals a credential bit; a token carries a credential byte outside the ciphertext | `GarrettConfidentiality` (some rejected first in its closure) |
 | login started for an unconfigured provider | `GarrettStatelessStrict` (rejected first by `GarrettStatelessLogin`, in its closure) |
 | proxy connection decides for the authority, not the peer | `GarrettStatelessConnection` |
@@ -439,6 +439,17 @@ import closure against the mutant. Each must break a proof.
 | login state: label not bound | `GarrettStatelessState` |
 | proxy: operation policy not consulted; credential decrypted before authorization | `GarrettStatelessComposition` (rejected first by `GarrettStatelessProxy`, in its closure: `decide_dispatch_trace`, `decide_unpermitted`) |
 | read-only policy: permits a write method; permits a body; ignores the destination provider; ignores the resource path; ignores the resource method; operation path includes the query | `GarrettStatelessComposition` |
+
+**Result, 2026-11-02 (`d307b86`): all 54 mutants are rejected**, in a copy
+of this directory alone, in 3953 s. The three new ones: a failed write
+treated as delivered and the connection closing on a credential bit, both
+by `GarrettStatelessConnection`, and an exchange without an issuance left
+exchanging, by `GarrettStatelessMailbox`. The admission-bypass mutant now
+forges an `Admitted` inside the core crate; outside it, the bypass does not
+compile (the `compile_fail` doctests). Two native defects are rejected by
+Rust and the guard rather than a proof: a second write on a provider
+session (`Authenticated::transmit` consumes it) and unsealing a merely
+verified token.
 
 **Result, 2026-11-01 (`2e16f5a`): all 51 mutants are rejected**, in a copy
 of this directory alone (`verification/standalone.py`), each by a real error
