@@ -452,3 +452,17 @@ def test_only_the_comment_post_counts_as_an_allowed_provider_write(monkeypatch):
                          ('DELETE', offline.COMMENTS_PATH)):
         with pytest.raises(DemoError):
             offline.validate_sent(Seen([row(method, path)]), expected_count=1)
+
+
+def test_read_only_profile_refuses_writes_and_a_missing_release_binary(tmp_path):
+    from dev.aivm_vm_acceptance import run_vm_acceptance
+    for name in ('garrett-authority', 'garrett-bridge', 'garrett-client'):
+        (tmp_path / name).write_text('#!/bin/sh\n')
+        (tmp_path / name).chmod(0o700)
+    # Both refusals happen before any guest or host state is touched.
+    with pytest.raises(DemoError, match='approve-mode'):
+        run_vm_acceptance(tmp_path / 'w', None, tmp_path, write_mode=True,
+                          read_only_profile=True)
+    with pytest.raises(DemoError, match='read-only bridge'):
+        run_vm_acceptance(tmp_path / 'w', None, tmp_path, read_only_profile=True)
+    assert not (tmp_path / 'w').exists()

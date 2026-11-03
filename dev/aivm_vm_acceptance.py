@@ -644,8 +644,16 @@ def _guest_credential_search(ssh: GuestSSH, guest: str) -> dict:
 
 def run_vm_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path,
                       *, adversarial: bool = False, agent: bool = False,
-                      write_mode: bool = False) -> dict:
+                      write_mode: bool = False, read_only_profile: bool = False) -> dict:
     tools = binaries(bin_dir)
+    if read_only_profile:
+        # The release binary: it refuses any configuration outside the
+        # proved read profile (profile::read_only) before it starts.
+        if write_mode:
+            raise DemoError('the read-only profile binary cannot run approve-mode writes')
+        tools['bridge'] = bin_dir / 'garrett-bridge-read-only'
+        if not tools['bridge'].is_file() or not os.access(tools['bridge'], os.X_OK):
+            raise DemoError(f"missing native read-only bridge at {tools['bridge']}")
     host = workspace / 'host'
     host.mkdir(mode=0o700)
     (host / 'provider').mkdir(mode=0o700)
@@ -832,6 +840,7 @@ def run_vm_acceptance(workspace: Path, ssh: GuestSSH, bin_dir: Path,
                 **({'approved_write': approved_write} if write_mode else {}),
                 'host_private_paths_unreadable_in_guest': True,
                 'application_socket_forwarding': 'ssh-remote-unix/mTLS',
+                'bridge_binary': tools['bridge'].name,
                 'provider_requests': witness,
                 **({'adversarial': attacks} if adversarial else {}),
                 **({'simulated_agent': agent_report,
@@ -865,6 +874,8 @@ def main(argv: list[str] | None = None) -> int:
                         help='run the broker in approve mode and check one exactly approved comment')
     parser.add_argument('--agent', action='store_true',
                         help='also run dev/guest_agent.py in the guest and search the guest for the credential')
+    parser.add_argument('--read-only-profile', action='store_true',
+                        help='run garrett-bridge-read-only, the read profile release binary')
     parser.add_argument('--bin-dir', type=Path, default=REPO_ROOT / 'rust/target/debug',
                         help='directory containing native Rust executables')
     args = parser.parse_args(argv)
@@ -878,7 +889,8 @@ def main(argv: list[str] | None = None) -> int:
                 report = run_vm_acceptance(workspace, GuestSSH(vm, config),
                                            args.bin_dir.absolute(),
                                            adversarial=args.adversarial, agent=args.agent,
-                                       write_mode=args.write)
+                                           write_mode=args.write,
+                                           read_only_profile=args.read_only_profile)
         else:
             workspace = args.workspace.absolute()
             workspace.mkdir(mode=0o700, parents=True, exist_ok=False)
@@ -886,7 +898,8 @@ def main(argv: list[str] | None = None) -> int:
             report = run_vm_acceptance(workspace, GuestSSH(vm, config),
                                        args.bin_dir.absolute(),
                                        adversarial=args.adversarial, agent=args.agent,
-                                       write_mode=args.write)
+                                       write_mode=args.write,
+                                       read_only_profile=args.read_only_profile)
             write(workspace / 'summary.json', report)
         print(json.dumps(report, sort_keys=True, indent=2))
         return 0
