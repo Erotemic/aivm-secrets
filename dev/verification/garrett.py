@@ -1091,6 +1091,8 @@ def inputs() -> list[str]:
         "proofs/GarrettRouteUnique.lean",
         "proofs/GarrettServiceHistory.lean",
         "proofs/GarrettLoginHistory.lean",
+        "proofs/GarrettSendOrigin.lean",
+        "proofs/GarrettProductionSendOrigin.lean",
     }
     for name in ["aivm-secrets-garrett", "aivm-secrets-garrett-core"]:
         directory = ROOT / "rust/crates" / name
@@ -1476,6 +1478,9 @@ def mutate(pattern: str | None = None) -> None:
          '            return Err(W::INVALID_TRANSITION);\n        }\n        let _ignored = self.work.send(channel);\n        self.work.send(channel)\n    }\n    fn receive'),
         (owned_dispatch, 'send log dispatch marked an attempt without sending', '            return Err(W::INVALID_TRANSITION);\n        }\n        self.work.send(channel)\n    }\n    fn receive',
          '            return Err(W::INVALID_TRANSITION);\n        }\n        let _unsent = channel;\n        Ok(())\n    }\n    fn receive'),
+        (owned_dispatch, 'send log dispatch marked the other phase',
+         '            .begin_send(self.phase, &mut self.local, self.write)',
+         '            .begin_send(match self.phase { Phase::Preflight => Phase::Final, Phase::Final => Phase::Preflight }, &mut self.local, self.write)'),
     ]
     context = source.with_name("request_context.rs")
     mutations += [
@@ -2488,7 +2493,7 @@ def mutate(pattern: str | None = None) -> None:
                             visit(imported)
                     closure.append(module)
 
-                visit("GarrettNativeSendLog" if label.startswith("send log ") else "GarrettJsonFrame" if label.startswith("json wire ") else "GarrettJsonString" if label.startswith("json string ") else "GarrettProviderWire" if label.startswith("provider wire ") else "GarrettProviderChannel" if label.startswith("provider channel ") else "GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
+                visit("GarrettSendOrigin" if label.startswith("send log ") else "GarrettJsonFrame" if label.startswith("json wire ") else "GarrettJsonString" if label.startswith("json string ") else "GarrettProviderWire" if label.startswith("provider wire ") else "GarrettProviderChannel" if label.startswith("provider channel ") else "GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
                 modules = closure + [module for module in modules if module not in seen]
             for module in modules:
                 proof = temporary / (module + ".lean")
