@@ -840,4 +840,273 @@ theorem dispatch_origin (keeps : Keeps work Inv) (primitive : current_admission.
 
 end dispatch
 
+/-! ## A request's sends, segment by segment -/
+section request
+variable {W F E O X D C V H : Type}
+  (ops : request_adapter.Work W F E O X (current_admission.Bound D C H F X) V H)
+  (primitive : dispatch.Work D H F X) (checks : current_admission.Checks C X)
+  (c0 : current_admission.Context)
+
+/-- The simulation contexts of a request whose captured context is `c0`. -/
+abbrev ctxOf (c0 : current_admission.Context) : read_transition.Phase → Context :=
+  fun _ => current_admission.Proofs.view c0
+
+/-- One returned request callback: the dispatch phase (for a dispatch
+    callback), the channels its primitive was asked to send, and its own
+    chronological receipt trace. -/
+structure Segment (H : Type) where
+  phase : Option read_transition.Phase
+  calls : List H
+  events : List confinement.Proofs.Event
+
+/-- A chain of returned request callbacks, each with its segment. The
+    premises of `dispatched` are the extracted adapter's own steps, its
+    ghost-logged re-run and a trace of its receipt. -/
+inductive Segs : request_adapter.Pending W F E O X (current_admission.Bound D C H F X) V H →
+    request_adapter.Pending W F E O X (current_admission.Bound D C H F X) V H → List (Segment H) → Prop where
+  | refl (p) : Segs p p []
+  | trans {p q r a b} : Segs p q a → Segs q r b → Segs p r (a ++ b)
+  | recheck {p q out} : (radapter ops).recheck p = Result.ok (out, q) → Segs p q [⟨none, [], []⟩]
+  | complete {p q raw out evs} : (radapter ops).complete p raw = Result.ok (out, q) →
+      TraceSteps (ctxOf c0) p.effects q.effects evs → Segs p q [⟨none, [], evs⟩]
+  | dispatched {p q phase effect out operationWrite effectWrite prepared plan native report logged evs}
+      (returned : (radapter ops).dispatch p phase effect = Result.ok (out, q))
+      (operation : ops.operation_write p.work = Result.ok operationWrite)
+      (classified : ops.effect_write p.work effect = Result.ok effectWrite)
+      (preparation : read_transition.prepare phase operationWrite effectWrite = Result.ok (.Ok prepared))
+      (planned : ops.dispatch p.work phase effect = Result.ok (plan, native))
+      (ran : dispatch.dispatch ops.dispatchWorkInst plan.work (.Ok prepared) p.effects plan.keyed_write =
+        Result.ok report)
+      (ghost : dispatch.dispatch (boundL primitive checks) (liftB plan.work []) (.Ok prepared) p.effects
+        plan.keyed_write = Result.ok logged)
+      (bound : plan.work.context = c0)
+      (trace : TraceSteps (ctxOf c0) p.effects q.effects evs) :
+      Segs p q [⟨some phase, logged.work.work.2, evs⟩]
+
+theorem traces_append (contexts : read_transition.Phase → Context) {first middle last : RequestEffects} {a b : List confinement.Proofs.Event}
+    (initial : TraceSteps contexts first middle a) (remaining : TraceSteps contexts middle last b) :
+    TraceSteps contexts first last (a ++ b) := by
+  induction remaining with
+  | refl => simpa using initial
+  | next prior step origin ih => simpa [List.append_assoc] using TraceSteps.next ih step origin
+
+/-- The segments' traces, in order, are one trace of the whole chain. -/
+theorem segs_trace {p q : request_adapter.Pending W F E O X (current_admission.Bound D C H F X) V H}
+    {segs : List (Segment H)} (chain : Segs ops primitive checks c0 p q segs) :
+    TraceSteps (ctxOf c0) p.effects q.effects (segs.flatMap Segment.events) := by
+  induction chain with
+  | refl p => exact .refl
+  | trans _ _ l r => simpa [List.flatMap_append] using traces_append (ctxOf c0) l r
+  | recheck h =>
+    rw [request_adapter.Proofs.recheck_frame ops _ _ _ h]
+    exact .refl
+  | complete _ trace => simpa using trace
+  | dispatched _ _ _ _ _ _ _ _ trace => simpa using trace
+
+/-- What a segment shows about its own sends. -/
+def SegmentOK (Inv : D → Prop) (seg : Segment H) : Prop :=
+  match seg.phase with
+  | none => seg.calls = [] ∧ sourceSends seg.events = []
+  | some ph => (seg.calls = [] ∧ sourceSends seg.events = []) ∨
+      ∃ c g a, seg.calls = [c] ∧ sourceSends seg.events = [.providerSend (eventPhase ph) g a] ∧
+        SetupFrom primitive Inv c
+
+/-- **Every segment of a chain from a reachable receipt accounts for its own
+    sends.** A recheck or completion segment has no call and no provider
+    send. A dispatch segment has either neither, or one call whose channel
+    came from that dispatch's own setup and exactly one provider send, of
+    that dispatch's phase. -/
+theorem segs_each (Inv : current_admission.Context → D → Prop) (keeps : ∀ k, Keeps primitive (Inv k))
+    (binding : ops.dispatchWorkInst = current_admission.Bound.Insts.Aivm_secrets_garrett_coreDispatchWork primitive checks)
+    (initInv : ∀ w phase effect plan native, ops.dispatch w phase effect = Result.ok (plan, native) →
+      Inv plan.work.context plan.work.work)
+    {p q : request_adapter.Pending W F E O X (current_admission.Bound D C H F X) V H} {segs : List (Segment H)}
+    (chain : Segs ops primitive checks c0 p q segs) (reach : Reachable p.effects) :
+    (∀ seg, seg ∈ segs → SegmentOK primitive (Inv c0) seg) ∧ Reachable q.effects := by
+  induction chain with
+  | refl p => exact ⟨by simp, reach⟩
+  | trans _ _ left right =>
+    obtain ⟨l, r1⟩ := left reach
+    obtain ⟨r, r2⟩ := right r1
+    exact ⟨fun seg m => by
+      rcases List.mem_append.mp m with m | m
+      · exact l seg m
+      · exact r seg m, r2⟩
+  | recheck h =>
+    refine ⟨fun seg m => ?_, by rw [request_adapter.Proofs.recheck_frame ops _ _ _ h]; exact reach⟩
+    simp only [List.mem_singleton] at m
+    subst m
+    exact ⟨rfl, rfl⟩
+  | @complete p q raw out evs h trace =>
+    have records : Records q.effects = Records p.effects := by
+      dsimp only [radapter, request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error] at h
+      unfold request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.complete at h
+      obtain ⟨⟨started, native⟩, _, rest⟩ := (bind_returns_iff _ _ _).mp h
+      obtain ⟨report, ran, rest⟩ := (bind_returns_iff _ _ _).mp rest
+      rw [returned_state _ _ _ _ rest]
+      exact complete_records _ _ _ _ ran
+    have count := trace_count (ctxOf c0) reach trace
+    rw [attCount_of_attempts (records_attempts' records)] at count
+    refine ⟨fun seg m => ?_, (trace_steps_preserve_soundness _ _ _ _ reach trace).1⟩
+    simp only [List.mem_singleton] at m
+    subst m
+    exact ⟨rfl, List.eq_nil_of_length_eq_zero (show (sourceSends evs).length = 0 by omega)⟩
+  | @dispatched p q phase effect out operationWrite effectWrite prepared plan native report logged evs
+      returned operation classified preparation planned ran ghost bound trace =>
+    have after : q = ⟨native, report.effects⟩ := by
+      dsimp only [radapter, request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error] at returned
+      unfold request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.dispatch at returned
+      simp only [operation, classified, preparation, planned, ran, bind_ok, uncurry_apply_pair] at returned
+      exact returned_state _ _ _ _ returned
+    subst after
+    have phaseEq := ((read_transition.Proofs.prepare_success_iff phase operationWrite effectWrite prepared).mp preparation).1
+    rw [binding] at ran
+    have start := initInv _ _ _ _ _ planned
+    rw [bound] at start
+    obtain ⟨logged', ghost', _, cases⟩ := dispatch_origin primitive checks (Inv c0) (keeps c0) plan.work prepared p.effects
+      plan.keyed_write report reach start ran (ctxOf c0) trace
+    rw [ghost] at ghost'
+    have same := Result.ok_injective ghost'
+    subst same
+    refine ⟨fun seg m => ?_, (trace_steps_preserve_soundness _ _ _ _ reach trace).1⟩
+    simp only [List.mem_singleton] at m
+    subst m
+    rw [phaseEq] at cases
+    exact cases
+
+end request
+
+section run
+open aivm_secrets_garrett_core.request_adapter.TraceRefinement
+variable {W F E O X D C V H : Type}
+  (ops : request_adapter.Work W F E O X (current_admission.Bound D C H F X) V H)
+  (primitive : dispatch.Work D H F X) (checks : current_admission.Checks C X)
+  (capture : W → current_admission.Context)
+
+theorem dispatch_segs (nc : NativeContext ops primitive checks capture) (c0 : current_admission.Context)
+    {p q : request_adapter.Pending W F E O X (current_admission.Bound D C H F X) V H}
+    {phase : read_transition.Phase} {effect : E} {out : core.result.Result F X}
+    (hp : capture p.work = c0) (returned : (radapter ops).dispatch p phase effect = Result.ok (out, q)) :
+    ∃ segs, Segs ops primitive checks c0 p q segs ∧ capture q.work = c0 := by
+  have whole := returned
+  dsimp only [radapter, request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error] at returned
+  unfold request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.dispatch at returned
+  obtain ⟨operationWrite, operation, rest⟩ := (bind_returns_iff _ _ _).mp returned
+  obtain ⟨effectWrite, classified, rest⟩ := (bind_returns_iff _ _ _).mp rest
+  obtain ⟨prepared, preparation, rest⟩ := (bind_returns_iff _ _ _).mp rest
+  cases prepared with
+  | Err denial =>
+    obtain ⟨error, _, rest⟩ := (bind_returns_iff _ _ _).mp rest
+    have same := returned_state _ _ _ _ rest
+    subst same
+    exact ⟨[], .refl _, hp⟩
+  | Ok prepared =>
+    obtain ⟨⟨plan, native⟩, planned, rest⟩ := (bind_returns_iff _ _ _).mp rest
+    obtain ⟨report, ran, rest⟩ := (bind_returns_iff _ _ _).mp rest
+    have q_eq : q = ⟨native, report.effects⟩ := (returned_state _ _ _ _ rest)
+    have captured := nc.dispatched p.work phase effect plan native planned
+    have bound := ran
+    rw [nc.dispatch_binding] at bound
+    obtain ⟨logged, ghost, _⟩ := dispatch.Erasure.dispatch_forward (logged_forward primitive checks)
+      (liftB plan.work []) (.Ok prepared) p.effects plan.keyed_write report bound
+    have traced := (dispatch.TraceRefinement.dispatch_trace primitive checks plan.work (.Ok prepared) p.effects
+      plan.keyed_write report bound).2
+    rw [captured.1, hp] at traced
+    obtain ⟨evs, trace⟩ := traced
+    subst q_eq
+    exact ⟨_, .dispatched whole operation classified preparation planned ran ghost (captured.1.trans hp) trace,
+      captured.2.trans hp⟩
+
+theorem recheck_segs (nc : NativeContext ops primitive checks capture) (c0 : current_admission.Context)
+    {p q : request_adapter.Pending W F E O X (current_admission.Bound D C H F X) V H}
+    {out : core.result.Result Unit X}
+    (hp : capture p.work = c0) (returned : (radapter ops).recheck p = Result.ok (out, q)) :
+    ∃ segs, Segs ops primitive checks c0 p q segs ∧ capture q.work = c0 := by
+  refine ⟨_, .recheck returned, ?_⟩
+  dsimp only [radapter, request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error] at returned
+  unfold request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.recheck at returned
+  obtain ⟨⟨result, native⟩, called, rest⟩ := (bind_returns_iff _ _ _).mp returned
+  have same := returned_state result out {p with work := native} q (by simpa using rest)
+  subst same
+  exact (nc.rechecked p.work result native called).trans hp
+
+theorem complete_segs (nc : NativeContext ops primitive checks capture) (c0 : current_admission.Context)
+    {p q : request_adapter.Pending W F E O X (current_admission.Bound D C H F X) V H}
+    {raw : F} {out : core.result.Result (completion.Completed O) X}
+    (hp : capture p.work = c0) (returned : (radapter ops).complete p raw = Result.ok (out, q)) :
+    ∃ segs, Segs ops primitive checks c0 p q segs ∧ capture q.work = c0 := by
+  obtain ⟨evs, traced⟩ := completion_callback_trace ops (ctxOf c0) p q raw out returned
+  refine ⟨_, .complete returned traced, ?_⟩
+  dsimp only [radapter, request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error] at returned
+  unfold request_adapter.Pending.Insts.Aivm_secrets_garrett_coreRead_transitionRequestClause0_FactsClause0_EffectCompletedClause0_Error.complete at returned
+  obtain ⟨⟨value, native⟩, called, rest⟩ := (bind_returns_iff _ _ _).mp returned
+  obtain ⟨report, _, rest⟩ := (bind_returns_iff _ _ _).mp rest
+  have same := returned_state report.outcome out ⟨native, report.effects⟩ q (by simpa using rest)
+  subst same
+  exact (nc.completed p.work raw value native called).trans hp
+
+private theorem segs_trans' {c0 : current_admission.Context}
+    {p q r : request_adapter.Pending W F E O X (current_admission.Bound D C H F X) V H}
+    (left : ∃ segs, Segs ops primitive checks c0 p q segs ∧ capture q.work = c0)
+    (right : capture q.work = c0 → ∃ segs, Segs ops primitive checks c0 q r segs ∧ capture r.work = c0) :
+    ∃ segs, Segs ops primitive checks c0 p r segs ∧ capture r.work = c0 := by
+  obtain ⟨a, l, hq⟩ := left
+  obtain ⟨b, r', hr⟩ := right hq
+  exact ⟨a ++ b, .trans l r', hr⟩
+
+/-- **Every returned request run is a chain of segments**, all traced under
+    the request's own captured context. -/
+theorem run_segs (nc : NativeContext ops primitive checks capture)
+    (pending : request_adapter.Pending W F E O X (current_admission.Bound D C H F X) V H)
+    (out : core.result.Result (completion.Completed O) X)
+    (after : read_transition.invocation.Invocation (request_adapter.Pending W F E O X (current_admission.Bound D C H F X) V H))
+    (run : read_transition.Proofs.RequestRun (radapter ops) pending out after) :
+    ∃ segs, Segs ops primitive checks (capture pending.work) pending after.adapter segs := by
+  let c0 := capture pending.work
+  have origin : ∀ (state : request_adapter.Pending W F E O X (current_admission.Bound D C H F X) V H)
+      (preflight : Bool) (facts : F),
+      read_transition.Proofs.FactsFrom (radapter ops) pending preflight facts state →
+      ∃ segs, Segs ops primitive checks c0 pending state segs ∧ capture state.work = c0 := by
+    intro state preflight facts source
+    cases preflight with
+    | false => obtain ⟨_, _, rfl⟩ := source; exact ⟨[], .refl _, rfl⟩
+    | true => obtain ⟨effect, _, sent⟩ := source; exact dispatch_segs ops primitive checks capture nc c0 rfl sent
+  have complete : ∀ p (preflight write : Bool) raw (out : core.result.Result (completion.Completed O) X) after,
+      capture p.work = c0 →
+      read_transition.Proofs.FinalCompletionRun (radapter ops) p preflight raw write out after →
+      ∃ segs, Segs ops primitive checks c0 p after.adapter segs ∧ capture after.adapter.work = c0 := by
+    intro p preflight write raw out after hp last
+    cases last with
+    | read result completed callback => exact complete_segs ops primitive checks capture nc c0 hp callback
+    | writeValue reply completed callback => exact complete_segs ops primitive checks capture nc c0 hp callback
+    | writeUncertain error unknown completed callback code => exact complete_segs ops primitive checks capture nc c0 hp callback
+  suffices h : ∃ segs, Segs ops primitive checks c0 pending after.adapter segs ∧ capture after.adapter.work = c0 by
+    obtain ⟨segs, chain, _⟩ := h
+    exact ⟨segs, chain⟩
+  cases run with
+  | factsDenied error after facts =>
+    cases facts with
+    | planDenied error planned => exact ⟨[], .refl _, rfl⟩
+    | providerDenied effect error state planned sent =>
+      exact dispatch_segs ops primitive checks capture nc c0 rfl sent
+  | finish facts state preflight out after source finished =>
+    refine segs_trans' ops primitive checks capture (origin state preflight facts source) (fun hs => ?_)
+    cases finished with
+    | planDenied error planned => exact ⟨[], .refl _, hs⟩
+    | currentDenied selected error state' planned current =>
+      exact recheck_segs ops primitive checks capture nc c0 hs current
+    | checkedOnly result checked completed planned current callback =>
+      exact segs_trans' ops primitive checks capture (recheck_segs ops primitive checks capture nc c0 hs current)
+        (fun hc => complete_segs ops primitive checks capture nc c0 hc callback)
+    | providerDenied effect write checked completed error planned current classified sent =>
+      exact segs_trans' ops primitive checks capture (recheck_segs ops primitive checks capture nc c0 hs current)
+        (fun hc => dispatch_segs ops primitive checks capture nc c0 hc sent)
+    | completed effect write checked dispatched raw result state' planned current classified sent last =>
+      exact segs_trans' ops primitive checks capture
+        (segs_trans' ops primitive checks capture (recheck_segs ops primitive checks capture nc c0 hs current)
+          (fun hc => dispatch_segs ops primitive checks capture nc c0 hc sent))
+        (fun hd => complete _ _ _ _ _ _ hd last)
+
+end run
+
 end aivm_secrets_garrett_core.nr23.SendOrigin
