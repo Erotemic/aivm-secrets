@@ -61,6 +61,7 @@ All are in the root `proofs/` Lake package, over the Aeneas extraction of
 
 | Theorem | Says | Native premises it still needs |
 | --- | --- | --- |
+| [`production_calls_have_own_evidence`, `production_calls_have_own_route_payload`](../../proofs/GarrettProductionSendOrigin.lean) | Each send individually: its own dispatch segment has exactly one `providerSend`, of its own phase, accepted, audited and bound to the context; its channel was built by that dispatch's setup for the request's own route, holding the extracted encoder's request (over `Submitting`) | `NATIVE-SINK-01` |
 | [`production_request_sends_are_the_logged_sends`](../../proofs/GarrettProductionAssurance.lean) | Every returned outcome: sound, bound source trace; the sends asked of the dispatch primitive equal the source sends in number; labelled in order they are an exact sink sequence, each accepted, audited and bound to the constructor context | `NATIVE-SINK-01` |
 | `production_accepted_read_has_logged_sends_and_guest_frame` (same file) | The above for a successful read, plus: the guest frame is the exact checked encoding of the selected value | `NATIVE-SINK-01`, the reply's JSON conversion (`RUST-JSON-01`) |
 | `production_denial_has_logged_sends_and_fixed_guest_frame` (same file) | The above for a denial, plus: the guest frame is one of 17 fixed lines, whichever public error is reported | `NATIVE-SINK-01` |

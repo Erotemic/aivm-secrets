@@ -83,6 +83,32 @@ OAuth source (its refresh opens its own TLS connection) and legacy
 registry-file identity (no revocation fencing). It is a reachability property of native code, checked by
 source guards and the syscall witness, not by Lean.
 
+**Call by call (2026-11-03).** The count above labels native sends in
+order. [`GarrettSendOrigin`](../../proofs/GarrettSendOrigin.lean) and
+[`GarrettProductionSendOrigin`](../../proofs/GarrettProductionSendOrigin.lean)
+tie each send to its own evidence instead:
+
+- `run_segs`: a returned request is a chain of segments, one per callback,
+  each with the channels its primitive was asked to send and its own trace;
+  the traces concatenate to the request's trace (`segs_trace`).
+- `segs_each`, `dispatch_origin`: a recheck or completion segment has no
+  call and no provider send. A dispatch segment has none, or exactly one
+  call and exactly one `providerSend`, of that dispatch's own phase
+  (`trace_phase_count`; the other phase's attempt bit is untouched), and the
+  channel is one the dispatch's own primitive `setup` returned.
+- `production_calls_have_own_evidence`: for the production request, that
+  send's gate was accepted by the extracted `manifest::authorize`, its
+  audit acknowledged, its binding the request's own, and the setup ran on a
+  routed state with the request's own route (`routed_keeps`).
+- `production_calls_have_own_route_payload`: over the core-owned
+  `Submitting` primitive, the channel holds the extracted encoder's request
+  for that route and the session credential, unsent (`BuiltFor`); the one
+  `Channel::submit` then writes exactly those bytes
+  (`fresh_returned_channel_exposes_exact_writer_bytes`).
+
+The native premise is unchanged: the native process's credential-bearing
+provider writes are those `write_all` calls (`NATIVE-SINK-01`).
+
 **How small that premise is (2026-10-24, still current).** The native credential type
 `custody::Credential` has a private field and one accessor, `expose()`. A
 compile-time check (`static_assertions::assert_not_impl_any!`) rejects any
