@@ -1,6 +1,7 @@
 # Plan: where we are and what comes next
 
-Updated 2026-10-24 at `0b9cc33`. This is the single ordered work queue.
+Updated 2026-11-02 at `c1320b3` (Phase 2 rows 2.4 and 2.5); otherwise as of
+2026-10-24 at `0b9cc33`. This is the single ordered work queue.
 The [product roadmap](aivm-secrets-product-roadmap.md) defines the outcome
 gates (OUT-0 to OUT-6) and the [native read roadmap](aivm-secrets-native-read-assurance-roadmap.md)
 defines the proof gates (NR-0 to NR-5). The previous queue is archived in
@@ -16,13 +17,15 @@ and proved in Lean (113 proof modules, about 30k lines of Lean against 32k
 lines of Rust).
 
 The gap that matters most is between those proofs and the whole native
-process. The top-level read theorem
-(`production_accepted_read_has_exact_attempt_accounting_and_guest_frame`)
-proves that every provider write the request path makes was authorized,
-audited and bound. It does so under the premise `ExactNativeSinkCoverage`: no
-other native code writes credential bytes. That premise (`NATIVE-SINK-01`) is
-checked today by source guards and tests, not by a proof. Proving that the
-authorized path is safe does not, on its own, rule out a second path.
+process. The top-level read theorems
+(`production_request_sends_are_the_logged_sends` and its accepted-read and
+denial versions, 2026-11-02) prove from the extracted code that a returned
+request asks its dispatch primitive for exactly as many provider sends as the
+source trace has, each authorized, audited and bound. They no longer assume
+`ExactNativeSinkCoverage`. What they still assume (`NATIVE-SINK-01`) is that
+every credential-bearing native write is one `ProviderWriter::write_all` made
+by the extracted `Channel::submit`, which is a property of native code. It is
+checked by source guards, tests and a syscall witness, not by a proof.
 
 The other open items are integration runs that the maintainer has not yet
 done in a VM, the read-only release package, and the write campaign.
@@ -56,10 +59,14 @@ This is the main proof gap (`NATIVE-SINK-01`, `ExactNativeSinkCoverage`).
 | 2.1 | Seal the credential type and pin its readers | **Done 2026-10-24.** `custody::Credential` and OAuth's `CurrentCredential` are sealed with `static_assertions` (a derived `Clone` fails the build) and the seven production readers are pinned by `tests/test_native_credential_readers.py` |
 | 2.2 | Whole-process witness | **Done 2026-10-24.** `dev/native_syscall_witness.py`: no credential bytes in any write-family syscall of the bridge, only the provider as a network destination, positive control on the audit records. TLS decryption was not needed: plaintext credential bytes have no reason to appear in any syscall at all |
 | 2.3 | Restate the premise as a contract | **Done 2026-10-24.** Ledger entry, roadmap row, claim matrix and proof tour now state the narrowed premise and its evidence |
+| 2.4 | One native provider transport | **Done 2026-11-02** (`8aa0125`). `custody/provider_stream.rs` is the only code that opens a provider TLS session; its `ProviderWriter` is the only type that can write to one, and the response parser gets a `ProviderReader` that cannot write. The account-status path uses the same module. W3 guard and bypass tests pin it |
+| 2.5 | Drop `ExactNativeSinkCoverage` from the production theorems | **Done 2026-11-02** (`47d705c`, `c1320b3`). `GarrettNativeSendLog` counts the sends a returned request asks its dispatch primitive for (ghost log, shown harmless by `GarrettDispatchErasure`) and proves the count equals the source sends; `production_request_sends_are_the_logged_sends` and the accepted-read and denial versions take no coverage premise |
 
 Step 2.2 is a test, not a proof, but it covers std, rustls and the OS, which
-source guards cannot reach. Together with 2.1 it leaves a premise small
-enough for a reviewer to accept or reject.
+source guards cannot reach. Together with 2.1, 2.4 and 2.5 it leaves a
+premise small enough for a reviewer to accept or reject: one native module
+writes to providers, and the Lean proofs fix how often and when the extracted
+core asks it to.
 
 ## Phase 3: finish the read claim and prepare review
 

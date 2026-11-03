@@ -2,13 +2,18 @@
 
 **Technical read-only campaign; reconciled 2026-10-24.**
 
-**Status 2026-10-24.** NR-0 and NR-1 are accepted. NR-2/3: the production
-read theorem (`production_accepted_read_has_exact_attempt_accounting_and_guest_frame`)
-holds under one premise, `ExactNativeSinkCoverage`. That premise is now a
-contract on seven pinned readers of a compile-time-sealed credential type,
-backed by a whole-process syscall witness (`NATIVE-SINK-01`). NR-4: adaptive
+**Status 2026-11-02.** NR-0 and NR-1 are accepted. NR-2/3: the production
+read theorems no longer take `ExactNativeSinkCoverage`
+(`production_request_sends_are_the_logged_sends` and its accepted-read and
+denial versions). The send count is proved from the extracted request,
+dispatch and completion code (`GarrettNativeSendLog`,
+`GarrettDispatchErasure`). The native premise left (`NATIVE-SINK-01`) is that
+every credential-bearing provider write is one `ProviderWriter::write_all`
+made by the extracted `Channel::submit`. It rests on one native transport
+module (`custody/provider_stream.rs`), seven pinned readers of a
+compile-time-sealed credential type and a whole-process syscall witness. NR-4: adaptive
 noninterference holds at the level of the guest's frames. NR-5 is waiting on
-the axiom audit and an independent review. The ordered work is in the
+an independent review. The ordered work is in the
 [plan](aivm-secrets-active-work.md). The text below is the original campaign
 design.
 

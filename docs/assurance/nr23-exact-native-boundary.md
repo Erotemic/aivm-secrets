@@ -7,6 +7,20 @@ not be called verified until `lake build GarrettNR23ProductionBoundary`
 succeeds on the pinned toolchain. The new package does not change production
 Rust, credentials, TLS, AIVM configuration, or live authorization policy.
 
+**Update (2026-11-02).** The production theorems no longer take
+`ExactNativeSinkCoverage`. `GarrettNativeSendLog` derives, from the extracted
+request, dispatch and completion code, that a returned request asks its
+dispatch primitive's `send` for exactly as many provider sends as the source
+trace has `providerSend` events, and `labelled_exact` turns that count into an
+`ExactNativeSinkSequence`. `GarrettDispatchErasure` shows the ghost send log
+used for counting changes no result. See
+`production_request_sends_are_the_logged_sends` in
+`GarrettProductionAssurance` and the
+[proof tour](native-read-proof-tour.md). The native premise left
+(`NATIVE-SINK-01`) is that every credential-bearing write is one
+`ProviderWriter::write_all` made by `Channel::submit`. The text below is the
+2026-10-22 campaign as written.
+
 ## The concrete gap this increment attacks
 
 Earlier `GarrettNR23Effects.AllNativeAttemptsAccounted` was a **membership**

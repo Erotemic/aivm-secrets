@@ -25,6 +25,7 @@ Each removes premises that earlier statements took as given.
 | Theorem | What it says, plainly | Premises removed | Still trusted |
 | --- | --- | --- | --- |
 | [`production_accepted_read_has_exact_attempt_accounting_and_guest_frame`](../../proofs/GarrettProductionAssurance.lean) and `production_denial_attempts_are_authorized_and_bound` | Every accounted provider attempt of a returned request was currently authorized, audit-acknowledged and bound to the context passed to `ScopedRequest::new` | `NativeContext`, the caller-chosen `capture` function | `ExactNativeSinkCoverage` (below) |
+| [`production_request_sends_are_the_logged_sends`, `production_accepted_read_has_logged_sends_and_guest_frame`, `production_denial_has_logged_sends_and_fixed_guest_frame`](../../proofs/GarrettProductionAssurance.lean) (2026-11-02) | For every returned outcome, the request asked its dispatch primitive's `send` for exactly as many provider sends as the source trace has `providerSend` events; labelled in order with those events they form an exact sink sequence, each accepted, audited and bound to the constructor context | `ExactNativeSinkCoverage` and its caller-supplied attempt list | that every credential-bearing native write is one `write_all` made by `Channel::submit` (`NATIVE-SINK-01`, below) |
 | [`denial_frame_exact`, `production_denial_has_authorized_attempts_and_fixed_guest_frame`](../../proofs/GarrettPublicError.lean) | A guest denial frame is exactly `{"error":{"code":C,"message":M},"ok":false,"version":1}` plus newline, for one of 17 fixed `(C, M)` pairs; it depends on nothing but which public error occurred | `denialJson`, its `Valid`/`Bound` and `prepared` premises | that `from_answer`'s error branch calls `denial_frame` (W3 guard) |
 | [`manifest_release_noninterference`](../../proofs/GarrettNR4ManifestRelease.lean) | Two provider responses that agree on the JSON at every host-selected path and on the pagination row count release the same value or the same refusal, for any current-control callback | `toJson`, `SelectedConversion`, unlinked `raw`/`selected`; exposes the row-count channel those premises hid | parse of provider bytes into the document; same credential in both runs |
 | [`adaptive_release_same_histories`](../../proofs/GarrettNR4AdaptiveRelease.lean) | A guest choosing each request from all earlier outcomes sees the same release histories in two worlds whose provider responses agree, request by request, on the declassified data | `step_preserves` / `PairedStepCertificate` for the release stage | admission/dispatch-stage outcomes are outside this step model |
@@ -40,16 +41,44 @@ fields, by design; (b) the length of the pagination row array, through
 contain the credential, through the reflection refusal. (b) was previously
 hidden inside the `SelectedConversion` premise.
 
-**Remaining NR-3 premise, stated honestly.** `ExactNativeSinkCoverage` says the
-native process makes credential-bearing writes only at the source's
-`providerSend` events. The core now owns channel construction, the send
-(`Channel::submit`) and the response gate, so the premise has narrowed to: the
-native primitives (`request_body`, `connect`, `parse`, audit/coordination
-callbacks) and the rest of the native crate perform no *other* write of
-credential bytes. That is a reachability property of native code, checked by
-the W3/W6 source guards and their mutation tests, not by Lean.
+**Remaining NR-3 premise, stated honestly (narrowed 2026-11-02).** The
+theorems in the first row of the table, and
+`production_denial_has_authorized_attempts_and_fixed_guest_frame`, assume
+`ExactNativeSinkCoverage`: a list of native attempts, each already labelled
+with a source phase, gate and audit bit, equals the source sends. The three
+theorems in the second row do not.
+They prove the count from the extracted code and leave a narrower native
+premise:
 
-**How small that premise now is (2026-10-24).** The native credential type
+- [`GarrettNativeSendLog`](../../proofs/GarrettNativeSendLog.lean) logs, as
+  ghost state beside the dispatch primitive, every channel the extracted
+  `dispatch::dispatch` passes to the primitive's `send`. A dispatch asks for
+  exactly as many sends as phases it newly marks provider-attempted
+  (`dispatch_grew`): `send` runs only after the composite `begin_send` gate
+  accepts, and then once. A trace's `providerSend` events are exactly the
+  newly marked phases (`trace_count`). Completion keeps both dispatch records
+  (`complete_records`). So along a whole returned request the sends asked
+  for equal the source sends (`run_calls`, `calls_match_sends`).
+- [`GarrettDispatchErasure`](../../proofs/GarrettDispatchErasure.lean)
+  shows the ghost log changes nothing: the dispatch controller, generic in
+  its primitive, returns the same report over the logged primitive as over
+  the real one (`dispatch_forward`, `logged_forward`).
+- `label` gives the `i`-th native send the labels of the `i`-th source send;
+  the counts being equal is what makes this an exact sink sequence
+  (`labelled_exact`).
+
+What is left native is therefore: every credential-bearing provider write is
+one `write_all` call made by the extracted `Channel::submit` (which on the
+production primitive is what `send` runs, once per call, on a fresh channel:
+`exchange_send_writes_route_body`). On the native side, one module,
+`custody/provider_stream.rs`, opens provider TLS sessions, and its
+`ProviderWriter` is the only type that can write to one. After the response
+gate the session becomes a `ProviderReader`, which cannot write, so the
+native response parser cannot reach the provider. The W3 guard pins this,
+with bypass tests. It is a reachability property of native code, checked by
+source guards and the syscall witness, not by Lean.
+
+**How small that premise is (2026-10-24, still current).** The native credential type
 `custody::Credential` has a private field and one accessor, `expose()`. A
 compile-time check (`static_assertions::assert_not_impl_any!`) rejects any
 `Debug`, `Display`, `Clone`, `Copy`, `Deref`, `AsRef` or `Serialize`
@@ -68,7 +97,8 @@ operator/guest flow with the bridge under `strace -f`. No write or send
 buffer contains the credential or its base64 forms, and the only network
 destination is the provider. The premise a reviewer has to accept is now:
 - those seven call sites do what their review says;
-- the TLS writer forwards exactly what `Channel::submit` gives it;
+- `ProviderWriter` forwards exactly what `Channel::submit` gives it into
+  the provider TLS stream, and nothing else writes to that stream;
 - std, rustls, ring and the kernel make no other plaintext copy.
 
 For review, the [claim-to-evidence matrix](claim-evidence-matrix.md) lists each
