@@ -94,10 +94,12 @@ shows the same steps by hand.
 Run these against the real VM before trusting it with a real credential:
 
 ```bash
-python dev/aivm_vm_acceptance.py --vm VM --adversarial --agent --workspace "$RUN"
+python dev/aivm_vm_acceptance.py --vm VM --adversarial --agent --read-only-profile --workspace "$RUN"
 ```
 
-This runs approved reads, a denied write and revocation. It also runs the
+`--read-only-profile` runs `garrett-bridge-read-only`, the binary this
+release documents, so the profile gate is part of the check. This runs
+approved reads, a denied write and revocation. It also runs the
 identity, network, mount and socket probes and a simulated agent that tries
 21 ways to get more than it was granted. It then searches every file and
 process in the guest, as root, for the credential. All of it uses a synthetic

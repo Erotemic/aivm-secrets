@@ -123,16 +123,19 @@ One line each; the ledger entry is authoritative.
 
 | Evidence | Date | Record |
 | --- | --- | --- |
-| Synthetic usable-system gate, `--full-tests` | 2026-11-02 (at `c1320b3` plus the docs of `b8a435e`) | passed: 167 Rust unit, 607 required workflow and 3,496 full-suite tests; evidence in the run's `.tools/system-*/report.json` (local, not committed) |
+| Synthetic usable-system gate, `--proofs --full-tests` | 2026-11-03 (at `3f6cdd6`, clean tree) | passed: 167 Rust unit, 607 required workflow and 3,507 full-suite tests, and the five pinned Lean chains; evidence in the run's `.tools/system-*/report.json` (local, not committed) |
+| `garrett.py check`: manifest, fresh extraction, every Lean module (`lake build`, 1,910 jobs), clippy (correctness), 772 parity tests | 2026-11-03 (at `ad8cebe`; no Rust, Lean or manifest change after it) | passed |
+| Agent-run nested KVM with the release binary `garrett-bridge-read-only`: approved reads, denied write, revocation fenced, four identity negatives, out-of-scope read, guest TCP egress, disconnect/reconnect, 21 simulated-agent attacks, guest-root credential search (73,761 files) | 2026-11-03 (at `3f6cdd6`) | [current-head VM run](../../dev/validation/2026-11-03-local-vm-acceptance-head.json); the same checks with `garrett-bridge` passed at `6926047` ([record](../../dev/validation/2026-11-03-local-vm-acceptance.json)) |
 | Whole-process syscall witness | 2026-11-02 (at `a323e36`) | `dev/native_syscall_witness.py`; no credential bytes in any write-family syscall, only the provider as a destination |
 | Agent-run nested KVM: baseline, adversarial, proxy, constrained, simulated agent, guest-wide secret hunt | 2026-10-24 | [local VM run](../../dev/validation/2026-10-24-local-vm-acceptance.json) |
 | Maintainer-run real KVM, baseline and adversarial (OUT-2) | 2026-10-21 | [VM acceptance](../aivm-vm-native-acceptance.md) |
 | Maintainer-run live GitHub read-only (OUT-3) | 2026-10-21 | [live acceptance](../aivm-github-live-readonly-acceptance.md) |
 | Axiom audit (at the maintainer's request) | 2026-10-24 | [axiom-audit.md](axiom-audit.md) |
 
-The live and VM runs predate the 2026-11-02 transport refactor (`8aa0125`)
-and proof changes; the synthetic gate and the syscall witness were rerun
-after them.
+The maintainer-run live GitHub and VM runs predate the 2026-11-02 transport
+refactor (`8aa0125`); the agent-run KVM run, the synthetic gate and the
+syscall witness were rerun after it. The VM runs use synthetic credentials and
+a local synthetic provider; they are not an isolation proof.
 
 ## 7. Mutation evidence
 
@@ -141,14 +144,23 @@ change and rebuilds the proof modules; a mutant passes only if some proof
 fails. Labels starting `owned dispatch`, `provider driver`, `provider io`,
 `provider channel`, `trace origin` and `send log` target this claim. The
 native guards have bypass tests in `tests/test_secrets_w3_effect_boundary.py`.
-On 2026-11-02 the two `send log` mutants (a send repeated after the gate,
-an attempt marked without a send) were both rejected, first by
-`GarrettDispatch`, whose exact callback characterization the send-log
-proofs build on. The full campaign was not rerun. `proofs/garrett-manifest.json` was
+
+On 2026-11-03 every read-path mutant was run against the current core (the
+extracted crate is byte-identical from `d87aff0` to `3f6cdd6`): 100 mutants,
+**all rejected, none survived**. They are 73 for this claim (`send log`,
+`owned dispatch`/`completion`/`request`, `provider driver`/`native`/`current`/`io`/`channel`,
+`trace origin`, `current admission`, `request context`/`receipt`/`orchestration`/`invocation`/`prefix`,
+`read transition`), a new `send log` mutant that hands `begin_send` the
+other phase, and 26 for the wire, JSON and guest framing (`provider wire`,
+`json wire`, `json string`, `guest framing`). All three `send log` mutants are
+rejected first by `GarrettDispatch`, whose exact callback characterization the
+send-log and send-origin proofs build on, so they do not separately exercise
+`GarrettSendOrigin`. `proofs/garrett-manifest.json` was
 re-recorded on 2026-11-02 after an independent agent review of the changes
 since its last accurate record (`e741383`): fresh extraction equal to the
 committed model, every Lean module built, and 29 newer proof modules added
-to its coverage. Formatting is not a gate (rustfmt was removed from `garrett.py check`).
+to its coverage, and re-recorded again on 2026-11-03 to cover
+`GarrettSendOrigin` and `GarrettProductionSendOrigin`. Formatting is not a gate (rustfmt was removed from `garrett.py check`).
 
 ## 8. Known limits
 
@@ -171,7 +183,9 @@ to its coverage. Formatting is not a gate (rustfmt was removed from `garrett.py 
 # Proofs (warm: about 5 minutes; cold: longer)
 lake -d proofs build
 # Synthetic witnesses, native conformance runners and source guards
-python dev/verification/system.py --full-tests
+python dev/verification/system.py --proofs --full-tests
+# Real KVM read profile with the release binary (needs a managed AIVM VM)
+python dev/aivm_vm_acceptance.py --adversarial --agent --read-only-profile
 # Whole-process syscall witness (needs strace)
 python dev/native_syscall_witness.py
 # Mutants for this claim

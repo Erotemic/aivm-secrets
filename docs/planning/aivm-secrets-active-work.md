@@ -1,6 +1,7 @@
 # Plan: where we are and what comes next
 
-Updated 2026-11-02 at `c1320b3` (Phase 2 rows 2.4 and 2.5); otherwise as of
+Updated 2026-11-03 at `3f6cdd6` (Phase 2 rows 2.6 to 2.8); 2026-11-02 at
+`c1320b3` (rows 2.4 and 2.5); otherwise as of
 2026-10-24 at `0b9cc33`. This is the single ordered work queue.
 The [product roadmap](aivm-secrets-product-roadmap.md) defines the outcome
 gates (OUT-0 to OUT-6) and the [native read roadmap](aivm-secrets-native-read-assurance-roadmap.md)
@@ -61,6 +62,9 @@ This is the main proof gap (`NATIVE-SINK-01`, `ExactNativeSinkCoverage`).
 | 2.3 | Restate the premise as a contract | **Done 2026-10-24.** Ledger entry, roadmap row, claim matrix and proof tour now state the narrowed premise and its evidence |
 | 2.4 | One native provider transport | **Done 2026-11-02** (`8aa0125`). `custody/provider_stream.rs` is the only code that opens a provider TLS session; its `ProviderWriter` is the only type that can write to one, and the response parser gets a `ProviderReader` that cannot write. The account-status path uses the same module. W3 guard and bypass tests pin it |
 | 2.5 | Drop `ExactNativeSinkCoverage` from the production theorems | **Done 2026-11-02** (`47d705c`, `c1320b3`). `GarrettNativeSendLog` counts the sends a returned request asks its dispatch primitive for (ghost log, shown harmless by `GarrettDispatchErasure`) and proves the count equals the source sends; `production_request_sends_are_the_logged_sends` and the accepted-read and denial versions take no coverage premise |
+| 2.6 | Per-call correspondence, not only counts | **Done 2026-11-03** (`818975f`, `0d552cd`, `27cf3c9`). `GarrettSendOrigin` and `GarrettProductionSendOrigin`: a returned request is a chain of per-callback segments; each dispatch that sent has one call and one provider send of its own phase, gate-accepted, audit-acknowledged and bound, whose channel its own setup built for the request's route (over the production primitive: exactly the extracted encoder's bytes for that route and the session credential) |
+| 2.7 | Close the remaining native writer and revocation gaps in the read profile | **Done 2026-11-03** (`395f9eb`, `841013f`). An independent review of the `ProviderWriter` call surface found the OAuth refresh's second TLS connection; `profile::read_only` now refuses OAuth and the legacy registry-file identity (whose revocation does not fence an admitted request). The W3 guard counts every network, socket, process and raw-OS primitive per file in both native crates |
+| 2.8 | Current-head validation | **Done 2026-11-03 at `3f6cdd6`:** `system.py --proofs --full-tests` (167 Rust, 607 workflow, 3,507 full-suite), `garrett.py check` (every Lean module, 772 parity), 100 read-path mutants all rejected, and the agent-run KVM acceptance with `garrett-bridge-read-only` ([record](../../dev/validation/2026-11-03-local-vm-acceptance-head.json)). The maintainer-run live GitHub check still predates `8aa0125` |
 
 Step 2.2 is a test, not a proof, but it covers std, rustls and the OS, which
 source guards cannot reach. Together with 2.1, 2.4 and 2.5 it leaves a

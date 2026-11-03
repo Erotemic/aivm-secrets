@@ -259,6 +259,14 @@ looking for.
 python dev/aivm_vm_acceptance.py --vm aivm-2404 --adversarial --agent --workspace "$RUN"
 ```
 
+Add `--read-only-profile` to run the read profile's release binary,
+`garrett-bridge-read-only`, instead of `garrett-bridge`. It refuses any
+configuration outside the profile before it starts (authority-root identity,
+file credential, `writes = "deny"`, no OAuth or coordinator) and cannot be
+combined with `--write`. The report's `bridge_binary` names the binary that
+ran. An agent run of this mode passed on 2026-11-03 at `3f6cdd6`
+([record](../dev/validation/2026-11-03-local-vm-acceptance-head.json)).
+
 
 ## Approved write (`--write`)
 

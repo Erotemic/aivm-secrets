@@ -1,0 +1,149 @@
+{
+  "schema": 1,
+  "status": "passed-for-listed-scopes",
+  "recorded_at": "2026-11-03T13:37:13.636522-05:00",
+  "source_commit": "3f6cdd6",
+  "source_dirty": false,
+  "aivm_commit": "b1444d56876a1f5352c20288636c8e23ef673390",
+  "runner": "agent (Claude Opus 5.5), not the maintainer",
+  "environment": {
+    "host": "same nested-KVM host as 2026-10-24",
+    "vm": "aivm-2404 (existing, no secrets adapter)",
+    "native_binaries": "debug build of rust/ at the source commit (built by system.py --proofs --full-tests, which passed at the same commit)",
+    "credentials": "synthetic only; no live provider"
+  },
+  "command": "python dev/aivm_vm_acceptance.py --adversarial --agent --read-only-profile",
+  "purpose": "Final current-head read-profile OUT-2 acceptance with the release binary garrett-bridge-read-only, after the profile began requiring authority-root identity and refusing OAuth (841013f, 395f9eb) and after the per-call send proofs. Not an isolation proof; the live GitHub OUT-3 run still predates 8aa0125 (needs the maintainer's credential).",
+  "differences_from_2026_11_03_6926047": {
+    "bridge_binary": "garrett-bridge-read-only (the earlier run used garrett-bridge with a read config)",
+    "one_megabyte_of_garbage": "closed:BrokenPipeError (earlier answered:7, the bridge's 7-byte TLS alert); the bridge sent the alert and closed before the guest finished writing 1 MiB. Both are refusals; which one is observed is timing.",
+    "guest_credential_search.processes_scanned": "185 (earlier 189)"
+  },
+  "runs": {
+    "adversarial_agent_read_only_profile": {
+      "adversarial": {
+        "identities": {
+          "certificate_key_mismatch_rejected": true,
+          "other_enrolled_subject_rejected": true,
+          "reenrolled_certificate_rejected": true,
+          "tampered_capability_rejected": true
+        },
+        "lifecycle": {
+          "authorized_read_after_reconnect": true,
+          "no_provider_effect_with_forward_disconnected": true
+        },
+        "mounts": {
+          "aliased_mounts": 3,
+          "attachment_devices": 2,
+          "attachment_mounts_observed": 4,
+          "canary_search": {
+            "as_guest_root": true,
+            "complete": true,
+            "found": false,
+            "max_depth": 4,
+            "mount_points_searched": 4
+          },
+          "host_workspace_in_mount_table": false,
+          "scope": "mount table metadata, alias grouping and a depth-4 search for the host canary name; not an exhaustive reachability proof",
+          "whole_share_root_mounts": 4
+        },
+        "network": {
+          "direct_synthetic_provider_tcp_denied": true,
+          "host_gateway_canary_denied": true,
+          "scope": "guest gateway TCP: one ephemeral canary and the host-loopback provider port"
+        },
+        "out_of_scope_read_denied": true
+      },
+      "application_socket_forwarding": "ssh-remote-unix/mTLS",
+      "approved_diff": true,
+      "approved_view": {
+        "headRefOid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "number": 13861,
+        "title": "Proof repair"
+      },
+      "bridge_binary": "garrett-bridge-read-only",
+      "denied_write": true,
+      "filesystem_isolation_proved": false,
+      "guest_credential_search": {
+        "as_guest_root": true,
+        "files_scanned": 73761,
+        "found": false,
+        "patterns": 3,
+        "processes_scanned": 185,
+        "ran": true
+      },
+      "host_private_paths_unreadable_in_guest": true,
+      "mode": "native-rust/aivm-kvm/synthetic-local-https",
+      "ok": true,
+      "provider_requests": [
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github.diff",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        },
+        {
+          "accept": "application/vnd.github+json",
+          "credential_substituted": true,
+          "method": "GET",
+          "path": "/repos/taucetiproject/tauceti/pulls/13861"
+        }
+      ],
+      "revocation_fenced": true,
+      "simulated_agent": {
+        "attacks": {
+          "arguments_not_an_object": "refused",
+          "arguments_not_json": "refused",
+          "denied_write": "refused",
+          "encoded_slash_in_repository": "refused",
+          "extra_url_argument": "refused",
+          "header_injection_in_repository": "refused",
+          "missing_argument": "refused",
+          "one_megabyte_of_garbage": "closed:BrokenPipeError",
+          "other_pull_request": "refused",
+          "other_repository": "refused",
+          "oversized_argument": "refused",
+          "path_traversal_in_repository": "refused",
+          "plain_http_on_broker_socket": "answered:7",
+          "pr_as_path": "refused",
+          "pr_float": "refused",
+          "pr_huge": "refused",
+          "pr_negative": "refused",
+          "query_in_repository": "refused",
+          "tls_without_client_certificate": "refused:SSLError",
+          "unknown_operation": "refused",
+          "unlisted_write": "refused"
+        },
+        "useful_read": true,
+        "useful_read_after_attacks": true
+      },
+      "virtualization": "kvm",
+      "vm": "aivm-2404",
+      "whole_service_secrecy_proved": false
+    }
+  }
+}
