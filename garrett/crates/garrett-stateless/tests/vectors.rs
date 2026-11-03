@@ -125,8 +125,8 @@ fn every_vector() {
             "certificate" => {
                 let der = base64_decode(s(row, "der"));
                 let peer = PeerIdentity::from_der(&der).unwrap();
-                assert_eq!(peer.thumbprint, s(row, "thumbprint"));
-                assert_eq!(peer.subject, s(row, "subject"));
+                assert_eq!(peer.thumbprint.as_str(), s(row, "thumbprint"));
+                assert_eq!(peer.subject.as_str(), s(row, "subject"));
                 assert_eq!(peer.not_after, i(row, "not_after"));
             }
             "seal" => {

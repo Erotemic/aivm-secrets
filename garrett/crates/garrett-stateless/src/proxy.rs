@@ -21,6 +21,7 @@ use crate::broker::Clock;
 use crate::config::{Authentication as RouteAuthentication, Operations, ProxyConfig};
 use crate::error::{rejection_name, Error, Result};
 use crate::files::{read_private, read_public};
+use crate::ids::Thumbprint;
 use crate::json::{self, Value};
 use crate::keys::ProxyKeys;
 use crate::tls::{self, PeerIdentity};
@@ -291,7 +292,7 @@ fn text(bytes: &[u8]) -> Value {
 struct Session<'a> {
     proxy: &'a Proxy,
     stream: StreamOwned<ServerConnection, TcpStream>,
-    peer: String,
+    peer: Thumbprint,
     started: Instant,
     chunk: Vec<u8>,
     method: String,
@@ -304,7 +305,7 @@ impl Origin for Session<'_> {
     fn rejected(&mut self, rejection: &Rejection) {
         self.proxy.record(json::object([
             ("event", json::text("rejected")),
-            ("peer", json::text(&self.peer)),
+            ("peer", json::text(self.peer.as_str())),
             ("reason", json::text(rejection_name(rejection))),
         ]));
     }

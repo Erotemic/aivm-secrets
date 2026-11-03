@@ -9,6 +9,7 @@ use crate::encoding::{is_credential, is_scope, random_id};
 use crate::error::{rejection_name, Error, Result};
 use crate::files::{read_private, read_public};
 use crate::http::{self, Request};
+use crate::ids::TokenId;
 use crate::json::{self, Value};
 use crate::keys::BrokerKeys;
 use crate::login;
@@ -529,7 +530,10 @@ impl Broker {
         // drawn (or a claim cannot be encoded), the mailbox still finishes
         // the login, with no issuance: it ends `Uncertain` and nothing is
         // sealed.
-        let issuance = match (token::sealer(self.keys.active_entry(), &info), random_id()) {
+        let issuance = match (
+            token::sealer(self.keys.active_entry(), &info),
+            TokenId::random(),
+        ) {
             (Ok(sealer), Ok(token_id)) => Some(Issuance {
                 sealer,
                 token_id: token_id.into_bytes(),
@@ -589,7 +593,7 @@ impl Broker {
             .map_err(|r| Error::Rejected(rejection_name(&r)))?;
         let nonce = crate::encoding::random::<12>()?;
         let sealer = TokenSealer::new(self.keys.active_entry().core(), info, nonce.to_vec());
-        let token_id = random_id()?;
+        let token_id = TokenId::random()?;
         let issued = stateless::renew(
             &self.verification,
             sealer,
@@ -809,7 +813,7 @@ pub fn mint_with(
         certificate_expires: peer.not_after,
         credential_expires: MAX_TIME,
     };
-    let token_id = random_id()?;
+    let token_id = TokenId::random()?;
     let issued = stateless::issue(
         sealer,
         policy,

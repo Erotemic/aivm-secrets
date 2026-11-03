@@ -100,6 +100,15 @@ the per-execution ones for every reachable world. Behind them:
   computations, the effect trace, native network effects under the
   transport contract, cryptography, deployment) and documents each main
   theorem's protected outcome, attacker, source, trust and limit.
+- **Typed identifiers at the public boundary.** The application crate's
+  `ids` module gives the issuer, audience, subject, provider, token ID and
+  certificate thumbprint each their own type, made only by the core's
+  extracted grammar predicates; `Claims` converts to and from the core's
+  `SurrogateClaims` byte for byte. `PeerIdentity` carries a `Thumbprint`
+  and a `Subject`, and the broker draws token IDs as `TokenId`. Two
+  `compile_fail` doctests show a subject cannot stand for a thumbprint and
+  an unchecked string cannot become one. The core and its proofs are
+  unchanged.
 
 ## Validation
 
@@ -107,7 +116,7 @@ At the commit that recorded this table (see `git log`):
 
 | Check | Result |
 | --- | --- |
-| `cargo test` (core and application; also with `--features tpm`) | 63 pass (with two `compile_fail` doctests) |
+| `cargo test` (core and application; also with `--features tpm`) | 70 pass (with four `compile_fail` doctests) |
 | `python -m pytest` (including interop, replicas, operations, vectors, purity) | 139 pass |
 | `verification/extract.py check` | pass; the model has no `axiom` |
 | `lake build` (independent package) | pass (1822 jobs; cold, 354 s) |
@@ -117,17 +126,11 @@ At the commit that recorded this table (see `git log`):
 
 ## Next, in order
 
-1. **Typed identifiers at the public boundary.** `SurrogateClaims` and the
-   grant carry issuer, audience, subject, `jti`, provider and thumbprint as
-   interchangeable byte vectors. An ergonomic facade of validated newtypes
-   in the application crate, over the unchanged extracted core, so the
-   proofs keep their simple types. (The verified/admitted distinction is
-   already a core type, `Admitted`.)
-2. **Vocabulary.** The code and some proofs say "guest" for the agent's side
+1. **Vocabulary.** The code and some proofs say "guest" for the agent's side
    of the proxy (`guest_response`, `GuestReply`); `PROTOCOL.md` fixes the
    terms (agent, broker, proxy, provider). Rename identifiers only where a
    reader gains from it.
-3. **Independent review** of the specification, the five guarantees and
+2. **Independent review** of the specification, the five guarantees and
    their layers in `Garrett.lean`, in particular: whether `TransportFaithful`
    (prefix of an attempt per provider session) is the right native contract
    and `upstream.rs` meets it; whether `ChannelsAgree` and the
@@ -135,15 +138,15 @@ At the commit that recorded this table (see `git log`):
    the trusted shells (`STATELESS-NATIVE-01`); `STATELESS-CRYPTO-01`
    (IND-CPA, the random source, the rotation limit) and `STATELESS-OPS-01`.
    An agent cannot self-certify it.
-4. **Live provider compatibility (maintainer).** One real OAuth provider with
+3. **Live provider compatibility (maintainer).** One real OAuth provider with
    PKCE and a read-only call, outside tests and CI.
-5. **Hardware TPM (maintainer).** The swtpm test against a device TPM, with
+4. **Hardware TPM (maintainer).** The swtpm test against a device TPM, with
    provenance verified by the CA.
-6. **Provider-specific read-only catalogues** (narrows `STATELESS-OPS-01`).
-7. **Narrow the native contract further.** A syscall-level witness that
+5. **Provider-specific read-only catalogues** (narrows `STATELESS-OPS-01`).
+6. **Narrow the native contract further.** A syscall-level witness that
    the proxy's only provider writes are `upstream.rs`'s (today Rust module
    privacy plus a source guard); the broker's issuance compared over a whole
    login, as the proxy now is over a whole connection.
-8. **Later, separate increments:** OAuth without the mailbox (a protocol
+7. **Later, separate increments:** OAuth without the mailbox (a protocol
    change); further acquisition adapters; a multi-replica broker run; the
    release decision.

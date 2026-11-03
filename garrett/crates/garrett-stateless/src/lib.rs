@@ -47,6 +47,7 @@ pub mod encoding;
 pub mod error;
 pub mod files;
 pub mod http;
+pub mod ids;
 pub mod json;
 pub mod keys;
 pub mod login;

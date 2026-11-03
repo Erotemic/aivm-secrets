@@ -5,6 +5,7 @@
 //! can supply or change it.
 use crate::encoding::{is_text, thumbprint};
 use crate::error::{Error, Result};
+use crate::ids::{Subject, Thumbprint};
 use rustls::client::ResolvesClientCert;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use rustls::server::{NoServerSessionStorage, WebPkiClientVerifier};
@@ -137,9 +138,9 @@ pub fn upstream_client(ca: Option<&[u8]>) -> Result<Arc<ClientConfig>> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PeerIdentity {
     /// `x5t#S256` of the leaf certificate DER.
-    pub thumbprint: String,
+    pub thumbprint: Thumbprint,
     /// Spec section 6.2.
-    pub subject: String,
+    pub subject: Subject,
     /// The leaf's `notAfter`, Unix seconds.
     pub not_after: i64,
 }
@@ -160,9 +161,11 @@ impl PeerIdentity {
                 }
             }
         }
+        // Both always match their grammars; checking costs nothing and keeps
+        // the types honest.
         Ok(Self {
-            thumbprint: print,
-            subject,
+            thumbprint: Thumbprint::parse(&print).map_err(|_| tls("peer certificate"))?,
+            subject: Subject::parse(&subject).map_err(|_| tls("peer certificate"))?,
             not_after: cert.validity().not_after.timestamp(),
         })
     }
