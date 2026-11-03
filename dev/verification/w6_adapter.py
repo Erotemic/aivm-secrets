@@ -128,10 +128,14 @@ def check(root: Path = ROOT) -> dict[str, int | str]:
            and 'manifest::current(' in admission and 'self.work.recheck()' not in admission,
            'native provider bypasses the source-owned bound current check')
     runtime = source.split('#[cfg(test)]', 1)[0]
-    ensure(runtime.count('.write_all(') == 1 and 'self.0.write_all(bytes)' in ''.join(runtime.split())
+    # The provider session and its one write are provider_stream.rs's.
+    stream = (root / SOURCE).with_name('provider_stream.rs').read_text().split('#[cfg(test)]', 1)[0]
+    ensure(runtime.count('.write_all(') == 0 and runtime.count('TcpStream::connect_timeout(') == 0
+           and runtime.count('provider_stream::connect(') == 1
+           and stream.count('.write_all(') == 1 and 'self.0.write_all(bytes)' in ''.join(stream.split())
+           and stream.count('TcpStream::connect_timeout(') == 1
            and 'provider_exchange::exchange(pending, audited)' in dispatch_core
-           and 'self.work.send(channel)' in dispatch_core and '.begin_send(self.phase, &mut self.local, self.write)' in dispatch_core
-           and runtime.count('TcpStream::connect_timeout(') == 1,
+           and 'self.work.send(channel)' in dispatch_core and '.begin_send(self.phase, &mut self.local, self.write)' in dispatch_core,
            'native manifest adapter has another provider send')
     routed_wire = (root / CORE_ROUTE).read_text().split('#[cfg(test)]', 1)[0]
     setup = source.split('fn request_fields(&mut self)', 1)[1].split('fn manifest_response(', 1)[0]

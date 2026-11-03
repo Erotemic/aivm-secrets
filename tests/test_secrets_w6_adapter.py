@@ -17,7 +17,8 @@ def fixture_checkout(tmp_path):
     contract = json.loads((ROOT / CONTRACT).read_text())
     names = {CONTRACT, SOURCE, TESTS, CORE_ROUTE, CORE_ENCODER, CORE_DISPATCH, CORE_REQUEST, CORE_CURRENT, CORE_CONTEXT, CORE_IO, CORE_GATE, CORE_RELEASE, CORE_CHANNEL, CORE_STATUS, COMMON_ENCODER,
              'docs/planning/aivm-secrets-w0-boundaries.json',
-             'docs/planning/aivm-secrets-assumptions.json'}
+             'docs/planning/aivm-secrets-assumptions.json',
+             str(Path(SOURCE).with_name('provider_stream.rs'))}
     names.update(channel['path'] for channel in contract['channels'])
     names.update(channel.get('evidence_path', TESTS) for channel in contract['channels'])
     for name in names:
@@ -78,13 +79,16 @@ def test_w6_new_provider_send_or_public_raw_return_is_rejected(tmp_path):
     path = checkout / SOURCE
     original = path.read_text()
     # A second credential-bearing write from the native connection primitive.
-    marker = '        Ok((ProviderWriter(stream), deadline))'
-    assert original.count(marker) == 1
-    body = original.replace(marker,
-                            '        let mut stream = stream;\n        stream.write_all(b"bypass").map_err(|_| Error::UpstreamResponse)?;\n' + marker, 1)
-    path.write_text(body)
+    stream_path = checkout / Path(SOURCE).with_name('provider_stream.rs')
+    stream_original = stream_path.read_text()
+    marker = '    Ok((ProviderWriter(StreamOwned::new(conn, socket)), deadline))'
+    assert stream_original.count(marker) == 1
+    body = stream_original.replace(marker,
+                            '    let mut session = StreamOwned::new(conn, socket);\n    session.write_all(b"bypass").map_err(|_| Error::UpstreamResponse)?;\n    Ok((ProviderWriter(session), deadline))', 1)
+    stream_path.write_text(body)
     with pytest.raises(ContractError, match='another provider send'):
         check(checkout)
+    stream_path.write_text(stream_original)
     release = '                aivm_secrets_garrett_core::selected_release::select(&mut selection)\n'
     assert original.count(release) == 1
     path.write_text(original.replace(release, '                Ok(raw_wire(&raw))\n', 1))

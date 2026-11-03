@@ -396,7 +396,11 @@ def review_semantics(contents: dict[str, str]) -> None:
                            'return Err(StatusDenial::Partial);', 'Ok(())'),
             'unreviewed partial response release')
     runtime = m.split('#[cfg(test)]', 1)[0]
-    require(runtime.count('TcpStream::connect_timeout(') == 1 and runtime.count('.write_all(') == 1
+    # The provider socket is provider_stream.rs's (checked below): the manifest
+    # session opens none and writes none itself.
+    require(runtime.count('TcpStream::connect_timeout(') == 0 and runtime.count('write_all') == 0
+            and 'provider_io::Writer' not in runtime
+            and runtime.count('ClientConnection::new(') == 0 and runtime.count('StreamOwned::new(') == 0
             and runtime.count('channel.submit()') == 0
             and runtime.count('channel_work::Submitting::new(work, secret.expose())') == 1
             and runtime.count('request_adapter::Pending::new(work)') == 1
@@ -431,21 +435,57 @@ def review_semantics(contents: dict[str, str]) -> None:
                            '.begin_send(self.phase, &mut self.local, self.write)', 'self.work.send(channel)'),
             'provider/current/raw-write receipt gates detached from the source-owned controller')
     setup = part(runtime, 'fn request_fields(&mut self)', 'fn manifest_response(')
-    primitive = part(runtime, 'struct ProviderWriter', "struct ManifestDispatch<'a>")
+    stream_source = contents[RUST + 'custody/provider_stream.rs']
+    primitive = part(stream_source, 'pub(super) struct ProviderWriter', 'impl<W: Write> ProviderWriter<W> {')
     channel_work = contents['rust/crates/aivm-secrets-garrett-core/src/channel_work.rs'].split('#[cfg(test)]', 1)[0]
     sender = part(channel_work, 'fn send(&mut self, channel: &mut Self::Channel)', 'fn receive(')
+    opener = part(stream_source, 'pub(super) fn connect(', '// The standard Write contract')
     require(same_order(setup, 'manifest_fields(&self.effect, &self.headers)',
                        'fn wrap_body(', 'ManifestWire(Zeroizing::new(encoded))',
-                       'fn connect(', 'TcpStream::connect_timeout(',
-                       'while conn.is_handshaking()', 'StreamOwned::new(conn, socket)',
-                       'Ok((ProviderWriter(stream), deadline))')
+                       'fn connect(', 'provider_stream::connect(',
+                       'SocketAddr::new(self.executor.address, endpoint.port())')
+            and same_order(opener, 'TcpStream::connect_timeout(&address',
+                           'ServerName::try_from(host.to_owned())', 'ClientConnection::new(tls.clone(), name)',
+                           'while conn.is_handshaking()', 'Ok((ProviderWriter(StreamOwned::new(conn, socket)), deadline))')
             and same_order(part(channel_work, 'fn setup_route(', 'fn audit_route('),
                            'self.work.request_fields()', 'self.work.connect(&endpoint)',
                            'Ok(Channel::new(body, writer, meta))')
             and 'SocketAddr::new(self.executor.address, endpoint.port())' in setup
             and 'std::str::from_utf8(endpoint.host())' in setup
-            and 'u16::try_from(route.port)' not in setup and 'std::str::from_utf8(&route.host)' not in setup and 'ClientConnection::new(self.executor.tls.clone(), name)' in setup,
+            and 'u16::try_from(route.port)' not in setup and 'std::str::from_utf8(&route.host)' not in setup
+            and '&self.executor.tls,' in setup,
             'provider setup bypasses wire validation or host route / TLS identity')
+    # provider_stream.rs is the one native provider transport: one connect,
+    # one handshake, one write and one flush (the core Writer callbacks), a
+    # session field private to the module, and a reader that cannot write.
+    head, _, tests = stream_source.partition('#[cfg(test)]')
+    stream_code = head + (tests.split('\n}\n', 1)[1] if '\n}\n' in tests else '')
+    require(stream_code.count('TcpStream::connect_timeout(') == 1 and stream_code.count('ClientConnection::new(') == 1
+            and stream_code.count('.write_all(') == 1 and stream_code.count('.flush()') == 1
+            and '.write(' not in stream_code and '.write_vectored(' not in stream_code
+            and 'pub(super) struct ProviderWriter<W: Write = Session>(W);' in stream_code
+            and 'pub(super) struct ProviderReader<W = Session>(W);' in stream_code
+            and 'impl<W: Read> Read for ProviderReader<W>' in stream_code
+            and 'for ProviderReader' not in stream_code.replace('impl<W: Read> Read for ProviderReader<W>', '')
+            and stream_code.count('ProviderWriter(') == 1,
+            'provider_stream.rs gained a second connect, write or writable reader, or exposes its session')
+    require(stream_source.count('fn wrap(') == 1 and same_order(stream_source, '#[cfg(test)]', 'fn wrap(', 'fn inner('),
+            'the fake-stream constructor of ProviderWriter is compiled outside tests')
+    for name, source in contents.items():
+        if not name.startswith(RUST) or name == RUST + 'custody/provider_stream.rs':
+            continue
+        code = source.split('#[cfg(test)]', 1)[0]
+        if 'provider_stream::' in code or 'ProviderWriter' in code:
+            require(name in (RUST + 'custody.rs', RUST + 'custody/manifest_session.rs'),
+                    'provider transport used outside custody: ' + name)
+    require(m.count('provider_stream::connect(') == 1
+            and contents[RUST + 'custody.rs'].count('provider_stream::connect(') == 1,
+            'a provider session is opened outside ManifestProvider::connect and the account executor')
+    parser = part(runtime, "impl ManifestResponse<'_> {", 'fn manifest_response(')
+    require(same_order(parser, 'released.into_parts()', 'drop(request);', 'BufReader::new(writer.into_reader())')
+            and not any(word in parser for word in ('write_all', '.write(', 'write_vectored', 'flush', 'Write::',
+                                                    'provider_io::Writer')),
+            'the native response parser can write to the provider or keeps the request bytes')
     # A Write callback is a high-level std::io::Write::write_all invocation;
     # it can accept an arbitrary prefix or retry Interrupted internally. Both
     # returned write and flush errors must be visible to the extracted
@@ -526,7 +566,7 @@ def review_semantics(contents: dict[str, str]) -> None:
                            'struct ManifestResponse', 'fn parse(',
                            'released: aivm_secrets_garrett_core::response_gate::Released<',
                            'released.into_parts()',
-                           'manifest_response(BufReader::new(stream)')
+                           'manifest_response(', 'BufReader::new(writer.into_reader())')
             and same_order(contents['rust/crates/aivm-secrets-garrett-core/src/response_gate.rs'],
                            'pub struct Released', 'writer: W,', 'request: Request<B>,',
                            'metadata: M,', 'pub fn into_parts(self)',
@@ -537,7 +577,7 @@ def review_semantics(contents: dict[str, str]) -> None:
                         for t in ('pub writer: W,', 'pub request: Request<B>,', 'pub metadata: M,'))
             and '#[derive(Clone' not in contents['rust/crates/aivm-secrets-garrett-core/src/response_gate.rs']
             and contents['rust/crates/aivm-secrets-garrett-core/src/response_gate.rs'].split('#[cfg(test)]', 1)[0].count('Ok(Released {') == 1
-            and 'Ok((ProviderWriter(stream),deadline))' in ''.join(setup.split()),
+            and 'provider_stream::connect(' in setup,
             'captured native channel or successful-flush response gate bypassed')
     provider = contents['rust/crates/aivm-secrets-garrett-core/src/provider_exchange.rs'].split('#[cfg(test)]', 1)[0]
     require(same_order(provider, 'pub fn exchange<', 'ops.setup()', 'ops.recheck()',
@@ -619,7 +659,9 @@ def review_semantics(contents: dict[str, str]) -> None:
             and 'host: route.host.clone()' in account_wire
             and 'request.extend_from_slice(secret.expose())' not in account_wire
             and same_order(account_transport, 'let request = account_request_bytes(route, secret)?;',
-                           'TcpStream::connect_timeout(', 'emit_current(fresh, || {'),
+                           'provider_stream::connect(', 'emit_current(fresh, || {', 'writer.write_all(&request)?;',
+                           'writer.flush()', 'writer.into_reader()')
+            and account_transport.count('write_all') == 1,
             'account HTTP bypasses the complete encoder or validates after connection')
     account_control = part(c, 'pub(crate) fn control(', '\nfn use_error(')
     require(same_order(account_control, 'self.check_coordination()?;',

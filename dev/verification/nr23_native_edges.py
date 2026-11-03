@@ -14,6 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = 'rust/crates/aivm-secrets-garrett/src/custody/manifest_session.rs'
+PROVIDER_STREAM = 'rust/crates/aivm-secrets-garrett/src/custody/provider_stream.rs'
 CUSTODY = 'rust/crates/aivm-secrets-garrett/src/custody.rs'
 TLS = 'rust/crates/aivm-secrets-garrett/src/tls.rs'
 CORE = 'rust/crates/aivm-secrets-garrett-core/src/provider_io.rs'
@@ -41,9 +42,12 @@ EDGES = (
          'fn request_fields(&mut self)', '\n}\nfn manifest_response(',
          ('manifest_fields(&self.effect, &self.headers)',
           'fn wrap_body(', 'ManifestWire(Zeroizing::new(encoded))',
-          'fn connect(', 'TcpStream::connect_timeout(',
-          'ClientConnection::new(', 'while conn.is_handshaking()',
-          'StreamOwned::new(conn, socket)', 'Ok((ProviderWriter(stream), deadline))')),
+          'fn connect(', 'provider_stream::connect(',
+          'SocketAddr::new(self.executor.address, endpoint.port())')),
+    Edge(PROVIDER_STREAM, 'provider-session-authenticates-then-yields-writer',
+         'pub(super) fn connect(', '// The standard Write contract',
+         ('TcpStream::connect_timeout(', 'ClientConnection::new(tls.clone(), name)',
+          'while conn.is_handshaking()', 'Ok((ProviderWriter(StreamOwned::new(conn, socket)), deadline))')),
     Edge(CORE_CHANNEL, 'core-setup-encodes-then-connects',
          'fn setup_route(', 'fn audit_route(',
          ('self.work.request_fields()', 'encode(&mut encoded, route, parts, self.secret)',
@@ -60,9 +64,9 @@ EDGES = (
          'let keyed_write =', 'let session = &*self;',
          ('let work = ManifestProvider {',
           'aivm_secrets_garrett_core::channel_work::Submitting::new(work, secret.expose())')),
-    Edge(MANIFEST, 'writer-forwards-exact-byte-vector',
+    Edge(PROVIDER_STREAM, 'writer-forwards-exact-byte-vector',
          'impl<W: Write> aivm_secrets_garrett_core::provider_io::Writer for ProviderWriter<W>',
-         'struct ManifestDispatch<',
+         'impl<W: Write> ProviderWriter<W> {',
          ('fn write_all(&mut self, bytes: &Vec<u8>)',
           'self.0.write_all(bytes)', 'fn flush(&mut self)', 'self.0.flush()')),
     Edge(CORE_CHANNEL, 'core-receive-enters-extracted-response-gate',
@@ -80,7 +84,7 @@ EDGES = (
          'struct ManifestResponse',
          'fn manifest_response(',
          ('fn parse(', 'response_gate::Released<',
-          'released.into_parts()', 'manifest_response(BufReader::new(stream)',)),
+          'released.into_parts()', 'drop(request);', 'BufReader::new(writer.into_reader())',)),
     Edge(MANIFEST, 'audit-route-records-request-binding',
          'fn audit_route(&mut self, route:', 'fn request_fields(&mut self)',
          ('audit.append_value(&aivm_secrets_garrett_core::session_audit::dispatch_record(',
@@ -156,7 +160,7 @@ def scan(sources: dict[str, str]) -> list[str]:
 
 
 def read_sources(root: Path = ROOT) -> dict[str, str]:
-    return {name: (root / name).read_text() for name in (MANIFEST, CUSTODY, TLS, CORE, CORE_AUDIT, CORE_RESPONSE, CORE_CHANNEL)}
+    return {name: (root / name).read_text() for name in (MANIFEST, PROVIDER_STREAM, CUSTODY, TLS, CORE, CORE_AUDIT, CORE_RESPONSE, CORE_CHANNEL)}
 
 
 def main() -> int:

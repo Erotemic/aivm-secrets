@@ -14,16 +14,16 @@ use ring::{
     aead, digest,
     rand::{SecureRandom, SystemRandom},
 };
-use rustls::{ClientConfig, ClientConnection, RootCertStore, StreamOwned};
+use rustls::{ClientConfig, RootCertStore};
 use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
     fs::File,
     io::{BufRead, BufReader, Read, Write},
-    net::{IpAddr, SocketAddr, TcpStream},
+    net::{IpAddr, SocketAddr},
     path::Path,
     sync::{Arc, Mutex},
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::{Instant, SystemTime, UNIX_EPOCH},
 };
 use zeroize::Zeroizing;
 
@@ -497,37 +497,19 @@ impl Executor {
         let request = account_request_bytes(route, secret)?;
         let host = std::str::from_utf8(&route.host).map_err(|_| Error::InternalError)?;
         let port = u16::try_from(route.port).map_err(|_| Error::InternalError)?;
-        let mut socket = TcpStream::connect_timeout(
-            &SocketAddr::new(self.address, port),
-            Duration::from_secs(5),
-        )
-        .map_err(|_| Error::Unreachable)?;
-        socket
-            .set_read_timeout(Some(Duration::from_secs(15)))
-            .map_err(|_| Error::Unreachable)?;
-        socket
-            .set_write_timeout(Some(Duration::from_secs(15)))
-            .map_err(|_| Error::Unreachable)?;
-        let killer = socket.try_clone().map_err(|_| Error::Unreachable)?;
-        let _deadline = Deadline::start_for(Duration::from_secs(40), move || {
-            let _ = killer.shutdown(std::net::Shutdown::Both);
-        });
-        let name = rustls::pki_types::ServerName::try_from(host.to_owned())
-            .map_err(|_| Error::InternalError)?;
-        let mut conn =
-            ClientConnection::new(self.tls.clone(), name).map_err(|_| Error::InternalError)?;
-        while conn.is_handshaking() {
-            conn.complete_io(&mut socket)
-                .map_err(|_| Error::Unreachable)?;
-        }
-        let mut stream = StreamOwned::new(conn, socket);
+        let (mut writer, _deadline) = provider_stream::connect(
+            &self.tls,
+            SocketAddr::new(self.address, port),
+            host,
+            Error::InternalError,
+            Error::InternalError,
+        )?;
         emit_current(fresh, || {
-            stream
-                .write_all(&request)
-                .and_then(|_| stream.flush())
-                .map_err(|_| Error::UpstreamResponse)
+            use aivm_secrets_garrett_core::provider_io::Writer;
+            writer.write_all(&request)?;
+            writer.flush()
         })?;
-        let body = Zeroizing::new(response(BufReader::new(stream))?);
+        let body = Zeroizing::new(response(BufReader::new(writer.into_reader()))?);
         let value = json::parse(&body, MAX_BODY).map_err(|_| Error::UpstreamResponse)?;
         let id = value.get("id").ok_or(Error::UpstreamResponse)?;
         let id = json::integer(id, 0, i64::MAX).map_err(|_| Error::UpstreamResponse)?;
@@ -1404,6 +1386,8 @@ mod tests {
 
 pub(crate) mod approval;
 mod manifest_session;
+mod provider_stream;
+use provider_stream::ProviderWriter;
 enum Backend {
     Account(Box<AccountSession>),
     Manifest(Box<manifest_session::Session>),

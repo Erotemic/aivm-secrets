@@ -92,9 +92,11 @@ def check(root: Path = ROOT) -> dict:
             and 'current_context.current(&mut CurrentChecks' in fresh,
             'last-admission primitives detached from host state')
     scope = (root / 'rust/crates/aivm-secrets-garrett-core/src/request_context.rs').read_text().split('#[cfg(test)]', 1)[0]
-    primitive = source.split('struct ProviderWriter', 1)[1].split("struct ManifestDispatch<'a>", 1)[0]
+    stream = (root / RUST).with_name('provider_stream.rs').read_text()
+    primitive = stream.split('pub(super) struct ProviderWriter', 1)[1].split('impl<W: Write> ProviderWriter<W> {', 1)[0]
     channel_work = (root / 'rust/crates/aivm-secrets-garrett-core/src/channel_work.rs').read_text().split('#[cfg(test)]', 1)[0]
-    require('let stream = StreamOwned::new(conn, socket);' in source and
+    require('Ok((ProviderWriter(StreamOwned::new(conn, socket)), deadline))' in stream and
+            'provider_stream::connect(' in source and
             'match response_gate::receive(channel) {' in channel_work and
             'channel.submit()' in channel_work.split('fn receive(', 1)[0] and
             'self.0.write_all(bytes)' in ''.join(primitive.split()) and
