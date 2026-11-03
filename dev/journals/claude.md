@@ -1892,3 +1892,48 @@ Confidence: high that the theorems compile and say what their docstrings
 say; medium on whether a reviewer accepts the ghost-log formulation as the
 meaning of "send was called"; the native premise is still a guard-and-
 witness argument, not a proof.
+
+## 2026-11-03 13:38:46 -0500
+
+Claude Opus 5.5 (`claude-opus-5-5`; exact weights/config variant not
+available). Maintainer asked for: manifest fix with review, rustfmt not a
+gate, per-call route/payload correspondence instead of more count lemmas,
+deployment-specific revocation, exact security scope, and current-head
+validation they will evaluate directly.
+
+What changed:
+- `0b5c4ac`, `6926047`: garrett manifest re-recorded after an agent review;
+  rustfmt removed, clippy style/complexity/perf allowed (correctness and
+  suspicious lints still fail).
+- `395f9eb`, `841013f`: read-only profile refuses OAuth (its refresh opens a
+  second TLS connection outside `provider_stream.rs`) and legacy
+  registry-file identity (revocation does not fence an admitted request);
+  W3 counts network/process/OS primitives per file in both crates.
+- `d87aff0`: release doc, NR-5 claim and matrix state that denied/failed
+  outcomes may follow sends, "read" is the operation's declaration, and
+  revocation does not interrupt an admitted send.
+- `818975f`, `0d552cd`, `27cf3c9`, `1225a4d`: `GarrettSendOrigin` and
+  `GarrettProductionSendOrigin`. Each dispatch segment that sent has one
+  call and one send of its own phase, gate-accepted and bound, through a
+  channel its own setup built for the request's route; over the production
+  primitive that channel holds the extracted encoder's bytes.
+- `ad8cebe`, `3f6cdd6`, `f3ee2ff`: phase-swap send-log mutant, manifest
+  coverage, `--read-only-profile` for the KVM harness, validation record.
+
+Validation at `3f6cdd6`: system gate with proofs and full tests passed;
+`garrett.py check` passed; 100 read-path mutants rejected; KVM adversarial
+plus simulated agent passed with `garrett-bridge-read-only`.
+
+Uncertainties and risks:
+- The send-log mutants are all caught by `GarrettDispatch` before the new
+  theorems compile, so no mutant isolates `GarrettSendOrigin`; its value is
+  the stronger statement, not extra mutant kills.
+- The first system run was invalidated by my own mid-run commit (snapshot
+  check); rerun clean. The first KVM attempt lacked `aivm` on PATH.
+- The 1 MiB garbage attack flipped from a 7-byte TLS alert to a broken pipe;
+  I judge it a timing difference (both refusals), recorded in the record.
+- `NATIVE-SINK-01` is still a native premise; the live GitHub OUT-3 run and
+  the NR-5 human review remain the maintainer's.
+
+Confidence: high that the listed checks passed at the stated commits;
+moderate that the per-call theorem statement is the shape a reviewer wants.
