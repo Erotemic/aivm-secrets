@@ -1745,3 +1745,90 @@ are about the extracted code and compile); medium on whether
 `TransportFaithful` and the declassification boundary are the contracts a
 reviewer will accept — both need independent review, which an agent cannot
 self-certify.
+
+## 2026-11-02 20:32:59 -0500
+
+Agent: Claude Opus 5.5 (claude-opus-5-5; exact weights/config variant not
+exposed to me). Task: the pasted "Garrett Follow-up: Close the Remaining
+Product-Level Security Boundaries" brief, from `4eac6b5`. All work in
+`garrett/`, committed locally on `main`, nothing pushed. The maintainer said
+axiom audits are not wanted; I dropped the queued audit and saved that as a
+memory.
+
+What changed, in the brief's priority order:
+
+- **Attempt vs emission (2).** The log's `sent D w` became
+  `attempted D w written` (the writer's report). `Garrett.TransportFaithful`
+  is now a `Forall₂` between the log's attempts and the provider sessions
+  with application data: each session carries a prefix of the attempt's
+  bytes, all of them if the writer reported success. `ProviderWrite` is TLS
+  plaintext, explicitly not TCP bytes. `provider_writes_confined` now
+  concludes `ProviderBytesConfined` (prefix of an authorized request);
+  `seg_completed`/`CompletedAfterWholeWrite`/`completed_requests_emitted_whole`
+  say a completion follows only a write reported whole. Test: a real-TLS
+  provider that drops the connection after k bytes sees exactly a prefix of
+  the authorized request and the agent gets a 502.
+- **Narrower native boundary (3).** `upstream.rs`: `Authenticated` (only from
+  `open`, after the handshake) and `Answering` (only from `transmit`, which
+  consumes the session and the `Egress`). One write per authenticated
+  session is now a type property. The guard pins the module, the agent
+  reply path and fresh nonces; 16 new bypass tests.
+- **Whole-connection confidentiality (4).** `connection_declassified`: a
+  relational lockstep proof over the existing `Runs`/`Stepped`
+  (`collect_loop_agree` by fixpoint induction, `exchange_agree`,
+  `serve_agree`, `logged_agree`, `stepped_agree`, `step_agree`,
+  `runs_agree`). Adaptive agent; hypothesis `ChannelsAgree` (network answers
+  independent of the credential bytes, which is the provider-answer
+  declassification); conclusion: same agent view, or equal up to the first
+  reflection refusal. `channels_agree_self` shows it is satisfiable.
+- **Mailbox failure (6 in the brief, 4 here).** `finish` takes
+  `Option<Issuance<S>>`; `None` ends the login `Uncertain` with
+  `MailboxError::Unavailable` and never runs `issued`. `refusing_sealer` is
+  gone. Mailbox proofs adapted (`finishedWith`).
+- **Verified vs admitted (7).** `Admitted { pub(crate) verified }`, made only
+  by `authenticate`; `SurrogateOpener::unseal` and `decrypt` take it.
+  Two `compile_fail` doctests show the shell can neither forge one nor
+  unseal a `Verified`. Operation authorization stays control flow (renewal
+  has no operation), proved by `decide_unpermitted`/`dispatch_permitted`.
+- **Nonces (5).** `GarrettNonce.repeated_le`/`nonce_collision_bound` (a
+  counting union bound, Mathlib); `STATELESS-CRYPTO-01` now separates
+  single use, the random source, the collision probability and the 2^32
+  rotation limit (moved to `STATELESS-DEPLOY-01` as an operator duty).
+- **Interface (8).** `Garrett.lean` has a one-paragraph claim in the brief's
+  defensible wording, a five-layer table, and protects/attacker/source/
+  trust/limit notes on the main theorems.
+
+Mutants: failed write treated as delivered (rejected by
+`GarrettStatelessConnection`), connection closes on a credential bit
+(rejected by `GarrettStatelessConnection` — I first claimed only the new
+theorem would catch it; `connection_step_paths` fixes each step's `open`
+exactly, so I corrected the mapping and the comment), exchange without an
+issuance left exchanging (`GarrettStatelessMailbox`). The admission-bypass
+mutant had to change: with `Admitted`, the old bypass no longer compiles,
+so the mutant now forges an `Admitted` inside the crate.
+
+Decisions and tradeoffs:
+
+- `TransportFaithful` keeps the ok→whole clause so completions can be tied
+  to whole emissions; the security conclusion uses only the prefix clause.
+- `ChannelsAgree` is a strong but honest hypothesis: it is exactly the
+  statement that the provider's behaviour does not depend on the
+  credential. The theorem therefore shows Garrett adds no leak of its own;
+  it says nothing about a provider that leaks.
+- I did not try a typestate for operation authorization: renewal opens
+  surrogates without an operation, so `decrypt` cannot demand one.
+- The Lean predicate `Admitted` (claims admitted) and the new structure
+  `stateless.Admitted` share a name; the proofs use the qualified form.
+
+Confidence: high that the theorems compile and say what their docstrings
+say; medium on whether the native contract and `ChannelsAgree` are what an
+independent reviewer will accept; the syscall-level witness is still open.
+
+Validation at `d307b86`, in a separate-directory copy: cargo 63 (63 with
+`tpm`), pytest 139, build, shell guard (13 checks, 34 bypass tests),
+extraction check, cold `lake build` (354 s), all 54 mutants rejected
+(3953 s, `--jobs 10`). Two acceptance runs failed first, both on my side:
+a long `TMPDIR` in my scratchpad pushed swtpm's Unix socket path past 108
+bytes (use the default temp dir for `standalone.py`), and three mutants
+still named the renamed `verified`. `mutate.py` now rejects stale anchors
+before doing any work.
