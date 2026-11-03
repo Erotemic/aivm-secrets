@@ -101,9 +101,15 @@ approval store, that a sent write which fails is `outcome_unknown` and never
 retried, and that keyed writes reserve before and finish after the exchange
 (see the [proof tour](../assurance/native-read-proof-tour.md#out-4-first-increment-the-exact-write-gate-2026-10-23)).
 Still open: the live-repository run (maintainer), and remembering an
-uncertain write across sessions without a coordinator. Prove that an uncertain send is never retried
-automatically, carry `outcome_unknown` across sessions, and record
-Python/Rust parity for each write operation. Budgets stay unbounded in native
+uncertain write across sessions without a coordinator. **Recorded
+2026-11-02** in [write-path-parity.md](../assurance/write-path-parity.md):
+Python/Rust parity for each write contract with its tests and proofs, and
+why neither implementation retries a write by itself in a session or
+across sessions (a new session has no approvals; a keyed write's
+reservation is durable). What is missing is telling the operator, on a new
+approval, that an identical earlier write ended `outcome_unknown`; that is a
+change to the host approval interface, with three decisions listed there
+for the maintainer. Budgets stay unbounded in native
 until this phase decides otherwise.
 
 ## Phase 6: proxy profiles (OUT-6)
