@@ -1431,6 +1431,16 @@ def mutate(pattern: str | None = None) -> None:
         (owned_dispatch, 'trace origin replaced stored current stamp', '        if !self.local.finish_check(stamp) {', '        let stored = match self.work.recheck() {\n            Ok(stored) => stored,\n            Err(error) => return Err(error),\n        };\n        if !self.local.finish_check(stored) {'),
         (owned_dispatch, 'trace origin discarded failed send receipt', '        if !self\n            .effects\n            .begin_send(self.phase, &mut self.local, self.write)\n        {\n            return Err(W::INVALID_TRANSITION);\n        }\n        self.work.send(channel)', '        let before = self.effects;\n        if !self\n            .effects\n            .begin_send(self.phase, &mut self.local, self.write)\n        {\n            return Err(W::INVALID_TRANSITION);\n        }\n        match self.work.send(channel) {\n            Ok(()) => Ok(()),\n            Err(error) => {\n                self.effects = before;\n                Err(error)\n            }\n        }'),
     ]
+    # Exact send accounting: the primitive's send runs once per marked
+    # attempt, never twice and never zero times. GarrettNativeSendLog states
+    # this for whole requests; GarrettDispatch, which it imports, already
+    # rejects both mutants (2026-11-02).
+    mutations += [
+        (owned_dispatch, 'send log dispatch sent twice after gate', '            return Err(W::INVALID_TRANSITION);\n        }\n        self.work.send(channel)\n    }\n    fn receive',
+         '            return Err(W::INVALID_TRANSITION);\n        }\n        let _ignored = self.work.send(channel);\n        self.work.send(channel)\n    }\n    fn receive'),
+        (owned_dispatch, 'send log dispatch marked an attempt without sending', '            return Err(W::INVALID_TRANSITION);\n        }\n        self.work.send(channel)\n    }\n    fn receive',
+         '            return Err(W::INVALID_TRANSITION);\n        }\n        let _unsent = channel;\n        Ok(())\n    }\n    fn receive'),
+    ]
     context = source.with_name("request_context.rs")
     mutations += [
         (context, 'request context dropped coordinated-write flag', 'keyed_write: plan.keyed_write,', 'keyed_write: false,'),
@@ -2426,7 +2436,7 @@ def mutate(pattern: str | None = None) -> None:
                 ]:
                     modules.remove(dependency)
                 modules[1:1] = ["GarrettLogin", "GarrettManifest", "GarrettDisclosure"]
-            if label.startswith(("trace origin ", "request context ", "provider io ", "provider channel ", "provider wire ", "json string ", "json wire ")):
+            if label.startswith(("send log ", "trace origin ", "request context ", "provider io ", "provider channel ", "provider wire ", "json string ", "json wire ")):
                 # Rebuild the actual local import closure against this mutant;
                 # cached proof objects are never substituted for dependencies.
                 closure: list[str] = []
@@ -2442,7 +2452,7 @@ def mutate(pattern: str | None = None) -> None:
                             visit(imported)
                     closure.append(module)
 
-                visit("GarrettJsonFrame" if label.startswith("json wire ") else "GarrettJsonString" if label.startswith("json string ") else "GarrettProviderWire" if label.startswith("provider wire ") else "GarrettProviderChannel" if label.startswith("provider channel ") else "GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
+                visit("GarrettNativeSendLog" if label.startswith("send log ") else "GarrettJsonFrame" if label.startswith("json wire ") else "GarrettJsonString" if label.startswith("json string ") else "GarrettProviderWire" if label.startswith("provider wire ") else "GarrettProviderChannel" if label.startswith("provider channel ") else "GarrettProviderIO" if label.startswith("provider io ") else "GarrettRequestContext" if label.startswith("request context ") else "GarrettDispatchTrace")
                 modules = closure + [module for module in modules if module not in seen]
             for module in modules:
                 proof = temporary / (module + ".lean")
