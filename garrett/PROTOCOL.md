@@ -65,7 +65,8 @@ ran (spec section 7.1).
    segments.
 
 `seal` consumes the `TokenSealer`, which carries the one fresh nonce for this
-seal; the application draws it at random (`token::sealer`). Nothing is sealed
+seal; the application draws it at random (`token::sealer`), which makes a
+repeat improbable, not impossible (`GarrettNonce`). Nothing is sealed
 if any check fails (`issue_invalid_never_seals`).
 
 Proved: `issue_trace`; `seal_token_ok` (the credential occurs in neither the
@@ -197,9 +198,13 @@ every pair of runs.
 ## What this does not show
 
 * **Trusted primitives**: Ed25519 and AES-256-GCM correctness, Ed25519
-  unforgeability, and **nonce uniqueness**, which the application ensures by
-  drawing each nonce at random and sealing once per sealer
-  (`STATELESS-CRYPTO-01`).
+  unforgeability, and that **nonces do not repeat** under a key. That is not
+  ensured, only made improbable: Rust ensures each sealer seals once, each
+  nonce is a fresh random draw (the random source is trusted), and a repeat
+  among `n` sealings under one key has probability at most
+  `n(n−1)/2 · 2^−96` (`GarrettNonce`). Replicas keep no nonce state, so
+  keeping each key below `2^32` sealings is the operator's key rotation
+  (`STATELESS-CRYPTO-01`, `STATELESS-DEPLOY-01`).
 * **TLS and the shells**: that the handshake's peer thumbprint is the one
   passed to the core, that `Origin::connect` reports only sessions that
   authenticated the destination and `Origin::transmit` writes, as TLS
