@@ -112,7 +112,7 @@ At the commit that recorded this table (see `git log`):
 | `verification/extract.py check` | pass; the model has no `axiom` |
 | `lake build` (independent package) | pass (1822 jobs; cold, 354 s) |
 | `verification/mutate.py` | all 54 rejected at `d307b86` (3953 s, `--jobs 10`, in the separate-directory copy): `GarrettStatelessProxy` 12, `GarrettStateless` 8, `GarrettStatelessMailbox` 7, `GarrettStatelessComposition` 6, `GarrettStatelessToken` 6, `GarrettStatelessConnection` 4, `GarrettStatelessGrammar` 4, `GarrettStatelessLogin` 4, `GarrettStatelessCodec` 1, `GarrettStatelessState` 1, `GarrettConfidentiality` 1 |
-| `verification/shell_guard.py check` | pass (13 checks; 38 bypass tests) |
+| `verification/shell_guard.py check` | pass (13 checks; 34 bypass tests) |
 | Separate-directory check (`verification/standalone.py`) | pass at `d307b86`: a copy of this directory alone, with a fresh virtual environment, Cargo target, toolchain bootstrap and cold Lake build, ran every row above; no source names the origin project outside the allowed history and provenance notes |
 
 ## Next, in order
