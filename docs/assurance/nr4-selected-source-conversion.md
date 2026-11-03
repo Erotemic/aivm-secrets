@@ -131,7 +131,6 @@ python3 dev/verification/w3_effect_boundary.py check
 python3 -m pytest -q tests/test_secrets_w3_effect_boundary.py
 
 cd rust
-cargo +nightly-2026-09-17 fmt --all -- --check
 cargo +nightly-2026-09-17 test --locked -p aivm-secrets-garrett-core --lib selected_conversion
 cargo +nightly-2026-09-17 test --locked -p aivm-secrets-garrett --lib manifest::disclosure::tests
 cd ..

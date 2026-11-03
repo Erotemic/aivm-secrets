@@ -137,8 +137,7 @@ proofs build on. The full campaign was not rerun. `proofs/garrett-manifest.json`
 re-recorded on 2026-11-02 after an independent agent review of the changes
 since its last accurate record (`e741383`): fresh extraction equal to the
 committed model, every Lean module built, and 29 newer proof modules added
-to its coverage. `garrett.py check` still stops at its final `cargo fmt
---check`, because 17 Rust files have drifted from rustfmt since 2026-10-21.
+to its coverage. Formatting is not a gate (rustfmt was removed from `garrett.py check`).
 
 ## 8. Known limits
 

@@ -719,7 +719,7 @@ pub fn forwarded(fields: &[Field]) -> Vec<Field> {
 /// A rule matches its exact path, the same path with a trailing slash, or,
 /// for a `/`-ending prefix, the prefix without its slash and everything
 /// under it.
-#[allow(clippy::len_zero)]
+// (A second `allow(clippy::len_zero)` here duplicated the one below.)
 /// An empty rule method matches any method.
 #[allow(clippy::len_zero)]
 pub fn method_ok(rule_method: &[u8], method: &[u8]) -> bool {
