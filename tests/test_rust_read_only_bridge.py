@@ -34,7 +34,8 @@ def start(tmp_path: Path, config: dict) -> subprocess.CompletedProcess:
                   'oauth': {'token_file': '/t'}}, id='oauth-source'),
 ])
 def test_a_configuration_outside_the_profile_never_starts(tmp_path, provider):
-    result = start(tmp_path, {'schema': 1, 'listen': str(tmp_path / 's'), 'provider': provider})
+    result = start(tmp_path, {'schema': 1, 'listen': str(tmp_path / 's'),
+                              'authority_root': str(tmp_path / 'a'), 'provider': provider})
     assert result.returncode == 1
     assert result.stderr.strip() == b'invalid_policy'
     assert not (tmp_path / 's').exists()
@@ -46,9 +47,19 @@ def test_legacy_forwarding_never_starts(tmp_path):
     assert result.returncode == 1 and result.stderr.strip() == b'invalid_policy'
 
 
+def test_legacy_registry_file_identity_never_starts(tmp_path):
+    """Registry-file mode reads a snapshot per request, so a request admitted
+    before a registry update could still send after it: not this profile."""
+    result = start(tmp_path, {'schema': 1, 'listen': str(tmp_path / 's'),
+                              'registry_path': str(tmp_path / 'r'),
+                              'provider': {'profile': 'manifest-https-v1', 'writes': 'deny'}})
+    assert result.returncode == 1 and result.stderr.strip() == b'invalid_policy'
+
+
 def test_the_read_profile_passes_the_gate(tmp_path):
     """An otherwise incomplete read configuration fails later, for another reason."""
     result = start(tmp_path, {'schema': 1, 'listen': str(tmp_path / 's'),
+                              'authority_root': str(tmp_path / 'a'),
                               'provider': {'profile': 'manifest-https-v1', 'writes': 'deny'}})
     assert result.returncode == 1
     assert result.stderr.strip() != b'invalid_policy'
