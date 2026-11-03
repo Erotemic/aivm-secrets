@@ -419,3 +419,29 @@ def test_request_invocation_review_guard_rejects_rebaselined_bypasses(tmp_path, 
     mutate(checkout, filename, before, after)
     with pytest.raises(ContractError, match='invocation'):
         check(checkout)
+
+
+# A second provider writer anywhere in the native crates must be reviewed,
+# even after its file's fingerprint is re-recorded.
+@pytest.mark.parametrize('filename,before,after', [
+    (RUST + 'json.rs', 'use ', 'use std::net::TcpStream as _Second;\nuse '),
+    (RUST + 'files.rs', 'use ', 'use rustls::ClientConnection as _Second;\nuse '),
+    (RUST + 'custody.rs', 'use ', 'use rustix::net as _raw_net;\nuse '),
+    (RUST + 'manifest.rs', 'use ', 'use std::net::UdpSocket as _Datagram;\nuse '),
+    (RUST + 'custody/manifest_session.rs', 'use ',
+     'fn _resolve() { let _ = std::net::ToSocketAddrs::to_socket_addrs("x:1"); }\nuse '),
+    (RUST + 'tls.rs', 'use ', 'use socket2 as _raw;\nuse '),
+    ('rust/crates/aivm-secrets-garrett-core/src/dispatch.rs', 'use ', 'use std::net::TcpStream as _Core;\nuse '),
+])
+def test_w3_rejects_unreviewed_network_or_os_primitive(tmp_path, filename, before, after):
+    repo = fake_checkout(tmp_path)
+    mutate(repo, filename, before, after)
+    with pytest.raises(ContractError, match='unreviewed network/process/OS primitive'):
+        check(repo)
+
+
+def test_w3_primitive_inventory_ignores_test_modules(tmp_path):
+    repo = fake_checkout(tmp_path)
+    mutate(repo, RUST + 'json.rs', 'use ',
+           '#[cfg(test)]\nmod probe {\n    fn f() { let _ = std::net::TcpStream::connect("x:1"); }\n}\nuse ')
+    assert check(repo)['effects'] == 15

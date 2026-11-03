@@ -28,6 +28,10 @@ def start(tmp_path: Path, config: dict) -> subprocess.CompletedProcess:
     pytest.param({'profile': 'account-status-v1', 'writes': 'deny'}, id='other-profile'),
     pytest.param({'profile': 'manifest-https-v1', 'writes': 'deny',
                   'coordination_file': '/c'}, id='coordinated'),
+    # Token refresh opens its own TLS connection to the token endpoint,
+    # outside the one provider transport the read proofs cover.
+    pytest.param({'profile': 'manifest-https-v1', 'writes': 'deny',
+                  'oauth': {'token_file': '/t'}}, id='oauth-source'),
 ])
 def test_a_configuration_outside_the_profile_never_starts(tmp_path, provider):
     result = start(tmp_path, {'schema': 1, 'listen': str(tmp_path / 's'), 'provider': provider})

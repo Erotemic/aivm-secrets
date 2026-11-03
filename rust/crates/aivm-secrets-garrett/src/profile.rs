@@ -2,8 +2,11 @@
 //! binary.
 //!
 //! The native read proofs cover one configuration: a provider session with
-//! `manifest-https-v1` and `writes = "deny"`, no cross-host coordination and
-//! no forwarding to a Python broker. The same source supports other
+//! `manifest-https-v1` and `writes = "deny"`, a file credential, no
+//! cross-host coordination and no forwarding to a Python broker. An OAuth
+//! source is refused: its token refresh opens its own TLS connection to the
+//! token endpoint (`oauth_vault`), outside the one provider transport the
+//! read proofs and `NATIVE-SINK-01` cover. The same source supports other
 //! configurations, so a release that claims only reads deploys
 //! `garrett-bridge-read-only`, which refuses any other
 //! configuration at startup instead of relying on the operator to pick the
@@ -24,6 +27,7 @@ pub fn read_only(config: &Value) -> Outcome<()> {
     if provider.get("profile").and_then(Value::as_str) != Some("manifest-https-v1")
         || provider.get("writes").and_then(Value::as_str) != Some("deny")
         || provider.contains_key("coordination_file")
+        || provider.contains_key("oauth")
     {
         return Err(Error::InvalidPolicy);
     }
@@ -49,6 +53,7 @@ mod tests {
             json!({"profile": "manifest-https-v1"}),
             json!({"profile": "account-status-v1", "writes": "deny"}),
             json!({"profile": "manifest-https-v1", "writes": "deny", "coordination_file": "/c"}),
+            json!({"profile": "manifest-https-v1", "writes": "deny", "oauth": {"token_file": "/t"}}),
         ] {
             assert!(read_only(&config(refused)).is_err());
         }

@@ -939,6 +939,93 @@ def review_semantics(contents: dict[str, str]) -> None:
             'coordinator reply lost bounded, deadline-protected transport shutdown')
 
 
+# Every network, socket, process and raw-OS primitive in the two native
+# crates' production code, counted per file. Test modules (`#[cfg(test)]`
+# items and `*/tests.rs`) are skipped. A new occurrence anywhere, including
+# a new file, fails until it is reviewed and added here; this is how a second
+# provider writer would be noticed. Roles: provider_stream.rs is the bridge's
+# only provider transport; tls.rs/bridge_main.rs/host_control.rs are the guest
+# listener, its Unix socket and the host control socket; client*.rs are the
+# guest client; oauth_vault/* is OAuth refresh and login (refused by the
+# read-only profile); coordination.rs, coordinator_authority/server.rs are
+# the optional coordinator (refused by the read-only profile); proxy_main.rs
+# is the separate garrett-proxy binary; tpm.rs is the client's TPM tool;
+# rustix in files.rs, custody*.rs, client_invoke.rs is file opening, locking
+# and owner checks; std::process in *_main.rs is the exit code.
+PRIMITIVE_TOKENS = (
+    'TcpStream', 'TcpListener', 'UdpSocket', 'UnixStream', 'UnixListener', 'UnixDatagram',
+    'ClientConnection', 'ServerConnection', 'StreamOwned', 'rustix::', 'libc::', 'nix::',
+    'socket2', 'Command::new', 'std::process', 'to_socket_addrs', 'lookup_host',
+)
+REVIEWED_PRIMITIVES = {
+    'authority_main.rs': {'std::process': 2},
+    'bridge_main.rs': {'UnixListener': 2, 'std::process': 1},
+    'client.rs': {'UnixStream': 2, 'ClientConnection': 2, 'StreamOwned': 2},
+    'client_invoke.rs': {'rustix::': 1},
+    'client_main.rs': {'std::process': 3},
+    'coordination.rs': {'TcpStream': 2, 'ClientConnection': 2, 'StreamOwned': 2, 'to_socket_addrs': 1},
+    'coordinator_authority/server.rs': {'TcpStream': 2, 'TcpListener': 3, 'ServerConnection': 2, 'StreamOwned': 2},
+    'coordinator_ctl_main.rs': {'std::process': 1},
+    'coordinator_main.rs': {'std::process': 1},
+    'custody.rs': {'rustix::': 4},
+    'custody/manifest_session.rs': {'rustix::': 1},
+    'custody/provider_stream.rs': {'TcpStream': 3, 'ClientConnection': 3, 'StreamOwned': 3},
+    'files.rs': {'rustix::': 32},
+    'host_control.rs': {'UnixStream': 3, 'UnixListener': 2, 'rustix::': 2},
+    'oauth_main.rs': {'std::process': 2},
+    'oauth_vault/login.rs': {'TcpStream': 2, 'TcpListener': 3},
+    'oauth_vault/transport.rs': {'TcpStream': 3, 'ClientConnection': 3, 'StreamOwned': 3, 'to_socket_addrs': 1},
+    'proxy_main.rs': {'TcpStream': 6, 'TcpListener': 2, 'ClientConnection': 2, 'ServerConnection': 3,
+                      'StreamOwned': 4, 'rustix::': 1, 'Command::new': 1, 'std::process': 11,
+                      'to_socket_addrs': 1},
+    'tls.rs': {'TcpStream': 1, 'UnixStream': 3, 'ServerConnection': 3, 'StreamOwned': 2},
+    'tpm.rs': {'rustix::': 1, 'Command::new': 1},
+}
+
+
+def without_tests(text: str) -> str:
+    """Drop each `#[cfg(test)]` item: up to its `;`, or its balanced braces."""
+    kept, index = [], 0
+    while True:
+        start = text.find('#[cfg(test)]', index)
+        if start < 0:
+            kept.append(text[index:])
+            return ''.join(kept)
+        kept.append(text[index:start])
+        after = start + len('#[cfg(test)]')
+        semi, brace = text.find(';', after), text.find('{', after)
+        if brace < 0 or 0 <= semi < brace:
+            index = semi + 1 if semi >= 0 else len(text)
+            continue
+        depth, position = 0, brace
+        while position < len(text):
+            if text[position] == '{':
+                depth += 1
+            elif text[position] == '}':
+                depth -= 1
+                if depth == 0:
+                    break
+            position += 1
+        index = position + 1
+
+
+def primitive_inventory(contents: dict[str, str]) -> None:
+    import re
+    crates = (RUST, 'rust/crates/aivm-secrets-garrett-core/src/')
+    for source, text in contents.items():
+        if not source.endswith('.rs') or not source.startswith(crates) or source.endswith('/tests.rs'):
+            continue
+        production = without_tests(text)
+        found = {}
+        for token in PRIMITIVE_TOKENS:
+            count = len(re.findall(r'\b' + re.escape(token), production))
+            if count:
+                found[token] = count
+        name = source[len(RUST):] if source.startswith(RUST) else source
+        require(found == REVIEWED_PRIMITIVES.get(name, {}),
+                f'unreviewed network/process/OS primitive use in {source}: {found}')
+
+
 def check(root: Path) -> dict:
     inventory = json.loads((root / INVENTORY_PATH).read_text())
     require(inventory.get('schema_version') == 1, 'unknown W3 inventory version')
@@ -974,6 +1061,7 @@ def check(root: Path) -> dict:
         require(effect.get('constructor') and effect.get('interpreter')
                 and effect.get('reachable_from'), 'missing W3 effect source chain')
     review_semantics(contents)
+    primitive_inventory(contents)
     return {'sources': len(fingerprints), 'effects': len(effects), 'scope': inventory['scope']}
 
 
