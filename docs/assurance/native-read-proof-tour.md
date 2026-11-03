@@ -73,9 +73,14 @@ production primitive is what `send` runs, once per call, on a fresh channel:
 `exchange_send_writes_route_body`). On the native side, one module,
 `custody/provider_stream.rs`, opens provider TLS sessions, and its
 `ProviderWriter` is the only type that can write to one. After the response
-gate the session becomes a `ProviderReader`, which cannot write, so the
-native response parser cannot reach the provider. The W3 guard pins this,
-with bypass tests. It is a reachability property of native code, checked by
+gate the native code turns the session into a `ProviderReader`, which has
+no write method, before parsing (a convention the W3 guard checks; the core
+hands back the writer type, and rustls may still send TLS control records
+while reading). W3 also counts every network, socket, process and raw-OS
+primitive per file in both native crates against a reviewed table, so a
+second provider writer anywhere fails it. The read-only binary refuses an
+OAuth source (its refresh opens its own TLS connection) and legacy
+registry-file identity (no revocation fencing). It is a reachability property of native code, checked by
 source guards and the syscall witness, not by Lean.
 
 **How small that premise is (2026-10-24, still current).** The native credential type

@@ -14,8 +14,9 @@ every premise is in the [assumption ledger](../planning/aivm-secrets-assumptions
 Draft of the scoped conditional statement that NR-5 would publish:
 
 > For the native `garrett-bridge-read-only` profile (`manifest-https-v1`,
-> `writes = deny`, no coordinator, no legacy forwarding, one sequential mTLS
-> guest session), every request a guest sends that returns has:
+> `writes = deny`, a file credential, identity from an authority root, no
+> coordinator, no legacy forwarding, one sequential mTLS guest session),
+> every request a guest sends that returns has:
 > (a) provider sends exactly matching the source trace's sends, each
 > after a current admission, an acknowledged host audit record and the send
 > gate, bound to the request's own identity, operation and route, carrying
@@ -30,7 +31,16 @@ Draft of the scoped conditional statement that NR-5 would publish:
 
 It does **not** claim: VM isolation, whole-service secrecy, delivery to the
 provider, TLS or OS correctness, timing side channels, writes, or anything
-about the proxy profiles.
+about the proxy profiles. Three scope points a reviewer should hold it to:
+
+- A denied or failed final outcome does not mean zero provider traffic: a
+  read may send a preflight and a final request, each after its own checks,
+  and a later step can still fail. (a) accounts for every such send.
+- A "read" is an operation the host manifest declares as one; its absence of
+  side effects is the provider API's semantics, not checked here.
+- Revocation does not interrupt an admitted send. In authority-root mode a
+  completed revocation has drained every earlier admission; the legacy
+  registry-file mode, which lacks that fencing, is refused by the profile.
 
 ## 2. Reading order
 

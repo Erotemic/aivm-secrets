@@ -12,7 +12,14 @@ The claims, and the evidence and assumptions behind each, are in the
 - Native Rust broker (`garrett-bridge`) in provider mode with profile
   `manifest-https-v1` and `writes = "deny"`.
 - One guest identity per session, enrolled with `garrett-authority`, talking
-  [protocol v1](protocol-v1.md) over mTLS on a forwarded Unix socket.
+  [protocol v1](protocol-v1.md) over mTLS on a forwarded Unix socket. The
+  bridge reads identity from the authority root (`authority_root`), never
+  from a legacy registry file: there a completed revocation waits for every
+  use admitted before it, so nothing admitted earlier sends afterwards. In
+  registry-file mode a request admitted before a registry update can still
+  send after it, so that mode is outside this profile.
+- A provider credential from a file. An OAuth source is outside the profile:
+  its token refresh opens its own connection to the token endpoint.
 - No forwarding to the Python broker, and no cross-host coordinator.
 
 The `garrett-bridge-read-only` binary enforces this at startup: it refuses
@@ -133,6 +140,25 @@ audited, and the grant is refused for every later request
   the read once you understand why. The broker never retries automatically.
 
 ## What this release does not claim
+
+What "read-only" and "denied" mean here, exactly:
+
+- **A denied or failed request may still have contacted the provider.** A
+  request is checked before each credential-bearing send, and a read may
+  make two (an optional preflight, then the final read). If a later step
+  fails (a refused final plan, a late revocation, a provider error, a
+  reflection or size refusal), the guest gets a denial frame, but sends
+  already admitted have happened. The proofs account for every such send;
+  they do not promise zero provider traffic for a denied outcome.
+- **"Read" is the operation's declaration, not a provider guarantee.** The
+  bridge sends only operations the host manifest declares as reads, with
+  `writes = "deny"`. That those provider requests have no side effects is
+  the provider API's semantics (and the policy author's choice of
+  operations), not something this release checks.
+- **Revocation does not interrupt a send already admitted.** In
+  authority-root mode a revocation completes only after the uses admitted
+  before it have drained, so once `garrett-authority revoke` returns, no
+  earlier-admitted request sends again and every later admission fails.
 
 It claims no writes; those are OUT-4, with their own proofs and tests. It
 does not claim protection against a compromised host, the kernel or VM
