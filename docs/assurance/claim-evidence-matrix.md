@@ -9,6 +9,9 @@ or reject every row. Assumption IDs refer to the
 [ledger](../planning/aivm-secrets-assumptions.json) and its
 [removal roadmap](../planning/aivm-secrets-assumption-roadmap.md).
 
+The [NR-5 review package](nr5-review-package.md) indexes this matrix with
+the reading order, recorded runs and a decision sheet.
+
 Each row names the claim, the checked theorem(s), the external premises it
 still needs, the runtime witnesses, and what remains excluded.
 

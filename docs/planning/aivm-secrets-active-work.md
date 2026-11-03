@@ -76,7 +76,7 @@ core asks it to.
 | 3.2 | Make renounce end the grant through the state the request path checks (`CONTROL-NATIVE-01`) | **Done 2026-10-24.** The extracted `control` marks the grant inactive itself; `renounced_grant_refuses_every_use` |
 | 3.3 | Fold `GuestFrame::from_answer`'s type mapping into extracted code (`NATIVE-GLUE-01`) | **Done 2026-10-24 (assessment).** Nothing left to fold: the error conversion is the identity (now written as such), and the reply capture is serde-to-wire, which belongs to `RUST-JSON-01` |
 | 3.4 | Comparative axiom audit, run once at the maintainer's request, against a recorded baseline | **Done 2026-10-24.** [axiom-audit.md](../assurance/axiom-audit.md): 1,444 theorems (rerun after the history models) rest only on Lean's three standard axioms; one `bv_decide` proof that trusted the native evaluator was replaced with a kernel proof. `dev/verification/axiom_audit.py run` compares against the recorded baseline |
-| 3.5 | NR-5 review package: claim matrix, proof tour and assumption ledger reviewed together by someone other than the author | Open |
+| 3.5 | NR-5 review package: claim matrix, proof tour and assumption ledger reviewed together by someone other than the author | **Package assembled 2026-11-02:** [nr5-review-package.md](../assurance/nr5-review-package.md) (claim, reading order, theorems, native boundary, premises, recorded runs, mutants, limits, decision sheet). The review itself needs a person other than the author |
 
 ## Phase 4: a read-only release profile (OUT-5, reads only)
 
