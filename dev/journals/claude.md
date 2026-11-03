@@ -1832,3 +1832,63 @@ a long `TMPDIR` in my scratchpad pushed swtpm's Unix socket path past 108
 bytes (use the default temp dir for `standalone.py`), and three mutants
 still named the renamed `verified`. `mutate.py` now rejects stale anchors
 before doing any work.
+
+## 2026-11-02 22:59:07 -0500
+
+Agent: Claude Opus 5.5 (claude-opus-5-5; exact weights/config variant not
+exposed to me). Task: the 2026-11-02 review's recommendations, taken "to
+the end" as far as this VM allows: narrow `ExactNativeSinkCoverage`, the
+NR-5 package, Garrett typed identifiers, write assurance. Local commits on
+`main`, nothing pushed.
+
+What changed:
+
+- **Native transport (`8aa0125`).** `custody/provider_stream.rs` is the only
+  provider TLS connect and writer; the parser gets a read-only session.
+- **Lean (`47d705c`, `c1320b3`).** `GarrettNativeSendLog` counts, with a
+  ghost log beside the dispatch primitive, the channels the extracted
+  dispatch passes to `send`: exactly as many as phases newly marked
+  attempted (`dispatch_grew`), so per request as many as source sends
+  (`run_calls`, `calls_match_sends`; completion keeps both dispatch records,
+  `complete_records`). `GarrettDispatchErasure` proves the controller,
+  generic in its primitive, commutes with forward simulation, so the ghost
+  log changes no result (`dispatch_forward`). Three production theorems now
+  drop `ExactNativeSinkCoverage`; the native premise left is "every
+  credential-bearing write is one `ProviderWriter::write_all` made by
+  `Channel::submit`".
+- **Docs (`b8a435e`, `a323e36`, `c94c8b0`).** Ledger, tour, matrix, roadmap,
+  queue; a write-path parity record; the NR-5 review package.
+- **Mutants (`5cbf54e`).** Two `send log` mutants, both rejected — but by
+  `GarrettDispatch`, which the new module imports, not by the new theorem
+  itself. The new theorem cannot be the first to reject a dispatch.rs
+  mutant, since it depends on that module.
+- **Garrett (`29b0373`).** Typed identifiers in the application crate,
+  validated by the core's extracted grammar; core and proofs unchanged.
+
+Decisions and tradeoffs:
+
+- I counted sends with a ghost log and proved erasure rather than assuming
+  a native observation; the alternative (counting by the report's provider
+  stage) needed the same walk and a weaker link to "send was called".
+- The new production theorems label native sends with source events in
+  order. The labels are derived, so the content is the count (and that
+  each send came after an accepted gate), stated as such in the docs.
+- I did not change the host approval interface for cross-session
+  uncertain writes. Neither implementation retries by itself; telling the
+  operator about an earlier uncertain identical write needs three
+  interface decisions, written down for the maintainer.
+- I did not re-record `proofs/garrett-manifest.json`. It has been stale
+  since before this session (69 changed, 53 missing), so `garrett.py
+  check` fails in CI; refreshing provenance blindly would hide what needs
+  review. Flagged in the NR-5 package.
+
+Validation: full `lake build` (1908 jobs); `system.py --full-tests` passed
+(167 Rust, 607 workflow, 3,496 full-suite); syscall witness ok; Garrett
+cargo 70 (also `tpm`), pytest 139, shell guard pass. Not rerun: Garrett's
+standalone copy check and full mutant campaigns; VM and live runs predate
+the transport refactor.
+
+Confidence: high that the theorems compile and say what their docstrings
+say; medium on whether a reviewer accepts the ghost-log formulation as the
+meaning of "send was called"; the native premise is still a guard-and-
+witness argument, not a proof.
